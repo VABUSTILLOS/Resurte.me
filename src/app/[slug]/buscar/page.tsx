@@ -41,6 +41,11 @@ export default async function SearchPage({ params }: Props) {
 
   const supabase = await createClient()
 
+  const { data: categories } = await supabase
+    .from("categories")
+    .select("id, name, slug, icon, parent_id")
+    .order("id")
+
   const { data: products } = await supabase
     .from("products")
     .select(`
@@ -53,7 +58,7 @@ export default async function SearchPage({ params }: Props) {
 
   return (
     <Suspense fallback={<div className="p-8 text-center text-[#999893]">Cargando...</div>}>
-      <SearchPageClient citySlug={slug} cityName={city.name} products={products ?? []} />
+      <SearchPageClient citySlug={slug} cityName={city.name} products={products ?? []} categories={categories ?? []} />
     </Suspense>
   )
 }

@@ -201,25 +201,6 @@ export function CityLanding({
         </div>
       </section>
 
-      {/* "Ver todos los productos" banner — Erewhon-style */}
-      <section className="bg-[#f7f4ef] py-6 border-b border-[#ede8df]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <span className="text-sm text-[#6b6b6b] font-medium">
-              Explora nuestro catálogo completo para tu negocio
-            </span>
-            <Link
-              href={`/${currentCity?.slug || DEFAULT_CITY_SLUG}/buscar`}
-              className="btn-pill btn-pill-primary inline-flex items-center gap-2"
-            >
-              <Grid3X3 className="w-4 h-4" />
-              Ver todos los productos
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* Search bar for products */}
       <section className="bg-white py-8 border-b border-[#E8E9EB]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -280,6 +261,20 @@ export function CityLanding({
               )
             })}
           </div>
+        </div>
+      </section>
+
+      {/* "Ver todos los productos" button — Erewhon-style, below category icons */}
+      <section className="bg-[#f7f4ef] py-6 border-b border-[#ede8df]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
+          <Link
+            href={`/${currentCity?.slug || DEFAULT_CITY_SLUG}/buscar`}
+            className="btn-pill btn-pill-primary inline-flex items-center gap-2 text-base px-8 py-3"
+          >
+            <Grid3X3 className="w-5 h-5" />
+            Ver todos los productos
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </section>
 
