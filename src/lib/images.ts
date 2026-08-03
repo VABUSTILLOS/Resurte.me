@@ -1,19 +1,18 @@
-// Product images — from resurte.me Google Cloud Storage (real store images)
-// or Wikimedia Commons public-domain images as fallback
-// Banners use Wikimedia Commons public-domain images only
+// Product images — all from resurte.me Google Cloud Storage (real store images)
+// Hero uses a verified Wikimedia Commons public-domain image
 
-// HERO & BANNERS
-export const HERO_GROCERY = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Vegetables_in_a_supermarket_cart.jpg/1280px-Vegetables_in_a_supermarket_cart.jpg"
-export const HERO_FRUITS = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Culinary_fruits_front_view.jpg/1280px-Culinary_fruits_front_view.jpg"
+// HERO
+export const HERO_GROCERY = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Shopping_cart_in_supermarket_-_Tokyo_area_Japan_-_Nov_24_2018.jpeg/1280px-Shopping_cart_in_supermarket_-_Tokyo_area_Japan_-_Nov_24_2018.jpeg"
+export const HERO_FRUITS = "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png"
 
 // FRUITS — real store images
 export const IMG_APPLE = "https://storage.googleapis.com/takeapp/media/cmihojint000k04if2qg48em7.png"
 export const IMG_ORANGE = "https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png"
 export const IMG_BANANA = "https://storage.googleapis.com/takeapp/media/cmikzez7l000004lgdmi10rlc.png"
 export const IMG_GRAPES = "https://storage.googleapis.com/takeapp/media/cmikmw51n000304jz0r6shapj.png"
-export const IMG_STRAWBERRY = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Strawberries_in_basket.jpg/640px-Strawberries_in_basket.jpg"
+export const IMG_STRAWBERRY = "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png"
 export const IMG_PAPAYA = "https://storage.googleapis.com/takeapp/media/cmijostxx001o04jv3tl8b2v9.png"
-export const IMG_MANGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Mangoes_whole_and_sliced.jpg/640px-Mangoes_whole_and_sliced.jpg"
+export const IMG_MANGO = "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png"
 export const IMG_WATERMELON = "https://storage.googleapis.com/takeapp/media/cmijq38em001604l7hja83595.png"
 
 // VEGETABLES — real store images
@@ -26,41 +25,41 @@ export const IMG_POTATO = "https://storage.googleapis.com/takeapp/media/cmijn2j9
 export const IMG_LETTUCE = "https://storage.googleapis.com/takeapp/media/cmihnwkxg000204lg9ujody7q.png"
 export const IMG_CILANTRO = "https://storage.googleapis.com/takeapp/media/cmikw8rii000104l7e1vfbfw3.png"
 
-// MEATS & PROTEIN — Wikimedia Commons fallback (not in store catalog)
-export const IMG_CHICKEN_BREAST = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Butcher_shop_display.jpg/640px-Butcher_shop_display.jpg"
-export const IMG_BEEF_STEAK = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Butcher_shop_display.jpg/640px-Butcher_shop_display.jpg"
-export const IMG_PORK = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Butcher_shop_display.jpg/640px-Butcher_shop_display.jpg"
-export const IMG_FISH = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Butcher_shop_display.jpg/640px-Butcher_shop_display.jpg"
-export const IMG_GROUND_BEEF = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Butcher_shop_display.jpg/640px-Butcher_shop_display.jpg"
-export const IMG_EGGS = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Dairy_products.jpg/640px-Dairy_products.jpg"
+// MEATS & PROTEIN — store fallback (no carnes catalog yet)
+export const IMG_CHICKEN_BREAST = "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png"
+export const IMG_BEEF_STEAK = "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png"
+export const IMG_PORK = "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png"
+export const IMG_FISH = "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png"
+export const IMG_GROUND_BEEF = "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png"
+export const IMG_EGGS = "https://storage.googleapis.com/takeapp/media/cmidk59fi00000imqacaggoal.webp"
 
-// DAIRY — Wikimedia Commons fallback
-export const IMG_MILK = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Dairy_products.jpg/640px-Dairy_products.jpg"
-export const IMG_CHEESE = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Dairy_products.jpg/640px-Dairy_products.jpg"
-export const IMG_YOGURT = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Dairy_products.jpg/640px-Dairy_products.jpg"
-export const IMG_BUTTER = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Butter_on_a_plate.jpg/640px-Butter_on_a_plate.jpg"
+// DAIRY — real store images
+export const IMG_MILK = "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp"
+export const IMG_CHEESE = "https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp"
+export const IMG_YOGURT = "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp"
+export const IMG_BUTTER = "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp"
 
-// BAKERY & GRAINS — Wikimedia Commons fallback
-export const IMG_BREAD = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Bread_assortment.jpg/640px-Bread_assortment.jpg"
+// BAKERY & GRAINS — real store images
+export const IMG_BREAD = "https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp"
 export const IMG_TORTILLAS = "https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp"
-export const IMG_RICE = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Grocery_store_aisle.jpg/640px-Grocery_store_aisle.jpg"
-export const IMG_PASTA = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Grocery_store_aisle.jpg/640px-Grocery_store_aisle.jpg"
+export const IMG_RICE = "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png"
+export const IMG_PASTA = "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png"
 
-// BEVERAGES — Wikimedia Commons fallback
-export const IMG_COCA_COLA = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Soft_drinks_assortment.jpg/640px-Soft_drinks_assortment.jpg"
-export const IMG_WATER = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Soft_drinks_assortment.jpg/640px-Soft_drinks_assortment.jpg"
+// BEVERAGES — store fallback
+export const IMG_COCA_COLA = "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png"
+export const IMG_WATER = "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png"
 
-// PANTRY — Wikimedia Commons fallback
-export const IMG_OIL = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Grocery_store_aisle.jpg/640px-Grocery_store_aisle.jpg"
-export const IMG_BEANS = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Grocery_store_aisle.jpg/640px-Grocery_store_aisle.jpg"
+// PANTRY — store fallback
+export const IMG_OIL = "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png"
+export const IMG_BEANS = "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png"
 
-// STORE BANNERS (Wikimedia Commons public domain)
-export const STORE_BANNER_LA_COMER = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Supermarket_aisle.jpg/640px-Supermarket_aisle.jpg"
-export const STORE_BANNER_SORIANA = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Grocery_store_interior.jpg/640px-Grocery_store_interior.jpg"
-export const STORE_BANNER_WALMART = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Supermarket_shelves.jpg/640px-Supermarket_shelves.jpg"
-export const STORE_BANNER_CHEDRAUI = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Fruit_and_vegetable_display.jpg/640px-Fruit_and_vegetable_display.jpg"
-export const STORE_BANNER_FRESKO = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Modern_grocery_store.jpg/640px-Modern_grocery_store.jpg"
-export const STORE_BANNER_CITY_MARKET = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Fresh_produce_department.jpg/640px-Fresh_produce_department.jpg"
+// STORE BANNERS
+export const STORE_BANNER_LA_COMER = "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png"
+export const STORE_BANNER_SORIANA = "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png"
+export const STORE_BANNER_WALMART = "https://storage.googleapis.com/takeapp/media/cmihqyxja000b04l5h1s4euob.png"
+export const STORE_BANNER_CHEDRAUI = "https://storage.googleapis.com/takeapp/media/cmijq38em001604l7hja83595.png"
+export const STORE_BANNER_FRESKO = "https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png"
+export const STORE_BANNER_CITY_MARKET = "https://storage.googleapis.com/takeapp/media/cmikmw51n000304jz0r6shapj.png"
 
 // Product image map for easy lookup by product name
 export const PRODUCT_IMAGES: Record<string, string> = {

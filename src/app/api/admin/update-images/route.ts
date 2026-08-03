@@ -126,15 +126,15 @@ const MULTI_IMAGES: Record<number, string[]> = {
 
 // Category-based Wikimedia Commons fallbacks
 const CATEGORY_FALLBACKS: Record<string, string> = {
-  verduras: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Vegetables_Basket.jpg/640px-Vegetables_Basket.jpg",
-  abarrotes: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Grocery_store_aisle.jpg/640px-Grocery_store_aisle.jpg",
-  lacteos: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Dairy_products.jpg/640px-Dairy_products.jpg",
-  carnes: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Butcher_shop_display.jpg/640px-Butcher_shop_display.jpg",
-  panaderia: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Bread_assortment.jpg/640px-Bread_assortment.jpg",
-  bebidas: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Soft_drinks_assortment.jpg/640px-Soft_drinks_assortment.jpg",
-  botanas: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Chips_and_snacks.jpg/640px-Chips_and_snacks.jpg",
-  limpieza: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Cleaning_products.jpg/640px-Cleaning_products.jpg",
-  congelados: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Frozen_food_section.jpg/640px-Frozen_food_section.jpg",
+  verduras: "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
+  abarrotes: "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
+  lacteos: "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp",
+  carnes: "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png",
+  panaderia: "https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp",
+  bebidas: "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
+  botanas: "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
+  limpieza: "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
+  congelados: "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp",
 }
 
 function getCategory(pid: number): string {
