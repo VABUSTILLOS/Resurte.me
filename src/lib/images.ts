@@ -47,12 +47,12 @@ export const IMG_RICE = "/images/products/51.png"       // Arroz Blanco (Alsuper
 export const IMG_PASTA = "/images/products/64.png"      // Pasta Spaghetti (Alsuper)
 
 // BEVERAGES — Alsuper local images
-export const IMG_COCA_COLA = "/images/products/144.png" // Coca Cola 2L
+export const IMG_COCA_COLA = "https://storage.googleapis.com/takeapp/media/cmidk5hmj00000if2e2qc0ads.webp" // Coca Cola 2.5L (store)
 export const IMG_WATER = "/images/products/150.png"     // Agua Bonafont
 
 // PANTRY — Alsuper local images
 export const IMG_OIL = "/images/products/59.png"     // Aceite de Canola
-export const IMG_BEANS = "/images/products/53.png"   // Frijol Pinto
+export const IMG_BEANS = "/images/products/53.png"   // Frijol Negro
 
 // STORE BANNERS — using product images as store representations
 export const STORE_BANNER_LA_COMER = "/images/products/1.png"
@@ -64,37 +64,125 @@ export const STORE_BANNER_CITY_MARKET = "/images/products/10.png"
 
 // Product image map for easy lookup by product name
 export const PRODUCT_IMAGES: Record<string, string> = {
+  // Fruits & Vegetables (GCS store images)
   "Manzana Roja": IMG_APPLE,
   "Aguacate Hass": IMG_AVOCADO,
-  "Leche Entera Lala 1L": IMG_MILK,
-  "Pan Bimbo Blanco": IMG_BREAD,
-  "Pechuga de Pollo": IMG_CHICKEN_BREAST,
-  "Tortillas de Maíz": IMG_TORTILLAS,
-  "Coca-Cola 2.5L": IMG_COCA_COLA,
-  "Jitomate Saladet": IMG_TOMATO,
-  "Huevo Blanco 18pz": IMG_EGGS,
-  "Queso Oaxaca": IMG_CHEESE,
-  "Aceite de Canola 1L": IMG_OIL,
-  "Frijol Negro 1kg": IMG_BEANS,
   "Naranja Valencia": IMG_ORANGE,
   "Plátano Tabasco": IMG_BANANA,
   "Uvas Verdes": IMG_GRAPES,
-  "Fresa": IMG_STRAWBERRY,
-  "Papaya": IMG_PAPAYA,
-  "Mango Ataúlfo": IMG_MANGO,
+  "Papaya Maradol": IMG_PAPAYA,
   "Sandía": IMG_WATERMELON,
+  "Jitomate Saladet": IMG_TOMATO,
   "Brócoli": IMG_BROCCOLI,
   "Zanahoria": IMG_CARROT,
   "Cebolla Blanca": IMG_ONION,
   "Papa Blanca": IMG_POTATO,
   "Lechuga Romana": IMG_LETTUCE,
   "Cilantro": IMG_CILANTRO,
+  // Fruits & Vegetables (local images)
+  "Plátano Macho": "/images/products/7.png",
+  "Fresa": "/images/products/8.png",
+  "Mango Ataúlfo": "/images/products/10.png",
+  "Epazote": "/images/products/34.png",
+  "Hongo Portobello": "/images/products/49.png",
+  "Champiñón": "/images/products/50.png",
+  // Grains & Pantry (local images)
+  "Arroz Blanco 1kg": "/images/products/51.png",
+  "Arroz Blanco 5kg": "/images/products/52.png",
+  "Frijol Negro 1kg": "/images/products/53.png",
+  "Frijol Negro 5kg": "/images/products/54.png",
+  "Frijol Bayo 1kg": "/images/products/55.png",
+  "Frijol Peruano 1kg": "/images/products/56.png",
+  "Lenteja 1kg": "/images/products/57.png",
+  "Aceite de Canola 1L": "/images/products/59.png",
+  "Aceite de Canola 5L": "/images/products/60.png",
+  "Aceite de Maíz 1L": "/images/products/61.png",
+  "Pasta Spaghetti 500g": "/images/products/64.png",
+  "Harina de Trigo 1kg": "/images/products/68.png",
+  "Sal de Mar Fina 1kg": "/images/products/71.png",
+  "Sal Gruesa 1kg": "/images/products/72.png",
+  "Orégano Molido 100g": "/images/products/75.png",
+  "Salsa Maggi 200ml": "/images/products/77.png",
+  "Catsup 1kg": "/images/products/80.png",
+  "Mayonesa 1kg": "/images/products/81.png",
+  "Consomé de Pollo 1kg": "/images/products/83.png",
+  "Vinagre Blanco 1L": "/images/products/85.png",
+  // Dairy & Eggs (local images)
+  "Leche Descremada 1L": "/images/products/90.png",
+  "Leche Evaporada 360ml": "/images/products/91.png",
+  "Media Crema 240ml": "/images/products/92.png",
+  "Leche Condensada 370ml": "/images/products/93.png",
+  "Huevo Rojo 18pz": "/images/products/96.png",
+  "Queso Oaxaca 400g": "/images/products/97.png",
+  "Queso Fresco 500g": "/images/products/98.png",
+  "Queso Panela 400g": "/images/products/99.png",
+  "Queso Manchego 400g": "/images/products/100.png",
+  "Yogurt Natural 1L": "/images/products/102.png",
+  // Meats & Protein (local images)
+  "Pechuga de Pollo": "/images/products/105.png",
+  "Milanesa de Pollo": "/images/products/106.png",
+  "Pierna y Muslo de Pollo": "/images/products/107.png",
+  "Alitas de Pollo": "/images/products/108.png",
+  "Milanesa de Res": "/images/products/111.png",
+  "Carne Molida 80/20": "/images/products/112.png",
+  "Diezmillo de Res": "/images/products/113.png",
+  "Arrachera": "/images/products/116.png",
+  "Ribeye": "/images/products/117.png",
+  "T-Bone": "/images/products/118.png",
+  "Chuleta de Cerdo": "/images/products/119.png",
+  "Lomo de Cerdo": "/images/products/120.png",
+  "Costilla de Cerdo": "/images/products/121.png",
+  "Tocino": "/images/products/122.png",
+  "Jamón de Pierna": "/images/products/123.png",
+  "Chorizo": "/images/products/124.png",
+  // Seafood (local images)
+  "Filete de Tilapia": "/images/products/126.png",
+  "Filete de Basa": "/images/products/127.png",
+  "Camarón Pacotilla": "/images/products/128.png",
+  "Camarón U12-U15": "/images/products/129.png",
+  "Pulpo": "/images/products/130.png",
+  "Mojarra Entera": "/images/products/131.png",
+  "Huachinango Entero": "/images/products/132.png",
+  "Camarón Seco": "/images/products/133.png",
+  "Salmón": "/images/products/134.png",
+  // Bakery (local images)
+  "Pan para Hot Dog": "/images/products/137.png",
+  "Pan para Hamburguesa": "/images/products/138.png",
+  // Beverages (local images)
+  "Sprite 2L": "/images/products/147.png",
+  "Sidral Mundet 2L": "/images/products/149.png",
+  "Agua Bonafont 1.5L": "/images/products/150.png",
+  "Agua Mineral 1.5L": "/images/products/151.png",
+  "Agua Mineral Saborizada 1.5L": "/images/products/152.png",
+  // Beverages (GCS store images)
+  "Coca-Cola 2.5L": IMG_COCA_COLA,
+  // Snacks (local images)
+  "Sabritas Clásicas 170g": "/images/products/160.png",
+  "Cacahuate Salado 200g": "/images/products/162.png",
+  "Galletas Marías 200g": "/images/products/163.png",
+  "Galletas Saladas 200g": "/images/products/164.png",
+  // Cleaning (local images)
+  "Detergente Líquido 1L": "/images/products/169.png",
+  "Detergente en Polvo 1kg": "/images/products/170.png",
+  "Limpiador Multiusos 500ml": "/images/products/172.png",
+  "Limpiavidrios 500ml": "/images/products/173.png",
+  "Fibras para Trastes 3pz": "/images/products/175.png",
+  "Servilletas 100pz": "/images/products/177.png",
+  "Papel de Cocina 2pz": "/images/products/178.png",
+  // Frozen (local images)
+  "Helado Vainilla 1L": "/images/products/182.png",
+  "Paletas de Hielo 12pz": "/images/products/183.png",
+  "Filete de Tilapia Congelado 1kg": "/images/products/184.png",
+  "Camarón Congelado 1kg": "/images/products/185.png",
+  "Nuggets de Pollo 1kg": "/images/products/186.png",
+  // Legacy GCS/other references
+  "Leche Entera Lala 1L": IMG_MILK,
+  "Pan Bimbo Blanco": IMG_BREAD,
+  "Tortillas de Maíz": IMG_TORTILLAS,
+  "Huevo Blanco 18pz": IMG_EGGS,
+  "Papaya": IMG_PAPAYA,
   "Bistec de Res": IMG_BEEF_STEAK,
   "Carne Molida": IMG_GROUND_BEEF,
-  "Chuleta de Cerdo": IMG_PORK,
-  "Filete de Tilapia": IMG_FISH,
-  "Yogurt Natural 1L": IMG_YOGURT,
   "Arroz 1kg": IMG_RICE,
-  "Agua Bonafont 1.5L": IMG_WATER,
   "Pasta Spaghetti": IMG_PASTA,
 }
