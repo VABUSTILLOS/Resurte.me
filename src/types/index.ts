@@ -39,6 +39,7 @@ export interface Product {
   slug: string
   description: string
   image_url: string
+  images?: string[]
   brand: string
   category_id: number
   show_in_whatsapp: boolean

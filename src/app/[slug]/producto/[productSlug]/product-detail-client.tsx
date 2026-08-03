@@ -24,6 +24,9 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
   const { addItem } = useCart()
   const [added, setAdded] = useState(false)
   const [quantity, setQuantity] = useState(1)
+  const [selectedImage, setSelectedImage] = useState(0)
+
+  const allImages = product.images?.length ? product.images : [product.image_url]
 
   const storeData = product.product_stores[0]
   const displayPrice = storeData?.sale_price ?? storeData?.price ?? 0
@@ -93,12 +96,12 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
 
         {/* Product detail — split layout */}
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-16">
-          {/* Left: Product image */}
+          {/* Left: Product image gallery */}
           <div className="w-full lg:w-[55%]">
             <div className="aspect-[4/3] sm:aspect-square bg-[#F6F7F8] rounded-xl sm:rounded-2xl overflow-hidden relative border border-[#E8E9EB]">
-              {product.image_url ? (
+              {allImages[selectedImage] ? (
                 <img
-                  src={product.image_url}
+                  src={allImages[selectedImage]}
                   alt={product.name}
                   className="w-full h-full object-contain p-8"
                 />
@@ -127,6 +130,25 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
                 </div>
               )}
             </div>
+
+            {/* Thumbnail strip */}
+            {allImages.length > 1 && (
+              <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+                {allImages.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedImage(idx)}
+                    className={`flex-shrink-0 w-16 h-16 rounded-lg border-2 overflow-hidden bg-[#F6F7F8] transition-all ${
+                      idx === selectedImage
+                        ? "border-[#108910] ring-1 ring-[#108910]"
+                        : "border-[#E8E9EB] hover:border-[#108910]/40"
+                    }`}
+                  >
+                    <img src={img} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-contain p-1" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Right: Product info */}

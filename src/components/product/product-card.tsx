@@ -81,6 +81,13 @@ export function ProductCard({
           </div>
         )}
 
+        {/* Multi-image indicator */}
+        {product.images && product.images.length > 1 && (
+          <div className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] font-medium px-1.5 py-0.5 rounded">
+            +{product.images.length - 1}
+          </div>
+        )}
+
         {/* Discount badge — improved with percentage */}
         {hasDiscount && (
           <div className="absolute top-2 left-2 bg-[#DE3534] text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
