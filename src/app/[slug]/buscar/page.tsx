@@ -52,7 +52,7 @@ export default async function SearchPage({ params }: Props) {
     .order("name")
 
   return (
-    <Suspense fallback={<div className="p-8 text-center text-gray-400">Cargando...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-[#999893]">Cargando...</div>}>
       <SearchPageClient citySlug={slug} cityName={city.name} products={products ?? []} />
     </Suspense>
   )

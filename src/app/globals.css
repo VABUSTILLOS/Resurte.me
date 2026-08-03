@@ -19,6 +19,16 @@
   --color-brand-900: #063A06;
   --color-brand-950: #032203;
 
+  /* Erewhon-inspired cream palette */
+  --color-cream-50: #faf8f5;
+  --color-cream-100: #f0ede5;
+  --color-cream-200: #f7f4ef;
+  --color-cream-300: #e0dbd2;
+  --color-cream-400: #ede8df;
+  --color-cream-500: #f5f2ec;
+  --color-cream-600: #999893;
+  --color-cream-700: #6b6b6b;
+
   /* Cornershop-inspired electric green (for success states) */
   --color-cs-green-50: #E6FFEE;
   --color-cs-green-100: #B3FFCD;
@@ -46,8 +56,8 @@
 }
 
 :root {
-  --background: #F7F5F0;
-  --foreground: #343538;
+  --background: #faf8f5;
+  --foreground: #1a1a1a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -55,4 +65,173 @@
     --background: #191A1C;
     --foreground: #E8E9EB;
   }
+}
+
+/* ===================================================================
+   EREWHON DESIGN SYSTEM — Custom utilities & animations
+   =================================================================== */
+
+/* --- Glassmorphism header --- */
+.glass-header {
+  background: rgba(250, 248, 245, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(224, 219, 210, 0.5);
+}
+
+/* --- Scroll reveal base states --- */
+.reveal-hidden {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.7s cubic-bezier(0.22, 0.61, 0.36, 1),
+              transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-hidden-left {
+  opacity: 0;
+  transform: translateX(-24px);
+  transition: opacity 0.7s cubic-bezier(0.22, 0.61, 0.36, 1),
+              transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.reveal-visible-left {
+  opacity: 1;
+  transform: translateX(0);
+}
+.reveal-hidden-right {
+  opacity: 0;
+  transform: translateX(24px);
+  transition: opacity 0.7s cubic-bezier(0.22, 0.61, 0.36, 1),
+              transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.reveal-visible-right {
+  opacity: 1;
+  transform: translateX(0);
+}
+.reveal-hidden-scale {
+  opacity: 0;
+  transform: scale(0.94);
+  transition: opacity 0.65s cubic-bezier(0.22, 0.61, 0.36, 1),
+              transform 0.65s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.reveal-visible-scale {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* --- Image swap on hover (product cards) --- */
+.product-card-img-swap {
+  position: relative;
+  overflow: hidden;
+}
+.product-card-img-swap img:first-child {
+  transition: opacity 0.4s ease;
+}
+.product-card-img-swap img:last-child {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.product-card-img-swap:hover img:first-child {
+  opacity: 0;
+}
+.product-card-img-swap:hover img:last-child {
+  opacity: 1;
+}
+
+/* --- Quick-add button (fades up on hover like Erewhon) --- */
+.quick-add-btn {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.group:hover .quick-add-btn,
+.product-card:hover .quick-add-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* --- Smooth accordion (Erewhon-style) --- */
+.accordion-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.22, 0.61, 0.36, 1), padding 0.35s ease;
+}
+.accordion-body.open {
+  max-height: 500px;
+  padding-top: 0.75rem;
+  padding-bottom: 1rem;
+}
+.accordion-icon {
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+.accordion-header[aria-expanded="true"] .accordion-icon {
+  transform: rotate(45deg);
+}
+
+/* --- Pill buttons (Erewhon-style) --- */
+.btn-pill {
+  border-radius: 9999px;
+  padding: 0.625rem 1.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+.btn-pill-primary {
+  background: #108910;
+  color: white;
+}
+.btn-pill-primary:hover {
+  background: #0D720D;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 137, 16, 0.25);
+}
+.btn-pill-outline {
+  background: transparent;
+  color: #108910;
+  border: 1.5px solid #108910;
+}
+.btn-pill-outline:hover {
+  background: rgba(16, 137, 16, 0.06);
+  transform: translateY(-1px);
+}
+
+/* ============================================
+   HERO ANIMATIONS — Erewhon-style fade-up
+   ============================================ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fadeUp 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  opacity: 0;
+}
+.animate-fade-up:nth-child(1) { animation-delay: 0s; }
+.animate-fade-up:nth-child(2) { animation-delay: 0.15s; }
+.animate-fade-up:nth-child(3) { animation-delay: 0.3s; }
+.animate-fade-up:nth-child(4) { animation-delay: 0.45s; }
+.animate-fade-up:nth-child(5) { animation-delay: 0.6s; }
+
+/* ============================================
+   CATEGORY CARD OVERLAY (Erewhon gradient hover)
+   ============================================ */
+.category-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.05));
+  display: flex;
+  align-items: flex-end;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+}
+.category-card-overlay h3 {
+  color: white;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }

@@ -19,13 +19,13 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-[#E8E9EB]">
+    <header className="sticky top-0 z-50 glass-header">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16 gap-3">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 shrink-0">
-            <span className="text-2xl font-bold text-[#108910]">Resurte</span>
-            <span className="text-2xl font-bold text-[#242529]">.me</span>
+          {/* Logo — Erewhon-style with refined type */}
+          <Link href="/" className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[1.35rem] font-bold text-[#108910] tracking-tight">Resurte</span>
+            <span className="text-[1.35rem] font-bold text-[#1a1a1a] tracking-tight">.me</span>
           </Link>
 
           {/* City Selector Trigger */}

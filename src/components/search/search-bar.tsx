@@ -58,14 +58,14 @@ export function SearchBar({
   return (
     <form onSubmit={handleSubmit} className={`relative ${className}`}>
       <div
-        className={`flex items-center bg-white border rounded-[10px] transition-all ${
+        className={`flex items-center bg-white border rounded-xl transition-all ${
           focused
-            ? "border-[#108910] ring-2 ring-[#108910]/20 shadow-sm"
-            : "border-[#E8E9EB] hover:border-[#C7C8CD]"
+            ? "border-[#108910] ring-2 ring-[#108910]/10 shadow-[0_0_0_3px_rgba(16,137,16,0.06)]"
+            : "border-[#e0dbd2] hover:border-[#c0bab0] shadow-sm"
         } ${compact ? "h-9" : "h-11"}`}
       >
         <Search
-          className={`shrink-0 text-[#72767E] ${compact ? "w-4 h-4 ml-3" : "w-5 h-5 ml-4"}`}
+          className={`shrink-0 text-[#999893] ${compact ? "w-4 h-4 ml-3" : "w-5 h-5 ml-4"}`}
         />
         <input
           ref={inputRef}
@@ -75,7 +75,7 @@ export function SearchBar({
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 200)}
           placeholder={placeholder ?? "Buscar productos..."}
-          className="flex-1 bg-transparent px-3 text-[#343538] placeholder:text-[#8F939B] focus:outline-none text-sm"
+          className="flex-1 bg-transparent px-3 text-[#1a1a1a] placeholder:text-[#999893] focus:outline-none text-sm"
           minLength={2}
         />
         {query && (

@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, Plus, Minus, Check, MessageCircle, ShoppingCart, Package } from "lucide-react"
+import { ArrowLeft, Plus, Minus, Check, MessageCircle, ShoppingCart, Package, ChevronDown } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
 import { ProductCard } from "@/components/product/product-card"
+import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import Link from "next/link"
 import type { Category, Product } from "@/types"
 
@@ -59,37 +60,37 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#faf8f5]">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-xs sm:text-sm mb-4 sm:mb-8 overflow-x-auto whitespace-nowrap pb-1">
           <Link
             href={`/${citySlug}`}
-            className="text-[#72767E] hover:text-[#108910] transition-colors flex items-center gap-1.5"
+            className="text-[#6b6b6b] hover:text-[#108910] transition-colors flex items-center gap-1.5"
           >
             <ArrowLeft className="w-4 h-4" />
             Volver
           </Link>
-          <span className="text-[#C7CACD]">/</span>
+          <span className="text-[#c0bab0]">/</span>
           <Link
             href={`/${citySlug}`}
-            className="text-[#72767E] hover:text-[#108910] transition-colors"
+            className="text-[#6b6b6b] hover:text-[#108910] transition-colors"
           >
             Inicio
           </Link>
           {category && (
             <>
-              <span className="text-[#C7CACD]">/</span>
+              <span className="text-[#c0bab0]">/</span>
               <Link
                 href={`/${citySlug}/categoria/${category.slug}`}
-                className="text-[#72767E] hover:text-[#108910] transition-colors"
+                className="text-[#6b6b6b] hover:text-[#108910] transition-colors"
               >
                 {category.name}
               </Link>
             </>
           )}
-          <span className="text-[#C7CACD]">/</span>
-          <span className="text-[#242529] font-medium truncate max-w-[200px]">
+          <span className="text-[#c0bab0]">/</span>
+          <span className="text-[#1a1a1a] font-medium truncate max-w-[200px]">
             {product.name}
           </span>
         </nav>
@@ -98,7 +99,7 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-16">
           {/* Left: Product image gallery */}
           <div className="w-full lg:w-[55%]">
-            <div className="aspect-[4/3] sm:aspect-square bg-[#F6F7F8] rounded-xl sm:rounded-2xl overflow-hidden relative border border-[#E8E9EB]">
+            <div className="aspect-[4/3] sm:aspect-square bg-[#f7f4ef] rounded-xl sm:rounded-2xl overflow-hidden relative border border-[#ede8df]">
               {allImages[selectedImage] ? (
                 <img
                   src={allImages[selectedImage]}
@@ -138,10 +139,10 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
                   <button
                     key={idx}
                     onClick={() => setSelectedImage(idx)}
-                    className={`flex-shrink-0 w-16 h-16 rounded-lg border-2 overflow-hidden bg-[#F6F7F8] transition-all ${
+                    className={`flex-shrink-0 w-16 h-16 rounded-lg border-2 overflow-hidden bg-[#f7f4ef] transition-all ${
                       idx === selectedImage
                         ? "border-[#108910] ring-1 ring-[#108910]"
-                        : "border-[#E8E9EB] hover:border-[#108910]/40"
+                        : "border-[#ede8df] hover:border-[#108910]/40"
                     }`}
                   >
                     <img src={img} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-contain p-1" />
@@ -157,7 +158,7 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
             {category && (
               <Link
                 href={`/${citySlug}/categoria/${category.slug}`}
-                className="inline-flex items-center gap-1.5 self-start text-sm text-[#108910] font-medium bg-[#E9FBE9] px-3 py-1 rounded-full hover:bg-[#D4F0D4] transition-colors mb-4"
+                className="inline-flex items-center gap-1.5 self-start text-sm text-[#108910] font-medium bg-[#e8f5e9] px-3 py-1 rounded-full hover:bg-[#c8e6c8] transition-colors mb-4"
               >
                 <span>{category.icon}</span>
                 {category.name}
@@ -165,19 +166,19 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
             )}
 
             {/* Product name */}
-            <h1 className="text-xl sm:text-2xl lg:text-[2rem] font-bold text-[#242529] leading-tight tracking-tight">
+            <h1 className="text-xl sm:text-2xl lg:text-[2rem] font-bold text-[#1a1a1a] leading-tight tracking-tight">
               {product.name}
             </h1>
 
             {/* Unit and Brand */}
             <div className="flex flex-wrap items-center gap-3 mt-3">
               {product.unit && (
-                <span className="text-sm font-medium text-[#108910] bg-[#E9FBE9] px-2.5 py-0.5 rounded-full">
+                <span className="text-sm font-medium text-[#108910] bg-[#e8f5e9] px-2.5 py-0.5 rounded-full">
                   {product.unit}
                 </span>
               )}
               {product.brand && (
-                <span className="text-sm text-[#72767E]">
+                <span className="text-sm text-[#6b6b6b]">
                   {product.brand}
                 </span>
               )}
@@ -192,17 +193,17 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
             )}
 
             {/* Price */}
-            <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-[#E8E9EB]">
+            <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-[#ede8df]">
               <div className="flex items-baseline gap-3">
-                <span className="text-2xl sm:text-3xl font-bold text-[#242529]">
+                <span className="text-2xl sm:text-3xl font-bold text-[#1a1a1a]">
                   ${displayPrice.toFixed(2)}
                 </span>
                 {hasDiscount && (
                   <>
-                    <span className="text-lg text-[#8F939B] line-through">
+                    <span className="text-lg text-[#999893] line-through">
                       ${originalPrice.toFixed(2)}
                     </span>
-                    <span className="text-sm font-semibold text-[#DE3534] bg-[#FFF0F0] px-2 py-0.5 rounded-full">
+                    <span className="text-sm font-semibold text-[#DE3534] bg-[#fdf2f2] px-2 py-0.5 rounded-full">
                       -{discountPercent}%
                     </span>
                   </>
@@ -214,7 +215,7 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
                 </p>
               )}
               {product.unit && (
-                <p className="text-xs text-[#72767E] mt-1">
+                <p className="text-xs text-[#6b6b6b] mt-1">
                   Precio por {product.unit.toLowerCase()}
                 </p>
               )}
@@ -223,21 +224,21 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
             {/* Quantity selector */}
             {!outOfStock && (
               <div className="mt-5">
-                <p className="text-sm font-medium text-[#242529] mb-2">Cantidad</p>
-                <div className="inline-flex items-center border border-[#E8E9EB] rounded-lg overflow-hidden">
+                <p className="text-sm font-medium text-[#1a1a1a] mb-2">Cantidad</p>
+                <div className="inline-flex items-center border border-[#ede8df] rounded-lg overflow-hidden">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-10 h-10 flex items-center justify-center text-[#72767E] hover:bg-[#F7F5F0] transition-colors"
+                    className="w-10 h-10 flex items-center justify-center text-[#6b6b6b] hover:bg-[#f0ede5] transition-colors"
                     disabled={quantity <= 1}
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="w-12 text-center text-sm font-semibold text-[#242529] select-none">
+                  <span className="w-12 text-center text-sm font-semibold text-[#1a1a1a] select-none">
                     {quantity}
                   </span>
                   <button
                     onClick={() => setQuantity(quantity + 1)}
-                    className="w-10 h-10 flex items-center justify-center text-[#72767E] hover:bg-[#F7F5F0] transition-colors"
+                    className="w-10 h-10 flex items-center justify-center text-[#6b6b6b] hover:bg-[#f0ede5] transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -283,29 +284,98 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
               </a>
             </div>
 
-            {/* Description */}
-            {product.description && (
-              <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-[#E8E9EB]">
-                <h2 className="text-sm font-semibold text-[#242529] uppercase tracking-wider mb-3">
+            {/* Description — Erewhon-style accordion */}
+            <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-[#e0dbd2]">
+              {/* Description accordion item */}
+              <div className="border-b border-[#ede8df] pb-3 mb-3">
+                <button
+                  className="accordion-header flex items-center justify-between w-full text-left text-sm font-semibold text-[#1a1a1a] py-2 uppercase tracking-wider"
+                  onClick={(e) => {
+                    const btn = e.currentTarget;
+                    const isOpen = btn.getAttribute("aria-expanded") === "true";
+                    btn.setAttribute("aria-expanded", String(!isOpen));
+                    const body = btn.nextElementSibling as HTMLElement;
+                    if (body) {
+                      if (isOpen) { body.classList.remove("open"); }
+                      else { body.classList.add("open"); }
+                    }
+                  }}
+                  aria-expanded="true"
+                >
                   Descripción
-                </h2>
-                <p className="text-sm text-[#5C6068] leading-relaxed whitespace-pre-line">
-                  {product.description}
-                </p>
+                  <span className="accordion-icon text-lg leading-none text-[#999893]">+</span>
+                </button>
+                <div className="accordion-body open">
+                  <p className="text-sm text-[#6b6b6b] leading-relaxed whitespace-pre-line">
+                    {product.description || "Producto seleccionado de la Central de Abastos con los más altos estándares de frescura y calidad."}
+                  </p>
+                </div>
               </div>
-            )}
 
-            {/* Delivery info */}
-            <div className="mt-4 sm:mt-8 p-3 sm:p-4 bg-[#F7F5F0] rounded-xl">
+              {/* Quality accordion item */}
+              <div className="border-b border-[#ede8df] pb-3 mb-3">
+                <button
+                  className="accordion-header flex items-center justify-between w-full text-left text-sm font-semibold text-[#1a1a1a] py-2 uppercase tracking-wider"
+                  onClick={(e) => {
+                    const btn = e.currentTarget;
+                    const isOpen = btn.getAttribute("aria-expanded") === "true";
+                    btn.setAttribute("aria-expanded", String(!isOpen));
+                    const body = btn.nextElementSibling as HTMLElement;
+                    if (body) {
+                      if (isOpen) { body.classList.remove("open"); }
+                      else { body.classList.add("open"); }
+                    }
+                  }}
+                  aria-expanded="false"
+                >
+                  Calidad y Origen
+                  <span className="accordion-icon text-lg leading-none text-[#999893]">+</span>
+                </button>
+                <div className="accordion-body">
+                  <p className="text-sm text-[#6b6b6b] leading-relaxed">
+                    Producto de calidad seleccionado directamente de la Central de Abastos. Todos nuestros productos pasan por estrictos controles de frescura y calidad antes de llegar a tu hogar.
+                  </p>
+                </div>
+              </div>
+
+              {/* Delivery accordion item */}
+              <div>
+                <button
+                  className="accordion-header flex items-center justify-between w-full text-left text-sm font-semibold text-[#1a1a1a] py-2 uppercase tracking-wider"
+                  onClick={(e) => {
+                    const btn = e.currentTarget;
+                    const isOpen = btn.getAttribute("aria-expanded") === "true";
+                    btn.setAttribute("aria-expanded", String(!isOpen));
+                    const body = btn.nextElementSibling as HTMLElement;
+                    if (body) {
+                      if (isOpen) { body.classList.remove("open"); }
+                      else { body.classList.add("open"); }
+                    }
+                  }}
+                  aria-expanded="false"
+                >
+                  Envíos y Devoluciones
+                  <span className="accordion-icon text-lg leading-none text-[#999893]">+</span>
+                </button>
+                <div className="accordion-body">
+                  <p className="text-sm text-[#6b6b6b] leading-relaxed">
+                    Envío gratis en pedidos superiores a $2,500 MXN en {cityName}. Entregas en 24-48 horas hábiles. Productos perecederos cuentan con garantía de frescura. Facturación electrónica incluida.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Delivery info — Erewhon-style glass box */}
+            <div className="mt-6 p-4 rounded-xl border border-[#e0dbd2] bg-[#faf8f5]/80 backdrop-blur-sm">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#E9FBE9] flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-full bg-[#108910]/10 flex items-center justify-center shrink-0">
                   <Package className="w-5 h-5 text-[#108910]" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-[#242529]">
+                  <p className="text-sm font-semibold text-[#1a1a1a]">
                     Entrega en {cityName}
                   </p>
-                  <p className="text-xs text-[#72767E] mt-0.5 leading-relaxed">
+                  <p className="text-xs text-[#6b6b6b] mt-0.5 leading-relaxed">
                     Envío gratis desde $2,500 MXN. Entrega en 24-48 horas hábiles.
                     Facturación electrónica incluida.
                   </p>
@@ -315,13 +385,14 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
           </div>
         </div>
 
-        {/* También te puede interesar */}
+        {/* También te puede interesar — Erewhon-style */}
         {relatedProducts.length > 0 && (
-          <section className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-[#E8E9EB]">
-            <h2 className="text-base sm:text-lg font-bold text-[#242529] mb-4 sm:mb-5">
-              También te puede interesar
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
+          <ScrollReveal>
+            <section className="mt-10 sm:mt-14 pt-6 sm:pt-8 border-t border-[#e0dbd2]">
+              <h2 className="text-lg sm:text-xl font-bold text-[#1a1a1a] mb-5 tracking-tight">
+                También te puede interesar
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {relatedProducts.map((rp) => {
                 const storeData = rp.product_stores[0]
                 return (
@@ -342,6 +413,7 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
               })}
             </div>
           </section>
+        </ScrollReveal>
         )}
       </div>
     </div>

@@ -7,6 +7,7 @@ import { useState, useEffect } from "react"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { HERO_GROCERY } from "@/lib/images"
 import { ProductCard } from "@/components/product/product-card"
+import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import type { Category, Product } from "@/types"
@@ -113,27 +114,22 @@ export function CityLanding({
 
   return (
     <div className="min-h-[80vh] flex flex-col">
-      {/* Hero — Erewhon editorial split layout */}
+      {/* Hero — Editorial split layout */}
       <section className="relative bg-[#1A1A1A] overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row items-center gap-0 lg:gap-16 min-h-[520px] lg:min-h-[580px]">
+          <div className="grid grid-cols-1 lg:grid-cols-[52%_48%] min-h-[520px] lg:min-h-[580px]">
             {/* Left: Copy */}
-            <div className="w-full lg:w-[52%] py-14 lg:py-20 z-10">
-              {/* Editorial tagline — Erewhon-style micro-label */}
+            <div className="py-14 lg:py-20 z-10 flex flex-col justify-center">
               <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#3CC73C] mb-4">
                 Proveeduría para profesionales de la cocina
               </p>
-
               <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold text-white leading-[1.08] tracking-tight">
                 Del campo a tu{" "}
                 <span className="text-[#3CC73C]">cocina</span>
               </h1>
-
               <p className="mt-5 text-base sm:text-lg text-white/75 leading-relaxed max-w-[480px]">
                 Abastece tu restaurante con la frescura de la central de abastos — sin madrugar, sin cargar, sin sorpresas.
               </p>
-
-              {/* Location badge */}
               <div className="mt-6 inline-flex items-center gap-1.5 text-sm text-white/70">
                 <MapPin className="w-3.5 h-3.5 text-[#3CC73C]" />
                 <span>
@@ -146,8 +142,6 @@ export function CityLanding({
                   cambiar
                 </button>
               </div>
-
-              {/* Search bar — clean and minimal */}
               <form onSubmit={handleSearch} className="mt-8 max-w-lg">
                 <div className="flex items-stretch bg-white rounded-[10px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.25)]">
                   <div className="flex items-center gap-2 flex-1 pl-4">
@@ -170,18 +164,16 @@ export function CityLanding({
                 </div>
               </form>
             </div>
-
-            {/* Right: Image — Erewhon-style hero visual */}
-            <div className="w-full lg:w-[48%] relative self-stretch min-h-[240px] lg:min-h-0">
-              {/* Gradient fade from left (overlaps with text side) */}
+            {/* Right: Image */}
+            <div className="relative min-h-[240px] lg:min-h-0 lg:rounded-r-2xl overflow-hidden">
               <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-[#1A1A1A] to-transparent z-10 hidden lg:block" />
               <div className="absolute inset-y-0 top-0 w-full bg-gradient-to-b from-[#1A1A1A] to-transparent h-24 z-10 lg:hidden" />
               <div className="absolute inset-y-0 bottom-0 w-full bg-gradient-to-t from-[#1A1A1A] to-transparent h-24 z-10 lg:hidden" />
-              {/* Subtle overlay for readability */}
-              <div className="absolute inset-0 bg-[#1A1A1A]/15 z-[1] rounded-r-2xl" />
-              <div
-                className="w-full h-full bg-cover bg-center lg:rounded-r-2xl"
-                style={{ backgroundImage: `url(${HERO_GROCERY})` }}
+              <div className="absolute inset-0 bg-[#1A1A1A]/10 z-[1]" />
+              <img
+                src={HERO_GROCERY}
+                alt="Frutas y verduras frescas"
+                className="absolute inset-0 w-full h-full object-cover"
               />
             </div>
           </div>
@@ -208,16 +200,16 @@ export function CityLanding({
         </div>
       </section>
 
-      {/* "Ver todos los productos" banner */}
-      <section className="bg-[#F7F5F0] py-6 border-b border-[#E8E9EB]">
+      {/* "Ver todos los productos" banner — Erewhon-style */}
+      <section className="bg-[#f7f4ef] py-6 border-b border-[#ede8df]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <span className="text-sm text-[#5C6068] font-medium">
+            <span className="text-sm text-[#6b6b6b] font-medium">
               Explora nuestro catálogo completo para tu negocio
             </span>
             <Link
               href={`/${currentCity?.slug || DEFAULT_CITY_SLUG}/buscar`}
-              className="inline-flex items-center gap-2 bg-[#108910] text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-[#0D720D] transition-colors shadow-sm"
+              className="btn-pill btn-pill-primary inline-flex items-center gap-2"
             >
               <Grid3X3 className="w-4 h-4" />
               Ver todos los productos
@@ -253,54 +245,57 @@ export function CityLanding({
         </div>
       </section>
 
-      {/* Category icons grid */}
-      <section className="bg-white py-12 border-b border-[#E8E9EB]">
+      {/* Category icons grid — Erewhon-style gradient cards */}
+      <section className="bg-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-8">
+          <ScrollReveal className="text-center mb-8">
             <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#108910] mb-3">
               Categorías
             </p>
-            <h2 className="text-2xl font-bold text-[#242529] tracking-tight">
+            <h2 className="text-2xl font-bold text-[#1a1a1a] tracking-tight">
               Todo lo que tu cocina necesita
             </h2>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {activeCategories.map((cat) => {
+          </ScrollReveal>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {activeCategories.map((cat, idx) => {
               const count = productsByCategory.get(cat.id)?.length ?? 0
               return (
-                <Link
-                  key={cat.id}
-                  href={`/${currentCity?.slug || DEFAULT_CITY_SLUG}/categoria/${cat.slug}`}
-                  className="group flex flex-col items-center gap-2 p-5 rounded-xl bg-[#F7F5F0] hover:bg-[#E9FBE9] border border-transparent hover:border-[#108910]/20 transition-all duration-200 hover:-translate-y-0.5"
-                >
-                  <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-2xl shadow-sm group-hover:shadow-md transition-shadow">
-                    {cat.icon}
-                  </div>
-                  <span className="text-sm font-semibold text-[#242529] text-center leading-tight group-hover:text-[#108910] transition-colors">
-                    {cat.name}
-                  </span>
-                  <span className="text-xs text-[#72767E]">{count} productos</span>
-                </Link>
+                <ScrollReveal key={cat.id} direction="scale" delay={idx * 0.06}>
+                  <Link
+                    href={`/${currentCity?.slug || DEFAULT_CITY_SLUG}/categoria/${cat.slug}`}
+                    className="group relative flex flex-col items-center gap-2 p-5 rounded-xl bg-white border border-[#ede8df] hover:border-[#108910]/20 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-all duration-200 hover:-translate-y-1 overflow-hidden"
+                  >
+                    {/* Subtle top gradient bar on hover */}
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#108910] to-[#3CC73C] opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                    <div className="w-14 h-14 rounded-2xl bg-[#f7f5f0] flex items-center justify-center text-2xl shadow-sm group-hover:shadow-md transition-shadow">
+                      {cat.icon}
+                    </div>
+                    <span className="text-sm font-semibold text-[#1a1a1a] text-center leading-tight group-hover:text-[#108910] transition-colors">
+                      {cat.name}
+                    </span>
+                    <span className="text-xs text-[#999893]">{count} productos</span>
+                  </Link>
+                </ScrollReveal>
               )
             })}
           </div>
         </div>
       </section>
 
-      {/* Product catalog by category — with "Ver Todo" links (4 featured categories) */}
+      {/* Product catalog by category — with "Ver Todo" links (Erewhon-style) */}
       <section className="bg-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-10">
+          <ScrollReveal className="text-center mb-10">
             <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#108910] mb-3">
               Catálogo completo
             </p>
-            <h2 className="text-3xl font-bold text-[#242529] tracking-tight">
+            <h2 className="text-3xl font-bold text-[#1a1a1a] tracking-tight">
               Todo lo que tu cocina necesita
             </h2>
-            <p className="text-base text-[#72767E] mt-3 max-w-xl mx-auto leading-relaxed">
+            <p className="text-base text-[#6b6b6b] mt-3 max-w-xl mx-auto leading-relaxed">
               De la central de abastos a tu negocio. {flatProducts.length} productos — por caja, bulto o pieza.
             </p>
-          </div>
+          </ScrollReveal>
 
           {featuredCategories.map((cat) => {
             const catProducts = productsByCategory.get(cat.id) || []
