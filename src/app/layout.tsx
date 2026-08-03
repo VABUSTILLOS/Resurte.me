@@ -93,6 +93,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#F7F5F0] text-[#343538] antialiased">
+        {/* Preconnect to image origins for faster resource loading */}
+        <link rel="preconnect" href="https://storage.googleapis.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://storage.googleapis.com" />
+        <link rel="dns-prefetch" href="https://upload.wikimedia.org" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

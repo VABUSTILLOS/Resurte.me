@@ -135,19 +135,19 @@
   position: relative;
   overflow: hidden;
 }
-.product-card-img-swap img:first-child {
+.product-card-img-swap .product-card-img-primary {
   transition: opacity 0.4s ease;
 }
-.product-card-img-swap img:last-child {
+.product-card-img-swap .product-card-img-secondary {
   position: absolute;
   inset: 0;
   opacity: 0;
   transition: opacity 0.4s ease;
 }
-.product-card-img-swap:hover img:first-child {
+.product-card-img-swap:hover .product-card-img-primary {
   opacity: 0;
 }
-.product-card-img-swap:hover img:last-child {
+.product-card-img-swap:hover .product-card-img-secondary {
   opacity: 1;
 }
 

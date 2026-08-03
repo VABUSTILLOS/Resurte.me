@@ -1,10 +1,11 @@
 "use client"
 
 import { Plus, Check } from "lucide-react"
+import Image from "next/image"
 import type { Product } from "@/types"
 import { useCart } from "@/contexts/cart-context"
 import { getProductTagline } from "@/lib/utils"
-import { useState } from "react"
+import { useState, memo } from "react"
 import Link from "next/link"
 
 /**
@@ -15,6 +16,9 @@ import Link from "next/link"
  * - Quick-add button fades up from below the card on hover
  * - Soft border, rounded corners, subtle hover lift
  * - Clean typography with brand green accent
+ *
+ * Wrapped in React.memo to prevent re-renders when parent adds more products
+ * via infinite scroll.
  */
 
 interface ProductCardProps {
@@ -27,7 +31,7 @@ interface ProductCardProps {
   onAddToCart?: () => void
 }
 
-export function ProductCard({
+export const ProductCard = memo(function ProductCard({
   product,
   storeId,
   storeName,
@@ -79,7 +83,7 @@ export function ProductCard({
   }
 
   return (
-    <div className="product-card group relative">
+    <div className="product-card group relative" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 320px" }}>
       <Link
         href={`/${citySlug}/producto/${product.slug}`}
         className="block relative bg-white rounded-xl border border-[#e0dbd2] overflow-hidden hover:shadow-[0_2px_20px_rgba(0,0,0,0.07)] transition-all duration-300 ease-out hover:-translate-y-0.5"
@@ -88,18 +92,20 @@ export function ProductCard({
         <div className={`aspect-[4/3] sm:aspect-square bg-[#faf8f5] relative overflow-hidden ${secondaryImage ? "product-card-img-swap" : ""}`}>
           {product.image_url ? (
             <>
-              <img
+              <Image
                 src={product.image_url}
                 alt={product.name}
-                className="w-full h-full object-contain p-2"
-                loading="lazy"
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                className="object-contain p-2 product-card-img-primary"
               />
               {secondaryImage && (
-                <img
+                <Image
                   src={secondaryImage}
                   alt={`${product.name} - vista 2`}
-                  className="w-full h-full object-contain p-2"
-                  loading="lazy"
+                  fill
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  className="object-contain p-2 product-card-img-secondary"
                 />
               )}
             </>
@@ -111,28 +117,28 @@ export function ProductCard({
 
           {/* Multi-image indicator */}
           {product.images && product.images.length > 1 && (
-            <div className="absolute bottom-2 right-2 bg-black/55 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full backdrop-blur-sm">
+            <div className="absolute bottom-2 right-2 bg-black/55 text-white text-[10px] font-medium px-1.5 py-0.5 rounded-full backdrop-blur-sm z-10">
               +{product.images.length - 1}
             </div>
           )}
 
           {/* Discount badge — Erewhon-style pill */}
           {hasDiscount && (
-            <div className="absolute top-2 left-2 bg-[#de3534] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+            <div className="absolute top-2 left-2 bg-[#de3534] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10">
               -{discountPercent}%
             </div>
           )}
 
           {/* Low stock badge */}
           {lowStock && !hasDiscount && (
-            <div className="absolute top-2 left-2 bg-[#f5a623] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+            <div className="absolute top-2 left-2 bg-[#f5a623] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10">
               Pocas unidades
             </div>
           )}
 
           {/* Out of stock overlay */}
           {outOfStock && (
-            <div className="absolute inset-0 bg-white/75 flex items-center justify-center backdrop-blur-[1px]">
+            <div className="absolute inset-0 bg-white/75 flex items-center justify-center backdrop-blur-[1px] z-10">
               <span className="text-sm font-semibold text-[#6b6b6b] bg-white px-4 py-1.5 rounded-full shadow-sm">
                 Agotado
               </span>
@@ -202,7 +208,7 @@ export function ProductCard({
       )}
     </div>
   )
-}
+})
 
 interface ProductCardGridProps {
   products: ProductCardProps["product"][]

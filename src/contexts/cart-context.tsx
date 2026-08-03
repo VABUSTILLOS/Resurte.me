@@ -6,6 +6,7 @@ import {
   useReducer,
   useEffect,
   useCallback,
+  useMemo,
   type ReactNode,
 } from "react"
 import type { Cart, CartItem, AppliedCoupon } from "@/types"
@@ -240,7 +241,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{
+      value={useMemo(() => ({
         ...state,
         addItem,
         removeItem,
@@ -252,7 +253,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         subtotal,
         discount,
         total,
-      }}
+      }), [state, addItem, removeItem, updateQuantity, clearCart, applyCoupon, removeCoupon, itemCount, subtotal, discount, total])}
     >
       {children}
     </CartContext.Provider>
