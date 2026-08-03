@@ -7,6 +7,7 @@ import { ProductCard } from "@/components/product/product-card"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import Link from "next/link"
 import type { Category, Product } from "@/types"
+import { getCategoryIcon } from "@/lib/utils"
 
 type ProductWithStore = Product & {
   product_stores: { store_id: number; price: number; sale_price: number | null; is_available: boolean; stock_status: string }[]
@@ -160,7 +161,7 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
                 href={`/${citySlug}/categoria/${category.slug}`}
                 className="inline-flex items-center gap-1.5 self-start text-sm text-[#108910] font-medium bg-[#e8f5e9] px-3 py-1 rounded-full hover:bg-[#c8e6c8] transition-colors mb-4"
               >
-                <span>{category.icon}</span>
+                <span>{getCategoryIcon(category.icon)}</span>
                 {category.name}
               </Link>
             )}

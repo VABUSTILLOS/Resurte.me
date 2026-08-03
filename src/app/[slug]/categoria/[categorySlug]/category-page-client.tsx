@@ -6,6 +6,7 @@ import { ProductCard } from "@/components/product/product-card"
 import { SearchBar } from "@/components/search/search-bar"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import type { Product } from "@/types"
+import { getCategoryIcon } from "@/lib/utils"
 
 interface CategoryPageClientProps {
   citySlug: string
@@ -43,7 +44,7 @@ export function CategoryPageClient({ citySlug, cityName, category, products }: C
           <ScrollReveal>
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-[#108910]/10 flex items-center justify-center text-3xl shadow-sm">
-                {category.icon}
+                {getCategoryIcon(category.icon)}
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1a1a] tracking-tight">{category.name}</h1>

@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { Search, MessageCircle, Check, Eye, EyeOff, RefreshCw, AlertCircle, ImageIcon } from "lucide-react"
 import { MOCK_PRODUCTS, MOCK_CATEGORIES } from "@/lib/mock-products"
+import { getCategoryIcon } from "@/lib/utils"
 
 export default function AdminWhatsAppPage() {
   const [products, setProducts] = useState(
@@ -134,7 +135,7 @@ export default function AdminWhatsAppPage() {
                   : "bg-white border border-[#E8E9EB] text-[#72767E] hover:bg-[#F7F5F0]"
               }`}
             >
-              {cat.icon} {cat.name}
+              {getCategoryIcon(cat.icon)} {cat.name}
             </button>
           ))}
         </div>
@@ -202,7 +203,7 @@ export default function AdminWhatsAppPage() {
                   )}
                 </div>
                 <p className="text-xs text-[#B0B3B8] mt-0.5">
-                  {category?.icon} {category?.name || "Sin categoría"}
+                  {getCategoryIcon(category?.icon)} {category?.name || "Sin categoría"}
                   {product.brand ? ` · ${product.brand}` : ""}
                   {product.unit ? ` · ${product.unit}` : ""}
                 </p>

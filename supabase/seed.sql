@@ -23,15 +23,15 @@ INSERT INTO cities (name, slug, state, lat, lng) VALUES
 
 -- Seed: Categorías de insumos para restaurante
 INSERT INTO categories (name, slug, icon) VALUES
-  ('Frutas y Verduras', 'frutas-verduras', 'apple'),
-  ('Abarrotes', 'abarrotes', 'package'),
-  ('Lácteos y Huevos', 'lacteos-huevos', 'milk'),
-  ('Carnes, Aves y Pescados', 'carnes-aves-pescados', 'beef'),
-  ('Panadería y Tortillería', 'panaderia-tortilleria', 'bread'),
-  ('Bebidas', 'bebidas', 'cup'),
-  ('Botanas y Dulces', 'botanas-dulces', 'cookie'),
-  ('Limpieza para Cocina', 'limpieza-cocina', 'spray'),
-  ('Congelados', 'congelados', 'snowflake');
+  ('Frutas y Verduras', 'frutas-verduras', '🥬'),
+  ('Abarrotes', 'abarrotes', '📦'),
+  ('Lácteos y Huevos', 'lacteos-huevos', '🧀'),
+  ('Carnes, Aves y Pescados', 'carnes-aves-pescados', '🥩'),
+  ('Panadería y Tortillería', 'panaderia-tortilleria', '🍞'),
+  ('Bebidas', 'bebidas', '🥤'),
+  ('Botanas y Dulces', 'botanas-dulces', '🍪'),
+  ('Limpieza para Cocina', 'limpieza-cocina', '🧹'),
+  ('Congelados', 'congelados', '❄️');
 
 -- ============================================================
 -- TIENDAS

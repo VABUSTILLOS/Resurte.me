@@ -11,6 +11,7 @@ import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import type { Category, Product } from "@/types"
+import { getCategoryIcon } from "@/lib/utils"
 
 const DEFAULT_CITY_SLUG = "chihuahua"
 
@@ -268,7 +269,7 @@ export function CityLanding({
                     {/* Subtle top gradient bar on hover */}
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#108910] to-[#3CC73C] opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     <div className="w-14 h-14 rounded-2xl bg-[#f7f5f0] flex items-center justify-center text-2xl shadow-sm group-hover:shadow-md transition-shadow">
-                      {cat.icon}
+                      {getCategoryIcon(cat.icon)}
                     </div>
                     <span className="text-sm font-semibold text-[#1a1a1a] text-center leading-tight group-hover:text-[#108910] transition-colors">
                       {cat.name}
@@ -308,7 +309,7 @@ export function CityLanding({
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-[#108910]/10 flex items-center justify-center text-xl">
-                      {cat.icon}
+                      {getCategoryIcon(cat.icon)}
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-[#242529]">{cat.name}</h3>
