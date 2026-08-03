@@ -1,9 +1,9 @@
 // Product images — all from resurte.me Google Cloud Storage (real store images)
 // Hero uses a verified Wikimedia Commons public-domain image
 
-// HERO — large-format store image (JPG, 976KB)
-export const HERO_GROCERY = "https://storage.googleapis.com/takeapp/media/cmifh7a6k000004jpa7or85li.jpg"
-export const HERO_FRUITS = "https://storage.googleapis.com/takeapp/media/cmifh7a6k000004jpa7or85li.jpg"
+// HERO — Wikimedia Commons: vegetables in a supermarket cart (verified 200)
+export const HERO_GROCERY = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Shopping_cart_in_supermarket_-_Tokyo_area_Japan_-_Nov_24_2018.jpeg/1280px-Shopping_cart_in_supermarket_-_Tokyo_area_Japan_-_Nov_24_2018.jpeg"
+export const HERO_FRUITS = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Shopping_cart_in_supermarket_-_Tokyo_area_Japan_-_Nov_24_2018.jpeg/1280px-Shopping_cart_in_supermarket_-_Tokyo_area_Japan_-_Nov_24_2018.jpeg"
 
 // FRUITS — real store images
 export const IMG_APPLE = "https://storage.googleapis.com/takeapp/media/cmihojint000k04if2qg48em7.png"

@@ -124,70 +124,42 @@ const MULTI_IMAGES: Record<number, string[]> = {
   140: ["https://storage.googleapis.com/takeapp/media/cmidk5ovr00000hka85jr5bzf.webp", "https://storage.googleapis.com/takeapp/media/cmidk5uvg00000ijcnvka82k1.webp"],
 }
 
-// Category-based fallback pools — multiple store images per category, cycled by PID
+// Category-based fallback pools — Wikimedia Commons images per category (verified 200)
 const CATEGORY_POOLS: Record<string, string[]> = {
   verduras: [
-    "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
-    "https://storage.googleapis.com/takeapp/media/cmihqyxja000b04l5h1s4euob.png",
-    "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png",
-    "https://storage.googleapis.com/takeapp/media/cmikmw51n000304jz0r6shapj.png",
-    "https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png",
-    "https://storage.googleapis.com/takeapp/media/cmijq38em001604l7hja83595.png",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Display_of_vegetables_in_the_market_in_Nansana.jpg/960px-Display_of_vegetables_in_the_market_in_Nansana.jpg",
   ],
   abarrotes: [
-    "https://storage.googleapis.com/takeapp/media/cmidk59fi00000imqacaggoal.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5ucg00000ijff55kb0k6.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5ahb00000ikx1fo4ebab.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5ovr00000hka85jr5bzf.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5uvg00000ijcnvka82k1.webp",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Grocery_Store_Aisle%2C_vermont.jpg/960px-Grocery_Store_Aisle%2C_vermont.jpg",
   ],
   lacteos: [
-    "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5ahb00000ikx1fo4ebab.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5ucg00000ijff55kb0k6.webp",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Dairy_Aisle_in_a_Checkers_in_Durbanville%2C_Cape_Town.jpg/960px-Dairy_Aisle_in_a_Checkers_in_Durbanville%2C_Cape_Town.jpg",
   ],
   carnes: [
-    "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png",
-    "https://storage.googleapis.com/takeapp/media/cmigudrly000s04jpe45e71lo.png",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Meat_display_in_butcher%27s_shop%2C_Bodmin%2C_Cornwall_-_January_2023.jpg/960px-Meat_display_in_butcher%27s_shop%2C_Bodmin%2C_Cornwall_-_January_2023.jpg",
   ],
   panaderia: [
-    "https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5o07000000hkcn2oeaq4.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5ovr00000hka85jr5bzf.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5uvg00000ijcnvka82k1.webp",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Bread_displayed_in_the_bakery_section_of_a_Publix_store.jpg/960px-Bread_displayed_in_the_bakery_section_of_a_Publix_store.jpg",
   ],
   bebidas: [
     "https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png",
     "https://storage.googleapis.com/takeapp/media/cmijq38em001604l7hja83595.png",
-    "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png",
-    "https://storage.googleapis.com/takeapp/media/cmikmw51n000304jz0r6shapj.png",
   ],
   botanas: [
-    "https://storage.googleapis.com/takeapp/media/cmikmw51n000304jz0r6shapj.png",
-    "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png",
-    "https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Potato_chips_2.jpg/960px-Potato_chips_2.jpg",
   ],
   limpieza: [
-    "https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5ucg00000ijff55kb0k6.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5ahb00000ikx1fo4ebab.webp",
-    "https://storage.googleapis.com/takeapp/media/cmidk5ovr00000hka85jr5bzf.webp",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Cleaning_products_aisle_in_Coop_Extra_supermarket%2C_Bergen_Stormarked_Shopping_Mall%2C_Norway_2017-10-25.jpg/960px-Cleaning_products_aisle_in_Coop_Extra_supermarket%2C_Bergen_Stormarked_Shopping_Mall%2C_Norway_2017-10-25.jpg",
   ],
   congelados: [
     "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png",
     "https://storage.googleapis.com/takeapp/media/cmigudrly000s04jpe45e71lo.png",
-    "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp",
   ],
 }
 
 function getFallback(category: string, pid: number): string {
   const pool = CATEGORY_POOLS[category] || CATEGORY_POOLS["abarrotes"]
-  return pool[pid % pool.length]
+  return pool[0] // Use primary image per category for consistency
 }
 
 function getCategory(pid: number): string {
