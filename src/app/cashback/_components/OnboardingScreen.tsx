@@ -127,9 +127,93 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
                 </div>
               </div>
 
-              <p className="text-white text-3xl font-black leading-tight mt-6 max-w-xs md:max-w-lg md:text-4xl">
+              <p className="text-white text-2xl font-bold leading-tight mt-6 max-w-xs md:max-w-lg md:text-3xl">
                 Potencia tu negocio haciendo lo que ya haces
               </p>
+
+              {/* Before vs After Illustration */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+                className="mt-8 w-full max-w-sm md:max-w-md"
+              >
+                {/* Before: Antes */}
+                <div className="rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 mb-3">
+                  <p className="text-gray-500 text-[10px] uppercase tracking-widest text-center mb-3">Antes</p>
+                  <div className="flex items-center gap-2">
+                    {/* Left box: Insumos */}
+                    <div className="flex-1 rounded-xl bg-gray-800/50 border border-gray-700/30 p-3 text-center">
+                      <span className="text-2xl">🛒</span>
+                      <p className="text-gray-400 text-[10px] mt-1.5 leading-tight">Comprar<br/>insumos</p>
+                    </div>
+                    {/* OR divider */}
+                    <div className="flex flex-col items-center gap-0.5 shrink-0">
+                      <div className="h-5 w-px bg-gray-700"></div>
+                      <span className="text-[9px] font-bold text-gray-600">O</span>
+                      <div className="h-5 w-px bg-gray-700"></div>
+                    </div>
+                    {/* Right box: Marketing */}
+                    <div className="flex-1 rounded-xl bg-gray-800/50 border border-gray-700/30 p-3 text-center opacity-50">
+                      <span className="text-2xl">📣</span>
+                      <p className="text-gray-500 text-[10px] mt-1.5 leading-tight">Invertir en<br/>marketing</p>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 text-[10px] text-center mt-3">Tenías que elegir uno</p>
+                </div>
+
+                {/* Transition Arrow */}
+                <motion.div
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ delay: 0.8, duration: 0.6 }}
+                  className="flex items-center justify-center py-1 origin-left"
+                >
+                  <div className="flex items-center gap-1">
+                    <motion.span
+                      animate={{ opacity: [0.3, 1, 0.3] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="text-emerald-400 text-lg"
+                    >
+                      ↓
+                    </motion.span>
+                  </div>
+                </motion.div>
+
+                {/* After: Ahora */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.9, duration: 0.5 }}
+                  className="rounded-2xl bg-emerald-500/[0.08] border border-emerald-500/20 p-4"
+                >
+                  <p className="text-emerald-400 text-[10px] uppercase tracking-widest text-center mb-3">Ahora</p>
+                  <div className="flex items-center gap-1.5">
+                    {/* Insumos */}
+                    <div className="flex-1 rounded-xl bg-emerald-600/20 border border-emerald-500/20 p-2.5 text-center">
+                      <span className="text-xl">🛒</span>
+                      <p className="text-emerald-300 text-[9px] mt-1">Insumos</p>
+                    </div>
+                    {/* Arrow */}
+                    <span className="text-emerald-600 text-sm shrink-0">→</span>
+                    {/* Cashback */}
+                    <div className="flex-1 rounded-xl bg-amber-500/20 border border-amber-500/20 p-2.5 text-center">
+                      <span className="text-xl">💰</span>
+                      <p className="text-amber-300 text-[9px] mt-1">Cashback</p>
+                    </div>
+                    {/* Arrow */}
+                    <span className="text-emerald-600 text-sm shrink-0">→</span>
+                    {/* Crecimiento */}
+                    <div className="flex-1 rounded-xl bg-violet-500/20 border border-violet-500/20 p-2.5 text-center">
+                      <span className="text-xl">🚀</span>
+                      <p className="text-violet-300 text-[9px] mt-1">Marketing</p>
+                    </div>
+                  </div>
+                  <p className="text-emerald-400/70 text-[10px] text-center mt-3 font-medium">
+                    Todo con la misma compra
+                  </p>
+                </motion.div>
+              </motion.div>
             </motion.div>
           )}
 
