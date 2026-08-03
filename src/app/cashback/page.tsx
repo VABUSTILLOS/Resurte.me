@@ -86,7 +86,7 @@ export default function CashbackPage() {
               <DashboardScreen
                 onOpenCalculator={handleOpenCalculator}
                 onServiceSelect={handleServiceSelect}
-                onScanInvoice={() => setShowScanner(true)}
+                onViewOrders={() => setShowScanner(true)}
               />
             )}
             {activeTab === "store" && (

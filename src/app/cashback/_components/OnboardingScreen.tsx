@@ -7,13 +7,8 @@ import {
   TrendingUp,
   Store,
   ShoppingBag,
-  Users,
   ArrowRight,
-  Check,
-  Camera,
 } from "lucide-react";
-import type { ServiceItem } from "./types";
-
 interface OnboardingScreenProps {
   onComplete: () => void;
 }
@@ -46,11 +41,11 @@ const steps = [
     fields: true,
   },
   {
-    id: "suppliers",
-    title: "Conecta tus proveedores",
-    subtitle: "Para que tu cashback se acumule automáticamente con cada pedido.",
-    illustration: "🔗",
-    suppliers: true,
+    id: "auto-cashback",
+    title: "Tu cashback es automático",
+    subtitle: "Sin escanear tickets. Sin conectar proveedores. Cada compra en Resurte.me genera cashback al instante.",
+    illustration: "⚡",
+    autoInfo: true,
   },
 ];
 
@@ -271,61 +266,73 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
             </motion.div>
           )}
 
-          {/* Step 3: Suppliers */}
+          {/* Step 3: Auto Cashback */}
           {step === 3 && (
             <motion.div
-              key="suppliers"
+              key="auto-cashback"
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -30 }}
-              className="flex-1 flex flex-col"
+              className="flex-1 flex flex-col items-center text-center"
             >
-              <div className="text-center mb-8">
-                <span className="text-5xl">🔗</span>
-                <h2 className="text-white text-2xl font-black mt-3">Conecta tus proveedores</h2>
-                <p className="text-gray-400 text-sm mt-2 max-w-xs mx-auto">
-                  Tu cashback se acumula automáticamente con cada pedido. Sin escanear tickets.
-                </p>
-              </div>
+              <motion.div
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="text-7xl mb-6"
+              >
+                ⚡
+              </motion.div>
 
-              <div className="space-y-3 flex-1">
+              <h2 className="text-white text-2xl font-black">Tu cashback es automático</h2>
+              <p className="text-gray-400 text-sm mt-3 max-w-xs leading-relaxed">
+                Sin escanear tickets. Sin conectar proveedores. Cada compra que hagas en
+                Resurte.me genera cashback al instante en tu Cartera de Crecimiento.
+              </p>
+
+              {/* How it works visually */}
+              <div className="mt-8 w-full space-y-4">
                 {[
-                  { name: "Distribuidora El Sol", category: "Abarrotes y lácteos", linked: true },
-                  { name: "Carnes Selectas del Norte", category: "Cárnicos", linked: true },
-                  { name: "Frutas y Verduras del Valle", category: "Frutas y verduras", linked: false },
-                ].map((supplier, i) => (
+                  {
+                    icon: "🛒",
+                    title: "Haces tu pedido en Resurte.me",
+                    desc: "Compras tus insumos como siempre. Frutas, carnes, lácteos, abarrotes — todo en un solo lugar.",
+                    color: "border-emerald-500/20 bg-emerald-500/5",
+                  },
+                  {
+                    icon: "💰",
+                    title: "El cashback se acredita al instante",
+                    desc: "El 5% del valor de tu pedido va directo a tu Cartera de Crecimiento. Sin hacer nada más.",
+                    color: "border-amber-500/20 bg-amber-500/5",
+                  },
+                  {
+                    icon: "🚀",
+                    title: "Lo canjeas por servicios de marketing",
+                    desc: "Cuando tengas saldo suficiente, elige entre campañas publicitarias, fotografía profesional, o desarrollo web.",
+                    color: "border-violet-500/20 bg-violet-500/5",
+                  },
+                ].map((item, i) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.12 * i }}
-                    className="flex items-center gap-3 rounded-2xl bg-white/5 border border-white/10 p-4"
+                    className={`flex items-start gap-4 rounded-2xl border ${item.color} p-4 text-left`}
                   >
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-lg flex-shrink-0">
-                      🏢
+                    <span className="text-2xl flex-shrink-0">{item.icon}</span>
+                    <div>
+                      <p className="text-white font-semibold text-sm">{item.title}</p>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">{item.desc}</p>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-semibold">{supplier.name}</p>
-                      <p className="text-gray-500 text-xs">{supplier.category}</p>
-                    </div>
-                    {supplier.linked ? (
-                      <span className="flex items-center gap-1 text-emerald-400 text-xs font-medium">
-                        <Check className="h-3.5 w-3.5" /> Conectado
-                      </span>
-                    ) : (
-                      <button className="rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-white transition-colors">
-                        Conectar
-                      </button>
-                    )}
                   </motion.div>
                 ))}
+              </div>
 
-                <button className="w-full rounded-2xl border-2 border-dashed border-white/10 p-4 
-                  flex items-center justify-center gap-2 text-gray-500 hover:border-emerald-500/30 
-                  hover:text-emerald-400 transition-colors">
-                  <span className="text-lg">+</span>
-                  <span className="text-sm">Agregar proveedor</span>
-                </button>
+              {/* Reassurance */}
+              <div className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-4 w-full">
+                <p className="text-gray-400 text-xs text-center">
+                  📊 En promedio, un restaurante genera <strong className="text-emerald-400">$1,600 MXN/mes</strong> en cashback
+                  solo con sus compras normales de insumos.
+                </p>
               </div>
             </motion.div>
           )}

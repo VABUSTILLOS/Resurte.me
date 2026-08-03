@@ -8,7 +8,7 @@ const sampleActivities: ActivityItem[] = [
   {
     id: "1",
     type: "invoice",
-    title: "Pedido #1024 — Distribuidora El Sol",
+    title: "Pedido #1024 — Frutas, carnes y lácteos",
     amount: 750,
     date: "Hoy, 14:32",
     status: "completed",
@@ -24,7 +24,7 @@ const sampleActivities: ActivityItem[] = [
   {
     id: "3",
     type: "invoice",
-    title: "Pedido #1020 — Carnes Selectas",
+    title: "Pedido #1020 — Abarrotes y verduras",
     amount: 620,
     date: "15 Jul, 09:45",
     status: "completed",
@@ -32,7 +32,7 @@ const sampleActivities: ActivityItem[] = [
   {
     id: "4",
     type: "invoice",
-    title: "Pedido #1018 — Frutas del Valle",
+    title: "Pedido #1018 — Carnes y especias",
     amount: 340,
     date: "14 Jul, 16:20",
     status: "pending",

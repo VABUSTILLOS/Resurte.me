@@ -16,21 +16,15 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
     preselectedService?.id || "meta-ads"
   );
   const [monthlySpend, setMonthlySpend] = useState(32000);
-  const [consolidated, setConsolidated] = useState(false);
+  const [growthMode, setGrowthMode] = useState(false);
 
   const cashbackRate = 0.05;
-  const consolidationMultiplier = 2.5;
-
-  const selectedService = SERVICES.find((s) => s.id === targetServiceId) || SERVICES[0];
-  const effectiveRate = consolidated ? cashbackRate * consolidationMultiplier : cashbackRate * 1.8;
-  const monthlyCashback = Math.round(monthlySpend * effectiveRate);
+  // In growth mode, simulate a 40% spend increase
+  const effectiveSpend = growthMode ? Math.round(monthlySpend * 1.4) : monthlySpend;
+  const monthlyCashback = Math.round(effectiveSpend * cashbackRate);
   const monthsToUnlock = Math.max(1, Math.ceil(selectedService.cost / monthlyCashback));
   const totalAccumulated = monthsToUnlock * monthlyCashback;
-
-  const scenActual = Math.ceil(selectedService.cost / Math.round(monthlySpend * cashbackRate * 1.8));
-  const scenConsolidado = consolidated
-    ? monthsToUnlock
-    : Math.max(1, Math.ceil(selectedService.cost / Math.round(monthlySpend * cashbackRate * consolidationMultiplier)));
+  const monthsAtCurrentSpend = Math.max(1, Math.ceil(selectedService.cost / Math.round(monthlySpend * cashbackRate)));
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-950">
@@ -108,7 +102,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
           </div>
         </div>
 
-        {/* Consolidation Toggle */}
+        {/* Growth Mode Toggle */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -121,60 +115,58 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
                 <p className="text-amber-400 text-sm font-semibold">Acelerador de Crecimiento</p>
               </div>
               <p className="text-gray-400 text-xs mt-1">
-                ¿Qué pasaría si consolidaras tus compras en 2 proveedores principales?
+                ¿Qué pasaría si aumentaras tu consumo un <strong className="text-amber-300">40%</strong>?
               </p>
             </div>
             {/* Custom toggle */}
             <button
-              onClick={() => setConsolidated(!consolidated)}
+              onClick={() => setGrowthMode(!growthMode)}
               className={`relative h-7 w-12 rounded-full transition-colors ${
-                consolidated ? "bg-amber-500" : "bg-gray-700"
+                growthMode ? "bg-amber-500" : "bg-gray-700"
               }`}
             >
               <motion.div
                 className="absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-md"
-                animate={{ left: consolidated ? "1.375rem" : "0.125rem" }}
+                animate={{ left: growthMode ? "1.375rem" : "0.125rem" }}
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
               />
             </button>
           </div>
 
           {/* Comparison */}
-          {consolidated && (
+          {growthMode && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               className="mt-4 grid grid-cols-2 gap-3 overflow-hidden"
             >
               <div className="rounded-xl bg-gray-800/50 p-3 text-center">
-                <p className="text-gray-500 text-[10px]">Hábito actual</p>
-                <p className="text-white text-xl font-bold tabular-nums mt-1">
-                  {scenActual}
+                <p className="text-gray-500 text-[10px]">Consumo actual</p>
+                <p className="text-white text-lg font-bold tabular-nums mt-1">
+                  ${monthlySpend.toLocaleString("es-MX")}
                 </p>
-                <p className="text-gray-500 text-[10px]">
-                  {scenActual === 1 ? "mes" : "meses"}
-                </p>
+                <p className="text-gray-500 text-[10px]">+${Math.round(monthlySpend * cashbackRate).toLocaleString("es-MX")}/mes cashback</p>
               </div>
               <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-center">
-                <p className="text-amber-400 text-[10px]">Compras consolidadas</p>
-                <p className="text-amber-400 text-xl font-bold tabular-nums mt-1">
-                  {scenConsolidado}
+                <p className="text-amber-400 text-[10px]">Consumo acelerado</p>
+                <p className="text-amber-400 text-lg font-bold tabular-nums mt-1">
+                  ${effectiveSpend.toLocaleString("es-MX")}
                 </p>
-                <p className="text-amber-400 text-[10px]">
-                  {scenConsolidado === 1 ? "mes" : "meses"}
-                </p>
+                <p className="text-amber-400 text-[10px]">+${monthlyCashback.toLocaleString("es-MX")}/mes cashback</p>
               </div>
             </motion.div>
           )}
 
-          <p className={`text-xs mt-3 text-center transition-opacity ${consolidated ? "text-amber-300/70" : "text-gray-600"}`}>
-            Concentrar tus compras acelera tu cashback hasta <strong className="text-amber-400">2.5×</strong>
+          <p className={`text-xs mt-3 text-center transition-opacity ${growthMode ? "text-amber-300/70" : "text-gray-600"}`}>
+            {growthMode
+              ? `Desbloquearías tu servicio en ${monthsToUnlock} ${monthsToUnlock === 1 ? "mes" : "meses"} en vez de ${monthsAtCurrentSpend}`
+              : "Actívalo para ver cómo un mayor consumo acelera tu crecimiento"}
           </p>
         </motion.div>
 
         {/* Results Panel */}
         <motion.div
-          key={consolidated ? "consolidated" : "normal"}
+          key={growthMode ? "growth" : "normal"}
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="rounded-2xl bg-gradient-to-br from-emerald-900/50 to-teal-900/50 

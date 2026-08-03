@@ -11,7 +11,7 @@ import type { ServiceItem } from "./types";
 interface DashboardScreenProps {
   onOpenCalculator: (service?: ServiceItem) => void;
   onServiceSelect: (service: ServiceItem) => void;
-  onScanInvoice?: () => void;
+  onViewOrders?: () => void;
   walletView?: boolean;
   profileView?: boolean;
 }
@@ -19,7 +19,7 @@ interface DashboardScreenProps {
 export function DashboardScreen({
   onOpenCalculator,
   onServiceSelect,
-  onScanInvoice,
+  onViewOrders,
   walletView,
   profileView,
 }: DashboardScreenProps) {
@@ -51,7 +51,7 @@ export function DashboardScreen({
       />
 
       <QuickActions
-        onScanInvoice={onScanInvoice}
+        onViewOrders={onViewOrders}
         onBrowseStore={() => onServiceSelect}
       />
 
@@ -199,7 +199,7 @@ function ProfileView() {
       </div>
 
       <div className="space-y-2">
-        <ProfileRow label="Proveedores vinculados" value="3" />
+        <ProfileRow label="Pedidos este mes" value="4" />
         <ProfileRow label="Servicios canjeados" value="2" />
         <ProfileRow label="Meses en el programa" value="8" />
         <ProfileRow label="Total cashback acumulado" value="$34,200 MXN" />
