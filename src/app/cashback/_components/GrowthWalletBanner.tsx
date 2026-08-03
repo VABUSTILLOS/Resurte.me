@@ -23,7 +23,7 @@ export function GrowthWalletBanner({ balance, nextUnlock }: GrowthWalletBannerPr
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 0.61, 0.36, 1] }}
-      className="relative mx-4 mt-4 overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 p-6 shadow-2xl shadow-emerald-900/40"
+      className="relative mx-4 mt-4 overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 p-6 shadow-2xl shadow-emerald-900/40 md:mx-0"
     >
       {/* Animated background glows */}
       <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-emerald-400 opacity-10 blur-3xl" />

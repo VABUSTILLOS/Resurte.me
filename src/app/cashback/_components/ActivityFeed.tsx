@@ -57,7 +57,7 @@ const iconMap = {
 
 export function ActivityFeed() {
   return (
-    <div className="mx-4 mt-6">
+    <div className="mx-4 mt-6 md:mx-0">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-white text-base font-bold">Actividad Reciente</h2>
         <button className="text-emerald-400 text-xs font-medium">Ver todo →</button>

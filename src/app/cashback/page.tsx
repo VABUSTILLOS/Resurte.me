@@ -56,70 +56,75 @@ export default function CashbackPage() {
   const showShell = !isFullScreen;
 
   return (
-    <div className="relative mx-auto flex min-h-screen max-w-md flex-col bg-gray-950">
-      {/* Full Screen Views */}
-      <AnimatePresence mode="wait">
-        {showOnboarding ? (
-          <OnboardingScreen key="onboarding" onComplete={handleOnboardingComplete} />
-        ) : showScanner ? (
-          <InvoiceScannerScreen
-            key="scanner"
-            onClose={() => setShowScanner(false)}
-            balance={balance}
-          />
-        ) : showCalculator ? (
-          <ROICalculatorScreen
-            key="calculator"
-            preselectedService={selectedService}
-            onClose={() => setShowCalculator(false)}
-          />
-        ) : showCheckout && selectedService ? (
-          <CheckoutFlowScreen
-            key="checkout"
-            service={selectedService}
-            onBack={() => setShowCheckout(false)}
-            onComplete={handleCheckoutComplete}
-          />
-        ) : (
-          <div key="main" className="flex-1 overflow-y-auto pb-24">
-            {activeTab === "home" && (
-              <DashboardScreen
-                onOpenCalculator={handleOpenCalculator}
-                onServiceSelect={handleServiceSelect}
-                onViewOrders={() => setShowScanner(true)}
-              />
-            )}
-            {activeTab === "store" && (
-              <StoreScreen
-                onServiceSelect={handleServiceSelect}
-                onOpenCalculator={handleOpenCalculator}
-              />
-            )}
-            {activeTab === "wallet" && (
-              <DashboardScreen
-                onOpenCalculator={handleOpenCalculator}
-                onServiceSelect={handleServiceSelect}
-                walletView
-              />
-            )}
-            {activeTab === "profile" && (
-              <DashboardScreen
-                onOpenCalculator={handleOpenCalculator}
-                onServiceSelect={handleServiceSelect}
-                profileView
-              />
-            )}
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Bottom Tab Bar */}
+    <div className="relative mx-auto flex min-h-screen max-w-md flex-col bg-gray-950 md:max-w-none md:flex-row">
+      {/* Sidebar Navigation (Tablet/Desktop) */}
       {showShell && (
-        <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+        <div className="hidden md:flex md:w-20 lg:w-64 md:flex-col md:border-r md:border-white/5 md:bg-gray-900/50 md:shrink-0">
+          <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+        </div>
       )}
 
-      {/* Confetti */}
-      {showConfetti && <ConfettiOverlay />}
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Full Screen Views */}
+        <AnimatePresence mode="wait">
+          {showOnboarding ? (
+            <OnboardingScreen key="onboarding" onComplete={handleOnboardingComplete} />
+          ) : showScanner ? (
+            <InvoiceScannerScreen
+              key="scanner"
+              onClose={() => setShowScanner(false)}
+              balance={balance}
+            />
+          ) : showCalculator ? (
+            <ROICalculatorScreen
+              key="calculator"
+              preselectedService={selectedService}
+              onClose={() => setShowCalculator(false)}
+            />
+          ) : showCheckout && selectedService ? (
+            <CheckoutFlowScreen
+              key="checkout"
+              service={selectedService}
+              onBack={() => setShowCheckout(false)}
+              onComplete={handleCheckoutComplete}
+            />
+          ) : (
+            <div key="main" className="flex-1 overflow-y-auto pb-24 md:pb-0">
+              {activeTab === "home" && (
+                <DashboardScreen
+                  onOpenCalculator={handleOpenCalculator}
+                  onServiceSelect={handleServiceSelect}
+                  onViewOrders={() => setShowScanner(true)}
+                />
+              )}
+              {activeTab === "store" && (
+                <StoreScreen
+                  onServiceSelect={handleServiceSelect}
+                  onOpenCalculator={handleOpenCalculator}
+                />
+              )}
+              {activeTab === "wallet" && (
+                <DashboardScreen
+                  onOpenCalculator={handleOpenCalculator}
+                  onServiceSelect={handleServiceSelect}
+                  walletView
+                />
+              )}
+              {activeTab === "profile" && (
+                <DashboardScreen
+                  onOpenCalculator={handleOpenCalculator}
+                  onServiceSelect={handleServiceSelect}
+                  profileView
+                />
+              )}
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Confetti */}
+        {showConfetti && <ConfettiOverlay />}
+      </div>
     </div>
   );
 }

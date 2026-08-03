@@ -57,7 +57,7 @@ export function QuickActions({
   const handlers = [onViewOrders, onBrowseStore, onInviteFriend];
 
   return (
-    <div className="mx-4 mt-5 grid grid-cols-3 gap-2.5">
+    <div className="mx-4 mt-5 grid grid-cols-3 gap-2.5 md:mx-0 md:gap-3 lg:gap-4">
       {quickActions.map((action, i) => (
         <motion.button
           key={i}

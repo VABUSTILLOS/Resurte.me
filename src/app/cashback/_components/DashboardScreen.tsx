@@ -31,9 +31,9 @@ export function DashboardScreen({
   }
 
   return (
-    <div className="pt-2 pb-6">
+    <div className="pt-2 pb-6 md:max-w-none lg:max-w-6xl lg:mx-auto">
       {/* Top Header with Notifications */}
-      <div className="flex items-center justify-between px-4 mb-3">
+      <div className="flex items-center justify-between px-4 mb-3 md:px-6 lg:px-8">
         <div>
           <p className="text-gray-400 text-xs">Buenos días</p>
           <p className="text-white text-lg font-bold">Taquería El Pariente 🌅</p>
@@ -41,52 +41,65 @@ export function DashboardScreen({
         <NotificationBell />
       </div>
 
-      <GrowthWalletBanner
-        balance={12450}
-        nextUnlock={{
-          name: "Campaña Meta Ads — Nivel Intermedio",
-          cost: 16000,
-          progressPercent: 72,
-        }}
-      />
-
-      <QuickActions
-        onViewOrders={onViewOrders}
-        onBrowseStore={() => onServiceSelect}
-      />
-
-      <ActivityFeed />
-
-      {/* Impact Teaser */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.8, duration: 0.4 }}
-        className="mx-4 mt-5 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 
-          border border-emerald-500/15 p-4"
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20">
-            <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 0 1 5.814-5.519l2.74-1.22m0 0-5.94-2.28m5.94 2.28-2.28 5.941" />
-            </svg>
+      {/* Main Dashboard Grid */}
+      <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:px-8">
+        {/* Left Column: Wallet + Quick Actions */}
+        <div className="lg:col-span-2">
+          <div className="px-0 md:px-6 lg:px-0">
+            <GrowthWalletBanner
+              balance={12450}
+              nextUnlock={{
+                name: "Campaña Meta Ads — Nivel Intermedio",
+                cost: 16000,
+                progressPercent: 72,
+              }}
+            />
           </div>
-          <div className="flex-1">
-            <p className="text-white text-sm font-semibold">
-              Con tu consumo actual, en 3 meses desbloqueas tu Campaña Meta Ads
-            </p>
-            <button
-              onClick={() => onOpenCalculator()}
-              className="mt-1.5 text-emerald-400 text-xs font-medium hover:underline"
-            >
-              Calcular proyección exacta →
-            </button>
+
+          <div className="px-0 md:px-6 lg:px-0">
+            <QuickActions
+              onViewOrders={onViewOrders}
+              onBrowseStore={() => onServiceSelect}
+            />
           </div>
+
+          {/* Impact Teaser */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8, duration: 0.4 }}
+            className="mx-4 mt-5 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 
+              border border-emerald-500/15 p-4 md:mx-6 lg:mx-0"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20">
+                <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 0 1 5.814-5.519l2.74-1.22m0 0-5.94-2.28m5.94 2.28-2.28 5.941" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-white text-sm font-semibold">
+                  Con tu consumo actual, en 3 meses desbloqueas tu Campaña Meta Ads
+                </p>
+                <button
+                  onClick={() => onOpenCalculator()}
+                  className="mt-1.5 text-emerald-400 text-xs font-medium hover:underline"
+                >
+                  Calcular proyección exacta →
+                </button>
+              </div>
+            </div>
+          </motion.div>
         </div>
-      </motion.div>
 
-      {/* Impact Stories Carousel */}
-      <ImpactStories />
+        {/* Right Column: Activity + Stories */}
+        <div className="lg:col-span-1 mt-5 lg:mt-0">
+          <div className="md:px-6 lg:px-0">
+            <ActivityFeed />
+          </div>
+          <ImpactStories />
+        </div>
+      </div>
     </div>
   );
 }
@@ -97,7 +110,7 @@ function WalletView() {
   const monthlyCashback = monthlySpend * cashbackRate;
 
   return (
-    <div className="px-4 pt-6 pb-6">
+    <div className="px-4 pt-6 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
       <h1 className="text-white text-xl font-bold mb-5">Mi Cartera</h1>
 
       {/* Balance Card */}
@@ -183,7 +196,7 @@ function WalletView() {
 
 function ProfileView() {
   return (
-    <div className="px-4 pt-6 pb-6">
+    <div className="px-4 pt-6 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
       <h1 className="text-white text-xl font-bold mb-5">Mi Perfil</h1>
 
       <div className="rounded-2xl bg-white/5 border border-white/10 p-5 mb-4">

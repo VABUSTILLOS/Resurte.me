@@ -183,7 +183,7 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator }: StoreScreenPr
   const monthlyCashback = monthlySpend * cashbackRate;
 
   return (
-    <div className="px-4 pt-6 pb-6">
+    <div className="px-4 pt-6 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -219,7 +219,7 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator }: StoreScreenPr
       </div>
 
       {/* Service Grid */}
-      <div className="grid gap-3">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         <AnimatePresence mode="popLayout">
           {filtered.map((service, i) => {
             const monthsToUnlock = Math.ceil(service.cost / monthlyCashback);

@@ -7,6 +7,7 @@ import {
   TrendingUp,
   Store,
   ShoppingBag,
+  Users,
   ArrowRight,
 } from "lucide-react";
 interface OnboardingScreenProps {
@@ -109,10 +110,10 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
                 🚀
               </motion.div>
 
-              <h1 className="text-white text-3xl font-black leading-tight max-w-xs">
+              <h1 className="text-white text-3xl font-black leading-tight max-w-xs md:max-w-lg md:text-4xl">
                 Convierte tus compras en crecimiento
               </h1>
-              <p className="text-gray-400 text-sm mt-4 max-w-xs leading-relaxed">
+              <p className="text-gray-400 text-sm mt-4 max-w-xs md:max-w-lg leading-relaxed md:text-base">
                 Cada vez que compras insumos para tu restaurante, acumulas saldo que
                 puedes canjear por servicios de marketing y desarrollo web.
               </p>
@@ -125,6 +126,10 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
                   </span>
                 </div>
               </div>
+
+              <p className="text-white text-3xl font-black leading-tight mt-6 max-w-xs md:max-w-lg md:text-4xl">
+                Potencia tu negocio haciendo lo que ya haces
+              </p>
             </motion.div>
           )}
 

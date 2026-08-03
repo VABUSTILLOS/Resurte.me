@@ -80,7 +80,7 @@ export function ImpactStories() {
   }, []);
 
   return (
-    <div className="mx-4 mt-6 mb-2">
+    <div className="mx-4 mt-6 mb-2 md:mx-6 lg:mx-0">
       {/* Section Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
