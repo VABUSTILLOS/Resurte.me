@@ -2,51 +2,52 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useSearchParams } from "next/navigation"
-import { Search, ShoppingBag, ArrowLeft, ArrowUpDown, SlidersHorizontal, X } from "lucide-react"
+import { Search, ShoppingBag, ArrowLeft, ArrowUpDown, X } from "lucide-react"
 import { ProductCard } from "@/components/product/product-card"
 import { SearchBar } from "@/components/search/search-bar"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import type { Product, Category } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
+import { loadMoreProducts } from "@/app/[slug]/buscar/actions"
 import Link from "next/link"
 
 type SortOption = "name" | "price-asc" | "price-desc"
 
+type FlattenedProduct = Product & { price: number; sale_price: number | null; stock_status: string }
+
 interface SearchPageClientProps {
   citySlug: string
   cityName: string
-  products: (Product & {
-    product_stores: { store_id: number; price: number; sale_price: number | null; is_available: boolean; stock_status: string }[]
-  })[]
+  products: FlattenedProduct[]
   categories: Category[]
+  totalProducts: number
+  pageSize: number
 }
 
-export function SearchPageClient({ citySlug, cityName, products, categories }: SearchPageClientProps) {
+export function SearchPageClient({ citySlug, cityName, products, categories, totalProducts, pageSize }: SearchPageClientProps) {
   const searchParams = useSearchParams()
   const query = searchParams.get("q") ?? ""
 
-  // Flatten product_store data
-  const flatProducts = useMemo(() => products.map((p) => ({
-    ...p,
-    price: p.product_stores[0]?.price ?? 0,
-    sale_price: p.product_stores[0]?.sale_price ?? null,
-    stock_status: p.product_stores[0]?.stock_status ?? "in_stock",
-  })), [products])
+  // Accumulated products (grows with infinite scroll)
+  const [allProducts, setAllProducts] = useState<FlattenedProduct[]>(products)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(products.length < totalProducts)
+  const [loadingMore, setLoadingMore] = useState(false)
 
-  type FlatProduct = (typeof flatProducts)[number]
-  const [results, setResults] = useState<FlatProduct[]>(flatProducts)
+  const [results, setResults] = useState<FlattenedProduct[]>(products)
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [sortBy, setSortBy] = useState<SortOption>("name")
   const filterBarRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
   // Build category-product count map for chip badges
   const categoryCounts = useMemo(() => {
     const map = new Map<number, number>()
-    flatProducts.forEach((p) => {
+    allProducts.forEach((p) => {
       map.set(p.category_id, (map.get(p.category_id) ?? 0) + 1)
     })
     return map
-  }, [flatProducts])
+  }, [allProducts])
 
   // Sort results
   const sortedResults = useMemo(() => {
@@ -65,8 +66,8 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
     const term = q.toLowerCase().trim()
 
     let filtered = catId
-      ? flatProducts.filter((p) => p.category_id === catId)
-      : flatProducts
+      ? allProducts.filter((p) => p.category_id === catId)
+      : allProducts
 
     if (!term) {
       setResults(filtered)
@@ -86,11 +87,37 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
           p.brand?.toLowerCase().includes(term)
       )
     )
-  }, [flatProducts])
+  }, [allProducts])
 
   useEffect(() => {
     performSearch(query, selectedCategory)
   }, [query, selectedCategory, performSearch])
+
+  // Infinite scroll: observe sentinel element
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel || !hasMore || loadingMore) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setLoadingMore(true)
+          loadMoreProducts(page).then(({ products: newProducts, hasMore: more }) => {
+            setAllProducts((prev) => [...prev, ...newProducts])
+            setPage((p) => p + 1)
+            setHasMore(more)
+            setLoadingMore(false)
+          }).catch(() => {
+            setLoadingMore(false)
+          })
+        }
+      },
+      { rootMargin: "200px" }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [page, hasMore, loadingMore])
 
   const handleCategoryToggle = (catId: number) => {
     setSelectedCategory(prev => prev === catId ? null : catId)
@@ -98,8 +125,20 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
 
   const hasResults = sortedResults.length > 0
   const isShowingAll = !query
-  const totalCount = flatProducts.length
+  const allCount = allProducts.length
   const selectedCat = selectedCategory ? categories.find(c => c.id === selectedCategory) : null
+
+  // Skeleton cards for loading state
+  const SkeletonCard = () => (
+    <div className="bg-white rounded-xl border border-[#e0dbd2] overflow-hidden animate-pulse">
+      <div className="aspect-[4/3] sm:aspect-square bg-[#f0ede6]" />
+      <div className="p-3 space-y-2">
+        <div className="h-3 bg-[#f0ede6] rounded w-1/3" />
+        <div className="h-4 bg-[#f0ede6] rounded w-3/4" />
+        <div className="h-5 bg-[#f0ede6] rounded w-1/2" />
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-[#faf8f5]">
@@ -126,7 +165,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
                   Todos los productos
                 </h1>
                 <p className="text-sm text-[#6b6b6b] mt-1">
-                  {totalCount} productos disponibles — por caja, bulto o pieza
+                  {allCount} de {totalProducts} productos — por caja, bulto o pieza
                 </p>
               </div>
             </div>
@@ -158,7 +197,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
               >
                 <ShoppingBag className="w-3.5 h-3.5" />
                 Todo
-                <span className="text-xs opacity-70 ml-0.5">{totalCount}</span>
+                <span className="text-xs opacity-70 ml-0.5">{allCount}</span>
               </button>
               {categories.map((cat) => {
                 const count = categoryCounts.get(cat.id) ?? 0
@@ -250,11 +289,28 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {sortedResults.map((product, idx) => (
-                <ScrollReveal key={product.id} direction="scale" delay={idx * 0.03}>
+                <ScrollReveal key={product.id} direction="scale" delay={Math.min(idx * 0.03, 0.3)}>
                   <ProductCard product={product} citySlug={citySlug} />
                 </ScrollReveal>
               ))}
             </div>
+
+            {/* Infinite scroll sentinel + loading skeleton */}
+            {hasMore && !loadingMore && (
+              <div ref={sentinelRef} className="h-4" />
+            )}
+            {loadingMore && (
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <SkeletonCard key={i} />
+                ))}
+              </div>
+            )}
+            {!hasMore && allProducts.length > 0 && sortedResults.length > 0 && (
+              <p className="text-center text-sm text-[#999893] mt-8 py-4 border-t border-[#ede8df]">
+                {allCount} de {totalProducts} productos mostrados
+              </p>
+            )}
           </section>
         )}
 

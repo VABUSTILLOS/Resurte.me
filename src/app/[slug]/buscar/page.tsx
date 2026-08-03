@@ -4,10 +4,13 @@ import { Metadata } from "next"
 import { SearchPageClient } from "@/components/search/search-page-client"
 import { Suspense } from "react"
 import { createClient } from "@/lib/supabase/server"
+import { getProductsByStorePaginated } from "@/lib/data"
 
 interface Props {
   params: Promise<{ slug: string }>
 }
+
+export const revalidate = 300 // ISR: revalidate every 5 minutes
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
@@ -34,6 +37,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
+const INITIAL_PAGE_SIZE = 24
+
 export default async function SearchPage({ params }: Props) {
   const { slug } = await params
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
@@ -41,24 +46,28 @@ export default async function SearchPage({ params }: Props) {
 
   const supabase = await createClient()
 
-  const { data: categories } = await supabase
+  const categoriesPromise = supabase
     .from("categories")
     .select("id, name, slug, icon, parent_id")
     .order("id")
 
-  const { data: products } = await supabase
-    .from("products")
-    .select(`
-      id, name, slug, description, image_url, images, brand, category_id, unit,
-      show_in_whatsapp, whatsapp_product_id,
-      product_stores!inner(store_id, price, sale_price, is_available, stock_status)
-    `)
-    .eq("product_stores.store_id", 1)
-    .order("name")
+  const productsPromise = getProductsByStorePaginated(1, 0, INITIAL_PAGE_SIZE)
+
+  const [{ data: categories }, { products, total }] = await Promise.all([
+    categoriesPromise,
+    productsPromise,
+  ])
 
   return (
     <Suspense fallback={<div className="p-8 text-center text-[#999893]">Cargando...</div>}>
-      <SearchPageClient citySlug={slug} cityName={city.name} products={products ?? []} categories={categories ?? []} />
+      <SearchPageClient
+        citySlug={slug}
+        cityName={city.name}
+        products={products}
+        categories={categories ?? []}
+        totalProducts={total}
+        pageSize={INITIAL_PAGE_SIZE}
+      />
     </Suspense>
   )
 }

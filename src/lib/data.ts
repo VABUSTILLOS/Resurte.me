@@ -99,6 +99,65 @@ export async function getProductsByStore(
   )
 }
 
+const PAGE_SIZE = 24
+
+export async function getProductsByStorePaginated(
+  storeId: number,
+  page: number = 0,
+  pageSize: number = PAGE_SIZE,
+  categoryId?: number
+): Promise<{
+  products: (Product & { price: number; sale_price: number | null; stock_status: string })[]
+  total: number
+  hasMore: boolean
+}> {
+  const supabase = await createClient()
+  const from = page * pageSize
+  const to = from + pageSize - 1
+
+  let query = supabase
+    .from("products")
+    .select(
+      `*, product_stores!inner(price, sale_price, stock_status)`,
+      { count: "exact", head: false }
+    )
+    .eq("product_stores.store_id", storeId)
+    .eq("product_stores.is_available", true)
+    .order("name")
+    .range(from, to)
+
+  if (categoryId) {
+    query = query.eq("category_id", categoryId)
+  }
+
+  const { data, count } = await query
+
+  const products =
+    (data as unknown as (Product & {
+      product_stores: { price: number; sale_price: number | null; stock_status: string }[]
+    })[])?.map((p) => ({
+      ...p,
+      price: p.product_stores[0]?.price ?? 0,
+      sale_price: p.product_stores[0]?.sale_price ?? null,
+      stock_status: p.product_stores[0]?.stock_status ?? "out_of_stock",
+    })) ?? []
+
+  const total = count ?? products.length
+  const hasMore = from + products.length < total
+
+  return { products, total, hasMore }
+}
+
+export async function getProductsCount(storeId: number): Promise<number> {
+  const supabase = await createClient()
+  const { count } = await supabase
+    .from("products")
+    .select("id", { count: "exact", head: true })
+    .eq("product_stores.store_id", storeId)
+    .eq("product_stores.is_available", true)
+  return count ?? 0
+}
+
 export async function getProductBySlug(
   slug: string,
   storeId?: number
