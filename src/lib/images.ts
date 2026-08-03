@@ -1,9 +1,9 @@
 // Product images — all from resurte.me Google Cloud Storage (real store images)
 // Hero uses a verified Wikimedia Commons public-domain image
 
-// HERO — store product images
-export const HERO_GROCERY = "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png"
-export const HERO_FRUITS = "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png"
+// HERO — large-format store image (JPG, 976KB)
+export const HERO_GROCERY = "https://storage.googleapis.com/takeapp/media/cmifh7a6k000004jpa7or85li.jpg"
+export const HERO_FRUITS = "https://storage.googleapis.com/takeapp/media/cmifh7a6k000004jpa7or85li.jpg"
 
 // FRUITS — real store images
 export const IMG_APPLE = "https://storage.googleapis.com/takeapp/media/cmihojint000k04if2qg48em7.png"

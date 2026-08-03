@@ -124,17 +124,70 @@ const MULTI_IMAGES: Record<number, string[]> = {
   140: ["https://storage.googleapis.com/takeapp/media/cmidk5ovr00000hka85jr5bzf.webp", "https://storage.googleapis.com/takeapp/media/cmidk5uvg00000ijcnvka82k1.webp"],
 }
 
-// Category-based fallbacks — diverse store images per category
-const CATEGORY_FALLBACKS: Record<string, string> = {
-  verduras: "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
-  abarrotes: "https://storage.googleapis.com/takeapp/media/cmidk59fi00000imqacaggoal.webp",
-  lacteos: "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp",
-  carnes: "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png",
-  panaderia: "https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp",
-  bebidas: "https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png",
-  botanas: "https://storage.googleapis.com/takeapp/media/cmikmw51n000304jz0r6shapj.png",
-  limpieza: "https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp",
-  congelados: "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png",
+// Category-based fallback pools — multiple store images per category, cycled by PID
+const CATEGORY_POOLS: Record<string, string[]> = {
+  verduras: [
+    "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
+    "https://storage.googleapis.com/takeapp/media/cmihqyxja000b04l5h1s4euob.png",
+    "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png",
+    "https://storage.googleapis.com/takeapp/media/cmikmw51n000304jz0r6shapj.png",
+    "https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png",
+    "https://storage.googleapis.com/takeapp/media/cmijq38em001604l7hja83595.png",
+  ],
+  abarrotes: [
+    "https://storage.googleapis.com/takeapp/media/cmidk59fi00000imqacaggoal.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5ucg00000ijff55kb0k6.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5ahb00000ikx1fo4ebab.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5ovr00000hka85jr5bzf.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5uvg00000ijcnvka82k1.webp",
+  ],
+  lacteos: [
+    "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5ahb00000ikx1fo4ebab.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5ucg00000ijff55kb0k6.webp",
+  ],
+  carnes: [
+    "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png",
+    "https://storage.googleapis.com/takeapp/media/cmigudrly000s04jpe45e71lo.png",
+  ],
+  panaderia: [
+    "https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5o07000000hkcn2oeaq4.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5ovr00000hka85jr5bzf.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5uvg00000ijcnvka82k1.webp",
+  ],
+  bebidas: [
+    "https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png",
+    "https://storage.googleapis.com/takeapp/media/cmijq38em001604l7hja83595.png",
+    "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png",
+    "https://storage.googleapis.com/takeapp/media/cmikmw51n000304jz0r6shapj.png",
+  ],
+  botanas: [
+    "https://storage.googleapis.com/takeapp/media/cmikmw51n000304jz0r6shapj.png",
+    "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png",
+    "https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp",
+  ],
+  limpieza: [
+    "https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5ucg00000ijff55kb0k6.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5ahb00000ikx1fo4ebab.webp",
+    "https://storage.googleapis.com/takeapp/media/cmidk5ovr00000hka85jr5bzf.webp",
+  ],
+  congelados: [
+    "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png",
+    "https://storage.googleapis.com/takeapp/media/cmigudrly000s04jpe45e71lo.png",
+    "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp",
+  ],
+}
+
+function getFallback(category: string, pid: number): string {
+  const pool = CATEGORY_POOLS[category] || CATEGORY_POOLS["abarrotes"]
+  return pool[pid % pool.length]
 }
 
 function getCategory(pid: number): string {
@@ -173,7 +226,7 @@ export async function POST(req: NextRequest) {
         images = MULTI_IMAGES[pid] || [imageUrl]
         realCount++
       } else {
-        imageUrl = CATEGORY_FALLBACKS[getCategory(pid)]
+        imageUrl = getFallback(getCategory(pid), pid)
         images = [imageUrl]
         fallbackCount++
       }
