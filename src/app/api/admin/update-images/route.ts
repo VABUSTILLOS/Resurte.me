@@ -71,7 +71,7 @@ const IMAGE_UPDATES: Record<number, string> = {
 const MULTI_IMAGES: Record<number, string[]> = {
   1: ["https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png", "https://storage.googleapis.com/takeapp/media/cmihp1d5p000904l4ap1f6tf8.png", "https://storage.googleapis.com/takeapp/media/cmihojint000k04if2qg48em7.png"],
   2: ["https://storage.googleapis.com/takeapp/media/cmihov9fh001304ju8yfi21dq.png", "https://storage.googleapis.com/takeapp/media/cmihounrr001004ju2zr0kkrr.png"],
-  3: ["https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png", "https://storage.googleapis.com/takeapp/media/cmihom7yn000c04jo60fp0i26.png"],
+  3: ["https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png", "https://storage.googleapis.com/takeapp/media/cmihqf2pi000704la16zb486c.png"],
   4: ["https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png", "https://storage.googleapis.com/takeapp/media/cmijnpqc1000c04lb4mr4b1cy.png"],
   5: ["https://storage.googleapis.com/takeapp/media/cmijp7zpj000404l40mtkbyuh.png", "https://storage.googleapis.com/takeapp/media/cmijp8bq3000604le988t96v6.png"],
   6: ["https://storage.googleapis.com/takeapp/media/cmijo779j000204jz2yrwe753.png", "https://storage.googleapis.com/takeapp/media/cmijo7k5s000504jzcz7ye4bg.png"],
@@ -124,17 +124,17 @@ const MULTI_IMAGES: Record<number, string[]> = {
   140: ["https://storage.googleapis.com/takeapp/media/cmidk5ovr00000hka85jr5bzf.webp", "https://storage.googleapis.com/takeapp/media/cmidk5uvg00000ijcnvka82k1.webp"],
 }
 
-// Category-based Wikimedia Commons fallbacks
+// Category-based fallbacks — diverse store images per category
 const CATEGORY_FALLBACKS: Record<string, string> = {
   verduras: "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
-  abarrotes: "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
+  abarrotes: "https://storage.googleapis.com/takeapp/media/cmidk59fi00000imqacaggoal.webp",
   lacteos: "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp",
   carnes: "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png",
   panaderia: "https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp",
-  bebidas: "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
-  botanas: "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
-  limpieza: "https://storage.googleapis.com/takeapp/media/cmihon5gm000f04jo8q5f7jdf.png",
-  congelados: "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp",
+  bebidas: "https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png",
+  botanas: "https://storage.googleapis.com/takeapp/media/cmikmw51n000304jz0r6shapj.png",
+  limpieza: "https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp",
+  congelados: "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png",
 }
 
 function getCategory(pid: number): string {
