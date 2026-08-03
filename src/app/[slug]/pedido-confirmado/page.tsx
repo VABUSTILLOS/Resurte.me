@@ -1,0 +1,106 @@
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useCity } from "@/contexts/city-context"
+import { CheckCircle2, ArrowRight, Package, Clock, MapPin, Store } from "lucide-react"
+import Link from "next/link"
+
+function generateOrderId(): string {
+  const prefix = "RT"
+  const random = Math.random().toString(36).substring(2, 7).toUpperCase()
+  const timestamp = Date.now().toString(36).substring(-4).toUpperCase()
+  return `${prefix}-${random}${timestamp}`
+}
+
+export default function OrderConfirmedPage() {
+  const { city } = useCity()
+  const [orderId] = useState(() => generateOrderId())
+
+  if (!city) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-20 text-center">
+        <p className="text-gray-500">Cargando...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-xl mx-auto px-4 sm:px-6 py-12">
+      {/* Success icon */}
+      <div className="text-center mb-8">
+        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-6">
+          <CheckCircle2 className="w-10 h-10 text-green-600" />
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+          ¡Pedido confirmado!
+        </h1>
+        <p className="text-gray-500 text-sm sm:text-base">
+          Tu pedido <span className="font-mono font-bold text-brand-600">{orderId}</span> ha sido
+          registrado exitosamente.
+        </p>
+      </div>
+
+      {/* Order info cards */}
+      <div className="space-y-4 mb-8">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
+            <Package className="w-5 h-5 text-brand-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">Estado del pedido</p>
+            <p className="text-sm text-gray-500">Pendiente de confirmación por la tienda.</p>
+            <div className="mt-2">
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-full border border-amber-200">
+                <Clock className="w-3 h-3" />
+                Pendiente
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+            <Store className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">Seguimiento en tiempo real</p>
+            <p className="text-sm text-gray-500">
+              Te notificaremos cuando la tienda confirme, prepare y envíe tu pedido.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
+            <MapPin className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900 text-sm">Entrega en {city.name}</p>
+            <p className="text-sm text-gray-500">
+              Recibirás una notificación cuando el repartidor esté en camino.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* CTA buttons */}
+      <div className="space-y-3">
+        <Link
+          href={`/${city.slug}`}
+          className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 transition-colors"
+        >
+          Seguir comprando
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+        <Link
+          href={`/${city.slug}/mis-pedidos`}
+          className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
+        >
+          <Package className="w-4 h-4" />
+          Ver mis pedidos
+        </Link>
+      </div>
+    </div>
+  )
+}

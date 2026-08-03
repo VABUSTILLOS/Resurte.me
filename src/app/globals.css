@@ -1,26 +1,58 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Instacart-inspired green palette — pure vivid green, not teal-emerald */
+  --color-brand-50: #F6FDF6;
+  --color-brand-100: #E9FBE9;
+  --color-brand-200: #B8EDB8;
+  --color-brand-300: #7ADE7A;
+  --color-brand-400: #3CC73C;
+  --color-brand-500: #108910;
+  --color-brand-600: #0D720D;
+  --color-brand-700: #0A610A;
+  --color-brand-800: #084D08;
+  --color-brand-900: #063A06;
+  --color-brand-950: #032203;
+
+  /* Cornershop-inspired electric green (for success states) */
+  --color-cs-green-50: #E6FFEE;
+  --color-cs-green-100: #B3FFCD;
+  --color-cs-green-200: #80FFAD;
+  --color-cs-green-300: #4DFF8C;
+  --color-cs-green-400: #1AFF6B;
+  --color-cs-green-500: #00DE52;
+  --color-cs-green-600: #00C549;
+  --color-cs-green-700: #00A83E;
+  --color-cs-green-800: #008B33;
+  --color-cs-green-900: #006E28;
+
+  /* Warm grays from Instacart's IDS system */
+  --color-warm-50: #F7F5F0;
+  --color-warm-100: #EFE9E1;
+  --color-warm-200: #E8E9EB;
+  --color-warm-300: #C7C8CD;
+  --color-warm-400: #8F939B;
+  --color-warm-500: #72767E;
+  --color-warm-600: #56595E;
+  --color-warm-700: #343538;
+  --color-warm-800: #242529;
+  --color-warm-900: #191A1C;
+  --color-warm-950: #0B0C0D;
+}
+
+:root {
+  --background: #F7F5F0;
+  --foreground: #343538;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #191A1C;
+    --foreground: #E8E9EB;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
