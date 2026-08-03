@@ -109,7 +109,7 @@ export default function RootLayout({
             <MobileCartBar />
             <MobileCartBar />
             <WhatsAppButton
-              phoneNumber="+525512345678"
+              phoneNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}
               message="¡Hola! Quiero hacer un pedido en Resurte.me"
               label="Pedir por WhatsApp"
             />

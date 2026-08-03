@@ -19,8 +19,16 @@ const DEFAULT_CITY_SLUG = "chihuahua"
 // Products per category to show on landing — show first 5, then "Ver Todo"
 const PREVIEW_COUNT = 5
 
-// Only show these 4 restaurant-essential categories on the homepage
-const FEATURED_CATEGORY_SLUGS = ["frutas-verduras", "carnes-aves-pescados", "abarrotes", "lacteos-huevos"]
+// Restaurant-essential categories shown on the homepage — ordered by priority
+const FEATURED_CATEGORY_SLUGS = [
+  "frutas-verduras",
+  "carnes-pescados",
+  "lacteos-huevos",
+  "panaderia-tortilleria",
+  "despensa",
+  "bebidas",
+  "limpieza",
+]
 
 const TESTIMONIALS = [
   {
@@ -135,7 +143,7 @@ export function CityLanding({
               <div className="mt-6 inline-flex items-center gap-1.5 text-sm text-white/70">
                 <MapPin className="w-3.5 h-3.5 text-[#3CC73C]" />
                 <span>
-                  Entregando hoy en {currentCity?.name || "Chihuahua"}, {currentCity?.state || "Chihuahua"}
+                  Entregando hoy en {currentCity?.name || "Ciudad de México"}, {currentCity?.state || "CDMX"}
                 </span>
                 <button
                   onClick={() => setShowSelector(true)}
@@ -143,6 +151,17 @@ export function CityLanding({
                 >
                   cambiar
                 </button>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/10 text-white/80 text-xs font-medium rounded-full border border-white/10">
+                  <span className="text-[#3CC73C]">📄</span> Facturamos (CFDI)
+                </span>
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/10 text-white/80 text-xs font-medium rounded-full border border-white/10">
+                  <span className="text-[#3CC73C]">🔄</span> Devolución sin costo
+                </span>
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/10 text-white/80 text-xs font-medium rounded-full border border-white/10">
+                  <span className="text-[#3CC73C]">🚚</span> Envío gratis desde $2,500
+                </span>
               </div>
               <form onSubmit={handleSearch} className="mt-8 max-w-lg">
                 <div className="flex items-stretch bg-white rounded-[10px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.25)]">
@@ -261,7 +280,7 @@ export function CityLanding({
                     {/* Subtle top gradient bar on hover */}
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#108910] to-[#3CC73C] opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     <div className="w-14 h-14 rounded-2xl bg-[#f7f5f0] flex items-center justify-center text-2xl shadow-sm group-hover:shadow-md transition-shadow">
-                      {getCategoryIcon(cat.icon)}
+                      {getCategoryIcon(cat.icon, cat.slug)}
                     </div>
                     <span className="text-sm font-semibold text-[#1a1a1a] text-center leading-tight group-hover:text-[#108910] transition-colors">
                       {cat.name}
@@ -315,7 +334,7 @@ export function CityLanding({
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-[#108910]/10 flex items-center justify-center text-xl">
-                      {getCategoryIcon(cat.icon)}
+                      {getCategoryIcon(cat.icon, cat.slug)}
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-[#242529]">{cat.name}</h3>
@@ -679,7 +698,7 @@ export function CityLanding({
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
             <a
-              href="https://wa.me/5216141234567?text=Quiero%20recibir%20la%20lista%20de%20precios%20semanal"
+              href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}?text=Quiero%20recibir%20la%20lista%20de%20precios%20semanal`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#25D366] text-white text-sm font-semibold px-6 py-3 rounded-[10px] hover:bg-[#20BD5A] transition-colors"

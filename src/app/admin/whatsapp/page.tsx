@@ -135,7 +135,7 @@ export default function AdminWhatsAppPage() {
                   : "bg-white border border-[#E8E9EB] text-[#72767E] hover:bg-[#F7F5F0]"
               }`}
             >
-              {getCategoryIcon(cat.icon)} {cat.name}
+              {getCategoryIcon(cat.icon, cat.slug)} {cat.name}
             </button>
           ))}
         </div>
@@ -203,7 +203,7 @@ export default function AdminWhatsAppPage() {
                   )}
                 </div>
                 <p className="text-xs text-[#B0B3B8] mt-0.5">
-                  {getCategoryIcon(category?.icon)} {category?.name || "Sin categoría"}
+                  {getCategoryIcon(category?.icon, category?.slug)} {category?.name || "Sin categoría"}
                   {product.brand ? ` · ${product.brand}` : ""}
                   {product.unit ? ` · ${product.unit}` : ""}
                 </p>

@@ -184,7 +184,7 @@ export default function CheckoutPage() {
             Envía tu pedido directamente por WhatsApp y un asesor te atenderá.
           </p>
           <a
-            href={`https://wa.me/525512345678?text=${encodeURIComponent(
+            href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}?text=${encodeURIComponent(
               "🛒 *Pedido desde Resurte.me*\n\n" +
                 cart.items
                   .map(

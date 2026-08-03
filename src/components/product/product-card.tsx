@@ -3,6 +3,7 @@
 import { Plus, Check } from "lucide-react"
 import type { Product } from "@/types"
 import { useCart } from "@/contexts/cart-context"
+import { getProductTagline } from "@/lib/utils"
 import { useState } from "react"
 import Link from "next/link"
 
@@ -46,6 +47,9 @@ export function ProductCard({
 
   // Second image for hover swap effect
   const secondaryImage = product.images?.[1]
+
+  // Extract scanning-friendly tagline from product description
+  const tagline = getProductTagline(product.description)
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -145,6 +149,12 @@ export function ProductCard({
           )}
           {product.brand && (
             <p className="text-xs text-[#999893] mb-0.5">{product.brand}</p>
+          )}
+          {/* Scanning-friendly tagline — last sentence of description as a use-case hint */}
+          {tagline && (
+            <p className="text-[11px] text-[#72767E] mb-0.5 line-clamp-1 italic">
+              {tagline}
+            </p>
           )}
           <h3 className="text-sm text-[#1a1a1a] font-medium line-clamp-2 leading-tight group-hover:text-[#108910] transition-colors duration-200">
             {product.name}

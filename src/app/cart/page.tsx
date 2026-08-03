@@ -1,0 +1,240 @@
+"use client"
+
+import { ArrowLeft, ShoppingCart, Trash2, Minus, Plus, Package } from "lucide-react"
+import { useCart } from "@/contexts/cart-context"
+import Link from "next/link"
+import { useState } from "react"
+
+export default function CartPage() {
+  const { cart, itemCount, subtotal, discount, coupon, removeItem, updateQuantity, clearCart } = useCart()
+  const [confirmClear, setConfirmClear] = useState(false)
+
+  const handleClear = () => {
+    if (confirmClear) {
+      clearCart()
+      setConfirmClear(false)
+    } else {
+      setConfirmClear(true)
+      setTimeout(() => setConfirmClear(false), 4000)
+    }
+  }
+
+  // Empty state
+  if (!cart.items.length) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center px-4">
+        <div className="w-20 h-20 rounded-full bg-[#F7F5F0] flex items-center justify-center mb-6">
+          <ShoppingCart className="w-10 h-10 text-[#D9D7D2]" />
+        </div>
+        <h1 className="text-2xl font-bold text-[#242529] mb-2">Tu carrito está vacío</h1>
+        <p className="text-[#72767E] text-center max-w-sm mb-8">
+          Agrega productos desde el catálogo para comenzar tu pedido.
+        </p>
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-[#108910] text-white font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
+        >
+          Explorar productos
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-6 sm:py-10">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm text-[#72767E] hover:text-[#108910] transition-colors mb-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Seguir comprando
+          </Link>
+          <h1 className="text-2xl font-bold text-[#242529]">Tu carrito</h1>
+          <p className="text-sm text-[#72767E]">{itemCount} {itemCount === 1 ? "producto" : "productos"}</p>
+        </div>
+        <button
+          onClick={handleClear}
+          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+            confirmClear
+              ? "bg-[#de3534] text-white"
+              : "text-[#de3534] hover:bg-red-50 border border-transparent hover:border-red-200"
+          }`}
+        >
+          <Trash2 className="w-4 h-4" />
+          {confirmClear ? "¿Confirmar?" : "Vaciar"}
+        </button>
+      </div>
+
+      {/* Cart items */}
+      <div className="space-y-3 mb-8">
+        {cart.items.map((item) => {
+          const itemPrice = item.sale_price ?? item.price
+          const itemTotal = itemPrice * item.quantity
+
+          return (
+            <div
+              key={item.product_id}
+              className="bg-white rounded-xl border border-[#e0dbd2] p-4 flex gap-4 items-center"
+            >
+              {/* Image */}
+              <Link
+                href={`/${item.store_slug || "resurte"}/producto/${item.slug}`}
+                className="w-20 h-20 rounded-lg bg-[#faf8f5] flex items-center justify-center overflow-hidden shrink-0"
+              >
+                {item.image_url ? (
+                  <img
+                    src={item.image_url}
+                    alt={item.name}
+                    className="w-full h-full object-contain p-1.5"
+                  />
+                ) : (
+                  <Package className="w-8 h-8 text-[#D9D7D2]" />
+                )}
+              </Link>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <Link
+                  href={`/${item.store_slug || "resurte"}/producto/${item.slug}`}
+                  className="font-semibold text-[#242529] text-sm line-clamp-2 hover:text-[#108910] transition-colors"
+                >
+                  {item.name}
+                </Link>
+                {item.brand && (
+                  <p className="text-xs text-[#B0B3B8] mt-0.5">{item.brand}</p>
+                )}
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-sm font-bold text-[#1a1a1a]">
+                    ${itemPrice.toFixed(2)}
+                  </span>
+                  {item.sale_price && item.sale_price < item.price && (
+                    <span className="text-xs text-[#B0B3B8] line-through">
+                      ${item.price.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Quantity + Remove */}
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <button
+                  onClick={() => removeItem(item.product_id)}
+                  className="text-[#B0B3B8] hover:text-[#de3534] transition-colors"
+                  aria-label={`Eliminar ${item.name}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <div className="flex items-center gap-1.5 bg-[#F7F5F0] rounded-lg p-1">
+                  <button
+                    onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
+                    className="w-7 h-7 flex items-center justify-center rounded-md text-[#72767E] hover:bg-white hover:text-[#1a1a1a] transition-colors"
+                    aria-label="Reducir cantidad"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="w-7 text-center text-sm font-semibold text-[#1a1a1a] tabular-nums">
+                    {item.quantity}
+                  </span>
+                  <button
+                    onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
+                    className="w-7 h-7 flex items-center justify-center rounded-md text-[#72767E] hover:bg-white hover:text-[#108910] transition-colors"
+                    aria-label="Aumentar cantidad"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <span className="text-sm font-semibold text-[#1a1a1a] tabular-nums">
+                  ${itemTotal.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Summary */}
+      <div className="bg-white rounded-xl border border-[#e0dbd2] p-5">
+        <h2 className="font-bold text-[#242529] mb-4">Resumen del pedido</h2>
+
+        <div className="space-y-2 text-sm mb-4">
+          <div className="flex justify-between text-[#72767E]">
+            <span>Subtotal ({itemCount} productos)</span>
+            <span className="tabular-nums">${subtotal.toFixed(2)}</span>
+          </div>
+          {discount > 0 && (
+            <div className="flex justify-between text-[#108910]">
+              <span>Descuento {coupon ? `(${coupon.code})` : ""}</span>
+              <span className="tabular-nums">-${discount.toFixed(2)}</span>
+            </div>
+          )}
+          {itemCount >= 10 && (
+            <div className="flex justify-between text-[#108910]">
+              <span>Envío</span>
+              <span>Gratis</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-between items-center pt-4 border-t border-[#e0dbd2]">
+          <span className="text-base font-bold text-[#242529]">Total</span>
+          <span className="text-xl font-bold text-[#1a1a1a] tabular-nums">
+            ${Math.max(0, subtotal - discount).toFixed(2)}
+          </span>
+        </div>
+
+        <p className="text-xs text-[#B0B3B8] mt-2">
+          Envío gratis en pedidos de 10+ productos. Aplican restricciones por zona.
+        </p>
+      </div>
+
+      {/* Actions */}
+      <div className="mt-6 flex flex-col sm:flex-row gap-3">
+        <a
+          href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}?text=${encodeURIComponent(
+            "🛒 *Pedido desde Resurte.me*\n\n" +
+              cart.items
+                .map(
+                  (item, i) =>
+                    `${i + 1}. ${item.quantity}× ${item.name} — $${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}`
+                )
+                .join("\n") +
+              `\n\n*Total: $${Math.max(0, subtotal - discount).toFixed(2)} MXN*\n\n¿Me confirman disponibilidad y tiempo de entrega?`
+          )}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors"
+        >
+          <Package className="w-5 h-5" />
+          Pedir por WhatsApp
+        </a>
+        <Link
+          href="/resurte/checkout"
+          className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-[#108910] text-white font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
+        >
+          Ir a checkout
+        </Link>
+      </div>
+
+      {/* Trust signals */}
+      <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+        {trustSignals.map((signal) => (
+          <div key={signal.label} className="bg-white rounded-xl border border-[#e0dbd2] p-3">
+            <span className="text-lg">{signal.icon}</span>
+            <p className="text-xs font-semibold text-[#242529] mt-1">{signal.label}</p>
+            <p className="text-[10px] text-[#B0B3B8]">{signal.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const trustSignals = [
+  { icon: "🔒", label: "Pago Seguro", desc: "Stripe y Conekta" },
+  { icon: "🚚", label: "Envío Gratis", desc: "En pedidos de 10+ prod." },
+  { icon: "📄", label: "Factura (CFDI)", desc: "Para tu negocio" },
+  { icon: "⭐", label: "Calidad Garantizada", desc: "O te devolvemos tu dinero" },
+]

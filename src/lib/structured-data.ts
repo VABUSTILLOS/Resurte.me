@@ -5,6 +5,9 @@ import { MEXICO_CITIES } from "@/lib/cities"
  * Injects into pages via <script type="application/ld+json">.
  */
 
+// WhatsApp number for structured data — resolves at build time via Next.js env inlining
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
+
 interface OrganizationSchema {
   "@context": "https://schema.org"
   "@type": "Organization"
@@ -35,11 +38,11 @@ export function getOrganizationSchema(): OrganizationSchema {
     sameAs: [
       "https://www.facebook.com/resurteme",
       "https://www.instagram.com/resurteme",
-      "https://wa.me/525512345678",
+      "https://wa.me/" + WHATSAPP_NUMBER,
     ],
     contactPoint: {
       "@type": "ContactPoint",
-      telephone: "+525512345678",
+      telephone: "+" + WHATSAPP_NUMBER,
       contactType: "customer service",
       areaServed: cities,
       availableLanguage: "es",

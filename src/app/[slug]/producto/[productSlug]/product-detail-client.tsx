@@ -161,7 +161,7 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
                 href={`/${citySlug}/categoria/${category.slug}`}
                 className="inline-flex items-center gap-1.5 self-start text-sm text-[#108910] font-medium bg-[#e8f5e9] px-3 py-1 rounded-full hover:bg-[#c8e6c8] transition-colors mb-4"
               >
-                <span>{getCategoryIcon(category.icon)}</span>
+                <span>{getCategoryIcon(category.icon, category.slug)}</span>
                 {category.name}
               </Link>
             )}
@@ -198,6 +198,14 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
               <div className="flex items-baseline gap-3">
                 <span className="text-2xl sm:text-3xl font-bold text-[#1a1a1a]">
                   ${displayPrice.toFixed(2)}
+
+            {/* Quality guarantee badge — prominent trust signal */}
+            <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-[#e8f5e9] rounded-xl border border-[#c8e6c8]">
+              <Check className="w-4 h-4 text-[#108910] shrink-0" />
+              <p className="text-xs font-medium text-[#1E6E1E]">
+                Calidad garantizada o te devolvemos tu dinero · Factura (CFDI) incluida
+              </p>
+            </div>
                 </span>
                 {hasDiscount && (
                   <>
@@ -273,7 +281,7 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
               </button>
 
               <a
-                href={`https://wa.me/5216141234567?text=${encodeURIComponent(
+                href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}?text=${encodeURIComponent(
                   `Hola, me interesa: ${product.name}${quantity > 1 ? ` x${quantity}` : ""} - $${displayPrice.toFixed(2)} c/u`
                 )}`}
                 target="_blank"
@@ -308,7 +316,7 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
                 </button>
                 <div className="accordion-body open">
                   <p className="text-sm text-[#6b6b6b] leading-relaxed whitespace-pre-line">
-                    {product.description || "Producto seleccionado de la Central de Abastos con los más altos estándares de frescura y calidad."}
+                    {product.description || "Producto seleccionado directamente en la Central de Abastos. Frescura garantizada para que tu negocio sirva siempre lo mejor. Origen verificado, manejo sanitario certificado."}
                   </p>
                 </div>
               </div>
@@ -334,7 +342,7 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
                 </button>
                 <div className="accordion-body">
                   <p className="text-sm text-[#6b6b6b] leading-relaxed">
-                    Producto de calidad seleccionado directamente de la Central de Abastos. Todos nuestros productos pasan por estrictos controles de frescura y calidad antes de llegar a tu hogar.
+                    <strong>Calidad garantizada para tu negocio.</strong> Todos nuestros productos provienen directamente de distribuidores autorizados en la Central de Abastos. Cada lote pasa por control de frescura, temperatura y manejo sanitario antes de salir a ruta. Si algo no llega en condiciones óptimas, te lo reponemos sin costo.
                   </p>
                 </div>
               </div>

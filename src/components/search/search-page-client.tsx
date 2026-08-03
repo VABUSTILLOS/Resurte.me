@@ -173,7 +173,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
                         : "bg-white text-[#1a1a1a] border border-[#e0dbd2] hover:border-[#108910]/30 hover:bg-[#f7f5f0]"
                     }`}
                   >
-                    <span className="text-base">{getCategoryIcon(cat.icon)}</span>
+                    <span className="text-base">{getCategoryIcon(cat.icon, cat.slug)}</span>
                     {cat.name}
                     <span className="text-xs opacity-70 ml-0.5">{count}</span>
                   </button>
@@ -188,7 +188,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
                   onClick={() => setSelectedCategory(null)}
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-[#108910]/10 text-[#108910] hover:bg-[#108910]/20 transition-colors"
                 >
-                  {getCategoryIcon(selectedCat.icon)} {selectedCat.name}
+                  {getCategoryIcon(selectedCat.icon, selectedCat.slug)} {selectedCat.name}
                   <X className="w-3 h-3" />
                 </button>
               )}

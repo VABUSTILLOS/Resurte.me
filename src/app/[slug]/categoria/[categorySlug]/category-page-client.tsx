@@ -44,7 +44,7 @@ export function CategoryPageClient({ citySlug, cityName, category, products }: C
           <ScrollReveal>
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-[#108910]/10 flex items-center justify-center text-3xl shadow-sm">
-                {getCategoryIcon(category.icon)}
+                {getCategoryIcon(category.icon, category.slug)}
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1a1a] tracking-tight">{category.name}</h1>

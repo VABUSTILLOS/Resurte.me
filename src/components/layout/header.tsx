@@ -6,17 +6,12 @@ import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
 import { SearchBar } from "@/components/search/search-bar"
-import { CART_DRAWER_EVENT } from "@/components/cart/cart-drawer"
 import { useState } from "react"
 
 export function Header() {
   const { city } = useCity()
   const { itemCount } = useCart()
   const [showCitySelector, setShowCitySelector] = useState(false)
-
-  const toggleCartDrawer = () => {
-    window.dispatchEvent(new Event(CART_DRAWER_EVENT))
-  }
 
   return (
     <header className="sticky top-0 z-50 glass-header">
@@ -57,8 +52,8 @@ export function Header() {
               <MapPin className="w-5 h-5 text-[#343538]" />
             </button>
 
-            <button
-              onClick={toggleCartDrawer}
+            <Link
+              href="/cart"
               className="relative p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
             >
               <ShoppingCart className="w-5 h-5 text-[#343538]" />
@@ -67,7 +62,7 @@ export function Header() {
                   {itemCount > 99 ? "99+" : itemCount}
                 </span>
               )}
-            </button>
+            </Link>
 
             <Link
               href="/auth/login"

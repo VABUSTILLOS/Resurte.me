@@ -109,7 +109,7 @@ export function CityPageClient({ slug }: Props) {
                   : "bg-[#F7F5F0] text-[#72767E] hover:bg-[#EDEBE6]"
               }`}
             >
-              <span>{getCategoryIcon(cat.icon)}</span>
+              <span>{getCategoryIcon(cat.icon, cat.slug)}</span>
               {cat.name}
             </button>
           ))}
@@ -127,7 +127,7 @@ export function CityPageClient({ slug }: Props) {
         productsByCategory?.map(({ category, products }) => (
           <section key={category.id} className="mb-10">
             <h2 className="flex items-center gap-2 text-xl font-bold text-[#242529] mb-4">
-              <span>{getCategoryIcon(category.icon)}</span>
+              <span>{getCategoryIcon(category.icon, category.slug)}</span>
               {category.name}
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
