@@ -360,7 +360,7 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
                 </button>
                 <div className="accordion-body">
                   <p className="text-sm text-[#6b6b6b] leading-relaxed">
-                    Envío gratis en pedidos superiores a $2,500 MXN en {cityName}. Entregas en 24-48 horas hábiles. Productos perecederos cuentan con garantía de frescura. Facturación electrónica incluida.
+                    Envío gratis en pedidos superiores a $2,500 MXN en {cityName}. Entregas el mismo día. Productos perecederos cuentan con garantía de frescura. Facturación electrónica incluida.
                   </p>
                 </div>
               </div>
@@ -377,7 +377,7 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
                     Entrega en {cityName}
                   </p>
                   <p className="text-xs text-[#6b6b6b] mt-0.5 leading-relaxed">
-                    Envío gratis desde $2,500 MXN. Entrega en 24-48 horas hábiles.
+                    Envío gratis desde $2,500 MXN. Entrega el mismo día.
                     Facturación electrónica incluida.
                   </p>
                 </div>

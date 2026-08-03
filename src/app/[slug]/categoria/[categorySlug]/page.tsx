@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const title = `${category.name} en ${city.name} — Resurte.me`
-  const description = `Compra ${category.name.toLowerCase()} por mayoreo en ${city.name}, ${city.state}. Precios de central de abastos, entrega en 24-48h.`
+  const description = `Compra ${category.name.toLowerCase()} por mayoreo en ${city.name}, ${city.state}. Precios de central de abastos, entrega el mismo día.`
 
   return {
     title,

@@ -164,6 +164,16 @@ export function CityLanding({
                   </button>
                 </div>
               </form>
+              <div className="mt-4">
+                <Link
+                  href={`/${currentCity?.slug || DEFAULT_CITY_SLUG}/buscar`}
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-white/80 hover:text-white hover:underline underline-offset-4 transition-colors"
+                >
+                  <Grid3X3 className="w-4 h-4" />
+                  Ver todos los productos
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
             </div>
             {/* Right: Image */}
             <div className="relative min-h-[240px] lg:min-h-0 lg:rounded-r-2xl overflow-hidden">
@@ -188,7 +198,7 @@ export function CityLanding({
             {[
               { value: "1,200+", label: "Negocios abastecidos", icon: Building2 },
               { value: "20", label: "Ciudades en México", icon: MapPin },
-              { value: "24-48h", label: "Tiempo de entrega", icon: Truck },
+              { value: "Hoy", label: "Tiempo de entrega", icon: Truck },
               { value: "CFDI", label: "Facturación incluida", icon: CreditCard },
             ].map((stat) => (
               <div key={stat.label} className="flex flex-col items-center gap-1.5">
@@ -386,7 +396,7 @@ export function CityLanding({
               </span>
               <span className="flex items-center gap-1.5 bg-white/15 rounded-full px-4 py-2">
                 <span className="w-2 h-2 rounded-full bg-[#3CC73C]" />
-                Entrega en 24-48h
+                Entrega el mismo día
               </span>
               <span className="flex items-center gap-1.5 bg-white/15 rounded-full px-4 py-2">
                 <span className="w-2 h-2 rounded-full bg-[#3CC73C]" />
@@ -478,7 +488,7 @@ export function CityLanding({
               {
                 icon: Truck,
                 title: "Recibe en tu negocio",
-                desc: "Entrega en 24-48 horas. Frescura garantizada. Listo para tu operación del día.",
+                desc: "Entrega el mismo día. Frescura garantizada. Listo para tu operación del día.",
               },
             ].map((step, i) => (
               <div
@@ -494,6 +504,18 @@ export function CityLanding({
                 <p className="text-[#72767E] text-sm">{step.desc}</p>
               </div>
             ))}
+          </div>
+
+          {/* "Ver todos los productos" CTA — after steps */}
+          <div className="mt-10 text-center">
+            <Link
+              href={`/${currentCity?.slug || DEFAULT_CITY_SLUG}/buscar`}
+              className="btn-pill btn-pill-primary inline-flex items-center gap-2 text-base px-8 py-3"
+            >
+              <Grid3X3 className="w-5 h-5" />
+              Ver todos los productos
+              <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
 
           {/* Trust bar — business-focused */}

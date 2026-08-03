@@ -1,14 +1,16 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useSearchParams } from "next/navigation"
-import { Search, ShoppingBag, ArrowLeft, SlidersHorizontal } from "lucide-react"
+import { Search, ShoppingBag, ArrowLeft, ArrowUpDown, SlidersHorizontal, X } from "lucide-react"
 import { ProductCard } from "@/components/product/product-card"
 import { SearchBar } from "@/components/search/search-bar"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import type { Product, Category } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
 import Link from "next/link"
+
+type SortOption = "name" | "price-asc" | "price-desc"
 
 interface SearchPageClientProps {
   citySlug: string
@@ -34,16 +36,38 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
   type FlatProduct = (typeof flatProducts)[number]
   const [results, setResults] = useState<FlatProduct[]>([])
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
+  const [sortBy, setSortBy] = useState<SortOption>("name")
+  const filterBarRef = useRef<HTMLDivElement>(null)
+
+  // Build category-product count map for chip badges
+  const categoryCounts = useMemo(() => {
+    const map = new Map<number, number>()
+    flatProducts.forEach((p) => {
+      map.set(p.category_id, (map.get(p.category_id) ?? 0) + 1)
+    })
+    return map
+  }, [flatProducts])
+
+  // Sort results
+  const sortedResults = useMemo(() => {
+    const copy = [...results]
+    switch (sortBy) {
+      case "price-asc":
+        return copy.sort((a, b) => a.price - b.price)
+      case "price-desc":
+        return copy.sort((a, b) => b.price - a.price)
+      default:
+        return copy.sort((a, b) => a.name.localeCompare(b.name))
+    }
+  }, [results, sortBy])
 
   const performSearch = useCallback((q: string, catId: number | null) => {
     const term = q.toLowerCase().trim()
 
-    // Start with all products or category-filtered
     let filtered = catId
       ? flatProducts.filter((p) => p.category_id === catId)
       : flatProducts
 
-    // If no query, show filtered products
     if (!term) {
       setResults(filtered)
       return
@@ -72,35 +96,58 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
     setSelectedCategory(prev => prev === catId ? null : catId)
   }
 
-  const hasResults = results.length > 0
+  const hasResults = sortedResults.length > 0
   const isShowingAll = !query
+  const totalCount = flatProducts.length
+  const selectedCat = selectedCategory ? categories.find(c => c.id === selectedCategory) : null
 
   return (
     <div className="min-h-screen bg-[#faf8f5]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Back link */}
-        <Link
-          href={`/${citySlug}`}
-          className="inline-flex items-center gap-1.5 text-sm text-[#6b6b6b] hover:text-[#108910] transition-colors mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Volver a la tienda
-        </Link>
+      {/* Header — Erewhon cream palette, matching category page */}
+      <div className="bg-[#f7f4ef] border-b border-[#ede8df]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-sm text-[#6b6b6b] mb-4">
+            <Link href={`/${citySlug}`} className="hover:text-[#108910] transition-colors">
+              {cityName}
+            </Link>
+            <span className="text-[#999893]">/</span>
+            <span className="text-[#1a1a1a] font-medium">Todos los productos</span>
+          </div>
 
-        {/* Search header */}
-        <div className="mb-8">
-          <SearchBar citySlug={citySlug} className="max-w-lg mx-auto" />
-        </div>
-
-        {/* Category filter chips — Erewhon-style pill selectors */}
-        {categories.length > 0 && (
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-3">
-              <SlidersHorizontal className="w-4 h-4 text-[#6b6b6b]" />
-              <span className="text-sm font-medium text-[#6b6b6b]">Filtrar por categoría</span>
+          {/* Title */}
+          <ScrollReveal>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#108910]/10 flex items-center justify-center text-3xl shadow-sm">
+                <ShoppingBag className="w-7 h-7 text-[#108910]" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1a1a] tracking-tight">
+                  Todos los productos
+                </h1>
+                <p className="text-sm text-[#6b6b6b] mt-1">
+                  {totalCount} productos disponibles — por caja, bulto o pieza
+                </p>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-              {/* "Todo" chip */}
+          </ScrollReveal>
+
+          {/* Search */}
+          <div className="mt-5 max-w-md">
+            <SearchBar citySlug={citySlug} />
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Filter & sort bar — sticky on scroll */}
+        <div
+          ref={filterBarRef}
+          className="sticky top-0 z-20 bg-[#faf8f5]/95 backdrop-blur-sm -mx-4 px-4 sm:mx-0 sm:px-0 py-3 mb-6 border-b border-[#ede8df]"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            {/* Category chips */}
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1">
               <button
                 onClick={() => setSelectedCategory(null)}
                 className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
@@ -111,30 +158,64 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
               >
                 <ShoppingBag className="w-3.5 h-3.5" />
                 Todo
+                <span className="text-xs opacity-70 ml-0.5">{totalCount}</span>
               </button>
-              {categories.map((cat) => (
+              {categories.map((cat) => {
+                const count = categoryCounts.get(cat.id) ?? 0
+                if (count === 0) return null
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => handleCategoryToggle(cat.id)}
+                    className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                      selectedCategory === cat.id
+                        ? "bg-[#108910] text-white shadow-md"
+                        : "bg-white text-[#1a1a1a] border border-[#e0dbd2] hover:border-[#108910]/30 hover:bg-[#f7f5f0]"
+                    }`}
+                  >
+                    <span className="text-base">{getCategoryIcon(cat.icon)}</span>
+                    {cat.name}
+                    <span className="text-xs opacity-70 ml-0.5">{count}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Sort dropdown & active filter indicator */}
+            <div className="flex items-center gap-2 shrink-0">
+              {selectedCategory && selectedCat && (
                 <button
-                  key={cat.id}
-                  onClick={() => handleCategoryToggle(cat.id)}
-                  className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                    selectedCategory === cat.id
-                      ? "bg-[#108910] text-white shadow-md"
-                      : "bg-white text-[#1a1a1a] border border-[#e0dbd2] hover:border-[#108910]/30 hover:bg-[#f7f5f0]"
-                  }`}
+                  onClick={() => setSelectedCategory(null)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-[#108910]/10 text-[#108910] hover:bg-[#108910]/20 transition-colors"
                 >
-                  <span className="text-base">{getCategoryIcon(cat.icon)}</span>
-                  {cat.name}
+                  {getCategoryIcon(selectedCat.icon)} {selectedCat.name}
+                  <X className="w-3 h-3" />
                 </button>
-              ))}
+              )}
+              <div className="relative flex items-center gap-1.5 bg-white border border-[#e0dbd2] rounded-full px-3 py-1.5">
+                <ArrowUpDown className="w-3.5 h-3.5 text-[#999893]" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className="text-xs font-medium text-[#1a1a1a] bg-transparent outline-none cursor-pointer appearance-none pr-1"
+                >
+                  <option value="name">Nombre A-Z</option>
+                  <option value="price-asc">Menor precio</option>
+                  <option value="price-desc">Mayor precio</option>
+                </select>
+              </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Results */}
+        {/* Results area */}
         {query.length > 0 && query.length < 2 && (
-          <p className="text-center text-[#999893] py-12">
-            Escribe al menos 2 caracteres para buscar.
-          </p>
+          <div className="text-center py-16">
+            <Search className="w-16 h-16 text-[#e0dbd2] mx-auto mb-4" />
+            <p className="text-[#999893]">
+              Escribe al menos 2 caracteres para buscar.
+            </p>
+          </div>
         )}
 
         {query.length >= 2 && !hasResults && (
@@ -146,19 +227,29 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
             <p className="text-[#6b6b6b]">
               No encontramos productos para &quot;{query}&quot; en {cityName}.
             </p>
+            <Link
+              href={`/${citySlug}/buscar`}
+              className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-[#108910] hover:text-[#0D720D]"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Ver todos los productos
+            </Link>
           </div>
         )}
 
         {hasResults && (
           <section>
-            <h2 className="text-lg font-bold text-[#1a1a1a] mb-5 flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-5">
               <ShoppingBag className="w-5 h-5 text-[#108910]" />
-              {isShowingAll
-                ? `Todos los productos (${results.length})`
-                : `Resultados (${results.length})`}
-            </h2>
+              <h2 className="text-lg font-semibold text-[#1a1a1a]">
+                {isShowingAll && !selectedCategory
+                  ? `${sortedResults.length} producto${sortedResults.length !== 1 ? "s" : ""}`
+                  : `${sortedResults.length} resultado${sortedResults.length !== 1 ? "s" : ""}`}
+                {selectedCat && <span className="text-[#6b6b6b] font-normal"> en {selectedCat.name}</span>}
+              </h2>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-              {results.map((product, idx) => (
+              {sortedResults.map((product, idx) => (
                 <ScrollReveal key={product.id} direction="scale" delay={idx * 0.03}>
                   <ProductCard product={product} citySlug={citySlug} />
                 </ScrollReveal>
@@ -167,7 +258,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
           </section>
         )}
 
-        {isShowingAll && !hasResults && (
+        {isShowingAll && !hasResults && !query && (
           <div className="text-center py-16">
             <ShoppingBag className="w-16 h-16 text-[#e0dbd2] mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-[#1a1a1a] mb-1">
@@ -176,8 +267,26 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
             <p className="text-[#6b6b6b]">
               No hay productos disponibles en este momento.
             </p>
+            <Link
+              href={`/${citySlug}`}
+              className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-[#108910] hover:text-[#0D720D]"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Volver al inicio
+            </Link>
           </div>
         )}
+
+        {/* Back link */}
+        <div className="mt-12 text-center pb-12">
+          <Link
+            href={`/${citySlug}`}
+            className="btn-pill btn-pill-outline inline-flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Volver a la tienda
+          </Link>
+        </div>
       </div>
     </div>
   )

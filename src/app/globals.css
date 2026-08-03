@@ -79,6 +79,15 @@
   border-bottom: 1px solid rgba(224, 219, 210, 0.5);
 }
 
+/* --- Hide scrollbar while allowing scroll (mobile chips) --- */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* --- Scroll reveal base states --- */
 .reveal-hidden {
   opacity: 0;
