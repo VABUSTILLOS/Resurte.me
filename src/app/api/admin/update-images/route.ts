@@ -1,10 +1,10 @@
 /**
  * POST /api/admin/update-images
  *
- * Updates product images in Supabase:
- * - Products found in resurte.me store → real Google Cloud Storage images (1-2 per product)
- * - Products not in store → category-appropriate Wikimedia Commons fallbacks
- * - Populates both image_url (primary) and images (gallery array) columns
+ * Updates product images in Supabase.
+ * - 53 products use original resurte.me store images (GCS)
+ * - 86 products use local Alsuper images
+ * - 48 products without images are deleted from DB
  */
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
@@ -18,7 +18,10 @@ const IMAGE_UPDATES: Record<number, string> = {
   4: "https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png",
   5: "https://storage.googleapis.com/takeapp/media/cmijp7zpj000404l40mtkbyuh.png",
   6: "https://storage.googleapis.com/takeapp/media/cmijo779j000204jz2yrwe753.png",
+  7: "/images/products/7.png",
+  8: "/images/products/8.png",
   9: "https://storage.googleapis.com/takeapp/media/cmijostxx001o04jv3tl8b2v9.png",
+  10: "/images/products/10.png",
   11: "https://storage.googleapis.com/takeapp/media/cmijwgf7r000904l738kc1xwb.png",
   12: "https://storage.googleapis.com/takeapp/media/cmijq38em001604l7hja83595.png",
   13: "https://storage.googleapis.com/takeapp/media/cmijy9mol000104jr05q555i9.png",
@@ -42,6 +45,7 @@ const IMAGE_UPDATES: Record<number, string> = {
   31: "https://storage.googleapis.com/takeapp/media/cmihgsazp000204ib1z4gae1g.png",
   32: "https://storage.googleapis.com/takeapp/media/cmilwesph000704ikfang4orw.png",
   33: "https://storage.googleapis.com/takeapp/media/cmilw6t51000104jq0du3blee.png",
+  34: "/images/products/34.png",
   35: "https://storage.googleapis.com/takeapp/media/cmikw8rii000104l7e1vfbfw3.png",
   36: "https://storage.googleapis.com/takeapp/media/cmijm5teg000704lbgiuf2ua2.png",
   37: "https://storage.googleapis.com/takeapp/media/cmikz37kb000004l5d2653hrg.png",
@@ -56,18 +60,99 @@ const IMAGE_UPDATES: Record<number, string> = {
   46: "https://storage.googleapis.com/takeapp/media/cmihhsrrr000004jfc58l4cxz.png",
   47: "https://storage.googleapis.com/takeapp/media/cmigr3lni000004l281j40gvp.jpg",
   48: "https://storage.googleapis.com/takeapp/media/cmifh7a6k000004jpa7or85li.jpg",
+  49: "/images/products/49.png",
+  50: "/images/products/50.png",
+  51: "/images/products/51.png",
+  52: "/images/products/52.png",
+  53: "/images/products/53.png",
+  54: "/images/products/54.png",
+  55: "/images/products/55.png",
+  56: "/images/products/56.png",
+  57: "/images/products/57.png",
+  59: "/images/products/59.png",
+  60: "/images/products/60.png",
+  61: "/images/products/61.png",
+  64: "/images/products/64.png",
+  68: "/images/products/68.png",
+  71: "/images/products/71.png",
+  72: "/images/products/72.png",
+  75: "/images/products/75.png",
+  77: "/images/products/77.png",
+  80: "/images/products/80.png",
+  81: "/images/products/81.png",
+  83: "/images/products/83.png",
+  85: "/images/products/85.png",
   89: "https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp",
+  90: "/images/products/90.png",
+  91: "/images/products/91.png",
+  92: "/images/products/92.png",
+  93: "/images/products/93.png",
   94: "https://storage.googleapis.com/takeapp/media/cmidk59fi00000imqacaggoal.webp",
   95: "https://storage.googleapis.com/takeapp/media/cmidk59fi00000imqacaggoal.webp",
+  96: "/images/products/96.png",
+  97: "/images/products/97.png",
+  98: "/images/products/98.png",
+  99: "/images/products/99.png",
+  100: "/images/products/100.png",
   101: "https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp",
+  102: "/images/products/102.png",
   103: "https://storage.googleapis.com/takeapp/media/cmidk5ahb00000ikx1fo4ebab.webp",
   104: "https://storage.googleapis.com/takeapp/media/cmidk5ucg00000ijff55kb0k6.webp",
+  105: "/images/products/105.png",
+  106: "/images/products/106.png",
+  107: "/images/products/107.png",
+  108: "/images/products/108.png",
+  111: "/images/products/111.png",
+  112: "/images/products/112.png",
+  113: "/images/products/113.png",
   115: "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png",
+  116: "/images/products/116.png",
+  117: "/images/products/117.png",
+  118: "/images/products/118.png",
+  119: "/images/products/119.png",
+  120: "/images/products/120.png",
+  121: "/images/products/121.png",
+  122: "/images/products/122.png",
+  123: "/images/products/123.png",
+  124: "/images/products/124.png",
+  126: "/images/products/126.png",
+  127: "/images/products/127.png",
+  128: "/images/products/128.png",
+  129: "/images/products/129.png",
+  130: "/images/products/130.png",
+  131: "/images/products/131.png",
+  132: "/images/products/132.png",
+  133: "/images/products/133.png",
+  134: "/images/products/134.png",
+  137: "/images/products/137.png",
+  138: "/images/products/138.png",
   139: "https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp",
   140: "https://storage.googleapis.com/takeapp/media/cmidk5ovr00000hka85jr5bzf.webp",
+  144: "/images/products/144.png",
+  147: "/images/products/147.png",
+  149: "/images/products/149.png",
+  150: "/images/products/150.png",
+  151: "/images/products/151.png",
+  152: "/images/products/152.png",
+  154: "/images/products/154.png",
+  160: "/images/products/160.png",
+  162: "/images/products/162.png",
+  163: "/images/products/163.png",
+  164: "/images/products/164.png",
+  169: "/images/products/169.png",
+  170: "/images/products/170.png",
+  172: "/images/products/172.png",
+  173: "/images/products/173.png",
+  175: "/images/products/175.png",
+  177: "/images/products/177.png",
+  178: "/images/products/178.png",
+  182: "/images/products/182.png",
+  183: "/images/products/183.png",
+  184: "/images/products/184.png",
+  185: "/images/products/185.png",
+  186: "/images/products/186.png",
 }
 
-// Products with multiple images from the resurte.me store
 const MULTI_IMAGES: Record<number, string[]> = {
   1: ["https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png", "https://storage.googleapis.com/takeapp/media/cmihp1d5p000904l4ap1f6tf8.png", "https://storage.googleapis.com/takeapp/media/cmihojint000k04if2qg48em7.png"],
   2: ["https://storage.googleapis.com/takeapp/media/cmihov9fh001304ju8yfi21dq.png", "https://storage.googleapis.com/takeapp/media/cmihounrr001004ju2zr0kkrr.png"],
@@ -75,7 +160,10 @@ const MULTI_IMAGES: Record<number, string[]> = {
   4: ["https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png", "https://storage.googleapis.com/takeapp/media/cmijnpqc1000c04lb4mr4b1cy.png"],
   5: ["https://storage.googleapis.com/takeapp/media/cmijp7zpj000404l40mtkbyuh.png", "https://storage.googleapis.com/takeapp/media/cmijp8bq3000604le988t96v6.png"],
   6: ["https://storage.googleapis.com/takeapp/media/cmijo779j000204jz2yrwe753.png", "https://storage.googleapis.com/takeapp/media/cmijo7k5s000504jzcz7ye4bg.png"],
+  7: ["/images/products/7.png"],
+  8: ["/images/products/8.png"],
   9: ["https://storage.googleapis.com/takeapp/media/cmijostxx001o04jv3tl8b2v9.png", "https://storage.googleapis.com/takeapp/media/cmijosl2y001l04jvck78hm6m.png"],
+  10: ["/images/products/10.png"],
   11: ["https://storage.googleapis.com/takeapp/media/cmijwgf7r000904l738kc1xwb.png", "https://storage.googleapis.com/takeapp/media/cmijwgwcq000b04l7bh364jb2.png"],
   12: ["https://storage.googleapis.com/takeapp/media/cmijq38em001604l7hja83595.png", "https://storage.googleapis.com/takeapp/media/cmijq3jh4001904l7b5ua1tia.png"],
   13: ["https://storage.googleapis.com/takeapp/media/cmijy9mol000104jr05q555i9.png", "https://storage.googleapis.com/takeapp/media/cmijy9y2d000304jr51oz2wx0.png"],
@@ -99,6 +187,7 @@ const MULTI_IMAGES: Record<number, string[]> = {
   31: ["https://storage.googleapis.com/takeapp/media/cmihgsazp000204ib1z4gae1g.png", "https://storage.googleapis.com/takeapp/media/cmihgsgtn000404ib09b78qrm.png"],
   32: ["https://storage.googleapis.com/takeapp/media/cmilwesph000704ikfang4orw.png", "https://storage.googleapis.com/takeapp/media/cmilwexvb000904ikc5ov3ffv.png"],
   33: ["https://storage.googleapis.com/takeapp/media/cmilw6t51000104jq0du3blee.png", "https://storage.googleapis.com/takeapp/media/cmilw6kb5000204l8hoc09tg9.png"],
+  34: ["/images/products/34.png"],
   35: ["https://storage.googleapis.com/takeapp/media/cmikw8rii000104l7e1vfbfw3.png", "https://storage.googleapis.com/takeapp/media/cmikw8wms000304l770o1crl9.png"],
   36: ["https://storage.googleapis.com/takeapp/media/cmijm5teg000704lbgiuf2ua2.png", "https://storage.googleapis.com/takeapp/media/cmijm5z1p000a04lb72yr2qyn.png"],
   37: ["https://storage.googleapis.com/takeapp/media/cmikz37kb000004l5d2653hrg.png", "https://storage.googleapis.com/takeapp/media/cmikz3md8000204l54oh20h6s.png"],
@@ -113,66 +202,101 @@ const MULTI_IMAGES: Record<number, string[]> = {
   46: ["https://storage.googleapis.com/takeapp/media/cmihhsrrr000004jfc58l4cxz.png", "https://storage.googleapis.com/takeapp/media/cmihht171000304jfh2lzc04d.png"],
   47: ["https://storage.googleapis.com/takeapp/media/cmigr3lni000004l281j40gvp.jpg", "https://storage.googleapis.com/takeapp/media/cmigr3r7s000304l22p3r4fx5.jpg", "https://storage.googleapis.com/takeapp/media/cmigujm9f000204lk0jfhc8ha.png"],
   48: ["https://storage.googleapis.com/takeapp/media/cmifh7a6k000004jpa7or85li.jpg", "https://storage.googleapis.com/takeapp/media/cmifh7dx3000304jpaymq66n4.jpg"],
+  49: ["/images/products/49.png"],
+  50: ["/images/products/50.png"],
+  51: ["/images/products/51.png"],
+  52: ["/images/products/52.png"],
+  53: ["/images/products/53.png"],
+  54: ["/images/products/54.png"],
+  55: ["/images/products/55.png"],
+  56: ["/images/products/56.png"],
+  57: ["/images/products/57.png"],
+  59: ["/images/products/59.png"],
+  60: ["/images/products/60.png"],
+  61: ["/images/products/61.png"],
+  64: ["/images/products/64.png"],
+  68: ["/images/products/68.png"],
+  71: ["/images/products/71.png"],
+  72: ["/images/products/72.png"],
+  75: ["/images/products/75.png"],
+  77: ["/images/products/77.png"],
+  80: ["/images/products/80.png"],
+  81: ["/images/products/81.png"],
+  83: ["/images/products/83.png"],
+  85: ["/images/products/85.png"],
   89: ["https://storage.googleapis.com/takeapp/media/cmidk5jyk00000icpgw3gh4pc.webp"],
+  90: ["/images/products/90.png"],
+  91: ["/images/products/91.png"],
+  92: ["/images/products/92.png"],
+  93: ["/images/products/93.png"],
   94: ["https://storage.googleapis.com/takeapp/media/cmidk59fi00000imqacaggoal.webp"],
   95: ["https://storage.googleapis.com/takeapp/media/cmidk59fi00000imqacaggoal.webp"],
+  96: ["/images/products/96.png"],
+  97: ["/images/products/97.png"],
+  98: ["/images/products/98.png"],
+  99: ["/images/products/99.png"],
+  100: ["/images/products/100.png"],
   101: ["https://storage.googleapis.com/takeapp/media/cmidk5taj00000igwdgi364t0.webp"],
+  102: ["/images/products/102.png"],
   103: ["https://storage.googleapis.com/takeapp/media/cmidk5ahb00000ikx1fo4ebab.webp"],
   104: ["https://storage.googleapis.com/takeapp/media/cmidk5ucg00000ijff55kb0k6.webp", "https://storage.googleapis.com/takeapp/media/cmidk60e200030ijffg7mmfo2z.webp"],
+  105: ["/images/products/105.png"],
+  106: ["/images/products/106.png"],
+  107: ["/images/products/107.png"],
+  108: ["/images/products/108.png"],
+  111: ["/images/products/111.png"],
+  112: ["/images/products/112.png"],
+  113: ["/images/products/113.png"],
   115: ["https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png", "https://storage.googleapis.com/takeapp/media/cmigudrly000s04jpe45e71lo.png"],
+  116: ["/images/products/116.png"],
+  117: ["/images/products/117.png"],
+  118: ["/images/products/118.png"],
+  119: ["/images/products/119.png"],
+  120: ["/images/products/120.png"],
+  121: ["/images/products/121.png"],
+  122: ["/images/products/122.png"],
+  123: ["/images/products/123.png"],
+  124: ["/images/products/124.png"],
+  126: ["/images/products/126.png"],
+  127: ["/images/products/127.png"],
+  128: ["/images/products/128.png"],
+  129: ["/images/products/129.png"],
+  130: ["/images/products/130.png"],
+  131: ["/images/products/131.png"],
+  132: ["/images/products/132.png"],
+  133: ["/images/products/133.png"],
+  134: ["/images/products/134.png"],
+  137: ["/images/products/137.png"],
+  138: ["/images/products/138.png"],
   139: ["https://storage.googleapis.com/takeapp/media/cmidk5ige00000ij9gnsz26bv.webp", "https://storage.googleapis.com/takeapp/media/cmidk5o07000000hkcn2oeaq4.webp"],
   140: ["https://storage.googleapis.com/takeapp/media/cmidk5ovr00000hka85jr5bzf.webp", "https://storage.googleapis.com/takeapp/media/cmidk5uvg00000ijcnvka82k1.webp"],
+  144: ["/images/products/144.png"],
+  147: ["/images/products/147.png"],
+  149: ["/images/products/149.png"],
+  150: ["/images/products/150.png"],
+  151: ["/images/products/151.png"],
+  152: ["/images/products/152.png"],
+  154: ["/images/products/154.png"],
+  160: ["/images/products/160.png"],
+  162: ["/images/products/162.png"],
+  163: ["/images/products/163.png"],
+  164: ["/images/products/164.png"],
+  169: ["/images/products/169.png"],
+  170: ["/images/products/170.png"],
+  172: ["/images/products/172.png"],
+  173: ["/images/products/173.png"],
+  175: ["/images/products/175.png"],
+  177: ["/images/products/177.png"],
+  178: ["/images/products/178.png"],
+  182: ["/images/products/182.png"],
+  183: ["/images/products/183.png"],
+  184: ["/images/products/184.png"],
+  185: ["/images/products/185.png"],
+  186: ["/images/products/186.png"],
 }
 
-// Category-based fallback pools — Wikimedia Commons images per category (verified 200)
-const CATEGORY_POOLS: Record<string, string[]> = {
-  verduras: [
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Display_of_vegetables_in_the_market_in_Nansana.jpg/960px-Display_of_vegetables_in_the_market_in_Nansana.jpg",
-  ],
-  abarrotes: [
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Grocery_Store_Aisle%2C_vermont.jpg/960px-Grocery_Store_Aisle%2C_vermont.jpg",
-  ],
-  lacteos: [
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Dairy_Aisle_in_a_Checkers_in_Durbanville%2C_Cape_Town.jpg/960px-Dairy_Aisle_in_a_Checkers_in_Durbanville%2C_Cape_Town.jpg",
-  ],
-  carnes: [
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Meat_display_in_butcher%27s_shop%2C_Bodmin%2C_Cornwall_-_January_2023.jpg/960px-Meat_display_in_butcher%27s_shop%2C_Bodmin%2C_Cornwall_-_January_2023.jpg",
-  ],
-  panaderia: [
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Bread_displayed_in_the_bakery_section_of_a_Publix_store.jpg/960px-Bread_displayed_in_the_bakery_section_of_a_Publix_store.jpg",
-  ],
-  bebidas: [
-    "https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png",
-    "https://storage.googleapis.com/takeapp/media/cmijq38em001604l7hja83595.png",
-  ],
-  botanas: [
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Potato_chips_2.jpg/960px-Potato_chips_2.jpg",
-  ],
-  limpieza: [
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Cleaning_products_aisle_in_Coop_Extra_supermarket%2C_Bergen_Stormarked_Shopping_Mall%2C_Norway_2017-10-25.jpg/960px-Cleaning_products_aisle_in_Coop_Extra_supermarket%2C_Bergen_Stormarked_Shopping_Mall%2C_Norway_2017-10-25.jpg",
-  ],
-  congelados: [
-    "https://storage.googleapis.com/takeapp/media/cmigudmvx000p04jp7knq43u4.png",
-    "https://storage.googleapis.com/takeapp/media/cmigudrly000s04jpe45e71lo.png",
-  ],
-}
-
-function getFallback(category: string, pid: number): string {
-  const pool = CATEGORY_POOLS[category] || CATEGORY_POOLS["abarrotes"]
-  return pool[0] // Use primary image per category for consistency
-}
-
-function getCategory(pid: number): string {
-  if (pid <= 50) return "verduras"
-  if (pid <= 88) return "abarrotes"
-  if (pid <= 104) return "lacteos"
-  if (pid <= 134) return "carnes"
-  if (pid <= 144) return "panaderia"
-  if (pid <= 159) return "bebidas"
-  if (pid <= 165) return "botanas"
-  if (pid <= 179) return "limpieza"
-  return "congelados"
-}
+// Products without any image — will be deleted from DB
+const DELETE_IDS = [58, 62, 63, 65, 66, 67, 69, 70, 73, 74, 76, 78, 79, 82, 84, 86, 87, 88, 109, 110, 114, 125, 135, 136, 141, 142, 143, 145, 146, 148, 153, 155, 156, 157, 158, 159, 161, 165, 166, 167, 168, 171, 174, 176, 179, 180, 181, 187]
 
 export async function POST(req: NextRequest) {
   try {
@@ -185,23 +309,27 @@ export async function POST(req: NextRequest) {
 
     const supabase = await createServiceClient()
 
-    let realCount = 0
-    let fallbackCount = 0
+    // Delete products without images
+    let deleted = 0
+    if (DELETE_IDS.length > 0) {
+      const { error: delErr } = await supabase
+        .from("products")
+        .delete()
+        .in("id", DELETE_IDS)
+      
+      if (delErr) {
+        return NextResponse.json({ error: `Delete failed: ${delErr.message}` }, { status: 500 })
+      }
+      deleted = DELETE_IDS.length
+    }
+
+    // Update images
+    let count = 0
     const errors: string[] = []
 
-    for (let pid = 1; pid <= 187; pid++) {
-      let imageUrl: string
-      let images: string[]
-
-      if (IMAGE_UPDATES[pid]) {
-        imageUrl = IMAGE_UPDATES[pid]
-        images = MULTI_IMAGES[pid] || [imageUrl]
-        realCount++
-      } else {
-        imageUrl = getFallback(getCategory(pid), pid)
-        images = [imageUrl]
-        fallbackCount++
-      }
+    for (const [pidStr, imageUrl] of Object.entries(IMAGE_UPDATES)) {
+      const pid = parseInt(pidStr)
+      const images = MULTI_IMAGES[pid] || [imageUrl]
 
       const { error } = await supabase
         .from("products")
@@ -210,14 +338,16 @@ export async function POST(req: NextRequest) {
 
       if (error) {
         errors.push(`Product ${pid}: ${error.message}`)
+      } else {
+        count++
       }
     }
 
     return NextResponse.json({
       success: errors.length === 0,
-      real_images: realCount,
-      fallback_images: fallbackCount,
-      total: realCount + fallbackCount,
+      updated: count,
+      deleted,
+      total: Object.keys(IMAGE_UPDATES).length,
       errors,
     })
   } catch (err) {
