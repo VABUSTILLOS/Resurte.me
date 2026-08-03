@@ -12,7 +12,7 @@ export default async function Home() {
   const { data: products } = await supabase
     .from("products")
     .select(`
-      id, name, slug, description, image_url, brand, category_id, unit,
+      id, name, slug, description, image_url, images, brand, category_id, unit,
       show_in_whatsapp, whatsapp_product_id,
       product_stores!inner(store_id, price, sale_price, is_available, stock_status)
     `)
