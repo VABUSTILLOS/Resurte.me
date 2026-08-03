@@ -1,65 +1,66 @@
-// Unsplash food images — production-ready, no API key needed
-// Format: https://images.unsplash.com/photo-{id}?w={width}&q=80&fit=crop
+// Product images — served from resurte.me product detail pages
+// Format: https://resurte.me/es/p/{product_id}
+// Banners use Wikimedia Commons public-domain images only
 
 // HERO & BANNERS
-export const HERO_GROCERY = "https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&q=80"
-export const HERO_FRUITS = "https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=1200&q=80"
+export const HERO_GROCERY = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/Vegetables_in_a_supermarket_cart.jpg/1280px-Vegetables_in_a_supermarket_cart.jpg"
+export const HERO_FRUITS = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Culinary_fruits_front_view.jpg/1280px-Culinary_fruits_front_view.jpg"
 
 // FRUITS
-export const IMG_APPLE = "https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=600&q=80"
-export const IMG_ORANGE = "https://images.unsplash.com/photo-1547514701-42782101795e?w=600&q=80"
-export const IMG_BANANA = "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=600&q=80"
-export const IMG_GRAPES = "https://images.unsplash.com/photo-1537640538966-79f369143f8f?w=600&q=80"
-export const IMG_STRAWBERRY = "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?w=600&q=80"
-export const IMG_PAPAYA = "https://images.unsplash.com/photo-1617114912620-65a362306488?w=600&q=80"
-export const IMG_MANGO = "https://images.unsplash.com/photo-1553279768-865429fa0078?w=600&q=80"
-export const IMG_WATERMELON = "https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=600&q=80"
+export const IMG_APPLE = "https://resurte.me/es/p/1"
+export const IMG_ORANGE = "https://resurte.me/es/p/13"
+export const IMG_BANANA = "https://resurte.me/es/p/14"
+export const IMG_GRAPES = "https://resurte.me/es/p/15"
+export const IMG_STRAWBERRY = "https://resurte.me/es/p/16"
+export const IMG_PAPAYA = "https://resurte.me/es/p/17"
+export const IMG_MANGO = "https://resurte.me/es/p/18"
+export const IMG_WATERMELON = "https://resurte.me/es/p/19"
 
 // VEGETABLES
-export const IMG_AVOCADO = "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=600&q=80"
-export const IMG_TOMATO = "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&q=80"
-export const IMG_BROCCOLI = "https://images.unsplash.com/photo-1459411621453-7b03977f4bfc?w=600&q=80"
-export const IMG_CARROT = "https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=600&q=80"
-export const IMG_ONION = "https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=600&q=80"
-export const IMG_POTATO = "https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=600&q=80"
-export const IMG_LETTUCE = "https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=600&q=80"
-export const IMG_CILANTRO = "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=600&q=80"
+export const IMG_AVOCADO = "https://resurte.me/es/p/2"
+export const IMG_TOMATO = "https://resurte.me/es/p/8"
+export const IMG_BROCCOLI = "https://resurte.me/es/p/20"
+export const IMG_CARROT = "https://resurte.me/es/p/21"
+export const IMG_ONION = "https://resurte.me/es/p/22"
+export const IMG_POTATO = "https://resurte.me/es/p/23"
+export const IMG_LETTUCE = "https://resurte.me/es/p/24"
+export const IMG_CILANTRO = "https://resurte.me/es/p/25"
 
 // MEATS & PROTEIN
-export const IMG_CHICKEN_BREAST = "https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=600&q=80"
-export const IMG_BEEF_STEAK = "https://images.unsplash.com/photo-1432139555190-58524dae6a55?w=600&q=80"
-export const IMG_PORK = "https://images.unsplash.com/photo-1432139509613-5c4255a1d179?w=600&q=80"
-export const IMG_FISH = "https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?w=600&q=80"
-export const IMG_GROUND_BEEF = "https://images.unsplash.com/photo-1588168333986-5078d3ae3976?w=600&q=80"
-export const IMG_EGGS = "https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=600&q=80"
+export const IMG_CHICKEN_BREAST = "https://resurte.me/es/p/5"
+export const IMG_BEEF_STEAK = "https://resurte.me/es/p/26"
+export const IMG_PORK = "https://resurte.me/es/p/28"
+export const IMG_FISH = "https://resurte.me/es/p/29"
+export const IMG_GROUND_BEEF = "https://resurte.me/es/p/27"
+export const IMG_EGGS = "https://resurte.me/es/p/9"
 
 // DAIRY
-export const IMG_MILK = "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=600&q=80"
-export const IMG_CHEESE = "https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=600&q=80"
-export const IMG_YOGURT = "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&q=80"
-export const IMG_BUTTER = "https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=600&q=80"
+export const IMG_MILK = "https://resurte.me/es/p/3"
+export const IMG_CHEESE = "https://resurte.me/es/p/10"
+export const IMG_YOGURT = "https://resurte.me/es/p/30"
+export const IMG_BUTTER = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Butter_on_a_plate.jpg/640px-Butter_on_a_plate.jpg"
 
 // BAKERY & GRAINS
-export const IMG_BREAD = "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&q=80"
-export const IMG_TORTILLAS = "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=80"
-export const IMG_RICE = "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&q=80"
-export const IMG_PASTA = "https://images.unsplash.com/photo-1551462147-ff29053bfc14?w=600&q=80"
+export const IMG_BREAD = "https://resurte.me/es/p/4"
+export const IMG_TORTILLAS = "https://resurte.me/es/p/6"
+export const IMG_RICE = "https://resurte.me/es/p/31"
+export const IMG_PASTA = "https://resurte.me/es/p/33"
 
 // BEVERAGES
-export const IMG_COCA_COLA = "https://images.unsplash.com/photo-1554866585-cd94860890b7?w=600&q=80"
-export const IMG_WATER = "https://images.unsplash.com/photo-1523362628745-0c100150b504?w=600&q=80"
+export const IMG_COCA_COLA = "https://resurte.me/es/p/7"
+export const IMG_WATER = "https://resurte.me/es/p/32"
 
 // PANTRY
-export const IMG_OIL = "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=600&q=80"
-export const IMG_BEANS = "https://images.unsplash.com/photo-1551462147-ff29053bfc14?w=600&q=80"
+export const IMG_OIL = "https://resurte.me/es/p/11"
+export const IMG_BEANS = "https://resurte.me/es/p/12"
 
-// STORE LOGOS (brand-colored backgrounds via gradient — we use placeholder patterns)
-export const STORE_BANNER_LA_COMER = "https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=600&q=80"
-export const STORE_BANNER_SORIANA = "https://images.unsplash.com/photo-1534723452862-4c874018d66d?w=600&q=80"
-export const STORE_BANNER_WALMART = "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?w=600&q=80"
-export const STORE_BANNER_CHEDRAUI = "https://images.unsplash.com/photo-1543168256-418811576931?w=600&q=80"
-export const STORE_BANNER_FRESKO = "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=600&q=80"
-export const STORE_BANNER_CITY_MARKET = "https://images.unsplash.com/photo-1595981267035-7b04ca84a6fd?w=600&q=80"
+// STORE BANNERS (Wikimedia Commons public domain)
+export const STORE_BANNER_LA_COMER = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Supermarket_aisle.jpg/640px-Supermarket_aisle.jpg"
+export const STORE_BANNER_SORIANA = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Grocery_store_interior.jpg/640px-Grocery_store_interior.jpg"
+export const STORE_BANNER_WALMART = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Supermarket_shelves.jpg/640px-Supermarket_shelves.jpg"
+export const STORE_BANNER_CHEDRAUI = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Fruit_and_vegetable_display.jpg/640px-Fruit_and_vegetable_display.jpg"
+export const STORE_BANNER_FRESKO = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Modern_grocery_store.jpg/640px-Modern_grocery_store.jpg"
+export const STORE_BANNER_CITY_MARKET = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Fresh_produce_department.jpg/640px-Fresh_produce_department.jpg"
 
 // Product image map for easy lookup by product name
 export const PRODUCT_IMAGES: Record<string, string> = {
