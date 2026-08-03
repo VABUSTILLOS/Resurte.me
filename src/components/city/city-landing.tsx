@@ -8,6 +8,7 @@ import { MEXICO_CITIES } from "@/lib/cities"
 import { HERO_GROCERY } from "@/lib/images"
 import { ProductCard } from "@/components/product/product-card"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
+import { StickyCatalogButton } from "@/components/ui/sticky-catalog-button"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import type { Category, Product } from "@/types"
@@ -737,6 +738,9 @@ export function CityLanding({
       {showSelector && (
         <CitySelector onClose={() => setShowSelector(false)} />
       )}
+
+      {/* Sticky catalog button — bottom-left, complements WhatsApp at bottom-right */}
+      <StickyCatalogButton citySlug={currentCity?.slug || DEFAULT_CITY_SLUG} />
     </div>
   )
 }
