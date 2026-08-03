@@ -34,7 +34,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories }: S
   })), [products])
 
   type FlatProduct = (typeof flatProducts)[number]
-  const [results, setResults] = useState<FlatProduct[]>([])
+  const [results, setResults] = useState<FlatProduct[]>(flatProducts)
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [sortBy, setSortBy] = useState<SortOption>("name")
   const filterBarRef = useRef<HTMLDivElement>(null)
