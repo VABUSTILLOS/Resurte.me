@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS wallets (
 COMMENT ON TABLE wallets IS 'Monedero digital de Créditos Resurte. 1 registro por usuario.';
 COMMENT ON COLUMN wallets.balance_credits IS 'Saldo actual en Créditos Resurte. Solo puede ser >= 0.';
 
-CREATE INDEX idx_wallets_user ON wallets(user_id);
+CREATE INDEX IF NOT EXISTS idx_wallets_user ON wallets(user_id);
 
 -- ============================================================
 -- 3. TRANSACCIONES DEL MONEDERO
@@ -50,9 +50,9 @@ COMMENT ON COLUMN wallet_transactions.amount   IS 'Positivo = abono de créditos
 COMMENT ON COLUMN wallet_transactions.concept  IS 'Concepto legible: "Cashback Nivel Oro", "Canje Servicio SEO", etc.';
 COMMENT ON COLUMN wallet_transactions.order_id IS 'Orden que originó el cashback (nullable para canjes manuales).';
 
-CREATE INDEX idx_wallet_tx_wallet   ON wallet_transactions(wallet_id);
-CREATE INDEX idx_wallet_tx_order    ON wallet_transactions(order_id) WHERE order_id IS NOT NULL;
-CREATE INDEX idx_wallet_tx_created  ON wallet_transactions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_wallet  ON wallet_transactions(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_order   ON wallet_transactions(order_id) WHERE order_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_wallet_tx_created ON wallet_transactions(created_at DESC);
 
 -- ============================================================
 -- 4. ROW LEVEL SECURITY (RLS)
@@ -61,10 +61,17 @@ CREATE INDEX idx_wallet_tx_created  ON wallet_transactions(created_at DESC);
 -- ── wallets ──
 ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;
 
--- Usuarios solo pueden LEER su propio monedero
-CREATE POLICY "Users can view own wallet"
-  ON wallets FOR SELECT
-  USING (auth.uid() = user_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE policyname = 'Users can view own wallet' AND tablename = 'wallets'
+  ) THEN
+    CREATE POLICY "Users can view own wallet"
+      ON wallets FOR SELECT
+      USING (auth.uid() = user_id);
+  END IF;
+END $$;
 
 -- Solo el service_role (o backend via SECURITY DEFINER) puede INSERT/UPDATE
 -- No se crean políticas de INSERT/UPDATE/DELETE para authenticated users
@@ -72,16 +79,23 @@ CREATE POLICY "Users can view own wallet"
 -- ── wallet_transactions ──
 ALTER TABLE wallet_transactions ENABLE ROW LEVEL SECURITY;
 
--- Usuarios solo pueden leer transacciones de su propio monedero
-CREATE POLICY "Users can view own wallet transactions"
-  ON wallet_transactions FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM wallets
-      WHERE wallets.id = wallet_transactions.wallet_id
-        AND wallets.user_id = auth.uid()
-    )
-  );
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE policyname = 'Users can view own wallet transactions' AND tablename = 'wallet_transactions'
+  ) THEN
+    CREATE POLICY "Users can view own wallet transactions"
+      ON wallet_transactions FOR SELECT
+      USING (
+        EXISTS (
+          SELECT 1 FROM wallets
+          WHERE wallets.id = wallet_transactions.wallet_id
+            AND wallets.user_id = auth.uid()
+        )
+      );
+  END IF;
+END $$;
 
 -- Solo el service_role puede INSERT (el trigger usa SECURITY DEFINER, no requiere política)
 
