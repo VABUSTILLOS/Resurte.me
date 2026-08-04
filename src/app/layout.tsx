@@ -4,6 +4,7 @@ import { CityProvider } from "@/contexts/city-context"
 import { CartProvider } from "@/contexts/cart-context"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
+import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { CityDetector } from "@/components/city/city-detector"
 import { CartDrawer, MobileCartBar } from "@/components/cart/cart-drawer"
 import { WhatsAppButton } from "@/components/whatsapp/whatsapp-button"
@@ -90,6 +91,7 @@ export default function RootLayout({
   return (
     <html
       lang="es-MX"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#faf8f5] text-[#343538] antialiased">
@@ -111,7 +113,7 @@ export default function RootLayout({
         <CityProvider>
           <CartProvider>
             <Header />
-            <main className="flex-1">{children}</main>
+            <main className="flex-1"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
             <Footer />
             <CityDetector />
             <CartDrawer />

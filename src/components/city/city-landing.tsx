@@ -9,6 +9,7 @@ import { HERO_GROCERY } from "@/lib/images"
 import { ProductCard } from "@/components/product/product-card"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import { StickyCatalogButton } from "@/components/ui/sticky-catalog-button"
+import { UserShopView } from "@/components/shop/user-shop-view"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import type { Category, Product } from "@/types"
@@ -55,12 +56,14 @@ export function CityLanding({
   citySlug,
   categories,
   products,
+  isLoggedIn = false,
 }: {
   citySlug?: string
   categories: Category[]
   products: (Product & {
     product_stores: { store_id: number; price: number; sale_price: number | null; is_available: boolean; stock_status: string }[]
   })[]
+  isLoggedIn?: boolean
 }) {
   const { city, setCity } = useCity()
   const [showSelector, setShowSelector] = useState(false)
@@ -123,6 +126,17 @@ export function CityLanding({
     }
   }
 
+  // ── Logged-in user: dynamic shop experience ──
+  if (isLoggedIn) {
+    return (
+      <UserShopView
+        categories={categories}
+        products={flatProducts}
+        citySlug={currentCity?.slug || DEFAULT_CITY_SLUG}
+      />
+    )
+  }
+  
   return (
     <div className="min-h-[80vh] flex flex-col">
       {/* Hero — Editorial split layout */}

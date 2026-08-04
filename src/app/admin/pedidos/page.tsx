@@ -79,7 +79,6 @@ export default function AdminOrdersPage() {
             <thead>
               <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
                 <th className="px-5 py-3">Pedido</th>
-                <th className="px-5 py-3">Tienda</th>
                 <th className="px-5 py-3">Cliente</th>
                 <th className="px-5 py-3">Total</th>
                 <th className="px-5 py-3">Pago</th>
@@ -93,12 +92,6 @@ export default function AdminOrdersPage() {
               {filtered.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3 font-mono text-xs font-semibold text-gray-500">#{order.id}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <span>{order.store_logo}</span>
-                      <span className="text-gray-900 font-medium">{order.store_name}</span>
-                    </div>
-                  </td>
                   <td className="px-5 py-3 text-xs text-gray-500">Usuario #{order.id * 7}</td>
                   <td className="px-5 py-3 font-semibold text-gray-900">${order.total.toFixed(2)}</td>
                   <td className="px-5 py-3">

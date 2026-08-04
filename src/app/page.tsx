@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export default async function Home() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
   const { data: categories } = await supabase
     .from("categories")
@@ -24,6 +25,7 @@ export default async function Home() {
       citySlug={undefined}
       categories={categories ?? []}
       products={products ?? []}
+      isLoggedIn={!!user}
     />
   )
 }

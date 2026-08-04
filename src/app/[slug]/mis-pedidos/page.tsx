@@ -84,11 +84,11 @@ export default function OrderHistoryPage() {
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <span className="text-xl">{order.store_logo}</span>
                   <div>
-                    <p className="font-semibold text-gray-900 text-sm">{order.store_name}</p>
+                    <p className="font-semibold text-gray-900 text-sm">
+                      Pedido #{order.id}
+                    </p>
                     <p className="text-xs text-gray-400">
-                      Pedido #{order.id} ·{" "}
                       {new Date(order.created_at).toLocaleDateString("es-MX", {
                         day: "numeric",
                         month: "short",

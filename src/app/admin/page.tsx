@@ -106,7 +106,6 @@ export default function AdminDashboardPage() {
             <thead>
               <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
                 <th className="px-5 py-2.5">Pedido</th>
-                <th className="px-5 py-2.5">Tienda</th>
                 <th className="px-5 py-2.5">Total</th>
                 <th className="px-5 py-2.5">Pago</th>
                 <th className="px-5 py-2.5">Estado</th>
@@ -117,12 +116,6 @@ export default function AdminDashboardPage() {
               {recentOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3 font-mono text-xs text-gray-500">#{order.id}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <span>{order.store_logo}</span>
-                      <span className="text-gray-900">{order.store_name}</span>
-                    </div>
-                  </td>
                   <td className="px-5 py-3 font-semibold text-gray-900">
                     ${order.total.toFixed(2)}
                   </td>

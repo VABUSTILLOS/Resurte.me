@@ -11,9 +11,7 @@ export interface MockOrder extends Order {
 }
 
 const STORE_POOL = [
-  { id: 1, name: "La Comer", slug: "la-comer", logo: "🏪" },
-  { id: 2, name: "Chedraui", slug: "chedraui", logo: "🛒" },
-  { id: 3, name: "City Market", slug: "city-market", logo: "🏬" },
+  { id: 1, name: "Resurte.me", slug: "resurte", logo: "🛒" },
 ]
 
 const PRODUCT_POOL = [

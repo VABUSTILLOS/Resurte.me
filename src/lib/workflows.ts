@@ -146,7 +146,7 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
     scheduled_for: order.scheduled_for,
     source: order.source,
     created_at: order.created_at,
-    store_name: (order.store as any)?.name || "Tu tienda",
+    store_name: (order.store as any)?.name || "Resurte.me",
     store_slug: (order.store as any)?.slug || "",
     store_whatsapp: storeWhatsapp,
     customer_name: (order.profile as any)?.full_name || "Cliente",

@@ -9,11 +9,16 @@ export async function GET(request: Request) {
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+    if (error) {
+      console.error("Auth callback error:", error.message)
+      return NextResponse.redirect(`${origin}/auth/login?error=${encodeURIComponent(error.message)}`)
     }
+    // Successful sign-in — redirect to intended destination
+    const forwardedHost = request.headers.get("x-forwarded-host")
+    const targetOrigin = forwardedHost ? `https://${forwardedHost}` : origin
+    return NextResponse.redirect(`${targetOrigin}${next}`)
   }
 
-  // Error — redirect to login
+  // No code — redirect to login
   return NextResponse.redirect(`${origin}/auth/login?error=auth_callback_error`)
 }

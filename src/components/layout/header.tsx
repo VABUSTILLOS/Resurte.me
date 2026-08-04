@@ -1,18 +1,44 @@
 "use client"
 
 import Link from "next/link"
-import { ShoppingCart, User, MapPin, ChevronDown, Coins } from "lucide-react"
+import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
 import { SearchBar } from "@/components/search/search-bar"
-import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
+import { useState, useEffect, useRef } from "react"
+import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 export function Header() {
   const { city } = useCity()
   const { itemCount } = useCart()
+  const router = useRouter()
+  const supabase = createClient()
   const [showCitySelector, setShowCitySelector] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const [user, setUser] = useState<SupabaseUser | null>(null)
   const [cashbackBalance, setCashbackBalance] = useState<number | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Detect auth state on mount
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user ?? null)
+    })
+  }, [supabase])
+
+  // Close user menu on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false)
+      }
+    }
+    document.addEventListener("click", handleClick)
+    return () => document.removeEventListener("click", handleClick)
+  }, [])
 
   // Load cashback balance from localStorage (set by cashback page)
   useEffect(() => {
@@ -21,6 +47,14 @@ export function Header() {
       setCashbackBalance(Number(saved))
     }
   }, [])
+
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    setUser(null)
+    setShowUserMenu(false)
+    router.refresh()
+    router.push("/")
+  }
 
   return (
     <header className="sticky top-0 z-50 glass-header">
@@ -32,17 +66,17 @@ export function Header() {
             <span className="text-[1.35rem] font-bold text-[#1a1a1a] tracking-tight">.me</span>
           </Link>
 
-          {/* Cashback badge — shown when user has balance */}
+          {/* Recompensas badge — shown when user has balance */}
           {cashbackBalance !== null && cashbackBalance > 0 && (
             <Link
-              href="/cashback"
+              href="/recompensas"
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-[#108910]/10 border border-[#108910]/20 hover:bg-[#108910]/15 transition-colors text-sm shrink-0"
             >
               <Coins className="w-4 h-4 text-[#108910]" />
               <span className="font-semibold text-[#108910]">
                 ${cashbackBalance.toLocaleString("es-MX")}
               </span>
-              <span className="text-xs text-[#108910]/70 hidden lg:inline">cashback</span>
+              <span className="text-xs text-[#108910]/70 hidden lg:inline">recompensas</span>
             </Link>
           )}
 
@@ -87,12 +121,49 @@ export function Header() {
               )}
             </Link>
 
-            <Link
-              href="/auth/login"
-              className="p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
-            >
-              <User className="w-5 h-5 text-[#343538]" />
-            </Link>
+            {user ? (
+              <div ref={menuRef} className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-1.5 p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
+                >
+                  <User className="w-5 h-5 text-[#108910]" />
+                </button>
+
+                {showUserMenu && (
+                  <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-50">
+                    <div className="px-4 py-2 border-b border-gray-100">
+                      <p className="text-sm font-medium text-[#343538] truncate">
+                        {user.user_metadata?.full_name || user.email}
+                      </p>
+                      <p className="text-xs text-[#72767E] truncate">{user.email}</p>
+                    </div>
+                    <Link
+                      href={city ? `/${city.slug}/mis-pedidos` : "/auth/login"}
+                      onClick={() => setShowUserMenu(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#343538] hover:bg-[#F7F5F0] transition-colors"
+                    >
+                      <Package className="w-4 h-4" />
+                      Mis pedidos
+                    </Link>
+                    <button
+                      onClick={handleSignOut}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Cerrar sesión
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link
+                href="/auth/login"
+                className="p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
+              >
+                <User className="w-5 h-5 text-[#343538]" />
+              </Link>
+            )}
           </div>
         </div>
       </div>

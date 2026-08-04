@@ -55,8 +55,9 @@ export default async function CityPage({ params }: Props) {
 
   if (!city) notFound()
 
-  // Fetch from Supabase
+  // Check auth
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
   const { data: categories } = await supabase
     .from("categories")
@@ -73,6 +74,15 @@ export default async function CityPage({ params }: Props) {
     .eq("product_stores.store_id", 1)
     .order("name")
 
+  const catalog = (
+    <CityLanding
+      citySlug={slug}
+      categories={categories ?? []}
+      products={products ?? []}
+      isLoggedIn={!!user}
+    />
+  )
+
   return (
     <>
       <script
@@ -85,6 +95,7 @@ export default async function CityPage({ params }: Props) {
         citySlug={slug}
         categories={categories ?? []}
         products={products ?? []}
+        isLoggedIn={!!user}
       />
     </>
   )

@@ -1,6 +1,7 @@
 "use client"
 
 import { MessageCircle } from "lucide-react"
+import { useCart } from "@/contexts/cart-context"
 
 interface WhatsAppButtonProps {
   phoneNumber: string
@@ -15,18 +16,25 @@ export function WhatsAppButton({
   label = "Chatear por WhatsApp",
   position = "bottom-right",
 }: WhatsAppButtonProps) {
+  const { itemCount } = useCart()
   const cleanNumber = phoneNumber.replace(/\D/g, "")
   const encodedMessage = encodeURIComponent(message)
   const waLink = `https://wa.me/${cleanNumber}?text=${encodedMessage}`
 
   const positionClass = position === "bottom-right" ? "right-4 sm:right-6" : "left-4 sm:left-6"
 
+  // When cart has items, MobileCartBar (~56px) appears above the bottom bar,
+  // so the WhatsApp button needs extra clearance to avoid overlapping.
+  const hasCartItems = itemCount > 0
+  const bottomMobile = hasCartItems ? "bottom-[128px]" : "bottom-[72px]"
+  const bottomDesktop = hasCartItems ? "sm:bottom-[136px]" : "sm:bottom-[80px]"
+
   return (
     <a
       href={waLink}
       target="_blank"
       rel="noopener noreferrer"
-      className={`fixed bottom-[72px] sm:bottom-[80px] ${positionClass} z-50 flex items-center gap-2 px-4 py-3 bg-green-500 text-white font-semibold rounded-full shadow-lg hover:bg-green-600 hover:shadow-xl transition-all group`}
+      className={`fixed ${bottomMobile} ${bottomDesktop} ${positionClass} z-50 flex items-center gap-2 px-4 py-3 bg-green-500 text-white font-semibold rounded-full shadow-lg hover:bg-green-600 hover:shadow-xl transition-all group`}
     >
       <MessageCircle className="w-5 h-5" />
       <span className="text-sm hidden sm:inline">{label}</span>

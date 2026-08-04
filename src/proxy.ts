@@ -1,3 +1,4 @@
+import { createServerClient, type CookieOptions } from "@supabase/ssr"
 import { type NextRequest, NextResponse } from "next/server"
 import { MEXICO_CITIES } from "@/lib/cities"
 
@@ -89,25 +90,66 @@ function detectCityFromGeo(request: RequestWithGeo): string | null {
   return null
 }
 
+/** Copia las cookies de auth de Supabase a una response existente */
+function copyAuthCookies(source: NextResponse, target: NextResponse) {
+  source.cookies.getAll().forEach((cookie) => {
+    if (cookie.name.startsWith("sb-")) {
+      target.cookies.set(cookie.name, cookie.value, {
+        path: cookie.path,
+        maxAge: cookie.maxAge,
+        domain: cookie.domain,
+        secure: cookie.secure,
+        httpOnly: cookie.httpOnly,
+        sameSite: cookie.sameSite as boolean | "lax" | "strict" | "none" | undefined,
+      })
+    }
+  })
+}
+
 /**
- * Proxy: maneja detección de ciudad y ruteo.
- * - Si root ("/") sin cookie de ciudad: detecta por IP y redirige
- * - Si root con cookie: redirige a esa ciudad
- * - Si path tipo "/:slug/...": valida slug, setea cookie
+ * Proxy: refresca sesión Supabase + detección de ciudad + ruteo.
  */
 export async function proxy(request: NextRequest) {
+  // ── Supabase session refresh ──
+  let supabaseResponse = NextResponse.next({ request })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  // Refresca la sesión (renueva token si expiró, setea cookies)
+  await supabase.auth.getUser()
+
+  // ── City detection & routing ──
   const { pathname } = request.nextUrl
 
-  // Skip public paths
+  // Skip public paths — still return supabaseResponse with auth cookies
   if (isPublicPath(pathname)) {
-    return NextResponse.next()
+    return supabaseResponse
   }
 
   // Root path — attempt IP detection
   if (pathname === "/") {
     const cookieSlug = request.cookies.get("city-slug")?.value
     if (cookieSlug && VALID_SLUGS.includes(cookieSlug)) {
-      return NextResponse.redirect(new URL(`/${cookieSlug}`, request.url))
+      const redirect = NextResponse.redirect(new URL(`/${cookieSlug}`, request.url))
+      copyAuthCookies(supabaseResponse, redirect)
+      return redirect
     }
     // Try IP geolocation
     const detectedSlug = detectCityFromGeo(request)
@@ -117,26 +159,26 @@ export async function proxy(request: NextRequest) {
         maxAge: 60 * 60 * 24 * 30,
         path: "/",
       })
+      copyAuthCookies(supabaseResponse, response)
       return response
     }
     // No se pudo detectar — mostrar landing con selector
-    return NextResponse.next()
+    return supabaseResponse
   }
 
   // Extract city slug from path: /:slug/...
   const segments = pathname.split("/").filter(Boolean)
   const citySlug = segments[0]
 
-  // Valid city slug → set cookie and continue
+  // Valid city slug → set cookie and continue (preserves auth cookies)
   if (VALID_SLUGS.includes(citySlug)) {
-    const response = NextResponse.next()
-    response.cookies.set("city-slug", citySlug, {
+    supabaseResponse.cookies.set("city-slug", citySlug, {
       maxAge: 60 * 60 * 24 * 30,
       path: "/",
     })
-    return response
+    return supabaseResponse
   }
 
-  // Unknown route — let Next.js handle (404)
-  return NextResponse.next()
+  // Unknown route — let Next.js handle (404) with auth cookies
+  return supabaseResponse
 }

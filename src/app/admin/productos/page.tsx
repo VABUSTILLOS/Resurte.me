@@ -18,16 +18,16 @@ interface MockProduct {
 }
 
 const MOCK_PRODUCTS: MockProduct[] = [
-  { id: 1, name: "Aguacate Hass", slug: "aguacate-hass", category: "Frutas y Verduras", brand: "Genérico", store_name: "La Comer", price: 35, sale_price: 29, is_available: true, show_in_whatsapp: true, image_url: "" },
-  { id: 2, name: "Pechuga de pollo 500g", slug: "pechuga-pollo", category: "Carnes", brand: "Bachoco", store_name: "Chedraui", price: 89, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
-  { id: 3, name: "Leche Lala entera 1L", slug: "leche-lala", category: "Lácteos", brand: "Lala", store_name: "La Comer", price: 28, sale_price: 24, is_available: true, show_in_whatsapp: true, image_url: "" },
-  { id: 4, name: "Tortillas de maíz 1kg", slug: "tortillas-maiz", category: "Tortillería", brand: "Genérico", store_name: "City Market", price: 22, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
-  { id: 5, name: "Jitomate saladet", slug: "jitomate-saladet", category: "Frutas y Verduras", brand: "Genérico", store_name: "Soriana", price: 18, sale_price: 15, is_available: false, show_in_whatsapp: true, image_url: "" },
-  { id: 6, name: "Pan Bimbo integral", slug: "pan-bimbo", category: "Panadería", brand: "Bimbo", store_name: "Walmart Express", price: 45, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
-  { id: 7, name: "Queso Oaxaca 400g", slug: "queso-oaxaca", category: "Lácteos", brand: "Esmeralda", store_name: "Fresko", price: 72, sale_price: 65, is_available: true, show_in_whatsapp: true, image_url: "" },
-  { id: 8, name: "Huevo blanco 18pz", slug: "huevo-blanco", category: "Abarrotes", brand: "San Juan", store_name: "La Comer", price: 52, sale_price: null, is_available: true, show_in_whatsapp: true, image_url: "" },
-  { id: 9, name: "Arroz Morelos 1kg", slug: "arroz-morelos", category: "Abarrotes", brand: "Verde Valle", store_name: "Chedraui", price: 32, sale_price: 28, is_available: true, show_in_whatsapp: false, image_url: "" },
-  { id: 10, name: "Jabón Zote blanco", slug: "jabon-zote", category: "Limpieza", brand: "Zote", store_name: "Soriana", price: 15, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
+  { id: 1, name: "Aguacate Hass", slug: "aguacate-hass", category: "Frutas y Verduras", brand: "Genérico", store_name: "Resurte.me", price: 35, sale_price: 29, is_available: true, show_in_whatsapp: true, image_url: "" },
+  { id: 2, name: "Pechuga de pollo 500g", slug: "pechuga-pollo", category: "Carnes", brand: "Bachoco", store_name: "Resurte.me", price: 89, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
+  { id: 3, name: "Leche Lala entera 1L", slug: "leche-lala", category: "Lácteos", brand: "Lala", store_name: "Resurte.me", price: 28, sale_price: 24, is_available: true, show_in_whatsapp: true, image_url: "" },
+  { id: 4, name: "Tortillas de maíz 1kg", slug: "tortillas-maiz", category: "Tortillería", brand: "Genérico", store_name: "Resurte.me", price: 22, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
+  { id: 5, name: "Jitomate saladet", slug: "jitomate-saladet", category: "Frutas y Verduras", brand: "Genérico", store_name: "Resurte.me", price: 18, sale_price: 15, is_available: false, show_in_whatsapp: true, image_url: "" },
+  { id: 6, name: "Pan Bimbo integral", slug: "pan-bimbo", category: "Panadería", brand: "Bimbo", store_name: "Resurte.me", price: 45, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
+  { id: 7, name: "Queso Oaxaca 400g", slug: "queso-oaxaca", category: "Lácteos", brand: "Esmeralda", store_name: "Resurte.me", price: 72, sale_price: 65, is_available: true, show_in_whatsapp: true, image_url: "" },
+  { id: 8, name: "Huevo blanco 18pz", slug: "huevo-blanco", category: "Abarrotes", brand: "San Juan", store_name: "Resurte.me", price: 52, sale_price: null, is_available: true, show_in_whatsapp: true, image_url: "" },
+  { id: 9, name: "Arroz Morelos 1kg", slug: "arroz-morelos", category: "Abarrotes", brand: "Verde Valle", store_name: "Resurte.me", price: 32, sale_price: 28, is_available: true, show_in_whatsapp: false, image_url: "" },
+  { id: 10, name: "Jabón Zote blanco", slug: "jabon-zote", category: "Limpieza", brand: "Zote", store_name: "Resurte.me", price: 15, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
 ]
 
 export default function AdminProductsPage() {
@@ -68,7 +68,7 @@ export default function AdminProductsPage() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input
           type="text"
-          placeholder="Buscar producto, categoría o tienda..."
+          placeholder="Buscar producto o categoría..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
@@ -83,7 +83,6 @@ export default function AdminProductsPage() {
               <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
                 <th className="px-5 py-3">Producto</th>
                 <th className="px-5 py-3">Categoría</th>
-                <th className="px-5 py-3">Tienda</th>
                 <th className="px-5 py-3">Precio</th>
                 <th className="px-5 py-3">Disponible</th>
                 <th className="px-5 py-3">WhatsApp</th>
@@ -110,7 +109,6 @@ export default function AdminProductsPage() {
                       {product.category}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-gray-600">{product.store_name}</td>
                   <td className="px-5 py-3">
                     {product.sale_price ? (
                       <div>

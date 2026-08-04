@@ -64,7 +64,6 @@ export default function OrderDetailPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Pedido #{order.id}</h1>
           <p className="text-sm text-gray-500">
-            {order.store_name} ·{" "}
             {new Date(order.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}
           </p>
         </div>
