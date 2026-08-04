@@ -243,3 +243,64 @@ export interface AppliedCoupon {
   discount_value: number
   min_order: number
 }
+
+// --- Cashback & Wallet Types ---
+
+export type CashbackTier = 'Verde' | 'Plata' | 'Oro' | 'Diamante'
+
+export const CASHBACK_TIERS: Record<number, { name: CashbackTier; pct: number }> = {
+  1: { name: 'Verde', pct: 5 },
+  2: { name: 'Plata', pct: 10 },
+  3: { name: 'Oro', pct: 15 },
+  4: { name: 'Diamante', pct: 20 },
+}
+
+export interface Wallet {
+  id: number
+  user_id: string
+  balance_credits: number
+  created_at: string
+  updated_at: string
+}
+
+export interface WalletTransaction {
+  id: number
+  wallet_id: number
+  amount: number       // > 0 = abono (cashback), < 0 = canje (uso de créditos)
+  concept: string
+  order_id: number | null
+  created_at: string
+}
+
+/** Orden enriquecida con metadata de cashback para el frontend */
+export interface OrderWithCashback {
+  id: number
+  user_id: string
+  store_id: number
+  city_id: number
+  address_id: number | null
+  status: OrderStatus
+  subtotal: number
+  delivery_fee: number
+  total: number
+  payment_method: PaymentMethod | null
+  payment_status: PaymentStatus
+  stripe_payment_intent_id: string | null
+  stripe_checkout_session_id: string | null
+  scheduled_for: string | null
+  source: 'web' | 'whatsapp'
+  cashback_credits: number | null
+  cashback_tier: CashbackTier | null
+  week_of_month: number | null
+  month_year: string | null
+  created_at: string
+}
+
+/** Resultado paginado del historial de transacciones */
+export interface WalletHistoryPage {
+  transactions: WalletTransaction[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+}

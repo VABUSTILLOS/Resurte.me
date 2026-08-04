@@ -290,7 +290,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {sortedResults.map((product, idx) => (
                 <ScrollReveal key={product.id} direction="scale" delay={Math.min(idx * 0.03, 0.3)}>
-                  <ProductCard product={product} citySlug={citySlug} />
+                  <ProductCard product={product} storeId={1} storeName="Resurte.me" storeSlug="resurte" citySlug={citySlug} />
                 </ScrollReveal>
               ))}
             </div>

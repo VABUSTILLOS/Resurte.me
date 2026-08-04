@@ -57,9 +57,16 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Validate required fields
-    if (!store_id || !city_id || !items?.length || !total) {
+    const missing: string[] = []
+    if (!store_id) missing.push("store_id")
+    if (!city_id) missing.push("city_id")
+    if (!items?.length) missing.push("items")
+    if (!total) missing.push("total")
+
+    if (missing.length) {
+      console.error("Order validation failed - missing:", missing, { store_id, city_id, items_count: items?.length, total })
       return NextResponse.json(
-        { error: "Faltan campos requeridos (store_id, city_id, items, total)" },
+        { error: `Faltan campos requeridos: ${missing.join(", ")}` },
         { status: 400 }
       )
     }
@@ -70,7 +77,7 @@ export async function POST(request: NextRequest) {
     const { data: addr, error: addrError } = await supabase
       .from("addresses")
       .insert({
-        user_id: "00000000-0000-0000-0000-000000000000", // anonymous checkout placeholder
+        user_id: null, // anonymous checkout
         label: address.label,
         street: address.street,
         number: address.number,
@@ -87,7 +94,7 @@ export async function POST(request: NextRequest) {
     if (addrError) {
       console.error("Address creation error:", addrError)
       return NextResponse.json(
-        { error: "Error al guardar la dirección" },
+        { error: "Error al guardar la dirección", detail: addrError.message, code: addrError.code },
         { status: 500 }
       )
     }
@@ -101,7 +108,7 @@ export async function POST(request: NextRequest) {
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({
-        user_id: "00000000-0000-0000-0000-000000000000", // anonymous checkout
+        user_id: null, // anonymous checkout
         store_id,
         city_id,
         address_id: addr.id,
@@ -120,7 +127,7 @@ export async function POST(request: NextRequest) {
     if (orderError) {
       console.error("Order creation error:", orderError)
       return NextResponse.json(
-        { error: "Error al crear el pedido" },
+        { error: "Error al crear el pedido", detail: orderError.message, code: orderError.code },
         { status: 500 }
       )
     }
@@ -174,11 +181,12 @@ export async function POST(request: NextRequest) {
           .eq("id", order.id)
       } catch (stripeError) {
         console.error("Stripe PaymentIntent error:", stripeError)
+        const stripeMsg = stripeError instanceof Error ? stripeError.message : String(stripeError)
         // Order is created but payment failed — clean up
         await supabase.from("order_items").delete().eq("order_id", order.id)
         await supabase.from("orders").delete().eq("id", order.id)
         return NextResponse.json(
-          { error: "Error al inicializar el pago con Stripe" },
+          { error: "Error al inicializar el pago con Stripe", detail: stripeMsg },
           { status: 500 }
         )
       }

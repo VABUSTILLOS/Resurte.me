@@ -120,7 +120,7 @@ export function CityPageClient({ slug }: Props) {
       {activeCategory ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} citySlug={slug} />
+            <ProductCard key={product.id} product={product} storeId={1} storeName="Resurte.me" storeSlug="resurte" citySlug={slug} />
           ))}
         </div>
       ) : (
@@ -132,7 +132,7 @@ export function CityPageClient({ slug }: Props) {
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {products.map((product) => (
-                <ProductCard key={product.id} product={product} citySlug={slug} />
+                <ProductCard key={product.id} product={product} storeId={1} storeName="Resurte.me" storeSlug="resurte" citySlug={slug} />
               ))}
             </div>
           </section>

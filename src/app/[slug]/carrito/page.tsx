@@ -40,7 +40,7 @@ export default function CartPage() {
             Agrega productos desde el catálogo de {city.name}.
           </p>
           <Link
-            href={`/${city.slug}`}
+            href={`/${city.slug}/buscar`}
             className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -148,7 +148,7 @@ export default function CartPage() {
           ))}
 
           <Link
-            href={`/${city.slug}`}
+            href={`/${city.slug}/buscar`}
             className="inline-flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 font-medium"
           >
             <ArrowLeft className="w-4 h-4" />

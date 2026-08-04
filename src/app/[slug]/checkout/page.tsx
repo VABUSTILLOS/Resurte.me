@@ -148,7 +148,7 @@ export default function CheckoutPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Carrito vacío</h1>
         <p className="text-gray-400 mb-6">Agrega productos antes de hacer checkout.</p>
         <Link
-          href={`/${city.slug}`}
+          href={`/${city.slug}/buscar`}
           className="inline-flex items-center gap-2 px-6 py-3 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -167,7 +167,7 @@ export default function CheckoutPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          store_id: cart.store_id,
+          store_id: cart.store_id || 1,
           city_id: city.id,
           address: {
             label: address.label,

@@ -126,9 +126,18 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       // Populate cart-level store info from items if missing
       if (!action.payload.cart.store_id && action.payload.cart.items.length > 0) {
         const firstItem = action.payload.cart.items[0]
-        action.payload.cart.store_id = firstItem.store_id ?? null
-        action.payload.cart.store_name = firstItem.store_name ?? null
-        action.payload.cart.store_slug = firstItem.store_slug ?? null
+        action.payload.cart.store_id = firstItem.store_id ?? 1
+        action.payload.cart.store_name = firstItem.store_name ?? "Resurte.me"
+        action.payload.cart.store_slug = firstItem.store_slug ?? "resurte"
+      }
+      // Also ensure all items have store_id for legacy cart data
+      if (action.payload.cart.store_id && action.payload.cart.items.length > 0) {
+        action.payload.cart.items = action.payload.cart.items.map((i) => ({
+          ...i,
+          store_id: i.store_id ?? action.payload.cart.store_id ?? 1,
+          store_name: i.store_name ?? action.payload.cart.store_name ?? "Resurte.me",
+          store_slug: i.store_slug ?? action.payload.cart.store_slug ?? "resurte",
+        }))
       }
       return { ...action.payload, isLoaded: true }
 

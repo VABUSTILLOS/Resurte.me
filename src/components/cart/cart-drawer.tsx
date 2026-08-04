@@ -48,12 +48,12 @@ export function CartDrawer() {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 z-[65] bg-black/30 backdrop-blur-sm transition-opacity"
         onClick={() => setIsOpen(false)}
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col animate-slide-in-right">
+      <div className="fixed right-0 top-0 bottom-0 z-[70] w-full max-w-md bg-white shadow-2xl flex flex-col animate-slide-in-right">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E9EB]">
           <div className="flex items-center gap-2">
@@ -344,25 +344,18 @@ export function MobileCartBar() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
       <div className="flex items-center gap-3 px-4 py-3.5 bg-white border-t border-[#E8E9EB] shadow-[0_-4px_24px_rgba(0,0,0,0.1)]">
-        {/* Item count badge */}
-        <div className="hidden sm:flex items-center gap-2 min-w-0">
-          <span className="bg-[#108910] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
-            {itemCount}
-          </span>
-          <span className="text-sm text-[#72767E] truncate hidden md:inline">
-            {itemCount === 1 ? "producto" : "productos"} · ${subtotal.toFixed(2)}
-          </span>
-        </div>
-
-        {/* Mobile: tap to open drawer */}
+        {/* Tap to open drawer — always visible */}
         <button
           onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
-          className="md:hidden flex items-center gap-2.5 min-w-0"
+          className="flex items-center gap-2.5 min-w-0"
         >
           <span className="bg-[#108910] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
             {itemCount}
           </span>
-          <span className="font-semibold text-sm text-[#242529]">Ver carrito</span>
+          <span className="text-sm text-[#72767E] truncate hidden md:inline">
+            Ver carrito · ${subtotal.toFixed(2)}
+          </span>
+          <span className="font-semibold text-sm text-[#242529] md:hidden">Ver carrito</span>
         </button>
 
         {/* Buttons */}
