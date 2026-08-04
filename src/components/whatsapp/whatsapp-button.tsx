@@ -23,11 +23,11 @@ export function WhatsAppButton({
 
   const positionClass = position === "bottom-right" ? "right-4 sm:right-6" : "left-4 sm:left-6"
 
-  // When cart has items, MobileCartBar (~56px) appears above the bottom bar,
-  // so the WhatsApp button needs extra clearance to avoid overlapping.
+  // Cart empty: WhatsApp sits at the same bottom level as "Ver más productos" would.
+  // Cart has items: WhatsApp moves up to clear the MobileCartBar (~60px).
   const hasCartItems = itemCount > 0
-  const bottomMobile = hasCartItems ? "bottom-[128px]" : "bottom-[72px]"
-  const bottomDesktop = hasCartItems ? "sm:bottom-[136px]" : "sm:bottom-[80px]"
+  const bottomMobile = hasCartItems ? "bottom-[80px]" : "bottom-[20px]"
+  const bottomDesktop = hasCartItems ? "sm:bottom-[84px]" : "sm:bottom-[24px]"
 
   return (
     <a
