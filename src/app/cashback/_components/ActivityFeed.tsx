@@ -107,7 +107,7 @@ export function ActivityFeed() {
                 }`}
               >
                 {activity.amount > 0 ? "+" : ""}
-                ${Math.abs(activity.amount).toLocaleString("es-MX")} MXN
+                ${Math.abs(activity.amount).toLocaleString("es-MX")} Créditos
               </span>
             )}
           </motion.div>

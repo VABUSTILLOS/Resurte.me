@@ -9,7 +9,7 @@ const sampleNotifications: Notification[] = [
   {
     id: "n1",
     type: "cashback_earned",
-    title: "+$750 MXN a tu cartera",
+    title: "+$750 Créditos a tu cartera",
     body: "Pedido #1024 de Distribuidora El Sol procesado exitosamente.",
     timestamp: "Hace 2 min",
     read: false,
@@ -18,7 +18,7 @@ const sampleNotifications: Notification[] = [
     id: "n2",
     type: "milestone",
     title: "¡Alcanzaste un hito!",
-    body: "Has acumulado más de $10,000 MXN en cashback total. Sigue así.",
+    body: "Has acumulado más de $10,000 Créditos en recompensas totales. Sigue así.",
     timestamp: "Hace 1 hora",
     read: false,
     actionLabel: "Ver cartera",
@@ -35,7 +35,7 @@ const sampleNotifications: Notification[] = [
   {
     id: "n4",
     type: "cashback_earned",
-    title: "+$620 MXN a tu cartera",
+    title: "+$620 Créditos a tu cartera",
     body: "Pedido #1020 de Carnes Selectas procesado exitosamente.",
     timestamp: "Ayer",
     read: true,
@@ -43,7 +43,7 @@ const sampleNotifications: Notification[] = [
   {
     id: "n5",
     type: "new_feature",
-    title: "Nuevo: Proyector de Crecimiento",
+    title: "Nuevo: Proyección de Crecimiento",
     body: "Ahora puedes calcular cuánto necesitas consumir para desbloquear cada servicio.",
     timestamp: "Hace 2 días",
     read: true,

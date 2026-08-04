@@ -156,7 +156,7 @@ function IdleState({
               Cada factura suma a tu crecimiento
             </p>
             <p className="text-gray-400 text-xs mt-1">
-              Por cada $1,000 MXN en insumos comprobados, acumulas $50 MXN en tu
+              Por cada $1,000 en insumos comprobados, acumulas $50 Créditos en tu
               Cartera de Crecimiento. Sin límite.
             </p>
           </div>
@@ -164,7 +164,7 @@ function IdleState({
 
         <div className="mt-4 grid grid-cols-3 gap-2">
           {[
-            { value: "5%", label: "Cashback" },
+            { value: "5%", label: "Recompensas" },
             { value: "24h", label: "Validación" },
             { value: "Sin tope", label: "Acumulación" },
           ].map((item) => (
@@ -340,7 +340,7 @@ function ExtractingState() {
         <Sparkles className="h-10 w-10 text-emerald-400" />
       </motion.div>
       <h2 className="text-white text-lg font-bold">Procesando datos</h2>
-      <p className="text-gray-400 text-sm mt-1">Calculando tu cashback...</p>
+      <p className="text-gray-400 text-sm mt-1">Calculando tus recompensas...</p>
 
       {/* Pulse dots */}
       <div className="flex gap-2 mt-4">
@@ -399,7 +399,7 @@ function SuccessState({
       </motion.div>
 
       <h2 className="text-white text-2xl font-black">¡Factura registrada!</h2>
-      <p className="text-gray-400 text-sm mt-1">Tu cashback ha sido acreditado</p>
+      <p className="text-gray-400 text-sm mt-1">Tus recompensas han sido acreditadas</p>
 
       {/* Invoice details */}
       <div className="mt-6 w-full rounded-2xl bg-white/5 border border-white/10 p-5">
@@ -409,17 +409,17 @@ function SuccessState({
           <DetailRow label="Fecha" value={date} />
           <DetailRow
             label="Monto factura"
-            value={`$${amount.toLocaleString("es-MX")} MXN`}
+            value={`$${amount.toLocaleString("es-MX")} Créditos`}
           />
           <hr className="border-white/10" />
           <DetailRow
-            label="Cashback generado"
-            value={`+$${cashback.toLocaleString("es-MX")} MXN`}
+            label="Recompensas generadas"
+            value={`+$${cashback.toLocaleString("es-MX")} Créditos`}
             highlight
           />
           <DetailRow
             label="Nuevo saldo"
-            value={`$${newBalance.toLocaleString("es-MX")} MXN`}
+            value={`$${newBalance.toLocaleString("es-MX")} Créditos`}
             highlight
           />
         </div>
@@ -430,7 +430,7 @@ function SuccessState({
         <div className="flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-emerald-400" />
           <p className="text-emerald-400 text-xs font-medium">
-            Con este cashback estás más cerca de tu próxima campaña publicitaria
+            Con estas recompensas estás más cerca de tu próxima campaña publicitaria
           </p>
         </div>
       </div>

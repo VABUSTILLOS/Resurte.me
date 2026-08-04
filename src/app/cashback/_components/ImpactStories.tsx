@@ -28,7 +28,7 @@ const stories: ImpactStory[] = [
     afterMetric: "40",
     metricLabel: "% de pedidos por canal digital",
     quote:
-      "Ahora el 40% de mis pedidos llegan por mi propia web. Dejé de pagar 30% de comisión a las apps de delivery.",
+      "Ahora el 40% de mis pedidos llegan por mi propia web. Dejé de pagar hasta 30% de comisión a las apps de delivery.",
     photoUrl: "",
     months: 3,
   },
@@ -52,7 +52,7 @@ const stories: ImpactStory[] = [
     serviceUsed: "Menú Digital Interactivo",
     beforeMetric: "180",
     afterMetric: "245",
-    metricLabel: "ticket promedio por mesa ($ MXN)",
+    metricLabel: "ticket promedio por mesa (Créditos)",
     quote:
       "El menú digital con fotos incrementó nuestro ticket promedio un 36%. La gente pide más cuando ve las fotos.",
     photoUrl: "",

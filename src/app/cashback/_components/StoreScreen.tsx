@@ -9,7 +9,7 @@ export const SERVICES: ServiceItem[] = [
   {
     id: "google-maps",
     name: "Optimización Google Maps",
-    tier: "basic",
+    tier: "verde",
     cost: 2800,
     category: "presencia",
     description:
@@ -22,7 +22,7 @@ export const SERVICES: ServiceItem[] = [
   {
     id: "foto-profesional",
     name: "Fotografía Profesional",
-    tier: "basic",
+    tier: "verde",
     cost: 3500,
     category: "presencia",
     description:
@@ -34,7 +34,7 @@ export const SERVICES: ServiceItem[] = [
   {
     id: "redes-sociales",
     name: "Gestión de Redes Sociales",
-    tier: "basic",
+    tier: "verde",
     cost: 4500,
     category: "presencia",
     description:
@@ -46,7 +46,7 @@ export const SERVICES: ServiceItem[] = [
   {
     id: "meta-ads",
     name: "Campaña Meta Ads Local",
-    tier: "intermediate",
+    tier: "plata",
     cost: 16000,
     category: "trafico",
     description:
@@ -64,7 +64,7 @@ export const SERVICES: ServiceItem[] = [
   {
     id: "google-ads",
     name: "Google Ads Local",
-    tier: "intermediate",
+    tier: "plata",
     cost: 14000,
     category: "trafico",
     description:
@@ -76,7 +76,7 @@ export const SERVICES: ServiceItem[] = [
   {
     id: "tiktok",
     name: "TikTok para Restaurantes",
-    tier: "intermediate",
+    tier: "plata",
     cost: 12000,
     category: "trafico",
     description:
@@ -88,7 +88,7 @@ export const SERVICES: ServiceItem[] = [
   {
     id: "menu-digital",
     name: "Menú Digital Interactivo",
-    tier: "advanced",
+    tier: "oro",
     cost: 25000,
     category: "infraestructura",
     description:
@@ -100,7 +100,7 @@ export const SERVICES: ServiceItem[] = [
   {
     id: "ecommerce",
     name: "Tienda Online + Pedidos",
-    tier: "advanced",
+    tier: "oro",
     cost: 45000,
     category: "infraestructura",
     description:
@@ -113,13 +113,13 @@ export const SERVICES: ServiceItem[] = [
     ],
     estimatedImpact: "+30% en ventas mensuales por canal digital",
     testimonials:
-      "Ahora el 40% de mis pedidos llegan por la web. Ya no dependo de apps que me cobran 30% de comisión.",
+      "Ahora el 40% de mis pedidos llegan por la web. Ya no dependo de apps que me cobran hasta 30% de comisión.",
     icon: "🛒",
   },
   {
     id: "web-completa",
     name: "Desarrollo Web Completo",
-    tier: "advanced",
+    tier: "negro",
     cost: 60000,
     category: "infraestructura",
     description:
@@ -136,20 +136,26 @@ export const SERVICES: ServiceItem[] = [
 ];
 
 const tierConfig: Record<Tier, { label: string; bg: string; text: string; border: string }> = {
-  basic: {
-    label: "Básico",
-    bg: "bg-sky-600/20",
-    text: "text-sky-400",
-    border: "border-sky-500/30",
+  verde: {
+    label: "Verde",
+    bg: "bg-emerald-600/20",
+    text: "text-emerald-400",
+    border: "border-emerald-500/30",
   },
-  intermediate: {
-    label: "Intermedio",
+  plata: {
+    label: "Plata",
+    bg: "bg-slate-500/20",
+    text: "text-slate-300",
+    border: "border-slate-400/30",
+  },
+  oro: {
+    label: "Oro",
     bg: "bg-amber-600/20",
     text: "text-amber-400",
     border: "border-amber-500/30",
   },
-  advanced: {
-    label: "Avanzado",
+  negro: {
+    label: "Negro",
     bg: "bg-violet-600/20",
     text: "text-violet-400",
     border: "border-violet-500/30",
@@ -195,7 +201,7 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator }: StoreScreenPr
           <h1 className="text-white text-xl font-bold">Tienda de Crecimiento</h1>
         </div>
         <p className="text-gray-400 text-sm mt-1">
-          Convierte tu cashback en clientes nuevos. Sin gastar un peso extra.
+          Convierte tus recompensas en clientes nuevos. Tus recompensas ya son tuyas.
         </p>
       </motion.div>
 
@@ -380,7 +386,7 @@ function ServiceCard({
         {/* Cost + CTA */}
         <div className="mt-3 flex items-center justify-between">
           <div>
-            <p className="text-gray-500 text-[10px] uppercase tracking-wider">Inversión</p>
+            <p className="text-gray-500 text-[10px] uppercase tracking-wider">Costo en recompensas</p>
             <p className="text-white font-bold text-lg tabular-nums">
               ${service.cost.toLocaleString("es-MX")}
             </p>
@@ -513,7 +519,7 @@ function ServiceDetailSheet({
         {/* Bottom CTA */}
         <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4">
           <div>
-            <p className="text-gray-500 text-xs">Inversión</p>
+            <p className="text-gray-500 text-xs">Costo en recompensas</p>
             <p className="text-white font-bold text-xl tabular-nums">
               ${service.cost.toLocaleString("es-MX")}
             </p>

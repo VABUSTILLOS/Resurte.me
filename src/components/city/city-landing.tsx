@@ -1,6 +1,6 @@
 "use client"
 
-import { MapPin, ArrowRight, Search, Store, Truck, Building2, CreditCard, Grid3X3 } from "lucide-react"
+import { MapPin, ArrowRight, Search, Store, Truck, Building2, CreditCard, Grid3X3, Percent } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { CitySelector } from "@/components/city/city-selector"
 import { useState, useEffect } from "react"
@@ -641,6 +641,122 @@ export function CityLanding({
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Programa de Recompensas — Potencia tu restaurante */}
+      <section className="bg-[#0D5E0D] py-20 relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#3CC73C]/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-[#3CC73C]/8 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
+          <div className="text-center mb-12">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 text-[#3CC73C] text-xs font-bold tracking-wider uppercase rounded-full border border-[#3CC73C]/30 mb-4">
+              <Percent className="w-3 h-3" /> Programa de Recompensas
+            </span>
+            <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight">
+              Potencia tu restaurante{" "}
+              <span className="text-[#3CC73C]">con Resurte.me</span>
+            </h2>
+            <p className="text-base text-white/70 mt-4 max-w-2xl mx-auto leading-relaxed">
+              Tus compras de insumos ya están trabajando para ti. Cada pedido genera{" "}
+              <strong className="text-white">recompensas del 5% al 20%</strong>{" "}
+              que puedes canjear por servicios de marketing digital, fotografía profesional,
+              desarrollo web y más. Sin costo extra. Solo crecimiento.
+            </p>
+
+            {/* Before vs After — the Resurte.me difference */}
+            <div className="mt-8 max-w-xl mx-auto">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl bg-white/5 border border-white/10 p-4 text-left">
+                  <p className="text-white/40 text-[10px] uppercase tracking-wider font-medium mb-2">Antes</p>
+                  <p className="text-white/50 text-xs leading-relaxed">
+                    Tenías que elegir entre{" "}
+                    <span className="text-white/70 line-through">comprar insumos</span>{" "}
+                    o{" "}
+                    <span className="text-white/70 line-through">pagar marketing</span>.
+                    Uno hacía funcionar tu cocina, el otro traía clientes.{" "}
+                    <strong className="text-red-400/80">Perdías uno sí o sí.</strong>
+                  </p>
+                </div>
+                <div className="rounded-xl bg-[#3CC73C]/10 border border-[#3CC73C]/30 p-4 text-left relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-16 h-16 bg-[#3CC73C]/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                  <p className="text-[#3CC73C] text-[10px] uppercase tracking-wider font-bold mb-2 relative z-10">Ahora</p>
+                  <p className="text-white/80 text-xs leading-relaxed relative z-10">
+                    <strong className="text-white">Sigues comprando tus insumos</strong>{" "}
+                    y automáticamente generas recompensas para canjear por marketing, fotografía y web.{" "}
+                    <strong className="text-[#3CC73C]">Los dos, sin pagar extra.</strong>
+                  </p>
+                </div>
+              </div>
+              <p className="text-center text-[#3CC73C] text-xs font-bold mt-3 tracking-wide">
+                La diferencia Resurte.me
+              </p>
+            </div>
+          </div>
+
+          {/* Benefit cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+            {[
+              {
+                icon: "🛒",
+                title: "Compra tus insumos",
+                desc: "Frutas, verduras, carnes y abarrotes. Como siempre, al mejor precio de mayoreo.",
+              },
+              {
+                icon: "💎",
+                title: "Acumula recompensas",
+                desc: "Del 5% al 20% de cada compra se convierte en Créditos según tu nivel.",
+              },
+              {
+                icon: "🚀",
+                title: "Canjea por crecimiento",
+                desc: "Marketing digital, fotografía, menús web y más. Servicios que atraen más clientes.",
+              },
+              {
+                icon: "📈",
+                title: "Sube de nivel",
+                desc: "Verde → Plata → Oro → Negro. Más compras semanales, más recompensas.",
+              },
+            ].map((card) => (
+              <div
+                key={card.title}
+                className="group p-6 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 hover:bg-white/15 hover:border-[#3CC73C]/40 hover:-translate-y-1 transition-all duration-200"
+              >
+                <div className="text-3xl mb-3">{card.icon}</div>
+                <h3 className="font-bold text-white mb-1.5 group-hover:text-[#3CC73C] transition-colors">
+                  {card.title}
+                </h3>
+                <p className="text-sm text-white/60 leading-relaxed">{card.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Social proof + CTA */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex items-center gap-2 text-white/50 text-sm">
+              <span className="flex -space-x-2">
+                {["🍽️", "🥩", "🥑", "🧀"].map((emoji, i) => (
+                  <span key={i} className="w-7 h-7 rounded-full bg-white/20 border-2 border-[#0D5E0D] flex items-center justify-center text-xs">
+                    {emoji}
+                  </span>
+                ))}
+              </span>
+              <span>+500 restaurantes ya están creciendo</span>
+            </div>
+            <Link
+              href="/cashback"
+              className="inline-flex items-center gap-2 bg-[#3CC73C] text-[#0D5E0D] text-sm font-bold px-6 py-3 rounded-[10px] hover:bg-[#4DD94D] hover:scale-105 active:scale-95 transition-all shadow-[0_4px_20px_rgba(60,199,60,0.35)]"
+            >
+              Descubre tu poder de recompensas
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {/* Bottom micro-copy */}
+          <p className="text-center text-white/30 text-xs mt-6">
+            Sin letras chiquitas. Tus Créditos se canjean por servicios en la Tienda de Crecimiento.
+          </p>
         </div>
       </section>
 

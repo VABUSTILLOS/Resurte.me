@@ -4,57 +4,56 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
-  TrendingUp,
-  Store,
-  ShoppingBag,
   Users,
   ArrowRight,
+  CreditCard,
+  Repeat,
+  TrendingUp,
+  Clock,
 } from "lucide-react";
+import { TIER_CONFIGS } from "./types";
+import type { Tier } from "./types";
+import { SERVICES } from "./StoreScreen";
 interface OnboardingScreenProps {
   onComplete: () => void;
 }
+
+const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "negro"];
 
 const steps = [
   {
     id: "welcome",
     title: "Convierte tus compras en crecimiento",
     subtitle:
-      "Cada vez que compras insumos para tu restaurante, acumulas saldo que puedes canjear por servicios de marketing y desarrollo web profesionales.",
+      "Cada compra de insumos para tu restaurante te acerca a un mejor nivel de recompensas. Canjea tu saldo por servicios de marketing, fotografía y desarrollo web.",
     illustration: "🚀",
     stat: "+500 restauranteros ya están creciendo",
   },
   {
-    id: "how-it-works",
-    title: "Así de simple funciona",
+    id: "tiers",
+    title: "Tus niveles de recompensas",
     subtitle: "",
-    illustration: "🔄",
-    features: [
-      { icon: ShoppingBag, label: "Compras tus insumos", desc: "Como siempre lo haces, con tus proveedores de confianza." },
-      { icon: TrendingUp, label: "Acumulas cashback", desc: "5% del valor de tus facturas va a tu Cartera de Crecimiento." },
-      { icon: Store, label: "Canjeas por servicios", desc: "Elige entre marketing digital, fotografía, o desarrollo web." },
-    ],
+    illustration: "⭐",
+    tiers: true,
   },
   {
-    id: "business-info",
-    title: "Cuéntanos de tu restaurante",
-    subtitle: "Personalizamos las recomendaciones de crecimiento para tu negocio.",
-    illustration: "🏪",
-    fields: true,
-  },
-  {
-    id: "auto-cashback",
-    title: "Tu cashback es automático",
-    subtitle: "Sin escanear tickets. Sin conectar proveedores. Cada compra en Resurte.me genera cashback al instante.",
+    id: "calculator",
+    title: "Cuánto Poder le puedes dar a tu restaurante",
+    subtitle: "Descubre los beneficios que puedes obtener para tu restaurante",
     illustration: "⚡",
-    autoInfo: true,
+    calculator: true,
+  },
+  {
+    id: "invitation",
+    title: "¿Listo para comenzar?",
+    subtitle: "Pon a prueba Resurte.me y empieza a potenciar tu restaurante.",
+    illustration: "🍳",
   },
 ];
 
 export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   const [step, setStep] = useState(0);
-  const [restaurantName, setRestaurantName] = useState("");
-  const [restaurantType, setRestaurantType] = useState("");
-  const [monthlySpend, setMonthlySpend] = useState(32000);
+  const [monthlySpend, setMonthlySpend] = useState(20000);
 
   const isLast = step === steps.length - 1;
 
@@ -114,8 +113,8 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
                 Convierte tus compras en crecimiento
               </h1>
               <p className="text-gray-400 text-sm mt-4 max-w-xs md:max-w-lg leading-relaxed md:text-base">
-                Cada vez que compras insumos para tu restaurante, acumulas saldo que
-                puedes canjear por servicios de marketing y desarrollo web.
+                Tus insumos ya trabajan para ti. Cada compra genera recompensas que
+                puedes canjear por marketing digital, fotografía profesional, menús interactivos y más.
               </p>
 
               <div className="mt-8 rounded-2xl bg-emerald-500/10 border border-emerald-500/15 px-5 py-3">
@@ -162,6 +161,21 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
                   <p className="text-gray-600 text-[10px] text-center mt-3">Tenías que elegir uno</p>
                 </div>
 
+                {/* Diferencia Resurte.me Badge */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.65, duration: 0.5 }}
+                  className="mt-3 rounded-2xl bg-amber-500/10 border border-amber-500/15 px-5 py-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-amber-400" />
+                    <span className="text-amber-400 text-sm font-medium">
+                      La diferencia Resurte.me
+                    </span>
+                  </div>
+                </motion.div>
+
                 {/* Transition Arrow */}
                 <motion.div
                   initial={{ scaleX: 0 }}
@@ -199,7 +213,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
                     {/* Cashback */}
                     <div className="flex-1 rounded-xl bg-amber-500/20 border border-amber-500/20 p-2.5 text-center">
                       <span className="text-xl">💰</span>
-                      <p className="text-amber-300 text-[9px] mt-1">Cashback</p>
+                      <p className="text-amber-300 text-[9px] mt-1">Recompensas</p>
                     </div>
                     {/* Arrow */}
                     <span className="text-emerald-600 text-sm shrink-0">→</span>
@@ -217,210 +231,246 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
             </motion.div>
           )}
 
-          {/* Step 1: How it works */}
+          {/* Step 1: Tiers / Niveles */}
           {step === 1 && (
             <motion.div
-              key="how"
+              key="tiers"
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -30 }}
               className="flex-1"
             >
-              <div className="text-center mb-8">
-                <span className="text-5xl">🔄</span>
-                <h2 className="text-white text-2xl font-black mt-3">Así de simple funciona</h2>
-              </div>
-
-              <div className="space-y-4">
-                {[
-                  {
-                    icon: ShoppingBag,
-                    color: "bg-emerald-500/15 text-emerald-400",
-                    label: "1. Compras tus insumos",
-                    desc: "Como siempre lo has hecho, con tus proveedores de confianza.",
-                  },
-                  {
-                    icon: TrendingUp,
-                    color: "bg-amber-500/15 text-amber-400",
-                    label: "2. Acumulas cashback",
-                    desc: "El 5% del valor de tus facturas va directo a tu Cartera de Crecimiento.",
-                  },
-                  {
-                    icon: Store,
-                    color: "bg-violet-500/15 text-violet-400",
-                    label: "3. Canjeas por servicios",
-                    desc: "Elige entre marketing digital, fotografía profesional, o desarrollo web.",
-                  },
-                ].map((item, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 * i }}
-                    className="flex items-start gap-4 rounded-2xl bg-white/5 border border-white/10 p-4"
-                  >
-                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${item.color} flex-shrink-0`}>
-                      <item.icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-white font-semibold text-sm">{item.label}</p>
-                      <p className="text-gray-400 text-xs mt-0.5">{item.desc}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Step 2: Business Info */}
-          {step === 2 && (
-            <motion.div
-              key="business"
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -30 }}
-              className="flex-1"
-            >
-              <div className="text-center mb-8">
-                <span className="text-5xl">🏪</span>
-                <h2 className="text-white text-2xl font-black mt-3">Cuéntanos de tu restaurante</h2>
-                <p className="text-gray-400 text-sm mt-2">
-                  Personalizamos tus oportunidades de crecimiento.
+              <div className="text-center mb-6">
+                <span className="text-5xl">⭐</span>
+                <h2 className="text-white text-2xl font-black mt-3 md:text-3xl">Tus niveles de recompensas</h2>
+                <p className="text-gray-400 text-sm mt-2 max-w-xs mx-auto leading-relaxed">
+                  Entre más compras, más ganas. Así de simple.
                 </p>
               </div>
 
-              <div className="space-y-4">
-                <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                  <label className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-2 block">
-                    Nombre de tu restaurante
-                  </label>
-                  <input
-                    type="text"
-                    value={restaurantName}
-                    onChange={(e) => setRestaurantName(e.target.value)}
-                    placeholder="Ej. Taquería El Pariente"
-                    className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white text-sm
-                      focus:outline-none focus:border-emerald-500/50 placeholder:text-gray-600"
-                  />
-                </div>
+              {/* Tier Cards */}
+              <div className="space-y-3">
+                {TIER_ORDER.map((tier, i) => {
+                  const cfg = TIER_CONFIGS[tier];
+                  const tierEmojis: Record<Tier, string> = { verde: "🟢", plata: "🥈", oro: "🥇", negro: "💎" };
+                  return (
+                    <motion.div
+                      key={tier}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 * i }}
+                      className={`flex items-center gap-4 rounded-2xl border ${cfg.borderColor} ${cfg.bgColor} p-4`}
+                    >
+                      {/* Rate badge */}
+                      <div className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl border ${cfg.borderColor} bg-gray-900/50`}>
+                        <div className="text-center">
+                          <span className={`text-lg font-black ${cfg.textColor} leading-none`}>{cfg.rate}%</span>
+                          <span className="block text-[9px] text-gray-500">recompensas</span>
+                        </div>
+                      </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-bold ${cfg.textColor}`}>
+                          {tierEmojis[tier]} {cfg.name}
+                        </p>
+                        <p className="text-gray-500 text-xs mt-0.5">
+                          {i === 0 && "Empiezas aquí al registrarte"}
+                          {i === 1 && "2+ semanas con al menos 1 compra al mes"}
+                          {i === 2 && "3+ semanas al mes con compras de alto volumen"}
+                          {i === 3 && "Domicilias tus favoritos + 4 compras al mes"}
+                        </p>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
 
-                <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                  <label className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-2 block">
-                    Tipo de cocina
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {["Mexicana", "Italiana", "Japonesa", "Mariscos", "Carnes", "Otra"].map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => setRestaurantType(t)}
-                        className={`rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
-                          restaurantType === t
-                            ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30"
-                            : "bg-white/5 text-gray-400 hover:bg-white/10"
-                        }`}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
+              {/* Unlock criteria explainer */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="mt-5 rounded-2xl bg-white/5 border border-white/10 p-4"
+              >
+                <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">
+                  ¿Cómo subes de nivel?
+                </p>
+                <div className="space-y-2.5">
+                  {[
+                    { icon: TrendingUp, text: "Volumen de compras mensual", desc: "A mayor ticket, más rápido subes" },
+                    { icon: Repeat, text: "Frecuencia semanal", desc: "Comprando más semanas al mes aceleras tu nivel" },
+                    { icon: CreditCard, text: "Suscripción recurrente", desc: "Domicilia tus favoritos y desbloquea el nivel Negro" },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 flex-shrink-0 mt-0.5">
+                        <item.icon className="h-3.5 w-3.5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="text-white text-xs font-medium">{item.text}</p>
+                        <p className="text-gray-500 text-[10px]">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
 
-                <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-                  <label className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-2 block">
-                    Gasto mensual aprox. en insumos
-                  </label>
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <span className="text-white text-2xl font-bold tabular-nums">
-                      ${monthlySpend.toLocaleString("es-MX")}
-                    </span>
-                    <span className="text-gray-500 text-sm">MXN</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={5000}
-                    max={150000}
-                    step={1000}
-                    value={monthlySpend}
-                    onChange={(e) => setMonthlySpend(Number(e.target.value))}
-                    className="w-full h-2 rounded-full bg-gray-700 appearance-none cursor-pointer accent-emerald-500
-                      [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:rounded-full
-                      [&::-webkit-slider-thumb]:bg-emerald-400"
-                  />
-                  <div className="flex justify-between mt-1">
-                    <span className="text-gray-600 text-[10px]">$5K</span>
-                    <span className="text-gray-600 text-[10px]">$150K</span>
-                  </div>
+          {/* Step 2: Calculator */}
+          {step === 2 && (
+            <motion.div
+              key="calculator"
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -30 }}
+              className="flex-1"
+            >
+              <div className="text-center mb-6">
+                <span className="text-5xl">⚡</span>
+                <h2 className="text-white text-2xl font-black mt-3 md:text-3xl">
+                  Cuánto Poder le puedes dar a tu restaurante
+                </h2>
+                <p className="text-gray-400 text-sm mt-2 max-w-xs mx-auto leading-relaxed">
+                  Descubre los beneficios que puedes obtener para tu restaurante
+                </p>
+              </div>
+
+              {/* Spend Slider */}
+              <div className="rounded-2xl bg-white/5 border border-white/10 p-4 mb-4">
+                <label className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-2 block">
+                  Gasto mensual aprox. en insumos
+                </label>
+                <div className="flex items-baseline gap-2 mb-3">
+                  <span className="text-white text-2xl font-bold tabular-nums">
+                    ${monthlySpend.toLocaleString("es-MX")}
+                  </span>
+                  <span className="text-gray-500 text-sm">Créditos</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100000}
+                  step={500}
+                  value={monthlySpend}
+                  onChange={(e) => setMonthlySpend(Number(e.target.value))}
+                  className="w-full h-2 rounded-full bg-gray-700 appearance-none cursor-pointer accent-emerald-500
+                    [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:rounded-full
+                    [&::-webkit-slider-thumb]:bg-emerald-400"
+                />
+                <div className="flex justify-between mt-1">
+                  <span className="text-gray-600 text-[10px]">$0</span>
+                  <span className="text-gray-600 text-[10px]">$100K</span>
+                </div>
+              </div>
+
+              {/* Cashback result */}
+              {(() => {
+                const cashbackAmount = Math.round(monthlySpend * 0.2);
+                return (
+                  <motion.div
+                    key={cashbackAmount}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="rounded-2xl bg-violet-500/10 border border-violet-500/20 p-4 mb-5 text-center"
+                  >
+                    <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">
+                      Tus recompensas mensuales estimadas
+                    </p>
+                    <p className="text-violet-300 text-3xl font-black tabular-nums">
+                      ${cashbackAmount.toLocaleString("es-MX")}
+                    </p>
+                    <p className="text-gray-500 text-xs mt-1">
+                      Tendrías{" "}
+                      <strong className="text-violet-400">
+                        ${cashbackAmount.toLocaleString("es-MX")}
+                      </strong>{" "}
+                      (el 20% de tu gasto mensual aprox. en insumos)
+                    </p>
+                  </motion.div>
+                );
+              })()}
+
+              {/* Service examples */}
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-3 text-center">
+                  Ejemplos de lo que puedes adquirir con tus recompensas
+                </p>
+                <div className="grid gap-2">
+                  {SERVICES.filter((s) =>
+                    ["google-maps", "foto-profesional", "redes-sociales", "google-ads", "menu-digital"].includes(s.id)
+                  )
+                    .sort((a, b) => a.cost - b.cost)
+                    .map((svc) => {
+                      const cashback = Math.round(monthlySpend * 0.2);
+                      const monthsToUnlock = cashback > 0
+                        ? Math.ceil(svc.cost / cashback)
+                        : null;
+                      return (
+                        <motion.div
+                          key={svc.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/10 p-3"
+                        >
+                          <span className="text-2xl flex-shrink-0">{svc.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-bold truncate">
+                              {svc.name}
+                            </p>
+                            <p className="text-gray-500 text-[10px]">
+                              ${svc.cost.toLocaleString("es-MX")}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 text-gray-600 text-xs flex-shrink-0">
+                            <Clock className="h-3 w-3" />
+                            <span>
+                              {monthsToUnlock === null
+                                ? "—"
+                                : `${monthsToUnlock} ${monthsToUnlock === 1 ? "mes" : "meses"}`}
+                            </span>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
                 </div>
               </div>
             </motion.div>
           )}
 
-          {/* Step 3: Auto Cashback */}
+          {/* Step 3: Invitation */}
           {step === 3 && (
             <motion.div
-              key="auto-cashback"
+              key="invitation"
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -30 }}
-              className="flex-1 flex flex-col items-center text-center"
+              className="flex-1 flex flex-col items-center text-center justify-center"
             >
               <motion.div
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 3, repeat: Infinity }}
                 className="text-7xl mb-6"
               >
-                ⚡
+                🍳
               </motion.div>
 
-              <h2 className="text-white text-2xl font-black">Tu cashback es automático</h2>
-              <p className="text-gray-400 text-sm mt-3 max-w-xs leading-relaxed">
-                Sin escanear tickets. Sin conectar proveedores. Cada compra que hagas en
-                Resurte.me genera cashback al instante en tu Cartera de Crecimiento.
+              <h2 className="text-white text-3xl font-black leading-tight max-w-xs md:text-4xl md:max-w-md">
+                ¿Listo para comenzar?
+              </h2>
+
+              <p className="text-gray-400 text-sm mt-4 max-w-xs md:max-w-sm leading-relaxed">
+                Pon a prueba <strong className="text-emerald-400">Resurte.me</strong> y empieza a
+                potenciar tu restaurante.
               </p>
 
-              {/* How it works visually */}
-              <div className="mt-8 w-full space-y-4">
-                {[
-                  {
-                    icon: "🛒",
-                    title: "Haces tu pedido en Resurte.me",
-                    desc: "Compras tus insumos como siempre. Frutas, carnes, lácteos, abarrotes — todo en un solo lugar.",
-                    color: "border-emerald-500/20 bg-emerald-500/5",
-                  },
-                  {
-                    icon: "💰",
-                    title: "El cashback se acredita al instante",
-                    desc: "El 5% del valor de tu pedido va directo a tu Cartera de Crecimiento. Sin hacer nada más.",
-                    color: "border-amber-500/20 bg-amber-500/5",
-                  },
-                  {
-                    icon: "🚀",
-                    title: "Lo canjeas por servicios de marketing",
-                    desc: "Cuando tengas saldo suficiente, elige entre campañas publicitarias, fotografía profesional, o desarrollo web.",
-                    color: "border-violet-500/20 bg-violet-500/5",
-                  },
-                ].map((item, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.12 * i }}
-                    className={`flex items-start gap-4 rounded-2xl border ${item.color} p-4 text-left`}
-                  >
-                    <span className="text-2xl flex-shrink-0">{item.icon}</span>
-                    <div>
-                      <p className="text-white font-semibold text-sm">{item.title}</p>
-                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">{item.desc}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+              <p className="text-white text-xl font-bold mt-8 max-w-xs leading-snug">
+                ¿Qué te hace falta en tu cocina?
+              </p>
 
-              {/* Reassurance */}
-              <div className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-4 w-full">
-                <p className="text-gray-400 text-xs text-center">
-                  📊 En promedio, un restaurante genera <strong className="text-emerald-400">$1,600 MXN/mes</strong> en cashback
-                  solo con sus compras normales de insumos.
+              <div className="mt-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/15 px-6 py-4">
+                <p className="text-emerald-400/70 text-xs">
+                  Sin inversión adicional. Solo haciendo lo que ya haces.
                 </p>
               </div>
             </motion.div>

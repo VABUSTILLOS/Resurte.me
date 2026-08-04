@@ -18,6 +18,11 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
   const [monthlySpend, setMonthlySpend] = useState(32000);
   const [growthMode, setGrowthMode] = useState(false);
 
+  const selectedService = useMemo(
+    () => SERVICES.find((s) => s.id === targetServiceId) || SERVICES[0],
+    [targetServiceId]
+  );
+
   const cashbackRate = 0.05;
   // In growth mode, simulate a 40% spend increase
   const effectiveSpend = growthMode ? Math.round(monthlySpend * 1.4) : monthlySpend;
@@ -37,7 +42,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div>
-          <h1 className="text-white text-lg font-bold">Proyector de Crecimiento</h1>
+          <h1 className="text-white text-lg font-bold">Proyección de Crecimiento</h1>
           <p className="text-gray-400 text-xs">Descubre cuánto necesitas consumir para desbloquear cada servicio</p>
         </div>
       </div>
@@ -57,7 +62,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
           >
             {SERVICES.map((s) => (
               <option key={s.id} value={s.id} className="bg-gray-900">
-                {s.icon} {s.name} — ${s.cost.toLocaleString("es-MX")} MXN
+                {s.icon} {s.name} — ${s.cost.toLocaleString("es-MX")} Créditos
               </option>
             ))}
           </select>
@@ -145,14 +150,14 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
                 <p className="text-white text-lg font-bold tabular-nums mt-1">
                   ${monthlySpend.toLocaleString("es-MX")}
                 </p>
-                <p className="text-gray-500 text-[10px]">+${Math.round(monthlySpend * cashbackRate).toLocaleString("es-MX")}/mes cashback</p>
+                <p className="text-gray-500 text-[10px]">+${Math.round(monthlySpend * cashbackRate).toLocaleString("es-MX")}/mes en recompensas</p>
               </div>
               <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-center">
                 <p className="text-amber-400 text-[10px]">Consumo acelerado</p>
                 <p className="text-amber-400 text-lg font-bold tabular-nums mt-1">
                   ${effectiveSpend.toLocaleString("es-MX")}
                 </p>
-                <p className="text-amber-400 text-[10px]">+${monthlyCashback.toLocaleString("es-MX")}/mes cashback</p>
+                <p className="text-amber-400 text-[10px]">+${monthlyCashback.toLocaleString("es-MX")}/mes en recompensas</p>
               </div>
             </motion.div>
           )}
@@ -178,8 +183,8 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
 
           <div className="space-y-3">
             <ResultRow
-              label="Cashback mensual estimado"
-              value={`$${monthlyCashback.toLocaleString("es-MX")} MXN`}
+              label="Recompensas mensuales estimadas"
+              value={`$${monthlyCashback.toLocaleString("es-MX")} Créditos`}
               icon={<TrendingUp className="h-5 w-5 text-emerald-400" />}
             />
 
@@ -193,8 +198,8 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
             />
 
             <ResultRow
-              label="Cashback acumulado en el período"
-              value={`$${totalAccumulated.toLocaleString("es-MX")} MXN`}
+              label="Recompensas acumuladas en el período"
+              value={`$${totalAccumulated.toLocaleString("es-MX")} Créditos`}
               icon={<Wallet className="h-5 w-5 text-emerald-400" />}
             />
           </div>
@@ -230,7 +235,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
                   }}
                   transition={{ duration: 0.8, delay: 0.2 }}
                 />
-                <span className="text-emerald-500 text-[10px]">Cashback</span>
+                <span className="text-emerald-500 text-[10px]">Recompensas</span>
               </div>
             </div>
           </div>

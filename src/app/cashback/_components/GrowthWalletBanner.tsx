@@ -149,7 +149,7 @@ function AnimatedBalance({ target, isNearUnlock }: { target: number; isNearUnloc
       transition={{ type: "spring", stiffness: 200, damping: 15 }}
     >
       ${displayed.toLocaleString("es-MX")}
-      <span className="ml-1 text-2xl font-semibold text-emerald-200">MXN</span>
+      <span className="ml-1 text-2xl font-semibold text-emerald-200">Créditos</span>
     </motion.h1>
   );
 }

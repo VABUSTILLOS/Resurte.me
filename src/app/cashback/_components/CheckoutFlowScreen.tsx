@@ -122,7 +122,7 @@ function Step1Confirm({
       exit={{ opacity: 0, x: -20 }}
     >
       <p className="text-gray-400 text-sm">
-        Estás a un paso de activar <strong className="text-white">{service.name}</strong> sin gastar un peso extra de tu bolsillo.
+        Tu <strong className="text-white">{service.name}</strong> está listo. Solo confírmalo.
       </p>
 
       {/* Service Summary */}
@@ -154,20 +154,20 @@ function Step1Confirm({
         <div className="flex justify-between items-center">
           <span className="text-gray-400 text-sm">Tu saldo actual</span>
           <span className="text-white font-bold tabular-nums">
-            ${balance.toLocaleString("es-MX")} MXN
+            ${balance.toLocaleString("es-MX")} Créditos
           </span>
         </div>
         <div className="flex justify-between items-center mt-2">
           <span className="text-gray-400 text-sm">Costo del servicio</span>
           <span className="text-white font-bold tabular-nums">
-            - ${service.cost.toLocaleString("es-MX")} MXN
+            - ${service.cost.toLocaleString("es-MX")} Créditos
           </span>
         </div>
         <hr className="my-3 border-gray-800" />
         <div className="flex justify-between items-center">
           <span className="text-gray-400 text-sm">Te quedaría</span>
           <span className={`font-bold tabular-nums text-lg ${remainingAfter >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-            ${remainingAfter.toLocaleString("es-MX")} MXN
+            ${remainingAfter.toLocaleString("es-MX")} Créditos
           </span>
         </div>
       </div>
@@ -178,7 +178,7 @@ function Step1Confirm({
           shadow-lg shadow-emerald-900/40 transition-all active:scale-[0.98] 
           hover:bg-emerald-500"
       >
-        Continuar — Sin costo real para ti
+        Continuar
       </button>
     </motion.div>
   );
@@ -258,7 +258,7 @@ function Step2Context({
           hover:bg-emerald-500"
       >
         <Sparkles className="h-4 w-4" />
-        Solicitar Servicio — Sin costo para ti
+        Solicitar Servicio
       </button>
     </motion.div>
   );

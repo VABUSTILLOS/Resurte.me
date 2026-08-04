@@ -1,16 +1,28 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { ArrowRight, TrendingUp, Star, Clock, CheckCircle, Lock } from "lucide-react";
 import { GrowthWalletBanner } from "./GrowthWalletBanner";
 import { QuickActions } from "./QuickActions";
 import { ActivityFeed } from "./ActivityFeed";
 import { NotificationBell } from "./NotificationBell";
 import { ImpactStories } from "./ImpactStories";
+import { SERVICES } from "./StoreScreen";
+import { TIER_CONFIGS } from "./types";
+import type { Tier } from "./types";
 import type { ServiceItem } from "./types";
+
+const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "negro"];
+
+// Simulated user state
+const USER_TIER: Tier = "plata";
+const USER_WEEKS_THIS_MONTH = 2;
+const USER_MONTHLY_SPEND = 32000;
 
 interface DashboardScreenProps {
   onOpenCalculator: (service?: ServiceItem) => void;
   onServiceSelect: (service: ServiceItem) => void;
+  onNavigateStore?: () => void;
   onViewOrders?: () => void;
   walletView?: boolean;
   profileView?: boolean;
@@ -19,6 +31,7 @@ interface DashboardScreenProps {
 export function DashboardScreen({
   onOpenCalculator,
   onServiceSelect,
+  onNavigateStore,
   onViewOrders,
   walletView,
   profileView,
@@ -29,6 +42,11 @@ export function DashboardScreen({
   if (profileView) {
     return <ProfileView />;
   }
+
+  // Pick 3 featured services for the home preview
+  const featuredServices = SERVICES.filter((s) =>
+    ["google-maps", "meta-ads", "menu-digital"].includes(s.id)
+  ).sort((a, b) => a.cost - b.cost);
 
   return (
     <div className="pt-2 pb-6 md:max-w-none lg:max-w-6xl lg:mx-auto">
@@ -49,19 +67,62 @@ export function DashboardScreen({
             <GrowthWalletBanner
               balance={12450}
               nextUnlock={{
-                name: "Campaña Meta Ads — Nivel Intermedio",
+                name: "Campaña Meta Ads — Nivel Plata",
                 cost: 16000,
                 progressPercent: 72,
               }}
             />
           </div>
 
-          <div className="px-0 md:px-6 lg:px-0">
-            <QuickActions
-              onViewOrders={onViewOrders}
-              onBrowseStore={() => onServiceSelect}
-            />
-          </div>
+          <QuickActions onViewOrders={onViewOrders} onBrowseStore={onNavigateStore} />
+
+          {/* Cashback Disclaimer */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.3 }}
+            className="mx-4 mt-3 rounded-xl bg-amber-500/5 border border-amber-500/10 px-4 py-2.5 md:mx-6 lg:mx-0"
+          >
+            <p className="text-amber-400/60 text-[11px] leading-relaxed">
+              ⓘ Tus Créditos solo pueden canjearse por servicios en la Tienda de Crecimiento. No son canjeables por dinero en efectivo.
+            </p>
+          </motion.div>
+
+          {/* Store Preview Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.4 }}
+            className="mx-4 mt-5 md:mx-6 lg:mx-0"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-white text-sm font-bold">Tienda de Crecimiento</p>
+              <button
+                onClick={onNavigateStore}
+                className="flex items-center gap-1 text-emerald-400 text-xs font-medium hover:underline"
+              >
+                Ver todo <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {featuredServices.map((svc) => (
+                <motion.button
+                  key={svc.id}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={onNavigateStore}
+                  className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 border border-white/10 p-3 text-center hover:border-white/20 transition-colors"
+                >
+                  <span className="text-2xl">{svc.icon}</span>
+                  <p className="text-white text-[10px] font-medium leading-tight line-clamp-2">
+                    {svc.name}
+                  </p>
+                  <p className="text-emerald-400 text-[10px] font-bold">
+                    ${svc.cost.toLocaleString("es-MX")}
+                  </p>
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
 
           {/* Impact Teaser */}
           <motion.div
@@ -105,89 +166,92 @@ export function DashboardScreen({
 }
 
 function WalletView() {
-  const monthlySpend = 32000;
-  const cashbackRate = 0.05;
-  const monthlyCashback = monthlySpend * cashbackRate;
+  const monthlySpend = USER_MONTHLY_SPEND;
+  const currentTierConfig = TIER_CONFIGS[USER_TIER];
+  const monthlyCashback = Math.round(monthlySpend * (currentTierConfig.rate / 100));
+
+  // Simulated automatic orders
+  const recentOrders = [
+    { id: "PED-1042", supplier: "Distribuidora El Sol", amount: 15000, date: "15 Jul 2026", cashback: Math.round(15000 * (currentTierConfig.rate / 100)) },
+    { id: "PED-1038", supplier: "Carnes Selectas del Norte", amount: 12400, date: "8 Jul 2026", cashback: Math.round(12400 * (currentTierConfig.rate / 100)) },
+    { id: "PED-1035", supplier: "Frutas y Verduras del Valle", amount: 8700, date: "2 Jul 2026", cashback: Math.round(8700 * (currentTierConfig.rate / 100)) },
+    { id: "PED-1032", supplier: "Lácteos La Pradera", amount: 5200, date: "28 Jun 2026", cashback: Math.round(5200 * (currentTierConfig.rate / 100)) },
+  ];
 
   return (
     <div className="px-4 pt-6 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
-      <h1 className="text-white text-xl font-bold mb-5">Mi Cartera</h1>
+      <h1 className="text-white text-xl font-bold mb-5">Mis Pedidos</h1>
+
+      {/* Cashback rate banner */}
+      <div className="rounded-2xl bg-gradient-to-br from-emerald-900/40 to-teal-900/40 border border-emerald-500/20 p-5 mb-4">
+        <div className="flex items-start gap-3">
+          <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-${currentTierConfig.color}-500/20 flex-shrink-0`}>
+            <Star className={`h-5 w-5 text-${currentTierConfig.color}-400`} />
+          </div>
+          <div className="flex-1">
+            <p className="text-white text-sm font-semibold">
+              Tus recompensas: <span className={currentTierConfig.textColor}>5% a 20% según nivel</span>
+            </p>
+            <p className="text-gray-400 text-xs mt-1">
+              Actualmente estás en nivel{" "}
+              <span className={`font-bold ${currentTierConfig.textColor}`}>{currentTierConfig.name}</span>{" "}
+              recibiendo <span className={`font-bold ${currentTierConfig.textColor}`}>{currentTierConfig.rate}%</span> de recompensas.
+              Tus pedidos en la Tienda de Crecimiento se registran automáticamente.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Balance Card */}
       <div className="rounded-2xl bg-white/5 border border-white/10 p-5 mb-4">
         <p className="text-gray-400 text-xs uppercase tracking-wider">Saldo Total</p>
         <p className="text-white text-4xl font-black tabular-nums mt-1">
-          $12,450 <span className="text-xl text-gray-400">MXN</span>
+          $12,450 <span className="text-xl text-gray-400">Créditos</span>
         </p>
-
-        {/* Monthly Breakdown */}
         <div className="mt-5 grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/15 p-3">
-            <p className="text-gray-400 text-[10px] uppercase tracking-wider">Cashback este mes</p>
+            <p className="text-gray-400 text-[10px] uppercase tracking-wider">Recompensas este mes</p>
             <p className="text-emerald-400 text-lg font-bold tabular-nums mt-0.5">
               +${monthlyCashback.toLocaleString("es-MX")}
             </p>
           </div>
           <div className="rounded-xl bg-amber-500/10 border border-amber-500/15 p-3">
-            <p className="text-gray-400 text-[10px] uppercase tracking-wider">Pendiente validar</p>
-            <p className="text-amber-400 text-lg font-bold tabular-nums mt-0.5">$1,020</p>
+            <p className="text-gray-400 text-[10px] uppercase tracking-wider">% Actual</p>
+            <p className={`text-lg font-bold tabular-nums mt-0.5 ${currentTierConfig.textColor}`}>
+              {currentTierConfig.rate}%
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Progress bar - monthly spending to cashback */}
-      <div className="rounded-2xl bg-white/5 border border-white/10 p-5 mb-4">
-        <p className="text-white text-sm font-semibold mb-3">Tus compras vs. tu cashback</p>
-        <div className="space-y-3">
-          <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-gray-400">Compras del mes</span>
-              <span className="text-white font-medium">${monthlySpend.toLocaleString("es-MX")}</span>
-            </div>
-            <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
-              <motion.div
-                className="h-full rounded-full bg-emerald-600"
-                initial={{ width: 0 }}
-                animate={{ width: "100%" }}
-                transition={{ duration: 1, delay: 0.3 }}
-              />
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-gray-400">Cashback generado</span>
-              <span className="text-emerald-400 font-medium">${monthlyCashback.toLocaleString("es-MX")}</span>
-            </div>
-            <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
-              <motion.div
-                className="h-full rounded-full bg-emerald-400"
-                initial={{ width: 0 }}
-                animate={{ width: `${cashbackRate * 100}%` }}
-                transition={{ duration: 1, delay: 0.5 }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Growth Timeline Chart placeholder */}
-      <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
-        <p className="text-white text-sm font-semibold mb-4">Historial de Crecimiento</p>
-        <div className="flex items-end gap-2 h-32">
-          {["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul"].map((month, i) => {
-            const heights = [15, 25, 20, 35, 45, 55, 72];
-            return (
-              <div key={month} className="flex-1 flex flex-col items-center gap-1.5">
-                <motion.div
-                  className="w-full rounded-t-md bg-gradient-to-t from-emerald-600 to-emerald-400"
-                  initial={{ height: 0 }}
-                  animate={{ height: heights[i] }}
-                  transition={{ delay: 0.1 * i + 0.6, duration: 0.5 }}
-                />
-                <span className="text-[10px] text-gray-500">{month}</span>
+      {/* Recent Orders */}
+      <div className="mb-4">
+        <p className="text-white text-sm font-bold mb-3">Pedidos recientes</p>
+        <div className="space-y-2">
+          {recentOrders.map((order) => (
+            <motion.div
+              key={order.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/5 p-3"
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15 flex-shrink-0">
+                <TrendingUp className="h-4 w-4 text-emerald-400" />
               </div>
-            );
-          })}
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-medium truncate">{order.supplier}</p>
+                <p className="text-gray-500 text-[10px]">{order.id} · {order.date}</p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-white text-sm font-bold tabular-nums">
+                  ${order.amount.toLocaleString("es-MX")}
+                </p>
+                <p className="text-emerald-400 text-[10px] font-medium">
+                  +${order.cashback.toLocaleString("es-MX")}
+                </p>
+              </div>
+            </motion.div>
+          ))}
         </div>
       </div>
     </div>
@@ -195,6 +259,25 @@ function WalletView() {
 }
 
 function ProfileView() {
+  const currentTierIdx = TIER_ORDER.indexOf(USER_TIER);
+
+  // Tier unlock conditions
+  const tierConditions: Record<Tier, { weeks: number; minWeekly: number; label: string }> = {
+    verde: { weeks: 0, minWeekly: 0, label: "Primera compra" },
+    plata: { weeks: 2, minWeekly: 3500, label: "2+ semanas al mes con compras" },
+    oro: { weeks: 3, minWeekly: 3500, label: "3+ semanas al mes + alto volumen" },
+    negro: { weeks: 4, minWeekly: 3500, label: "4 semanas al mes + suscripción recurrente" },
+  };
+
+  const inviteShare = async () => {
+    const msg = "🚀 Te invito a Resurte.me — genera Créditos en tus compras de insumos que puedes canjear por marketing digital, fotografía profesional, menús interactivos y más. ¡Crecer juntos sabe mejor! https://resurte.me/invite";
+    if (navigator.share) {
+      try { await navigator.share({ title: "Resurte.me", text: msg }); return; } catch {}
+    }
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, "_blank");
+  };
+
   return (
     <div className="px-4 pt-6 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
       <h1 className="text-white text-xl font-bold mb-5">Mi Perfil</h1>
@@ -211,19 +294,105 @@ function ProfileView() {
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 mb-6">
         <ProfileRow label="Pedidos este mes" value="4" />
         <ProfileRow label="Servicios canjeados" value="2" />
         <ProfileRow label="Meses en el programa" value="8" />
-        <ProfileRow label="Total cashback acumulado" value="$34,200 MXN" />
+        <ProfileRow label="Total recompensas acumuladas" value="$34,200 Créditos" />
       </div>
 
-      <div className="mt-6 rounded-2xl bg-gradient-to-br from-purple-600/20 to-purple-800/20 border border-purple-500/15 p-4">
-        <p className="text-white text-sm font-semibold">🎁 Invita a otro restaurantero</p>
+      {/* Tier Progression Ladder */}
+      <div className="mb-6">
+        <h2 className="text-white text-sm font-bold mb-4">Tu progreso de niveles</h2>
+        <div className="space-y-3">
+          {TIER_ORDER.map((tier, idx) => {
+            const cfg = TIER_CONFIGS[tier];
+            const cond = tierConditions[tier];
+            const isUnlocked = idx <= currentTierIdx;
+            const isCurrent = idx === currentTierIdx;
+            const isNext = idx === currentTierIdx + 1;
+
+            return (
+              <motion.div
+                key={tier}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                className={`relative rounded-xl border p-4 ${
+                  isUnlocked
+                    ? `${cfg.bgColor} ${cfg.borderColor}`
+                    : "bg-white/5 border-white/10 opacity-60"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  {/* Tier badge */}
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl flex-shrink-0 ${
+                    isUnlocked ? `bg-${cfg.color}-500/20` : "bg-gray-800"
+                  }`}>
+                    {isUnlocked ? (
+                      <CheckCircle className={`h-5 w-5 ${cfg.textColor}`} />
+                    ) : (
+                      <Lock className="h-5 w-5 text-gray-600" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className={`text-sm font-bold ${isUnlocked ? cfg.textColor : "text-gray-500"}`}>
+                        {cfg.name}
+                      </p>
+                      {isCurrent && (
+                        <span className="rounded-full bg-emerald-600/30 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                          Actual
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-400 text-[10px] mt-0.5">
+                      {cfg.rate}% recompensas · {cond.label}
+                    </p>
+
+                    {/* Progress bar for next tier */}
+                    {isNext && (
+                      <div className="mt-2">
+                        <div className="flex justify-between text-[10px] mb-1">
+                          <span className="text-gray-500">
+                            {USER_WEEKS_THIS_MONTH} de {cond.weeks} semanas este mes
+                          </span>
+                          <span className={cfg.textColor}>
+                            {Math.round((USER_WEEKS_THIS_MONTH / cond.weeks) * 100)}%
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-gray-800 overflow-hidden">
+                          <motion.div
+                            className={`h-full rounded-full bg-${cfg.color}-500`}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(USER_WEEKS_THIS_MONTH / cond.weeks) * 100}%` }}
+                            transition={{ duration: 0.8, delay: 0.3 }}
+                          />
+                        </div>
+                        <p className="text-gray-600 text-[9px] mt-1">
+                          Mínimo ${cond.minWeekly.toLocaleString("es-MX")} por semana
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Invite */}
+      <div className="rounded-2xl bg-gradient-to-br from-purple-600/20 to-purple-800/20 border border-purple-500/15 p-4">
+        <p className="text-white text-sm font-semibold">🎁 Crecer juntos sabe mejor</p>
         <p className="text-gray-400 text-xs mt-1">
-          Gana $500 MXN extra en tu cartera por cada amigo que se una y registre su primera factura.
+          Invita a otro restaurantero y ambos ganan $500 Créditos en recompensas.
         </p>
-        <button className="mt-3 w-full rounded-xl bg-purple-600 py-2.5 text-sm font-bold text-white active:scale-[0.98] transition-transform">
+        <button
+          onClick={inviteShare}
+          className="mt-3 w-full rounded-xl bg-purple-600 py-2.5 text-sm font-bold text-white active:scale-[0.98] transition-transform"
+        >
           Compartir invitación
         </button>
       </div>

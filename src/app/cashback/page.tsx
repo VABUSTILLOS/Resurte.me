@@ -41,6 +41,14 @@ export default function CashbackPage() {
     setShowCalculator(true);
   }, []);
 
+  const handleNavigateStore = useCallback(() => {
+    setActiveTab("store");
+  }, []);
+
+  const handleViewOrders = useCallback(() => {
+    setActiveTab("wallet");
+  }, []);
+
   const handleCheckoutComplete = useCallback(() => {
     setShowCheckout(false);
     setShowConfetti(true);
@@ -95,7 +103,8 @@ export default function CashbackPage() {
                 <DashboardScreen
                   onOpenCalculator={handleOpenCalculator}
                   onServiceSelect={handleServiceSelect}
-                  onViewOrders={() => setShowScanner(true)}
+                  onNavigateStore={handleNavigateStore}
+                  onViewOrders={handleViewOrders}
                 />
               )}
               {activeTab === "store" && (
