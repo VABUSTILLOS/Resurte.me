@@ -1,17 +1,26 @@
 "use client"
 
 import Link from "next/link"
-import { ShoppingCart, User, MapPin, ChevronDown } from "lucide-react"
+import { ShoppingCart, User, MapPin, ChevronDown, Coins } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
 import { SearchBar } from "@/components/search/search-bar"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export function Header() {
   const { city } = useCity()
   const { itemCount } = useCart()
   const [showCitySelector, setShowCitySelector] = useState(false)
+  const [cashbackBalance, setCashbackBalance] = useState<number | null>(null)
+
+  // Load cashback balance from localStorage (set by cashback page)
+  useEffect(() => {
+    const saved = localStorage.getItem("cashback-balance")
+    if (saved) {
+      setCashbackBalance(Number(saved))
+    }
+  }, [])
 
   return (
     <header className="sticky top-0 z-50 glass-header">
@@ -22,6 +31,20 @@ export function Header() {
             <span className="text-[1.35rem] font-bold text-[#108910] tracking-tight">Resurte</span>
             <span className="text-[1.35rem] font-bold text-[#1a1a1a] tracking-tight">.me</span>
           </Link>
+
+          {/* Cashback badge — shown when user has balance */}
+          {cashbackBalance !== null && cashbackBalance > 0 && (
+            <Link
+              href="/cashback"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-[#108910]/10 border border-[#108910]/20 hover:bg-[#108910]/15 transition-colors text-sm shrink-0"
+            >
+              <Coins className="w-4 h-4 text-[#108910]" />
+              <span className="font-semibold text-[#108910]">
+                ${cashbackBalance.toLocaleString("es-MX")}
+              </span>
+              <span className="text-xs text-[#108910]/70 hidden lg:inline">cashback</span>
+            </Link>
+          )}
 
           {/* City Selector Trigger */}
           <button

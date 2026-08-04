@@ -193,6 +193,78 @@ export function CartDrawer() {
               <span className="font-semibold text-[#242529]">${subtotal.toFixed(2)}</span>
             </div>
 
+            {/* Cross-sell: "Restaurantes también compran" hints */}
+            <div className="bg-[#FDF8F3] rounded-xl border border-[#F0E5D8] p-3">
+              <p className="text-[11px] font-semibold text-[#B87A3A] uppercase tracking-wide mb-2">
+                🔥 Restaurantes también compran
+              </p>
+              <p className="text-xs text-[#8F939B] leading-relaxed">
+                Complementa tu pedido con{" "}
+                <Link
+                  href={city ? `/${city.slug}/categoria/limpieza-cocina` : "#"}
+                  onClick={() => setIsOpen(false)}
+                  className="text-[#108910] font-semibold hover:underline"
+                >
+                  insumos de limpieza
+                </Link>
+                ,{" "}
+                <Link
+                  href={city ? `/${city.slug}/categoria/bebidas` : "#"}
+                  onClick={() => setIsOpen(false)}
+                  className="text-[#108910] font-semibold hover:underline"
+                >
+                  bebidas
+                </Link>{" "}
+                y{" "}
+                <Link
+                  href={city ? `/${city.slug}/categoria/botanas-dulces` : "#"}
+                  onClick={() => setIsOpen(false)}
+                  className="text-[#108910] font-semibold hover:underline"
+                >
+                  botanas
+                </Link>{" "}
+                para maximizar tu ticket.
+              </p>
+            </div>
+
+            {/* Free shipping progress bar */}
+            {(() => {
+              const FREE_SHIPPING_THRESHOLD = 2500
+              const remaining = FREE_SHIPPING_THRESHOLD - subtotal
+              const progress = Math.min((subtotal / FREE_SHIPPING_THRESHOLD) * 100, 100)
+
+              if (remaining <= 0) {
+                return (
+                  <div className="flex items-center gap-2 rounded-lg bg-[#E9FBE9] border border-[#108910]/20 px-3 py-2">
+                    <span className="text-lg">🎉</span>
+                    <div>
+                      <p className="text-xs font-bold text-[#108910]">¡Envío gratis!</p>
+                      <p className="text-[10px] text-[#108910]/70">Tu pedido califica para entrega sin costo</p>
+                    </div>
+                  </div>
+                )
+              }
+
+              return (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[#72767E] flex items-center gap-1">
+                      <span>🚚</span> Envío gratis desde $2,500
+                    </span>
+                    <span className="font-semibold text-[#108910]">
+                      Te faltan ${remaining.toFixed(0)}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-[#F0EDE5] rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#108910] rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Delivery estimate */}
             <div className="flex items-center gap-1.5 text-xs text-[#8F939B]">
               <Clock className="w-3 h-3" />
@@ -256,40 +328,60 @@ export function CartDrawer() {
 }
 
 /**
- * Cornershop-style sticky bottom bar for mobile.
- * Shows item count + total + "Ver carrito" CTA.
+ * Sticky bottom bar that appears when cart has items.
+ * Shows two CTAs: "Ver más productos" and "Hacer Checkout".
+ * Works on both mobile and desktop.
  */
 export function MobileCartBar() {
   const { cart, itemCount, subtotal } = useCart()
   const [mounted, setMounted] = useState(false)
+  const { city } = useCity()
 
   useEffect(() => { setMounted(true) }, [])
 
   if (!mounted || itemCount === 0) return null
 
-  const toggleDrawer = () => {
-    window.dispatchEvent(new Event(CART_DRAWER_EVENT))
-  }
-
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
-      <button
-        onClick={toggleDrawer}
-        className="w-full flex items-center justify-between px-4 py-3.5 bg-[#108910] text-white shadow-[0_-4px_24px_rgba(0,0,0,0.15)] active:bg-[#0D720D] transition-colors"
-      >
-        <div className="flex items-center gap-2.5">
-          <span className="bg-white/20 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">
+    <div className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
+      <div className="flex items-center gap-3 px-4 py-3.5 bg-white border-t border-[#E8E9EB] shadow-[0_-4px_24px_rgba(0,0,0,0.1)]">
+        {/* Item count badge */}
+        <div className="hidden sm:flex items-center gap-2 min-w-0">
+          <span className="bg-[#108910] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
             {itemCount}
           </span>
-          <span className="font-semibold text-[15px]">
-            Ver carrito
+          <span className="text-sm text-[#72767E] truncate hidden md:inline">
+            {itemCount === 1 ? "producto" : "productos"} · ${subtotal.toFixed(2)}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="font-bold text-[15px]">${subtotal.toFixed(2)}</span>
-          <ArrowRight className="w-4 h-4" />
+
+        {/* Mobile: tap to open drawer */}
+        <button
+          onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
+          className="md:hidden flex items-center gap-2.5 min-w-0"
+        >
+          <span className="bg-[#108910] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
+            {itemCount}
+          </span>
+          <span className="font-semibold text-sm text-[#242529]">Ver carrito</span>
+        </button>
+
+        {/* Buttons */}
+        <div className="flex items-center gap-2 ml-auto">
+          <Link
+            href={city ? `/${city.slug}/buscar` : "#"}
+            className="px-3 sm:px-5 py-2.5 text-sm font-semibold text-[#242529] bg-[#F7F5F0] hover:bg-[#EDEAE4] rounded-[10px] transition-colors whitespace-nowrap"
+          >
+            Ver más productos
+          </Link>
+          <Link
+            href={city ? `/${city.slug}/checkout` : "#"}
+            className="flex items-center gap-1.5 px-3 sm:px-5 py-2.5 text-sm font-semibold text-white bg-[#108910] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap"
+          >
+            Hacer Checkout
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
-      </button>
+      </div>
     </div>
   )
 }

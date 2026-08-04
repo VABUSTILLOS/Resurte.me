@@ -1,0 +1,25 @@
+{
+  "name": "Resurte.me — Central de Abastos Digital",
+  "short_name": "Resurte.me",
+  "description": "Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F5F0",
+  "theme_color": "#108910",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["food", "business", "shopping"],
+  "lang": "es-MX",
+  "dir": "ltr"
+}

@@ -89,7 +89,7 @@ export const ProductCard = memo(function ProductCard({
         className="block relative bg-white rounded-xl border border-[#e0dbd2] overflow-hidden hover:shadow-[0_2px_20px_rgba(0,0,0,0.07)] transition-all duration-300 ease-out hover:-translate-y-0.5"
       >
         {/* Product image — Erewhon-style image swap on hover */}
-        <div className={`aspect-[4/3] sm:aspect-square bg-[#faf8f5] relative overflow-hidden ${secondaryImage ? "product-card-img-swap" : ""}`}>
+        <div className={`aspect-[4/3] sm:aspect-[3/2] lg:aspect-[5/3] bg-[#faf8f5] relative overflow-hidden ${secondaryImage ? "product-card-img-swap" : ""}`}>
           {product.image_url ? (
             <>
               <Image
@@ -180,6 +180,13 @@ export const ProductCard = memo(function ProductCard({
           {hasDiscount && (
             <p className="text-[11px] text-[#108910] font-medium mt-0.5">
               Ahorras ${(product.price - product.sale_price!).toFixed(2)}
+            </p>
+          )}
+
+          {/* Volume pricing hint — shown for bulk-friendly products */}
+          {product.unit && (["por kilo", "por pieza", "charola"].some(u => product.unit?.includes(u))) && (
+            <p className="text-[10px] text-[#108910]/70 font-medium mt-0.5">
+              💰 Precio de mayoreo — compra más y ahorra
             </p>
           )}
         </div>

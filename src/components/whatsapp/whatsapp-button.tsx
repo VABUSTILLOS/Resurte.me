@@ -26,7 +26,7 @@ export function WhatsAppButton({
       href={waLink}
       target="_blank"
       rel="noopener noreferrer"
-      className={`fixed bottom-4 sm:bottom-6 ${positionClass} z-50 flex items-center gap-2 px-4 py-3 bg-green-500 text-white font-semibold rounded-full shadow-lg hover:bg-green-600 hover:shadow-xl transition-all group`}
+      className={`fixed bottom-[72px] sm:bottom-[80px] ${positionClass} z-50 flex items-center gap-2 px-4 py-3 bg-green-500 text-white font-semibold rounded-full shadow-lg hover:bg-green-600 hover:shadow-xl transition-all group`}
     >
       <MessageCircle className="w-5 h-5" />
       <span className="text-sm hidden sm:inline">{label}</span>

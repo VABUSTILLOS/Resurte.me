@@ -78,7 +78,7 @@ export const metadata: Metadata = {
     },
   },
   verification: {
-    google: "google-site-verification-code",
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
   },
 }
 
@@ -92,11 +92,16 @@ export default function RootLayout({
       lang="es-MX"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#F7F5F0] text-[#343538] antialiased">
+      <body className="min-h-full flex flex-col bg-[#faf8f5] text-[#343538] antialiased">
         {/* Preconnect to image origins for faster resource loading */}
         <link rel="preconnect" href="https://storage.googleapis.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://storage.googleapis.com" />
         <link rel="dns-prefetch" href="https://upload.wikimedia.org" />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#108910" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Resurte.me" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -110,7 +115,6 @@ export default function RootLayout({
             <Footer />
             <CityDetector />
             <CartDrawer />
-            <MobileCartBar />
             <MobileCartBar />
             <WhatsAppButton
               phoneNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}

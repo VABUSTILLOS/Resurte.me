@@ -29,7 +29,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -37,6 +37,24 @@ export function AuthForm({ mode }: AuthFormProps) {
           },
         })
         if (error) throw error
+
+        // Trigger onboarding WhatsApp coupon via API
+        if (data.user) {
+          try {
+            await fetch("/api/workflows/trigger", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                workflow_type: "onboarding",
+                user_id: data.user.id,
+                email,
+                full_name: fullName,
+              }),
+            })
+          } catch {
+            // Silent fail — don't block registration if workflow fails
+          }
+        }
       }
       router.refresh()
       router.push("/")

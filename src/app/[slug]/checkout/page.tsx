@@ -21,6 +21,8 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { PAYMENT_METHODS, type PaymentMethod } from "@/types"
+import { StripeProvider } from "@/components/stripe/stripe-provider"
+import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
 
 // ============================================================
 // Types
@@ -109,6 +111,11 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
   const [isProcessing, setIsProcessing] = useState(false)
 
+  // Stripe integration state
+  const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null)
+  const [showStripeForm, setShowStripeForm] = useState(false)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
+
   const deliveryFee = itemCount > 0 ? 35 : 0
   const total = subtotal - discount + deliveryFee
 
@@ -153,11 +160,76 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async () => {
     setIsProcessing(true)
-    // TODO: Integrar con Supabase para crear orden
-    // TODO: Si paymentMethod es stripe, crear PaymentIntent y redirigir a Stripe Elements
-    await new Promise((r) => setTimeout(r, 1500))
+    setCheckoutError(null)
+
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          store_id: cart.store_id,
+          city_id: city.id,
+          address: {
+            label: address.label,
+            street: address.street,
+            number: address.number,
+            interior: address.interior,
+            neighborhood: address.neighborhood,
+            zip_code: address.zip_code,
+            references: address.references,
+          },
+          schedule: {
+            date: schedule.date,
+            time: schedule.time,
+          },
+          payment_method: paymentMethod,
+          subtotal,
+          delivery_fee: deliveryFee,
+          total,
+          items: cart.items.map((item) => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_price: item.sale_price ?? item.price,
+            name: item.name,
+          })),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setCheckoutError(data.error || "Error al crear el pedido")
+        setIsProcessing(false)
+        return
+      }
+
+      // Card payment → show Stripe form
+      if (paymentMethod === "card" && data.clientSecret) {
+        setStripeClientSecret(data.clientSecret)
+        setShowStripeForm(true)
+        setIsProcessing(false)
+        return
+      }
+
+      // Non-card payment → redirect to confirmation
+      clearCart()
+      router.push(`/${city.slug}/pedido-confirmado`)
+    } catch (err) {
+      setCheckoutError(
+        err instanceof Error ? err.message : "Error de conexión. Intenta de nuevo."
+      )
+      setIsProcessing(false)
+    }
+  }
+
+  const handleStripeSuccess = (paymentIntentId: string) => {
     clearCart()
     router.push(`/${city.slug}/pedido-confirmado`)
+  }
+
+  const handleStripeBack = () => {
+    setShowStripeForm(false)
+    setStripeClientSecret(null)
   }
 
   return (
@@ -548,112 +620,142 @@ export default function CheckoutPage() {
       {/* ============ STEP 4: PAYMENT ============ */}
       {step === "payment" && (
         <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-1">
-            <CreditCard className="w-5 h-5 inline mr-2 text-brand-600" />
-            Método de pago
-          </h2>
-          <p className="text-gray-500 text-sm mb-6">
-            Elige cómo quieres pagar. Procesamiento seguro.
-          </p>
-
-          {/* Payment methods */}
-          <div className="space-y-3 mb-6">
-            {PAYMENT_METHODS.filter((m) => m.value !== "codi").map((method) => (
-              <button
-                key={method.value}
-                onClick={() => setPaymentMethod(method.value)}
-                className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-colors text-left ${
-                  paymentMethod === method.value
-                    ? "border-brand-600 bg-brand-50"
-                    : "border-gray-200 bg-white hover:border-gray-300"
-                }`}
-              >
-                <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    paymentMethod === method.value
-                      ? "bg-brand-600 text-white"
-                      : "bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  {PAYMENT_ICONS[method.value]}
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900 text-sm">{method.label}</p>
-                  <p className="text-xs text-gray-500">{method.description}</p>
-                </div>
-                <div
-                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    paymentMethod === method.value
-                      ? "border-brand-600"
-                      : "border-gray-300"
-                  }`}
-                >
-                  {paymentMethod === method.value && (
-                    <div className="w-3 h-3 rounded-full bg-brand-600" />
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Total reminder */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-            <div className="flex justify-between">
-              <span className="font-bold text-gray-900">Total a pagar</span>
-              <span className="font-bold text-brand-600 text-lg">${total.toFixed(2)}</span>
-            </div>
-            <p className="text-xs text-gray-400 mt-1">Incluye ${deliveryFee.toFixed(2)} de envío</p>
-          </div>
-
-          {/* Payment method instructions */}
-          {paymentMethod === "spei" && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm">
-              <p className="text-blue-800 font-semibold mb-1">Pago vía SPEI</p>
-              <p className="text-blue-600 text-xs">
-                Al confirmar tu pedido recibirás la CLABE interbancaria para realizar la transferencia. Tu pedido se procesará cuando el pago sea confirmado (típicamente 5–30 minutos).
+          {/* Stripe Card Form */}
+          {showStripeForm && stripeClientSecret ? (
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">
+                <CreditCard className="w-5 h-5 inline mr-2 text-brand-600" />
+                Pago con tarjeta
+              </h2>
+              <p className="text-gray-500 text-sm mb-6">
+                Ingresa los datos de tu tarjeta. Pago seguro con Stripe.
               </p>
-            </div>
-          )}
 
-          {paymentMethod === "oxxo" && (
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 text-sm">
-              <p className="text-orange-800 font-semibold mb-1">Pago en OXXO</p>
-              <p className="text-orange-600 text-xs">
-                Recibirás un código de barras para pagar en cualquier tienda OXXO. Tienes 24 horas para realizar el pago. Tu pedido se prepara al confirmar el pago.
+              <StripeProvider clientSecret={stripeClientSecret}>
+                <StripePaymentForm
+                  amount={total}
+                  onSuccess={handleStripeSuccess}
+                  onBack={handleStripeBack}
+                />
+              </StripeProvider>
+            </div>
+          ) : (
+            <>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">
+                <CreditCard className="w-5 h-5 inline mr-2 text-brand-600" />
+                Método de pago
+              </h2>
+              <p className="text-gray-500 text-sm mb-6">
+                Elige cómo quieres pagar. Procesamiento seguro.
               </p>
-            </div>
-          )}
 
-          {/* Action buttons */}
-          <div className="flex gap-3">
-            <button
-              onClick={() => setStep("review")}
-              className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Atrás
-            </button>
-            <button
-              onClick={handlePlaceOrder}
-              disabled={isProcessing}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 disabled:opacity-70 transition-colors"
-            >
-              {isProcessing ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Procesando...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-5 h-5" />
-                  Confirmar pedido — ${total.toFixed(2)}
-                </>
+              {/* Payment methods */}
+              <div className="space-y-3 mb-6">
+                {PAYMENT_METHODS.filter((m) => m.value !== "codi").map((method) => (
+                  <button
+                    key={method.value}
+                    onClick={() => setPaymentMethod(method.value)}
+                    className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-colors text-left ${
+                      paymentMethod === method.value
+                        ? "border-brand-600 bg-brand-50"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        paymentMethod === method.value
+                          ? "bg-brand-600 text-white"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      {PAYMENT_ICONS[method.value]}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900 text-sm">{method.label}</p>
+                      <p className="text-xs text-gray-500">{method.description}</p>
+                    </div>
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        paymentMethod === method.value
+                          ? "border-brand-600"
+                          : "border-gray-300"
+                      }`}
+                    >
+                      {paymentMethod === method.value && (
+                        <div className="w-3 h-3 rounded-full bg-brand-600" />
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Total reminder */}
+              <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+                <div className="flex justify-between">
+                  <span className="font-bold text-gray-900">Total a pagar</span>
+                  <span className="font-bold text-brand-600 text-lg">${total.toFixed(2)}</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Incluye ${deliveryFee.toFixed(2)} de envío</p>
+              </div>
+
+              {/* Payment method instructions */}
+              {paymentMethod === "spei" && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm">
+                  <p className="text-blue-800 font-semibold mb-1">Pago vía SPEI</p>
+                  <p className="text-blue-600 text-xs">
+                    Al confirmar tu pedido recibirás la CLABE interbancaria para realizar la transferencia. Tu pedido se procesará cuando el pago sea confirmado (típicamente 5–30 minutos).
+                  </p>
+                </div>
               )}
-            </button>
-          </div>
-          <p className="text-center text-xs text-gray-400 mt-4">
-            Al confirmar aceptas nuestros Términos y Política de Privacidad.
-          </p>
+
+              {paymentMethod === "oxxo" && (
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 text-sm">
+                  <p className="text-orange-800 font-semibold mb-1">Pago en OXXO</p>
+                  <p className="text-orange-600 text-xs">
+                    Recibirás un código de barras para pagar en cualquier tienda OXXO. Tienes 24 horas para realizar el pago. Tu pedido se prepara al confirmar el pago.
+                  </p>
+                </div>
+              )}
+
+              {/* Error display */}
+              {checkoutError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-sm text-red-700">
+                  {checkoutError}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setStep("review")}
+                  className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Atrás
+                </button>
+                <button
+                  onClick={handlePlaceOrder}
+                  disabled={isProcessing}
+                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 disabled:opacity-70 transition-colors"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-5 h-5" />
+                      Confirmar pedido — ${total.toFixed(2)}
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-center text-xs text-gray-400 mt-4">
+                Al confirmar aceptas nuestros Términos y Política de Privacidad.
+              </p>
+            </>
+          )}
         </div>
       )}
     </div>

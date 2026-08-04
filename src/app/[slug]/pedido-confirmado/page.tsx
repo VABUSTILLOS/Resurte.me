@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useCity } from "@/contexts/city-context"
-import { CheckCircle2, ArrowRight, Package, Clock, MapPin, Store } from "lucide-react"
+import { CheckCircle2, ArrowRight, Package, Clock, MapPin, Store, Share2 } from "lucide-react"
 import Link from "next/link"
 
 function generateOrderId(): string {
@@ -93,6 +93,20 @@ export default function OrderConfirmedPage() {
           Seguir comprando
           <ArrowRight className="w-4 h-4" />
         </Link>
+
+        {/* WhatsApp share button — viral referral */}
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(
+            `¡Acabo de pedir mis insumos para restaurante en Resurte.me! 🥑\n\n✅ Precios de mayoreo\n✅ Entrega el mismo día\n✅ Facturación CFDI\n\nPruébalo: https://resurte.me`
+          )}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-[#25D366] text-white font-semibold rounded-xl hover:bg-[#20BD5A] transition-colors"
+        >
+          <Share2 className="w-4 h-4" />
+          Compartir con otro restaurante
+        </a>
+
         <Link
           href={`/${city.slug}/mis-pedidos`}
           className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"

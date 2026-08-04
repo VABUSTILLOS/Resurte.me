@@ -65,10 +65,17 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         items.push(newItem)
       }
 
+      // Propagate store info to cart level from the item
+      const storeId = state.cart.store_id ?? newItem.store_id ?? null
+      const storeName = state.cart.store_name ?? newItem.store_name ?? null
+      const storeSlug = state.cart.store_slug ?? newItem.store_slug ?? null
+
       return {
         ...state,
         cart: {
-          ...state.cart,
+          store_id: storeId,
+          store_name: storeName,
+          store_slug: storeSlug,
           items,
         },
       }
@@ -116,6 +123,13 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       return { ...state, coupon: null }
 
     case "LOAD_CART":
+      // Populate cart-level store info from items if missing
+      if (!action.payload.cart.store_id && action.payload.cart.items.length > 0) {
+        const firstItem = action.payload.cart.items[0]
+        action.payload.cart.store_id = firstItem.store_id ?? null
+        action.payload.cart.store_name = firstItem.store_name ?? null
+        action.payload.cart.store_slug = firstItem.store_slug ?? null
+      }
       return { ...action.payload, isLoaded: true }
 
     default:

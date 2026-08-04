@@ -4,6 +4,9 @@ import { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
 import { ProductDetailClient } from "./product-detail-client"
 
+// ISR: revalidate product pages every hour for fresh pricing
+export const revalidate = 3600
+
 interface Props {
   params: Promise<{ slug: string; productSlug: string }>
 }
