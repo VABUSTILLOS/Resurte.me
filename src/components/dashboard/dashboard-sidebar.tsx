@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useCity } from "@/contexts/city-context"
+import { useCart } from "@/contexts/cart-context"
 import { useRouter } from "next/navigation"
 import {
   Package,
@@ -63,6 +64,7 @@ function generateMockOrders(count: number): OrderSummary[] {
 
 export function DashboardSidebar() {
   const { city } = useCity()
+  const { itemCount } = useCart()
   const router = useRouter()
   const supabase = createClient()
   const [user, setUser] = useState<SupabaseUser | null>(null)
@@ -79,6 +81,10 @@ export function DashboardSidebar() {
     setCollapsed(next)
     localStorage.setItem("sidebar-collapsed", String(next))
   }
+
+  // Match WhatsApp button vertical position: higher when MobileCartBar is visible
+  const hasCartItems = itemCount > 0
+  const pillBottom = hasCartItems ? "bottom-[80px]" : "bottom-[20px]"
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
@@ -288,7 +294,7 @@ export function DashboardSidebar() {
       {!collapsed ? (
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="lg:hidden fixed bottom-28 left-3 z-[60] flex items-center gap-2.5 bg-white text-gray-900 pl-1.5 pr-4 py-1.5 rounded-full shadow-[0_4px_24px_rgba(0,0,0,0.15)] ring-1 ring-gray-200 hover:shadow-[0_6px_28px_rgba(0,0,0,0.2)] active:scale-[0.97] transition-all"
+          className={`lg:hidden fixed ${pillBottom} left-3 z-[60] flex items-center gap-2.5 bg-white text-gray-900 pl-1.5 pr-4 py-1.5 rounded-full shadow-[0_4px_24px_rgba(0,0,0,0.15)] ring-1 ring-gray-200 hover:shadow-[0_6px_28px_rgba(0,0,0,0.2)] active:scale-[0.97] transition-all`}
           aria-label={mobileOpen ? "Cerrar mi cuenta" : "Abrir mi cuenta"}
           style={{ touchAction: "manipulation" }}
         >
@@ -309,7 +315,7 @@ export function DashboardSidebar() {
         /* Collapsed — just the avatar, tap to expand */
         <button
           onClick={toggleCollapsed}
-          className="lg:hidden fixed bottom-28 left-3 z-[60] w-11 h-11 rounded-full bg-white shadow-[0_4px_24px_rgba(0,0,0,0.15)] ring-1 ring-gray-200 flex items-center justify-center hover:shadow-[0_6px_28px_rgba(0,0,0,0.2)] active:scale-95 transition-all"
+          className={`lg:hidden fixed ${pillBottom} left-3 z-[60] w-11 h-11 rounded-full bg-white shadow-[0_4px_24px_rgba(0,0,0,0.15)] ring-1 ring-gray-200 flex items-center justify-center hover:shadow-[0_6px_28px_rgba(0,0,0,0.2)] active:scale-95 transition-all`}
           aria-label="Mostrar panel"
           style={{ touchAction: "manipulation" }}
         >
