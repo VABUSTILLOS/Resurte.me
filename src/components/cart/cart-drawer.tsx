@@ -334,10 +334,8 @@ export function CartDrawer() {
  */
 export function MobileCartBar() {
   const { cart, itemCount, subtotal } = useCart()
-  const [mounted, setMounted] = useState(false)
+  const [mounted, setMounted] = useState(true)
   const { city } = useCity()
-
-  useEffect(() => { setMounted(true) }, [])
 
   if (!mounted || itemCount === 0) return null
 

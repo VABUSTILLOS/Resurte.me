@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import { Search, ShoppingBag, ArrowLeft, ArrowUpDown, X } from "lucide-react"
 import { ProductCard } from "@/components/product/product-card"
@@ -34,7 +34,6 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
   const [hasMore, setHasMore] = useState(products.length < totalProducts)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  const [results, setResults] = useState<FlattenedProduct[]>(products)
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [sortBy, setSortBy] = useState<SortOption>("name")
   const filterBarRef = useRef<HTMLDivElement>(null)
@@ -49,6 +48,24 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
     return map
   }, [allProducts])
 
+  // Compute filtered + searched results (derived state, no effect needed)
+  const results = useMemo(() => {
+    const term = query.toLowerCase().trim()
+    const filtered = selectedCategory
+      ? allProducts.filter((p) => p.category_id === selectedCategory)
+      : allProducts
+
+    if (!term) return filtered
+    if (term.length < 2) return []
+
+    return filtered.filter(
+      (p) =>
+        p.name.toLowerCase().includes(term) ||
+        p.description?.toLowerCase().includes(term) ||
+        p.brand?.toLowerCase().includes(term)
+    )
+  }, [query, selectedCategory, allProducts])
+
   // Sort results
   const sortedResults = useMemo(() => {
     const copy = [...results]
@@ -61,37 +78,6 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
         return copy.sort((a, b) => a.name.localeCompare(b.name))
     }
   }, [results, sortBy])
-
-  const performSearch = useCallback((q: string, catId: number | null) => {
-    const term = q.toLowerCase().trim()
-
-    let filtered = catId
-      ? allProducts.filter((p) => p.category_id === catId)
-      : allProducts
-
-    if (!term) {
-      setResults(filtered)
-      return
-    }
-
-    if (term.length < 2) {
-      setResults([])
-      return
-    }
-
-    setResults(
-      filtered.filter(
-        (p) =>
-          p.name.toLowerCase().includes(term) ||
-          p.description?.toLowerCase().includes(term) ||
-          p.brand?.toLowerCase().includes(term)
-      )
-    )
-  }, [allProducts])
-
-  useEffect(() => {
-    performSearch(query, selectedCategory)
-  }, [query, selectedCategory, performSearch])
 
   // Infinite scroll: observe sentinel element
   useEffect(() => {

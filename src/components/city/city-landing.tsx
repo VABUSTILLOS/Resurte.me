@@ -3,7 +3,8 @@
 import { MapPin, ArrowRight, Search, Store, Truck, Building2, CreditCard, Grid3X3, Percent } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { CitySelector } from "@/components/city/city-selector"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import Image from "next/image"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { HERO_GROCERY } from "@/lib/images"
 import { ProductCard } from "@/components/product/product-card"
@@ -18,17 +19,15 @@ import { getCategoryIcon } from "@/lib/utils"
 const DEFAULT_CITY_SLUG = "chihuahua"
 
 // Products per category to show on landing — show first 5, then "Ver Todo"
-const PREVIEW_COUNT = 5
+const PREVIEW_COUNT = 4
 
 // Restaurant-essential categories shown on the homepage — ordered by priority
 const FEATURED_CATEGORY_SLUGS = [
   "frutas-verduras",
   "carnes-pescados",
   "lacteos-huevos",
-  "panaderia-tortilleria",
   "despensa",
   "bebidas",
-  "limpieza",
 ]
 
 const TESTIMONIALS = [
@@ -85,31 +84,40 @@ export function CityLanding({
 
   const currentCity = MEXICO_CITIES.find(c => c.slug === resolvedSlug) || MEXICO_CITIES.find(c => c.slug === DEFAULT_CITY_SLUG)
 
-  // Flatten product_store data
-  const flatProducts = products.map((p) => ({
+  // Flatten product_store data — memoized to avoid recalculation on every render
+  const flatProducts = useMemo(() => products.map((p) => ({
     ...p,
     price: p.product_stores[0]?.price ?? 0,
     sale_price: p.product_stores[0]?.sale_price ?? null,
     stock_status: p.product_stores[0]?.stock_status ?? "in_stock",
-  }))
+  })), [products])
 
-  // Group by category
-  const productsByCategory = new Map<number, typeof flatProducts>()
-  flatProducts.forEach((p) => {
-    const list = productsByCategory.get(p.category_id) || []
-    list.push(p)
-    productsByCategory.set(p.category_id, list)
-  })
+  // Group by category — memoized
+  const productsByCategory = useMemo(() => {
+    const map = new Map<number, typeof flatProducts>()
+    flatProducts.forEach((p) => {
+      const list = map.get(p.category_id) || []
+      list.push(p)
+      map.set(p.category_id, list)
+    })
+    return map
+  }, [flatProducts])
 
-  // Only show categories that have products
-  const activeCategories = categories.filter((c) => {
-    const catProducts = productsByCategory.get(c.id)
-    return catProducts && catProducts.length > 0
-  })
+  // Only show categories that have products — memoized
+  const activeCategories = useMemo(() =>
+    categories.filter((c) => {
+      const catProducts = productsByCategory.get(c.id)
+      return catProducts && catProducts.length > 0
+    }),
+    [categories, productsByCategory]
+  )
 
-  // Featured categories for the product grid (only 4 restaurant-essential)
-  const featuredCategories = activeCategories.filter((c) =>
-    FEATURED_CATEGORY_SLUGS.includes(c.slug)
+  // Featured categories for the product grid (only 4 restaurant-essential) — memoized
+  const featuredCategories = useMemo(() =>
+    activeCategories.filter((c) =>
+      FEATURED_CATEGORY_SLUGS.includes(c.slug)
+    ),
+    [activeCategories]
   )
 
   const handleSearch = (e: React.FormEvent) => {
@@ -142,85 +150,107 @@ export function CityLanding({
       {/* Hero — Editorial split layout */}
       <section className="relative bg-[#1A1A1A] overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-[52%_48%] min-h-[520px] lg:min-h-[580px]">
+          <div className="grid grid-cols-1 lg:grid-cols-[52%_48%] min-h-[auto] lg:min-h-[580px]">
             {/* Left: Copy */}
-            <div className="py-14 lg:py-20 z-10 flex flex-col justify-center">
-              <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#3CC73C] mb-4">
+            <div className="pt-10 sm:pt-14 lg:py-20 pb-4 sm:pb-6 z-10 flex flex-col justify-center">
+              <p className="text-[10px] sm:text-xs font-medium tracking-[0.2em] uppercase text-[#3CC73C] mb-3 sm:mb-4">
                 Proveeduría para profesionales de la cocina
               </p>
-              <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold text-white leading-[1.08] tracking-tight">
+              <h1 className="text-[2rem] leading-[1.1] sm:text-5xl lg:text-[3.5rem] font-bold text-white tracking-tight">
                 Del campo a tu{" "}
                 <span className="text-[#3CC73C]">cocina</span>
               </h1>
-              <p className="mt-5 text-base sm:text-lg text-white/75 leading-relaxed max-w-[480px]">
+              <p className="mt-3 sm:mt-5 text-sm sm:text-lg text-white/70 sm:text-white/75 leading-relaxed max-w-[480px]">
                 Abastece tu restaurante con la frescura de la central de abastos — sin madrugar, sin cargar, sin sorpresas.
               </p>
-              <div className="mt-6 inline-flex items-center gap-1.5 text-sm text-white/70">
-                <MapPin className="w-3.5 h-3.5 text-[#3CC73C]" />
-                <span>
-                  Entregando hoy en {currentCity?.name || "Ciudad de México"}, {currentCity?.state || "CDMX"}
+              <div className="mt-4 sm:mt-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs sm:text-sm text-white/60 sm:text-white/70">
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#3CC73C]" />
+                  {currentCity?.name || "Ciudad de México"}, {currentCity?.state || "CDMX"}
                 </span>
                 <button
                   onClick={() => setShowSelector(true)}
-                  className="ml-1 text-[#3CC73C] hover:text-[#4DE64D] underline underline-offset-2 font-medium transition-colors"
+                  aria-label="Cambiar ciudad"
+                  className="text-[#3CC73C] hover:text-[#4DE64D] underline underline-offset-2 font-medium transition-colors"
                 >
                   cambiar
                 </button>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/10 text-white/80 text-xs font-medium rounded-full border border-white/10">
-                  <span className="text-[#3CC73C]">📄</span> Facturamos (CFDI)
+                <span className="hidden sm:inline text-white/30">·</span>
+                <span className="hidden sm:inline-flex items-center gap-1">
+                  📄 Facturamos
                 </span>
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/10 text-white/80 text-xs font-medium rounded-full border border-white/10">
-                  <span className="text-[#3CC73C]">🔄</span> Devolución sin costo
-                </span>
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/10 text-white/80 text-xs font-medium rounded-full border border-white/10">
-                  <span className="text-[#3CC73C]">🚚</span> Envío gratis desde $2,500
+                <span className="hidden sm:inline text-white/30">·</span>
+                <span className="hidden sm:inline-flex items-center gap-1">
+                  🚚 Envío gratis desde $2,500
                 </span>
               </div>
-              <form onSubmit={handleSearch} className="mt-8 max-w-lg">
+              {/* Mobile-only compact feature line */}
+              <p className="mt-3 sm:hidden text-[11px] text-white/50">
+                📄 Facturamos · 🔄 Devolución sin costo · 🚚 Envío gratis desde $2,500
+              </p>
+              <form onSubmit={handleSearch} className="mt-6 sm:mt-8 max-w-lg">
                 <div className="flex items-stretch bg-white rounded-[10px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.25)]">
-                  <div className="flex items-center gap-2 flex-1 pl-4">
-                    <Search className="w-4 h-4 text-[#B0B3B8] shrink-0" />
+                  <div className="flex items-center gap-2 flex-1 pl-3.5 sm:pl-4">
+                    <Search className="w-4 h-4 text-[#B0B3B8] shrink-0" aria-hidden="true" />
+                    <label htmlFor="hero-search" className="sr-only">Buscar productos</label>
                     <input
+                      id="hero-search"
                       type="text"
                       placeholder="¿Qué ingredientes necesita tu cocina hoy?"
                       value={heroSearch}
                       onChange={(e) => setHeroSearch(e.target.value)}
-                      className="flex-1 text-sm text-[#343538] py-3.5 bg-transparent outline-none placeholder:text-[#B0B3B8]"
+                      className="flex-1 text-sm text-[#343538] py-3 sm:py-3.5 bg-transparent outline-none placeholder:text-[#B0B3B8] placeholder:text-xs sm:placeholder:text-sm"
                     />
                   </div>
                   <button
                     type="submit"
-                    className="shrink-0 inline-flex items-center gap-1.5 px-6 py-3.5 bg-[#108910] text-white text-sm font-semibold hover:bg-[#0D720D] active:bg-[#0A610A] transition-colors"
+                    aria-label="Buscar productos"
+                    className="shrink-0 inline-flex items-center gap-1.5 px-5 sm:px-6 py-3 sm:py-3.5 bg-[#108910] text-white text-sm font-semibold hover:bg-[#0D720D] active:bg-[#0A610A] transition-colors"
                   >
                     Buscar
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4" aria-hidden="true" />
                   </button>
                 </div>
               </form>
-              <div className="mt-4">
+              <div className="mt-3 sm:mt-4">
                 <Link
                   href={`/${currentCity?.slug || DEFAULT_CITY_SLUG}/buscar`}
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-white/80 hover:text-white hover:underline underline-offset-4 transition-colors"
+                  className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-white/80 hover:text-white hover:underline underline-offset-4 transition-colors"
                 >
-                  <Grid3X3 className="w-4 h-4" />
+                  <Grid3X3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   Ver todos los productos
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 </Link>
               </div>
             </div>
-            {/* Right: Image */}
-            <div className="relative min-h-[240px] lg:min-h-0 lg:rounded-r-2xl overflow-hidden">
-              <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-[#1A1A1A] to-transparent z-10 hidden lg:block" />
-              <div className="absolute inset-y-0 top-0 w-full bg-gradient-to-b from-[#1A1A1A] to-transparent h-24 z-10 lg:hidden" />
-              <div className="absolute inset-y-0 bottom-0 w-full bg-gradient-to-t from-[#1A1A1A] to-transparent h-24 z-10 lg:hidden" />
+            {/* Right: Image — full-height on desktop, compact card on mobile */}
+            <div className="hidden lg:flex relative lg:rounded-r-2xl overflow-hidden">
+              <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-[#1A1A1A] to-transparent z-10" />
               <div className="absolute inset-0 bg-[#1A1A1A]/10 z-[1]" />
-              <img
+              <Image
                 src={HERO_GROCERY}
                 alt="Frutas y verduras frescas"
+                fill
+                sizes="50vw"
+                priority
+                fetchPriority="high"
                 className="absolute inset-0 w-full h-full object-cover"
               />
+            </div>
+            {/* Mobile: compact rounded image card below the CTA */}
+            <div className="lg:hidden -mx-4">
+              <div className="relative h-[200px] overflow-hidden">
+                <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-[#1A1A1A] to-transparent z-10" />
+                <Image
+                  src={HERO_GROCERY}
+                  alt="Frutas y verduras frescas"
+                  fill
+                  sizes="100vw"
+                  priority
+                  fetchPriority="high"
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -252,8 +282,10 @@ export function CityLanding({
           <form onSubmit={handleCatalogSearch} className="max-w-2xl mx-auto">
             <div className="flex items-stretch bg-[#F7F5F0] rounded-xl overflow-hidden border border-[#E8E9EB] focus-within:border-[#108910]/40 focus-within:ring-2 focus-within:ring-[#108910]/10 transition-all">
               <div className="flex items-center gap-2 flex-1 pl-4">
-                <Search className="w-5 h-5 text-[#B0B3B8] shrink-0" />
+                <Search className="w-5 h-5 text-[#B0B3B8] shrink-0" aria-hidden="true" />
+                <label htmlFor="catalog-search" className="sr-only">Buscar en el catálogo</label>
                 <input
+                  id="catalog-search"
                   type="text"
                   placeholder="Buscar frutas, verduras, carnes, abarrotes..."
                   value={catalogSearch}
@@ -263,6 +295,7 @@ export function CityLanding({
               </div>
               <button
                 type="submit"
+                aria-label="Buscar en el catálogo"
                 className="shrink-0 inline-flex items-center gap-1.5 px-5 py-3 bg-[#108910] text-white text-sm font-semibold hover:bg-[#0D720D] transition-colors"
               >
                 Buscar
@@ -330,7 +363,7 @@ export function CityLanding({
             const remaining = catProducts.length - PREVIEW_COUNT
 
             return (
-              <div key={cat.id} className="mb-14 last:mb-0">
+              <div key={cat.id} className="mb-14 last:mb-0 product-grid-section">
                 {/* Category header with "Ver Todo" */}
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
@@ -529,26 +562,12 @@ export function CityLanding({
 
           {/* Trust bar — business-focused */}
           <div className="mt-14 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm text-[#72767E]">
-            <span className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-[#E9FBE9] flex items-center justify-center text-[#108910] text-xs font-bold">✓</span>
-              Sin membresía
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-[#E9FBE9] flex items-center justify-center text-[#108910] text-xs font-bold">✓</span>
-              Envío gratis desde $2,500
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-[#E9FBE9] flex items-center justify-center text-[#108910] text-xs font-bold">✓</span>
-              Facturación electrónica
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-[#E9FBE9] flex items-center justify-center text-[#108910] text-xs font-bold">✓</span>
-              Pago seguro
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-[#E9FBE9] flex items-center justify-center text-[#108910] text-xs font-bold">✓</span>
-              Calidad garantizada
-            </span>
+            {["Sin membresía", "Envío gratis desde $2,500", "Facturación electrónica", "Pago seguro", "Calidad garantizada"].map((label) => (
+              <span key={label} className="flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-[#E9FBE9] flex items-center justify-center text-[#108910] text-xs font-bold" aria-hidden="true">✓</span>
+                {label}
+              </span>
+            ))}
           </div>
         </div>
       </section>
@@ -621,13 +640,15 @@ export function CityLanding({
               {/* Action CTA */}
               <div className="mt-6 flex gap-3">
                 <a
-                  href={`/${currentCity?.slug || DEFAULT_CITY_SLUG}/buscar`}
+                  href="/auth/register"
                   className="inline-flex items-center gap-2 bg-[#108910] text-white text-sm font-semibold px-5 py-2.5 rounded-[10px] hover:bg-[#0D720D] transition-colors"
                 >
                   Registra tu negocio
                 </a>
                 <a
-                  href="#"
+                  href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}?text=${encodeURIComponent("Me interesa conocer su catálogo de productos y programa de recompensas")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 border border-[#C7CACD] text-[#5C6068] text-sm font-semibold px-5 py-2.5 rounded-[10px] hover:border-[#108910] hover:text-[#108910] transition-colors"
                 >
                   Agenda una llamada
@@ -799,7 +820,7 @@ export function CityLanding({
               <div className="text-center pt-6 sm:pt-8 border-t border-[#f0ede5]">
                 <p className="text-xs sm:text-sm text-[#999893] mb-4">+500 restaurantes ya están creciendo con Resurte.me</p>
                 <Link
-                  href="/cashback"
+                  href="/recompensas"
                   className="btn-pill btn-pill-primary inline-flex items-center justify-center gap-2 text-sm sm:text-base px-6 sm:px-8 py-2.5 sm:py-3 w-full sm:w-auto"
                 >
                   Descubre tu poder de recompensas

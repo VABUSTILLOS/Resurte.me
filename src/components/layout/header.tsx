@@ -19,7 +19,11 @@ export function Header() {
   const [showCitySelector, setShowCitySelector] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [cashbackBalance, setCashbackBalance] = useState<number | null>(null)
+  const [cashbackBalance, setCashbackBalance] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null
+    const saved = localStorage.getItem("cashback-balance")
+    return saved ? Number(saved) : null
+  })
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Detect auth state on mount
@@ -38,14 +42,6 @@ export function Header() {
     }
     document.addEventListener("click", handleClick)
     return () => document.removeEventListener("click", handleClick)
-  }, [])
-
-  // Load cashback balance from localStorage (set by cashback page)
-  useEffect(() => {
-    const saved = localStorage.getItem("cashback-balance")
-    if (saved) {
-      setCashbackBalance(Number(saved))
-    }
   }, [])
 
   async function handleSignOut() {
@@ -83,13 +79,14 @@ export function Header() {
           {/* City Selector Trigger */}
           <button
             onClick={() => setShowCitySelector(!showCitySelector)}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] hover:bg-[#F7F5F0] transition-colors text-sm shrink-0"
+            aria-label="Seleccionar ciudad"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] hover:bg-[#F7F5F0] transition-colors text-sm shrink-0 touch-target"
           >
-            <MapPin className="w-4 h-4 text-[#108910]" />
+            <MapPin className="w-4 h-4 text-[#108910]" aria-hidden="true" />
             <span className="font-medium text-[#343538]">
               {city ? city.name : "Seleccionar ciudad"}
             </span>
-            <ChevronDown className="w-4 h-4 text-[#72767E]" />
+            <ChevronDown className="w-4 h-4 text-[#72767E]" aria-hidden="true" />
           </button>
 
           {/* Search Bar — hidden on mobile, shown on md+ */}
@@ -104,18 +101,20 @@ export function Header() {
             {/* Mobile city trigger */}
             <button
               onClick={() => setShowCitySelector(!showCitySelector)}
-              className="sm:hidden p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
+              aria-label="Seleccionar ciudad"
+              className="sm:hidden p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
             >
-              <MapPin className="w-5 h-5 text-[#343538]" />
+              <MapPin className="w-5 h-5 text-[#343538]" aria-hidden="true" />
             </button>
 
             <Link
               href="/cart"
-              className="relative p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
+              aria-label={`Carrito de compras${itemCount > 0 ? `, ${itemCount} artículos` : ""}`}
+              className="relative p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
             >
-              <ShoppingCart className="w-5 h-5 text-[#343538]" />
+              <ShoppingCart className="w-5 h-5 text-[#343538]" aria-hidden="true" />
               {itemCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#108910] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#108910] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5" role="status">
                   {itemCount > 99 ? "99+" : itemCount}
                 </span>
               )}
@@ -125,9 +124,12 @@ export function Header() {
               <div ref={menuRef} className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-1.5 p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
+                  aria-label="Menú de usuario"
+                  aria-haspopup="menu"
+                  aria-expanded={showUserMenu}
+                  className="flex items-center gap-1.5 p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
                 >
-                  <User className="w-5 h-5 text-[#108910]" />
+                  <User className="w-5 h-5 text-[#108910]" aria-hidden="true" />
                 </button>
 
                 {showUserMenu && (
@@ -159,9 +161,10 @@ export function Header() {
             ) : (
               <Link
                 href="/auth/login"
-                className="p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
+                aria-label="Iniciar sesión"
+                className="p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
               >
-                <User className="w-5 h-5 text-[#343538]" />
+                <User className="w-5 h-5 text-[#343538]" aria-hidden="true" />
               </Link>
             )}
           </div>

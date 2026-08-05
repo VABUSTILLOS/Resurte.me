@@ -1,30 +1,62 @@
 import { CityLanding } from "@/components/city/city-landing"
 import { createClient } from "@/lib/supabase/server"
+import { unstable_cache } from "next/cache"
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Resurte.me — Central de Abastos Digital para tu Negocio",
+  description:
+    "Proveeduría para restaurantes, fondas y negocios. Frutas, verduras, carnes y abarrotes por mayoreo con envío gratis desde $2,500 MXN. Sin membresía.",
+  alternates: {
+    canonical: "https://resurte.me",
+  },
+}
+
+const getCategories = unstable_cache(
+  async () => {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from("categories")
+      .select("id, name, slug, icon, parent_id")
+      .order("id")
+    return data ?? []
+  },
+  ["home-categories"],
+  { revalidate: 3600, tags: ["categories"] }
+)
+
+const getProducts = unstable_cache(
+  async () => {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from("products")
+      .select(`
+        id, name, slug, description, image_url, images, brand, category_id, unit,
+        show_in_whatsapp, whatsapp_product_id,
+        product_stores!inner(store_id, price, sale_price, is_available, stock_status)
+      `)
+      .eq("product_stores.store_id", 1)
+      .order("name")
+    return data ?? []
+  },
+  ["home-products"],
+  { revalidate: 3600, tags: ["products"] }
+)
 
 export default async function Home() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: categories } = await supabase
-    .from("categories")
-    .select("id, name, slug, icon, parent_id")
-    .order("id")
-
-  const { data: products } = await supabase
-    .from("products")
-    .select(`
-      id, name, slug, description, image_url, images, brand, category_id, unit,
-      show_in_whatsapp, whatsapp_product_id,
-      product_stores!inner(store_id, price, sale_price, is_available, stock_status)
-    `)
-    .eq("product_stores.store_id", 1)
-    .order("name")
+  const [categories, products] = await Promise.all([
+    getCategories(),
+    getProducts(),
+  ])
 
   return (
     <CityLanding
       citySlug={undefined}
-      categories={categories ?? []}
-      products={products ?? []}
+      categories={categories}
+      products={products}
       isLoggedIn={!!user}
     />
   )

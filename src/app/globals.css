@@ -158,7 +158,8 @@
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 .group:hover .quick-add-btn,
-.product-card:hover .quick-add-btn {
+.product-card:hover .quick-add-btn,
+.quick-add-btn:focus-visible {
   opacity: 1;
   transform: translateY(0);
 }
@@ -251,4 +252,97 @@
 @keyframes shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
+}
+
+/* ============================================
+   PERFORMANCE — content-visibility for off-screen sections
+   ============================================ */
+.product-grid-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+
+/* Performance: skip rendering off-screen layout sections */
+.site-footer {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+}
+
+/* ============================================
+   ACCESSIBILITY — Reduced motion & focus styles
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  .reveal-hidden,
+  .reveal-hidden-left,
+  .reveal-hidden-right,
+  .reveal-hidden-scale,
+  .animate-fade-up,
+  .accordion-body,
+  .accordion-icon,
+  .quick-add-btn,
+  .product-card-img-swap .product-card-img-primary,
+  .product-card-img-swap .product-card-img-secondary {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .reveal-hidden,
+  .reveal-hidden-left,
+  .reveal-hidden-right,
+  .reveal-hidden-scale {
+    opacity: 1;
+    transform: none;
+  }
+
+  .animate-fade-up {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* Keyboard focus indicator — visible ring for interactive elements */
+:focus-visible {
+  outline: 2px solid #108910;
+  outline-offset: 2px;
+}
+
+/* Only apply border-radius fix for elements that need it */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  border-radius: 4px;
+}
+
+/* Skip-to-main link — hidden until focused */
+.skip-to-main {
+  position: absolute;
+  top: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  padding: 0.75rem 1.5rem;
+  background: #108910;
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-radius: 0 0 8px 8px;
+  transition: top 0.2s ease;
+}
+.skip-to-main:focus {
+  top: 0;
+}
+
+/* Touch target minimum for mobile */
+@media (max-width: 640px) {
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }

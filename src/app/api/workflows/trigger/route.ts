@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
         break
 
       case "status_update":
-        result = await notifyCustomerStatusUpdate(orderId, (order as any).status)
+        result = await notifyCustomerStatusUpdate(orderId, order.status)
         break
 
       case "payment_reminder":

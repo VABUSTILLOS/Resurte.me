@@ -68,6 +68,30 @@ export interface OrderWithDetails {
   items?: { name: string; quantity: number }[]
 }
 
+/** Raw shape of order joined with store and profile from Supabase */
+interface RawOrderRow {
+  id: number
+  user_id: string
+  store_id: number
+  status: string
+  payment_status: string
+  payment_method: string
+  total: number
+  subtotal: number
+  delivery_fee: number
+  scheduled_for: string | null
+  source: string
+  created_at: string
+  store: { name: string; slug: string; whatsapp_number: string | null }
+  profile: { full_name: string; phone: string | null }
+}
+
+/** Raw shape of order_item joined with product from Supabase */
+interface RawOrderItemRow {
+  quantity: number
+  product: { name: string }
+}
+
 // ============================================================
 // Workflow Logging
 // ============================================================
@@ -118,6 +142,8 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
     return null
   }
 
+  const rawOrder = order as unknown as RawOrderRow
+
   // Fetch order items
   const { data: items } = await supabase
     .from("order_items")
@@ -127,32 +153,34 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
     `)
     .eq("order_id", orderId)
 
+  const rawItems = (items as unknown as RawOrderItemRow[]) || []
+
   // Fetch staff phones for this store
   // For now, use the store's whatsapp_number as staff contact
   // In production, you'd have a staff/team table
-  const storeWhatsapp = (order.store as any)?.whatsapp_number || null
+  const storeWhatsapp = rawOrder.store?.whatsapp_number || null
   const staffPhones = storeWhatsapp ? [storeWhatsapp] : []
 
   return {
-    id: order.id,
-    user_id: order.user_id,
-    store_id: order.store_id,
-    status: order.status,
-    payment_status: order.payment_status,
-    payment_method: order.payment_method,
-    total: order.total,
-    subtotal: order.subtotal,
-    delivery_fee: order.delivery_fee,
-    scheduled_for: order.scheduled_for,
-    source: order.source,
-    created_at: order.created_at,
-    store_name: (order.store as any)?.name || "Resurte.me",
-    store_slug: (order.store as any)?.slug || "",
-    store_whatsapp: storeWhatsapp,
-    customer_name: (order.profile as any)?.full_name || "Cliente",
-    customer_phone: (order.profile as any)?.phone || null,
+    id: rawOrder.id,
+    user_id: rawOrder.user_id,
+    store_id: rawOrder.store_id,
+    status: rawOrder.status as OrderStatus,
+    payment_status: rawOrder.payment_status as PaymentStatus,
+    payment_method: rawOrder.payment_method,
+    total: rawOrder.total,
+    subtotal: rawOrder.subtotal,
+    delivery_fee: rawOrder.delivery_fee,
+    scheduled_for: rawOrder.scheduled_for,
+    source: rawOrder.source as "web" | "whatsapp",
+    created_at: rawOrder.created_at,
+    store_name: rawOrder.store?.name || "Resurte.me",
+    store_slug: rawOrder.store?.slug || "",
+    store_whatsapp: storeWhatsapp ?? undefined,
+    customer_name: rawOrder.profile?.full_name || "Cliente",
+    customer_phone: rawOrder.profile?.phone ?? undefined,
     staff_phones: staffPhones,
-    items: (items || []).map((item: any) => ({
+    items: rawItems.map((item) => ({
       name: item.product?.name || "Producto",
       quantity: item.quantity,
     })),

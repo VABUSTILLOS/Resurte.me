@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Search, MapPin, X } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { CITIES_BY_STATE } from "@/lib/cities"
@@ -12,6 +13,7 @@ interface CitySelectorProps {
 export function CitySelector({ onClose }: CitySelectorProps) {
   const { city: currentCity, setCity } = useCity()
   const [search, setSearch] = useState("")
+  const router = useRouter()
 
   const filtered = search
     ? Object.entries(CITIES_BY_STATE).reduce(
@@ -31,8 +33,7 @@ export function CitySelector({ onClose }: CitySelectorProps) {
   const handleSelect = (slug: string) => {
     setCity(slug)
     onClose()
-    // Navigate to that city's page
-    window.location.href = `/${slug}`
+    router.push(`/${slug}`)
   }
 
   return (

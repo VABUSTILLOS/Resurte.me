@@ -86,7 +86,7 @@ export const ProductCard = memo(function ProductCard({
     <div className="product-card group relative" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 320px" }}>
       <Link
         href={`/${citySlug}/producto/${product.slug}`}
-        className="block relative bg-white rounded-xl border border-[#e0dbd2] overflow-hidden hover:shadow-[0_2px_20px_rgba(0,0,0,0.07)] transition-all duration-300 ease-out hover:-translate-y-0.5"
+        className="block relative bg-white rounded-xl border border-[#e0dbd2] overflow-hidden hover:shadow-[0_2px_20px_rgba(0,0,0,0.07)] focus-visible:ring-2 focus-visible:ring-[#108910] focus-visible:ring-offset-1 transition-all duration-300 ease-out hover:-translate-y-0.5"
       >
         {/* Product image — Erewhon-style image swap on hover */}
         <div className={`aspect-[4/3] sm:aspect-[3/2] lg:aspect-[5/3] bg-[#faf8f5] relative overflow-hidden ${secondaryImage ? "product-card-img-swap" : ""}`}>
@@ -96,6 +96,8 @@ export const ProductCard = memo(function ProductCard({
                 src={product.image_url}
                 alt={product.name}
                 fill
+                placeholder="blur"
+                blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23faf8f5' width='400' height='300'/%3E%3C/svg%3E"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 className="object-contain p-2 product-card-img-primary"
               />
@@ -104,6 +106,9 @@ export const ProductCard = memo(function ProductCard({
                   src={secondaryImage}
                   alt={`${product.name} - vista 2`}
                   fill
+                  loading="lazy"
+                  placeholder="blur"
+                  blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23faf8f5' width='400' height='300'/%3E%3C/svg%3E"
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   className="object-contain p-2 product-card-img-secondary"
                 />
@@ -124,21 +129,21 @@ export const ProductCard = memo(function ProductCard({
 
           {/* Discount badge — Erewhon-style pill */}
           {hasDiscount && (
-            <div className="absolute top-2 left-2 bg-[#de3534] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10">
+            <div className="absolute top-2 left-2 bg-[#de3534] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10" aria-label={`${discountPercent}% de descuento`}>
               -{discountPercent}%
             </div>
           )}
 
           {/* Low stock badge */}
           {lowStock && !hasDiscount && (
-            <div className="absolute top-2 left-2 bg-[#f5a623] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10">
+            <div className="absolute top-2 left-2 bg-[#f5a623] text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10" role="status">
               Pocas unidades
             </div>
           )}
 
           {/* Out of stock overlay */}
           {outOfStock && (
-            <div className="absolute inset-0 bg-white/75 flex items-center justify-center backdrop-blur-[1px] z-10">
+            <div className="absolute inset-0 bg-white/75 flex items-center justify-center backdrop-blur-[1px] z-10" role="alert">
               <span className="text-sm font-semibold text-[#6b6b6b] bg-white px-4 py-1.5 rounded-full shadow-sm">
                 Agotado
               </span>
@@ -196,7 +201,8 @@ export const ProductCard = memo(function ProductCard({
       {!outOfStock && (
         <button
           onClick={handleAdd}
-          className={`quick-add-btn absolute -bottom-2 left-1/2 -translate-x-1/2 z-10 px-5 py-2 rounded-full text-sm font-semibold transition-all duration-300 ease-out shadow-lg ${
+          aria-label={`Agregar ${product.name} al carrito`}
+          className={`quick-add-btn absolute -bottom-2 left-1/2 -translate-x-1/2 z-10 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ease-out shadow-lg touch-target ${
             added
               ? "bg-green-500 text-white"
               : "bg-[#108910] text-white hover:bg-[#0D720D] hover:shadow-xl"

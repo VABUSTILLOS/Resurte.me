@@ -52,25 +52,24 @@ function setCityLocalStorage(slug: string) {
 const DEFAULT_CITY_SLUG = "chihuahua"
 
 export function CityProvider({ children }: { children: ReactNode }) {
-  const [city, setCityState] = useState<City | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isDetecting, setIsDetecting] = useState(false)
-  const [detectionError, setDetectionError] = useState<string | null>(null)
-
-  // On mount, read from cookie or localStorage; default to Chihuahua
-  useEffect(() => {
+  const [city, setCityState] = useState<City | null>(() => {
+    if (typeof window === "undefined") return null
     const slug =
       getCityFromCookie() || getCityFromLocalStorage() || DEFAULT_CITY_SLUG
     const found = MEXICO_CITIES.find((c) => c.slug === slug)
-    if (found) {
-      setCityState(found as City)
-      // Persist the default so subsequent visits keep it
-      if (!getCityFromCookie()) {
-        setCityCookie(DEFAULT_CITY_SLUG)
-        setCityLocalStorage(DEFAULT_CITY_SLUG)
-      }
+    return (found as City) || null
+  })
+  // Derived: isLoading is true only during SSR (city not yet computed from cookies)
+  const isLoading = city === null
+  const [isDetecting, setIsDetecting] = useState(false)
+  const [detectionError, setDetectionError] = useState<string | null>(null)
+
+  // Persist the default city cookie so subsequent visits keep it
+  useEffect(() => {
+    if (!getCityFromCookie()) {
+      setCityCookie(DEFAULT_CITY_SLUG)
+      setCityLocalStorage(DEFAULT_CITY_SLUG)
     }
-    setIsLoading(false)
   }, [])
 
   const setCity = useCallback((slug: string) => {

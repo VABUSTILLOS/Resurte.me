@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { CityProvider } from "@/contexts/city-context"
 import { CartProvider } from "@/contexts/cart-context"
@@ -14,12 +14,20 @@ import "./globals.css"
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 })
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 })
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#108910",
+}
 
 export const metadata: Metadata = {
   title: "Resurte.me — Central de Abastos Digital",
@@ -67,6 +75,15 @@ export const metadata: Metadata = {
       "Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Envío gratis desde $2,500 MXN.",
     images: ["https://resurte.me/og-image.png"],
   },
+  icons: {
+    icon: [
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-48.png", sizes: "48x48", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-icon.webp", sizes: "180x180", type: "image/webp" },
+    ],
+  },
   robots: {
     index: true,
     follow: true,
@@ -95,12 +112,17 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#faf8f5] text-[#343538] antialiased">
-        {/* Preconnect to image origins for faster resource loading */}
+        {/* Skip to main content — keyboard accessibility */}
+        <a href="#main-content" className="skip-to-main">
+          Saltar al contenido principal
+        </a>
+        {/* Preconnect to external origins for faster resource loading */}
         <link rel="preconnect" href="https://storage.googleapis.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://storage.googleapis.com" />
         <link rel="dns-prefetch" href="https://upload.wikimedia.org" />
+        <link rel="dns-prefetch" href="https://isogthougrpctnfzcdes.supabase.co" />
+        <link rel="preload" href="/images/hero-grocery.webp" as="image" fetchPriority="high" />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#108910" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Resurte.me" />
@@ -113,7 +135,7 @@ export default function RootLayout({
         <CityProvider>
           <CartProvider>
             <Header />
-            <main className="flex-1"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
+            <main id="main-content" className="flex-1"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
             <Footer />
             <CityDetector />
             <CartDrawer />

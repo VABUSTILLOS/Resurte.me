@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
 import { BottomTabBar } from "./_components/BottomTabBar";
 import { DashboardScreen } from "./_components/DashboardScreen";
@@ -19,17 +19,12 @@ export default function CashbackPage() {
   const [showScanner, setShowScanner] = useState(false);
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (typeof window === "undefined") return false
+    return !localStorage.getItem("cashback-onboarded")
+  });
 
   const balance = 12450;
-
-  // Show onboarding on first visit (simulated)
-  useEffect(() => {
-    const onboarded = localStorage.getItem("cashback-onboarded");
-    if (!onboarded) {
-      setShowOnboarding(true);
-    }
-  }, []);
 
   const handleServiceSelect = useCallback((service: ServiceItem) => {
     setSelectedService(service);

@@ -11,6 +11,8 @@ interface Particle {
   rotation: number;
   size: number;
   delay: number;
+  driftX: number;
+  fallDuration: number;
 }
 
 const colors = [
@@ -23,11 +25,8 @@ const colors = [
 ];
 
 export function ConfettiOverlay() {
-  const [particles, setParticles] = useState<Particle[]>([]);
-  const [show, setShow] = useState(true);
-
-  useEffect(() => {
-    const newParticles: Particle[] = Array.from({ length: 50 }, (_, i) => ({
+  const [particles] = useState<Particle[]>(() =>
+    Array.from({ length: 50 }, (_, i) => ({
       id: i,
       x: Math.random() * 100,
       y: -10 - Math.random() * 20,
@@ -35,9 +34,13 @@ export function ConfettiOverlay() {
       rotation: Math.random() * 360,
       size: 6 + Math.random() * 10,
       delay: Math.random() * 0.5,
-    }));
-    setParticles(newParticles);
+      driftX: (Math.random() - 0.5) * 100,
+      fallDuration: 2.5 + Math.random() * 2,
+    }))
+  );
+  const [show, setShow] = useState(true);
 
+  useEffect(() => {
     const timer = setTimeout(() => setShow(false), 4000);
     return () => clearTimeout(timer);
   }, []);
@@ -68,10 +71,10 @@ export function ConfettiOverlay() {
                 y: "110vh",
                 opacity: [1, 1, 0],
                 rotate: p.rotation + 720,
-                x: [0, (Math.random() - 0.5) * 100],
+                x: [0, p.driftX],
               }}
               transition={{
-                duration: 2.5 + Math.random() * 2,
+                duration: p.fallDuration,
                 delay: p.delay,
                 ease: "easeIn",
               }}

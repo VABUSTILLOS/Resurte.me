@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
@@ -214,16 +215,16 @@ export function AuthForm({ mode }: AuthFormProps) {
         {isLogin ? (
           <>
             ¿No tienes cuenta?{" "}
-            <a href="/auth/register" className="font-semibold text-emerald-600 hover:text-emerald-500">
+            <Link href="/auth/register" className="font-semibold text-emerald-600 hover:text-emerald-500">
               Regístrate
-            </a>
+            </Link>
           </>
         ) : (
           <>
             ¿Ya tienes cuenta?{" "}
-            <a href="/auth/login" className="font-semibold text-emerald-600 hover:text-emerald-500">
+            <Link href="/auth/login" className="font-semibold text-emerald-600 hover:text-emerald-500">
               Inicia sesión
-            </a>
+            </Link>
           </>
         )}
       </p>

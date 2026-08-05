@@ -22,12 +22,12 @@ const FOOTER_LINKS = {
 
 export function Footer() {
   return (
-    <footer className="bg-[#242529] text-[#C7C8CD] mt-auto">
+    <footer className="bg-[#242529] text-[#C7C8CD] mt-auto site-footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div>
-            <Link href="/" className="inline-block mb-4">
+            <Link href="/" className="inline-block mb-4" aria-label="Resurte.me — Ir al inicio">
               <span className="text-xl font-bold text-[#108910]">Resurte</span>
               <span className="text-xl font-bold text-[#E8E9EB]">.me</span>
             </Link>
@@ -38,7 +38,7 @@ export function Footer() {
 
           {/* Link sections */}
           {Object.entries(FOOTER_LINKS).map(([title, links]) => (
-            <div key={title}>
+            <nav key={title} aria-label={title}>
               <h3 className="font-semibold text-[#E8E9EB] mb-3 text-sm uppercase tracking-wider">
                 {title}
               </h3>
@@ -54,13 +54,13 @@ export function Footer() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </nav>
           ))}
         </div>
 
         <div className="mt-10 pt-6 border-t border-[#343538] text-center text-sm text-[#72767E]">
           <p className="flex items-center justify-center gap-1">
-            Hecho con <Heart className="w-3 h-3 text-red-500 fill-red-500" /> en
+            Hecho con <Heart className="w-3 h-3 text-red-500 fill-red-500" aria-hidden="true" /> en
             México — Resurte.me — Central de Abastos Digital © {new Date().getFullYear()}
           </p>
         </div>

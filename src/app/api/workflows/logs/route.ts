@@ -34,9 +34,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+interface ParsedContent {
+  status?: string
+  message_id?: string | null
+  error?: string | null
+}
+
+// ... (inside the map callback)
+
     // Parse the JSON content for each log entry
     const logs = (data || []).map((entry) => {
-      let parsed = {}
+      let parsed: ParsedContent = {}
       try {
         parsed = JSON.parse(entry.content || "{}")
       } catch { /* keep raw */ }
@@ -45,9 +53,9 @@ export async function GET(req: NextRequest) {
         workflow_type: entry.message_type?.replace("workflow:", ""),
         order_id: entry.order_id,
         recipient: entry.from_number,
-        status: (parsed as any).status || "unknown",
-        message_id: (parsed as any).message_id || null,
-        error: (parsed as any).error || null,
+        status: parsed.status || "unknown",
+        message_id: parsed.message_id || null,
+        error: parsed.error || null,
         created_at: entry.created_at,
       }
     })

@@ -2,6 +2,21 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr"
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function updateSession(request: NextRequest) {
+  // Skip auth check for static assets and API routes that don't need it
+  const { pathname } = request.nextUrl
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/images") ||
+    pathname.startsWith("/favicon") ||
+    pathname.startsWith("/apple-icon") ||
+    pathname.startsWith("/icon") ||
+    pathname.startsWith("/robots") ||
+    pathname.startsWith("/sitemap") ||
+    pathname.startsWith("/manifest")
+  ) {
+    return { supabaseResponse: NextResponse.next({ request }), user: null }
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
