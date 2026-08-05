@@ -69,7 +69,8 @@ export async function getCategories(): Promise<Category[]> {
 
 export async function getProductsByStore(
   storeId: number,
-  categoryId?: number
+  categoryId?: number,
+  includeHidden: boolean = false
 ): Promise<(Product & { price: number; sale_price: number | null; stock_status: string })[]> {
   const supabase = await createClient()
   let query = supabase
@@ -79,8 +80,12 @@ export async function getProductsByStore(
     )
     .eq("product_stores.store_id", storeId)
     .eq("product_stores.is_available", true)
-    .eq("is_visible", true)
-    .order("name")
+ 
+  if (!includeHidden) {
+    query = query.eq("is_visible", true)
+  }
+ 
+  query = query.order("name")
  
   if (categoryId) {
     query = query.eq("category_id", categoryId)
@@ -106,7 +111,8 @@ export async function getProductsByStorePaginated(
   storeId: number,
   page: number = 0,
   pageSize: number = PAGE_SIZE,
-  categoryId?: number
+  categoryId?: number,
+  includeHidden: boolean = false
 ): Promise<{
   products: (Product & { price: number; sale_price: number | null; stock_status: string })[]
   total: number
@@ -124,8 +130,12 @@ export async function getProductsByStorePaginated(
     )
     .eq("product_stores.store_id", storeId)
     .eq("product_stores.is_available", true)
-    .eq("is_visible", true)
-    .order("name")
+
+  if (!includeHidden) {
+    query = query.eq("is_visible", true)
+  }
+
+  query = query.order("name")
     .range(from, to)
  
   if (categoryId) {
@@ -150,14 +160,19 @@ export async function getProductsByStorePaginated(
   return { products, total, hasMore }
 }
 
-export async function getProductsCount(storeId: number): Promise<number> {
+export async function getProductsCount(storeId: number, includeHidden: boolean = false): Promise<number> {
   const supabase = await createClient()
-  const { count } = await supabase
+  let query = supabase
     .from("products")
     .select("id", { count: "exact", head: true })
     .eq("product_stores.store_id", storeId)
     .eq("product_stores.is_available", true)
-    .eq("is_visible", true)
+
+  if (!includeHidden) {
+    query = query.eq("is_visible", true)
+  }
+
+  const { count } = await query
   return count ?? 0
 }
 
@@ -220,7 +235,6 @@ export async function searchAll(
       )
       .ilike("name", searchTerm)
       .eq("product_stores.is_available", true)
-      .eq("is_visible", true)
       .limit(20),
     supabase
       .from("stores")
@@ -311,7 +325,6 @@ export async function getProductsByCollection(
     .select(`*, product_stores!inner(price, sale_price, stock_status)`)
     .eq("product_stores.store_id", storeId)
     .eq("product_stores.is_available", true)
-    .eq("is_visible", true)
     .order("name")
   
   const filteredProducts =
