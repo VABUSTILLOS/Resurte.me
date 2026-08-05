@@ -5,6 +5,9 @@ import { CityLanding } from "@/components/city/city-landing"
 import { getCityLandingSchema } from "@/lib/structured-data"
 import { createClient } from "@/lib/supabase/server"
 
+// ISR: revalidate every hour so new collections/products appear without manual deploy
+export const revalidate = 3600
+
 interface Props {
   params: Promise<{ slug: string }>
 }
