@@ -457,10 +457,232 @@ BEGIN
   END LOOP;
 END $$;
 
+
 -- ============================================================
--- COLECCIONES DE RESTAURANTE (14 giros)
+-- 10. PRODUCTOS ADICIONALES — Ingredientes de recetas
+-- Generado automáticamente para completar catálogo de recetas
 -- ============================================================
-INSERT INTO restaurant_collections (name, slug, description, image_url, tags, display_order) VALUES
+INSERT INTO products (name, slug, description, image_url, images, brand, category_id, show_in_whatsapp, unit) VALUES
+  ('Pan Brioche', 'pan-brioche', 'Pan brioche suave con mantequilla.', 'https://images.unsplash.com/photo-1509448614-166f5ff9f2d8?w=600&q=80', NULL, 'Benny', 5, false, 'paquete 4 pz'),
+  ('Queso Cheddar Rebanado', 'queso-cheddar-rebanado', 'Rebanadas de queso cheddar americano.', 'https://images.unsplash.com/photo-15505822435-0d2f6290aa56?w=600&q=80', NULL, 'Kraft', 3, true, 'paquete 200 g'),
+  ('Pepinillos', 'pepinillos', 'Pepinillos encurtidos agridulces en rodajas.', 'https://images.unsplash.com/photo-1598177504383-1e0a7a6cfbb?w=600&q=80', NULL, 'Vlasic', 1, true, 'frasco 500 g'),
+  ('Salchicha Jumbo', 'salchicha-jumbo', 'Salchicha estilo Frankfurt jumbo para hot dogs.', 'https://images.unsplash.com/photo-1603046897888-5c1021482d49?w=600&q=80', NULL, 'FUD', 4, true, 'paquete 6 pz'),
+  ('Pepinillos Encurtidos', 'pepinillos-encurtidos', 'Pepinillos enteros encurtidos en salmuera.', 'https://images.unsplash.com/photo-1598177504383-1e0a7a6cfbb?w=600&q=80', NULL, 'Vlasic', 1, true, 'frasco 1 L'),
+  ('Chiles Jalapeños Encurtidos', 'chiles-jalapenos-encurtidos', 'Jalapeños en escabeche tatemados.', 'https://images.unsplash.com/photo-1566385107-2473ecc9f0a1?w=600&q=80', NULL, 'La Costeña', 1, true, 'lata 380 g'),
+  ('Papas Congeladas', 'papas-congeladas', 'Papas pre-fritas congeladas para freír.', 'https://images.unsplash.com/photo-1576107235292-a2471cfd80d6?w=600&q=80', NULL, 'McCain', 9, false, 'bolsa 1 kg'),
+  ('Aceite Vegetal', 'aceite-vegetal', 'Aceite vegetal para freír y cocinar.', 'https://images.unsplash.com/photo-1474979265790-1c2a608cf8?w=600&q=80', NULL, '1-2-3', 2, true, 'botella 1 L'),
+  ('Aros de Cebolla', 'aros-de-cebolla', 'Aros de cebolla empanizados congelados.', 'https://images.unsplash.com/photo-1625937283898-5c1021482d49?w=600&q=80', NULL, 'McCain', 9, false, 'bolsa 500 g'),
+  ('Salsa BBQ', 'salsa-bbq', 'Salsa barbacoa ahumada estilo Kansas City.', 'https://images.unsplash.com/photo-1587063867103-b6f615a70d53?w=600&q=80', NULL, 'Hunt''s', 7, true, 'botella 500 ml'),
+  ('Frijoles Refritos', 'frijoles-refritos', 'Frijoles refritos tradicionales listos para servir.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'La Sierra', 7, true, 'lata 580 g'),
+  ('Panko', 'panko', 'Pan molido japonés para empanizados extra crujientes.', 'https://images.unsplash.com/photo-1600585058159-0a93c6e8b5f9?w=600&q=80', NULL, 'Kikkoman', 2, true, 'bolsa 200 g'),
+  ('Huevo Fresco', 'huevo-fresco', 'Huevo blanco fresco de gallina para cocina diaria.', 'https://images.unsplash.com/photo-1582722871984-8f3a8de86a9b?w=600&q=80', NULL, 'San Juan', 3, true, 'caja 30 pz'),
+  ('Aderezo Ranch', 'aderezo-ranch', 'Aderezo ranch cremoso para ensaladas y dips.', 'https://images.unsplash.com/photo-1556909212-d7af153b3f26?w=600&q=80', NULL, 'McCormick', 7, true, 'botella 355 ml'),
+  ('Pierna de Cerdo', 'pierna-de-cerdo', 'Pierna de cerdo fresca para carnitas y guisos.', 'https://images.unsplash.com/photo-1603046897888-5c1021482d49?w=600&q=80', NULL, 'Local', 4, true, 'por kilo'),
+  ('Achiote en Pasta', 'achiote-en-pasta', 'Pasta de achiote concentrada para cochinita pibil.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'El Yucateco', 2, true, 'paquete 100 g'),
+  ('Chiles Secos Surtidos', 'chiles-secos-surtidos', 'Chiles secos variados para moles y adobos.', 'https://images.unsplash.com/photo-1566385107-2473ecc9f0a1?w=600&q=80', NULL, 'Local', 2, true, 'bolsa 250 g'),
+  ('Cebolla Cambray', 'cebolla-cambray', 'Cebollas cambray tiernas para asar al carbón.', 'https://images.unsplash.com/photo-1587049355551-c74d1c28ef7a?w=600&q=80', NULL, 'Local', 1, true, 'por manojo'),
+  ('Chile Guajillo', 'chile-guajillo', 'Chile guajillo seco de sabor afrutado para adobos.', 'https://images.unsplash.com/photo-1566385107-2473ecc9f0a1?w=600&q=80', NULL, 'Local', 2, true, 'bolsa 200 g'),
+  ('Manteca de Cerdo', 'manteca-de-cerdo', 'Manteca de cerdo pura para fritura tradicional.', 'https://images.unsplash.com/photo-1551024601-ecb2e8e54b29?w=600&q=80', NULL, 'Local', 2, true, 'por kilo'),
+  ('Hoja de Laurel', 'hoja-de-laurel', 'Hojas de laurel secas para guisos y caldos.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'Local', 2, true, 'bolsa 20 g'),
+  ('Flor de Calabaza', 'flor-de-calabaza', 'Flor de calabaza fresca para quesadillas y sopas.', 'https://images.unsplash.com/photo-1457537301881-07104cf8407e?w=600&q=80', NULL, 'Local', 1, true, 'por manojo'),
+  ('Chile Chipotle', 'chile-chipotle', 'Chipotles en adobo para salsas y guisos ahumados.', 'https://images.unsplash.com/photo-1566385107-2473ecc9f0a1?w=600&q=80', NULL, 'La Costeña', 2, true, 'lata 230 g'),
+  ('Alga Nori', 'alga-nori', 'Hojas de alga nori tostada para sushi rolls.', 'https://images.unsplash.com/photo-1598177504383-1e0a7a6cfbb?w=600&q=80', NULL, 'Kikkoman', 2, true, 'paquete 10 hojas'),
+  ('Surimi', 'surimi', 'Palitos de surimi para sushi california y ensaladas.', 'https://images.unsplash.com/photo-1559737558-2b6cc7885f5d?w=600&q=80', NULL, 'Del Pacífico', 4, true, 'paquete 250 g'),
+  ('Jengibre Encurtido', 'jengibre-encurtido', 'Jengibre rosado encurtido para sushi (gari).', 'https://images.unsplash.com/photo-1611247335938-2b6cc7885f5d?w=600&q=80', NULL, 'Kikkoman', 2, true, 'frasco 200 g'),
+  ('Huesos de Cerdo', 'huesos-de-cerdo', 'Huesos de cerdo para caldo de ramen tonkotsu.', 'https://images.unsplash.com/photo-1551024601-ecb2e8e54b29?w=600&q=80', NULL, 'Local', 4, true, 'por kilo'),
+  ('Fideos Ramen', 'fideos-ramen', 'Fideos para ramen estilo japonés, cocción rápida.', 'https://images.unsplash.com/photo-1612925451970-5729f62bdf52?w=600&q=80', NULL, 'Maruchan', 2, true, 'paquete 500 g'),
+  ('Jengibre Fresco', 'jengibre-fresco', 'Raíz de jengibre fresco para cocina asiática.', 'https://images.unsplash.com/photo-1600028068383-ea11a7a101f3?w=600&q=80', NULL, 'Local', 1, true, 'por 100 g'),
+  ('Carne de Cerdo Molida', 'carne-de-cerdo-molida', 'Carne de cerdo molida para gyoza y dumplings.', 'https://images.unsplash.com/photo-1603046897888-5c1021482d49?w=600&q=80', NULL, 'Local', 4, true, 'por kilo'),
+  ('Col China', 'col-china', 'Col china (hakusai) para ramen, salteados y kimchi.', 'https://images.unsplash.com/photo-1598177504383-1e0a7a6cfbb?w=600&q=80', NULL, 'Local', 1, true, 'por pieza'),
+  ('Cebollín', 'cebollin', 'Cebollín fresco para guarnición de sushi y ramen.', 'https://images.unsplash.com/photo-1587049355551-c74d1c28ef7a?w=600&q=80', NULL, 'Local', 1, true, 'por manojo'),
+  ('Pasta Wonton', 'pasta-wonton', 'Cuadros de pasta fina para wonton y dumplings.', 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=600&q=80', NULL, 'Local', 5, false, 'paquete 50 hojas'),
+  ('Pasta de Tamarindo', 'pasta-de-tamarindo', 'Concentrado de tamarindo para salsas agridulces.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Local', 2, true, 'frasco 300 g'),
+  ('Germinado de Soya', 'germinado-de-soya', 'Germinado de soya fresco para salteados y ramen.', 'https://images.unsplash.com/photo-1598177504383-1e0a7a6cfbb?w=600&q=80', NULL, 'Local', 1, true, 'bolsa 200 g'),
+  ('Salsa de Anguila', 'salsa-de-anguila', 'Salsa dulce de anguila (unagi) para sushi glaze.', 'https://images.unsplash.com/photo-1587063867103-b6f615a70d53?w=600&q=80', NULL, 'Kikkoman', 7, true, 'botella 200 ml'),
+  ('Puré de Tomate Enlatado', 'pure-de-tomate-enlatado', 'Puré de tomate italiano para salsas y bases.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'La Fina', 7, true, 'lata 794 g'),
+  ('Queso Mozzarella', 'queso-mozzarella', 'Queso mozzarella fresco para pizzas, ideal para fundir.', 'https://images.unsplash.com/photo-1626958390669-524c0e38bcd?w=600&q=80', NULL, 'Local', 3, true, 'por kilo'),
+  ('Albahaca Fresca', 'albahaca-fresca', 'Albahaca fresca italiana de hoja grande para pesto y pizzas.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'Local', 1, true, 'por manojo'),
+  ('Levadura', 'levadura', 'Levadura seca instantánea para panes y masas.', 'https://images.unsplash.com/photo-1587049355551-c74d1c28ef7a?w=600&q=80', NULL, 'Levapan', 5, false, 'sobre 11 g'),
+  ('Pepperoni', 'pepperoni', 'Pepperoni rebanado para pizzas estilo americano.', 'https://images.unsplash.com/photo-1625937283898-5c1021482d49?w=600&q=80', NULL, 'FUD', 4, true, 'paquete 200 g'),
+  ('Champiñones Frescos', 'champinones-frescos', 'Champiñones frescos rebanados para pizzas y salteados.', 'https://images.unsplash.com/photo-1576158113928-12617c7bbe98?w=600&q=80', NULL, 'Local', 1, true, 'charola 250 g'),
+  ('Pimiento Morrón', 'pimiento-morron', 'Pimiento morrón de colores para pizzas y asados.', 'https://images.unsplash.com/photo-1598177504383-1e0a7a6cfbb?w=600&q=80', NULL, 'Local', 1, true, 'por kilo'),
+  ('Pasta Fettuccine', 'pasta-fettuccine', 'Pasta larga fettuccine de sémola de trigo.', 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=600&q=80', NULL, 'Barilla', 2, true, 'paquete 500 g'),
+  ('Queso Parmesano', 'queso-parmesano', 'Queso parmesano añejo para rallar fresco.', 'https://images.unsplash.com/photo-1626958390669-524c0e38bcd?w=600&q=80', NULL, 'Kraft', 3, true, 'cuña 200 g'),
+  ('Crema para Batir', 'crema-para-batir', 'Crema para batir con 35% de grasa para salsas y repostería.', 'https://images.unsplash.com/photo-15505822435-0d2f6290aa56?w=600&q=80', NULL, 'Alpura', 3, true, 'litro'),
+  ('Queso Gorgonzola', 'queso-gorgonzola', 'Queso azul italiano gorgonzola DOP cremoso.', 'https://images.unsplash.com/photo-1626958390669-524c0e38bcd?w=600&q=80', NULL, 'Importado', 3, true, 'cuña 200 g'),
+  ('Queso Provolone', 'queso-provolone', 'Queso provolone semiduro para sándwiches y gratinados.', 'https://images.unsplash.com/photo-1626958390669-524c0e38bcd?w=600&q=80', NULL, 'Local', 3, true, 'por kilo'),
+  ('Pasta para Lasaña', 'pasta-para-lasana', 'Láminas de pasta para lasaña, precocción.', 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=600&q=80', NULL, 'Barilla', 2, true, 'caja 500 g'),
+  ('Puré de Jitomate', 'pure-de-jitomate', 'Puré de jitomate concentrado para salsas italianas.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'La Fina', 7, true, 'lata 794 g'),
+  ('Soletillas', 'soletillas', 'Bizcochos de soletilla para tiramisú y postres.', 'https://images.unsplash.com/photo-1576107235292-a2471cfd80d6?w=600&q=80', NULL, 'Local', 5, false, 'paquete 200 g'),
+  ('Queso Mascarpone', 'queso-mascarpone', 'Queso mascarpone cremoso para tiramisú y postres.', 'https://images.unsplash.com/photo-1626958390669-524c0e38bcd?w=600&q=80', NULL, 'Importado', 3, true, 'tarrina 250 g'),
+  ('Café Espresso', 'cafe-espresso', 'Café espresso en grano tostado italiano.', 'https://images.unsplash.com/photo-1509048194180-8a148911d34?w=600&q=80', NULL, 'Illy', 6, false, 'bolsa 1 kg'),
+  ('Cocoa en Polvo', 'cocoa-en-polvo', 'Cocoa en polvo sin azúcar para repostería y moles.', 'https://images.unsplash.com/photo-1587063867103-b6f615a70d53?w=600&q=80', NULL, 'Hershey''s', 7, true, 'lata 200 g'),
+  ('Salsa Buffalo', 'salsa-buffalo', 'Salsa picante estilo buffalo para alitas clásicas.', 'https://images.unsplash.com/photo-1587063867103-b6f615a70d53?w=600&q=80', NULL, 'Frank''s', 7, true, 'botella 355 ml'),
+  ('Queso Azul', 'queso-azul', 'Queso azul para aderezo de alitas y ensaladas.', 'https://images.unsplash.com/photo-1626958390669-524c0e38bcd?w=600&q=80', NULL, 'Local', 3, true, 'cuña 150 g'),
+  ('Pan Molido', 'pan-molido', 'Pan molido fino para empanizar pollo y croquetas.', 'https://images.unsplash.com/photo-1600585058159-0a93c6e8b5f9?w=600&q=80', NULL, 'Local', 5, false, 'bolsa 500 g'),
+  ('Romero Fresco', 'romero-fresco', 'Romero fresco en rama para marinadas y asados.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'Local', 1, true, 'por manojo'),
+  ('Tomillo Fresco', 'tomillo-fresco', 'Tomillo fresco para pollos, pescados y guisos.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'Local', 1, true, 'por manojo'),
+  ('Papas Cambray', 'papas-cambray', 'Papas cambray gourmet para asar enteras.', 'https://images.unsplash.com/photo-1576107235292-a2471cfd80d6?w=600&q=80', NULL, 'Local', 1, true, 'por kilo'),
+  ('Miel de Abeja', 'miel-de-abeja', 'Miel de abeja 100% natural para aderezos y glaseados.', 'https://images.unsplash.com/photo-1587049355551-c74d1c28ef7a?w=600&q=80', NULL, 'Carlota', 7, true, 'frasco 500 g'),
+  ('Queso Asadero', 'queso-asadero', 'Queso asadero para fundir en quesadillas y chiles rellenos.', 'https://images.unsplash.com/photo-1626958390669-524c0e38bcd?w=600&q=80', NULL, 'Local', 3, true, 'por kilo'),
+  ('Chile Mulato', 'chile-mulato', 'Chile mulato seco para moles oscuros tradicionales.', 'https://images.unsplash.com/photo-1566385107-2473ecc9f0a1?w=600&q=80', NULL, 'Local', 2, true, 'bolsa 150 g'),
+  ('Chile Ancho', 'chile-ancho', 'Chile ancho seco de sabor dulce y terroso para adobos.', 'https://images.unsplash.com/photo-1566385107-2473ecc9f0a1?w=600&q=80', NULL, 'Local', 2, true, 'bolsa 150 g'),
+  ('Chile Pasilla', 'chile-pasilla', 'Chile pasilla seco ahumado para moles y salsas.', 'https://images.unsplash.com/photo-1566385107-2473ecc9f0a1?w=600&q=80', NULL, 'Local', 2, true, 'bolsa 150 g'),
+  ('Chocolate de Mesa', 'chocolate-de-mesa', 'Chocolate de mesa para mole poblano y chocolate caliente.', 'https://images.unsplash.com/photo-1587063867103-b6f615a70d53?w=600&q=80', NULL, 'Abuelita', 7, true, 'tableta 90 g'),
+  ('Almendras', 'almendras', 'Almendras enteras sin sal para moles y repostería.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Local', 2, true, 'bolsa 200 g'),
+  ('Pasas', 'pasas', 'Pasas para moles, rellenos y picadillo tradicional.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Local', 2, true, 'bolsa 200 g'),
+  ('Maíz Cacahuazintle', 'maiz-cacahuazintle', 'Maíz cacahuazintle de grano grande para pozole.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Local', 2, true, 'por kilo'),
+  ('Pera', 'pera', 'Pera fresca para ensaladas, postres y guarniciones.', 'https://images.unsplash.com/photo-1598177504383-1e0a7a6cfbb?w=600&q=80', NULL, 'Local', 1, true, 'por kilo'),
+  ('Nuez de Castilla', 'nuez-de-castilla', 'Nuez de castilla para nogada y repostería.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Local', 2, true, 'bolsa 200 g'),
+  ('Queso de Cabra', 'queso-de-cabra', 'Queso de cabra fresco para ensaladas y entradas.', 'https://images.unsplash.com/photo-1626958390669-524c0e38bcd?w=600&q=80', NULL, 'Local', 3, true, 'por 200 g'),
+  ('Granada', 'granada', 'Granada roja fresca para chiles en nogada y decoración.', 'https://images.unsplash.com/photo-1598177504383-1e0a7a6cfbb?w=600&q=80', NULL, 'Local', 1, true, 'por pieza'),
+  ('Masa para Tamal', 'masa-para-tamal', 'Masa de maíz preparada para tamales.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Local', 5, false, 'por kilo'),
+  ('Hoja de Maíz', 'hoja-de-maiz', 'Hojas de maíz secas para tamales.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Local', 2, true, 'paquete 100 hojas'),
+  ('Caldo de Pollo', 'caldo-de-pollo', 'Caldo de pollo concentrado para sopas y arroces.', 'https://images.unsplash.com/photo-1551024601-ecb2e8e54b29?w=600&q=80', NULL, 'Knorr', 7, true, 'litro'),
+  ('Filete de Pescado Blanco', 'filete-de-pescado-blanco', 'Filete de pescado blanco del día para ceviches y frituras.', 'https://images.unsplash.com/photo-1579403128514-2305bb28ba2?w=600&q=80', NULL, 'Local', 4, true, 'por kilo'),
+  ('Jugo de Tomate', 'jugo-de-tomate', 'Jugo de tomate sazonado para coctelería y micheladas.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Del Valle', 6, false, 'botella 1 L'),
+  ('Salsa Picante', 'salsa-picante', 'Salsa picante mexicana para mariscos y botanas.', 'https://images.unsplash.com/photo-1587063867103-b6f615a70d53?w=600&q=80', NULL, 'Valentina', 7, true, 'botella 150 ml'),
+  ('Sal de Grano', 'sal-de-grano', 'Sal de grano para terminar carnes asadas.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'Local', 2, true, 'por kilo'),
+  ('Costillas de Cerdo', 'costillas-de-cerdo', 'Costillas de cerdo frescas para asador y BBQ.', 'https://images.unsplash.com/photo-1603046897888-5c1021482d49?w=600&q=80', NULL, 'Local', 4, true, 'por kilo'),
+  ('Azúcar Mascabado', 'azucar-mascabado', 'Azúcar mascabado sin refinar para rubs y adobos.', 'https://images.unsplash.com/photo-1587049355551-c74d1c28ef7a?w=600&q=80', NULL, 'Local', 2, true, 'por kilo'),
+  ('Pimentón', 'pimenton', 'Pimentón español ahumado para carnes y embutidos.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'McCormick', 2, true, 'frasco 100 g'),
+  ('Cebolla en Polvo', 'cebolla-en-polvo', 'Cebolla en polvo para sazonadores y rubs.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'McCormick', 2, true, 'frasco 100 g'),
+  ('Suadero de Res', 'suadero-de-res', 'Suadero de res para tacos de plancha.', 'https://images.unsplash.com/photo-1551024601-ecb2e8e54b29?w=600&q=80', NULL, 'Local', 4, true, 'por kilo'),
+  ('Salsa Verde', 'salsa-verde', 'Salsa verde mexicana de tomate y chile serrano.', 'https://images.unsplash.com/photo-1587063867103-b6f615a70d53?w=600&q=80', NULL, 'La Costeña', 7, true, 'frasco 370 g'),
+  ('Nutella', 'nutella', 'Crema de avellana y chocolate para crepas y hotcakes.', 'https://images.unsplash.com/photo-1587063867103-b6f615a70d53?w=600&q=80', NULL, 'Nutella', 7, true, 'frasco 350 g'),
+  ('Harina para Hot Cakes', 'harina-para-hot-cakes', 'Mezcla preparada para hot cakes esponjosos.', 'https://images.unsplash.com/photo-1600585058159-0a93c6e8b5f9?w=600&q=80', NULL, 'Hot Cakes', 5, false, 'caja 800 g'),
+  ('Miel de Maple', 'miel-de-maple', 'Miel de maple pura para hotcakes, waffles y crepas.', 'https://images.unsplash.com/photo-1587049355551-c74d1c28ef7a?w=600&q=80', NULL, 'Aunt Jemima', 7, true, 'botella 250 ml'),
+  ('Café en Grano', 'cafe-en-grano', 'Café en grano de altura para espresso y americano.', 'https://images.unsplash.com/photo-1509048194180-8a148911d34?w=600&q=80', NULL, 'Local', 6, false, 'bolsa 1 kg'),
+  ('Zarzamora', 'zarzamora', 'Zarzamora fresca para smoothies, bowls y repostería.', 'https://images.unsplash.com/photo-1598177504383-1e0a7a6cfbb?w=600&q=80', NULL, 'Driscoll''s', 1, true, 'charola 170 g'),
+  ('Atún Fresco', 'atun-fresco', 'Atún fresco en lomo para poke bowls y tataki.', 'https://images.unsplash.com/photo-1559737558-2b6cc7885f5d?w=600&q=80', NULL, 'Local', 4, true, 'por kilo'),
+  ('Edamame', 'edamame', 'Vainas de soya edamame para bowls y botanas.', 'https://images.unsplash.com/photo-1598177504383-1e0a7a6cfbb?w=600&q=80', NULL, 'Birds Eye', 1, true, 'bolsa 400 g'),
+  ('Pan para Crutones', 'pan-para-crutones', 'Cubos de pan sazonado para crutones de ensalada César.', 'https://images.unsplash.com/photo-1600585058159-0a93c6e8b5f9?w=600&q=80', NULL, 'Bimbo', 5, false, 'bolsa 300 g'),
+  ('Quinoa', 'quinoa', 'Quinoa real blanca, alto contenido de proteína vegetal.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Local', 2, true, 'bolsa 500 g'),
+  ('Jitomate Cherry', 'jitomate-cherry', 'Jitomate cherry dulce para ensaladas y bowls.', 'https://images.unsplash.com/photo-1598177504383-1e0a7a6cfbb?w=600&q=80', NULL, 'Local', 1, true, 'charola 250 g'),
+  ('Aceituna Kalamata', 'aceituna-kalamata', 'Aceitunas kalamata griegas para ensaladas mediterráneas.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Local', 2, true, 'frasco 300 g'),
+  ('Queso Feta', 'queso-feta', 'Queso feta griego en salmuera para ensaladas frescas.', 'https://images.unsplash.com/photo-1626958390669-524c0e38bcd?w=600&q=80', NULL, 'Local', 3, true, 'por 200 g'),
+  ('Tortilla Integral', 'tortilla-integral', 'Tortillas de harina integral para wraps saludables.', 'https://images.unsplash.com/photo-1600585058159-0a93c6e8b5f9?w=600&q=80', NULL, 'Tía Rosa', 5, false, 'paquete 12 pz'),
+  ('Yogur Griego', 'yogur-griego', 'Yogur griego natural sin azúcar para bowls y aderezos.', 'https://images.unsplash.com/photo-15505822435-0d2f6290aa56?w=600&q=80', NULL, 'Yoplait', 3, true, 'litro'),
+  ('Chispas de Chocolate', 'chispas-de-chocolate', 'Chispas de chocolate semiamargo para galletas y repostería.', 'https://images.unsplash.com/photo-1587063867103-b6f615a70d53?w=600&q=80', NULL, 'Hershey''s', 7, true, 'bolsa 300 g'),
+  ('Yemas de Huevo', 'yemas-de-huevo', 'Yemas de huevo pasteurizadas para cremas y repostería.', 'https://images.unsplash.com/photo-1582722871984-8f3a8de86a9b?w=600&q=80', NULL, 'San Juan', 3, true, 'litro pasteurizado'),
+  ('Canela en Polvo', 'canela-en-polvo', 'Canela molida para postres, arroz con leche y repostería.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'McCormick', 2, true, 'frasco 100 g'),
+  ('Cajeta', 'cajeta', 'Cajeta de leche de cabra estilo tradicional.', 'https://images.unsplash.com/photo-1587049355551-c74d1c28ef7a?w=600&q=80', NULL, 'Coronado', 7, true, 'frasco 350 g'),
+  ('Pan Pita', 'pan-pita', 'Pan pita estilo árabe para shawarma y falafel.', 'https://images.unsplash.com/photo-1600585058159-0a93c6e8b5f9?w=600&q=80', NULL, 'Local', 5, false, 'paquete 6 pz'),
+  ('Jocoque', 'jocoque', 'Jocoque seco para aderezos y tacos árabes.', 'https://images.unsplash.com/photo-15505822435-0d2f6290aa56?w=600&q=80', NULL, 'Local', 3, true, 'frasco 500 g'),
+  ('Eneldo Fresco', 'eneldo-fresco', 'Eneldo fresco para tzatziki y cocina griega.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'Local', 1, true, 'por manojo'),
+  ('Tahini', 'tahini', 'Pasta de ajonjolí tahini para hummus y salsas.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Local', 2, true, 'frasco 300 g'),
+  ('Pasta Filo', 'pasta-filo', 'Hojas de pasta filo para baklava y pasteles.', 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=600&q=80', NULL, 'Local', 5, false, 'caja 500 g'),
+  ('Pistache', 'pistache', 'Pistache sin sal para repostería árabe y helados.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Local', 2, true, 'bolsa 200 g'),
+  ('Harina PAN', 'harina-pan', 'Harina de maíz precocida para arepas auténticas.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'PAN', 2, true, 'paquete 1 kg'),
+  ('Achiote', 'achiote', 'Semillas de achiote para dar color natural a las comidas.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'Local', 2, true, 'bolsa 50 g'),
+  ('Maíz Tierno', 'maiz-tierno', 'Maíz tierno en grano para cachapas y arepas dulces.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'Del Monte', 1, true, 'lata 410 g'),
+  ('Queso de Mano', 'queso-de-mano', 'Queso blanco venezolano de mano para arepas.', 'https://images.unsplash.com/photo-1626958390669-524c0e38bcd?w=600&q=80', NULL, 'Local', 3, true, 'por kilo'),
+  ('Queso Blanco', 'queso-blanco', 'Queso blanco duro para rallar, estilo llanero.', 'https://images.unsplash.com/photo-1626958390669-524c0e38bcd?w=600&q=80', NULL, 'Local', 3, true, 'por kilo'),
+  ('Frijoles Rojos', 'frijoles-rojos', 'Frijoles rojos para pabellón criollo y sopas.', 'https://images.unsplash.com/photo-1551217873814-1b4390f8ab6c?w=600&q=80', NULL, 'La Sierra', 2, true, 'bolsa 1 kg'),
+  ('Chicharrón', 'chicharron', 'Chicharrón de cerdo para freír y guisos latinos.', 'https://images.unsplash.com/photo-1551024601-ecb2e8e54b29?w=600&q=80', NULL, 'Local', 4, true, 'por kilo'),
+  ('Cerveza Clara', 'cerveza-clara', 'Cerveza clara tipo lager para micheladas y servicio.', 'https://images.unsplash.com/photo-1551024707-ee50e2e69dd?w=600&q=80', NULL, 'Modelo', 6, false, 'six 355 ml'),
+  ('Chile en Polvo', 'chile-en-polvo', 'Chile en polvo con limón para botanas y micheladas.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'Tajín', 2, true, 'frasco 150 g'),
+  ('Jalapeños en Escabeche', 'jalapenos-en-escabeche', 'Jalapeños en escabeche para botanear.', 'https://images.unsplash.com/photo-1566385107-2473ecc9f0a1?w=600&q=80', NULL, 'La Costeña', 7, true, 'lata 380 g'),
+  ('Hierbabuena Fresca', 'hierbabuena-fresca', 'Hierbabuena fresca para mojitos, tés y coctelería.', 'https://images.unsplash.com/photo-1599909523127-04dc276376e?w=600&q=80', NULL, 'Local', 1, true, 'por manojo'),
+  ('Tequila Blanco', 'tequila-blanco', 'Tequila blanco joven para coctelería y barra.', 'https://images.unsplash.com/photo-1551024707-ee50e2e69dd?w=600&q=80', NULL, 'José Cuervo', 6, false, 'botella 750 ml'),
+  ('Licor de Naranja', 'licor-de-naranja', 'Licor de naranja triple sec para margaritas y coctelería.', 'https://images.unsplash.com/photo-1551024707-ee50e2e69dd?w=600&q=80', NULL, 'Controy', 6, false, 'botella 750 ml'),
+  ('Ron Blanco', 'ron-blanco', 'Ron blanco para mojitos, cuba libre y coctelería.', 'https://images.unsplash.com/photo-1551024707-ee50e2e69dd?w=600&q=80', NULL, 'Bacardi', 6, false, 'botella 750 ml');
+
+
+-- ============================================================
+-- PRECIOS PARA PRODUCTOS ADICIONALES (IDs 188-311)
+-- ============================================================
+DO $$
+DECLARE
+  pid BIGINT;
+  i INT := 0;
+  pr NUMERIC(10,2);
+  sp NUMERIC(10,2);
+BEGIN
+
+  -- Categoría 1 (IDs 188-210, 23 productos)
+  FOR i IN 0..22 LOOP
+    pid := 188 + i;
+    pr := CASE i WHEN 0 THEN 38 WHEN 1 THEN 45 WHEN 2 THEN 32 WHEN 3 THEN 42 WHEN 4 THEN 35 WHEN 5 THEN 28 WHEN 6 THEN 35 WHEN 7 THEN 30 WHEN 8 THEN 32 WHEN 9 THEN 28 WHEN 10 THEN 38 WHEN 11 THEN 28 WHEN 12 THEN 25 WHEN 13 THEN 22 WHEN 14 THEN 35 WHEN 15 THEN 30 WHEN 16 THEN 42 WHEN 17 THEN 28 WHEN 18 THEN 32 WHEN 19 THEN 35 WHEN 20 THEN 28 WHEN 21 THEN 32 WHEN 22 THEN 30 END;
+    sp := NULL;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    pr := CASE i WHEN 0 THEN 49 WHEN 1 THEN 58 WHEN 2 THEN 42 WHEN 3 THEN 55 WHEN 4 THEN 45 WHEN 5 THEN 36 WHEN 6 THEN 45 WHEN 7 THEN 39 WHEN 8 THEN 42 WHEN 9 THEN 36 WHEN 10 THEN 49 WHEN 11 THEN 36 WHEN 12 THEN 32 WHEN 13 THEN 28 WHEN 14 THEN 45 WHEN 15 THEN 39 WHEN 16 THEN 55 WHEN 17 THEN 36 WHEN 18 THEN 42 WHEN 19 THEN 45 WHEN 20 THEN 36 WHEN 21 THEN 42 WHEN 22 THEN 39 END;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 2, pr, sp, 'in_stock');
+  END LOOP;
+
+  -- Categoría 2 (IDs 211-245, 35 productos)
+  FOR i IN 0..34 LOOP
+    pid := 211 + i;
+    pr := CASE i WHEN 0 THEN 26 WHEN 1 THEN 32 WHEN 2 THEN 22 WHEN 3 THEN 28 WHEN 4 THEN 24 WHEN 5 THEN 28 WHEN 6 THEN 25 WHEN 7 THEN 18 WHEN 8 THEN 25 WHEN 9 THEN 26 WHEN 10 THEN 22 WHEN 11 THEN 28 WHEN 12 THEN 32 WHEN 13 THEN 42 WHEN 14 THEN 35 WHEN 15 THEN 28 WHEN 16 THEN 26 WHEN 17 THEN 28 WHEN 18 THEN 35 WHEN 19 THEN 38 WHEN 20 THEN 35 WHEN 21 THEN 32 WHEN 22 THEN 28 WHEN 23 THEN 30 WHEN 24 THEN 25 WHEN 25 THEN 22 WHEN 26 THEN 35 WHEN 27 THEN 28 WHEN 28 THEN 26 WHEN 29 THEN 32 WHEN 30 THEN 30 WHEN 31 THEN 28 WHEN 32 THEN 22 WHEN 33 THEN 28 WHEN 34 THEN 25 END;
+    sp := NULL;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    pr := CASE i WHEN 0 THEN 34 WHEN 1 THEN 42 WHEN 2 THEN 28 WHEN 3 THEN 36 WHEN 4 THEN 31 WHEN 5 THEN 36 WHEN 6 THEN 32 WHEN 7 THEN 23 WHEN 8 THEN 32 WHEN 9 THEN 34 WHEN 10 THEN 28 WHEN 11 THEN 36 WHEN 12 THEN 42 WHEN 13 THEN 55 WHEN 14 THEN 45 WHEN 15 THEN 36 WHEN 16 THEN 34 WHEN 17 THEN 36 WHEN 18 THEN 45 WHEN 19 THEN 49 WHEN 20 THEN 45 WHEN 21 THEN 42 WHEN 22 THEN 36 WHEN 23 THEN 39 WHEN 24 THEN 32 WHEN 25 THEN 28 WHEN 26 THEN 45 WHEN 27 THEN 36 WHEN 28 THEN 34 WHEN 29 THEN 42 WHEN 30 THEN 39 WHEN 31 THEN 36 WHEN 32 THEN 28 WHEN 33 THEN 36 WHEN 34 THEN 32 END;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 2, pr, sp, 'in_stock');
+  END LOOP;
+
+  -- Categoría 3 (IDs 246-262, 17 productos)
+  FOR i IN 0..16 LOOP
+    pid := 246 + i;
+    pr := CASE i WHEN 0 THEN 52 WHEN 1 THEN 28 WHEN 2 THEN 48 WHEN 3 THEN 68 WHEN 4 THEN 65 WHEN 5 THEN 58 WHEN 6 THEN 42 WHEN 7 THEN 72 WHEN 8 THEN 68 WHEN 9 THEN 62 WHEN 10 THEN 42 WHEN 11 THEN 35 WHEN 12 THEN 48 WHEN 13 THEN 42 WHEN 14 THEN 55 WHEN 15 THEN 48 WHEN 16 THEN 32 END;
+    sp := NULL;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    pr := CASE i WHEN 0 THEN 68 WHEN 1 THEN 36 WHEN 2 THEN 62 WHEN 3 THEN 88 WHEN 4 THEN 85 WHEN 5 THEN 75 WHEN 6 THEN 55 WHEN 7 THEN 94 WHEN 8 THEN 88 WHEN 9 THEN 81 WHEN 10 THEN 55 WHEN 11 THEN 46 WHEN 12 THEN 62 WHEN 13 THEN 55 WHEN 14 THEN 72 WHEN 15 THEN 62 WHEN 16 THEN 42 END;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 2, pr, sp, 'in_stock');
+  END LOOP;
+
+  -- Categoría 4 (IDs 263-273, 11 productos)
+  FOR i IN 0..10 LOOP
+    pid := 263 + i;
+    pr := CASE i WHEN 0 THEN 95 WHEN 1 THEN 88 WHEN 2 THEN 72 WHEN 3 THEN 85 WHEN 4 THEN 68 WHEN 5 THEN 95 WHEN 6 THEN 125 WHEN 7 THEN 88 WHEN 8 THEN 78 WHEN 9 THEN 85 WHEN 10 THEN 68 END;
+    sp := NULL;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    pr := CASE i WHEN 0 THEN 122 WHEN 1 THEN 115 WHEN 2 THEN 94 WHEN 3 THEN 110 WHEN 4 THEN 88 WHEN 5 THEN 122 WHEN 6 THEN 162 WHEN 7 THEN 115 WHEN 8 THEN 100 WHEN 9 THEN 110 WHEN 10 THEN 88 END;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 2, pr, sp, 'in_stock');
+  END LOOP;
+
+  -- Categoría 5 (IDs 274-284, 11 productos)
+  FOR i IN 0..10 LOOP
+    pid := 274 + i;
+    pr := CASE i WHEN 0 THEN 42 WHEN 1 THEN 28 WHEN 2 THEN 32 WHEN 3 THEN 18 WHEN 4 THEN 36 WHEN 5 THEN 32 WHEN 6 THEN 28 WHEN 7 THEN 25 WHEN 8 THEN 28 WHEN 9 THEN 38 WHEN 10 THEN 35 END;
+    sp := NULL;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    pr := CASE i WHEN 0 THEN 55 WHEN 1 THEN 36 WHEN 2 THEN 42 WHEN 3 THEN 23 WHEN 4 THEN 47 WHEN 5 THEN 42 WHEN 6 THEN 36 WHEN 7 THEN 32 WHEN 8 THEN 36 WHEN 9 THEN 49 WHEN 10 THEN 46 END;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 2, pr, sp, 'in_stock');
+  END LOOP;
+
+  -- Categoría 6 (IDs 285-291, 7 productos)
+  FOR i IN 0..6 LOOP
+    pid := 285 + i;
+    pr := CASE i WHEN 0 THEN 185 WHEN 1 THEN 22 WHEN 2 THEN 195 WHEN 3 THEN 285 WHEN 4 THEN 36 WHEN 5 THEN 185 WHEN 6 THEN 165 END;
+    sp := NULL;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    pr := CASE i WHEN 0 THEN 240 WHEN 1 THEN 28 WHEN 2 THEN 255 WHEN 3 THEN 370 WHEN 4 THEN 47 WHEN 5 THEN 240 WHEN 6 THEN 215 END;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 2, pr, sp, 'in_stock');
+  END LOOP;
+
+  -- Categoría 7 (IDs 292-309, 18 productos)
+  FOR i IN 0..17 LOOP
+    pid := 292 + i;
+    pr := CASE i WHEN 0 THEN 35 WHEN 1 THEN 18 WHEN 2 THEN 65 WHEN 3 THEN 38 WHEN 4 THEN 32 WHEN 5 THEN 35 WHEN 6 THEN 25 WHEN 7 THEN 28 WHEN 8 THEN 22 WHEN 9 THEN 48 WHEN 10 THEN 28 WHEN 11 THEN 35 WHEN 12 THEN 32 WHEN 13 THEN 28 WHEN 14 THEN 42 WHEN 15 THEN 35 WHEN 16 THEN 28 WHEN 17 THEN 32 END;
+    sp := NULL;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    pr := CASE i WHEN 0 THEN 46 WHEN 1 THEN 23 WHEN 2 THEN 85 WHEN 3 THEN 49 WHEN 4 THEN 42 WHEN 5 THEN 46 WHEN 6 THEN 32 WHEN 7 THEN 36 WHEN 8 THEN 28 WHEN 9 THEN 62 WHEN 10 THEN 36 WHEN 11 THEN 46 WHEN 12 THEN 42 WHEN 13 THEN 36 WHEN 14 THEN 55 WHEN 15 THEN 46 WHEN 16 THEN 36 WHEN 17 THEN 42 END;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 2, pr, sp, 'in_stock');
+  END LOOP;
+
+  -- Categoría 9 (IDs 310-311, 2 productos)
+  FOR i IN 0..1 LOOP
+    pid := 310 + i;
+    pr := CASE i WHEN 0 THEN 62 WHEN 1 THEN 55 END;
+    sp := NULL;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    pr := CASE i WHEN 0 THEN 81 WHEN 1 THEN 72 END;
+    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 2, pr, sp, 'in_stock');
+  END LOOP;
+
+END $$;
+
+
   ('Hamburguesas y Hot Dogs', 'hamburguesas-hot-dogs',
    'Carne molida sirloin/chuck, pan brioche, queso cheddar, papas congeladas, tocino y aderezos. Proveeduría completa para burger joints y hot dog stands.',
    'https://upload.wikimedia.org/wikipedia/commons/e/ef/Hamburger_and_onion_rings.jpg',
