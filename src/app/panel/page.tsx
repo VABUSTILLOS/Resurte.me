@@ -4,8 +4,25 @@ import { useRestaurant } from "@/contexts/restaurant-context"
 import Link from "next/link"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp,
-  Calendar, ClipboardCheck, ArrowRight, ChefHat,
+  Calendar, ClipboardCheck, ArrowRight, ChefHat, Store,
 } from "lucide-react"
+
+const COLLECTION_ICONS: Record<string, string> = {
+  "hamburguesas-hot-dogs": "🍔",
+  "taquerias-antojitos": "🌮",
+  "sushi-comida-asiatica": "🍣",
+  "pizzas-comida-italiana": "🍕",
+  "pollo-alitas": "🍗",
+  "comida-mexicana-corrida": "🍲",
+  "mariscos-pescados": "🦐",
+  "cortes-carne-asaderos": "🥩",
+  "cafeterias-crepas-desayunos": "☕",
+  "saludable-ensaladas-pokes": "🥗",
+  "postres-panaderia-helados": "🍰",
+  "comida-arabe-griega": "🥙",
+  "comida-venezolana-latina": "🇻🇪",
+  "bebidas-bares-botanas": "🍺",
+}
 
 interface Tool {
   title: string
@@ -75,7 +92,7 @@ const TOOLS: Tool[] = [
 ]
 
 export default function PanelPage() {
-  const { selectedCollection } = useRestaurant()
+  const { selectedCollection, collections, setSelectedCollection } = useRestaurant()
 
   return (
     <div>
@@ -100,25 +117,50 @@ export default function PanelPage() {
             </div>
           </div>
         ) : (
-          <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl p-6 sm:p-8 border border-amber-200/50">
-            <div className="flex items-start gap-4">
+          <div className="bg-white rounded-2xl p-6 sm:p-8 border border-gray-200 shadow-sm">
+            <div className="flex items-start gap-4 mb-6">
               <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center shrink-0">
-                <ChefHat className="w-7 h-7 text-amber-600" />
+                <Store className="w-7 h-7 text-amber-600" />
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">
                   ¡Elige tu tipo de restaurante!
                 </h2>
                 <p className="text-gray-500 max-w-2xl">
-                  Selecciona el tipo de cocina de tu negocio en el selector de arriba. 
-                  Así personalizamos cada herramienta con sugerencias, precios e 
-                  insumos relevantes para ti. Todo basado en el catálogo real de Resurte.me.
+                  Selecciona el tipo de cocina de tu negocio. Así personalizamos 
+                  cada herramienta con sugerencias, precios e insumos relevantes 
+                  para ti. Todo basado en el catálogo real de Resurte.me.
                 </p>
               </div>
+            </div>
+
+            {/* Collection picker grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+              {collections.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedCollection(c)}
+                  className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-gray-100 hover:border-[#108910]/30 hover:bg-[#F0FDF4] transition-all text-center group"
+                >
+                  <span className="text-2xl group-hover:scale-110 transition-transform">
+                    {COLLECTION_ICONS[c.slug] || "🍽️"}
+                  </span>
+                  <span className="text-xs font-medium text-gray-600 group-hover:text-[#108910] leading-tight">
+                    {c.name}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         )}
       </div>
+
+      {/* Legend when no collection selected */}
+      {!selectedCollection && (
+        <p className="text-center text-sm text-gray-400 mb-6">
+          Escoge tu tipo de restaurante para activar las herramientas
+        </p>
+      )}
 
       {/* Tool cards grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -149,7 +191,7 @@ export default function PanelPage() {
             {!selectedCollection && (
               <div className="absolute inset-0 bg-white/40 rounded-2xl flex items-center justify-center">
                 <span className="text-xs font-semibold text-gray-400 bg-white px-3 py-1.5 rounded-full border border-gray-200 shadow-sm">
-                  Selecciona tu tipo de cocina ↑
+                  🔒 Bloqueado
                 </span>
               </div>
             )}
