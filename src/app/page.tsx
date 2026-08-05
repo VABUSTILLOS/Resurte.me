@@ -26,7 +26,7 @@ export default async function Home() {
       const missingIds = allProducts.filter((p: any) => !storeIds.has(p.id)).map((p: any) => p.id)
       if (missingIds.length > 0) {
         await serviceClient.from("product_stores").insert(
-          missingIds.map((id: number) => ({ product_id: id, store_id: 1 }))
+          missingIds.map((id: number) => ({ product_id: id, store_id: 1, price: 0 }))
         )
       }
     }

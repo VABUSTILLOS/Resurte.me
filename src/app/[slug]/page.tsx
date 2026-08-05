@@ -73,7 +73,7 @@ export default async function CityPage({ params }: Props) {
       const missingIds = allProducts.filter((p) => !storeIds.has(p.id)).map((p) => p.id)
       if (missingIds.length > 0) {
         await serviceClient.from("product_stores").insert(
-          missingIds.map((id) => ({ product_id: id, store_id: 1 }))
+          missingIds.map((id) => ({ product_id: id, store_id: 1, price: 0 }))
         )
         console.log(`[catalog-fix] Added ${missingIds.length} products to catalog:`, missingIds)
       }

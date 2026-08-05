@@ -34,7 +34,7 @@ export async function GET() {
     for (const p of missing) {
       const { error } = await supabase
         .from("product_stores")
-        .insert({ product_id: p.id, store_id: 1 })
+        .insert({ product_id: p.id, store_id: 1, price: 0 })
 
       if (error && error.code !== "23505") {
         results.push(`❌ [${p.id}] ${p.name}: ${error.message}`)
