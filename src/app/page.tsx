@@ -1,5 +1,6 @@
 import { CityLanding } from "@/components/city/city-landing"
 import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/service"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -14,6 +15,22 @@ export const metadata: Metadata = {
 export default async function Home() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+
+  // Auto-fix: ensure all products have product_stores entries
+  const serviceClient = await createServiceClient()
+  try {
+    const { data: allProducts } = await serviceClient.from("products").select("id")
+    const { data: allStores } = await serviceClient.from("product_stores").select("product_id")
+    if (allProducts && allStores) {
+      const storeIds = new Set(allStores.map((s: any) => s.product_id))
+      const missingIds = allProducts.filter((p: any) => !storeIds.has(p.id)).map((p: any) => p.id)
+      if (missingIds.length > 0) {
+        await serviceClient.from("product_stores").insert(
+          missingIds.map((id: number) => ({ product_id: id, store_id: 1 }))
+        )
+      }
+    }
+  } catch (_) { /* non-critical */ }
 
   const [categories, products] = await Promise.all([
     supabase

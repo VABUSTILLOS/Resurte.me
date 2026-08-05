@@ -4,6 +4,7 @@ import { Metadata } from "next"
 import { CityLanding } from "@/components/city/city-landing"
 import { getCityLandingSchema } from "@/lib/structured-data"
 import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/service"
 
 // ISR: revalidate every hour so new collections/products appear without manual deploy
 export const revalidate = 3600
@@ -61,6 +62,26 @@ export default async function CityPage({ params }: Props) {
   // Check auth
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+
+  // Auto-fix: ensure all products have product_stores entries so they appear in catalog
+  const serviceClient = await createServiceClient()
+  try {
+    const { data: allProducts } = await serviceClient.from("products").select("id")
+    const { data: allStores } = await serviceClient.from("product_stores").select("product_id")
+    if (allProducts && allStores) {
+      const storeIds = new Set(allStores.map((s) => s.product_id))
+      const missingIds = allProducts.filter((p) => !storeIds.has(p.id)).map((p) => p.id)
+      if (missingIds.length > 0) {
+        await serviceClient.from("product_stores").insert(
+          missingIds.map((id) => ({ product_id: id, store_id: 1 }))
+        )
+        console.log(`[catalog-fix] Added ${missingIds.length} products to catalog:`, missingIds)
+      }
+    }
+  } catch (e) {
+    // Non-critical — product query still works, just some products may be hidden
+    console.warn("[catalog-fix] Could not auto-fix product_stores:", e)
+  }
 
   const { data: categories } = await supabase
     .from("categories")
