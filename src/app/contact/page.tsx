@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 export const metadata: Metadata = {
   title: "Contacto — Resurte.me",
   description:
-    "Ponte en contacto con Resurte.me. Estamos disponibles por WhatsApp, correo electrónico y teléfono para ayudarte con tus pedidos y dudas.",
+    "Háblanos sin miedo. Estamos en WhatsApp, correo y teléfono para resolver tus dudas, cotizar por volumen o ayudarte con tu pedido.",
 }
 
 export default function ContactPage() {
@@ -17,7 +17,7 @@ export default function ContactPage() {
             <span className="text-[#108910]">Contáctanos</span>
           </h1>
           <p className="text-lg text-[#5C6068]">
-            Estamos aquí para ayudarte. Elige el canal que prefieras.
+            Elige cómo prefieres hablarnos. Contestamos rápido, sin bots.
           </p>
         </div>
       </section>
@@ -28,23 +28,23 @@ export default function ContactPage() {
             {
               icon: "💬",
               title: "WhatsApp",
-              desc: "Respuesta inmediata en horario laboral.",
+              desc: "El más rápido. Contestamos en minutos, en horario laboral.",
               href: `https://wa.me/${whatsappNumber}`,
-              label: "Enviar mensaje",
+              label: "Mandar WhatsApp",
             },
             {
               icon: "📧",
-              title: "Correo electrónico",
-              desc: "Te respondemos en menos de 4 horas.",
+              title: "Correo",
+              desc: "¿Prefieres formalidad? Te respondemos en máximo 4 horas.",
               href: "mailto:hola@resurte.me",
-              label: "Enviar correo",
+              label: "Escribir correo",
             },
             {
               icon: "📞",
               title: "Teléfono",
-              desc: "Lunes a viernes, 8 AM – 6 PM.",
+              desc: "Llamada directa. Lunes a viernes, 8 AM a 6 PM.",
               href: "tel:+526145337486",
-              label: "Llamar ahora",
+              label: "Llamar",
             },
           ].map(({ icon, title, desc, href, label }) => (
             <a

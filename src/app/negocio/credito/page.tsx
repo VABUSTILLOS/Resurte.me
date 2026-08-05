@@ -3,9 +3,9 @@ import Link from "next/link"
 import { ArrowRight, Clock, CreditCard, ShieldCheck } from "lucide-react"
 
 export const metadata: Metadata = {
-  title: "Línea de crédito — Resurte.me",
+  title: "Línea de crédito para tu negocio — Resurte.me",
   description:
-    "Accede a una línea de crédito para surtir tu negocio. Paga a 7, 15 o 30 días sin complicaciones. Crédito ágil para negocios mexicanos.",
+    "Paga tus insumos a 7, 15 o 30 días. Sin aval, sin garantías. Crédito que crece con tu negocio. Actívalo en 24 horas.",
 }
 
 export default function CreditoPage() {
@@ -14,10 +14,12 @@ export default function CreditoPage() {
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
-            Línea de <span className="text-[#108910]">crédito</span>
+            Surtir hoy,{" "}
+            <span className="text-[#108910]">pagar después</span>
           </h1>
           <p className="text-lg text-[#5C6068]">
-            Surtir tu negocio nunca fue tan fácil. Paga después, crece hoy.
+            Tu negocio no debería frenarse porque la caja está apretada.
+            Activa tu línea de crédito en 24 horas y paga cuando te funcione.
           </p>
         </div>
       </section>
@@ -28,17 +30,17 @@ export default function CreditoPage() {
             {
               icon: Clock,
               title: "Paga a 7, 15 o 30 días",
-              desc: "Tú eliges el plazo que mejor se adapte al flujo de tu negocio. Sin letras chiquitas.",
+              desc: "Tú eliges la fecha que mejor se acopla a tu flujo. ¿Cierres quincenales? ¿Cobranza a 30 días? Lo armamos a tu ritmo, sin letras chiquitas.",
             },
             {
               icon: ShieldCheck,
-              title: "Sin garantías complicadas",
-              desc: "No pedimos aval ni propiedades en garantía. Evaluamos tu historial de compras en la plataforma.",
+              title: "Cero garantías, cero papeleo",
+              desc: "Nada de aval, propiedades en garantía ni trámites eternos. Miramos tu historial de compras en la plataforma y te damos respuesta en 24 horas.",
             },
             {
               icon: CreditCard,
-              title: "Crédito creciente",
-              desc: "Tu línea de crédito crece conforme crece tu negocio. Mientras más compras, más crédito tienes.",
+              title: "Tu crédito crece contigo",
+              desc: "Empiezas con una línea base y, conforme compras y pagas a tiempo, tu crédito se expande automáticamente. Como debe ser.",
             },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="text-center">
@@ -56,13 +58,13 @@ export default function CreditoPage() {
         {/* How it works */}
         <div className="bg-[#F9FAFB] rounded-[16px] p-8 mb-12">
           <h2 className="text-2xl font-bold text-[#242529] text-center mb-8">
-            ¿Cómo funciona?
+            Tres pasos. Cero vueltas.
           </h2>
           <div className="grid sm:grid-cols-3 gap-6">
             {[
-              { step: "1", title: "Solicítalo", desc: "Llena el formulario desde tu cuenta. Sin papeleo." },
-              { step: "2", title: "Actívalo", desc: "Revisamos tu historial y activamos tu línea en 24 horas." },
-              { step: "3", title: "Compra", desc: "Elige \"pago a crédito\" al finalizar tu pedido." },
+              { step: "1", title: "Solicítalo", desc: "Desde tu cuenta, llenas un formulario de 2 minutos." },
+              { step: "2", title: "Actívalo", desc: "Revisamos tu historial y en máximo 24 horas tienes tu línea activa." },
+              { step: "3", title: "Súrtete", desc: "Eliges \"pago a crédito\" al finalizar. Así de simple." },
             ].map(({ step, title, desc }) => (
               <div key={step} className="text-center">
                 <div className="w-10 h-10 bg-[#108910] text-white rounded-full flex items-center justify-center mx-auto mb-3 text-lg font-bold">
@@ -80,7 +82,7 @@ export default function CreditoPage() {
             href="/auth/register"
             className="inline-flex items-center gap-2 bg-[#108910] text-white font-semibold px-8 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
           >
-            Crear cuenta y solicitar crédito
+            Crear cuenta y activar mi crédito
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

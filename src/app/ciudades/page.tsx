@@ -4,7 +4,7 @@ import Link from "next/link"
 export const metadata: Metadata = {
   title: "Zonas de entrega — Resurte.me",
   description:
-    "Consulta las ciudades y zonas donde realizamos entregas. Resurte.me cubre las principales áreas metropolitanas de México.",
+    "Entregamos en CDMX, Monterrey, Guadalajara y más ciudades. Revisa si tu colonia está en nuestra cobertura y empieza a pedir hoy.",
 }
 
 const CITIES = [
@@ -22,11 +22,13 @@ export default function CiudadesPage() {
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
-            Zonas de <span className="text-[#108910]">entrega</span>
+            ¿Entregamos{" "}
+            <span className="text-[#108910]">en tu colonia?</span>
           </h1>
           <p className="text-lg text-[#5C6068]">
-            Entregamos en las principales ciudades de México. Estamos expandiendo
-            nuestra cobertura constantemente.
+            Estas son las ciudades y zonas donde ya estamos. Cada mes activamos
+            cobertura nueva. Si no ves la tuya, avísanos y te notificamos en
+            cuanto lleguemos.
           </p>
         </div>
       </section>
@@ -51,11 +53,11 @@ export default function CiudadesPage() {
 
         <div className="mt-12 text-center p-8 bg-[#F9FAFB] rounded-[12px]">
           <p className="text-[#5C6068]">
-            ¿No encuentras tu ciudad?{" "}
+            ¿No ves tu ciudad?{" "}
             <Link href="/contact" className="text-[#108910] font-semibold hover:underline">
-              Contáctanos
+              Avísanos
             </Link>{" "}
-            y te avisamos cuando lleguemos.
+            y te mandamos un mensaje en cuanto active mos cobertura en tu zona.
           </p>
         </div>
       </section>

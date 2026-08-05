@@ -3,9 +3,9 @@ import Link from "next/link"
 import { ArrowRight, FileText, CheckCircle, Download } from "lucide-react"
 
 export const metadata: Metadata = {
-  title: "Facturación electrónica — Resurte.me",
+  title: "Facturación electrónica (CFDI 4.0) — Resurte.me",
   description:
-    "Todas tus compras en Resurte.me incluyen factura electrónica (CFDI 4.0). Sin costo extra, lista para tu contabilidad.",
+    "Cada compra genera tu factura automáticamente. CFDI 4.0, listo para deducir. Sin costo extra, sin pasos extra.",
 }
 
 export default function FacturacionPage() {
@@ -15,11 +15,11 @@ export default function FacturacionPage() {
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
             Facturación{" "}
-            <span className="text-[#108910]">electrónica</span>
+            <span className="text-[#108910]">sin mover un dedo</span>
           </h1>
           <p className="text-lg text-[#5C6068]">
-            Cada compra incluye tu CFDI 4.0 sin costo extra. Listo para tu
-            contabilidad.
+            Registras tu RFC una sola vez y olvídate. Cada pedido genera tu CFDI
+            4.0 automáticamente. Sin costo, sin recordatorios, sin estrés fiscal.
           </p>
         </div>
       </section>
@@ -29,18 +29,18 @@ export default function FacturacionPage() {
           {[
             {
               icon: FileText,
-              title: "CFDI 4.0",
-              desc: "Facturas electrónicas que cumplen con los requisitos más recientes del SAT. Válidas para deducción fiscal.",
+              title: "CFDI 4.0 sin falta",
+              desc: "Facturas electrónicas que cumplen al pie de la letra con los requisitos más recientes del SAT. 100% deducibles. Sin excepciones.",
             },
             {
               icon: CheckCircle,
-              title: "Automático",
-              desc: "Al registrar tu RFC y uso de CFDI, cada pedido genera tu factura automáticamente. Sin pasos extra.",
+              title: "Automático de verdad",
+              desc: "Registras tu RFC y uso de CFDI al crear tu cuenta. A partir de ahí, cada pedido dispara tu factura sin que tengas que pedirla. Cero clics.",
             },
             {
               icon: Download,
-              title: "Descarga inmediata",
-              desc: "Tus facturas están disponibles en tu cuenta apenas se confirma el pedido. Descarga PDF y XML.",
+              title: "Siempre disponibles",
+              desc: "Todas tus facturas viven en tu panel. Descarga PDF y XML cuando quieras. También te las mandamos por correo si lo prefieres.",
             },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="text-center">
@@ -80,7 +80,7 @@ export default function FacturacionPage() {
             href="/auth/register"
             className="inline-flex items-center gap-2 bg-[#108910] text-white font-semibold px-8 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
           >
-            Crear cuenta y empezar a facturar
+            Crear cuenta y automatizar mi facturación
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

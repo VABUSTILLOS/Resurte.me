@@ -5,7 +5,7 @@ import { ArrowRight, Box, Calculator, MessageCircle } from "lucide-react"
 export const metadata: Metadata = {
   title: "Cotizaciones por volumen — Resurte.me",
   description:
-    "¿Compras grandes volúmenes? Solicita una cotización especial para tu negocio. Mejores precios para pedidos al mayoreo en Resurte.me.",
+    "¿Compras por tonelada? Te damos precio de mayoreo real. Cotización personalizada en menos de 2 horas con ejecutivo dedicado.",
 }
 
 export default function CotizacionesPage() {
@@ -16,12 +16,13 @@ export default function CotizacionesPage() {
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
-            Cotizaciones por{" "}
-            <span className="text-[#108910]">volumen</span>
+            Precio de mayoreo,{" "}
+            <span className="text-[#108910]">trato personal</span>
           </h1>
           <p className="text-lg text-[#5C6068]">
-            ¿Compras al mayoreo? Te damos precio especial. Mientras más compras,
-            más ahorras.
+            Mientras más compras, menos pagas. Te asignamos un ejecutivo
+            dedicado que te arma la cotización a tu medida. Sin menú del día,
+            sin precios fijos: tu volumen manda.
           </p>
         </div>
       </section>
@@ -31,18 +32,18 @@ export default function CotizacionesPage() {
           {[
             {
               icon: Calculator,
-              title: "Precios a tu medida",
-              desc: "Cotizaciones personalizadas según el volumen y frecuencia de tus pedidos. No hay dos negocios iguales.",
+              title: "Precio a tu medida",
+              desc: "Nada de tablas genéricas. Tu cotización se calcula según lo que compras, qué tan seguido y en qué volumen. Más justo, imposible.",
             },
             {
               icon: Box,
-              title: "Cualquier volumen",
-              desc: "Desde media tonelada de fruta hasta pedidos consolidados con múltiples proveedores. Lo manejamos todo.",
+              title: "Del kilo a la tonelada",
+              desc: "Fruta, verdura, abarrotes, lácteos, carnes. Manejamos desde pedidos consolidados con múltiples proveedores hasta entregas de un solo producto por tonelada.",
             },
             {
               icon: MessageCircle,
-              title: "Ejecutivo dedicado",
-              desc: "Un ejecutivo de cuenta exclusivo para tu negocio. Respuesta rápida directo por WhatsApp.",
+              title: "Tu propio ejecutivo",
+              desc: "Una persona real, dedicada a tu cuenta. Te contesta por WhatsApp, te resuelve cambios de último minuto y te consigue lo que necesites aunque no esté en catálogo.",
             },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="text-center">
@@ -59,11 +60,11 @@ export default function CotizacionesPage() {
 
         <div className="bg-[#F9FAFB] rounded-[16px] p-8 text-center">
           <h2 className="text-2xl font-bold text-[#242529] mb-3">
-            Solicita tu cotización
+            ¿Listo para pagar menos?
           </h2>
           <p className="text-[#5C6068] mb-6 max-w-lg mx-auto">
-            Cuéntanos qué productos necesitas y en qué volumen. Te respondemos
-            con una cotización personalizada en menos de 2 horas.
+            Mándanos un WhatsApp con lo que necesitas y en menos de 2 horas te
+            mandamos tu cotización. Sin compromiso, sin letras chiquitas.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
@@ -73,13 +74,13 @@ export default function CotizacionesPage() {
               className="inline-flex items-center justify-center gap-2 bg-[#25D366] text-white font-semibold px-6 py-3 rounded-[10px] hover:bg-[#1DA851] transition-colors"
             >
               <MessageCircle className="w-4 h-4" />
-              Solicitar por WhatsApp
+              Pedir cotización por WhatsApp
             </a>
             <Link
               href="/auth/register"
               className="inline-flex items-center justify-center gap-2 border border-[#108910] text-[#108910] font-semibold px-6 py-3 rounded-[10px] hover:bg-[#F0F7F0] transition-colors"
             >
-              Crear cuenta
+              Crear cuenta primero
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

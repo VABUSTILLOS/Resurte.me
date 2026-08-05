@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 export const metadata: Metadata = {
   title: "Política de privacidad — Resurte.me",
   description:
-    "Conoce cómo Resurte.me recopila, usa y protege tus datos personales y los de tu negocio conforme a la legislación mexicana.",
+    "Tu información es tuya. Así de claro. Conoce cómo protegemos los datos de tu negocio conforme a la ley mexicana.",
 }
 
 export default function PrivacyPage() {

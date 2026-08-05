@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 export const metadata: Metadata = {
   title: "Términos y condiciones — Resurte.me",
   description:
-    "Términos y condiciones de uso de la plataforma Resurte.me. Conoce tus derechos y obligaciones al usar nuestros servicios.",
+    "Las reglas del juego, en español claro. Condiciones de uso de Resurte.me para que sepas exactamente qué esperar de nosotros y qué esperamos de ti.",
 }
 
 export default function TermsPage() {

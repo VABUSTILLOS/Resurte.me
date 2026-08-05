@@ -154,14 +154,14 @@ export function CityLanding({
             {/* Left: Copy */}
             <div className="pt-10 sm:pt-14 lg:py-20 pb-4 sm:pb-6 z-10 flex flex-col justify-center">
               <p className="text-[10px] sm:text-xs font-medium tracking-[0.2em] uppercase text-[#3CC73C] mb-3 sm:mb-4">
-                Proveeduría para profesionales de la cocina
+                Proveeduría inteligente para tu cocina
               </p>
               <h1 className="text-[2rem] leading-[1.1] sm:text-5xl lg:text-[3.5rem] font-bold text-white tracking-tight">
                 Del campo a tu{" "}
                 <span className="text-[#3CC73C]">cocina</span>
               </h1>
               <p className="mt-3 sm:mt-5 text-sm sm:text-lg text-white/70 sm:text-white/75 leading-relaxed max-w-[480px]">
-                Abastece tu restaurante con la frescura de la central de abastos — sin madrugar, sin cargar, sin sorpresas.
+                Pide los insumos de tu restaurante desde el cel. Te los entregamos al siguiente día, frescos y al mejor precio. Sin madrugar, sin vueltas.
               </p>
               <div className="mt-4 sm:mt-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs sm:text-sm text-white/60 sm:text-white/70">
                 <span className="inline-flex items-center gap-1">
@@ -177,16 +177,16 @@ export function CityLanding({
                 </button>
                 <span className="hidden sm:inline text-white/30">·</span>
                 <span className="hidden sm:inline-flex items-center gap-1">
-                  📄 Facturamos
+                  📄 Factura automática
                 </span>
                 <span className="hidden sm:inline text-white/30">·</span>
                 <span className="hidden sm:inline-flex items-center gap-1">
-                  🚚 Envío gratis desde $2,500
+                  🚚 Entrega al siguiente día
                 </span>
               </div>
               {/* Mobile-only compact feature line */}
               <p className="mt-3 sm:hidden text-[11px] text-white/50">
-                📄 Facturamos · 🔄 Devolución sin costo · 🚚 Envío gratis desde $2,500
+                📄 Factura automática · 🔄 Devolución sin costo · 🚚 Entrega al siguiente día
               </p>
               <form onSubmit={handleSearch} className="mt-6 sm:mt-8 max-w-lg">
                 <div className="flex items-stretch bg-white rounded-[10px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.25)]">
@@ -580,10 +580,10 @@ export function CityLanding({
               Aliado de tu negocio
             </p>
             <h2 className="text-3xl font-bold text-[#242529] tracking-tight">
-              No solo entregamos insumos. Te ayudamos a crecer.
+              Tu negocio no puede parar. Nosotros tampoco.
             </h2>
             <p className="text-base text-[#72767E] mt-3 max-w-xl mx-auto leading-relaxed">
-              Más que un proveedor: calidad consistente, precios estables y facturación fiscal en cada pedido.
+              Calidad consistente, precios que no brincan, facturación automática y un ejecutivo que te contesta en minutos. Así de simple.
             </p>
           </div>
           <div className="flex flex-col md:flex-row items-center gap-10">
@@ -593,10 +593,10 @@ export function CityLanding({
                 <div className="text-center px-8">
                   <span className="text-6xl">🚛</span>
                   <p className="mt-4 text-[#108910] font-semibold text-lg">
-                    Más que un proveedor, tu aliado
+                   La central de abastos, sin salir de tu cocina
                   </p>
                   <p className="text-sm text-[#72767E] mt-1">
-                    Como tener la central de abastos a la vuelta de tu negocio
+                   Pide hoy, recibe mañana. Frescura directo del productor.
                   </p>
                 </div>
               </div>
@@ -818,7 +818,7 @@ export function CityLanding({
 
               {/* CTA */}
               <div className="text-center pt-6 sm:pt-8 border-t border-[#f0ede5]">
-                <p className="text-xs sm:text-sm text-[#999893] mb-4">+500 restaurantes ya están creciendo con Resurte.me</p>
+                <p className="text-xs sm:text-sm text-[#999893] mb-4">Más de 500 restaurantes y hoteles ya surten con nosotros</p>
                 <Link
                   href="/recompensas"
                   className="btn-pill btn-pill-primary inline-flex items-center justify-center gap-2 text-sm sm:text-base px-6 sm:px-8 py-2.5 sm:py-3 w-full sm:w-auto"

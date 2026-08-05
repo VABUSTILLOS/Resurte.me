@@ -5,7 +5,7 @@ import { ArrowRight, Leaf, Truck, Users } from "lucide-react"
 export const metadata: Metadata = {
   title: "Sobre nosotros — Resurte.me",
   description:
-    "Resurte.me es la Central de Abastos Digital que conecta negocios locales con proveedores de confianza, con entregas puntuales y programa de recompensas.",
+    "Somos la Central de Abastos Digital que le ahorra tiempo y dinero a miles de negocios mexicanos. Proveeduría inteligente, sin intermediarios, con entregas al siguiente día.",
 }
 
 export default function AboutPage() {
@@ -15,14 +15,15 @@ export default function AboutPage() {
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-6">
-            Tu Central de Abastos{" "}
-            <span className="text-[#108910]">Digital</span>
+            La Central de Abastos{" "}
+            <span className="text-[#108910]">que sí entiende tu negocio</span>
           </h1>
           <p className="text-lg text-[#5C6068] leading-relaxed">
-            Nacimos para simplificar la proveeduría de los negocios mexicanos.
-            Conectamos restaurantes, hoteles, cafeterías y pequeños comercios con
-            los mejores proveedores, eliminando intermediarios y haciendo que
-            surtir tu negocio sea más rápido, fácil y rentable.
+            Sabemos lo que es levantarse a las 4 AM para ir a la central. Por eso
+            construimos Resurte.me: la plataforma que elimina las vueltas, los
+            intermediarios y las sorpresas. Conectamos a restaurantes, hoteles,
+            cafeterías y changarros con los mejores proveedores del país. Pides
+            desde el cel, te llega al siguiente día y pagas como más te convenga.
           </p>
         </div>
       </section>
@@ -33,18 +34,18 @@ export default function AboutPage() {
           {[
             {
               icon: Leaf,
-              title: "Frescura garantizada",
-              desc: "Productos seleccionados y entregados en el punto justo de maduración. Trabajamos solo con proveedores que cumplen nuestros estándares de calidad.",
+              title: "Calidad que tu cliente nota",
+              desc: "Seleccionamos cada producto en su punto justo. Solo trabajamos con proveedores que pasan nuestra prueba de calidad. Si no nos lo comeríamos nosotros, no te lo mandamos.",
             },
             {
               icon: Truck,
-              title: "Entrega puntual",
-              desc: "Sabemos que tu negocio no puede esperar. Entregas programadas con puntualidad para que nunca te quedes sin insumos.",
+              title: "Tu cocina nunca se para",
+              desc: "Pedidos antes de las 5 PM se entregan al día siguiente. En CDMX tenemos entregas express el mismo día. Porque un restaurante sin insumos es un restaurante cerrado.",
             },
             {
               icon: Users,
-              title: "Hecho para ti",
-              desc: "Entendemos las necesidades del negocio mexicano. Crédito, facturación y atención personalizada para que solo te preocupes por crecer.",
+              title: "Hecho a la medida del negocio mexicano",
+              desc: "Crédito a 30 días, facturación automática, cotizaciones por volumen y un ejecutivo dedicado que te resuelve por WhatsApp. Así de simple.",
             },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="text-center">
@@ -64,13 +65,14 @@ export default function AboutPage() {
       <section className="bg-[#108910] py-16 px-4 text-center">
         <div className="max-w-xl mx-auto">
           <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
-            ¿Listo para surtir tu negocio sin complicaciones?
+            Deja de madrugar para surtir. Pide en 5 minutos desde tu cel.
           </h2>
+          <p className="text-white/80 mb-6">Date de alta gratis y haz tu primer pedido hoy.</p>
           <Link
             href="/auth/register"
             className="inline-flex items-center gap-2 bg-white text-[#108910] font-semibold px-8 py-3 rounded-[10px] hover:bg-[#F0F7F0] transition-colors"
           >
-            Crear cuenta gratis
+            Quiero empezar
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
