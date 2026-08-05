@@ -109,9 +109,9 @@ export default function RootLayout({
     <html
       lang="es-MX"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased overflow-x-clip`}
     >
-      <body className="min-h-full flex flex-col bg-[#faf8f5] text-[#343538] antialiased">
+      <body className="min-h-full flex flex-col bg-[#faf8f5] text-[#343538] antialiased max-w-full overflow-x-clip">
         {/* Skip to main content — keyboard accessibility */}
         <a href="#main-content" className="skip-to-main">
           Saltar al contenido principal

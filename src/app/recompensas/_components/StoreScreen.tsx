@@ -189,24 +189,24 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator }: StoreScreenPr
   const monthlyCashback = monthlySpend * cashbackRate;
 
   return (
-    <div className="px-4 pt-6 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
+    <div className="px-4 pt-4 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-5"
+        className="mb-4"
       >
         <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-emerald-400" />
-          <h1 className="text-white text-xl font-bold">Tienda de Crecimiento</h1>
+          <Sparkles className="h-4 w-4 text-emerald-400" />
+          <h1 className="text-white text-lg font-bold">Tienda de Crecimiento</h1>
         </div>
-        <p className="text-gray-400 text-sm mt-1">
+        <p className="text-gray-400 text-[13px] mt-0.5">
           Convierte tus recompensas en clientes nuevos. Tus recompensas ya son tuyas.
         </p>
       </motion.div>
 
       {/* Category filter chips */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-4">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-3">
         {categories.map((cat) => (
           <button
             key={cat.id}
@@ -225,7 +225,7 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator }: StoreScreenPr
       </div>
 
       {/* Service Grid */}
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
         <AnimatePresence mode="popLayout">
           {filtered.map((service, i) => {
             const monthsToUnlock = Math.ceil(service.cost / monthlyCashback);
@@ -352,7 +352,7 @@ function ServiceCard({
         </motion.div>
       )}
 
-      <div className="p-4 pt-9">
+      <div className="p-3 pt-8">
         {/* Icon + Name */}
         <div className="flex items-start gap-3">
           <motion.div
@@ -368,7 +368,7 @@ function ServiceCard({
         </div>
 
         {/* Impact Badge */}
-        <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/10 px-2.5 py-1.5">
+        <div className="mt-2.5 flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/10 px-2.5 py-1">
           <TrendingUp className="h-3 w-3 text-emerald-400 flex-shrink-0" />
           <p className="text-emerald-400 text-[10px] font-medium leading-tight">
             {service.estimatedImpact}
@@ -376,7 +376,7 @@ function ServiceCard({
         </div>
 
         {/* Social Proof */}
-        <div className="mt-2 flex items-center gap-1.5">
+        <div className="mt-1.5 flex items-center gap-1.5">
           <Users className="h-3 w-3 text-gray-600" />
           <span className="text-gray-600 text-[10px]">
             {socialProofCounts[service.id] || "0 restaurantes"} ya lo canjearon
@@ -384,7 +384,7 @@ function ServiceCard({
         </div>
 
         {/* Cost + CTA */}
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-2.5 flex items-center justify-between">
           <div>
             <p className="text-gray-500 text-[10px] uppercase tracking-wider">Costo en recompensas</p>
             <p className="text-white font-bold text-lg tabular-nums">

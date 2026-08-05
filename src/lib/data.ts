@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import type { City, Store, Category, Product, ProductStore } from "@/types"
+import type { City, Store, Category, Product, ProductStore, RestaurantCollection } from "@/types"
 
 // ============================================================
 // CIUDADES
@@ -238,4 +238,85 @@ export async function searchAll(
       })) ?? [],
     stores: (stores as Store[]) ?? [],
   }
+}
+
+// ============================================================
+// COLECCIONES DE RESTAURANTE
+// ============================================================
+
+/**
+ * Obtiene todas las colecciones activas ordenadas por display_order.
+ * Cada colección agrupa productos por tags (sin duplicar inventario).
+ */
+export async function getRestaurantCollections(): Promise<RestaurantCollection[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from("restaurant_collections")
+    .select("*")
+    .eq("is_active", true)
+    .order("display_order")
+  return (data as RestaurantCollection[]) ?? []
+}
+
+/**
+ * Obtiene una colección por su slug.
+ */
+export async function getRestaurantCollectionBySlug(
+  slug: string
+): Promise<RestaurantCollection | null> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from("restaurant_collections")
+    .select("*")
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .single()
+  return (data as RestaurantCollection) ?? null
+}
+
+/**
+ * Obtiene los productos asociados a una colección mediante intersección de tags.
+ * Las colecciones funcionan como queries filtradas: los productos deben tener al
+ * menos un tag que coincida con los tags de la colección.
+ *
+ * Usa el operador ?| de PostgreSQL JSONB para intersección de arrays.
+ */
+export async function getProductsByCollection(
+  collectionSlug: string,
+  storeId: number = 1
+): Promise<(Product & { price: number; sale_price: number | null; stock_status: string })[]> {
+  const supabase = await createClient()
+
+  // 1. Obtener la colección y sus tags
+  const { data: collection } = await supabase
+    .from("restaurant_collections")
+    .select("tags")
+    .eq("slug", collectionSlug)
+    .eq("is_active", true)
+    .single()
+
+  if (!collection || !(collection as { tags: string[] }).tags?.length) return []
+
+  const tags = (collection as { tags: string[] }).tags
+
+  // 2. Filtrar productos cuyos tags intersectan con los de la colección
+  //    Usamos el operador ?| de PostgreSQL: tags ?| array['taqueria','tacos']
+  const { data } = await supabase
+    .from("products")
+    .select(`*, product_stores!inner(price, sale_price, stock_status)`)
+    .eq("product_stores.store_id", storeId)
+    .eq("product_stores.is_available", true)
+    .filter("tags", "ov", `{${tags.join(",")}}`) // ?| overlap operator via Supabase .filter()
+    .order("name")
+
+  return (
+    (data as unknown as (Product & {
+      product_stores: { price: number; sale_price: number | null; stock_status: string }[]
+    })[])?.map((p) => ({
+      ...p,
+      price: p.product_stores[0]?.price ?? 0,
+      sale_price: p.product_stores[0]?.sale_price ?? null,
+      stock_status: p.product_stores[0]?.stock_status ?? "out_of_stock",
+    })) ?? []
+  )
 }

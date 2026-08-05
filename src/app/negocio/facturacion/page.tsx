@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, FileText, CheckCircle, Download } from "lucide-react"
+import { ArrowRight, FileText, CheckCircle, Download, Shield } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Facturación electrónica (CFDI 4.0) — Resurte.me",
@@ -21,6 +21,19 @@ export default function FacturacionPage() {
             Registras tu RFC una sola vez y olvídate. Cada pedido genera tu CFDI
             4.0 automáticamente. Sin costo, sin recordatorios, sin estrés fiscal.
           </p>
+        </div>
+      </section>
+
+      {/* Trust badge */}
+      <section className="max-w-xl mx-auto px-4 pb-10">
+        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#108910]/20 rounded-[16px] p-5 flex items-center gap-4">
+          <div className="w-12 h-12 bg-[#108910] rounded-xl flex items-center justify-center flex-shrink-0">
+            <Shield className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-[#242529]">CFDI 4.0 garantizado</p>
+            <p className="text-xs text-[#5C6068]">Cumplimos con todos los requisitos del SAT. Tus facturas son 100% deducibles. Si el SAT te rechaza una factura nuestra, la corregimos en menos de 4 horas.</p>
+          </div>
         </div>
       </section>
 

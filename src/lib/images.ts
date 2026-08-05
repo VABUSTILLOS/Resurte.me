@@ -1,3 +1,19 @@
+// --- Restaurant Collection Covers (Wikimedia Commons, B2B institutional tone) ---
+// Taquería — tacos al pastor on trompo
+export const COLLECTION_TAQUERIA = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Tacos_al_Pastor.jpg/640px-Tacos_al_Pastor.jpg"
+// Hamburguesería — classic burger
+export const COLLECTION_BURGER = "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/RedDot_Burger.jpg/640px-RedDot_Burger.jpg"
+// Sushi — sushi platter
+export const COLLECTION_SUSHI = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Sushi_platter.jpg/640px-Sushi_platter.jpg"
+// Pizzería — margherita pizza
+export const COLLECTION_PIZZA = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Eq_it-na_pizza-margherita_sep2005_sml.jpg/640px-Eq_it-na_pizza-margherita_sep2005_sml.jpg"
+// Cafetería — espresso cup
+export const COLLECTION_CAFE = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/A_small_cup_of_coffee.JPG/640px-A_small_cup_of_coffee.JPG"
+// Marisquería — seafood display
+export const COLLECTION_MARISCOS = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Seafood_display_at_Fish_market.jpg/640px-Seafood_display_at_Fish_market.jpg"
+// Fondas/Cocina Económica — Mexican stew
+export const COLLECTION_FONDA = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Mexican_stew.jpg/640px-Mexican_stew.jpg"
+
 // Product images: resurte.me store images (GCS) for products sold in the store,
 // Alsuper local images for generic fresh produce / packaged goods.
 // Hero is a local produce market image.

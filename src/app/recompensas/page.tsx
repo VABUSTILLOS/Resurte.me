@@ -93,7 +93,7 @@ export default function CashbackPage() {
               onComplete={handleCheckoutComplete}
             />
           ) : (
-            <div key="main" className="flex-1 overflow-y-auto pb-24 md:pb-0">
+            <div key="main" className="flex-1 overflow-y-auto pb-20 md:pb-0">
               {activeTab === "home" && (
                 <DashboardScreen
                   onOpenCalculator={handleOpenCalculator}

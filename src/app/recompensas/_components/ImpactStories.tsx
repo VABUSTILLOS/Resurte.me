@@ -80,12 +80,12 @@ export function ImpactStories() {
   }, []);
 
   return (
-    <div className="mx-4 mt-6 mb-2 md:mx-6 lg:mx-0">
+    <div className="mx-4 mt-4 mb-2 md:mx-6 lg:mx-0">
       {/* Section Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-white text-base font-bold">Historias de Crecimiento</h2>
-          <p className="text-gray-500 text-xs mt-0.5">
+          <h2 className="text-white text-[15px] font-bold">Historias de Crecimiento</h2>
+          <p className="text-gray-500 text-[10px] mt-0.5">
             Restaurantes como el tuyo ya están creciendo
           </p>
         </div>
@@ -110,7 +110,7 @@ export function ImpactStories() {
               overflow-hidden hover:border-white/20 transition-colors"
           >
             {/* Photo placeholder */}
-            <div className="relative h-36 bg-gradient-to-br from-emerald-900/60 to-teal-900/60 flex items-center justify-center">
+            <div className="relative h-28 bg-gradient-to-br from-emerald-900/60 to-teal-900/60 flex items-center justify-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-3xl">
                 {["🌮", "🦐", "☕", "🍕"][i]}
               </div>
@@ -121,16 +121,16 @@ export function ImpactStories() {
               </div>
             </div>
 
-            <div className="p-4">
+            <div className="p-3">
               {/* Restaurant info */}
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-white font-bold text-sm">{story.restaurantName}</span>
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="text-white font-bold text-[13px]">{story.restaurantName}</span>
                 <span className="text-gray-600 text-xs">•</span>
                 <span className="text-gray-500 text-xs">{story.ownerName}</span>
               </div>
 
               {/* Before → After */}
-              <div className="flex items-center gap-3 rounded-xl bg-emerald-500/10 border border-emerald-500/15 p-3 mb-3">
+              <div className="flex items-center gap-3 rounded-xl bg-emerald-500/10 border border-emerald-500/15 p-2.5 mb-2.5">
                 <div className="text-center">
                   <p className="text-gray-500 text-[10px] uppercase tracking-wider">Antes</p>
                   <p className="text-gray-400 text-xl font-black tabular-nums">{story.beforeMetric}</p>
@@ -151,7 +151,7 @@ export function ImpactStories() {
               </p>
 
               {/* Quote */}
-              <div className="mt-3 flex gap-2">
+              <div className="mt-2.5 flex gap-2">
                 <Quote className="h-4 w-4 text-purple-400 flex-shrink-0 mt-0.5" />
                 <p className="text-gray-400 text-xs italic leading-relaxed">
                   &ldquo;{story.quote}&rdquo;
@@ -159,7 +159,7 @@ export function ImpactStories() {
               </div>
 
               {/* Service tag */}
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-2.5 flex items-center gap-2">
                 <span className="rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold px-2.5 py-0.5">
                   {story.serviceUsed}
                 </span>

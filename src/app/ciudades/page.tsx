@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { MapPin, Truck, Building2 } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Zonas de entrega — Resurte.me",
@@ -8,12 +9,12 @@ export const metadata: Metadata = {
 }
 
 const CITIES = [
-  { name: "CDMX", slug: "cdmx", zonas: "Benito Juárez, Cuauhtémoc, Miguel Hidalgo, Coyoacán, Álvaro Obregón, Iztapalapa, Gustavo A. Madero y más" },
-  { name: "Monterrey", slug: "monterrey", zonas: "San Pedro, Santa Catarina, San Nicolás, Guadalupe, Apodaca, Centro de MTY" },
-  { name: "Guadalajara", slug: "guadalajara", zonas: "Zapopan, Tlaquepaque, Tonalá, Tlajomulco, Centro de GDL" },
-  { name: "Puebla", slug: "puebla", zonas: "Centro, Angelópolis, Cholula, San Andrés, Cuautlancingo" },
-  { name: "Querétaro", slug: "queretaro", zonas: "Centro, Juriquilla, El Refugio, Zibatá, Corregidora" },
-  { name: "Mérida", slug: "merida", zonas: "Centro, Norte, Montebello, Altabrisa, Caucel" },
+  { name: "CDMX", slug: "cdmx", zonas: "Benito Juárez, Cuauhtémoc, Miguel Hidalgo, Coyoacán, Álvaro Obregón, Iztapalapa, Gustavo A. Madero y más", entrega: "Mismo día (antes de 11 AM) o siguiente día" },
+  { name: "Monterrey", slug: "monterrey", zonas: "San Pedro, Santa Catarina, San Nicolás, Guadalupe, Apodaca, Centro de MTY", entrega: "Siguiente día hábil" },
+  { name: "Guadalajara", slug: "guadalajara", zonas: "Zapopan, Tlaquepaque, Tonalá, Tlajomulco, Centro de GDL", entrega: "Siguiente día hábil" },
+  { name: "Puebla", slug: "puebla", zonas: "Centro, Angelópolis, Cholula, San Andrés, Cuautlancingo", entrega: "Siguiente día hábil" },
+  { name: "Querétaro", slug: "queretaro", zonas: "Centro, Juriquilla, El Refugio, Zibatá, Corregidora", entrega: "Siguiente día hábil" },
+  { name: "Mérida", slug: "merida", zonas: "Centro, Norte, Montebello, Altabrisa, Caucel", entrega: "Siguiente día hábil" },
 ]
 
 export default function CiudadesPage() {
@@ -33,6 +34,23 @@ export default function CiudadesPage() {
         </div>
       </section>
 
+      {/* Trust stats */}
+      <section className="max-w-4xl mx-auto px-4 pb-10">
+        <div className="grid grid-cols-3 gap-4 text-center">
+          {[
+            { icon: MapPin, value: "6", label: "Ciudades activas" },
+            { icon: Truck, value: "98%", label: "Entregas a tiempo" },
+            { icon: Building2, value: "+30", label: "Colonias con cobertura" },
+          ].map(({ icon: Icon, value, label }) => (
+            <div key={label} className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-[12px] p-4">
+              <Icon className="w-5 h-5 text-[#108910] mx-auto mb-2" />
+              <p className="text-2xl font-extrabold text-[#108910]">{value}</p>
+              <p className="text-xs text-[#5C6068]">{label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="max-w-4xl mx-auto px-4 py-16">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {CITIES.map((city) => (
@@ -44,8 +62,11 @@ export default function CiudadesPage() {
               <h3 className="text-xl font-bold text-[#242529] group-hover:text-[#108910] transition-colors mb-2">
                 {city.name}
               </h3>
-              <p className="text-sm text-[#5C6068] leading-relaxed">
+              <p className="text-sm text-[#5C6068] leading-relaxed mb-2">
                 {city.zonas}
+              </p>
+              <p className="text-xs text-[#108910] font-medium">
+                🚚 {city.entrega}
               </p>
             </Link>
           ))}

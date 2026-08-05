@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { Shield, Star } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Preguntas frecuentes — Resurte.me",
@@ -64,6 +65,22 @@ export default function FaqPage() {
         </div>
       </section>
 
+      {/* Trust bar */}
+      <section className="max-w-3xl mx-auto px-4 pb-8">
+        <div className="bg-white border border-[#E5E7EB] rounded-[16px] p-6 grid grid-cols-3 gap-4 text-center">
+          {[
+            { value: "98%", label: "Entregas a tiempo" },
+            { value: "< 5 min", label: "Respuesta en WhatsApp" },
+            { value: "24h", label: "Garantía de devolución" },
+          ].map(({ value, label }) => (
+            <div key={label}>
+              <p className="text-2xl font-extrabold text-[#108910]">{value}</p>
+              <p className="text-xs text-[#5C6068] mt-1">{label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="max-w-3xl mx-auto px-4 py-16 space-y-4">
         {FAQS.map(({ q, a }) => (
           <details
@@ -79,6 +96,23 @@ export default function FaqPage() {
             <p className="mt-4 text-[#5C6068] leading-relaxed">{a}</p>
           </details>
         ))}
+      </section>
+
+      {/* Guarantee highlight */}
+      <section className="max-w-xl mx-auto px-4 pb-8">
+        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#108910]/20 rounded-[16px] p-6 flex items-start gap-4">
+          <div className="w-10 h-10 bg-[#108910] rounded-xl flex items-center justify-center flex-shrink-0">
+            <Shield className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-[#242529] mb-1">Garantía sin letras chiquitas</h3>
+            <p className="text-sm text-[#5C6068] leading-relaxed">
+              Producto en mal estado: te lo reponemos o te devolvemos el dinero.
+              ¿Entrega tarde? Esa va con descuento. Tu primer pedido tiene
+              garantía de satisfacción total. Sin peros.
+            </p>
+          </div>
+        </div>
       </section>
 
       <section className="max-w-xl mx-auto px-4 pb-20 text-center">

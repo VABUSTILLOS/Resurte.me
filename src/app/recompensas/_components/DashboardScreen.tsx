@@ -49,12 +49,12 @@ export function DashboardScreen({
   ).sort((a, b) => a.cost - b.cost);
 
   return (
-    <div className="pt-2 pb-6 md:max-w-none lg:max-w-6xl lg:mx-auto">
+    <div className="pt-1 pb-4 md:max-w-none lg:max-w-6xl lg:mx-auto">
       {/* Top Header with Notifications */}
-      <div className="flex items-center justify-between px-4 mb-3 md:px-6 lg:px-8">
+      <div className="flex items-center justify-between px-4 mb-2 md:px-6 lg:px-8">
         <div>
-          <p className="text-gray-400 text-xs">Buenos días</p>
-          <p className="text-white text-lg font-bold">Taquería El Pariente 🌅</p>
+          <p className="text-gray-400 text-[11px]">Buenos días</p>
+          <p className="text-white text-base font-bold">Taquería El Pariente 🌅</p>
         </div>
         <NotificationBell />
       </div>
@@ -81,7 +81,7 @@ export function DashboardScreen({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.3 }}
-            className="mx-4 mt-3 rounded-xl bg-amber-500/5 border border-amber-500/10 px-4 py-2.5 md:mx-6 lg:mx-0"
+            className="mx-4 mt-2.5 rounded-xl bg-amber-500/5 border border-amber-500/10 px-4 py-2 md:mx-6 lg:mx-0"
           >
             <p className="text-amber-400/60 text-[11px] leading-relaxed">
               ⓘ Tus Créditos solo pueden canjearse por servicios en la Tienda de Crecimiento. No son canjeables por dinero en efectivo.
@@ -93,10 +93,10 @@ export function DashboardScreen({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.4 }}
-            className="mx-4 mt-5 md:mx-6 lg:mx-0"
+            className="mx-4 mt-4 md:mx-6 lg:mx-0"
           >
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-white text-sm font-bold">Tienda de Crecimiento</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-white text-[13px] font-bold">Tienda de Crecimiento</p>
               <button
                 onClick={onNavigateStore}
                 className="flex items-center gap-1 text-emerald-400 text-xs font-medium hover:underline"
@@ -129,8 +129,8 @@ export function DashboardScreen({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8, duration: 0.4 }}
-            className="mx-4 mt-5 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 
-              border border-emerald-500/15 p-4 md:mx-6 lg:mx-0"
+            className="mx-4 mt-4 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 
+              border border-emerald-500/15 p-3 md:mx-6 lg:mx-0"
           >
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20">
@@ -139,7 +139,7 @@ export function DashboardScreen({
                 </svg>
               </div>
               <div className="flex-1">
-                <p className="text-white text-sm font-semibold">
+                <p className="text-white text-[13px] font-semibold">
                   Con tu consumo actual, en 3 meses desbloqueas tu Campaña Meta Ads
                 </p>
                 <button
@@ -154,7 +154,7 @@ export function DashboardScreen({
         </div>
 
         {/* Right Column: Activity + Stories */}
-        <div className="lg:col-span-1 mt-5 lg:mt-0">
+        <div className="lg:col-span-1 mt-4 lg:mt-0">
           <div className="md:px-6 lg:px-0">
             <ActivityFeed />
           </div>

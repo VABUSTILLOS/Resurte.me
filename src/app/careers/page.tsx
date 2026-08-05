@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { ArrowRight, Users, TrendingUp, MapPin } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Trabaja con nosotros — Resurte.me",
@@ -22,6 +23,23 @@ export default function CareersPage() {
             ensuciarse las manos y construir algo que de verdad impacte a miles
             de negocios mexicanos.
           </p>
+        </div>
+      </section>
+
+      {/* Team stats */}
+      <section className="max-w-4xl mx-auto px-4 pb-12">
+        <div className="grid grid-cols-3 gap-4 text-center">
+          {[
+            { icon: Users, value: "40+", label: "Personas en el equipo" },
+            { icon: TrendingUp, value: "3x", label: "Crecimiento este año" },
+            { icon: MapPin, value: "8", label: "Estados con presencia" },
+          ].map(({ icon: Icon, value, label }) => (
+            <div key={label} className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-[12px] p-4">
+              <Icon className="w-5 h-5 text-[#108910] mx-auto mb-2" />
+              <p className="text-2xl font-extrabold text-[#108910]">{value}</p>
+              <p className="text-xs text-[#5C6068]">{label}</p>
+            </div>
+          ))}
         </div>
       </section>
 

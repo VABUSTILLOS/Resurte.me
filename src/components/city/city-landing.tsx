@@ -13,8 +13,9 @@ import { StickyCatalogButton } from "@/components/ui/sticky-catalog-button"
 import { UserShopView } from "@/components/shop/user-shop-view"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import type { Category, Product } from "@/types"
+import type { Category, Product, RestaurantCollection } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
+import { CollectionSlider } from "@/components/collections/collection-slider"
 
 const DEFAULT_CITY_SLUG = "chihuahua"
 
@@ -55,6 +56,7 @@ export function CityLanding({
   citySlug,
   categories,
   products,
+  collections,
   isLoggedIn = false,
 }: {
   citySlug?: string
@@ -62,6 +64,7 @@ export function CityLanding({
   products: (Product & {
     product_stores: { store_id: number; price: number; sale_price: number | null; is_available: boolean; stock_status: string }[]
   })[]
+  collections?: RestaurantCollection[]
   isLoggedIn?: boolean
 }) {
   const { city, setCity } = useCity()
@@ -341,6 +344,11 @@ export function CityLanding({
           </div>
         </div>
       </section>
+
+      {/* Restaurant collection slider — curated by business type */}
+      {collections && collections.length > 0 && (
+        <CollectionSlider collections={collections} citySlug={currentCity?.slug || DEFAULT_CITY_SLUG} />
+      )}
 
       {/* Product catalog by category — with "Ver Todo" links (Erewhon-style) */}
       <section className="bg-white py-16">

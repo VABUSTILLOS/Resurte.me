@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { ShieldCheck, Clock, RefreshCw } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Términos y condiciones — Resurte.me",
@@ -17,6 +18,25 @@ export default function TermsPage() {
           <p className="text-[#5C6068]">
             Última actualización: enero 2026
           </p>
+        </div>
+      </section>
+
+      {/* Trust summary */}
+      <section className="max-w-3xl mx-auto px-4 pb-12">
+        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#108910]/20 rounded-[16px] p-6">
+          <p className="text-sm text-[#242529] font-semibold mb-3">En cristiano, esto significa:</p>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {[
+              { icon: ShieldCheck, text: "Tu cuenta es tuya. Puedes cerrarla cuando quieras y te llevas tus datos." },
+              { icon: Clock, text: "Si algo llega mal, tienes 24h para reportarlo y lo resolvemos sin vueltas." },
+              { icon: RefreshCw, text: "Si cambiamos algo importante, te avisamos con 15 días de anticipación." },
+            ].map(({ icon: Icon, text }) => (
+              <div key={text} className="flex items-start gap-2">
+                <Icon className="w-4 h-4 text-[#108910] mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-[#5C6068] leading-relaxed">{text}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 

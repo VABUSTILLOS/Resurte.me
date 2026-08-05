@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, Box, Calculator, MessageCircle } from "lucide-react"
+import { ArrowRight, Box, Calculator, MessageCircle, Clock, Star } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Cotizaciones por volumen — Resurte.me",
@@ -24,6 +24,19 @@ export default function CotizacionesPage() {
             dedicado que te arma la cotización a tu medida. Sin menú del día,
             sin precios fijos: tu volumen manda.
           </p>
+        </div>
+      </section>
+
+      {/* Guarantee strip */}
+      <section className="max-w-xl mx-auto px-4 pb-10">
+        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#108910]/20 rounded-[16px] p-5 flex items-center gap-4">
+          <div className="w-12 h-12 bg-[#108910] rounded-xl flex items-center justify-center flex-shrink-0">
+            <Clock className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-[#242529]">Cotización en menos de 2 horas, garantizado</p>
+            <p className="text-xs text-[#5C6068]">Si en 2 horas no tienes tu cotización, te mandamos un cupón de $200 para tu primer pedido. Así de seguros estamos.</p>
+          </div>
         </div>
       </section>
 

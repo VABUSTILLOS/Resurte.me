@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, Clock, CreditCard, ShieldCheck } from "lucide-react"
+import { ArrowRight, Clock, CreditCard, ShieldCheck, Star } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Línea de crédito para tu negocio — Resurte.me",
@@ -21,6 +21,22 @@ export default function CreditoPage() {
             Tu negocio no debería frenarse porque la caja está apretada.
             Activa tu línea de crédito en 24 horas y paga cuando te funcione.
           </p>
+        </div>
+      </section>
+
+      {/* Trust stats */}
+      <section className="max-w-3xl mx-auto px-4 pb-10">
+        <div className="bg-white border border-[#E5E7EB] rounded-[16px] p-6 grid grid-cols-3 gap-4 text-center">
+          {[
+            { value: "24h", label: "Respuesta máxima" },
+            { value: "85%", label: "Tasa de aprobación" },
+            { value: "Sin buró", label: "Sin consulta a buró de crédito" },
+          ].map(({ value, label }) => (
+            <div key={label}>
+              <p className="text-2xl font-extrabold text-[#108910]">{value}</p>
+              <p className="text-xs text-[#5C6068] mt-1">{label}</p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -77,7 +93,20 @@ export default function CreditoPage() {
           </div>
         </div>
 
-        <div className="text-center">
+        {/* FAQ about credit */}
+        <div className="max-w-3xl mx-auto mt-12 bg-[#FFF7ED] border border-[#F59E0B]/20 rounded-[16px] p-6">
+          <h3 className="font-semibold text-[#242529] mb-3 flex items-center gap-2">
+            <Star className="w-4 h-4 text-[#F59E0B]" />
+            Lo que siempre preguntan sobre el crédito
+          </h3>
+          <div className="space-y-3 text-sm text-[#5C6068]">
+            <p><strong className="text-[#242529]">¿Revisan buró de crédito?</strong> No. Evaluamos tu historial de compras dentro de Resurte.me, no tu score externo.</p>
+            <p><strong className="text-[#242529]">¿Necesito aval?</strong> Cero. Tu historial con nosotros es tu mejor aval.</p>
+            <p><strong className="text-[#242529]">¿Cuánto crédito me dan?</strong> Empiezas con una línea base que crece automáticamente conforme compras y pagas a tiempo.</p>
+          </div>
+        </div>
+
+        <div className="text-center mt-10">
           <Link
             href="/auth/register"
             className="inline-flex items-center gap-2 bg-[#108910] text-white font-semibold px-8 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"

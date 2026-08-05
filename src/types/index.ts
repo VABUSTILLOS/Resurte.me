@@ -33,6 +33,17 @@ export interface Category {
   description?: string
 }
 
+export interface RestaurantCollection {
+  id: number
+  name: string
+  slug: string
+  description: string | null
+  image_url: string | null
+  tags: string[]
+  display_order: number
+  is_active: boolean
+}
+
 export interface Product {
   id: number
   name: string
@@ -45,6 +56,7 @@ export interface Product {
   show_in_whatsapp: boolean
   whatsapp_product_id: string | null
   unit?: string
+  tags?: string[]
 }
 
 export interface ProductStore {

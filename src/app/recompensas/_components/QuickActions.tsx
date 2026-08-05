@@ -119,7 +119,7 @@ export function QuickActions({ onViewOrders, onBrowseStore }: QuickActionsProps)
   };
 
   return (
-    <div className="mx-4 mt-5 grid grid-cols-3 gap-2.5 md:mx-0 md:gap-3 lg:gap-4">
+    <div className="mx-4 mt-4 grid grid-cols-3 gap-2 md:mx-0 md:gap-3 lg:gap-4">
       {quickActions.map((action) => (
         <motion.button
           key={action.id}
@@ -127,8 +127,8 @@ export function QuickActions({ onViewOrders, onBrowseStore }: QuickActionsProps)
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 * quickActions.indexOf(action) + 0.3, duration: 0.4 }}
           onClick={handlers[action.id]}
-          className={`flex flex-col items-center gap-2 rounded-2xl bg-gradient-to-b ${action.accent} 
-            bg-opacity-15 p-3.5 backdrop-blur-sm transition-all active:scale-95 
+        className={`flex flex-col items-center gap-1.5 rounded-2xl bg-gradient-to-b ${action.accent} 
+          bg-opacity-15 p-3 backdrop-blur-sm transition-all active:scale-95 
             border border-white/10 hover:border-white/20`}
         >
           <div className="text-white">{action.icon}</div>

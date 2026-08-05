@@ -74,14 +74,12 @@ export default async function CityPage({ params }: Props) {
     .eq("product_stores.store_id", 1)
     .order("name")
 
-  const catalog = (
-    <CityLanding
-      citySlug={slug}
-      categories={categories ?? []}
-      products={products ?? []}
-      isLoggedIn={!!user}
-    />
-  )
+  // Fetch active restaurant collections
+  const { data: collections } = await supabase
+    .from("restaurant_collections")
+    .select("*")
+    .eq("is_active", true)
+    .order("display_order")
 
   return (
     <>
@@ -95,6 +93,7 @@ export default async function CityPage({ params }: Props) {
         citySlug={slug}
         categories={categories ?? []}
         products={products ?? []}
+        collections={collections ?? []}
         isLoggedIn={!!user}
       />
     </>

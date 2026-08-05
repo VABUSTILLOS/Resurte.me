@@ -57,9 +57,9 @@ const iconMap = {
 
 export function ActivityFeed() {
   return (
-    <div className="mx-4 mt-6 md:mx-0">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-white text-base font-bold">Actividad Reciente</h2>
+    <div className="mx-4 mt-4 md:mx-0">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-white text-[15px] font-bold">Actividad Reciente</h2>
         <button className="text-emerald-400 text-xs font-medium">Ver todo →</button>
       </div>
 
@@ -70,11 +70,11 @@ export function ActivityFeed() {
             initial={{ opacity: 0, x: -15 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.08 * i + 0.5, duration: 0.35 }}
-            className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/5 p-3"
+            className="flex items-center gap-2.5 rounded-xl bg-white/5 border border-white/5 p-2.5"
           >
             {/* Icon */}
             <div
-              className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+              className={`flex h-8 w-8 items-center justify-center rounded-lg ${
                 activity.status === "pending"
                   ? "bg-amber-500/15"
                   : activity.type === "milestone"
@@ -95,14 +95,14 @@ export function ActivityFeed() {
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-medium truncate">{activity.title}</p>
-              <p className="text-gray-500 text-xs">{activity.date}</p>
+              <p className="text-white text-[13px] font-medium truncate">{activity.title}</p>
+              <p className="text-gray-500 text-[10px]">{activity.date}</p>
             </div>
 
             {/* Amount */}
             {activity.amount !== 0 && (
               <span
-                className={`text-sm font-bold tabular-nums ${
+                className={`text-[13px] font-bold tabular-nums ${
                   activity.amount > 0 ? "text-emerald-400" : "text-red-400"
                 }`}
               >

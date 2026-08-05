@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { Shield, Lock, FileCheck } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Política de privacidad — Resurte.me",
@@ -17,6 +18,25 @@ export default function PrivacyPage() {
           <p className="text-[#5C6068]">
             Última actualización: enero 2026
           </p>
+        </div>
+      </section>
+
+      {/* Trust summary */}
+      <section className="max-w-3xl mx-auto px-4 pb-12">
+        <div className="grid sm:grid-cols-3 gap-4">
+          {[
+            { icon: Shield, title: "Datos protegidos", desc: "Cumplimos con la LFPDPPP. Tus datos se tratan con cifrado y acceso restringido." },
+            { icon: Lock, title: "Tú controlas", desc: "Derechos ARCO garantizados. Accede, rectifica o elimina tus datos cuando quieras." },
+            { icon: FileCheck, title: "Cero venta de datos", desc: "No vendemos, rentamos ni compartimos tu información con terceros para marketing." },
+          ].map(({ icon: Icon, title, desc }) => (
+            <div key={title} className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-[12px] p-5 text-center">
+              <div className="w-10 h-10 bg-[#E8F5E8] rounded-xl flex items-center justify-center mx-auto mb-3">
+                <Icon className="w-5 h-5 text-[#108910]" />
+              </div>
+              <h3 className="text-sm font-semibold text-[#242529] mb-1">{title}</h3>
+              <p className="text-xs text-[#5C6068] leading-relaxed">{desc}</p>
+            </div>
+          ))}
         </div>
       </section>
 
