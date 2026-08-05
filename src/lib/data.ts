@@ -299,24 +299,29 @@ export async function getProductsByCollection(
 
   const tags = (collection as { tags: string[] }).tags
 
-  // 2. Filtrar productos cuyos tags intersectan con los de la colección
-  //    Usamos el operador ?| de PostgreSQL: tags ?| array['taqueria','tacos']
+  // 2. Obtener todos los productos disponibles y filtrar por tags
+  //    en el lado del servidor (JSONB overlap vía PostgREST
+  //    tiene problemas de casteo de tipos).
   const { data } = await supabase
     .from("products")
     .select(`*, product_stores!inner(price, sale_price, stock_status)`)
     .eq("product_stores.store_id", storeId)
     .eq("product_stores.is_available", true)
-    .filter("tags", "ov", `{${tags.join(",")}}`) // ?| overlap operator via Supabase .filter()
     .order("name")
-
-  return (
-    (data as unknown as (Product & {
+  
+  const filteredProducts =
+    (data as (Product & {
       product_stores: { price: number; sale_price: number | null; stock_status: string }[]
-    })[])?.map((p) => ({
+      tags: string[]
+    })[])?.filter((p) => {
+      const productTags: string[] = Array.isArray(p.tags) ? p.tags : []
+      return productTags.some((t) => tags.includes(t))
+    }) ?? []
+
+  return filteredProducts.map((p) => ({
       ...p,
       price: p.product_stores[0]?.price ?? 0,
       sale_price: p.product_stores[0]?.sale_price ?? null,
       stock_status: p.product_stores[0]?.stock_status ?? "out_of_stock",
-    })) ?? []
-  )
+    }))
 }

@@ -18,23 +18,37 @@ import type { RestaurantCollection } from "@/types"
  */
 
 const COLLECTION_ICONS: Record<string, string> = {
-  taquerias: "🌮",
-  hamburgueserias: "🍔",
-  sushi: "🍣",
-  pizzeria: "🍕",
-  cafeteria: "☕",
-  marisquerias: "🦐",
-  fondas: "🍲",
+  "hamburguesas-hot-dogs": "🍔",
+  "taquerias-antojitos": "🌮",
+  "sushi-comida-asiatica": "🍣",
+  "pizzas-comida-italiana": "🍕",
+  "pollo-alitas": "🍗",
+  "comida-mexicana-corrida": "🍲",
+  "mariscos-pescados": "🦐",
+  "cortes-carne-asaderos": "🥩",
+  "cafeterias-crepas-desayunos": "☕",
+  "saludable-ensaladas-pokes": "🥗",
+  "postres-panaderia-helados": "🍰",
+  "comida-arabe-griega": "🥙",
+  "comida-venezolana-latina": "🇻🇪",
+  "bebidas-bares-botanas": "🍺",
 }
 
 const COLLECTION_TAGLINES: Record<string, string> = {
-  taquerias: "Tortillas, pastor y salsas por bulto",
-  hamburgueserias: "Carne molida y pan por caja",
-  sushi: "Arroz y pescado grado institucional",
-  pizzeria: "Harina, queso y pepperoni al mayoreo",
-  cafeteria: "Café en grano, leche y desechables",
-  marisquerias: "Mariscos frescos y congelados por kilo",
-  fondas: "Guisos, aceite y abarrotes por bidón",
+  "hamburguesas-hot-dogs": "Carne molida, pan y queso por caja",
+  "taquerias-antojitos": "Tortillas, pastor y salsas por bulto",
+  "sushi-comida-asiatica": "Arroz, salmón y soya grado institucional",
+  "pizzas-comida-italiana": "Harina, mozzarella y pepperoni al mayoreo",
+  "pollo-alitas": "Alitas, boneless y salsas por garrafa",
+  "comida-mexicana-corrida": "Guisos, aceite y abarrotes por bidón",
+  "mariscos-pescados": "Mariscos frescos y congelados por kilo",
+  "cortes-carne-asaderos": "Rib eye, picanha y carbón para parrilla",
+  "cafeterias-crepas-desayunos": "Café en grano, leche y desechables",
+  "saludable-ensaladas-pokes": "Lechugas, semillas y proteínas magras",
+  "postres-panaderia-helados": "Harina, chocolate y bases para helado",
+  "comida-arabe-griega": "Pan pita, tahini y especias concentradas",
+  "comida-venezolana-latina": "Harina PAN, plátano macho y queso costeño",
+  "bebidas-bares-botanas": "Cervezas, refrescos y botanas al mayoreo",
 }
 
 interface CollectionSliderProps {

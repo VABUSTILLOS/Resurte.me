@@ -1,18 +1,32 @@
-// --- Restaurant Collection Covers (Wikimedia Commons, B2B institutional tone) ---
-// Taquería — tacos al pastor on trompo
-export const COLLECTION_TAQUERIA = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Tacos_al_Pastor.jpg/640px-Tacos_al_Pastor.jpg"
-// Hamburguesería — classic burger
-export const COLLECTION_BURGER = "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/RedDot_Burger.jpg/640px-RedDot_Burger.jpg"
-// Sushi — sushi platter
-export const COLLECTION_SUSHI = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Sushi_platter.jpg/640px-Sushi_platter.jpg"
-// Pizzería — margherita pizza
-export const COLLECTION_PIZZA = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Eq_it-na_pizza-margherita_sep2005_sml.jpg/640px-Eq_it-na_pizza-margherita_sep2005_sml.jpg"
-// Cafetería — espresso cup
-export const COLLECTION_CAFE = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/A_small_cup_of_coffee.JPG/640px-A_small_cup_of_coffee.JPG"
-// Marisquería — seafood display
-export const COLLECTION_MARISCOS = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Seafood_display_at_Fish_market.jpg/640px-Seafood_display_at_Fish_market.jpg"
-// Fondas/Cocina Económica — Mexican stew
-export const COLLECTION_FONDA = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Mexican_stew.jpg/640px-Mexican_stew.jpg"
+// --- Restaurant Collection Covers (Wikimedia Commons direct URLs — NO /thumb/ pattern) ---
+// 1. Hamburguesas y Hot Dogs — burger & onion rings
+export const COLLECTION_BURGER = "https://upload.wikimedia.org/wikipedia/commons/e/ef/Hamburger_and_onion_rings.jpg"
+// 2. Taquerías y Antojitos — tacos platter
+export const COLLECTION_TAQUERIA = "https://upload.wikimedia.org/wikipedia/commons/7/73/001_Tacos_de_carnitas%2C_carne_asada_y_al_pastor.jpg"
+// 3. Sushi y Comida Asiática — sushi roll
+export const COLLECTION_SUSHI = "https://upload.wikimedia.org/wikipedia/commons/3/37/Sushi_roll.jpg"
+// 4. Pizzas y Comida Italiana — pizza margherita
+export const COLLECTION_PIZZA = "https://upload.wikimedia.org/wikipedia/commons/a/a3/Eq_it-na_pizza-margherita_sep2005_sml.jpg"
+// 5. Pollo y Alitas — chicken wings
+export const COLLECTION_POLLO = "https://upload.wikimedia.org/wikipedia/commons/6/69/Home-Made-Fried-Chicken-Wings-2008.jpg"
+// 6. Comida Mexicana — chileajo (oaxacan stew)
+export const COLLECTION_FONDA = "https://upload.wikimedia.org/wikipedia/commons/c/c2/Chileajo.jpg"
+// 7. Mariscos y Pescados — seafood platter
+export const COLLECTION_MARISCOS = "https://upload.wikimedia.org/wikipedia/commons/8/8a/Seafood_and_fish_dish.jpg"
+// 8. Cortes de Carne y Asaderos — steak dinner
+export const COLLECTION_CORTES = "https://upload.wikimedia.org/wikipedia/commons/6/69/Steak_dinner.jpg"
+// 9. Cafeterías y Desayunos — coffee cup
+export const COLLECTION_CAFE = "https://upload.wikimedia.org/wikipedia/commons/7/76/Coffee_cup.jpg"
+// 10. Saludable y Pokés — salad bowl
+export const COLLECTION_SALUDABLE = "https://upload.wikimedia.org/wikipedia/commons/8/89/Food-salad-healthy-vegetables-1_%2823959011279%29.jpg"
+// 11. Postres y Panadería — dessert spread
+export const COLLECTION_POSTRES = "https://upload.wikimedia.org/wikipedia/commons/2/2a/Dessert-_coffee_jelly%2C_ginger_ice_cream_and_banana%2C_matcha_cake%2C_mochi_and_fruit.jpg"
+// 12. Comida Árabe y Griega — shawarma
+export const COLLECTION_ARABE = "https://upload.wikimedia.org/wikipedia/commons/f/f9/Shawarma.jpg"
+// 13. Comida Venezolana y Latina — arepa
+export const COLLECTION_LATINA = "https://upload.wikimedia.org/wikipedia/commons/0/05/Arepa.jpg"
+// 14. Bebidas y Bares — beer glass
+export const COLLECTION_BEBIDAS = "https://upload.wikimedia.org/wikipedia/commons/9/95/Beer_glass.jpg"
 
 // Product images: resurte.me store images (GCS) for products sold in the store,
 // Alsuper local images for generic fresh produce / packaged goods.

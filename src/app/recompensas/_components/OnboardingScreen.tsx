@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
@@ -16,6 +17,7 @@ import type { Tier } from "./types";
 import { SERVICES } from "./StoreScreen";
 interface OnboardingScreenProps {
   onComplete: () => void;
+  isAuthenticated: boolean;
 }
 
 const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "negro"];
@@ -51,7 +53,8 @@ const steps = [
   },
 ];
 
-export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
+export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScreenProps) {
+  const router = useRouter();
   const [step, setStep] = useState(0);
   const [monthlySpend, setMonthlySpend] = useState(20000);
 
@@ -479,31 +482,53 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
 
         {/* Bottom CTA */}
         <div className="mt-6 space-y-3">
-          <button
-            onClick={handleNext}
-            className="w-full rounded-2xl bg-emerald-600 py-4 text-base font-bold text-white 
-              shadow-lg shadow-emerald-900/40 transition-all active:scale-[0.98] hover:bg-emerald-500
-              flex items-center justify-center gap-2"
-          >
-            {isLast ? (
-              <>
+          {isLast && !isAuthenticated ? (
+            <>
+              <button
+                onClick={() => router.push("/auth/register")}
+                className="w-full rounded-2xl bg-emerald-600 py-4 text-base font-bold text-white 
+                  shadow-lg shadow-emerald-900/40 transition-all active:scale-[0.98] hover:bg-emerald-500
+                  flex items-center justify-center gap-2"
+              >
                 <Sparkles className="h-5 w-5" />
-                Comenzar a crecer
-              </>
-            ) : (
-              <>
-                Continuar
-                <ArrowRight className="h-5 w-5" />
-              </>
-            )}
-          </button>
-          {step > 0 && (
-            <button
-              onClick={() => setStep((s) => s - 1)}
-              className="w-full text-gray-500 text-sm py-2 hover:text-gray-400 transition-colors"
-            >
-              Volver
-            </button>
+                Crear cuenta gratis
+              </button>
+              <button
+                onClick={() => router.push("/auth/login")}
+                className="w-full text-gray-400 text-sm py-2 hover:text-white transition-colors"
+              >
+                Ya tengo cuenta — Iniciar sesión
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={handleNext}
+                className="w-full rounded-2xl bg-emerald-600 py-4 text-base font-bold text-white 
+                  shadow-lg shadow-emerald-900/40 transition-all active:scale-[0.98] hover:bg-emerald-500
+                  flex items-center justify-center gap-2"
+              >
+                {isLast ? (
+                  <>
+                    <Sparkles className="h-5 w-5" />
+                    Comenzar a crecer
+                  </>
+                ) : (
+                  <>
+                    Continuar
+                    <ArrowRight className="h-5 w-5" />
+                  </>
+                )}
+              </button>
+              {step > 0 && (
+                <button
+                  onClick={() => setStep((s) => s - 1)}
+                  className="w-full text-gray-500 text-sm py-2 hover:text-gray-400 transition-colors"
+                >
+                  Volver
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

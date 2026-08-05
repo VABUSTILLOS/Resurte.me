@@ -1,6 +1,5 @@
 import { CityLanding } from "@/components/city/city-landing"
 import { createClient } from "@/lib/supabase/server"
-import { unstable_cache } from "next/cache"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -12,23 +11,17 @@ export const metadata: Metadata = {
   },
 }
 
-const getCategories = unstable_cache(
-  async () => {
-    const supabase = await createClient()
-    const { data } = await supabase
+export default async function Home() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const [categories, products] = await Promise.all([
+    supabase
       .from("categories")
       .select("id, name, slug, icon, parent_id")
       .order("id")
-    return data ?? []
-  },
-  ["home-categories"],
-  { revalidate: 3600, tags: ["categories"] }
-)
-
-const getProducts = unstable_cache(
-  async () => {
-    const supabase = await createClient()
-    const { data } = await supabase
+      .then(({ data }) => data ?? []),
+    supabase
       .from("products")
       .select(`
         id, name, slug, description, image_url, images, brand, category_id, unit,
@@ -37,19 +30,7 @@ const getProducts = unstable_cache(
       `)
       .eq("product_stores.store_id", 1)
       .order("name")
-    return data ?? []
-  },
-  ["home-products"],
-  { revalidate: 3600, tags: ["products"] }
-)
-
-export default async function Home() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const [categories, products] = await Promise.all([
-    getCategories(),
-    getProducts(),
+      .then(({ data }) => data ?? []),
   ])
 
   return (

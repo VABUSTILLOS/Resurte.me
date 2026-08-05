@@ -458,117 +458,70 @@ BEGIN
 END $$;
 
 -- ============================================================
--- COLECCIONES DE RESTAURANTE
+-- COLECCIONES DE RESTAURANTE (14 giros)
 -- ============================================================
 INSERT INTO restaurant_collections (name, slug, description, image_url, tags, display_order) VALUES
-  ('Taquerías', 'taquerias',
-   'Insumos esenciales para taquerías y restaurantes mexicanos. Carnes, tortillas, salsas y desechables por mayoreo.',
-   'https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Tacos_al_Pastor.jpg/640px-Tacos_al_Pastor.jpg',
-   '["taqueria", "tacos", "mexicana", "carnes", "tortillas"]', 1),
-  ('Hamburgueserías', 'hamburgueserias',
-   'Carne molida, pan, queso y complementos para hamburgueserías. Formatos institucionales con facturación.',
-   'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/RedDot_Burger.jpg/640px-RedDot_Burger.jpg',
-   '["hamburgueseria", "burger", "carnes", "pan", "lacteos"]', 2),
-  ('Sushi', 'sushi',
-   'Arroz para sushi, salmón, camarón y complementos para cocina japonesa profesional.',
-   'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Sushi_platter.jpg/640px-Sushi_platter.jpg',
-   '["sushi", "japonesa", "pescados", "mariscos", "arroz"]', 3),
-  ('Pizzerías', 'pizzeria',
-   'Harina de fuerza, queso mozzarella, pepperoni y salsas para pizzería. Todo en formato de mayoreo.',
-   'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Eq_it-na_pizza-margherita_sep2005_sml.jpg/640px-Eq_it-na_pizza-margherita_sep2005_sml.jpg',
-   '["pizzeria", "italiana", "lacteos", "harinas", "carnes"]', 4),
-  ('Cafeterías', 'cafeteria',
-   'Café en grano, leche, desechables y repostería para cafeterías y coffee shops.',
-   'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/A_small_cup_of_coffee.JPG/640px-A_small_cup_of_coffee.JPG',
-   '["cafeteria", "cafe", "lacteos", "panaderia", "desechables"]', 5),
-  ('Marisquerías', 'marisquerias',
-   'Mariscos frescos, congelados, botanas y salsas para marisquerías. Precios de central de abastos.',
-   'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Seafood_display_at_Fish_market.jpg/640px-Seafood_display_at_Fish_market.jpg',
-   '["marisqueria", "mariscos", "pescados", "botanas", "salsas"]', 6),
-  ('Fondas y Cocinas Económicas', 'fondas',
-   'Aceite por bidón, abarrotes básicos, frutas y verduras de temporada para fondas. El surtido completo para tu cocina.',
-   'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Mexican_stew.jpg/640px-Mexican_stew.jpg',
-   '["fonda", "cocina-economica", "abarrotes", "frutas-verduras", "aceite"]', 7);
+  ('Hamburguesas y Hot Dogs', 'hamburguesas-hot-dogs',
+   'Carne molida sirloin/chuck, pan brioche, queso cheddar, papas congeladas, tocino y aderezos. Proveeduría completa para burger joints y hot dog stands.',
+   'https://upload.wikimedia.org/wikipedia/commons/e/ef/Hamburger_and_onion_rings.jpg',
+   '["hamburgueseria","burger","hotdog"]', 1),
+  ('Taquerías y Antojitos', 'taquerias-antojitos',
+   'Cortes para asada, pastor y suadero, tortillas, cebolla, cilantro, chiles frescos y queso asadero. Todo para taquerías y puestos de antojitos.',
+   'https://upload.wikimedia.org/wikipedia/commons/7/73/001_Tacos_de_carnitas%2C_carne_asada_y_al_pastor.jpg',
+   '["taqueria","tacos","mexicana","antojitos"]', 2),
+  ('Sushi y Comida Asiática', 'sushi-comida-asiatica',
+   'Arroz grano corto, alga nori, salmón, atún, queso crema, panko, sriracha y salsa de soya.',
+   'https://upload.wikimedia.org/wikipedia/commons/3/37/Sushi_roll.jpg',
+   '["sushi","japonesa","asiatica"]', 3),
+  ('Pizzas y Comida Italiana', 'pizzas-comida-italiana',
+   'Harina de fuerza, mozzarella, pepperoni, puré de tomate enlatado y cajas de cartón.',
+   'https://upload.wikimedia.org/wikipedia/commons/a/a3/Eq_it-na_pizza-margherita_sep2005_sml.jpg',
+   '["pizzeria","italiana","pasta"]', 4),
+  ('Pollo y Alitas', 'pollo-alitas',
+   'Alitas, boneless, pollo entero, salsas en garrafa (Buffalo, BBQ) y aceite por bidón.',
+   'https://upload.wikimedia.org/wikipedia/commons/6/69/Home-Made-Fried-Chicken-Wings-2008.jpg',
+   '["pollo","alitas","boneless","fritura"]', 5),
+  ('Comida Mexicana y Comida Corrida', 'comida-mexicana-corrida',
+   'Guisados, arroz, frijol, carnes de cerdo/res, desechables térmicos KRAFT.',
+   'https://upload.wikimedia.org/wikipedia/commons/c/c2/Chileajo.jpg',
+   '["fonda","cocina-economica","mexicana","guisados"]', 6),
+  ('Mariscos y Pescados', 'mariscos-pescados',
+   'Camarón, pulpo, filete de pescado, tostadas, aguacate, salsas y limones.',
+   'https://upload.wikimedia.org/wikipedia/commons/8/8a/Seafood_and_fish_dish.jpg',
+   '["marisqueria","mariscos","pescados"]', 7),
+  ('Cortes de Carne y Asaderos', 'cortes-carne-asaderos',
+   'Rib eye, New York, picanha, arrachera, carbón, tortillas de harina y queso para fundir.',
+   'https://upload.wikimedia.org/wikipedia/commons/6/69/Steak_dinner.jpg',
+   '["cortes","asador","parrilla","carne-res"]', 8),
+  ('Cafeterías, Crepas y Desayunos', 'cafeterias-crepas-desayunos',
+   'Café en grano, leches enteras/vegetales, jarabes, huevo, hot cakes y vasos térmicos.',
+   'https://upload.wikimedia.org/wikipedia/commons/7/76/Coffee_cup.jpg',
+   '["cafeteria","cafe","desayunos","crepas"]', 9),
+  ('Saludable, Ensaladas y Pokés', 'saludable-ensaladas-pokes',
+   'Lechugas gourmet, kale, semillas, proteínas magras, aderezos y contenedores PET.',
+   'https://upload.wikimedia.org/wikipedia/commons/8/89/Food-salad-healthy-vegetables-1_%2823959011279%29.jpg',
+   '["saludable","ensaladas","poke","organico"]', 10),
+  ('Postres, Panadería y Helados', 'postres-panaderia-helados',
+   'Harina preparada, mantequilla, chispas de chocolate, fruta congelada y bases para helado.',
+   'https://upload.wikimedia.org/wikipedia/commons/2/2a/Dessert-_coffee_jelly%2C_ginger_ice_cream_and_banana%2C_matcha_cake%2C_mochi_and_fruit.jpg',
+   '["postres","panaderia","helados","reposteria"]', 11),
+  ('Comida Árabe y Griega', 'comida-arabe-griega',
+   'Carne para trompo, pan pita, jocoque, tahini y especias concentradas.',
+   'https://upload.wikimedia.org/wikipedia/commons/f/f9/Shawarma.jpg',
+   '["arabe","griega","trompo","kebab"]', 12),
+  ('Comida Venezolana y Latina', 'comida-venezolana-latina',
+   'Harina PAN, plátano macho, queso costeño/paisa, yuca y papelón.',
+   'https://upload.wikimedia.org/wikipedia/commons/0/05/Arepa.jpg',
+   '["venezolana","colombiana","latina","arepas"]', 13),
+  ('Bebidas, Bares y Botanas', 'bebidas-bares-botanas',
+   'Cervezas, refrescos, mezcladores, desechables para micheladas, botanas y frituras.',
+   'https://upload.wikimedia.org/wikipedia/commons/9/95/Beer_glass.jpg',
+   '["bebidas","bar","botanas","licor"]', 14);
 
 -- ============================================================
--- TAGS EN PRODUCTOS EXISTENTES (agrupación referencial sin duplicar)
+-- TAGS: Los productos ya se taggearon vía script Node.js.
+-- Las 14 colecciones filtran por intersección de tags
+-- (product.tags ∩ collection.tags) en el servidor.
 -- ============================================================
-
--- Taquerías: carnes, tortillas, salsas, desechables
-UPDATE products SET tags = tags || '["taqueria", "mexicana"]'::jsonb
-  WHERE slug IN (
-    'milanesa-de-res', 'chuleta-de-cerdo', 'lomo-de-cerdo', 'costilla-de-cerdo',
-    'diezmillo-de-res', 'arrachera', 'carne-molida-80-20',
-    'pechuga-de-pollo', 'pierna-y-muslo-de-pollo',
-    'tortillas-de-maiz', 'tortillas-de-harina',
-    'salsa-maggi-200ml', 'catsup-1kg', 'aceite-de-canola-5l', 'aceite-de-maiz-1l',
-    'cebolla-blanca', 'cilantro', 'jitomate-saladet',
-    'servilletas-100pz', 'frijol-negro-5kg'
-  );
-
--- Hamburgueserías: carne molida, pan, quesos
-UPDATE products SET tags = tags || '["hamburgueseria", "burger"]'::jsonb
-  WHERE slug IN (
-    'carne-molida-80-20', 'pan-para-hamburguesa', 'queso-manchego-400g',
-    'tocino', 'pechuga-de-pollo',
-    'catsup-1kg', 'mayonesa-1kg', 'aceite-de-canola-5l',
-    'cebolla-blanca', 'jitomate-saladet', 'lechuga-romana',
-    'servilletas-100pz', 'papel-de-cocina-2pz'
-  );
-
--- Sushi: arroz, pescados, camarón
-UPDATE products SET tags = tags || '["sushi", "japonesa"]'::jsonb
-  WHERE slug IN (
-    'arroz-blanco-5kg', 'filete-de-tilapia', 'filete-de-basa',
-    'salmon', 'camaron-pacotilla', 'camaron-u12-u15',
-    'arroz-blanco-1kg', 'aceite-de-canola-1l',
-    'salsa-maggi-200ml', 'vinagre-blanco-1l'
-  );
-
--- Pizzerías: harina, queso, pepperoni
-UPDATE products SET tags = tags || '["pizzeria", "italiana"]'::jsonb
-  WHERE slug IN (
-    'harina-de-trigo-1kg', 'queso-manchego-400g', 'queso-oaxaca-400g',
-    'queso-fresco-500g', 'aceite-de-canola-5l',
-    'catsup-1kg', 'jitomate-saladet', 'oregano-molido-100g',
-    'servilletas-100pz', 'papel-de-cocina-2pz'
-  );
-
--- Cafeterías: café, leche, panadería, desechables
-UPDATE products SET tags = tags || '["cafeteria", "cafe"]'::jsonb
-  WHERE slug IN (
-    'leche-descremada-1l', 'leche-evaporada-360ml', 'media-crema-240ml',
-    'leche-condensada-370ml', 'yogurt-natural-1l',
-    'pan-para-hot-dog', 'pan-para-hamburguesa',
-    'servilletas-100pz', 'papel-de-cocina-2pz',
-    'galletas-marias-200g', 'galletas-saladas-200g', 'agua-bonafont-1-5l'
-  );
-
--- Marisquerías: pescados, mariscos, botanas, salsas
-UPDATE products SET tags = tags || '["marisqueria", "mariscos"]'::jsonb
-  WHERE slug IN (
-    'filete-de-tilapia', 'filete-de-basa', 'camaron-pacotilla', 'camaron-u12-u15',
-    'pulpo', 'mojarra-entera', 'huachinango-entero', 'camaron-seco',
-    'salmon', 'camaron-congelado-1kg', 'filete-de-tilapia-congelado-1kg',
-    'sabritas-clasicas-170g', 'cacahuate-salado-200g',
-    'salsa-maggi-200ml', 'catsup-1kg', 'aceite-de-canola-5l',
-    'jitomate-saladet', 'cebolla-blanca', 'cilantro',
-    'agua-mineral-1-5l', 'agua-mineral-saborizada-1-5l'
-  );
-
--- Fondas: abarrotes, aceite, frutas, verduras básicas
-UPDATE products SET tags = tags || '["fonda", "cocina-economica"]'::jsonb
-  WHERE slug IN (
-    'aceite-de-canola-5l', 'aceite-de-maiz-1l', 'aceite-de-canola-1l',
-    'arroz-blanco-5kg', 'frijol-negro-5kg', 'frijol-bayo-1kg',
-    'lenteja-1kg', 'harina-de-trigo-1kg', 'pasta-spaghetti-500g',
-    'sal-de-mar-fina-1kg', 'sal-gruesa-1kg',
-    'consome-de-pollo-1kg', 'salsa-maggi-200ml',
-    'jitomate-saladet', 'cebolla-blanca', 'papa-blanca', 'zanahoria',
-    'cilantro', 'lechuga-romana', 'brocoli',
-    'huevo-blanco-18pz', 'huevo-rojo-18pz',
-    'pechuga-de-pollo', 'carne-molida-80-20', 'chuleta-de-cerdo',
-    'tortillas-de-maiz', 'tortillas-de-harina',
-    'servilletas-100pz', 'papel-de-cocina-2pz',
-    'detergente-liquido-1l', 'limpiador-multiusos-500ml'
-  );
+-- FIN COLECCIONES
+-- ============================================================

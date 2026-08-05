@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
 import { BottomTabBar } from "./_components/BottomTabBar";
 import { DashboardScreen } from "./_components/DashboardScreen";
 import { StoreScreen } from "./_components/StoreScreen";
@@ -13,16 +14,44 @@ import { OnboardingScreen } from "./_components/OnboardingScreen";
 import type { Tab, ServiceItem } from "./_components/types";
 
 export default function CashbackPage() {
+  const supabase = createClient();
+
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [showCalculator, setShowCalculator] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    if (typeof window === "undefined") return false
-    return !localStorage.getItem("cashback-onboarded")
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Check auth state on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const authed = !!session;
+      setIsAuthenticated(authed);
+      if (authed) {
+        // Only show onboarding if user hasn't completed it before
+        const onboarded = localStorage.getItem("cashback-onboarded");
+        if (!onboarded) setShowOnboarding(true);
+      } else {
+        // Always show onboarding for unauthenticated users
+        setShowOnboarding(true);
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const authed = !!session;
+      setIsAuthenticated(authed);
+      if (authed) {
+        const onboarded = localStorage.getItem("cashback-onboarded");
+        if (!onboarded) setShowOnboarding(true);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const balance = 12450;
 
@@ -55,6 +84,15 @@ export default function CashbackPage() {
     localStorage.setItem("cashback-onboarded", "true");
   }, []);
 
+  // Show nothing while checking auth state
+  if (isAuthenticated === null) {
+    return (
+      <div className="relative mx-auto flex min-h-screen max-w-md items-center justify-center bg-gray-950">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+      </div>
+    );
+  }
+
   const isFullScreen = showCalculator || showCheckout || showScanner || showOnboarding;
   const showShell = !isFullScreen;
 
@@ -72,7 +110,7 @@ export default function CashbackPage() {
         {/* Full Screen Views */}
         <AnimatePresence mode="wait">
           {showOnboarding ? (
-            <OnboardingScreen key="onboarding" onComplete={handleOnboardingComplete} />
+            <OnboardingScreen key="onboarding" onComplete={handleOnboardingComplete} isAuthenticated={!!isAuthenticated} />
           ) : showScanner ? (
             <InvoiceScannerScreen
               key="scanner"
