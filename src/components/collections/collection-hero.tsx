@@ -27,7 +27,7 @@ export function CollectionHero({
   cityName,
 }: CollectionHeroProps) {
   return (
-    <section className="relative min-h-[70vh] sm:min-h-[80vh] flex items-end overflow-hidden">
+    <section className="relative min-h-[60vh] sm:min-h-[80vh] flex items-end overflow-hidden">
       {/* Background image */}
       {imageUrl ? (
         <Image
@@ -67,16 +67,16 @@ export function CollectionHero({
         </nav>
 
         {/* Collection name — large, commanding */}
-        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white tracking-tight leading-[0.95] mb-6 max-w-4xl animate-fade-up">
+        <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white tracking-tight leading-[0.95] mb-4 sm:mb-6 max-w-4xl animate-fade-up">
           {collectionName}
         </h1>
 
         {/* Icon + tagline — editorial pull-quote feel */}
-        <div className="flex items-start gap-4 sm:gap-5 animate-fade-up">
-          <span className="text-3xl sm:text-4xl shrink-0 mt-1 opacity-80">
+        <div className="flex items-start gap-3 sm:gap-5 animate-fade-up">
+          <span className="text-2xl sm:text-4xl shrink-0 mt-0.5 sm:mt-1 opacity-80">
             {icon}
           </span>
-          <p className="text-lg sm:text-xl md:text-2xl text-white/60 font-light leading-relaxed max-w-xl italic tracking-[0.01em]">
+          <p className="text-sm sm:text-xl md:text-2xl text-white/60 font-light leading-relaxed max-w-xl italic tracking-[0.01em]">
             {tagline}
           </p>
         </div>

@@ -1,29 +1,179 @@
 'use client'
 
-import { useRef, useState } from "react"
-import { ChevronLeft, ChevronRight, Clock, Users } from "lucide-react"
+import { useRef, useState, useCallback } from "react"
+import { ChevronLeft, ChevronRight, Clock, Users, Plus, Search, ShoppingCart } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
+import { useCart } from "@/contexts/cart-context"
 import type { CollectionRecipe } from "@/types"
+import type { Product } from "@/types"
 
-interface RecipeSliderProps {
-  recipes: CollectionRecipe[]
+// ── Fuzzy ingredient → product matcher ──────────────────────
+interface MatchedProduct {
+  id: number
+  name: string
+  slug: string
+  image_url: string
+  price: number
+  sale_price: number | null
+  unit?: string
+  brand: string
+  stock_status: string
 }
 
-export default function RecipeSlider({ recipes }: RecipeSliderProps) {
+function matchIngredient(
+  ingredient: string,
+  products: (Product & { price: number; sale_price: number | null; stock_status: string })[]
+): MatchedProduct | null {
+  const ing = ingredient.toLowerCase().trim()
+  // Exact match
+  let match = products.find((p) => p.name.toLowerCase() === ing)
+  if (!match) {
+    // Partial match — ingredient word appears in product name
+    match = products.find((p) => p.name.toLowerCase().includes(ing) || ing.includes(p.name.toLowerCase()))
+  }
+  if (!match) return null
+  return {
+    id: match.id,
+    name: match.name,
+    slug: match.slug,
+    image_url: match.image_url,
+    price: match.price,
+    sale_price: match.sale_price,
+    unit: match.unit,
+    brand: match.brand,
+    stock_status: match.stock_status,
+  }
+}
+
+// ── Ingredient badge + popover ──────────────────────────────────
+function RecipeIngredient({
+  name,
+  products,
+  citySlug,
+}: {
+  name: string
+  products: (Product & { price: number; sale_price: number | null; stock_status: string })[]
+  citySlug: string
+}) {
+  const [open, setOpen] = useState(false)
+  const { addItem, cart } = useCart()
+  const matched = matchIngredient(name, products)
+
+  // Close on outside click
+  const handleAddToCart = useCallback(() => {
+    if (!matched) return
+    const existing = cart.items.find((i) => i.product_id === matched.id)
+    addItem({
+      product_id: matched.id,
+      store_id: 1,
+      store_name: "Resurte.me",
+      store_slug: "resurte",
+      name: matched.name,
+      slug: matched.slug,
+      image_url: matched.image_url,
+      brand: matched.brand,
+      price: matched.sale_price ?? matched.price,
+      sale_price: matched.sale_price,
+      quantity: 1,
+      stock_status: matched.stock_status as "in_stock" | "low_stock" | "out_of_stock",
+    })
+    setOpen(false)
+  }, [matched, addItem, cart.items])
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => matched && setOpen(!open)}
+        className={`inline-block px-2.5 py-1 text-xs rounded-full font-medium border transition-all duration-150 ${
+          matched
+            ? "bg-[#108910]/5 text-[#108910] border-[#108910]/20 hover:bg-[#108910]/10 hover:border-[#108910]/30 cursor-pointer active:scale-95"
+            : "bg-amber-50 text-amber-800 border-amber-100 cursor-default"
+        }`}
+      >
+        {name}
+        {matched && <Plus className="inline-block w-3 h-3 ml-1 -mt-px" />}
+      </button>
+
+      {/* Popover */}
+      {open && matched && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute bottom-full left-0 mb-2 z-50 w-64 bg-white rounded-xl border border-[#ede8df] shadow-[0_16px_48px_rgba(0,0,0,0.12)] overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+            {/* Product image + info */}
+            <div className="flex gap-3 p-3">
+              <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-[#f7f4ef] shrink-0">
+                <Image
+                  src={matched.image_url}
+                  alt={matched.name}
+                  fill
+                  sizes="56px"
+                  className="object-cover"
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-[#1a1a1a] leading-tight truncate">
+                  {matched.name}
+                </p>
+                <p className="text-xs text-[#999893] mt-0.5">{matched.unit || matched.brand}</p>
+                <p className="text-sm font-bold text-[#108910] mt-1">
+                  ${(matched.sale_price ?? matched.price).toFixed(2)}
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex border-t border-[#ede8df]">
+              <button
+                onClick={handleAddToCart}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold text-white bg-[#108910] hover:bg-[#0D720D] transition-colors"
+              >
+                <ShoppingCart className="w-3.5 h-3.5" />
+                Agregar al carrito
+              </button>
+              <Link
+                href={`/${citySlug}/producto/${matched.slug}`}
+                className="flex items-center justify-center px-3 py-2.5 bg-[#f7f4ef] hover:bg-[#ede8df] transition-colors"
+              >
+                <Search className="w-3.5 h-3.5 text-[#6b6b6b]" />
+              </Link>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Recipe Slider ─────────────────────────────────────────────
+interface RecipeSliderProps {
+  recipes: CollectionRecipe[]
+  products: (Product & { price: number; sale_price: number | null; stock_status: string })[]
+  citySlug: string
+}
+
+export default function RecipeSlider({ recipes, products, citySlug }: RecipeSliderProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
+  const [activeIndex, setActiveIndex] = useState(0)
 
   const handleScroll = () => {
     if (!scrollRef.current) return
     const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current
     setCanScrollLeft(scrollLeft > 10)
     setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 10)
+
+    // Track active slide
+    const idx = Math.round(scrollLeft / clientWidth)
+    setActiveIndex(idx)
   }
 
   const scroll = (direction: "left" | "right") => {
     if (!scrollRef.current) return
-    const amount = scrollRef.current.clientWidth * 0.7
+    const cardWidth = scrollRef.current.querySelector("article")?.offsetWidth ?? 300
+    const gap = 20
+    const amount = (cardWidth + gap) * 1.5
     scrollRef.current.scrollBy({
       left: direction === "left" ? -amount : amount,
       behavior: "smooth",
@@ -33,114 +183,118 @@ export default function RecipeSlider({ recipes }: RecipeSliderProps) {
   if (!recipes.length) return null
 
   return (
-    <section className="relative group">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <section className="relative">
+      {/* Header — premium editorial */}
+      <div className="flex items-end justify-between mb-6">
         <div>
-          <p className="text-sm font-medium uppercase tracking-wider text-stone-500">Recetario</p>
-          <h2 className="text-2xl font-bold text-stone-800 mt-1">Inspiración para tu cocina</h2>
+          <span className="inline-block text-[11px] font-semibold tracking-[0.25em] uppercase text-[#108910]/70 mb-2">
+            Recetario
+          </span>
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#1a1a1a] tracking-tight leading-[1.12]">
+            Inspiración para tu cocina
+          </h2>
         </div>
-        <div className="flex gap-2">
+
+        {/* Desktop nav arrows */}
+        <div className="hidden sm:flex gap-1.5">
           <button
             onClick={() => scroll("left")}
             disabled={!canScrollLeft}
             className={`p-2.5 rounded-full border transition-all duration-200 ${
               canScrollLeft
-                ? "border-stone-300 bg-white text-stone-700 hover:bg-stone-50 hover:border-stone-400 shadow-sm"
-                : "border-stone-200 bg-stone-50 text-stone-300 cursor-not-allowed"
+                ? "border-[#ede8df] bg-white text-[#1a1a1a] hover:bg-[#f7f4ef] hover:border-[#108910]/20 shadow-sm"
+                : "border-[#ede8df] bg-[#faf8f5] text-[#ccc] cursor-not-allowed"
             }`}
             aria-label="Recetas anteriores"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             onClick={() => scroll("right")}
             disabled={!canScrollRight}
             className={`p-2.5 rounded-full border transition-all duration-200 ${
               canScrollRight
-                ? "border-stone-300 bg-white text-stone-700 hover:bg-stone-50 hover:border-stone-400 shadow-sm"
-                : "border-stone-200 bg-stone-50 text-stone-300 cursor-not-allowed"
+                ? "border-[#ede8df] bg-white text-[#1a1a1a] hover:bg-[#f7f4ef] hover:border-[#108910]/20 shadow-sm"
+                : "border-[#ede8df] bg-[#faf8f5] text-[#ccc] cursor-not-allowed"
             }`}
             aria-label="Recetas siguientes"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Slider */}
+      {/* Slider — touch-friendly, snap scrolling */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex gap-5 overflow-x-auto scroll-smooth pb-4 -mx-px px-px scrollbar-hide snap-x snap-mandatory"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="flex gap-4 sm:gap-5 overflow-x-auto scroll-smooth pb-6 -mx-1 px-1 scrollbar-hide snap-x snap-mandatory"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
       >
         {recipes.map((recipe, i) => (
           <article
             key={i}
-            className="flex-shrink-0 w-[300px] sm:w-[340px] snap-start group/card"
+            className="flex-shrink-0 w-[280px] sm:w-[340px] snap-start"
           >
-            <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm hover:shadow-md hover:border-stone-300 transition-all duration-300 h-full flex flex-col">
+            <div className="bg-white rounded-2xl border border-[#ede8df] overflow-hidden shadow-sm hover:shadow-md hover:border-[#ede8df]/80 transition-all duration-300 h-full flex flex-col">
               {/* Image */}
-              <div className="relative h-48 bg-stone-100 overflow-hidden">
+              <div className="relative h-44 sm:h-52 bg-[#f7f4ef] overflow-hidden">
                 {recipe.image_url ? (
                   <Image
                     src={recipe.image_url}
                     alt={recipe.name}
                     fill
-                    sizes="340px"
-                    className="object-cover group-hover/card:scale-105 transition-transform duration-500"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none"
-                    }}
+                    sizes="(max-width: 640px) 280px, 340px"
+                    className="object-cover transition-transform duration-700 hover:scale-105"
+                    quality={85}
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100">
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#f7f4ef] via-[#ede8df] to-[#f0ede5]">
                     <span className="text-4xl">🍳</span>
                   </div>
                 )}
-                {/* Overlay gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-              </div>
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
 
-              {/* Content */}
-              <div className="p-5 flex flex-col flex-1">
-                <h3 className="font-bold text-stone-800 text-lg mb-2 leading-tight">
-                  {recipe.name}
-                </h3>
-                <p className="text-sm text-stone-500 leading-relaxed mb-4 line-clamp-2 flex-1">
-                  {recipe.description}
-                </p>
-
-                {/* Meta badges */}
-                <div className="flex gap-4 text-xs text-stone-400 mb-4">
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" />
+                {/* Meta badges on image */}
+                <div className="absolute bottom-3 left-3 flex gap-3 text-[11px] font-medium text-white/90">
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
                     {recipe.prep_time}
                   </span>
-                  <span className="flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5" />
+                  <span className="flex items-center gap-1">
+                    <Users className="w-3 h-3" />
                     {recipe.servings}
                   </span>
                 </div>
+              </div>
 
-                {/* Ingredient tags */}
-                <div className="border-t border-stone-100 pt-3">
-                  <p className="text-xs font-medium text-stone-400 uppercase tracking-wide mb-2">
+              {/* Content */}
+              <div className="p-4 sm:p-5 flex flex-col flex-1">
+                <h3 className="font-bold text-[#1a1a1a] text-base sm:text-lg mb-1.5 leading-tight">
+                  {recipe.name}
+                </h3>
+                <p className="text-sm text-[#6b6b6b] leading-relaxed mb-4 line-clamp-2 flex-1">
+                  {recipe.description}
+                </p>
+
+                {/* Tappable ingredients */}
+                <div className="border-t border-[#f7f4ef] pt-3">
+                  <p className="text-[10px] font-semibold text-[#999893] uppercase tracking-widest mb-2.5">
                     Ingredientes
                   </p>
                   <div className="flex flex-wrap gap-1.5">
-                    {recipe.ingredients.slice(0, 5).map((ing, j) => (
-                      <span
+                    {recipe.ingredients.slice(0, 6).map((ing, j) => (
+                      <RecipeIngredient
                         key={j}
-                        className="inline-block px-2.5 py-1 bg-amber-50 text-amber-800 text-xs rounded-full font-medium border border-amber-100"
-                      >
-                        {ing}
-                      </span>
+                        name={ing}
+                        products={products}
+                        citySlug={citySlug}
+                      />
                     ))}
-                    {recipe.ingredients.length > 5 && (
-                      <span className="inline-block px-2.5 py-1 bg-stone-50 text-stone-400 text-xs rounded-full">
-                        +{recipe.ingredients.length - 5} más
+                    {recipe.ingredients.length > 6 && (
+                      <span className="inline-block px-2.5 py-1 bg-[#f7f4ef] text-[#999893] text-xs rounded-full font-medium">
+                        +{recipe.ingredients.length - 6} más
                       </span>
                     )}
                   </div>
@@ -153,11 +307,31 @@ export default function RecipeSlider({ recipes }: RecipeSliderProps) {
 
       {/* Fade edges */}
       {canScrollLeft && (
-        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-stone-50 to-transparent pointer-events-none rounded-l-xl -ml-px" />
+        <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#faf8f5] to-transparent pointer-events-none" />
       )}
       {canScrollRight && (
-        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-stone-50 to-transparent pointer-events-none rounded-r-xl -mr-px" />
+        <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#faf8f5] to-transparent pointer-events-none" />
       )}
+
+      {/* Mobile dots */}
+      <div className="flex sm:hidden justify-center gap-1.5 mt-3">
+        {recipes.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => {
+              if (!scrollRef.current) return
+              scrollRef.current.scrollTo({
+                left: i * (scrollRef.current.querySelector("article")?.offsetWidth ?? 280 + 16),
+                behavior: "smooth",
+              })
+            }}
+            className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+              i === activeIndex ? "bg-[#108910] w-4" : "bg-[#ccc]"
+            }`}
+            aria-label={`Receta ${i + 1}`}
+          />
+        ))}
+      </div>
     </section>
   )
 }
