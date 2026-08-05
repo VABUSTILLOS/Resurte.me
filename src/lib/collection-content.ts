@@ -11,7 +11,9 @@ export interface CollectionStory {
   title: string
   /** Texto narrativo que enaltece la tradición culinaria */
   body: string
-  /** URL de imagen decorativa para la sección (opcional, usa la de la colección si no) */
+  /** Etiqueta que reemplaza "Nuestra Historia" con frase específica de la colección */
+  storyLabel: string
+  /** URL de imagen decorativa para la sección (siempre distinta a la del hero) */
   imageUrl?: string
 }
 
@@ -42,6 +44,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "El alma de la taquería",
       body: "La taquería mexicana no es un negocio: es un templo. Cada tortilla que sale del comal, cada trompo que gira frente al carbón, cada salsa que se muele en molcajete lleva siglos de historia. Desde los mercados prehispánicos hasta las taquerías contemporáneas, el taco ha sido el lenguaje común de un país que se entiende a través de sus sabores. Proveer a una taquería es honrar esa herencia — es asegurarse de que cada ingrediente esté a la altura de la tradición que representa.",
+      storyLabel: "El alma del taco",
+      imageUrl: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&q=85",
     },
     values: [
       {
@@ -67,6 +71,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "El alma de la taquería",
       body: "La taquería mexicana no es un negocio: es un templo. Cada tortilla que sale del comal, cada trompo que gira frente al carbón, cada salsa que se muele en molcajete lleva siglos de historia. Desde los mercados prehispánicos hasta las taquerías contemporáneas, el taco ha sido el lenguaje común de un país que se entiende a través de sus sabores. Proveer a una taquería es honrar esa herencia — es asegurarse de que cada ingrediente esté a la altura de la tradición que representa.",
+      storyLabel: "El alma del taco",
+      imageUrl: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&q=85",
     },
     values: [
       {
@@ -93,6 +99,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "Más que fast food: un oficio",
       body: "La hamburguesería contemporánea ha elevado lo que antes era comida rápida a un arte culinario. El smash burger perfecto, la blend de cortes premium, el pan brioche que se tuesta en mantequilla — cada detalle importa. Detrás de cada hamburguesería exitosa hay un dueño que entiende que la calidad de los insumos es lo que separa una hamburguesa del montón de una que los clientes recuerdan. Nosotros existimos para que nunca tengas que sacrificar calidad por volumen.",
+      storyLabel: "El oficio del fuego",
+      imageUrl: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&q=85",
     },
     values: [
       {
@@ -118,6 +126,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "Más que fast food: un oficio",
       body: "La hamburguesería contemporánea ha elevado lo que antes era comida rápida a un arte culinario. El smash burger perfecto, la blend de cortes premium, el pan brioche que se tuesta en mantequilla — cada detalle importa. Detrás de cada hamburguesería exitosa hay un dueño que entiende que la calidad de los insumos es lo que separa una hamburguesa del montón de una que los clientes recuerdan. Nosotros existimos para que nunca tengas que sacrificar calidad por volumen.",
+      storyLabel: "El oficio del fuego",
+      imageUrl: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&q=85",
     },
     values: [
       {
@@ -144,6 +154,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "El camino del arroz",
       body: "En la cocina japonesa, el arroz no es una guarnición: es el plato. El sushi es, ante todo, arroz — sazonado con vinagre, azúcar y sal en la proporción exacta que cada itamae guarda como un secreto. Sobre esa cama de arroz perfecto descansa el pescado más fresco, las verduras más crujientes, las algas más puras. Abastecer a una cocina asiática es entender que cada ingrediente tiene un propósito, una técnica, un respeto. Desde el salmón grado sashimi hasta la soya fermentada, cada insumo cuenta.",
+    storyLabel: "El camino del arroz",
+    imageUrl: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=800&q=85",
     },
     values: [
       {
@@ -169,6 +181,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "El camino del arroz",
       body: "En la cocina japonesa, el arroz no es una guarnición: es el plato. El sushi es, ante todo, arroz — sazonado con vinagre, azúcar y sal en la proporción exacta que cada itamae guarda como un secreto. Sobre esa cama de arroz perfecto descansa el pescado más fresco, las verduras más crujientes, las algas más puras. Abastecer a una cocina asiática es entender que cada ingrediente tiene un propósito, una técnica, un respeto. Desde el salmón grado sashimi hasta la soya fermentada, cada insumo cuenta.",
+    storyLabel: "El camino del arroz",
+    imageUrl: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=800&q=85",
     },
     values: [
       {
@@ -195,6 +209,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "El horno no miente",
       body: "La pizza es democracia culinaria: un disco de masa que acepta cualquier ingrediente pero exige respeto absoluto por la técnica. Harina doble cero, levadura viva, fermentación lenta, San Marzano, mozzarella di bufala — cada elemento tiene su razón de ser. Una pizzería no vive de la cobertura, vive de la masa. Y una gran masa empieza con grandes insumos. Desde la harina italiana hasta el pepperoni americano, nosotros aseguramos que tu horno siempre tenga lo mejor para trabajar.",
+    storyLabel: "Donde nace la masa",
+    imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=85",
     },
     values: [
       {
@@ -220,6 +236,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "El horno no miente",
       body: "La pizza es democracia culinaria: un disco de masa que acepta cualquier ingrediente pero exige respeto absoluto por la técnica. Harina doble cero, levadura viva, fermentación lenta, San Marzano, mozzarella di bufala — cada elemento tiene su razón de ser. Una pizzería no vive de la cobertura, vive de la masa. Y una gran masa empieza con grandes insumos. Desde la harina italiana hasta el pepperoni americano, nosotros aseguramos que tu horno siempre tenga lo mejor para trabajar.",
+    storyLabel: "Donde nace la masa",
+    imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&q=85",
     },
     values: [
       {
@@ -246,6 +264,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "La pausa que vale",
       body: "Una cafetería no vende café: vende momentos. Ese primer sorbo de la mañana, la conversación que se alarga, la laptop y el espresso, el capuchino que se vuelve ritual. Detrás de cada taza hay una cadena de decisiones — el origen del grano, el tueste exacto, la molienda precisa, la leche vaporizada a la temperatura correcta. Cada eslabón importa. Nuestros insumos para cafetería están seleccionados para que cada taza que sirvas honre ese momento.",
+    storyLabel: "El ritual del grano",
+    imageUrl: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=85",
     },
     values: [
       {
@@ -271,6 +291,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "La pausa que vale",
       body: "Una cafetería no vende café: vende momentos. Ese primer sorbo de la mañana, la conversación que se alarga, la laptop y el espresso, el capuchino que se vuelve ritual. Detrás de cada taza hay una cadena de decisiones — el origen del grano, el tueste exacto, la molienda precisa, la leche vaporizada a la temperatura correcta. Cada eslabón importa. Nuestros insumos para cafetería están seleccionados para que cada taza que sirvas honre ese momento.",
+    storyLabel: "El ritual del grano",
+    imageUrl: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&q=85",
     },
     values: [
       {
@@ -297,6 +319,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "El mar no espera",
       body: "La marisquería mexicana es un patrimonio. Desde los cócteles de campechana en la costa hasta los tacos de pescado estilo Ensenada, pasando por los aguachiles de Sinaloa y los pescados a la talla del Pacífico. Cada región tiene su forma de honrar el mar, pero todas coinciden en una cosa: el producto manda. Un camarón que no está fresco, un pescado que perdió la cadena de frío, un callo de hacha que viajó de más — eso no se arregla con limón. Por eso nuestra logística está diseñada para que el mar llegue intacto a tu cocina.",
+    storyLabel: "El llamado del mar",
+    imageUrl: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=800&q=85",
     },
     values: [
       {
@@ -322,6 +346,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "El mar no espera",
       body: "La marisquería mexicana es un patrimonio. Desde los cócteles de campechana en la costa hasta los tacos de pescado estilo Ensenada, pasando por los aguachiles de Sinaloa y los pescados a la talla del Pacífico. Cada región tiene su forma de honrar el mar, pero todas coinciden en una cosa: el producto manda. Un camarón que no está fresco, un pescado que perdió la cadena de frío, un callo de hacha que viajó de más — eso no se arregla con limón. Por eso nuestra logística está diseñada para que el mar llegue intacto a tu cocina.",
+    storyLabel: "El llamado del mar",
+    imageUrl: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=800&q=85",
     },
     values: [
       {
@@ -348,6 +374,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "El sazón que no se improvisa",
       body: "La fonda es el corazón de la gastronomía mexicana. Es el lugar donde el arroz rojo sabe a casa, donde los frijoles huelen a epazote, donde el guisado del día reconforta el alma. No hay alta cocina sin cocina de fondo, y no hay cocina de fondo sin buenos insumos. Desde el aceite donde se fríen las tortillas hasta la sal de grano que sazona los frijoles, cada ingrediente importa. Porque la comida corrida no es comida rápida: es comida honesta, hecha con tiempo y con producto.",
+    storyLabel: "El sazón de casa",
+    imageUrl: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=85",
     },
     values: [
       {
@@ -373,6 +401,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "El sazón que no se improvisa",
       body: "La fonda es el corazón de la gastronomía mexicana. Es el lugar donde el arroz rojo sabe a casa, donde los frijoles huelen a epazote, donde el guisado del día reconforta el alma. No hay alta cocina sin cocina de fondo, y no hay cocina de fondo sin buenos insumos. Desde el aceite donde se fríen las tortillas hasta la sal de grano que sazona los frijoles, cada ingrediente importa. Porque la comida corrida no es comida rápida: es comida honesta, hecha con tiempo y con producto.",
+    storyLabel: "El sazón de casa",
+    imageUrl: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=85",
     },
     values: [
       {
@@ -399,6 +429,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "Donde el carbón encuentra su propósito",
       body: "El asador mexicano es un lugar de encuentro. Es el aroma a carbón encendido, el sonido de la carne al contacto con la parrilla, la paciencia de quien sabe que un buen corte no se apura. Desde los asaderos de Sonora hasta las parrillas urbanas, la cultura de la carne en México es profunda, diversa y exigente. Un rib eye mal marmoleado, un vacío sin sello, un carbón que no da la temperatura — eso se nota. Nuestros cortes están seleccionados para asaderos que entienden que la carne se respeta.",
+    storyLabel: "Donde el fuego habla",
+    imageUrl: "https://images.unsplash.com/photo-1600891964092-4316c288032e?w=800&q=85",
     },
     values: [
       {
@@ -425,6 +457,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "El pollo que levanta el vuelo",
       body: "Las alitas no son un antojo: son una industria. Desde el restaurante especializado en wings hasta la cocina que fríe pollo para todo el barrio, el pollo frito y las alitas representan uno de los segmentos más dinámicos de la gastronomía. Pero una gran alita no se improvisa: necesita un pollo de calidad, una cobertura que cruja, un aceite limpio y una salsa que enganche. Cada eslabón de esa cadena importa, y nosotros nos aseguramos de que todos estén cubiertos.",
+    storyLabel: "El arte de la fritura",
+    imageUrl: "https://images.unsplash.com/photo-1608039829572-f785535a8346?w=800&q=85",
     },
     values: [
       {
@@ -451,6 +485,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "Comer limpio no es comer aburrido",
       body: "El movimiento saludable no es una moda: es una evolución. Ensaladas que son plato fuerte, pokes que compiten con cualquier comida, bowls que equilibran proteína, grasa buena y carbohidratos complejos. Pero servir comida saludable a escala requiere insumos que duren, que sepan y que nutran. Desde las lechugas hidropónicas hasta las semillas, desde el salmón para poke hasta los aderezos sin conservadores — cada ingrediente de tu cocina saludable debe estar a la altura de la promesa que le haces a tus clientes.",
+    storyLabel: "Lo verde es potencia",
+    imageUrl: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&q=85",
     },
     values: [
       {
@@ -477,6 +513,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "Donde la repostería se vuelve precisión",
       body: "La panadería y la repostería son el punto dulce entre la ciencia y el arte. Gramos exactos, temperaturas precisas, fermentaciones controladas — y al mismo tiempo, creatividad, presentación, sorpresa. Un croissant perfecto, un pastel que se deshace, un helado que sabe a lo que promete: nada de eso sucede sin los mejores insumos. Harinas de fuerza, chocolates de cobertura, esencias puras, frutos para hornear. Cada gramo cuenta cuando el resultado se mide en sonrisas.",
+    storyLabel: "La ciencia del dulce",
+    imageUrl: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&q=85",
     },
     values: [
       {
@@ -503,6 +541,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "Sabores que vienen de lejos",
       body: "La cocina árabe y mediterránea es una de las más antiguas del mundo. Cada especia, cada técnica, cada combinación de sabores lleva consigo rutas de comercio, historias de migración y siglos de perfeccionamiento. El tahini que emulsiona el hummus, el za'atar que perfuma el pan pita, el cordero especiado que se deshace en el plato — todo eso requiere insumos fieles a su origen. Porque un shawarma no es cualquier trompo, y un falafel no es cualquier croqueta.",
+    storyLabel: "Especias del desierto",
+    imageUrl: "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&q=85",
     },
     values: [
       {
@@ -529,6 +569,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "Harina PAN y corazón",
       body: "La cocina latinoamericana es un mosaico de influencias indígenas, africanas y europeas. Desde las arepas venezolanas hasta las empanadas argentinas, desde los tacos mexicanos hasta las pupusas salvadoreñas — cada bocado cuenta una historia de mestizaje, migración y orgullo. Pero hay un ingrediente que une a toda Latinoamérica: el maíz. Harina PAN, masa de maíz, plátano macho, queso costeño — estos insumos son identidad. Y merecen ser tratados con el respeto que su historia demanda.",
+    storyLabel: "Sabor que cruza fronteras",
+    imageUrl: "https://images.unsplash.com/photo-1583608205776-bd8e38e3ae76?w=800&q=85",
     },
     values: [
       {
@@ -555,6 +597,8 @@ const COLLECTION_CONTENT: Record<string, CollectionContent> = {
     story: {
       title: "La barra es el escenario",
       body: "Un bar no solo vende bebidas: vende atmósfera. Es el lugar donde se brinda, se celebra, se conoce gente. Pero detrás de cada cerveza bien servida, de cada coctel perfectamente balanceado, de cada botana que acompaña la charla, hay una operación que no puede fallar. Hielo, refrescos, cervezas, limones, sales, escarchados, cacahuates, papas — cada insumo parece menor, pero su ausencia se nota al instante. Una barra desabastecida es una experiencia incompleta.",
+      storyLabel: "La barra es el escenario",
+      imageUrl: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=800&q=85",
     },
     values: [
       {
@@ -591,6 +635,8 @@ export function getCollectionContent(slug: string): CollectionContent {
     story: {
       title: "Nuestra Historia",
       body: `Cada restaurante tiene una historia. La tuya merece insumos que estén a la altura. En Resurte.me entendemos que cocinar para otros es un acto de generosidad — y queremos que nunca tengas que sacrificar calidad por volumen. Esta colección reúne los mejores productos para ${fallbackName}, seleccionados con el mismo cuidado que tú pones en cada plato.`,
+      storyLabel: "Nuestra Historia",
+      imageUrl: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800&q=85",
     },
     values: [
       {
