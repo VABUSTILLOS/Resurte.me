@@ -117,7 +117,6 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
       {/* ── 3. OUR STORY — Narrative section ── */}
       <CollectionStorySection
         story={content.story}
-        fallbackImage={collection.image_url ?? undefined}
         collectionName={collection.name}
       />
 
@@ -178,13 +177,13 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
 
       {/* ── 11. Empty state ── */}
       {flatProducts.length === 0 && (
-        <div className="text-center py-20 bg-[#f7f4ef] border-t border-[#ede8df]">
-          <div className="text-5xl mb-4">{icon}</div>
-          <p className="text-[#999893] text-lg">Estamos curando los mejores insumos para esta colección.</p>
-          <p className="text-[#b0b0b0] text-sm mt-2">Vuelve pronto — estamos agregando productos cada semana.</p>
+        <div className="text-center py-28 bg-[#faf8f5] border-t border-[#ede8df]">
+          <div className="text-6xl mb-5 opacity-60">{icon}</div>
+          <p className="text-[#5a5a5a] text-lg font-light">Estamos curando los mejores insumos para esta colección.</p>
+          <p className="text-[#b0b0b0] text-sm mt-3">Vuelve pronto — estamos agregando productos cada semana.</p>
           <Link
             href={`/${citySlug}`}
-            className="inline-flex items-center gap-2 mt-6 text-sm font-semibold text-[#108910] hover:text-[#0D720D] btn-pill btn-pill-outline"
+            className="inline-flex items-center gap-2 mt-8 text-sm font-semibold text-[#108910] hover:text-[#0D720D] btn-pill btn-pill-outline"
           >
             <ArrowLeft className="w-4 h-4" />
             Volver al inicio
@@ -193,10 +192,10 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
       )}
 
       {/* ── 12. FOOTER CTA — Back to collections ── */}
-      <div className="bg-[#f7f4ef] border-t border-[#ede8df] py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
+      <div className="bg-[#f7f4ef] border-t border-[#ede8df] py-16">
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 text-center">
           <ScrollReveal>
-            <p className="text-[#6b6b6b] text-sm mb-5">
+            <p className="text-[#6b6b6b] text-sm mb-6 font-light">
               ¿Buscas otro tipo de cocina?
             </p>
             <Link
@@ -236,19 +235,19 @@ function ProductGridSection({
   hideHeader?: boolean
 }) {
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-12">
+    <section className="max-w-7xl mx-auto px-5 sm:px-8 py-12 sm:py-16">
       {!hideHeader && (
         <ScrollReveal>
-          <div className="flex items-center gap-2 mb-6">
+          <div className="flex items-center gap-3 mb-8">
             <ShoppingBag className="w-5 h-5 text-[#108910]" />
-            <h2 className="text-lg font-semibold text-[#1a1a1a]">
+            <h2 className="text-base font-semibold text-[#1a1a1a] tracking-tight">
               {total} producto{total !== 1 ? "s" : ""} en esta colección
             </h2>
           </div>
         </ScrollReveal>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
         {products.map((product, idx) => (
           <ScrollReveal key={product.id} direction="scale" delay={idx * 0.04}>
             <ProductCard

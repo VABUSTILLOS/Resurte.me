@@ -6,75 +6,81 @@ import type { CollectionStory } from "@/lib/collection-content"
 
 interface CollectionStorySectionProps {
   story: CollectionStory
-  fallbackImage?: string
   collectionName: string
 }
 
 /**
- * CollectionStorySection — Erewhon-inspired narrative section.
+ * CollectionStorySection — Editorial "Nuestra Historia".
  *
- * Full-width split layout: image on one side, story text on the other.
- * Premium typography with the brand cream palette.
+ * Tratamiento de revista: generoso espacio en blanco, tipografía
+ * refinada con leading amplio, y una imagen decorativa propia
+ * (nunca se repite la del hero). En mobile el texto manda.
  */
 export function CollectionStorySection({
   story,
-  fallbackImage,
   collectionName,
 }: CollectionStorySectionProps) {
-  const imageSrc = story.imageUrl || fallbackImage
-
   return (
-    <section className="relative overflow-hidden bg-[#f7f4ef] border-y border-[#ede8df]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20 lg:py-24">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-          {/* Image side */}
-          <ScrollReveal direction="left" className="relative">
-            <div className="relative aspect-[4/5] lg:aspect-[3/4] rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.12)]">
-              {imageSrc ? (
-                <Image
-                  src={imageSrc}
-                  alt={`${story.title} — ${collectionName}`}
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  className="object-cover"
-                  priority
-                />
-              ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-[#108910]/10 via-[#f7f4ef] to-[#ede8df]" />
-              )}
-              {/* Subtle gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a1a]/10 to-transparent" />
-            </div>
-
-            {/* Decorative accent dot */}
-            <div className="absolute -bottom-4 -right-4 w-20 h-20 rounded-full bg-[#108910]/5 border border-[#108910]/10 hidden lg:block" />
-          </ScrollReveal>
-
-          {/* Text side */}
-          <ScrollReveal direction="right" className="relative">
-            {/* Decorative label */}
-            <span className="inline-block text-xs font-medium tracking-[0.2em] uppercase text-[#108910] mb-5">
+    <section className="relative overflow-hidden bg-[#faf8f5]">
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 py-20 sm:py-28 lg:py-32">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 lg:gap-20 items-center">
+          {/* ── Text column — takes more space ── */}
+          <ScrollReveal className="lg:col-span-3 order-1 lg:order-1">
+            {/* Label */}
+            <span className="inline-block text-[11px] font-semibold tracking-[0.25em] uppercase text-[#108910]/70 mb-6">
               Nuestra Historia
             </span>
 
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#1a1a1a] tracking-tight leading-[1.15] mb-6">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#1a1a1a] tracking-tight leading-[1.12] mb-8">
               {story.title}
             </h2>
 
-            {/* Ornamental divider */}
-            <div className="w-12 h-px bg-[#108910]/30 mb-6" />
+            {/* Ornamental line */}
+            <div className="w-16 h-[2px] bg-[#108910]/25 mb-8" />
 
-            <p className="text-base sm:text-lg text-[#6b6b6b] leading-relaxed max-w-lg">
-              {story.body}
-            </p>
+            {/* Body text — editorial leading */}
+            <div className="space-y-5">
+              {story.body.split("\n\n").map((paragraph, i) => (
+                <p
+                  key={i}
+                  className="text-base sm:text-lg text-[#5a5a5a] leading-[1.85] max-w-xl"
+                >
+                  {paragraph}
+                </p>
+              ))}
+            </div>
 
-            {/* Subtle bottom accent */}
-            <div className="mt-8 flex items-center gap-3">
-              <div className="w-8 h-px bg-[#108910]/20" />
-              <span className="text-xs font-medium tracking-[0.15em] uppercase text-[#999893]">
+            {/* Footer accent */}
+            <div className="mt-10 flex items-center gap-3">
+              <div className="w-8 h-[1px] bg-[#108910]/20" />
+              <span className="text-[11px] font-medium tracking-[0.15em] uppercase text-[#999893]">
                 {collectionName}
               </span>
             </div>
+          </ScrollReveal>
+
+          {/* ── Image column — decorative, distinct from hero ── */}
+          <ScrollReveal direction="right" className="lg:col-span-2 order-2 lg:order-2">
+            {story.imageUrl ? (
+              <div className="relative aspect-[3/4] sm:aspect-[4/5] rounded-2xl overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.10)] border border-[#ede8df]/50">
+                <Image
+                  src={story.imageUrl}
+                  alt=""
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 40vw"
+                  className="object-cover"
+                  quality={85}
+                />
+              </div>
+            ) : (
+              /* Elegant decorative placeholder — abstract, editorial */
+              <div className="relative aspect-[3/4] sm:aspect-[4/5] rounded-2xl overflow-hidden border border-[#ede8df]/50">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#f7f4ef] via-[#ede8df] to-[#f0ede5]" />
+                {/* Abstract geometric accent */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-[#108910]/[0.04] border border-[#108910]/10" />
+                <div className="absolute top-1/3 right-1/3 w-16 h-16 rounded-full bg-[#108910]/[0.03]" />
+              </div>
+            )}
           </ScrollReveal>
         </div>
       </div>
