@@ -57,6 +57,20 @@ export interface Product {
   whatsapp_product_id: string | null
   unit?: string
   tags?: string[]
+  is_visible?: boolean
+}
+
+export interface CollectionRecipe {
+  id: number
+  collection_id: number
+  name: string
+  description: string
+  ingredients: string[]
+  prep_time: string
+  servings: string
+  image_url: string | null
+  display_order: number
+  is_active: boolean
 }
 
 export interface ProductStore {

@@ -79,14 +79,15 @@ export async function getProductsByStore(
     )
     .eq("product_stores.store_id", storeId)
     .eq("product_stores.is_available", true)
+    .eq("is_visible", true)
     .order("name")
-
+ 
   if (categoryId) {
     query = query.eq("category_id", categoryId)
   }
-
+ 
   const { data } = await query
-
+ 
   return (
     (data as unknown as (Product & {
       product_stores: { price: number; sale_price: number | null; stock_status: string }[]
@@ -98,7 +99,7 @@ export async function getProductsByStore(
     })) ?? []
   )
 }
-
+ 
 const PAGE_SIZE = 24
 
 export async function getProductsByStorePaginated(
@@ -123,15 +124,16 @@ export async function getProductsByStorePaginated(
     )
     .eq("product_stores.store_id", storeId)
     .eq("product_stores.is_available", true)
+    .eq("is_visible", true)
     .order("name")
     .range(from, to)
-
+ 
   if (categoryId) {
     query = query.eq("category_id", categoryId)
   }
-
+ 
   const { data, count } = await query
-
+ 
   const products =
     (data as unknown as (Product & {
       product_stores: { price: number; sale_price: number | null; stock_status: string }[]
@@ -141,7 +143,7 @@ export async function getProductsByStorePaginated(
       sale_price: p.product_stores[0]?.sale_price ?? null,
       stock_status: p.product_stores[0]?.stock_status ?? "out_of_stock",
     })) ?? []
-
+ 
   const total = count ?? products.length
   const hasMore = from + products.length < total
 
@@ -155,6 +157,7 @@ export async function getProductsCount(storeId: number): Promise<number> {
     .select("id", { count: "exact", head: true })
     .eq("product_stores.store_id", storeId)
     .eq("product_stores.is_available", true)
+    .eq("is_visible", true)
   return count ?? 0
 }
 
@@ -217,6 +220,7 @@ export async function searchAll(
       )
       .ilike("name", searchTerm)
       .eq("product_stores.is_available", true)
+      .eq("is_visible", true)
       .limit(20),
     supabase
       .from("stores")
@@ -307,6 +311,7 @@ export async function getProductsByCollection(
     .select(`*, product_stores!inner(price, sale_price, stock_status)`)
     .eq("product_stores.store_id", storeId)
     .eq("product_stores.is_available", true)
+    .eq("is_visible", true)
     .order("name")
   
   const filteredProducts =

@@ -9,7 +9,9 @@ import { CollectionHero } from "@/components/collections/collection-hero"
 import { CollectionStorySection } from "@/components/collections/collection-story-section"
 import { CollectionValueHighlight } from "@/components/collections/collection-value-highlight"
 import { getCollectionContent } from "@/lib/collection-content"
-import type { Product } from "@/types"
+import { getCollectionRecipes } from "@/lib/recipes"
+import RecipeSlider from "@/components/collections/recipe-slider"
+import type { Product, CollectionRecipe } from "@/types"
 
 const COLLECTION_ICONS: Record<string, string> = {
   taquerias: "🌮",
@@ -54,6 +56,12 @@ function chunkProducts<T>(products: T[], chunks: number): T[][] {
 export function CollectionPageClient({ citySlug, cityName, collection, products }: CollectionPageClientProps) {
   const icon = COLLECTION_ICONS[collection.slug] || "📦"
   const content = getCollectionContent(collection.slug)
+  const recipes: CollectionRecipe[] = getCollectionRecipes(collection.slug).map((r, i) => ({
+    ...r,
+    id: i + 1,
+    collection_id: collection.id,
+    is_active: true,
+  }))
 
   // Flatten product_store data
   const flatProducts = products.map((p) => ({
@@ -112,6 +120,13 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
         fallbackImage={collection.image_url ?? undefined}
         collectionName={collection.name}
       />
+
+      {/* ── 3.5 RECIPE SLIDER — Recetario inspiracional ── */}
+      {recipes.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-12">
+          <RecipeSlider recipes={recipes} />
+        </section>
+      )}
 
       {/* ── 4. PRODUCT GRID — First chunk ── */}
       {productChunks[0]?.length > 0 && (
