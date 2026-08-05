@@ -14,6 +14,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [fullName, setFullName] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -23,17 +24,21 @@ export function AuthForm({ mode }: AuthFormProps) {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setSuccessMessage(null)
 
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
+        router.refresh()
+        router.push("/")
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: { full_name: fullName },
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
         })
         if (error) throw error
@@ -55,9 +60,18 @@ export function AuthForm({ mode }: AuthFormProps) {
             // Silent fail — don't block registration if workflow fails
           }
         }
+
+        // If session exists, user is auto-confirmed — redirect to home
+        if (data.session) {
+          router.refresh()
+          router.push("/")
+        } else {
+          // Email confirmation required — show message to user
+          setSuccessMessage(
+            `Te enviamos un enlace de confirmación a ${email}. Revisa tu bandeja de entrada (y spam) para activar tu cuenta.`
+          )
+        }
       }
-      router.refresh()
-      router.push("/")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error de autenticación")
     } finally {
@@ -93,6 +107,13 @@ export function AuthForm({ mode }: AuthFormProps) {
       {error && (
         <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
           {error}
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="mb-4 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700">
+          <p className="font-semibold mb-1">¡Cuenta creada!</p>
+          <p>{successMessage}</p>
         </div>
       )}
 
