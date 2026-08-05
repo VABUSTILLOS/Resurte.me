@@ -2,10 +2,13 @@
 
 import Link from "next/link"
 import { ArrowLeft, ShoppingBag, Box, TrendingUp, Truck } from "lucide-react"
-import Image from "next/image"
 import { ProductCard } from "@/components/product/product-card"
 import { SearchBar } from "@/components/search/search-bar"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
+import { CollectionHero } from "@/components/collections/collection-hero"
+import { CollectionStorySection } from "@/components/collections/collection-story-section"
+import { CollectionValueHighlight } from "@/components/collections/collection-value-highlight"
+import { getCollectionContent } from "@/lib/collection-content"
 import type { Product } from "@/types"
 
 const COLLECTION_ICONS: Record<string, string> = {
@@ -34,8 +37,23 @@ interface CollectionPageClientProps {
   })[]
 }
 
+/**
+ * Distribuye productos en N grupos de tamaño aproximado para
+ * intercalar secciones narrativas entre bloques del catálogo.
+ */
+function chunkProducts<T>(products: T[], chunks: number): T[][] {
+  if (chunks <= 1 || products.length === 0) return [products]
+  const size = Math.ceil(products.length / chunks)
+  const result: T[][] = []
+  for (let i = 0; i < products.length; i += size) {
+    result.push(products.slice(i, i + size))
+  }
+  return result
+}
+
 export function CollectionPageClient({ citySlug, cityName, collection, products }: CollectionPageClientProps) {
   const icon = COLLECTION_ICONS[collection.slug] || "📦"
+  const content = getCollectionContent(collection.slug)
 
   // Flatten product_store data
   const flatProducts = products.map((p) => ({
@@ -45,124 +63,189 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
     stock_status: p.product_stores[0]?.stock_status ?? "in_stock",
   }))
 
+  // Split products into 4 chunks to interleave 3 value sections
+  const productChunks = chunkProducts(flatProducts, 4)
+
   return (
     <div className="min-h-screen bg-[#faf8f5]">
-      {/* Hero header — B2B institutional */}
-      <div className="bg-[#f7f4ef] border-b border-[#ede8df]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-sm text-[#6b6b6b] mb-5">
-            <Link href={`/${citySlug}`} className="hover:text-[#108910] transition-colors">
-              {cityName}
-            </Link>
-            <span className="text-[#999893]">/</span>
-            <span className="text-[#1a1a1a] font-medium">{collection.name}</span>
-          </div>
+      {/* ── 1. HERO — Full-width Erewhon-style banner ── */}
+      <CollectionHero
+        collectionName={collection.name}
+        tagline={content.heroTagline}
+        imageUrl={collection.image_url}
+        icon={icon}
+        citySlug={citySlug}
+        cityName={cityName}
+      />
 
-          <ScrollReveal>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-              {/* Collection icon/image */}
-              <div className="shrink-0">
-                {collection.image_url ? (
-                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden shadow-md">
-                    <Image
-                      src={collection.image_url}
-                      alt={collection.name}
-                      fill
-                      sizes="96px"
-                      className="object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-[#108910]/10 flex items-center justify-center text-4xl shadow-sm">
-                    {icon}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex-1">
-                <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1a1a] tracking-tight">
-                  {collection.name}
-                </h1>
-                <p className="text-sm sm:text-base text-[#6b6b6b] mt-1.5 max-w-2xl leading-relaxed">
-                  {collection.description || `Insumos curados por mayoreo para ${collection.name.toLowerCase()}. Precios institucionales sin mínimo de compra.`}
-                </p>
-              </div>
+      {/* ── 2. B2B VALUE BADGES + SEARCH (compact bar) ── */}
+      <div className="bg-white border-b border-[#ede8df] sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            {/* Value badges */}
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#6b6b6b] bg-[#f7f4ef] rounded-full px-3 py-1.5">
+                <Box className="w-3.5 h-3.5 text-[#108910]" />
+                Venta por volumen
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#6b6b6b] bg-[#f7f4ef] rounded-full px-3 py-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-[#108910]" />
+                Precio institucional
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#6b6b6b] bg-[#f7f4ef] rounded-full px-3 py-1.5">
+                <Truck className="w-3.5 h-3.5 text-[#108910]" />
+                Entrega programada
+              </span>
             </div>
-          </ScrollReveal>
 
-          {/* B2B value badges */}
-          <div className="flex flex-wrap gap-3 mt-5">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#6b6b6b] bg-white rounded-full px-3 py-1.5 shadow-sm border border-[#ede8df]">
-              <Box className="w-3.5 h-3.5 text-[#108910]" />
-              Venta por volumen
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#6b6b6b] bg-white rounded-full px-3 py-1.5 shadow-sm border border-[#ede8df]">
-              <TrendingUp className="w-3.5 h-3.5 text-[#108910]" />
-              Precio institucional
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#6b6b6b] bg-white rounded-full px-3 py-1.5 shadow-sm border border-[#ede8df]">
-              <Truck className="w-3.5 h-3.5 text-[#108910]" />
-              Entrega programada
-            </span>
-          </div>
-
-          {/* Search */}
-          <div className="mt-5 max-w-md">
-            <SearchBar citySlug={citySlug} />
+            {/* Search */}
+            <div className="w-full sm:w-64">
+              <SearchBar citySlug={citySlug} />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Products grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex items-center gap-2 mb-6">
-          <ShoppingBag className="w-5 h-5 text-[#108910]" />
-          <h2 className="text-lg font-semibold text-[#1a1a1a]">
-            {flatProducts.length} producto{flatProducts.length !== 1 ? "s" : ""} en esta colección
-          </h2>
-        </div>
+      {/* ── 3. OUR STORY — Narrative section ── */}
+      <CollectionStorySection
+        story={content.story}
+        fallbackImage={collection.image_url ?? undefined}
+        collectionName={collection.name}
+      />
 
-        {flatProducts.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-5xl mb-4">{icon}</div>
-            <p className="text-[#999893] text-lg">Estamos curando los mejores insumos para esta colección.</p>
-            <p className="text-[#b0b0b0] text-sm mt-2">Vuelve pronto — estamos agregando productos cada semana.</p>
-            <Link
-              href={`/${citySlug}`}
-              className="inline-flex items-center gap-2 mt-6 text-sm font-semibold text-[#108910] hover:text-[#0D720D] btn-pill btn-pill-outline"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Volver al inicio
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-            {flatProducts.map((product, idx) => (
-              <ScrollReveal key={product.id} direction="scale" delay={idx * 0.04}>
-                <ProductCard
-                  product={product}
-                  storeId={1}
-                  storeName="Resurte.me"
-                  storeSlug="resurte"
-                  citySlug={citySlug}
-                />
-              </ScrollReveal>
-            ))}
-          </div>
-        )}
+      {/* ── 4. PRODUCT GRID — First chunk ── */}
+      {productChunks[0]?.length > 0 && (
+        <ProductGridSection
+          products={productChunks[0]}
+          total={flatProducts.length}
+          citySlug={citySlug}
+        />
+      )}
 
-        {/* Back link */}
-        <div className="mt-12 text-center">
+      {/* ── 5. VALUE HIGHLIGHT 1 ── */}
+      <CollectionValueHighlight value={content.values[0]} index={0} />
+
+      {/* ── 6. PRODUCT GRID — Second chunk ── */}
+      {productChunks[1]?.length > 0 && (
+        <ProductGridSection
+          products={productChunks[1]}
+          total={flatProducts.length}
+          citySlug={citySlug}
+          hideHeader
+        />
+      )}
+
+      {/* ── 7. VALUE HIGHLIGHT 2 ── */}
+      <CollectionValueHighlight value={content.values[1]} index={1} />
+
+      {/* ── 8. PRODUCT GRID — Third chunk ── */}
+      {productChunks[2]?.length > 0 && (
+        <ProductGridSection
+          products={productChunks[2]}
+          total={flatProducts.length}
+          citySlug={citySlug}
+          hideHeader
+        />
+      )}
+
+      {/* ── 9. VALUE HIGHLIGHT 3 ── */}
+      <CollectionValueHighlight value={content.values[2]} index={2} />
+
+      {/* ── 10. PRODUCT GRID — Final chunk ── */}
+      {productChunks[3]?.length > 0 && (
+        <ProductGridSection
+          products={productChunks[3]}
+          total={flatProducts.length}
+          citySlug={citySlug}
+          hideHeader
+        />
+      )}
+
+      {/* ── 11. Empty state ── */}
+      {flatProducts.length === 0 && (
+        <div className="text-center py-20 bg-[#f7f4ef] border-t border-[#ede8df]">
+          <div className="text-5xl mb-4">{icon}</div>
+          <p className="text-[#999893] text-lg">Estamos curando los mejores insumos para esta colección.</p>
+          <p className="text-[#b0b0b0] text-sm mt-2">Vuelve pronto — estamos agregando productos cada semana.</p>
           <Link
             href={`/${citySlug}`}
-            className="btn-pill btn-pill-outline inline-flex items-center gap-2"
+            className="inline-flex items-center gap-2 mt-6 text-sm font-semibold text-[#108910] hover:text-[#0D720D] btn-pill btn-pill-outline"
           >
             <ArrowLeft className="w-4 h-4" />
-            Ver todas las colecciones
+            Volver al inicio
           </Link>
+        </div>
+      )}
+
+      {/* ── 12. FOOTER CTA — Back to collections ── */}
+      <div className="bg-[#f7f4ef] border-t border-[#ede8df] py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
+          <ScrollReveal>
+            <p className="text-[#6b6b6b] text-sm mb-5">
+              ¿Buscas otro tipo de cocina?
+            </p>
+            <Link
+              href={`/${citySlug}`}
+              className="btn-pill btn-pill-outline inline-flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Ver todas las colecciones
+            </Link>
+          </ScrollReveal>
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * ProductGridSection — Bloque de productos con encabezado opcional.
+ *
+ * Se reutiliza para cada chunk del catálogo intercalado.
+ */
+type FlatProduct = Product & {
+  price: number
+  sale_price: number | null
+  stock_status: string
+}
+
+function ProductGridSection({
+  products,
+  total,
+  citySlug,
+  hideHeader = false,
+}: {
+  products: FlatProduct[]
+  total: number
+  citySlug: string
+  hideHeader?: boolean
+}) {
+  return (
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-12">
+      {!hideHeader && (
+        <ScrollReveal>
+          <div className="flex items-center gap-2 mb-6">
+            <ShoppingBag className="w-5 h-5 text-[#108910]" />
+            <h2 className="text-lg font-semibold text-[#1a1a1a]">
+              {total} producto{total !== 1 ? "s" : ""} en esta colección
+            </h2>
+          </div>
+        </ScrollReveal>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        {products.map((product, idx) => (
+          <ScrollReveal key={product.id} direction="scale" delay={idx * 0.04}>
+            <ProductCard
+              product={product}
+              storeId={1}
+              storeName="Resurte.me"
+              storeSlug="resurte"
+              citySlug={citySlug}
+            />
+          </ScrollReveal>
+        ))}
+      </div>
+    </section>
   )
 }
