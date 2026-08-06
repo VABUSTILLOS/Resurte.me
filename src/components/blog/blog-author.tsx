@@ -1,4 +1,5 @@
 import { Clock, CalendarDays, UserRound } from "lucide-react"
+import { formatPostDate } from "@/lib/blog-format"
 import type { BlogPostMeta } from "@/lib/blog"
 
 interface BlogAuthorProps {
@@ -6,17 +7,9 @@ interface BlogAuthorProps {
 }
 
 export function BlogAuthor({ post }: BlogAuthorProps) {
-  const published = new Date(post.date).toLocaleDateString("es-MX", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  })
+  const published = formatPostDate(post.date, "long")
   const updated = post.updatedAt
-    ? new Date(post.updatedAt).toLocaleDateString("es-MX", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
+    ? formatPostDate(post.updatedAt, "long")
     : null
 
   return (

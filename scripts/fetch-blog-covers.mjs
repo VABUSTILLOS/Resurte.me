@@ -76,6 +76,72 @@ const MAP = {
   "sector-restaurantero-2027-preview": "1504754524776-8f4f37790ca0", // platillo moderno
   "sector-restaurantero-mexico-2026": "1569718212165-3a8278d5f624", // corte de carne
   "tendencias-consumo-restaurantes": "1571091718767-18b5b1457add", // hamburguesa gourmet
+
+  // ── costos (nuevos) ─────────────────────────────────────
+  "como-calcular-precio-venta-restaurante": "1461023058943-07fcbe16d735", // platillo gourmet
+  "punto-de-equilibrio-restaurante": "1466978913421-dad2ebd01d17", // platillo elegante
+  "utilidad-bruta-vs-neta-restaurante": "1468071174046-657d9d351a40", // restaurante moderno
+  "costo-bebidas-alcohol-restaurante": "1476124369491-e7addf5db371", // botellas bar
+  "precio-por-gramo-rendimiento-restaurante": "1476718406336-bb5a9690ee2a", // cocina profesional
+  "descuentos-combos-promociones-restaurante": "1481070414801-51fd732d7184", // mesa de comida
+  "impuestos-utilidad-restaurante-mexico": "1485808191679-5f86510681a2", // desayuno restaurante
+  "kpi-financieros-restaurante-mes": "1487017159836-4e23ece2e4cf", // platillo de autor
+  "costos-fijos-vs-variables-restaurante": "1490645935967-10de6ba17061", // cocina en acción
+
+  // ── operacion (nuevos) ─────────────────────────────────
+  "organizar-cocina-por-estaciones": "1495474472287-4d71bcdd2085", // cocina profesional
+  "recetas-estandar-cocina-restaurante": "1498837167922-ddd27525d352", // platillo casero
+  "inventario-inicial-final-restaurante": "1506461883276-594a12b11cf3", // ingredientes frescos
+  "limpieza-profunda-cocina-rutina": "1507048331197-7d4ac70811cf", // cocina limpia
+  "recepcion-mercancia-verificacion": "1509042239860-f550ce710b93", // cajas insumos
+  "desperdicio-preparacion-porciones": "1510707577719-ae7c14805e3a", // verduras cocina
+  "menu-operativo-restaurante": "1511689660979-10d2b1aada49", // menú en pizarrón
+  "almacenamiento-alimentos-temperatura": "1512621776951-a57141f2eefd", // despensa organizada
+  "capacitacion-equipo-cocina": "1513456852971-30c0b8199d4d", // equipo en cocina
+
+  // ── proveeduria (nuevos) ───────────────────────────────
+  "cotizaciones-comparar-proveedores": "1515003197210-e0cd71810b5f", // mesa con alimentos
+  "proveedores-directos-vs-distribuidores": "1525059696034-4967a8e1dca2", // granos y semillas
+  "calendario-compras-mensual-restaurante": "1530554764233-e79e16c91d08", // mercado de frutas
+  "criterios-calidad-insumos": "1532938911079-1b06ac7ceec7", // verduras frescas
+  "comprar-mercado-vs-mayoreo": "1533134242443-d4fd215305ad", // puesto de mercado
+  "proveedores-cumplen-plazos": "1534422298391-e4f8c172dddb", // camión de entregas
+  "stock-seguridad-inventario": "1537047902294-62a40c20a6ae", // almacén alimentos
+  "renegociar-precios-inflacion": "1540189549336-e6e99c3679fe", // plato de comida
+  "entregas-programadas-proveedores": "1544787219-7f47ccb76574", // entrega de alimentos
+
+  // ── marketing (nuevos) ─────────────────────────────────
+  "google-business-restaurante-guia": "1550317138-10000687a72b", // fachada restaurante
+  "campanas-redes-sociales-comida": "1551538827-9c037cb4f32a", // platillo colorido
+  "eventos-colaboraciones-restaurante": "1556909114-f6e7ad7d3136", // mesa para eventos
+  "fotografia-comida-restaurante": "1563379091339-03b21ab4a4f8", // platillo fotografiado
+  "club-clientes-restaurante": "1563379926898-05f4575a45d8", // clientes en restaurante
+  "marketing-estacional-restaurante": "1563805042-7684c019e1cb", // comida de temporada
+  "cross-selling-upselling-restaurante": "1564355808539-22fda35bed7e", // platillo servido
+  "historia-marca-restaurante": "1567188040759-fb8a883dc6d8", // interior acogedor
+  "encuestas-satisfaccion-clientes": "1567620832903-9fc6debc209f", // mesa con comida
+
+  // ── herramientas (nuevos) ──────────────────────────────
+  "punto-venta-restaurante-guia": "1572442388796-11668a67e53d", // caja registradora
+  "apps-gestion-inventario-movil": "1572490122747-3968b75cc699", // teléfono con comida
+  "hojas-calculo-vs-panel": "1573080496219-bb080dd4f877", // laptop con café
+  "automatizar-procesos-restaurante": "1574071318508-1cdbab80d002", // cocina automatizada
+  "dashboard-restaurante-un-dia": "1581006852262-e4307cf6283a", // laptop datos
+  "tecnologia-delivery-restaurante": "1581091226825-a6a2a5aee158", // repartidor comida
+  "seguridad-datos-restaurante": "1585032226651-759b368d7246", // candado seguridad
+  "inteligencia-artificial-restaurantes": "1589302168068-964664d93dc0", // robot cocina
+  "datos-restaurante-para-decidir": "1589308078059-be1415eab4c3", // gráficas en tablet
+
+  // ── industria (nuevos) ─────────────────────────────────
+  "cuanto-cuesta-abrir-restaurante-mexico": "1592417817098-8fd3d9eb14a5", // local nuevo
+  "franquicias-restaurantes-mexico": "1599974579688-8dbdd335c77f", // franquicia comida
+  "food-trucks-costos-regulacion": "1600334089648-b0d9d3028eb2", // food truck
+  "legislacion-laboral-restaurantes": "1600891964092-4316c288032e", // documentos laborales
+  "estadisticas-delivery-mexico": "1601050690597-df0568f70950", // entregas a domicilio
+  "tendencias-cocina-mexicana": "1603894584373-5ac82b2ae398", // comida mexicana
+  "sostenibilidad-restaurantes": "1604908176997-125f25cc6f3d", // productos orgánicos
+  "renta-local-restaurante-costo": "1606755962773-d324e0a13086", // local comercial
+  "economia-restaurantes-2027": "1611145367651-6303b46e4040", // economato cocina
 }
 
 // Garantiza que no haya IDs repetidos (regresión de la auditoría de duplicados)

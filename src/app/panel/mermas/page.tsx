@@ -3,7 +3,9 @@
 import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { usePanelConfig } from "@/lib/panel-config"
 import { useToast } from "@/components/toast"
+import EmptyState from "@/components/panel/EmptyState"
 import Link from "next/link"
 import {
   Trash2, ArrowLeft, DollarSign, TrendingDown, Lightbulb,
@@ -94,6 +96,7 @@ export default function MermasPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [dateFilter, setDateFilter] = useState<"all" | "week" | "month">("all")
   const [monthlyGoal, setMonthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
+  const panelCfg = usePanelConfig(slug)
 
   // Filtro por rango de fechas — calculado siempre (nunca después de un early return)
   const filteredEntries = useMemo(() => {
@@ -108,8 +111,19 @@ export default function MermasPage() {
   function addEntry() {
     const kg = parseFloat(amountKg)
     const cost = parseFloat(costPerKg)
-    if (!selectedCategory || !selectedCause || !kg || !cost || kg <= 0 || cost <= 0) return
-    
+    if (!selectedCategory || !selectedCause) {
+      toast("Selecciona categoría y causa", "error")
+      return
+    }
+    if (isNaN(kg) || kg <= 0) {
+      toast("La cantidad debe ser mayor a 0 kg", "error")
+      return
+    }
+    if (isNaN(cost) || cost < 0) {
+      toast("El costo por kg no puede ser negativo", "error")
+      return
+    }
+
     if (editingId) {
       // Update existing entry
       setEntries((prev) => prev.map((e) => e.id === editingId ? {
@@ -279,6 +293,24 @@ export default function MermasPage() {
       </div>
 
       {/* Entries */}
+      {filteredEntries.length === 0 && !showForm && (
+        <div className="mb-6">
+          <EmptyState
+            icon={TrendingDown}
+            title="Sin registros de merma todavía"
+            description="Registra cada pérdida de insumos para conocer cuánto dinero se te va en merma al mes y reducirla con datos."
+            action={
+              <button
+                onClick={() => setShowForm(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-xl hover:bg-red-700 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Registrar primera merma
+              </button>
+            }
+          />
+        </div>
+      )}
       {filteredEntries.length > 0 && (
         <div className="space-y-2 mb-6">
           {filteredEntries.map((entry) => {
@@ -605,7 +637,7 @@ export default function MermasPage() {
                 <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      goalProgress > 100 ? "bg-red-500" : goalProgress > 75 ? "bg-amber-500" : "bg-emerald-500"
+                      goalProgress > 100 ? "bg-red-500" : goalProgress > 100 - panelCfg.mermaMaxPct ? "bg-amber-500" : "bg-emerald-500"
                     }`}
                     style={{ width: `${Math.min(goalProgress, 100)}%` }}
                   />

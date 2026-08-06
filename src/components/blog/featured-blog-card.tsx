@@ -1,6 +1,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Clock, ArrowUpRight, Star } from "lucide-react"
+import { formatPostDate } from "@/lib/blog-format"
 import type { BlogPostMeta } from "@/lib/blog"
 import { getCategory } from "@/lib/blog-categories"
 
@@ -8,12 +9,14 @@ interface FeaturedBlogCardProps {
   post: BlogPostMeta
   size?: "large" | "compact"
   priority?: boolean
+  className?: string
 }
 
 export function FeaturedBlogCard({
   post,
   size = "compact",
   priority = false,
+  className = "",
 }: FeaturedBlogCardProps) {
   const category = getCategory(post.category)
   const large = size === "large"
@@ -23,7 +26,7 @@ export function FeaturedBlogCard({
       href={`/blog/${post.slug}`}
       className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border border-warm-200 bg-white shadow-sm transition-shadow hover:shadow-md ${
         large ? "lg:flex-row" : ""
-      }`}
+      } ${className}`}
     >
       <div
         className={`relative w-full overflow-hidden bg-cream-100 ${
@@ -80,11 +83,7 @@ export function FeaturedBlogCard({
         </p>
         <div className="mt-auto flex items-center gap-3 pt-4 text-xs text-warm-400">
           <span>
-            {new Date(post.date).toLocaleDateString("es-MX", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
+            {formatPostDate(post.date)}
           </span>
           <span className="inline-flex items-center gap-1">
             <Clock className="h-3.5 w-3.5" aria-hidden="true" />

@@ -1,6 +1,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Clock, ArrowUpRight } from "lucide-react"
+import { formatPostDate } from "@/lib/blog-format"
 import type { BlogPostMeta } from "@/lib/blog"
 import { getCategory } from "@/lib/blog-categories"
 
@@ -46,11 +47,7 @@ export function BlogCard({ post, priority = false }: BlogCardProps) {
         </p>
         <div className="mt-auto flex items-center gap-3 pt-4 text-xs text-warm-400">
           <span>
-            {new Date(post.date).toLocaleDateString("es-MX", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
+            {formatPostDate(post.date)}
           </span>
           <span className="inline-flex items-center gap-1">
             <Clock className="h-3.5 w-3.5" aria-hidden="true" />

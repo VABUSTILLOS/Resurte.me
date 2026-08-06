@@ -30,9 +30,9 @@ export const metadata: Metadata = {
 export default async function BlogIndexPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; categoria?: string }>
+  searchParams: Promise<{ q?: string; categoria?: string; tipo?: string }>
 }) {
-  const { q, categoria } = await searchParams
+  const { q, categoria, tipo } = await searchParams
   const posts = getAllPosts()
   const jsonLd = [
     getBlogIndexSchema(posts),
@@ -64,6 +64,7 @@ export default async function BlogIndexPage({
         posts={posts}
         initialQuery={q ?? ""}
         initialCategory={categoria ?? "all"}
+        initialContentType={tipo ?? "all"}
       />
       <div className="pb-16">
         <PostCTA

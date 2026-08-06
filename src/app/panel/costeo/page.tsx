@@ -1,15 +1,21 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { getCatalogProducts, mergeWithCatalog, type CatalogProduct } from "@/lib/catalog"
+import { usePanelConfig } from "@/lib/panel-config"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
+import { normalizeName } from "@/lib/normalize"
+import { uid } from "@/lib/ids"
 import Link from "next/link"
 import {
   Calculator, Plus, Trash2, PieChart, ArrowLeft, Gift, Tag,
   Percent, TrendingDown, AlertCircle, Edit3, Download, CheckSquare,
   Copy, Printer,
 } from "lucide-react"
+import EmptyState from "@/components/panel/EmptyState"
+import ConfirmDialog from "@/components/panel/ConfirmDialog"
 
 // Mock ingredients per collection type — in production this comes from Resurte.me catalog
 const MOCK_INGREDIENTS: Record<string, { name: string; unit: string; price: number }[]> = {
@@ -152,6 +158,7 @@ interface Dish {
   sellingPrice: number
   category: string
   portions: number
+  modificadores?: { id: string; nombre: string; precio: number }[]
 }
 
 const DISH_CATEGORIES = [
@@ -193,15 +200,31 @@ export default function CosteoPage() {
   const { toast } = useToast()
   const slug = selectedCollection?.slug || null
 
-  const ingredients = selectedCollection
+  const mockIngredients = selectedCollection
     ? (MOCK_INGREDIENTS[selectedCollection.slug] || DEFAULT_INGREDIENTS)
     : DEFAULT_INGREDIENTS
+
+  // Real catalog products (Supabase) merged with mocks as fallback
+  const [catalogIngredients, setCatalogIngredients] = useState<CatalogProduct[]>([])
+  useEffect(() => {
+    let alive = true
+    getCatalogProducts().then((products) => {
+      if (alive) setCatalogIngredients(products)
+    })
+    return () => { alive = false }
+  }, [])
+
+  const ingredients = useMemo(
+    () => mergeWithCatalog(mockIngredients, catalogIngredients),
+    [mockIngredients, catalogIngredients],
+  )
 
   // Persist dishes per collection
   const [dishes, setDishes] = useLocalStorage<Dish[]>("costeo-dishes", [], slug)
   // Sync with shared cross-tool store
   const [, setSharedDishes] = useSharedDishes(slug)
   const [showForm, setShowForm] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const [editingDishId, setEditingDishId] = useState<string | null>(null)
   const [newDishName, setNewDishName] = useState("")
   const [newDishIngredients, setNewDishIngredients] = useState<DishIngredient[]>([
@@ -219,7 +242,11 @@ export default function CosteoPage() {
   const [viewMode, setViewMode] = useLocalStorage<string>("costeo-view", "lista", slug)
   const [newDishCategory, setNewDishCategory] = useState("plato-fuerte")
   const [newDishPortions, setNewDishPortions] = useState(4)
+  const [newDishModifiers, setNewDishModifiers] = useState<{ id: string; nombre: string; precio: number }[]>([])
+  const [modName, setModName] = useState("")
+  const [modPrice, setModPrice] = useState("")
   const [inventarioItems] = useLocalStorage<{ name: string; stock: number; minStock: number; unit: string; pricePerUnit: number }[]>("inventario-items", [], slug)
+  const panelCfg = usePanelConfig(slug)
   const [undoStack, setUndoStack] = useState<Dish[][]>([])
   const [undoIndex, setUndoIndex] = useState(-1)
   const [selectedDishes, setSelectedDishes] = useState<Set<string>>(new Set())
@@ -313,6 +340,9 @@ export default function CosteoPage() {
   const comboCost = (items: ComboItem[]) =>
     items.reduce((s, it) => s + dishCostById(it.dishId) * it.qty, 0)
 
+  const comboMissingDishes = (items: ComboItem[]) =>
+    items.filter((it) => !dishes.some((d) => d.id === it.dishId))
+
   const suggestedComboPrice = (items: ComboItem[]) => {
     const cost = comboCost(items)
     return targetFoodCost > 0 ? Math.round((cost / (targetFoodCost / 100)) * 100) / 100 : 0
@@ -345,7 +375,7 @@ export default function CosteoPage() {
       return
     }
     const combo: Combo = {
-      id: `combo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: uid("combo"),
       name: newComboName.trim(),
       items: newComboItems.map((it) => ({ ...it })),
       price,
@@ -426,11 +456,21 @@ export default function CosteoPage() {
         }
       }
       if (e.key === "Escape" && showForm) resetForm()
+      if (e.key === "Escape" && showShortcuts) setShowShortcuts(false)
+      if (e.key === "Escape" && batchDeleteConfirm) setBatchDeleteConfirm(false)
+      if (e.key === "Escape" && comboDeleteConfirm) setComboDeleteConfirm(null)
+      if (e.key === "?") {
+        const el = e.target as HTMLElement
+        const isTyping = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)
+        if (!isTyping) {
+          e.preventDefault()
+          setShowShortcuts((s) => !s)
+        }
+      }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   })
-
   // Warn before leaving if the add/edit form has unsaved changes
   useEffect(() => {
     function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -455,6 +495,9 @@ export default function CosteoPage() {
     setShowForm(false)
     setNewDishCategory("plato-fuerte")
     setNewDishPortions(4)
+    setNewDishModifiers([])
+    setModName("")
+    setModPrice("")
   }
 
   function duplicateDish(dish: Dish) {
@@ -463,6 +506,7 @@ export default function CosteoPage() {
       id: nextId(),
       name: `${dish.name} (copia)`,
       ingredients: dish.ingredients.map((i) => ({ ...i })),
+      modificadores: (dish.modificadores || []).map((m) => ({ ...m })),
     }
     pushHistory([...dishes, copy])
   }
@@ -478,6 +522,18 @@ export default function CosteoPage() {
 
   function removeIngredient(idx: number) {
     setNewDishIngredients(newDishIngredients.filter((_, i) => i !== idx))
+  }
+
+  function addModifier() {
+    const nombre = modName.trim()
+    if (!nombre) return
+    setNewDishModifiers([...newDishModifiers, { id: uid("mod"), nombre, precio: Math.max(0, parseFloat(modPrice) || 0) }])
+    setModName("")
+    setModPrice("")
+  }
+
+  function removeModifier(id: string) {
+    setNewDishModifiers(newDishModifiers.filter((m) => m.id !== id))
   }
 
   function updateIngredient(idx: number, field: keyof DishIngredient, value: string | number) {
@@ -516,6 +572,8 @@ export default function CosteoPage() {
     setNewDishName(dish.name)
     setNewDishIngredients(dish.ingredients.map((ing) => ({ ...ing })))
     setNewDishPortions(dish.portions || 4)
+    setNewDishCategory(dish.category || "plato-fuerte")
+    setNewDishModifiers((dish.modificadores || []).map((m) => ({ ...m })))
     setShowForm(true)
   }
 
@@ -532,6 +590,7 @@ export default function CosteoPage() {
       sellingPrice: Math.round(sellingPrice * 100) / 100,
       category: newDishCategory,
       portions: newDishPortions,
+      modificadores: newDishModifiers.length > 0 ? newDishModifiers.map((m) => ({ ...m })) : undefined,
     }
 
     if (editingDishId) {
@@ -579,6 +638,14 @@ export default function CosteoPage() {
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-bold text-gray-900">Costeando mi menú</h2>
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="w-6 h-6 rounded-full border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 text-xs font-bold transition-colors"
+              title="Atajos de teclado (?)"
+              aria-label="Ver atajos de teclado"
+            >
+              ?
+            </button>
             {dishes.length > 0 && (
               <button
                 onClick={exportCSV}
@@ -616,14 +683,14 @@ export default function CosteoPage() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setTargetFoodCost(Math.max(20, targetFoodCost - 5))}
+              onClick={() => setTargetFoodCost(Math.max(panelCfg.costeoTargetFcMin, targetFoodCost - 5))}
               className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 transition-colors"
             >
               −
             </button>
             <span className="text-2xl font-bold text-[#108910]">{targetFoodCost}%</span>
             <button
-              onClick={() => setTargetFoodCost(Math.min(45, targetFoodCost + 5))}
+              onClick={() => setTargetFoodCost(Math.min(panelCfg.costeoTargetFcMax, targetFoodCost + 5))}
               className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 transition-colors"
             >
               +
@@ -637,6 +704,24 @@ export default function CosteoPage() {
       </div>
 
       {/* Category filter tabs */}
+      {dishes.length === 0 && viewMode === "lista" && (
+        <div className="mb-6">
+          <EmptyState
+            icon={Calculator}
+            title="Tu menú aún no tiene platillos costeados"
+            description="Costea tu primer platillo con sus ingredientes y el precio sugerido se calculará automáticamente según tu food cost objetivo."
+            action={
+              <button
+                onClick={() => setShowForm(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Crear tu primer platillo
+              </button>
+            }
+          />
+        </div>
+      )}
       {dishes.length > 0 && (
         <div className="flex gap-1.5 mb-3 flex-wrap">
           {DISH_CATEGORIES.map((cat) => (
@@ -854,6 +939,15 @@ export default function CosteoPage() {
                   Food cost real: {actualFoodCost.toFixed(1)}%
                   {isGood ? " — ¡Excelente!" : isOk ? " — Aceptable" : " — ¡Revisa tus precios!"}
                 </div>
+                {dish.modificadores && dish.modificadores.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {dish.modificadores.map((m) => (
+                      <span key={m.id} className="text-[9px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium">
+                        +{m.nombre}{m.precio > 0 ? ` $${m.precio.toFixed(0)}` : ""}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}
@@ -909,7 +1003,7 @@ export default function CosteoPage() {
 
           <div className="space-y-3 mb-4">
             {newDishIngredients.map((ing, idx) => {
-              const invMatch = inventarioItems.find((i) => i.name.toLowerCase() === ing.ingredientName.toLowerCase())
+              const invMatch = inventarioItems.find((i) => normalizeName(i.name) === normalizeName(ing.ingredientName))
               return (
               <>
               <div key={idx} className="flex items-center gap-2">
@@ -961,7 +1055,7 @@ export default function CosteoPage() {
                     {ing.unitPrice === invMatch.pricePerUnit && " ✓"}
                   </button>
                   {ing.unitPrice !== invMatch.pricePerUnit && (
-                    <span className="text-[10px] text-gray-400">→ click para usar precio de inventario</span>
+                    <span className="text-[10px] text-amber-600">⚠ precio desactualizado — click para usar ${invMatch.pricePerUnit}</span>
                   )}
                 </div>
               )}
@@ -1028,6 +1122,62 @@ export default function CosteoPage() {
               </div>
             </div>
           )}
+
+          {/* Modificadores del platillo (sin cebolla, extra queso, etc.) */}
+          <div className="mb-4">
+            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">
+              Modificadores opcionales
+              <span className="ml-1 normal-case font-normal text-gray-300">(se suman al precio en Ventas y aparecen en Comanda)</span>
+            </label>
+            <div className="space-y-2">
+              {newDishModifiers.map((m) => (
+                <div key={m.id} className="flex items-center gap-2">
+                  <span className="flex-1 px-3 py-2 rounded-lg bg-amber-50 text-sm text-amber-800 font-medium">
+                    {m.nombre}
+                    <span className="text-amber-600 font-semibold ml-1">{m.precio > 0 ? `+$${m.precio.toFixed(0)}` : "(sin costo)"}</span>
+                  </span>
+                  <button
+                    onClick={() => removeModifier(m.id)}
+                    className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"
+                    aria-label={`Quitar modificador ${m.nombre}`}
+                    title="Quitar modificador"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                value={modName}
+                onChange={(e) => setModName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addModifier() } }}
+                placeholder="Ej. Sin cebolla, extra queso, término medio"
+                className="flex-1 px-3 py-2 rounded-lg border border-amber-200 text-sm focus:outline-none focus:border-amber-400"
+                aria-label="Nombre del modificador"
+              />
+              <input
+                type="number"
+                value={modPrice}
+                onChange={(e) => setModPrice(e.target.value)}
+                placeholder="$"
+                min="0"
+                step="0.5"
+                className="w-20 px-2 py-2 rounded-lg border border-amber-200 text-sm text-center focus:outline-none focus:border-amber-400"
+                aria-label="Precio del modificador"
+              />
+              <button
+                onClick={addModifier}
+                disabled={!modName.trim()}
+                className="px-3 py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-40 transition-colors"
+                title="Agregar modificador"
+                aria-label="Agregar modificador"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
 
           <div className="flex gap-3">
             <button onClick={saveDish} className="flex-1 bg-[#108910] text-white font-semibold py-2.5 rounded-xl hover:bg-[#0D720D] transition-colors">
@@ -1107,6 +1257,14 @@ export default function CosteoPage() {
                       </span>
                     ))}
                   </div>
+                  {comboMissingDishes(combo.items).length > 0 && (
+                    <div className="mb-3 flex items-center gap-2 text-[11px] font-medium text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      {comboMissingDishes(combo.items).length === 1
+                        ? `El platillo "${comboMissingDishes(combo.items)[0].dishName}" ya no existe — su costo cuenta como $0.`
+                        : `${comboMissingDishes(combo.items).length} platillos de este combo ya no existen — su costo cuenta como $0.`}
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                     <div className="bg-gray-50 rounded-xl p-2.5">
                       <p className="text-[10px] text-gray-400">Costo combo</p>
@@ -1278,8 +1436,8 @@ export default function CosteoPage() {
       {/* Tip */}
       <div className="mt-4 bg-blue-50 rounded-xl p-4 border border-blue-100">
         <p className="text-xs text-blue-700">
-          <strong>💡 Tip:</strong> Todos los precios mostrados son del catálogo real de Resurte.me. 
-          Cuando los precios cambien en nuestra plataforma, regresa aquí para actualizar tus costos automáticamente.
+          <strong>💡 Tip:</strong> Los precios de ingredientes vienen del catálogo real de Resurte.me cuando está disponible (los locales usan precios de referencia). 
+          Si los precios cambian en la plataforma, agrega el ingrediente de nuevo para usar el precio actual.
         </p>
       </div>
 
@@ -1322,22 +1480,46 @@ export default function CosteoPage() {
       )}
 
       {/* Batch delete confirmation modal */}
-      {batchDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
-            <h4 className="font-bold text-gray-900 mb-2">¿Eliminar {selectedDishes.size} platillo{selectedDishes.size > 1 ? "s" : ""}?</h4>
-            <p className="text-sm text-gray-500 mb-4">
-              Esta acción no se puede deshacer. Perderás todos los ingredientes y precios de los platillos seleccionados.
-              Puedes deshacer con Ctrl+Z después de eliminar.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={batchDelete} className="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-xl hover:bg-red-700 text-sm">
-                Sí, eliminar
-              </button>
-              <button onClick={() => setBatchDeleteConfirm(false)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-50 text-sm">
-                Cancelar
-              </button>
+      <ConfirmDialog
+        open={batchDeleteConfirm}
+        danger
+        title={`¿Eliminar ${selectedDishes.size} platillo${selectedDishes.size > 1 ? "s" : ""}?`}
+        message="Esta acción no se puede deshacer. Perderás todos los ingredientes y precios de los platillos seleccionados. Puedes deshacer con Ctrl+Z después de eliminar."
+        confirmLabel="Sí, eliminar"
+        onConfirm={batchDelete}
+        onCancel={() => setBatchDeleteConfirm(false)}
+      />
+
+      {/* Shortcuts overlay */}
+      {showShortcuts && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowShortcuts(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-bold text-gray-900">Atajos de teclado</h4>
+              <button onClick={() => setShowShortcuts(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Cerrar atajos">×</button>
             </div>
+            <ul className="space-y-3 text-sm">
+              <li className="flex justify-between items-center">
+                <span className="text-gray-600">Nuevo platillo / combo</span>
+                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-xs font-mono">Ctrl+N</kbd>
+              </li>
+              <li className="flex justify-between items-center">
+                <span className="text-gray-600">Deshacer</span>
+                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-xs font-mono">Ctrl+Z</kbd>
+              </li>
+              <li className="flex justify-between items-center">
+                <span className="text-gray-600">Rehacer</span>
+                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-xs font-mono">Ctrl+Y</kbd>
+              </li>
+              <li className="flex justify-between items-center">
+                <span className="text-gray-600">Cerrar formularios / ventanas</span>
+                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-xs font-mono">Esc</kbd>
+              </li>
+              <li className="flex justify-between items-center">
+                <span className="text-gray-600">Mostrar/ocultar esta ayuda</span>
+                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-xs font-mono">?</kbd>
+              </li>
+            </ul>
           </div>
         </div>
       )}

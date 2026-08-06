@@ -3,11 +3,16 @@
 import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
+import { foodCostStatus, usePanelConfig } from "@/lib/panel-config"
 import { useToast } from "@/components/toast"
+import { normalizeName } from "@/lib/normalize"
+import { uid } from "@/lib/ids"
+import { convertQty } from "@/lib/panel-units"
 import Link from "next/link"
 import {
   ArrowLeft, Plus, Trash2, DollarSign, TrendingUp, Receipt,
   Copy, BarChart3, Target, ChevronUp, ChevronDown, AlertCircle, Landmark, Flame,
+  AlertTriangle, ShieldAlert, Percent, Settings2, Check, Users, Gift,
 } from "lucide-react"
 
 interface SaleEntry {
@@ -20,7 +25,20 @@ interface SaleEntry {
   unitCost: number
   paymentMethod?: PaymentMethod
   channel?: SaleChannel
+  discount?: { type: "monto" | "porcentaje"; value: number }
+  clienteId?: string
+  modificadores?: { nombre: string; precio: number }[]
   createdAt?: string // ISO timestamp, set on addEntry
+}
+
+interface Cliente {
+  id: string
+  nombre: string
+  telefono?: string
+  puntos: number
+  visitas: number
+  totalGastado: number
+  createdAt: string
 }
 
 const PAYMENT_METHODS = [
@@ -78,6 +96,15 @@ function dateLabel(dateStr: string) {
   return `${d.getDate()} ${meses[d.getMonth()]}`
 }
 
+// Revenue of an entry after applying its optional discount.
+function entryTotal(e: SaleEntry) {
+  let total = e.quantity * e.unitPrice
+  if (e.discount) {
+    total -= e.discount.type === "porcentaje" ? (total * e.discount.value) / 100 : e.discount.value
+  }
+  return Math.max(0, total)
+}
+
 export default function VentasPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
@@ -85,17 +112,42 @@ export default function VentasPage() {
   const [sharedDishes] = useSharedDishes(slug)
 
   const [entries, setEntries] = useLocalStorage<SaleEntry[]>("ventas-entries", [], slug)
+  const panelCfg = usePanelConfig(slug)
   const [inventarioItems, setInventarioItems] = useLocalStorage<InventoryItemLike[]>("inventario-items", [], slug)
   const [movements, setMovements] = useLocalStorage<StockMovementLike[]>("inventario-movimientos", [], slug)
   const [deductStock, setDeductStock] = useLocalStorage<boolean>("ventas-descontar-stock", false, slug)
+  const [dailyGoal, setDailyGoal] = useLocalStorage<number>("ventas-meta-dia", 0, slug)
+  const [monthlyGoal, setMonthlyGoal] = useLocalStorage<number>("ventas-meta-mes", 0, slug)
+  const [ticketThreshold, setTicketThreshold] = useLocalStorage<number>("ventas-umbral-ticket", 3000, slug)
+  const [clientes, setClientes] = useLocalStorage<Cliente[]>("clientes", [], slug)
+  const [puntosTasa, setPuntosTasa] = useLocalStorage<number>("ventas-puntos-tasa", 100, slug)
+  const [puntosCanje, setPuntosCanje] = useLocalStorage<number>("ventas-puntos-canje", 1, slug)
+  const [tipoCambio, setTipoCambio] = useLocalStorage<number>("ventas-tipo-cambio", 1, slug)
+  // Keep comanda statuses in sync: deleting a sale must remove its comanda status
+  const [, setComandaStatuses] = useLocalStorage<Record<string, unknown>>("comanda-statuses", {}, slug)
   const [formDishId, setFormDishId] = useState("")
   const [formQty, setFormQty] = useState("1")
   const [formDate, setFormDate] = useState(todayStr())
   const [formPayment, setFormPayment] = useState<PaymentMethod>("efectivo")
   const [formChannel, setFormChannel] = useState<SaleChannel>("comedor")
+  const [formDiscountType, setFormDiscountType] = useState<"monto" | "porcentaje">("monto")
+  const [formDiscountValue, setFormDiscountValue] = useState("")
+  const [formClienteId, setFormClienteId] = useState("")
+  const [formRedeemPts, setFormRedeemPts] = useState("")
+  const [formMods, setFormMods] = useState<string[]>([])
+  const [showGoals, setShowGoals] = useState(false)
+  const [showClientes, setShowClientes] = useState(false)
+  const [clienteName, setClienteName] = useState("")
+  const [clientePhone, setClientePhone] = useState("")
+  const [clientePts, setClientePts] = useState("")
+  const [clienteEditId, setClienteEditId] = useState<string | null>(null)
+  const [clienteDeleteId, setClienteDeleteId] = useState<string | null>(null)
+  const [goalFormDia, setGoalFormDia] = useState("")
+  const [goalFormMes, setGoalFormMes] = useState("")
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [showAll, setShowAll] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [reportPeriod, setReportPeriod] = useState<"hoy" | "7d" | "30d">("hoy")
 
   // ── Derived ────────────────────────────────────────────
   const dishCost = (id: string) => {
@@ -108,19 +160,48 @@ export default function VentasPage() {
   const dayEntries = useMemo(() => entries.filter((e) => e.date === selectedDate), [entries, selectedDate])
 
   const dayStats = useMemo(() => {
-    const revenue = dayEntries.reduce((s, e) => s + e.quantity * e.unitPrice, 0)
+    const revenue = dayEntries.reduce((s, e) => s + entryTotal(e), 0)
     const cost = dayEntries.reduce((s, e) => s + e.quantity * e.unitCost, 0)
     const units = dayEntries.reduce((s, e) => s + e.quantity, 0)
     const orders = dayEntries.length
-    return { revenue, cost, margin: revenue - cost, units, orders, foodCost: revenue > 0 ? (cost / revenue) * 100 : 0, avgTicket: orders > 0 ? revenue / orders : 0 }
+    const discount = dayEntries.reduce(
+      (s, e) => s + (e.quantity * e.unitPrice - entryTotal(e)),
+      0,
+    )
+    return { revenue, cost, margin: revenue - cost, units, orders, foodCost: revenue > 0 ? (cost / revenue) * 100 : 0, avgTicket: orders > 0 ? revenue / orders : 0, discount }
   }, [dayEntries])
+
+  // ── Sales goals (daily / monthly) ─────────────────────
+  const today = todayStr()
+  const monthKey = today.slice(0, 7)
+  const monthRevenue = useMemo(
+    () => entries.filter((e) => e.date.startsWith(monthKey)).reduce((s, e) => s + entryTotal(e), 0),
+    [entries, monthKey],
+  )
+  const dailyGoalPct = dailyGoal > 0 ? (dayStats.revenue / dailyGoal) * 100 : 0
+  const monthlyGoalPct = monthlyGoal > 0 ? (monthRevenue / monthlyGoal) * 100 : 0
+  const hourElapsed = (() => {
+    const now = new Date()
+    return (now.getHours() + now.getMinutes() / 60) / 24
+  })()
+  const projectedRevenue = hourElapsed > 0.04 ? dayStats.revenue / hourElapsed : dayStats.revenue
+  const onPace = dailyGoal > 0 && projectedRevenue >= dailyGoal
+
+  const saveGoals = () => {
+    const d = parseFloat(goalFormDia)
+    const m = parseFloat(goalFormMes)
+    if (!Number.isNaN(d) && d >= 0) setDailyGoal(d)
+    if (!Number.isNaN(m) && m >= 0) setMonthlyGoal(m)
+    setShowGoals(false)
+    toast("Metas de venta guardadas", "success")
+  }
 
   const topSellers = useMemo(() => {
     const byName = new Map<string, { name: string; qty: number; revenue: number }>()
     dayEntries.forEach((e) => {
       const cur = byName.get(e.dishName) || { name: e.dishName, qty: 0, revenue: 0 }
       cur.qty += e.quantity
-      cur.revenue += e.quantity * e.unitPrice
+      cur.revenue += entryTotal(e)
       byName.set(e.dishName, cur)
     })
     return [...byName.values()].sort((a, b) => b.qty - a.qty).slice(0, 5)
@@ -131,7 +212,7 @@ export default function VentasPage() {
     dayEntries.forEach((e) => {
       const m = (e.paymentMethod || "efectivo") as PaymentMethod
       const cur = byMethod.get(m) || { revenue: 0, count: 0 }
-      cur.revenue += e.quantity * e.unitPrice
+      cur.revenue += entryTotal(e)
       cur.count += 1
       byMethod.set(m, cur)
     })
@@ -146,7 +227,7 @@ export default function VentasPage() {
     dayEntries.forEach((e) => {
       const c = (e.channel || "comedor") as SaleChannel
       const cur = byChannel.get(c) || { revenue: 0, count: 0 }
-      cur.revenue += e.quantity * e.unitPrice
+      cur.revenue += entryTotal(e)
       cur.count += 1
       byChannel.set(c, cur)
     })
@@ -162,7 +243,7 @@ export default function VentasPage() {
       const d = new Date()
       d.setDate(d.getDate() - i)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-      const rev = entries.filter((e) => e.date === key).reduce((s, e) => s + e.quantity * e.unitPrice, 0)
+      const rev = entries.filter((e) => e.date === key).reduce((s, e) => s + entryTotal(e), 0)
       const cost = entries.filter((e) => e.date === key).reduce((s, e) => s + e.quantity * e.unitCost, 0)
       days.push({ label: dateLabel(key), revenue: rev, cost })
     }
@@ -171,10 +252,109 @@ export default function VentasPage() {
   }, [entries])
 
   const allTimeStats = useMemo(() => {
-    const revenue = entries.reduce((s, e) => s + e.quantity * e.unitPrice, 0)
+    const revenue = entries.reduce((s, e) => s + entryTotal(e), 0)
     const cost = entries.reduce((s, e) => s + e.quantity * e.unitCost, 0)
     return { revenue, cost, margin: revenue - cost, foodCost: revenue > 0 ? (cost / revenue) * 100 : 0, count: entries.length }
   }, [entries])
+
+  // ── Antifraud heuristics ──────────────────────────────
+  const fraudAlerts = useMemo(() => {
+    const alerts: { entryId: string; dishName: string; reason: string }[] = []
+    dayEntries.forEach((e) => {
+      const total = entryTotal(e)
+      if (ticketThreshold > 0 && total > ticketThreshold) {
+        alerts.push({ entryId: e.id, dishName: e.dishName, reason: `Ticket de $${total.toFixed(0)} supera el umbral de $${ticketThreshold.toFixed(0)}` })
+      }
+      if (e.quantity >= 20) {
+        alerts.push({ entryId: e.id, dishName: e.dishName, reason: `Cantidad de ${e.quantity} unidades` })
+      }
+      if (e.discount && e.discount.type === "porcentaje" && e.discount.value > 30) {
+        alerts.push({ entryId: e.id, dishName: e.dishName, reason: `Descuento del ${e.discount.value}%` })
+      }
+      if (e.unitPrice <= 0) {
+        alerts.push({ entryId: e.id, dishName: e.dishName, reason: "Venta con precio $0" })
+      }
+    })
+    return alerts
+  }, [dayEntries, ticketThreshold])
+
+  // ── Management report (period) ──────────────────────
+  const reportEntries = useMemo(() => {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - (reportPeriod === "hoy" ? 0 : reportPeriod === "7d" ? 7 : 30))
+    const minKey = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`
+    return reportPeriod === "hoy"
+      ? entries.filter((e) => e.date === today)
+      : entries.filter((e) => e.date >= minKey)
+  }, [entries, reportPeriod, today])
+
+  const reportStats = useMemo(() => {
+    const revenue = reportEntries.reduce((s, e) => s + entryTotal(e), 0)
+    const cost = reportEntries.reduce((s, e) => s + e.quantity * e.unitCost, 0)
+    const units = reportEntries.reduce((s, e) => s + e.quantity, 0)
+    const orders = reportEntries.length
+    const discount = reportEntries.reduce((s, e) => s + (e.quantity * e.unitPrice - entryTotal(e)), 0)
+    return {
+      revenue,
+      cost,
+      margin: revenue - cost,
+      units,
+      orders,
+      discount,
+      foodCost: revenue > 0 ? (cost / revenue) * 100 : 0,
+      avgTicket: orders > 0 ? revenue / orders : 0,
+    }
+  }, [reportEntries])
+
+  const reportTop = useMemo(() => {
+    const byName = new Map<string, { name: string; qty: number; revenue: number }>()
+    reportEntries.forEach((e) => {
+      const cur = byName.get(e.dishName) || { name: e.dishName, qty: 0, revenue: 0 }
+      cur.qty += e.quantity
+      cur.revenue += entryTotal(e)
+      byName.set(e.dishName, cur)
+    })
+    return [...byName.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 5)
+  }, [reportEntries])
+
+  const reportMethods = useMemo(() => {
+    const byMethod = new Map<PaymentMethod, number>()
+    reportEntries.forEach((e) => {
+      const m = (e.paymentMethod || "efectivo") as PaymentMethod
+      byMethod.set(m, (byMethod.get(m) || 0) + entryTotal(e))
+    })
+    return PAYMENT_METHODS.map((m) => ({ ...m, revenue: byMethod.get(m.key) || 0 })).filter((m) => m.revenue > 0)
+  }, [reportEntries])
+
+  const reportChannels = useMemo(() => {
+    const byChannel = new Map<SaleChannel, number>()
+    reportEntries.forEach((e) => {
+      const c = (e.channel || "comedor") as SaleChannel
+      byChannel.set(c, (byChannel.get(c) || 0) + entryTotal(e))
+    })
+    return SALE_CHANNELS.map((c) => ({ ...c, revenue: byChannel.get(c.key) || 0 })).filter((c) => c.revenue > 0)
+  }, [reportEntries])
+
+  const copyGerencial = () => {
+    const label = reportPeriod === "hoy" ? "Hoy" : reportPeriod === "7d" ? "Últimos 7 días" : "Últimos 30 días"
+    const lines = [
+      `📊 Reporte gerencial — ${label} (${selectedCollection?.name || ""})`,
+      `Ingresos: $${reportStats.revenue.toFixed(0)}`,
+      `Costo de venta: $${reportStats.cost.toFixed(0)}`,
+      `Margen bruto: $${reportStats.margin.toFixed(0)}`,
+      `Food cost: ${reportStats.foodCost.toFixed(1)}%`,
+      `Tickets: ${reportStats.orders} · Ticket promedio: $${reportStats.avgTicket.toFixed(0)}`,
+      `Platillos vendidos: ${reportStats.units}`,
+    ]
+    if (reportStats.discount > 0) lines.push(`Descuentos otorgados: -$${reportStats.discount.toFixed(0)}`)
+    if (tipoCambio !== 1) lines.push(`Aprox. USD: $${(reportStats.revenue / tipoCambio).toFixed(2)}`)
+    if (reportMethods.length > 0) lines.push("", "Por método de pago:", ...reportMethods.map((m) => `${m.icon} ${m.label}: $${m.revenue.toFixed(0)}`))
+    if (reportChannels.length > 1) lines.push("", "Por canal:", ...reportChannels.map((c) => `${c.icon} ${c.label}: $${c.revenue.toFixed(0)}`))
+    if (reportTop.length > 0) lines.push("", "Top productos:", ...reportTop.map((t, i) => `${i + 1}. ${t.name} — ${t.qty} pz ($${t.revenue.toFixed(0)})`))
+    lines.push("", "📈 Registrado en resurte.me")
+    navigator.clipboard.writeText(lines.join("\n"))
+    toast("Reporte gerencial copiado", "success")
+  }
 
   // ── Actions ────────────────────────────────────────────
   const addEntry = () => {
@@ -193,43 +373,78 @@ export default function VentasPage() {
       return
     }
     const unitCost = dishCost(dish.id)
+    const mods = (dish.modificadores || []).filter((m) => formMods.includes(m.id))
+    const modTotal = mods.reduce((s, m) => s + m.precio, 0)
+    const unitPrice = dish.sellingPrice + modTotal
+    const discountValue = formDiscountValue ? Math.max(0, parseFloat(formDiscountValue) || 0) : 0
+    // Loyalty redemption: convert points to a peso discount (monto)
+    const redeemPts = formRedeemPts ? Math.max(0, parseInt(formRedeemPts) || 0) : 0
+    const redeemValue = formClienteId && redeemPts > 0 ? Math.min(redeemPts * puntosCanje, qty * unitPrice) : 0
     const entry: SaleEntry = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      id: uid("sale"),
       dishId: dish.id,
       dishName: dish.name,
       quantity: qty,
       date: formDate,
-      unitPrice: dish.sellingPrice,
+      unitPrice,
       unitCost,
       paymentMethod: formPayment,
       channel: formChannel,
+      clienteId: formClienteId || undefined,
+      modificadores: mods.length > 0 ? mods.map((m) => ({ nombre: m.nombre, precio: m.precio })) : undefined,
+      discount: redeemValue > 0
+        ? { type: "monto", value: redeemValue }
+        : discountValue > 0 ? { type: formDiscountType, value: discountValue } : undefined,
       createdAt: new Date().toISOString(),
     }
     setEntries((prev) => [...prev, entry])
     setSelectedDate(formDate)
 
+    // Loyalty: accumulate points, visits and spend for the assigned client
+    if (formClienteId) {
+      const total = entryTotal(entry)
+      const earned = Math.floor(total / (puntosTasa > 0 ? puntosTasa : 100))
+      setClientes((prev) =>
+        prev.map((c) =>
+          c.id === formClienteId
+            ? {
+                ...c,
+                puntos: Math.max(0, c.puntos + earned - redeemPts),
+                visitas: c.visitas + 1,
+                totalGastado: c.totalGastado + total,
+              }
+            : c,
+        ),
+      )
+    }
+    setFormRedeemPts("")
+    setFormMods([])
+    setFormDiscountValue("")
+
     // Optional: deduct dish ingredients from inventory (opt-in)
     let deducted = 0
     if (deductStock) {
-      const deductions = new Map<string, { itemId: string; itemName: string; neededKg: number }>()
+      const deductions = new Map<string, { itemId: string; itemName: string; neededQty: number }>()
       dish.ingredients.forEach((ing) => {
-        const key = ing.ingredientName.toLowerCase().trim()
+        const key = normalizeName(ing.ingredientName)
         if (!key) return
-        const neededKg = (ing.quantity || 0) * qty / 1000
-        if (neededKg <= 0) return
-        const item = inventarioItems.find((i) => i.name.toLowerCase().trim() === key)
+        const totalQty = (ing.quantity || 0) * qty
+        if (totalQty <= 0) return
+        const item = inventarioItems.find((i) => normalizeName(i.name) === key)
         if (!item) return
+        // Convert the recipe quantity (in the ingredient's unit) to the inventory item's unit
+        const neededQty = convertQty(totalQty, ing.unit || "g", item.unit) ?? totalQty
         deductions.set(item.id, {
           itemId: item.id,
           itemName: item.name,
-          neededKg: (deductions.get(item.id)?.neededKg || 0) + neededKg,
+          neededQty: (deductions.get(item.id)?.neededQty || 0) + neededQty,
         })
       })
       if (deductions.size > 0) {
         setInventarioItems((prev) =>
           prev.map((i) => {
             const d = deductions.get(i.id)
-            return d ? { ...i, stock: Math.max(0, i.stock - d.neededKg) } : i
+            return d ? { ...i, stock: Math.max(0, i.stock - d.neededQty) } : i
           })
         )
         const newMovements: StockMovementLike[] = Array.from(deductions.values()).map((d) => ({
@@ -237,10 +452,10 @@ export default function VentasPage() {
           itemId: d.itemId,
           itemName: d.itemName,
           tipo: "salida",
-          delta: -d.neededKg,
+          delta: -d.neededQty,
           motivo: `Venta: ${dish.name} ×${qty}`,
         }))
-        setMovements((prev) => [...newMovements, ...prev].slice(0, 50))
+        setMovements((prev) => [...newMovements, ...prev].slice(0, 500))
       }
       deducted = deductions.size
     }
@@ -265,8 +480,70 @@ export default function VentasPage() {
 
   const deleteEntry = (id: string) => {
     setEntries((prev) => prev.filter((e) => e.id !== id))
+    // Remove the orphaned comanda status so it doesn't linger forever
+    setComandaStatuses((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
     setDeleteConfirm(null)
     toast("Venta eliminada", "warning")
+  }
+
+  // ── Clientes frecuentes ────────────────────────────────
+  const saveCliente = () => {
+    const name = clienteName.trim()
+    if (!name) {
+      toast("Escribe el nombre del cliente", "warning")
+      return
+    }
+    const pts = Math.max(0, clientePts ? parseInt(clientePts) || 0 : 0)
+    if (clienteEditId) {
+      setClientes((prev) =>
+        prev.map((c) =>
+          c.id === clienteEditId
+            ? { ...c, nombre: name, telefono: clientePhone.trim() || undefined, puntos: pts }
+            : c,
+        ),
+      )
+      toast("Cliente actualizado", "success")
+    } else {
+      setClientes((prev) => [
+        ...prev,
+        { id: uid("cliente"), nombre: name, telefono: clientePhone.trim() || undefined, puntos: pts, visitas: 0, totalGastado: 0, createdAt: new Date().toISOString() },
+      ])
+      toast("Cliente agregado", "success")
+    }
+    setClienteName("")
+    setClientePhone("")
+    setClientePts("")
+    setClienteEditId(null)
+  }
+
+  const startEditCliente = (c: Cliente) => {
+    setClienteEditId(c.id)
+    setClienteName(c.nombre)
+    setClientePhone(c.telefono || "")
+    setClientePts(String(c.puntos))
+  }
+
+  const confirmDeleteCliente = () => {
+    if (!clienteDeleteId) return
+    setClientes((prev) => prev.filter((c) => c.id !== clienteDeleteId))
+    setClienteDeleteId(null)
+    toast("Cliente eliminado", "warning")
+  }
+
+  const copyClientes = () => {
+    if (clientes.length === 0) {
+      toast("No hay clientes registrados", "warning")
+      return
+    }
+    const header = `👥 Clientes frecuentes — ${selectedCollection?.name || ""}`
+    const lines = clientes.map((c) => `${c.nombre}${c.telefono ? ` · ${c.telefono}` : ""} · ${c.puntos} pts · ${c.visitas} visitas · $${c.totalGastado.toFixed(0)}`)
+    navigator.clipboard.writeText([header, ...lines].join("\n"))
+    toast("Clientes copiados", "success")
   }
 
   const copySummary = () => {
@@ -278,6 +555,7 @@ export default function VentasPage() {
       `Food cost real: ${dayStats.foodCost.toFixed(1)}%`,
       `Platillos vendidos: ${dayStats.units}`,
     ]
+    if (dayStats.discount > 0) lines.push(`Descuentos otorgados: -$${dayStats.discount.toFixed(0)}`)
     const methods = methodBreakdown.filter((m) => m.count > 0)
     const methodLines = methods.length > 0
       ? ["", "Por método de pago:", ...methods.map((m) => `${m.icon} ${m.label}: $${m.revenue.toFixed(0)} (${m.count} venta${m.count > 1 ? "s" : ""})`)]
@@ -289,7 +567,16 @@ export default function VentasPage() {
     const top = topSellers.length > 0
       ? ["", "Top ventas:", ...topSellers.map((t, i) => `${i + 1}. ${t.name} — ${t.qty} pz ($${t.revenue.toFixed(0)})`)]
       : []
-    navigator.clipboard.writeText([header, ...lines, ...methodLines, ...channelLines, ...top, "", "📈 Registrado en resurte.me"].join("\n"))
+    if (tipoCambio !== 1) lines.push(`Aprox. USD: $${(dayStats.revenue / tipoCambio).toFixed(2)}`)
+    const clienteName = (id?: string) => clientes.find((c) => c.id === id)?.nombre || ""
+    const entries = dayEntries.length > 0
+      ? ["", "Ventas del día:", ...dayEntries.map((e, i) => {
+          const mods = e.modificadores && e.modificadores.length > 0 ? ` [+${e.modificadores.map((m) => m.nombre).join(", ")}]` : ""
+          const cli = e.clienteId ? ` · ${clienteName(e.clienteId)}` : ""
+          return `${i + 1}. ${e.dishName}${mods} ×${e.quantity}${cli} — $${(e.unitPrice * e.quantity).toFixed(0)}`
+        })]
+      : []
+    navigator.clipboard.writeText([header, ...lines, ...entries, ...methodLines, ...channelLines, ...top, "", "📈 Registrado en resurte.me"].join("\n"))
     toast("Resumen del día copiado", "success")
   }
 
@@ -303,6 +590,9 @@ export default function VentasPage() {
         ? ["", ...channelBreakdown.filter((c) => c.count > 0)
             .map((c) => `${c.icon} ${c.label}: $${c.revenue.toFixed(0)} (${c.count} venta${c.count > 1 ? "s" : ""})`)]
         : []),
+      ...(dayStats.discount > 0 ? [`Descuentos otorgados: -$${dayStats.discount.toFixed(0)}`] : []),
+      ...(tipoCambio !== 1 ? [`Aprox. USD: $${(dayStats.revenue / tipoCambio).toFixed(2)}`] : []),
+      ...(dayEntries.some((e) => e.modificadores?.length) ? ["", "Con modificadores:", ...dayEntries.filter((e) => e.modificadores?.length).map((e) => `${e.dishName} [+${e.modificadores!.map((m) => m.nombre).join(", ")}] ×${e.quantity}`)] : []),
       "",
       `Total: $${dayStats.revenue.toFixed(0)} · ${dayStats.units} platillos`,
       "",
@@ -317,6 +607,10 @@ export default function VentasPage() {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
         e.preventDefault()
+        if (sharedDishes.length === 0) {
+          toast("Primero costea tu menú para registrar una venta", "warning")
+          return
+        }
         setFormDishId(sharedDishes[0]?.id || "")
         setFormQty("1")
         setFormDate(todayStr())
@@ -459,6 +753,30 @@ export default function VentasPage() {
               ))}
             </select>
           </div>
+          <div className="w-28">
+            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Descuento</label>
+            <select
+              value={formDiscountType}
+              onChange={(e) => setFormDiscountType(e.target.value as "monto" | "porcentaje")}
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#108910]"
+              aria-label="Tipo de descuento"
+            >
+              <option value="monto">$ Monto</option>
+              <option value="porcentaje">%</option>
+            </select>
+          </div>
+          <div className="w-24">
+            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Valor</label>
+            <input
+              type="number"
+              value={formDiscountValue}
+              onChange={(e) => setFormDiscountValue(e.target.value)}
+              min="0"
+              placeholder="0"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+              aria-label="Valor del descuento"
+            />
+          </div>
           <button
             onClick={addEntry}
             disabled={!formDishId}
@@ -468,11 +786,90 @@ export default function VentasPage() {
             Registrar
           </button>
         </div>
-        {formDishId && (
-          <p className="text-[10px] text-gray-400 mt-2">
-            El precio y costo se toman del platillo costeado ({dishPrice(formDishId) > 0 ? `$${dishPrice(formDishId).toFixed(0)} / costo $${dishCost(formDishId).toFixed(0)}` : "sin precio de venta"}).
-          </p>
-        )}
+        {formDishId && (() => {
+          const dish = sharedDishes.find((d) => d.id === formDishId)
+          const mods = dish?.modificadores || []
+          const activeMods = mods.filter((m) => formMods.includes(m.id))
+          const modTotal = activeMods.reduce((s, m) => s + m.precio, 0)
+          const subtotal = (parseInt(formQty) || 1) * (dishPrice(formDishId) + modTotal)
+          const redeemPts = formRedeemPts ? Math.max(0, parseInt(formRedeemPts) || 0) : 0
+          const redeemValue = formClienteId && redeemPts > 0 ? Math.min(redeemPts * puntosCanje, subtotal) : 0
+          const discountValue = Math.max(0, parseFloat(formDiscountValue) || 0)
+          const total = redeemValue > 0 ? subtotal - redeemValue : formDiscountType === "porcentaje" ? subtotal * (1 - discountValue / 100) : subtotal - discountValue
+          return (
+            <>
+              <p className="text-[10px] text-gray-400 mt-2">
+                El precio y costo se toman del platillo costeado (
+                <>
+                  subtotal ${subtotal.toFixed(0)}
+                  {modTotal > 0 && <span className="text-amber-600 font-semibold"> (modificadores +${modTotal.toFixed(0)})</span>}
+                  {(redeemValue > 0 || discountValue > 0) && <> → <span className="text-red-500 font-semibold">${Math.max(0, total).toFixed(0)}</span></>}
+                  {` · costo $${(dishCost(formDishId) * (parseInt(formQty) || 1)).toFixed(0)}`}
+                </>
+                ).
+              </p>
+              {mods.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {mods.map((m) => {
+                    const active = formMods.includes(m.id)
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() =>
+                          setFormMods((prev) =>
+                            active ? prev.filter((x) => x !== m.id) : [...prev, m.id],
+                          )
+                        }
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
+                          active
+                            ? "bg-[#108910] text-white border-[#108910]"
+                            : "bg-gray-50 text-gray-600 border-gray-200 hover:border-[#108910]"
+                        }`}
+                        aria-pressed={active}
+                      >
+                        {active ? "✓ " : "+ "}{m.nombre} {m.precio > 0 ? `+$${m.precio.toFixed(0)}` : ""}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )
+        })()}
+        <div className="flex flex-wrap gap-3 mt-3">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Cliente frecuente</label>
+            <select
+              value={formClienteId}
+              onChange={(e) => { setFormClienteId(e.target.value); setFormRedeemPts("") }}
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#108910]"
+              aria-label="Cliente frecuente"
+            >
+              <option value="">Sin cliente</option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>{c.nombre} · {c.puntos} pts</option>
+              ))}
+            </select>
+          </div>
+          {formClienteId && (
+            <div className="w-36">
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Redimir puntos</label>
+              <input
+                type="number"
+                value={formRedeemPts}
+                onChange={(e) => setFormRedeemPts(e.target.value)}
+                min="0"
+                placeholder={`Máx ${(() => clientes.find((c) => c.id === formClienteId)?.puntos || 0)()} pts`}
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+                aria-label="Puntos a redimir"
+              />
+            </div>
+          )}
+          <div className="flex items-end text-[11px] text-gray-400 pb-2">
+            <span>1 pt = ${puntosTasa.toFixed(0)} MXN · canje $1 = {puntosCanje.toFixed(0)} MXN</span>
+          </div>
+        </div>
         <label className="flex items-start gap-2 mt-3 text-[11px] text-gray-500 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -488,6 +885,342 @@ export default function VentasPage() {
           </span>
         </label>
       </div>
+
+      {/* ── Sales goals ──────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Target className="w-4 h-4 text-[#108910]" />
+          <h3 className="text-sm font-semibold text-gray-900">Metas de venta</h3>
+          <button
+            onClick={() => {
+              if (!showGoals) {
+                setGoalFormDia(String(dailyGoal || ""))
+                setGoalFormMes(String(monthlyGoal || ""))
+              }
+              setShowGoals(!showGoals)
+            }}
+            className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
+            title={showGoals ? "Cerrar edición" : "Editar metas diaria y mensual"}
+            aria-label="Editar metas de venta"
+          >
+            <Settings2 className="w-3.5 h-3.5" />
+            {showGoals ? "Cerrar" : "Editar metas"}
+          </button>
+        </div>
+
+        {showGoals ? (
+          <div className="grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Meta diaria ($)</label>
+              <input
+                type="number"
+                value={goalFormDia}
+                onChange={(e) => setGoalFormDia(e.target.value)}
+                min="0"
+                placeholder="Ej. 12000"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                aria-label="Meta de venta diaria"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Meta mensual ($)</label>
+              <input
+                type="number"
+                value={goalFormMes}
+                onChange={(e) => setGoalFormMes(e.target.value)}
+                min="0"
+                placeholder="Ej. 360000"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                aria-label="Meta de venta mensual"
+              />
+            </div>
+            <button
+              onClick={saveGoals}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+            >
+              <Check className="w-3.5 h-3.5" />
+              Guardar
+            </button>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <div className="flex items-baseline justify-between mb-1.5">
+                <span className="text-xs font-medium text-gray-500">Meta diaria</span>
+                <span className="text-xs text-gray-400">
+                  {dailyGoal > 0 ? `$${dayStats.revenue.toFixed(0)} / $${dailyGoal.toFixed(0)}` : "Sin meta"}
+                </span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    dailyGoalPct >= 100 ? "bg-green-500" : dailyGoalPct >= 50 ? "bg-amber-500" : "bg-[#108910]"
+                  }`}
+                  style={{ width: `${Math.min(dailyGoalPct, 100)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1.5">
+                {dailyGoal > 0
+                  ? `${dailyGoalPct.toFixed(0)}% · Proyección a cierre: $${projectedRevenue.toFixed(0)} ${
+                      onPace ? "✅ En ritmo" : "⚠️ Atrasado"
+                    }`
+                  : "Define una meta para ver tu progreso del día."}
+              </p>
+            </div>
+            <div>
+              <div className="flex items-baseline justify-between mb-1.5">
+                <span className="text-xs font-medium text-gray-500">Meta mensual</span>
+                <span className="text-xs text-gray-400">
+                  {monthlyGoal > 0 ? `$${monthRevenue.toFixed(0)} / $${monthlyGoal.toFixed(0)}` : "Sin meta"}
+                </span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    monthlyGoalPct >= 100 ? "bg-green-500" : monthlyGoalPct >= 50 ? "bg-amber-500" : "bg-[#108910]"
+                  }`}
+                  style={{ width: `${Math.min(monthlyGoalPct, 100)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1.5">
+                {monthlyGoal > 0
+                  ? `${monthlyGoalPct.toFixed(0)}% del mes · te faltan $${Math.max(0, monthlyGoal - monthRevenue).toFixed(0)}`
+                  : "Define una meta para seguir tu avance mensual."}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Clientes frecuentes ──────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Users className="w-4 h-4 text-[#108910]" />
+          <h3 className="text-sm font-semibold text-gray-900">Clientes frecuentes</h3>
+          {clientes.length > 0 && (
+            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+              {clientes.length} cliente{clientes.length !== 1 ? "s" : ""}
+            </span>
+          )}
+          <button
+            onClick={copyClientes}
+            className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
+            title="Copiar lista de clientes"
+            aria-label="Copiar clientes frecuentes"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            Copiar clientes
+          </button>
+          <button
+            onClick={() => setShowClientes(!showClientes)}
+            className="flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
+            aria-expanded={showClientes}
+            aria-label="Mostrar u ocultar clientes frecuentes"
+          >
+            <Settings2 className="w-3.5 h-3.5" />
+            {showClientes ? "Cerrar" : "Gestionar"}
+          </button>
+        </div>
+
+        {showClientes && (
+          <div className="space-y-4">
+            <div className="grid sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Nombre</label>
+                <input
+                  type="text"
+                  value={clienteName}
+                  onChange={(e) => setClienteName(e.target.value)}
+                  placeholder={clienteEditId ? "Editar nombre…" : "Ej. María López"}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                  aria-label="Nombre del cliente"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Teléfono</label>
+                <input
+                  type="text"
+                  value={clientePhone}
+                  onChange={(e) => setClientePhone(e.target.value)}
+                  placeholder="Opcional"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                  aria-label="Teléfono del cliente"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Puntos iniciales</label>
+                <input
+                  type="number"
+                  value={clientePts}
+                  onChange={(e) => setClientePts(e.target.value)}
+                  min="0"
+                  placeholder="0"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+                  aria-label="Puntos iniciales del cliente"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={saveCliente}
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+              >
+                <Check className="w-3.5 h-3.5" />
+                {clienteEditId ? "Guardar cambios" : "Agregar cliente"}
+              </button>
+              {clienteEditId && (
+                <button
+                  onClick={() => { setClienteEditId(null); setClienteName(""); setClientePhone(""); setClientePts("") }}
+                  className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+                >
+                  Cancelar
+                </button>
+              )}
+              <div className="ml-auto flex flex-wrap gap-3 items-end">
+                <label className="block">
+                  <span className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">$ por punto (tasa)</span>
+                  <input
+                    type="number"
+                    value={puntosTasa}
+                    onChange={(e) => setPuntosTasa(Math.max(1, parseFloat(e.target.value) || 0))}
+                    min="1"
+                    className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#108910]"
+                    aria-label="Pesos por punto al ganar"
+                  />
+                </label>
+                <label className="block">
+                  <span className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Valor por punto (canje)</span>
+                  <input
+                    type="number"
+                    value={puntosCanje}
+                    onChange={(e) => setPuntosCanje(Math.max(0, parseFloat(e.target.value) || 0))}
+                    min="0"
+                    step="0.5"
+                    className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#108910]"
+                    aria-label="Pesos por punto al canjear"
+                  />
+                </label>
+                <label className="block">
+                  <span className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Tipo de cambio MXN/USD</span>
+                  <input
+                    type="number"
+                    value={tipoCambio}
+                    onChange={(e) => setTipoCambio(Math.max(0, parseFloat(e.target.value) || 0))}
+                    min="0"
+                    step="0.01"
+                    className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#108910]"
+                    aria-label="Tipo de cambio MXN a USD"
+                  />
+                </label>
+              </div>
+            </div>
+            {clientes.length === 0 ? (
+              <p className="text-[11px] text-gray-400">Aún no registras clientes frecuentes. Agrega el primero para empezar a acumular puntos por compra.</p>
+            ) : (
+              <div className="border-t border-gray-100 pt-3">
+                <ul className="divide-y divide-gray-50">
+                  {clientes.map((c) => (
+                    <li key={c.id} className="flex items-center gap-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{c.nombre}</p>
+                        <p className="text-[10px] text-gray-400">
+                          {c.telefono ? `${c.telefono} · ` : ""}{c.visitas} visita{c.visitas !== 1 ? "s" : ""} · ${c.totalGastado.toFixed(0)} gastados
+                        </p>
+                      </div>
+                      <span className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${c.puntos >= 500 ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
+                        <Gift className="w-3.5 h-3.5" />
+                        {c.puntos} pts
+                      </span>
+                      <button
+                        onClick={() => startEditCliente(c)}
+                        className="p-1.5 text-gray-400 hover:text-[#108910] rounded-lg hover:bg-emerald-50 transition-colors"
+                        title="Editar cliente"
+                        aria-label={`Editar a ${c.nombre}`}
+                      >
+                        <Settings2 className="w-4 h-4" />
+                      </button>
+                      {clienteDeleteId === c.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={confirmDeleteCliente}
+                            className="px-2 py-1 text-[10px] font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600"
+                          >
+                            Sí
+                          </button>
+                          <button
+                            onClick={() => setClienteDeleteId(null)}
+                            className="px-2 py-1 text-[10px] font-semibold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setClienteDeleteId(c.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                          title="Eliminar cliente"
+                          aria-label={`Eliminar a ${c.nombre}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Antifraud alerts ─────────────────────────────── */}
+      {fraudAlerts.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldAlert className="w-4 h-4 text-red-600" />
+            <h3 className="text-sm font-semibold text-red-800">
+              Posibles ventas irregulares ({fraudAlerts.length})
+            </h3>
+            <div className="ml-auto flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-[10px] font-semibold text-red-400 uppercase">
+                Umbral ticket $
+                <input
+                  id="ventas-umbral"
+                  type="number"
+                  value={ticketThreshold}
+                  onChange={(e) => setTicketThreshold(Math.max(0, parseFloat(e.target.value) || 0))}
+                  min="0"
+                  className="w-20 px-2 py-1 rounded-lg border border-red-200 text-xs bg-white focus:outline-none focus:border-red-400"
+                  aria-label="Umbral de ticket para alerta antifraude"
+                />
+              </label>
+              <label className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 uppercase" title="Tipo de cambio MXN → USD (solo presentación)">
+                Tipo cambio MXN/USD
+                <input
+                  id="ventas-tipo-cambio"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={tipoCambio}
+                  onChange={(e) => setTipoCambio(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="w-16 px-2 py-1 rounded-lg border border-emerald-200 text-xs bg-white focus:outline-none focus:border-emerald-400"
+                  aria-label="Tipo de cambio MXN a USD"
+                />
+              </label>
+            </div>
+          </div>
+          <ul className="space-y-1.5">
+            {fraudAlerts.map((a, i) => (
+              <li key={`${a.entryId}-${i}`} className="flex items-center gap-2 text-xs text-red-700">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span className="font-medium">{a.dishName}</span>
+                <span className="text-red-500">— {a.reason}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[10px] text-red-400 mt-3">Revisa estos registros antes de cerrar tu corte de caja.</p>
+        </div>
+      )}
 
       {/* ── Day stats ────────────────────────────────────── */}
       <div className="flex items-center gap-2 mb-4">
@@ -531,6 +1264,7 @@ export default function VentasPage() {
               <DollarSign className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
               <p className="text-lg font-extrabold text-emerald-700">${dayStats.revenue.toFixed(0)}</p>
               <p className="text-[10px] text-gray-400">Ingresos · {dateLabel(selectedDate)}</p>
+              {tipoCambio !== 1 && <p className="text-[10px] text-gray-300 font-semibold mt-0.5">≈ ${(dayStats.revenue / tipoCambio).toFixed(2)} USD</p>}
             </div>
             <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
               <Receipt className="w-5 h-5 text-blue-600 mx-auto mb-1" />
@@ -546,7 +1280,10 @@ export default function VentasPage() {
             </div>
             <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
               <Target className="w-5 h-5 text-amber-600 mx-auto mb-1" />
-              <p className={`text-lg font-extrabold ${dayStats.foodCost > 38 ? "text-red-600" : dayStats.foodCost > 30 ? "text-amber-600" : "text-green-700"}`}>
+              <p className={`text-lg font-extrabold ${
+                foodCostStatus(dayStats.foodCost, panelCfg) === "red" ? "text-red-600" :
+                foodCostStatus(dayStats.foodCost, panelCfg) === "amber" ? "text-amber-600" : "text-green-700"
+              }`}>
                 {dayStats.foodCost.toFixed(1)}%
               </p>
               <p className="text-[10px] text-gray-400">Food cost real del día</p>
@@ -585,8 +1322,122 @@ export default function VentasPage() {
             </div>
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
               <span className="text-xs text-gray-500">Total del día</span>
-              <span className="text-lg font-extrabold text-[#108910]">${dayStats.revenue.toFixed(0)}</span>
+              <span className="flex flex-col items-end">
+                <span className="text-lg font-extrabold text-[#108910]">${dayStats.revenue.toFixed(0)}</span>
+                {tipoCambio !== 1 && <span className="text-[10px] text-gray-400">≈ ${(dayStats.revenue / tipoCambio).toFixed(2)} USD</span>}
+              </span>
             </div>
+          </div>
+
+          {/* ── Management report (period) ─────────────── */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <BarChart3 className="w-4 h-4 text-purple-600" />
+              <h3 className="text-sm font-semibold text-gray-900">Reporte gerencial</h3>
+              <div className="flex items-center gap-1 ml-auto">
+                {(["hoy", "7d", "30d"] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setReportPeriod(p)}
+                    className={`px-3 py-1 text-[10px] font-semibold rounded-lg transition-colors ${
+                      reportPeriod === p ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    }`}
+                  >
+                    {p === "hoy" ? "Hoy" : p === "7d" ? "7 días" : "30 días"}
+                  </button>
+                ))}
+                <button
+                  onClick={copyGerencial}
+                  disabled={reportEntries.length === 0}
+                  title="Copiar reporte gerencial del período"
+                  aria-label="Copiar reporte gerencial"
+                  className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  Copiar reporte
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-gray-500 mb-1">Ingresos</p>
+                <p className="text-lg font-extrabold text-[#108910]">${reportStats.revenue.toFixed(0)}</p>
+                <p className="text-[10px] text-gray-400">{reportStats.orders} ticket{reportStats.orders !== 1 ? "s" : ""}</p>
+                {tipoCambio !== 1 && <p className="text-[10px] text-gray-300 font-semibold">≈ ${(reportStats.revenue / tipoCambio).toFixed(2)} USD</p>}
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-gray-500 mb-1">Costo de venta</p>
+                <p className="text-lg font-extrabold text-gray-800">${reportStats.cost.toFixed(0)}</p>
+                <p className="text-[10px] text-gray-400">{reportStats.units} platillos</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-gray-500 mb-1">Margen bruto</p>
+                <p className="text-lg font-extrabold text-gray-800">${reportStats.margin.toFixed(0)}</p>
+                <p className="text-[10px] text-gray-400">ingresos − costo</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-gray-500 mb-1">Food cost</p>
+                <p className="text-lg font-extrabold text-gray-800">{reportStats.foodCost.toFixed(1)}%</p>
+                <p className="text-[10px] text-gray-400">costo / ingresos</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-gray-500 mb-1">Ticket promedio</p>
+                <p className="text-lg font-extrabold text-gray-800">${reportStats.avgTicket.toFixed(0)}</p>
+                <p className="text-[10px] text-gray-400">{reportStats.orders > 0 ? "por ticket" : "sin ventas"}</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 text-center">
+                <p className="text-[10px] text-gray-500 mb-1">Descuentos</p>
+                <p className="text-lg font-extrabold text-red-600">-${reportStats.discount.toFixed(0)}</p>
+                <p className="text-[10px] text-gray-400">otorgados</p>
+              </div>
+            </div>
+
+            {reportEntries.length === 0 ? (
+              <p className="text-xs text-gray-400">Sin ventas en este período.</p>
+            ) : (
+              <div className="grid sm:grid-cols-3 gap-4 text-xs">
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500 font-semibold mb-2">Por método de pago</p>
+                  <div className="space-y-1.5">
+                    {reportMethods.length === 0 ? (
+                      <p className="text-gray-400">—</p>
+                    ) : reportMethods.map((m) => (
+                      <div key={m.key} className="flex items-center justify-between gap-2">
+                        <span className="text-gray-600">{m.icon} {m.label}</span>
+                        <span className="font-semibold text-gray-800">${m.revenue.toFixed(0)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500 font-semibold mb-2">Por canal</p>
+                  <div className="space-y-1.5">
+                    {reportChannels.length === 0 ? (
+                      <p className="text-gray-400">—</p>
+                    ) : reportChannels.map((c) => (
+                      <div key={c.key} className="flex items-center justify-between gap-2">
+                        <span className="text-gray-600">{c.icon} {c.label}</span>
+                        <span className="font-semibold text-gray-800">${c.revenue.toFixed(0)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-[10px] text-gray-500 font-semibold mb-2">Top productos</p>
+                  <div className="space-y-1.5">
+                    {reportTop.length === 0 ? (
+                      <p className="text-gray-400">—</p>
+                    ) : reportTop.map((t, i) => (
+                      <div key={t.name} className="flex items-center justify-between gap-2">
+                        <span className="text-gray-600 truncate">{i + 1}. {t.name}</span>
+                        <span className="font-semibold text-gray-800 shrink-0">{t.qty} pz</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6 mb-6">
@@ -661,19 +1512,19 @@ export default function VentasPage() {
               )}
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-xs" aria-label="Ventas del día">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Platillo</th>
-                    <th className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Cant.</th>
-                    <th className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Precio</th>
-                    <th className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Costo</th>
-                    <th className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Total</th>
-                    <th className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Margen</th>
-                    <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Fecha</th>
-                    <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Pago</th>
-                    <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Canal</th>
-                    <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Acción</th>
+                    <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Platillo</th>
+                    <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Cant.</th>
+                    <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Precio</th>
+                    <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Costo</th>
+                    <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Total</th>
+                    <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Margen</th>
+                    <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Fecha</th>
+                    <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Pago</th>
+                    <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Canal</th>
+                    <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Acción</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -681,14 +1532,32 @@ export default function VentasPage() {
                     .slice()
                     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
                     .map((e) => {
-                      const total = e.quantity * e.unitPrice
+                      const subtotal = e.quantity * e.unitPrice
+                      const total = entryTotal(e)
                       const cost = e.quantity * e.unitCost
                       const margin = total - cost
+                      const currentCost = dishCost(e.dishId)
+                      const costStale = e.dishId && currentCost > 0 && Math.abs(currentCost - e.unitCost) > 0.01
                       return (
                         <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                           <td className="px-4 py-3">
-                            <p className="font-semibold text-gray-800">{e.dishName}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-semibold text-gray-800">{e.dishName}</p>
+                              {e.clienteId && (() => {
+                                const c = clientes.find((x) => x.id === e.clienteId)
+                                return c ? <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full font-medium">👤 {c.nombre}</span> : null
+                              })()}
+                            </div>
                             <p className="text-[10px] text-gray-400">${e.unitPrice.toFixed(0)} / ${e.unitCost.toFixed(2)}</p>
+                            {e.modificadores && e.modificadores.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {e.modificadores.map((m) => (
+                                  <span key={m.nombre} className="text-[9px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium">
+                                    +{m.nombre}{m.precio > 0 ? ` $${m.precio.toFixed(0)}` : ""}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1">
@@ -707,8 +1576,29 @@ export default function VentasPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-right text-gray-700 font-medium">${e.unitPrice.toFixed(0)}</td>
-                          <td className="px-4 py-3 text-right text-gray-500">${cost.toFixed(0)}</td>
-                          <td className="px-4 py-3 text-right font-bold text-gray-900">${total.toFixed(0)}</td>
+                          <td className="px-4 py-3 text-right text-gray-500">${cost.toFixed(0)}
+                            {costStale && (
+                              <span
+                                className="block text-[9px] text-amber-600 font-semibold mt-0.5 cursor-help"
+                                title={`El costo registrado fue $${e.unitCost.toFixed(2)}/u; hoy el platillo cuesta $${currentCost.toFixed(2)}/u. El margen usa el costo congelado de la venta.`}
+                              >
+                                ⚠ costo actualizado
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {e.discount ? (
+                              <>
+                                <p className="text-[10px] text-gray-400 line-through">${subtotal.toFixed(0)}</p>
+                                <p className="font-bold text-red-600">${total.toFixed(0)}</p>
+                                <p className="text-[9px] text-red-400 font-semibold">
+                                  {e.discount.type === "porcentaje" ? `${e.discount.value}%` : `-$${e.discount.value.toFixed(0)}`} desc.
+                                </p>
+                              </>
+                            ) : (
+                              <p className="font-bold text-gray-900">${total.toFixed(0)}</p>
+                            )}
+                          </td>
                           <td className={`px-4 py-3 text-right font-bold ${margin >= 0 ? "text-green-600" : "text-red-600"}`}>
                             ${margin.toFixed(0)}
                           </td>
@@ -770,7 +1660,7 @@ export default function VentasPage() {
               <p className="text-xs text-gray-500 leading-relaxed">
                 {allTimeStats.count} registros · ${allTimeStats.revenue.toFixed(0)} ingresos · ${allTimeStats.margin.toFixed(0)} margen bruto
                 {allTimeStats.foodCost > 0 && ` · food cost promedio ${allTimeStats.foodCost.toFixed(1)}%`}.
-                Un food cost arriba de 38% significa que estás regalando margen: ajusta precios desde el Costeador.
+                Un food cost arriba de {panelCfg.foodCostRedAbove}% significa que estás regalando margen: ajusta precios desde el Costeador.
               </p>
             </div>
           </div>

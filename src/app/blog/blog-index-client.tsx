@@ -227,7 +227,7 @@ export function BlogIndexClient({
           Tipo de contenido
         </span>
         {[
-          { slug: "all", label: "Todos", emoji: "🗂️" },
+          { slug: "all", label: "Todos", emoji: "🗂️", description: "Todos los tipos de contenido" },
           ...BLOG_CONTENT_TYPES,
         ].map((chip) => {
           const active = activeContentType === chip.slug
@@ -265,13 +265,13 @@ export function BlogIndexClient({
               </p>
             </div>
           </div>
-          <div className="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 flex flex-col gap-6">
             <FeaturedBlogCard
               post={featured[0]}
               size="large"
               priority
             />
-            <div className="flex flex-col gap-6 md:col-span-1">
+            <div className="grid gap-6 sm:grid-cols-3">
               {featured.slice(1, 4).map((post) => (
                 <FeaturedBlogCard key={post.slug} post={post} />
               ))}

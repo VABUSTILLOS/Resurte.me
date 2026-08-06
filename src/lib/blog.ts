@@ -48,7 +48,8 @@ export interface BlogPostMeta {
 
 function normalizeFrontmatter(
   slug: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  body?: string
 ): BlogPostMeta {
   const date = String(data.date ?? "")
   const updatedAt = String(data.updatedAt ?? date)
@@ -89,7 +90,7 @@ function normalizeFrontmatter(
   }
 
   const title = String(data.title ?? slug)
-  const raw = String(data.description ?? "")
+  const raw = body?.trim() || String(data.description ?? "")
   const readingTime = estimateReadingTime(raw)
 
   return {
@@ -122,7 +123,7 @@ function readPostFile(slug: string): { content: string; data: BlogPostMeta } | n
   if (!fs.existsSync(file)) return null
   const raw = fs.readFileSync(file, "utf-8")
   const { content, data } = matter(raw)
-  return { content, data: normalizeFrontmatter(slug, data) }
+  return { content, data: normalizeFrontmatter(slug, data, content) }
 }
 
 /** Todos los posts, ordenados por fecha (más reciente primero). */

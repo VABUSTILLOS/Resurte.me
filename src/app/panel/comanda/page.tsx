@@ -20,6 +20,8 @@ interface SaleEntryLike {
   unitCost: number
   paymentMethod?: string
   channel?: string
+  clienteId?: string
+  modificadores?: { nombre: string; precio: number }[]
   createdAt?: string
 }
 
@@ -150,6 +152,39 @@ export default function ComandaPage() {
     return { count: listos.length, avgMin: totalMin / listos.length, totalMin }
   }, [dayEntries, statuses, now])
 
+  // "En producción ahora": group en-cocina by dishName with live elapsed average
+  const inProduction = useMemo(() => {
+    const map = new Map<string, { dishName: string; count: number; totalMs: number }>()
+    comandas.forEach((c) => {
+      if (c.status !== "en-cocina") return
+      const cur = map.get(c.entry.dishName) || { dishName: c.entry.dishName, count: 0, totalMs: 0 }
+      cur.count += c.entry.quantity
+      cur.totalMs += now - (c.startedAt || c.time)
+      map.set(c.entry.dishName, cur)
+    })
+    return Array.from(map.values()).map((g) => ({ ...g, avgMin: Math.max(0, g.totalMs / g.count / 60000) }))
+  }, [comandas, now])
+
+  // Average production time per dish over all "listo" comandas of the day
+  const dishAvgTimes = useMemo(() => {
+    const map = new Map<string, { dishName: string; count: number; totalMin: number }>()
+    dayEntries.forEach((e) => {
+      const s = statuses[e.id]
+      if (!s || s.status !== "listo") return
+      const start = s.startedAt || entryTime(e)
+      const ready = s.readyAt || now
+      const mins = Math.max(0, (ready - start) / 60000)
+      const cur = map.get(e.dishName) || { dishName: e.dishName, count: 0, totalMin: 0 }
+      cur.count += 1
+      cur.totalMin += mins
+      map.set(e.dishName, cur)
+    })
+    return Array.from(map.values())
+      .map((g) => ({ dishName: g.dishName, count: g.count, avgMin: g.totalMin / g.count }))
+      .sort((a, b) => b.avgMin - a.avgMin)
+      .slice(0, 5)
+  }, [dayEntries, statuses, now])
+
   const setComandaStatus = (id: string, patch: Partial<ComandaStatus> & { status: ComandaStatus["status"] }) => {
     setStatuses((prev) => {
       const base = prev[id] || { status: "pendiente" as const }
@@ -192,6 +227,15 @@ export default function ComandaPage() {
       prodStats.count > 0
         ? `Tiempo promedio de producción: ${prodStats.avgMin.toFixed(0)} min (${prodStats.count} comanda${prodStats.count > 1 ? "s" : ""})`
         : "Tiempo promedio de producción: —",
+      ...(inProduction.length > 0
+        ? ["", "En producción ahora:", ...inProduction.map((g) => `${g.dishName} ×${g.count} — ${g.avgMin.toFixed(0)} min promedio`)]
+        : []),
+      ...(dishAvgTimes.length > 0
+        ? ["", "Tiempos por platillo (listas):", ...dishAvgTimes.map((g) => `${g.dishName} — ${g.avgMin.toFixed(0)} min (${g.count})`)]
+        : []),
+      ...(filtered.some((f) => f.entry.modificadores?.length)
+        ? ["", "Con modificadores:", ...filtered.filter((f) => f.entry.modificadores?.length).map((f) => `${f.entry.dishName} [+${f.entry.modificadores!.map((m) => m.nombre).join(", ")}] ×${f.entry.quantity}`)]
+        : []),
       "",
       ...CHANNELS.filter((c) => filtered.some((f) => (f.entry.channel || "comedor") === c.key))
         .map((c) => `${c.icon} ${c.label}: ${filtered.filter((f) => (f.entry.channel || "comedor") === c.key).length}`),
@@ -366,6 +410,54 @@ export default function ComandaPage() {
         </div>
       </div>
 
+      {/* ── En producción ahora + tiempos por platillo ───── */}
+      {(inProduction.length > 0 || dishAvgTimes.length > 0) && (
+        <div className="grid md:grid-cols-2 gap-4 mb-6">
+          {inProduction.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Flame className="w-4 h-4 text-blue-600" />
+                <h3 className="text-sm font-semibold text-gray-900">En producción ahora</h3>
+                <span className="ml-auto text-[10px] text-gray-400">actualiza cada 30s</span>
+              </div>
+              <ul className="space-y-2">
+                {inProduction.map((g) => (
+                  <li key={g.dishName} className="flex items-center gap-3">
+                    <span className="flex-1 text-sm font-semibold text-gray-800 truncate">{g.dishName}</span>
+                    <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">×{g.count}</span>
+                    <span className="text-[10px] text-gray-400 w-20 text-right">{g.avgMin.toFixed(0)} min en corte</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {dishAvgTimes.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="w-4 h-4 text-[#108910]" />
+                <h3 className="text-sm font-semibold text-gray-900">Tiempos por platillo (listas)</h3>
+                <span className="ml-auto text-[10px] text-gray-400">top 5</span>
+              </div>
+              <ul className="space-y-2">
+                {dishAvgTimes.map((g) => (
+                  <li key={g.dishName} className="flex items-center gap-3">
+                    <span className="flex-1 text-sm font-semibold text-gray-800 truncate">{g.dishName}</span>
+                    <span className="text-[10px] text-gray-400">{g.count} pz</span>
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        g.avgMin > 15 ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"
+                      }`}
+                    >
+                      {g.avgMin > 15 ? "⚠️ " : ""}{g.avgMin.toFixed(0)} min
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {dayEntries.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
           <ChefHat className="w-12 h-12 text-gray-200 mx-auto mb-4" />
@@ -416,6 +508,15 @@ export default function ComandaPage() {
                             <p className="font-bold text-gray-900 text-sm leading-tight">{c.entry.dishName}</p>
                             <span className="text-lg font-extrabold text-gray-700 shrink-0">×{c.entry.quantity}</span>
                           </div>
+                          {c.entry.modificadores && c.entry.modificadores.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {c.entry.modificadores.map((m) => (
+                                <span key={m.nombre} className="text-[9px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium">
+                                  +{m.nombre}{m.precio > 0 ? ` $${m.precio.toFixed(0)}` : ""}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
                               {chan?.icon} {chan?.label}
@@ -507,6 +608,15 @@ export default function ComandaPage() {
                     <tr key={c.entry.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-3">
                         <p className="font-semibold text-gray-800">{c.entry.dishName}</p>
+                        {c.entry.modificadores && c.entry.modificadores.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {c.entry.modificadores.map((m) => (
+                              <span key={m.nombre} className="text-[9px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium">
+                                +{m.nombre}{m.precio > 0 ? ` $${m.precio.toFixed(0)}` : ""}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-gray-800">×{c.entry.quantity}</td>
                       <td className="px-4 py-3 text-center text-gray-500">{chan?.icon} {chan?.label}</td>

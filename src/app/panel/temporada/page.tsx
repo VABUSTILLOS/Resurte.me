@@ -103,7 +103,10 @@ export default function TemporadaPage() {
   
   interface ShoppingItem { key: string; name: string; icon: string; pricePerKg: number; quantityKg: number }
   const [shoppingList, setShoppingList] = useLocalStorage<ShoppingItem[]>("temporada-shopping-list", [], slug)
-  interface TransferItem { name: string; icon: string; price: number; qtyKg: number; unit: string }
+  // Transfer items carry clean names (no emoji) + real unit so the planificador
+  // matches them against inventory. `qtyKg` is kept for legacy data written
+  // before the unit unification.
+  interface TransferItem { name: string; unit: string; price: number; qty: number; icon?: string; qtyKg?: number }
   const [transfers, setTransfers] = useLocalStorage<TransferItem[]>("temporada-transfer", [], slug)
 
   const tips = selectedCollection
@@ -127,10 +130,26 @@ export default function TemporadaPage() {
   function transferToPlanner(item: { name: string; icon: string; highPrice: number }) {
     setTransfers((prev) => {
       const exists = prev.find((t) => t.name === item.name)
-      if (exists) return prev.map((t) => t.name === item.name ? { ...t, qtyKg: t.qtyKg + 5 } : t)
-      return [...prev, { name: item.name, icon: item.icon, price: item.highPrice, qtyKg: 5, unit: "kg" }]
+      if (exists) return prev.map((t) => t.name === item.name ? { ...t, qty: t.qty + 5 } : t)
+      return [...prev, { name: item.name, unit: "kg", price: item.highPrice, qty: 5 }]
     })
     toast(`${item.icon} ${item.name} enviado al planificador`, "success")
+    router.push("/panel/planificador")
+  }
+
+  // Send the whole shopping list (clean names + real unit + price + qty) to the planificador
+  function transferShoppingListToPlanner() {
+    if (shoppingList.length === 0) return
+    setTransfers((prev) => {
+      const next = [...prev]
+      shoppingList.forEach((s) => {
+        const exists = next.find((t) => t.name === s.name)
+        if (exists) exists.qty += s.quantityKg
+        else next.push({ name: s.name, unit: "kg", price: s.pricePerKg, qty: s.quantityKg })
+      })
+      return next
+    })
+    toast(`${shoppingList.length} producto${shoppingList.length > 1 ? "s" : ""} enviado${shoppingList.length > 1 ? "s" : ""} al planificador`, "success")
     router.push("/panel/planificador")
   }
 
@@ -267,13 +286,23 @@ export default function TemporadaPage() {
                   {shoppingList.length} producto{shoppingList.length > 1 ? "s" : ""}
                 </span>
               </div>
-              <button
-                onClick={copyShoppingList}
-                className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg transition-colors"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                Copiar lista
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={copyShoppingList}
+                  className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg transition-colors"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  Copiar lista
+                </button>
+                <button
+                  onClick={transferShoppingListToPlanner}
+                  className="flex items-center gap-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1.5 rounded-lg transition-colors"
+                  title="Envía la lista de compras al planificador"
+                >
+                  <ShoppingCart className="w-3.5 h-3.5" />
+                  Enviar al planificador
+                </button>
+              </div>
             </div>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {shoppingList.map((s) => (

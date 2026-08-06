@@ -4,13 +4,6 @@ import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Search, X, ArrowRight } from "lucide-react"
 
-interface Product {
-  name: string
-  category: string
-  price: number
-  unit: string
-}
-
 interface InventarioItem {
   name: string
   stock: number
@@ -35,6 +28,24 @@ interface SearchResult {
   emoji: string
 }
 
+interface WasteEntry {
+  id: string
+  category: string
+  amountKg: number
+  costPerKg: number
+  date: string
+  note?: string
+  cause?: string
+}
+
+interface ShoppingItem {
+  key: string
+  name: string
+  icon?: string
+  pricePerKg?: number
+  quantityKg?: number
+}
+
 function readJSON<T>(key: string): T[] {
   if (typeof window === "undefined") return []
   try {
@@ -43,10 +54,13 @@ function readJSON<T>(key: string): T[] {
   } catch { return [] }
 }
 
-export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: () => void; slug?: string | null }) {
   const router = useRouter()
   const [query, setQuery] = useState("")
   const [selectedIdx, setSelectedIdx] = useState(0)
+
+  // Claves reales scoped por colección (mismo formato que useLocalStorage).
+  const storageKey = (key: string) => (slug ? `resurte-${key}-${slug}` : `resurte-${key}`)
 
   useEffect(() => {
     if (open) {
@@ -60,27 +74,35 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
     const q = query.toLowerCase()
     const items: SearchResult[] = []
 
-    // Index dishes from costeo
+    // Index dishes from costeo (datos reales de shared-dishes)
     try {
-      const dishes: Dish[] = readJSON("resurte-costeo-dishes-default") || []
-      dishes.forEach((d) => {
-        if (d.name.toLowerCase().includes(q) || d.category?.toLowerCase().includes(q) || d.ingredients?.some((i) => i.ingredientName.toLowerCase().includes(q))) {
-          items.push({
-            id: `dish-${d.name}`,
-            label: d.name,
-            subtitle: `${d.category || "Sin categoría"} · ${d.ingredients?.length || 0} ingredientes`,
-            tool: "costeo",
-            toolLabel: "Costeo de Menú",
-            url: "/panel/costeo",
-            emoji: "🍽️",
-          })
-        }
+      const dishes: Dish[] = readJSON(storageKey("costeo-dishes"))
+      const shared: Dish[] = readJSON(storageKey("shared-dishes"))
+      const allDishes = [...dishes, ...shared]
+      const seenDishes = new Set<string>()
+      allDishes.forEach((d) => {
+        if (!d.name || seenDishes.has(d.name)) return
+        const hit =
+          d.name.toLowerCase().includes(q) ||
+          d.category?.toLowerCase().includes(q) ||
+          d.ingredients?.some((i) => i.ingredientName.toLowerCase().includes(q))
+        if (!hit) return
+        seenDishes.add(d.name)
+        items.push({
+          id: `dish-${d.name}`,
+          label: d.name,
+          subtitle: `${d.category || "Sin categoría"} · ${d.ingredients?.length || 0} ingredientes`,
+          tool: "costeo",
+          toolLabel: "Costeo de Menú",
+          url: "/panel/costeo",
+          emoji: "🍽️",
+        })
       })
     } catch {}
 
     // Index inventario
     try {
-      const inv: InventarioItem[] = readJSON("resurte-inventario-items-default") || []
+      const inv: InventarioItem[] = readJSON(storageKey("inventario-items"))
       inv.forEach((i) => {
         if (i.name.toLowerCase().includes(q)) {
           const status = i.stock <= 0 ? "Agotado" : i.stock <= i.stockMin ? "Bajo" : "OK"
@@ -97,14 +119,18 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
       })
     } catch {}
 
-    // Index planificador products
+    // Index planificador: cantidades manuales reales (productos del pedido)
     try {
-      const raw = localStorage.getItem("resurte-planner-products-default")
+      const raw = localStorage.getItem(storageKey("planner-manual-qtys"))
       if (raw) {
-        const prods: Product[] = JSON.parse(raw)
-        prods.forEach((p) => {
-          if (p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)) {
-            items.push({ id: `prod-${p.name}`, label: p.name, subtitle: `${p.category} · $${p.price}/${p.unit}`, tool: "planificador", toolLabel: "Planificador", url: "/panel/planificador", emoji: "📋" })
+        const qtys: Record<string, unknown> = JSON.parse(raw)
+        Object.entries(qtys).forEach(([name, value]) => {
+          if (!name.toLowerCase().includes(q)) return
+          if (value && typeof value === "object" && typeof (value as { qty?: unknown }).qty === "number") {
+            const v = value as { qty: number; unit?: string }
+            items.push({ id: `prod-${name}`, label: name, subtitle: `Cantidad: ${v.qty} ${v.unit || "kg"} (pedido actual)`, tool: "planificador", toolLabel: "Planificador", url: "/panel/planificador", emoji: "📋" })
+          } else if (typeof value === "number") {
+            items.push({ id: `prod-${name}`, label: name, subtitle: `Cantidad: ${value} (pedido actual)`, tool: "planificador", toolLabel: "Planificador", url: "/panel/planificador", emoji: "📋" })
           }
         })
       }
@@ -112,7 +138,7 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
 
     // Index ventas entries
     try {
-      const raw = localStorage.getItem("resurte-ventas-entries-default")
+      const raw = localStorage.getItem(storageKey("ventas-entries"))
       if (raw) {
         const sales: { dishName: string; quantity: number; date: string; unitPrice: number }[] = JSON.parse(raw)
         const seen = new Set<string>()
@@ -133,9 +159,46 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
       }
     } catch {}
 
+    // Index mermas entries
+    try {
+      const wastes: WasteEntry[] = readJSON(storageKey("mermas-entries"))
+      wastes.forEach((w) => {
+        const haystack = `${w.category} ${w.cause || ""} ${w.note || ""}`
+        if (haystack.toLowerCase().includes(q)) {
+          items.push({
+            id: `merma-${w.id || w.date}`,
+            label: `${w.category} — ${w.amountKg} kg`,
+            subtitle: `Costo: $${w.costPerKg}/kg · ${w.date}${w.cause ? ` · ${w.cause}` : ""}`,
+            tool: "mermas",
+            toolLabel: "Mermas",
+            url: "/panel/mermas",
+            emoji: "♻️",
+          })
+        }
+      })
+    } catch {}
+
+    // Index temporada: lista de compras estacional
+    try {
+      const list: ShoppingItem[] = readJSON(storageKey("temporada-shopping-list"))
+      list.forEach((s) => {
+        if (s.name.toLowerCase().includes(q)) {
+          items.push({
+            id: `temporada-${s.key || s.name}`,
+            label: `${s.icon || ""} ${s.name}`.trim(),
+            subtitle: `${s.quantityKg ?? 1} kg · $${s.pricePerKg ?? 0}/kg`,
+            tool: "temporada",
+            toolLabel: "Temporada",
+            url: "/panel/temporada",
+            emoji: "🌱",
+          })
+        }
+      })
+    } catch {}
+
     // Limit to 8 results max
     return items.slice(0, 8)
-  }, [query])
+  }, [query, storageKey])
 
   const goTo = (url: string) => {
     onClose()

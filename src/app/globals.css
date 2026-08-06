@@ -64,6 +64,30 @@
   --inset-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Theme toggle (light/dark/system) — explicit data-theme wins */
+[data-theme="light"] {
+  --background: #faf8f5;
+  --foreground: #1a1a1a;
+}
+
+[data-theme="dark"] {
+  --background: #191A1C;
+  --foreground: #E8E9EB;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* System preference — applies when the user picked "system" (no data-theme) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #191A1C;
+    --foreground: #E8E9EB;
+  }
+}
+
 /* Mobile: no tap highlight, no auto-zoom on focus, snappier taps */
 html {
   -webkit-tap-highlight-color: transparent;
@@ -91,7 +115,7 @@ label[for] {
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --background: #191A1C;
     --foreground: #E8E9EB;
   }

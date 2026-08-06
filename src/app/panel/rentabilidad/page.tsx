@@ -4,6 +4,9 @@ import { useMemo, useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
+import { foodCostStatus, usePanelConfig } from "@/lib/panel-config"
+import { normalizeName } from "@/lib/normalize"
+import EmptyState from "@/components/panel/EmptyState"
 import Link from "next/link"
 import {
   TrendingUp, ArrowLeft, Circle, AlertTriangle, CheckCircle2,
@@ -146,6 +149,7 @@ export default function RentabilidadPage() {
   const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
   const [mermaEntries] = useLocalStorage<{ amountKg: number; costPerKg: number; id: string; date: string }[]>("mermas-entries", [], slug)
+  const panelCfg = usePanelConfig(slug)
   const [monthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
   const [priceOverrides, setPriceOverrides] = useLocalStorage<Record<string, number>>("rentabilidad-prices", {}, slug)
   const [editingName, setEditingName] = useState<string | null>(null)
@@ -153,6 +157,16 @@ export default function RentabilidadPage() {
   const [sortBy, setSortBy] = useLocalStorage<string>("rentabilidad-sort", "name", slug)
   const [costMultiplier, setCostMultiplier] = useLocalStorage<number>("rentabilidad-sim", 0, slug)
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
+
+  // Merma factor: integrates "Merma del mes" into real cost/margin calculations
+  const mermaStats = useMemo(() => {
+    const monthLoss = mermaEntries
+      .filter((e) => new Date(e.date).getMonth() === new Date().getMonth())
+      .reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
+    const mermaPct = monthlyGoal > 0 ? (monthLoss / monthlyGoal) * 100 : 0
+    return { monthLoss, mermaPct, hasMerma: mermaEntries.length > 0 }
+  }, [mermaEntries, monthlyGoal])
+  const mermaFactor = mermaStats.hasMerma && mermaStats.monthLoss > 0 ? 1 + mermaStats.mermaPct / 100 : 1
 
   // Merge: base mock data + dishes from costeo tool
   const mockDishes = selectedCollection
@@ -167,42 +181,43 @@ export default function RentabilidadPage() {
         cost: Math.round(totalCost * 100) / 100,
         price: d.sellingPrice,
         category: "Mi menú",
-        alert: (totalCost / d.sellingPrice) * 100 > 38
+        alert: foodCostStatus((totalCost / d.sellingPrice) * 100, panelCfg) === "red"
           ? "Food cost elevado — revisa ingredientes"
           : undefined,
       }
     }),
-  [sharedDishes])
+  [sharedDishes, panelCfg])
 
   const dishes = useMemo(() => {
     // Deduplicate by name (costeo dishes override mock ones)
-    const costeoNames = new Set(costeoDishes.map((d) => d.name.toLowerCase()))
-    const filteredMock = mockDishes.filter((d) => !costeoNames.has(d.name.toLowerCase()))
+    const costeoNames = new Set(costeoDishes.map((d) => normalizeName(d.name)))
+    const filteredMock = mockDishes.filter((d) => !costeoNames.has(normalizeName(d.name)))
     let merged = [...costeoDishes, ...filteredMock]
     // Apply price overrides
     merged = merged.map((d) => ({
       ...d,
       price: priceOverrides[d.name] ?? d.price,
     }))
-    // Apply cost multiplier (simulator)
-    if (costMultiplier !== 0) {
+    // Apply cost multiplier (simulator) and merma factor into real cost
+    const adjust = (1 + costMultiplier / 100) * mermaFactor
+    if (costMultiplier !== 0 || mermaFactor !== 1) {
       merged = merged.map((d) => ({
         ...d,
-        cost: +(d.cost * (1 + costMultiplier / 100)).toFixed(2),
+        cost: +(d.cost * adjust).toFixed(2),
       }))
     }
     // Sort
     merged = [...merged].sort((a, b) => {
       switch (sortBy) {
-        case "margin": return (b.price - b.cost * (1 + costMultiplier / 100)) - (a.price - a.cost * (1 + costMultiplier / 100))
-        case "foodcost": return ((a.cost * (1 + costMultiplier / 100)) / a.price) - ((b.cost * (1 + costMultiplier / 100)) / b.price)
+        case "margin": return (b.price - b.cost * adjust) - (a.price - a.cost * adjust)
+        case "foodcost": return ((a.cost * adjust) / a.price) - ((b.cost * adjust) / b.price)
         case "name": return a.name.localeCompare(b.name)
         case "category": return a.category.localeCompare(b.category)
         default: return 0
       }
     })
     return merged
-  }, [mockDishes, costeoDishes, priceOverrides, sortBy, costMultiplier])
+  }, [mockDishes, costeoDishes, priceOverrides, sortBy, costMultiplier, mermaStats])
 
   // Category analysis: counts, avg food cost, avg margin, semaphore per category
   const categoryAnalysis = useMemo(() => {
@@ -218,16 +233,19 @@ export default function RentabilidadPage() {
       .map(([category, g]) => {
         const avgFc = (g.cost / g.price) * 100
         const avgMargin = (g.price - g.cost) / g.count
-        const status = avgFc <= 30 ? "ok" : avgFc <= 38 ? "justo" : "mal"
+        const st = foodCostStatus(avgFc, panelCfg)
+        const status = st === "green" ? "ok" : st === "amber" ? "justo" : "mal"
         return { category, count: g.count, avgFc, avgMargin, status }
       })
       .sort((a, b) => a.avgFc - b.avgFc)
-  }, [dishes])
+  }, [dishes, panelCfg])
 
   const worstCategory = useMemo(() => {
     if (categoryAnalysis.length === 0) return null
-    return categoryAnalysis.reduce((worst, c) => (c.avgFc > worst.avgFc ? c : worst))
-  }, [categoryAnalysis])
+    const bad = categoryAnalysis.filter((c) => foodCostStatus(c.avgFc, panelCfg) === "red")
+    if (bad.length === 0) return null
+    return bad.reduce((worst, c) => (c.avgFc > worst.avgFc ? c : worst))
+  }, [categoryAnalysis, panelCfg])
 
   const filteredDishes = useMemo(() => {
     if (categoryFilter === "all") return dishes
@@ -236,9 +254,10 @@ export default function RentabilidadPage() {
 
   function exportCSV() {
     const header = "Platillo,Categoría,Costo,Precio Venta,Margen,Food Cost %,Estado"
-    const rows = filteredDishes.map((d) => {
+    const rows = dishes.map((d) => {
       const fc = ((d.cost / d.price) * 100).toFixed(1)
-      const status = parseFloat(fc) <= 30 ? "Excelente" : parseFloat(fc) <= 38 ? "Aceptable" : "Revisar"
+      const st = foodCostStatus(parseFloat(fc), panelCfg)
+      const status = st === "green" ? "Excelente" : st === "amber" ? "Aceptable" : "Revisar"
       return `"${d.name}","${d.category}",${d.cost.toFixed(2)},${d.price.toFixed(2)},${(d.price - d.cost).toFixed(2)},${fc}%,${status}`
     })
     const csv = [header, ...rows].join("\n")
@@ -266,24 +285,16 @@ export default function RentabilidadPage() {
 
   function getStatus(cost: number, price: number) {
     const pct = (cost / price) * 100
-    if (pct <= 30) return { color: "green", label: "Excelente", icon: CheckCircle2 }
-    if (pct <= 38) return { color: "amber", label: "Aceptable", icon: AlertTriangle }
+    if (foodCostStatus(pct, panelCfg) === "green") return { color: "green", label: "Excelente", icon: CheckCircle2 }
+    if (foodCostStatus(pct, panelCfg) === "amber") return { color: "amber", label: "Aceptable", icon: AlertTriangle }
     return { color: "red", label: "Revisar", icon: Circle }
   }
 
-  const greenCount = dishes.filter((d) => (d.cost / d.price) * 100 <= 30).length
-  const amberCount = dishes.filter((d) => { const p = (d.cost / d.price) * 100; return p > 30 && p <= 38 }).length
-  const redCount = dishes.filter((d) => (d.cost / d.price) * 100 > 38).length
+  const fcStatus = (pct: number) => foodCostStatus(pct, panelCfg)
+  const greenCount = dishes.filter((d) => fcStatus((d.cost / d.price) * 100) === "green").length
+  const amberCount = dishes.filter((d) => fcStatus((d.cost / d.price) * 100) === "amber").length
+  const redCount = dishes.filter((d) => fcStatus((d.cost / d.price) * 100) === "red").length
   const alerts = dishes.filter((d) => d.alert)
-
-  // Merma factor for simulator display
-  const mermaStats = useMemo(() => {
-    const monthLoss = mermaEntries
-      .filter((e) => new Date(e.date).getMonth() === new Date().getMonth())
-      .reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
-    const mermaPct = monthlyGoal > 0 ? (monthLoss / monthlyGoal) * 100 : 0
-    return { monthLoss, mermaPct, hasMerma: mermaEntries.length > 0 }
-  }, [mermaEntries, monthlyGoal])
 
   return (
     <div>
@@ -344,7 +355,7 @@ export default function RentabilidadPage() {
               <TrendingUp className="w-5 h-5 text-[#108910]" />
               <h3 className="font-bold text-gray-900 text-sm">Análisis por categoría</h3>
             </div>
-            {worstCategory && worstCategory.avgFc > 38 && (
+            {worstCategory && foodCostStatus(worstCategory.avgFc, panelCfg) === "red" && (
               <span className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-full font-semibold">
                 ⚠️ {worstCategory.category}: peor food cost ({worstCategory.avgFc.toFixed(1)}%)
               </span>
@@ -462,12 +473,28 @@ export default function RentabilidadPage() {
           {monthlyGoal > 0 && (
             <span> — {mermaStats.mermaPct.toFixed(0)}% de tu meta de ${monthlyGoal.toFixed(0)}</span>
           )}
-          <span className="ml-auto text-red-500">Considera este impacto en tus márgenes reales</span>
+          <span className="ml-auto text-red-500">Ya incluida en costos y márgenes</span>
         </div>
       )}
 
       {/* Dish cards */}
-      <div className="space-y-3">
+      {dishes.length === 0 ? (
+        <EmptyState
+          icon={TrendingUp}
+          title="Aún no tienes platillos para analizar"
+          description="Costea tu menú para ver el semáforo de rentabilidad con datos reales: margen, food cost y ajustes sugeridos."
+          action={
+            <Link
+              href="/panel/costeo"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
+            >
+              <DollarSign className="w-3.5 h-3.5" />
+              Ir al Costeador
+            </Link>
+          }
+        />
+      ) : (
+        <div className="space-y-3">
         {filteredDishes.map((dish, idx) => {
           const status = getStatus(dish.cost, dish.price)
           const foodCost = ((dish.cost / dish.price) * 100).toFixed(1)
@@ -551,22 +578,23 @@ export default function RentabilidadPage() {
                   </p>
                 </div>
               </div>
-              {mermaStats.hasMerma && mermaStats.monthLoss > 0 && (
-                <div className="mt-2 pt-2 border-t border-red-100 flex items-center justify-between text-[10px] bg-red-50/50 rounded-lg px-3 py-1.5">
-                  <span className="text-red-500 flex items-center gap-1">
-                    <Trash2 className="w-3 h-3" />
-                    Costo ajustado por merma
-                  </span>
-                  <span className="font-bold text-red-600">
-                    ${(dish.cost + (dish.cost * (mermaStats.mermaPct / 100))).toFixed(0)}
-                    <span className="text-red-400 ml-1">(+{mermaStats.mermaPct.toFixed(0)}%)</span>
-                  </span>
-                </div>
-              )}
+              {mermaStats.hasMerma && mermaStats.monthLoss > 0 && (() => {
+                const mermaAmount = dish.cost - dish.cost / mermaFactor
+                return (
+                  <div className="mt-2 pt-2 border-t border-red-100 flex items-center justify-between text-[10px] bg-red-50/50 rounded-lg px-3 py-1.5">
+                    <span className="text-red-500 flex items-center gap-1">
+                      <Trash2 className="w-3 h-3" />
+                      Merma ya incluida en el costo ({mermaStats.mermaPct.toFixed(0)}%)
+                    </span>
+                    <span className="font-bold text-red-600">+${mermaAmount.toFixed(0)}</span>
+                  </div>
+                )
+              })()}
             </div>
           )
         })}
-      </div>
+        </div>
+      )}
 
       {/* Tip */}
       <div className="mt-6 bg-gradient-to-r from-[#F0FDF4] to-white rounded-2xl border border-[#108910]/10 p-5">
@@ -575,8 +603,8 @@ export default function RentabilidadPage() {
           <div>
             <h4 className="font-semibold text-gray-900 mb-1 text-sm">¿Cómo usarlo?</h4>
             <p className="text-xs text-gray-500 leading-relaxed">
-              Este semáforo usa precios reales del catálogo de Resurte.me. Cuando los precios de insumos 
-              cambien en nuestra plataforma, regresa aquí para recalcular automáticamente. 
+              Los platillos de "Mi menú" usan los precios reales del catálogo de Resurte.me vía Costeando mi menú;
+              los platillos de referencia son estimados para tu tipo de cocina. 
               Un food cost arriba del 38% pone en riesgo tu negocio.
             </p>
           </div>

@@ -1,9 +1,12 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
+import { normalizeName } from "@/lib/normalize"
+import { getCatalogProducts } from "@/lib/catalog"
+import { findManualQty, findManualQtyKey, ManualQty, ManualQtys, convertQty, readManualQtys, unitDimension } from "@/lib/panel-units"
 import Link from "next/link"
 import {
   ShoppingCart, ArrowLeft, Users, TrendingUp, AlertCircle,
@@ -154,25 +157,105 @@ export default function PlanificadorPage() {
   const slug = selectedCollection?.slug || null
   const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
-  const products = selectedCollection
-    ? (COLLECTION_PRODUCTS[selectedCollection.slug] || DEFAULT_PRODUCTS)
-    : DEFAULT_PRODUCTS
 
   const [covers, setCovers] = useLocalStorage<number>("planner-covers", 50, slug)
   const [ventasEntries] = useLocalStorage<{ id: string; dishId: string; dishName: string; quantity: number; date: string; unitPrice: number; unitCost: number }[]>("ventas-entries", [], slug)
   const [wastePcts, setWastePcts] = useLocalStorage<Record<string, number>>("planner-waste-pcts", {}, slug)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
   const [showOrder, setShowOrder] = useState(false)
-  const [manualQtys, setManualQtys] = useLocalStorage<Record<string, number>>("planner-manual-qtys", {}, slug)
-  const [transfers, setTransfers] = useLocalStorage<{ name: string; icon: string; price: number; qtyKg: number; unit: string }[]>("temporada-transfer", [], slug)
+  const [manualQtysRaw, setManualQtysRaw] = useLocalStorage<Record<string, number | ManualQty>>("planner-manual-qtys", {}, slug)
+  const [transfers, setTransfers] = useLocalStorage<{ name: string; unit: string; price: number; qty: number; icon?: string; qtyKg?: number }[]>("temporada-transfer", [], slug)
+
+  // Real catalog prices (Supabase): refresh price/unit of matching products.
+  const [catalogPrices, setCatalogPrices] = useState<Record<string, { price: number; unit?: string }>>({})
+  const [confirmImport, setConfirmImport] = useState<{ dishName: string; ingredients: { name: string; existing: string }[] } | null>(null)
+  useEffect(() => {
+    let alive = true
+    getCatalogProducts().then((catalog) => {
+      if (!alive) return
+      const byKey: Record<string, { price: number; unit?: string }> = {}
+      catalog.forEach((p) => {
+        const key = normalizeName(p.name)
+        if (key && (!(key in byKey) || p.price > 0)) byKey[key] = { price: p.price, unit: p.unit }
+      })
+      setCatalogPrices(byKey)
+    })
+    return () => { alive = false }
+  }, [])
+
+  // Close overwrite-confirm modal with Escape
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && confirmImport) setConfirmImport(null)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [confirmImport])
+
+  const products = useMemo(() => {
+    const base = selectedCollection
+      ? (COLLECTION_PRODUCTS[selectedCollection.slug] || DEFAULT_PRODUCTS)
+      : DEFAULT_PRODUCTS
+    if (Object.keys(catalogPrices).length === 0) return base
+    return base.map((p) => {
+      const real = catalogPrices[normalizeName(p.name)]
+      if (!real) return p
+      return { ...p, price: real.price > 0 ? real.price : p.price, unit: real.unit || p.unit }
+    })
+  }, [selectedCollection, catalogPrices])
+
+  // Normalized manual quantities: legacy bare numbers → { qty, unit } with the
+  // catalog unit when known, so unit metadata is always available.
+  const manualQtys = useMemo<ManualQtys>(
+    () => readManualQtys(manualQtysRaw, (name) => {
+      const p = products.find((pp) => normalizeName(pp.name) === normalizeName(name))
+      return p?.unit
+    }),
+    [manualQtysRaw, products],
+  )
+
+  // Quantity and price to use for a catalog product: manual override wins,
+  // otherwise the per-person estimate with category waste.
+  const qtyFor = (p: { name: string; unit: string; price: number; perPerson: number; category: string }) => {
+    const mq = findManualQty(manualQtys, p.name)
+    if (mq) return mq.qty
+    const waste = getWastePct(p.category)
+    return p.perPerson * covers * (1 + waste / 100)
+  }
+
+  const unitFor = (p: { name: string; unit: string }) => {
+    return findManualQty(manualQtys, p.name)?.unit ?? p.unit
+  }
+
+  const priceFor = (p: { name: string; unit: string; price: number }) => {
+    const mq = findManualQty(manualQtys, p.name)
+    return mq?.price && mq.price > 0 ? mq.price : p.price
+  }
 
   // Accept pending season transfers
   function acceptTransfers() {
     transfers.forEach((t) => {
-      setManualQtys((prev) => ({ ...prev, [t.icon + " " + t.name]: t.qtyKg }))
+      const name = normalizeName(t.name)
+      if (!name) return
+      const qty = t.qty ?? t.qtyKg ?? 0
+      setManualQtysRaw((prev) => ({ ...prev, [name]: { qty, unit: t.unit || "kg", price: t.price } }))
     })
     setTransfers([])
     toast(`${transfers.length} producto(s) de temporada agregados al pedido`, "success")
+  }
+
+  // Import a dish's ingredients as manual quantities, overwriting existing entries
+  function doImportDish(dish: { name: string; ingredients: { ingredientName: string; quantity?: number; unit?: string; unitPrice?: number }[] }) {
+    const newQtys: ManualQtys = { ...manualQtys }
+    dish.ingredients.forEach((ing) => {
+      newQtys[ing.ingredientName] = {
+        qty: (ing.quantity || 0) * covers,
+        unit: ing.unit || "kg",
+        price: ing.unitPrice,
+      }
+    })
+    setManualQtysRaw(newQtys)
+    toast(`"${dish.name}" importado (${dish.ingredients.length} ingredientes)`, "success")
   }
 
   // Group by category
@@ -223,10 +306,7 @@ export default function PlanificadorPage() {
   })()
 
   const totalCost = products.reduce((sum, p) => {
-    const waste = getWastePct(p.category)
-    const autoNeeded = p.perPerson * covers * (1 + waste / 100)
-    const needed = p.name in manualQtys ? manualQtys[p.name] : autoNeeded
-    return sum + (needed * p.price)
+    return sum + (qtyFor(p) * priceFor(p))
   }, 0)
 
   return (
@@ -247,6 +327,35 @@ export default function PlanificadorPage() {
       </div>
 
       {/* Shared dishes from Costeo — quick ingredient needs reference */}
+      {sharedDishes.length === 0 && (
+        <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl border border-emerald-100 p-5 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Package className="w-4 h-4 text-emerald-600" />
+            <h3 className="text-sm font-semibold text-gray-700">Empieza en 3 pasos</h3>
+          </div>
+          <ol className="space-y-2 text-xs text-gray-600">
+            {[
+              <>1. <Link href="/panel/costeo" className="text-emerald-700 font-semibold hover:underline">Costea tu menú</Link> para tener precios reales de insumos.</>,
+              <>2. Vuelve aquí: tus platillos costeados aparecerán arriba con sus ingredientes.</>,
+              <>3. Escribe las cantidades por persona y envía el pedido a tu inventario.</>,
+            ].map((step, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="mt-0.5 w-5 h-5 shrink-0 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">
+                  {i + 1}
+                </span>
+                <span className="leading-relaxed">{step}</span>
+              </li>
+            ))}
+          </ol>
+          <Link
+            href="/panel/costeo"
+            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[11px] font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
+          >
+            <Calculator className="w-3.5 h-3.5" />
+            Ir al Costeador
+          </Link>
+        </div>
+      )}
       {sharedDishes.length > 0 && (
         <div className="bg-white rounded-2xl border border-green-100 p-5 mb-6">
           <div className="flex items-center gap-2 mb-3">
@@ -260,14 +369,27 @@ export default function PlanificadorPage() {
           </div>
           <div className="grid sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
             {sharedDishes.map((dish) => {
-              const totalGrams = dish.ingredients.reduce((sum, ing) => sum + (ing.quantity || 0), 0)
-              const scaledGrams = totalGrams * covers
-              const scaledKg = (scaledGrams / 1000).toFixed(1)
+              const totals = dish.ingredients.reduce(
+                (acc, ing) => {
+                  const qty = ing.quantity || 0
+                  const dim = unitDimension(ing.unit)
+                  if (dim === "mass") acc.mass += (convertQty(qty, ing.unit, "kg") ?? 0) * covers
+                  else if (dim === "volume") acc.volume += (convertQty(qty, ing.unit, "L") ?? 0) * covers
+                  else acc.count += qty * covers
+                  return acc
+                },
+                { mass: 0, volume: 0, count: 0 },
+              )
+              const summary = [
+                totals.mass > 0 ? `${totals.mass.toFixed(1)} kg` : "",
+                totals.volume > 0 ? `${totals.volume.toFixed(1)} L` : "",
+                totals.count > 0 ? `${Math.round(totals.count)} pza` : "",
+              ].filter(Boolean).join(" · ")
               return (
                 <div key={dish.id} className="flex items-center justify-between bg-green-50/50 rounded-xl px-3 py-2 text-xs">
                   <span className="font-medium text-gray-700 truncate mr-2">{dish.name}</span>
                   <span className="text-green-700 whitespace-nowrap font-medium">
-                    ~{scaledKg} kg para {covers} pax
+                    ~{summary} para {covers} pax
                   </span>
                 </div>
               )
@@ -285,32 +407,46 @@ export default function PlanificadorPage() {
                 <button
                   key={dish.id}
                   onClick={() => {
-                    const ingredientNames = dish.ingredients.map((i) => i.ingredientName)
                     // Check if any ingredient is already in manualQtys
-                    const alreadyImported = ingredientNames.some((n) => n in manualQtys)
+                    const alreadyImported = dish.ingredients.some((i) => findManualQtyKey(manualQtys, normalizeName(i.ingredientName)))
                     if (alreadyImported) {
                       // Remove them
-                      const cleaned: Record<string, number> = { ...manualQtys }
-                      ingredientNames.forEach((n) => { delete cleaned[n] })
-                      setManualQtys(cleaned)
+                      const cleaned: ManualQtys = { ...manualQtys }
+                      dish.ingredients.forEach((i) => {
+                        const k = findManualQtyKey(manualQtys, normalizeName(i.ingredientName))
+                        if (k) delete cleaned[k]
+                      })
+                      setManualQtysRaw(cleaned)
                       toast(`"${dish.name}" quitado del pedido`, "warning")
                     } else {
-                      // Add them with per-person scaling
-                      const newQtys: Record<string, number> = { ...manualQtys }
-                      dish.ingredients.forEach((ing) => {
-                        newQtys[ing.ingredientName] = ing.quantity * covers
-                      })
-                      setManualQtys(newQtys)
-                      toast(`"${dish.name}" importado (${dish.ingredients.length} ingredientes)`, "success")
+                      // Detect manual quantities that would be overwritten by this import
+                      const willOverwrite = dish.ingredients
+                        .map((ing) => ({
+                          name: ing.ingredientName,
+                          existing: findManualQtyKey(manualQtys, normalizeName(ing.ingredientName)),
+                        }))
+                        .filter((o): o is { name: string; existing: string } => !!o.existing)
+                      if (willOverwrite.length > 0) {
+                        setConfirmImport({
+                          dishName: dish.name,
+                          ingredients: willOverwrite.map((o) => ({
+                            name: o.name,
+                            existing: manualQtys[o.existing].qty + " " + (manualQtys[o.existing].unit || ""),
+                          })),
+                        })
+                        return
+                      }
+                      // Add them with per-person scaling, preserving each ingredient's unit and price
+                      doImportDish(dish)
                     }
                   }}
                   className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
-                    dish.ingredients.every((i) => i.ingredientName in manualQtys)
+                    dish.ingredients.every((i) => findManualQtyKey(manualQtys, normalizeName(i.ingredientName)))
                       ? "bg-green-200 text-green-800"
                       : "bg-white border border-green-200 text-green-700 hover:bg-green-50"
                   }`}
                 >
-                  {dish.ingredients.every((i) => i.ingredientName in manualQtys) ? "✓ " : "+ "}
+                  {dish.ingredients.every((i) => findManualQtyKey(manualQtys, normalizeName(i.ingredientName))) ? "✓ " : "+ "}
                   {dish.name} ({dish.ingredients.length} ing.)
                 </button>
               ))}
@@ -334,7 +470,7 @@ export default function PlanificadorPage() {
           <div className="flex flex-wrap gap-2 mb-3">
             {transfers.map((t, i) => (
               <span key={i} className="text-xs bg-white border border-emerald-200 rounded-lg px-2.5 py-1 text-emerald-700 font-medium">
-                {t.icon} {t.name}: {t.qtyKg} {t.unit}
+                {t.icon ? `${t.icon} ` : ""}{t.name}: {t.qty ?? t.qtyKg} {t.unit}
               </span>
             ))}
           </div>
@@ -457,36 +593,65 @@ export default function PlanificadorPage() {
                 {items.map((item, idx) => {
                   const waste = getWastePct(item.category)
                   const autoNeeded = item.perPerson * covers * (1 + waste / 100)
-                  const isManual = item.name in manualQtys
-                  const needed = isManual ? manualQtys[item.name] : autoNeeded
-                  const cost = needed * item.price
+                  const mq = findManualQty(manualQtys, item.name)
+                  const isManual = !!mq
+                  const needed = mq ? mq.qty : autoNeeded
+                  const unit = mq ? mq.unit : item.unit
+                  const price = mq?.price && mq.price > 0 ? mq.price : item.price
+                  const cost = needed * price
                   return (
                     <div key={idx} className="flex items-center justify-between px-4 py-3 text-sm">
                       <div className="min-w-0 mr-4 flex-1">
                         <p className="font-medium text-gray-800 truncate">{item.name}</p>
-                        <p className="text-xs text-gray-400">${item.price}/{item.unit}</p>
+                        <p className="text-xs text-gray-400">${price}/{unit}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <input
                           type="number"
-                          value={needed < 1 ? parseFloat((needed * 1000).toFixed(0)) : parseFloat(needed.toFixed(2))}
+                          value={parseFloat(needed.toFixed(2))}
                           onChange={(e) => {
                             const val = parseFloat(e.target.value) || 0
-                            const unitVal = item.unit === "kg" || item.unit === "L" ? val : val / 1000
+                            const key = findManualQtyKey(manualQtys, item.name) ?? item.name
                             if (val === 0) {
-                              setManualQtys((prev) => { const { [item.name]: _, ...rest } = prev; return rest })
+                              setManualQtysRaw((prev) => {
+                                const rest = { ...prev }
+                                delete rest[key]
+                                return rest
+                              })
                             } else {
-                              setManualQtys((prev) => ({ ...prev, [item.name]: unitVal }))
+                              setManualQtysRaw((prev) => ({
+                                ...prev,
+                                [key]: { qty: val, unit, price: mq?.price ?? item.price },
+                              }))
                             }
                           }}
                           className={`w-20 text-right text-sm font-mono font-bold py-1 px-2 rounded-lg border focus:outline-none ${
                             isManual ? "border-amber-300 bg-amber-50 text-amber-800" : "border-transparent bg-gray-50 text-gray-900 hover:border-gray-200"
                           }`}
-                          step={item.unit === "kg" || item.unit === "L" ? "0.01" : "1"}
+                          step={unit === "kg" || unit === "L" ? "0.01" : "1"}
                           min="0"
                           title={isManual ? "Cantidad manual" : "Click para ajustar"}
                         />
-                        <span className="text-xs text-gray-400 w-12 text-left">{item.unit === "kg" || item.unit === "L" || needed >= 1 ? item.unit : "g"}</span>
+                        <select
+                          value={unit}
+                          onChange={(e) => {
+                            const newUnit = e.target.value
+                            const key = findManualQtyKey(manualQtys, item.name) ?? item.name
+                            setManualQtysRaw((prev) => ({
+                              ...prev,
+                              [key]: { qty: parseFloat(needed.toFixed(2)), unit: newUnit, price: mq?.price ?? item.price },
+                            }))
+                          }}
+                          className={`text-xs py-1 px-1 rounded-lg border focus:outline-none w-14 ${
+                            isManual ? "border-amber-300 bg-amber-50 text-amber-800" : "border-gray-200 bg-gray-50 text-gray-500"
+                          }`}
+                          title="Unidad de medida"
+                          aria-label={`Unidad de ${item.name}`}
+                        >
+                          {["kg", "g", "pza", "L", "ml", "rebanada", "docena"].map((u) => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
                         <p className="text-xs text-emerald-600 font-medium w-16 text-right">
                           ${cost.toFixed(2)}
                         </p>
@@ -569,11 +734,14 @@ export default function PlanificadorPage() {
           <div className="bg-white rounded-2xl border-2 border-[#108910]/20 p-5">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-bold text-gray-900">📋 Lista de pedido — {selectedCollection.name}</h4>
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => {
                   const text = products.map((p) => {
-                    const needed = (p.perPerson * covers * (1 + avgWastePct / 100)).toFixed(2)
-                    return `• ${p.name}: ${needed} ${p.unit} — $${(parseFloat(needed) * p.price).toFixed(0)} MXN ($${p.price}/${p.unit})`
+                    const needed = qtyFor(p).toFixed(2)
+                    const unit = unitFor(p)
+                    const price = priceFor(p)
+                    return `• ${p.name}: ${needed} ${unit} — $${(parseFloat(needed) * price).toFixed(0)} MXN ($${price}/${unit})`
                   }).join("\n")
                   const header = `Pedido para ${covers} comensales (+${avgWastePct}% merma) — ${selectedCollection.name}\n\n`
                   navigator.clipboard.writeText(header + text + `\n\nTotal estimado: $${totalCost.toFixed(0)} MXN\nPedido generado con Resurte.me`)
@@ -583,16 +751,27 @@ export default function PlanificadorPage() {
               >
                 📋 Copiar
               </button>
+              <Link
+                href="/panel/inventario"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#108910] text-white px-3 py-1.5 rounded-lg hover:bg-[#0D720D] transition-colors"
+                title="Importa estas cantidades como stock en tu inventario"
+              >
+                <Package className="w-3.5 h-3.5" />
+                Enviar a inventario
+              </Link>
+            </div>
             </div>
             <div className="space-y-1.5 max-h-64 overflow-y-auto">
               {products.map((p) => {
-                const needed = (p.perPerson * covers * (1 + avgWastePct / 100)).toFixed(2)
-                const subtotal = parseFloat(needed) * p.price
+                const needed = qtyFor(p).toFixed(2)
+                const unit = unitFor(p)
+                const price = priceFor(p)
+                const subtotal = parseFloat(needed) * price
                 return (
                   <div key={p.name} className="flex items-center justify-between text-sm py-1 border-b border-gray-50 last:border-0">
                     <div>
                       <span className="font-medium text-gray-800">{p.name}</span>
-                      <span className="text-gray-400 ml-1">{needed} {p.unit}</span>
+                      <span className="text-gray-400 ml-1">{needed} {unit}</span>
                     </div>
                     <span className="font-semibold text-gray-700 text-xs">${subtotal.toFixed(0)}</span>
                   </div>
@@ -621,6 +800,53 @@ export default function PlanificadorPage() {
           </div>
         </div>
       </div>
+
+      {/* Overwrite confirmation dialog */}
+      {confirmImport && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setConfirmImport(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-import-title"
+          >
+            <h4 id="confirm-import-title" className="font-bold text-gray-900 mb-2">Sobrescribir cantidades manuales</h4>
+            <p className="text-xs text-gray-500 mb-4">
+              Importar <span className="font-semibold text-gray-700">"{confirmImport.dishName}"</span> sobrescribirá estas cantidades que ya escribiste a mano:
+            </p>
+            <ul className="space-y-1.5 mb-5 bg-amber-50 border border-amber-200 rounded-xl p-3">
+              {confirmImport.ingredients.map((o) => (
+                <li key={o.name} className="flex items-center justify-between text-xs">
+                  <span className="text-amber-800 font-medium">{o.name}</span>
+                  <span className="text-amber-600">{o.existing} → automático</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setConfirmImport(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const dish = sharedDishes.find((d) => d.name === confirmImport.dishName)
+                  if (dish) doImportDish(dish)
+                  setConfirmImport(null)
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+              >
+                Sí, sobrescribir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

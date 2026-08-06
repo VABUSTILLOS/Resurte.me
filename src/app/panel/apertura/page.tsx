@@ -355,7 +355,13 @@ export default function AperturaPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-6">
+      <style>{`
+        @media print {
+          .print-hidden { display: none !important; }
+          .print-avoid-break { break-inside: avoid; }
+        }
+      `}</style>
+      <div className="flex items-center gap-4 mb-6 print:hidden">
         <Link href="/panel" className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
           <ArrowLeft className="w-5 h-5 text-gray-400" />
         </Link>
@@ -406,7 +412,7 @@ export default function AperturaPage() {
           const phaseComplete = items.every((c) => checkedSet.has(c.id))
           const phaseDate = phaseDates[phase] || ""
           return (
-          <div key={phase} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div key={phase} className="bg-white rounded-2xl border border-gray-100 overflow-hidden print-avoid-break">
             <div className={`px-5 py-3 flex items-center gap-2 border-b ${phaseComplete ? "bg-green-50 border-green-100" : "border-gray-50"}`}>
               {phaseComplete
                 ? <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -418,7 +424,7 @@ export default function AperturaPage() {
               </span>
             </div>
             {/* Phase date estimate */}
-            <div className="px-5 py-2 bg-gray-50/50 border-b border-gray-50">
+            <div className="px-5 py-2 bg-gray-50/50 border-b border-gray-50 print-hidden">
               <div className="flex items-center gap-2">
                 <CalendarClock className="w-3.5 h-3.5 text-gray-400" />
                 <input
@@ -453,10 +459,10 @@ export default function AperturaPage() {
       </div>
 
       {/* Investment calculator */}
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6 print-avoid-break">
         <button
           onClick={() => setShowCalculator(!showCalculator)}
-          className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
+          className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors print-hidden"
         >
           <div className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-indigo-600" />
@@ -530,6 +536,14 @@ export default function AperturaPage() {
                       toast("Verifica los montos (sin negativos y máximo ≥ mínimo)", "error")
                       return
                     }
+                    if (customItems.length >= 20) {
+                      toast("Máximo 20 rubros personalizados", "error")
+                      return
+                    }
+                    if (customItems.some((i) => i.name.toLowerCase() === newCustomName.trim().toLowerCase())) {
+                      toast("Ese rubro ya existe", "error")
+                      return
+                    }
                     setCustomItems((prev) => [...prev, {
                       name: newCustomName,
                       low,
@@ -555,7 +569,7 @@ export default function AperturaPage() {
       </div>
 
       {/* First order CTA */}
-      <div className="bg-gradient-to-r from-indigo-50 to-[#F0FDF4] rounded-2xl border border-indigo-100 p-5">
+      <div className="bg-gradient-to-r from-indigo-50 to-[#F0FDF4] rounded-2xl border border-indigo-100 p-5 print-hidden">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 bg-[#108910]/10 rounded-xl flex items-center justify-center shrink-0">
             <Package className="w-5 h-5 text-[#108910]" />

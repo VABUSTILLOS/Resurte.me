@@ -85,6 +85,7 @@ export interface SharedDish {
   ingredients: { ingredientName: string; quantity: number; unit: string; unitPrice: number }[]
   foodCostPercent: number
   sellingPrice: number
+  modificadores?: { id: string; nombre: string; precio: number }[]
 }
 
 export function useSharedDishes(collectionSlug?: string | null) {

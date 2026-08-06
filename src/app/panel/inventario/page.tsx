@@ -4,10 +4,14 @@ import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
+import { normalizeName } from "@/lib/normalize"
+import { uid } from "@/lib/ids"
+import { convertQty, ManualQty, readManualQtys } from "@/lib/panel-units"
 import {
   Package, Plus, Edit3, Trash2, ShoppingCart,
   ArrowDownToLine, Copy, AlertTriangle, CheckCircle2,
   Clock, Download, ChevronDown, ChevronUp, BarChart3, X,
+  Truck, MessageCircle, Users, Layers,
 } from "lucide-react"
 
 // ── Types ──────────────────────────────────────────────
@@ -19,6 +23,14 @@ interface InventoryItem {
   unit: string
   pricePerUnit: number
   category?: string
+  proveedorId?: string
+}
+
+interface Proveedor {
+  id: string
+  nombre: string
+  contacto?: string
+  telefono?: string
 }
 
 interface StockMovement {
@@ -38,14 +50,25 @@ export default function InventarioPage() {
   const { toast } = useToast()
 
   const [items, setItems] = useLocalStorage<InventoryItem[]>("inventario-items", [], slug)
+  const [proveedores, setProveedores] = useLocalStorage<Proveedor[]>("proveedores", [], slug)
   const [sortBy, setSortBy] = useLocalStorage<SortField>("inventario-sort", "name", slug)
   // NOTE: planificador writes to "planner-manual-qtys" (was previously "planificador-qtys")
-  const [manualQtys] = useLocalStorage<Record<string, number>>("planner-manual-qtys", {}, slug)
+  const [manualQtysRaw] = useLocalStorage<Record<string, number | ManualQty>>("planner-manual-qtys", {}, slug)
+  // Normalized quantities: legacy bare numbers → { qty, unit } so the import
+  // preserves real units instead of assuming grams.
+  const manualQtys = useMemo(() => readManualQtys(manualQtysRaw), [manualQtysRaw])
   const [covers] = useLocalStorage<number>("planner-covers", 50, slug)
   const [sharedDishes] = useSharedDishes(slug)
   const [movements, setMovements] = useLocalStorage<StockMovement[]>("inventario-movimientos", [], slug)
   const [showMovements, setShowMovements] = useState(false)
   const [projectionIncluded, setProjectionIncluded] = useState(false)
+  const [groupBySupplier, setGroupBySupplier] = useState(false)
+  const [showSuppliers, setShowSuppliers] = useState(false)
+  const [supplierForm, setSupplierForm] = useState<{ nombre: string; contacto: string; telefono: string }>({
+    nombre: "",
+    contacto: "",
+    telefono: "",
+  })
 
   // Form state
   const [showForm, setShowForm] = useState(false)
@@ -56,6 +79,7 @@ export default function InventarioPage() {
   const [formUnit, setFormUnit] = useState("kg")
   const [formPrice, setFormPrice] = useState("0")
   const [formCategory, setFormCategory] = useState("")
+  const [formProveedorId, setFormProveedorId] = useState("")
 
   // Purchase order
   const [orderExpanded, setOrderExpanded] = useState(false)
@@ -114,16 +138,24 @@ export default function InventarioPage() {
   }, [lowStock, outOfStock])
 
   // ── Stock projection from recipe menu (shared dishes × covers) ──
+  // Each ingredient carries its own unit (kg, L, pza…); needs are aggregated
+  // per dimension so the projection compares correctly against inventory units.
   const ingredientNeeds = useMemo(() => {
-    if (sharedDishes.length === 0 || covers <= 0) return new Map<string, number>()
-    const needs = new Map<string, number>()
+    if (sharedDishes.length === 0 || covers <= 0) return new Map<string, { qty: number; unit: string }>()
+    const needs = new Map<string, { qty: number; unit: string }>()
     sharedDishes.forEach((dish) => {
       dish.ingredients.forEach((ing) => {
-        // Planificador convention: quantity × covers = grams → kg
-        const neededKg = (ing.quantity || 0) * covers / 1000
-        const key = ing.ingredientName.toLowerCase().trim()
+        const qty = (ing.quantity || 0) * covers
+        const unit = ing.unit || "kg"
+        const key = normalizeName(ing.ingredientName)
         if (!key) return
-        needs.set(key, (needs.get(key) || 0) + neededKg)
+        const prev = needs.get(key)
+        if (!prev) {
+          needs.set(key, { qty, unit })
+        } else {
+          const converted = convertQty(qty, unit, prev.unit)
+          needs.set(key, { qty: prev.qty + (converted ?? qty), unit: prev.unit })
+        }
       })
     })
     return needs
@@ -134,26 +166,38 @@ export default function InventarioPage() {
     const rows: {
       key: string
       name: string
-      neededKg: number
-      stockKg: number | null
-      shortfallKg: number
+      neededQty: number
+      neededUnit: string
+      stockQty: number | null
+      stockUnit: string | null
+      shortfallQty: number
       itemId: string | null
       status: "ok" | "justo" | "falta"
       label: string
       icon: string
     }[] = []
-    ingredientNeeds.forEach((neededKg, key) => {
-      const match = items.find((i) => i.name.toLowerCase().trim() === key)
-      const stockKg = match ? match.stock : null
+    ingredientNeeds.forEach((need, key) => {
+      const match = items.find((i) => normalizeName(i.name) === key)
+      // Convert the recipe need into the inventory item's unit when dimensions match
+      let neededQty = need.qty
+      let neededUnit = need.unit
+      if (match) {
+        const converted = convertQty(need.qty, need.unit, match.unit)
+        if (converted !== null) {
+          neededQty = converted
+          neededUnit = match.unit
+        }
+      }
+      const stockQty = match ? match.stock : null
       let status: "ok" | "justo" | "falta"
       let label: string
-      if (stockKg === null) {
+      if (stockQty === null) {
         status = "falta"
         label = "No registrado en inventario"
-      } else if (stockKg >= neededKg * 1.1) {
+      } else if (stockQty >= neededQty * 1.1) {
         status = "ok"
         label = "Suficiente"
-      } else if (stockKg >= neededKg) {
+      } else if (stockQty >= neededQty) {
         status = "justo"
         label = "Justo (mínimo)"
       } else {
@@ -163,10 +207,12 @@ export default function InventarioPage() {
       const icon = status === "ok" ? "🟢" : status === "justo" ? "🟡" : "🔴"
       rows.push({
         key,
-        name: key.charAt(0).toUpperCase() + key.slice(1),
-        neededKg,
-        stockKg,
-        shortfallKg: stockKg === null ? neededKg : Math.max(0, neededKg - stockKg),
+        name: match?.name ?? key.charAt(0).toUpperCase() + key.slice(1),
+        neededQty,
+        neededUnit,
+        stockQty,
+        stockUnit: match?.unit ?? null,
+        shortfallQty: stockQty === null ? neededQty : Math.max(0, neededQty - stockQty),
         itemId: match?.id || null,
         status,
         label,
@@ -186,22 +232,23 @@ export default function InventarioPage() {
     if (!projectionIncluded) return purchaseOrder
     const base = [...purchaseOrder]
     projection
-      .filter((p) => p.status !== "ok" && p.shortfallKg > 0)
+      .filter((p) => p.status !== "ok" && p.shortfallQty > 0)
       .forEach((p) => {
-        const existing = base.find((b) => b.name.toLowerCase().trim() === p.key)
+        const existing = base.find((b) => normalizeName(b.name) === p.key)
         if (existing) {
-          existing.toBuy = Math.max(existing.toBuy, Math.ceil(p.shortfallKg))
+          const converted = convertQty(p.shortfallQty, p.neededUnit, existing.unit)
+          existing.toBuy = Math.max(existing.toBuy, Math.ceil(converted ?? p.shortfallQty))
           existing.cost = existing.toBuy * existing.pricePerUnit
         } else {
           base.push({
             id: `proj-${p.key}`,
             name: p.name,
-            toBuy: Math.ceil(p.shortfallKg),
-            unit: "kg",
+            toBuy: Math.ceil(p.shortfallQty),
+            unit: p.neededUnit,
             stock: 0,
             minStock: 0,
             pricePerUnit: p.itemId ? items.find((i) => i.id === p.itemId)?.pricePerUnit || 0 : 0,
-            cost: Math.ceil(p.shortfallKg) * (p.itemId ? items.find((i) => i.id === p.itemId)?.pricePerUnit || 0 : 0),
+            cost: Math.ceil(p.shortfallQty) * (p.itemId ? items.find((i) => i.id === p.itemId)?.pricePerUnit || 0 : 0),
           })
         }
       })
@@ -217,6 +264,7 @@ export default function InventarioPage() {
     setFormUnit("kg")
     setFormPrice("0")
     setFormCategory("")
+    setFormProveedorId("")
     setShowForm(true)
   }
 
@@ -228,6 +276,7 @@ export default function InventarioPage() {
     setFormUnit(item.unit)
     setFormPrice(String(item.pricePerUnit))
     setFormCategory(item.category || "")
+    setFormProveedorId(item.proveedorId || "")
     setShowForm(true)
   }
 
@@ -249,7 +298,7 @@ export default function InventarioPage() {
       setItems((prevArr) =>
         prevArr.map((i) =>
           i.id === editingId
-            ? { ...i, name: formName.trim(), stock, minStock, unit: formUnit, pricePerUnit, category: formCategory || undefined }
+            ? { ...i, name: formName.trim(), stock, minStock, unit: formUnit, pricePerUnit, category: formCategory || undefined, proveedorId: formProveedorId || undefined }
             : i
         )
       )
@@ -265,13 +314,14 @@ export default function InventarioPage() {
       toast("Producto actualizado", "success")
     } else {
       const newItem: InventoryItem = {
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        id: uid("item"),
         name: formName.trim(),
         stock,
         minStock,
         unit: formUnit,
         pricePerUnit,
         category: formCategory || undefined,
+        proveedorId: formProveedorId || undefined,
       }
       setItems((prev) => [...prev, newItem])
       toast("Producto agregado al inventario", "success")
@@ -284,6 +334,58 @@ export default function InventarioPage() {
     setItems((prev) => prev.filter((i) => i.id !== id))
     setDeleteConfirm(null)
     toast("Producto eliminado", "warning")
+  }
+
+  // ── Suppliers CRUD ────────────────────────────────────
+  const addSupplier = () => {
+    if (!supplierForm.nombre.trim()) {
+      toast("El nombre del proveedor es obligatorio", "warning")
+      return
+    }
+    const nuevo: Proveedor = {
+      id: uid("item"),
+      nombre: supplierForm.nombre.trim(),
+      contacto: supplierForm.contacto.trim() || undefined,
+      telefono: supplierForm.telefono.trim() || undefined,
+    }
+    setProveedores((prev) => [...prev, nuevo])
+    setSupplierForm({ nombre: "", contacto: "", telefono: "" })
+    toast(`Proveedor ${nuevo.nombre} agregado`, "success")
+  }
+
+  const deleteSupplier = (id: string) => {
+    setProveedores((prev) => prev.filter((p) => p.id !== id))
+    // Unlink items assigned to the deleted supplier
+    setItems((prev) => prev.map((i) => (i.proveedorId === id ? { ...i, proveedorId: undefined } : i)))
+    toast("Proveedor eliminado", "warning")
+  }
+
+  const proveedorName = (id?: string) => proveedores.find((p) => p.id === id)?.nombre || "Sin proveedor"
+
+  // Group the projected order by supplier
+  const groupedOrder = useMemo(() => {
+    const groups = new Map<string | null, { proveedorId: string | null; nombre: string; items: typeof projectedOrder }>()
+    projectedOrder.forEach((item) => {
+      const id = item.proveedorId || null
+      if (!groups.has(id)) {
+        groups.set(id, { proveedorId: id, nombre: id ? proveedorName(id) : "Sin proveedor", items: [] })
+      }
+      groups.get(id)!.items.push(item)
+    })
+    return [...groups.values()]
+  }, [projectedOrder, proveedores])
+
+  const orderTextFor = (list: typeof projectedOrder) => {
+    const header = `🛒 Orden de compra — ${selectedCollection?.name || "Mi inventario"}`
+    const footer = `\n📦 Pedir en resurte.me`
+    const lines = list.map((item) => `• ${item.name}: ${item.toBuy} ${item.unit} × $${item.pricePerUnit} = $${item.cost.toFixed(0)}`)
+    const total = `\n💰 Total estimado: $${list.reduce((s, i) => s + i.cost, 0).toFixed(0)}`
+    return [header, ...lines, total, footer].join("\n")
+  }
+
+  const sendWhatsApp = (list: typeof projectedOrder, nombreProveedor: string) => {
+    const text = `🧾 Orden de compra${nombreProveedor !== "Sin proveedor" ? ` — ${nombreProveedor}` : ""}\n\n${orderTextFor(list)}`
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer")
   }
 
   const adjustStock = (id: string, delta: number) => {
@@ -311,7 +413,7 @@ export default function InventarioPage() {
         ...m,
         fecha: new Date().toISOString(),
       }
-      return [entry, ...prev].slice(0, 50)
+      return [entry, ...prev].slice(0, 500)
     })
   }
 
@@ -346,38 +448,45 @@ export default function InventarioPage() {
   // ── Import from planificador ────────────────────────────
   const importFromPlanificador = () => {
     const planItems = Object.entries(manualQtys)
-      .filter(([, qty]) => qty > 0)
-      .map(([name, qty]) => ({
+      .filter(([, m]) => m.qty > 0)
+      .map(([name, m]) => ({
         name,
-        stock: Math.ceil(qty / 1000),
-        minStock: Math.max(5, Math.ceil(qty / 500)),
+        qty: m.qty,
+        unit: m.unit || "kg",
+        price: m.price,
       }))
 
-    const existingNames = new Set(items.map((i) => i.name.toLowerCase()))
+    const existingNames = new Set(items.map((i) => normalizeName(i.name)))
     const merged = items.map((i) => {
-      const match = planItems.find((p) => p.name.toLowerCase() === i.name.toLowerCase())
-      return match ? { ...i, stock: i.stock + match.stock } : i
+      const match = planItems.find((p) => normalizeName(p.name) === normalizeName(i.name))
+      if (!match) return i
+      // Convert the planned qty into the inventory item's unit when dimensions match
+      const converted = convertQty(match.qty, match.unit, i.unit)
+      const delta = converted !== null ? Math.max(1, Math.ceil(converted)) : Math.max(1, Math.ceil(match.qty))
+      const price = match.price && match.price > 0 ? match.price : i.pricePerUnit
+      return { ...i, stock: i.stock + delta, pricePerUnit: price }
     })
     const trulyNew: InventoryItem[] = planItems
-      .filter((p) => !existingNames.has(p.name.toLowerCase()))
+      .filter((p) => !existingNames.has(normalizeName(p.name)))
       .map((p) => ({
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        id: uid("item"),
         name: p.name,
-        stock: p.stock,
-        minStock: p.minStock,
-        unit: "kg",
-        pricePerUnit: 20,
+        stock: Math.max(1, Math.ceil(p.qty)),
+        minStock: Math.max(5, Math.ceil(p.qty / 2)),
+        unit: p.unit,
+        pricePerUnit: p.price ?? 0,
       }))
     setItems([...merged, ...trulyNew])
-    const deltaNames = [...merged, ...trulyNew].filter((i) => planItems.some((p) => p.name.toLowerCase() === i.name.toLowerCase()))
+    const deltaNames = [...merged, ...trulyNew].filter((i) => planItems.some((p) => normalizeName(p.name) === normalizeName(i.name)))
     deltaNames.forEach((i) => {
-      const plan = planItems.find((p) => p.name.toLowerCase() === i.name.toLowerCase())
+      const plan = planItems.find((p) => normalizeName(p.name) === normalizeName(i.name))
       if (plan) {
+        const converted = convertQty(plan.qty, plan.unit, i.unit)
         logMovement({
           itemId: i.id,
           itemName: i.name,
           tipo: "entrada",
-          delta: plan.stock,
+          delta: converted !== null ? Math.max(1, Math.ceil(converted)) : Math.max(1, Math.ceil(plan.qty)),
           motivo: "Importación desde el planificador",
         })
       }
@@ -513,8 +622,89 @@ export default function InventarioPage() {
         </div>
       )}
 
+      {/* ── Suppliers catalog ──────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+        <button onClick={() => setShowSuppliers(!showSuppliers)} className="flex items-center justify-between w-full text-left">
+          <div className="flex items-center gap-2">
+            <Truck className="w-5 h-5 text-[#108910]" />
+            <h3 className="font-bold text-gray-900 text-sm">Proveedores ({proveedores.length})</h3>
+            <p className="text-[10px] text-gray-400 hidden sm:block">Asigna un proveedor a cada producto para agrupar tus órdenes</p>
+          </div>
+          {showSuppliers ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        </button>
+        {showSuppliers && (
+          <div className="mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-2">
+              <input
+                type="text"
+                value={supplierForm.nombre}
+                onChange={(e) => setSupplierForm({ ...supplierForm, nombre: e.target.value })}
+                placeholder="Nombre del proveedor"
+                className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]"
+                aria-label="Nombre del proveedor"
+              />
+              <input
+                type="text"
+                value={supplierForm.contacto}
+                onChange={(e) => setSupplierForm({ ...supplierForm, contacto: e.target.value })}
+                placeholder="Contacto (opcional)"
+                className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]"
+                aria-label="Contacto del proveedor"
+              />
+              <input
+                type="text"
+                value={supplierForm.telefono}
+                onChange={(e) => setSupplierForm({ ...supplierForm, telefono: e.target.value })}
+                placeholder="Teléfono (opcional)"
+                className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]"
+                aria-label="Teléfono del proveedor"
+              />
+              <button
+                onClick={addSupplier}
+                disabled={!supplierForm.nombre.trim()}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Agregar
+              </button>
+            </div>
+            {proveedores.length === 0 && (
+              <p className="text-[10px] text-gray-400">
+                Agrega tus proveedores (p. ej. "Distribuidora Lácteos" o "Carnicería El Norte") para después asignarlos a cada producto.
+              </p>
+            )}
+            {proveedores.length > 0 && (
+              <div className="space-y-1.5 mt-3">
+                {proveedores.map((p) => {
+                  const assigned = items.filter((i) => i.proveedorId === p.id).length
+                  return (
+                    <div key={p.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2 text-xs">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-700 truncate">{p.nombre}</p>
+                        <p className="text-[10px] text-gray-400">
+                          {[p.contacto, p.telefono].filter(Boolean).join(" · ") || "Sin contacto"}
+                          {assigned > 0 && ` · ${assigned} producto${assigned > 1 ? "s" : ""}`}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => deleteSupplier(p.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Eliminar proveedor"
+                        aria-label={`Eliminar proveedor ${p.nombre}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* ── Import from planificador ───────────────────── */}
-      {Object.keys(manualQtys).some((k) => manualQtys[k] > 0) && (
+      {Object.values(manualQtys).some((m) => m.qty > 0) && (
         <div className="bg-gradient-to-r from-indigo-50 to-white rounded-xl border border-indigo-100 p-4 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -577,13 +767,13 @@ export default function InventarioPage() {
                   {p.label}
                 </span>
                 <span className="text-gray-400 shrink-0">
-                  {p.stockKg === null ? "—" : `${p.stockKg} kg`} / {p.neededKg.toFixed(1)} kg
+                  {p.stockQty === null ? "—" : `${p.stockQty} ${p.stockUnit}`} / {p.neededQty.toFixed(1)} {p.neededUnit}
                 </span>
               </div>
             ))}
           </div>
           <p className="text-[10px] text-gray-400">
-            Proyección = ingredientes de tus {sharedDishes.length} platillos costeados × {covers} comensales (kg).
+            Proyección = ingredientes de tus {sharedDishes.length} platillos costeados × {covers} comensales (con su unidad).
             Compara contra tu inventario actual para no quedarte corto en el servicio.
           </p>
         </div>
@@ -625,18 +815,18 @@ export default function InventarioPage() {
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs" aria-label="Inventario de artículos">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50">
-                  <th className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Estado</th>
-                  <th className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Producto</th>
-                  <th className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Stock</th>
-                  <th className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Mínimo</th>
-                  <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Unidad</th>
-                  <th className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Precio/Unid</th>
-                  <th className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Valor</th>
-                  <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Ajuste</th>
-                  <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Acción</th>
+                  <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Estado</th>
+                  <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Producto</th>
+                  <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Stock</th>
+                  <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Mínimo</th>
+                  <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Unidad</th>
+                  <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Precio/Unid</th>
+                  <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Valor</th>
+                  <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Ajuste</th>
+                  <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -650,6 +840,11 @@ export default function InventarioPage() {
                       <td className="px-4 py-3">
                         <p className="font-semibold text-gray-800">{item.name}</p>
                         {item.category && <p className="text-[10px] text-gray-400">{item.category}</p>}
+                        {item.proveedorId && (
+                          <p className="text-[10px] text-emerald-600 font-medium truncate max-w-[160px]">
+                            🚚 {proveedorName(item.proveedorId)}
+                          </p>
+                        )}
                       </td>
                       <td className={`px-4 py-3 text-right font-bold ${
                         item.stock === 0 ? "text-red-600" : item.stock <= item.minStock ? "text-amber-600" : "text-green-700"
@@ -711,31 +906,114 @@ export default function InventarioPage() {
           </button>
           {orderExpanded && (
             <div className="mt-4">
-              <div className="space-y-2 mb-4">
-                {projectedOrder.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2 text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span>{item.id.startsWith("proj-") ? "🔍" : getStatus(item).icon}</span>
-                      <span className="font-semibold text-gray-700 truncate">{item.name}</span>
-                      {item.id.startsWith("proj-") && (
-                        <span className="text-[9px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded-full font-medium">Proyección</span>
-                      )}
+              {proveedores.length > 0 && groupedOrder.length > 1 && (
+                <div className="flex items-center gap-2 mb-4">
+                  <label className="flex items-center gap-2 text-[11px] text-gray-500 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={groupBySupplier}
+                      onChange={(e) => setGroupBySupplier(e.target.checked)}
+                      className="accent-[#108910]"
+                    />
+                    <span className="font-semibold text-gray-700">Agrupar por proveedor</span>
+                  </label>
+                  <Layers className="w-3.5 h-3.5 text-gray-400" />
+                </div>
+              )}
+
+              {groupBySupplier && proveedores.length > 0 ? (
+                <div className="space-y-4 mb-4">
+                  {groupedOrder.map((group) => (
+                    <div key={group.proveedorId || "sin"} className="rounded-xl border border-gray-100 overflow-hidden">
+                      <div className="flex items-center justify-between bg-gray-50 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-3.5 h-3.5 text-[#108910]" />
+                          <span className="text-xs font-bold text-gray-700">{group.nombre}</span>
+                          <span className="text-[9px] text-gray-400">{group.items.length} producto{group.items.length > 1 ? "s" : ""}</span>
+                        </div>
+                        <span className="text-xs font-bold text-[#108910]">
+                          ${group.items.reduce((s, i) => s + i.cost, 0).toFixed(0)}
+                        </span>
+                      </div>
+                      <div className="divide-y divide-gray-50">
+                        {group.items.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between px-3 py-2 text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span>{item.id.startsWith("proj-") ? "🔍" : getStatus(item).icon}</span>
+                              <span className="font-semibold text-gray-700 truncate">{item.name}</span>
+                              {item.id.startsWith("proj-") && (
+                                <span className="text-[9px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded-full font-medium">Proyección</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="text-gray-500">Comprar {item.toBuy} {item.unit}</span>
+                              <span className="font-bold text-[#108910]">${item.cost.toFixed(0)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-2 border-t border-gray-100">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(orderTextFor(group.items))
+                            toast(`Orden de ${group.nombre} copiada`, "success")
+                          }}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 text-gray-700 text-[10px] font-semibold rounded-lg hover:bg-gray-200 transition-colors"
+                          aria-label={`Copiar orden de ${group.nombre}`}
+                        >
+                          <Copy className="w-3 h-3" /> Copiar
+                        </button>
+                        <button
+                          onClick={() => sendWhatsApp(group.items, group.nombre)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 text-green-700 text-[10px] font-semibold rounded-lg hover:bg-green-100 transition-colors"
+                          aria-label={`Enviar orden de ${group.nombre} por WhatsApp`}
+                        >
+                          <MessageCircle className="w-3 h-3" /> WhatsApp
+                        </button>
+                        <span className="ml-auto text-[10px] text-gray-400">{group.nombre}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-gray-500">Comprar {item.toBuy} {item.unit}</span>
-                      <span className="font-bold text-[#108910]">${item.cost.toFixed(0)}</span>
-                      <a href="https://resurte.me" target="_blank" rel="noopener noreferrer"
-                        className="text-[10px] bg-[#108910] text-white px-2 py-0.5 rounded-full font-medium hover:bg-green-800 transition-colors">
-                        Comprar
-                      </a>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2 mb-4">
+                  {projectedOrder.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span>{item.id.startsWith("proj-") ? "🔍" : getStatus(item).icon}</span>
+                        <span className="font-semibold text-gray-700 truncate">{item.name}</span>
+                        {item.id.startsWith("proj-") && (
+                          <span className="text-[9px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded-full font-medium">Proyección</span>
+                        )}
+                        {item.proveedorId && (
+                          <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-full font-medium hidden sm:inline">
+                            {proveedorName(item.proveedorId)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-gray-500">Comprar {item.toBuy} {item.unit}</span>
+                        <span className="font-bold text-[#108910]">${item.cost.toFixed(0)}</span>
+                        <a href="https://resurte.me" target="_blank" rel="noopener noreferrer"
+                          className="text-[10px] bg-[#108910] text-white px-2 py-0.5 rounded-full font-medium hover:bg-green-800 transition-colors">
+                          Comprar
+                        </a>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2 pt-3 border-t border-gray-100 flex-wrap">
                 <button onClick={copyOrder}
                   className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-200 transition-colors">
                   <Copy className="w-3.5 h-3.5" /> Copiar lista
+                </button>
+                <button
+                  onClick={() => sendWhatsApp(projectedOrder, "general")}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 text-xs font-semibold rounded-xl hover:bg-green-100 transition-colors"
+                  aria-label="Enviar orden de compra por WhatsApp"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" /> Enviar por WhatsApp
                 </button>
                 <p className="text-[10px] text-gray-400">Pega en WhatsApp o notas</p>
                 <span className="ml-auto text-xs font-bold text-gray-700">Total: ${projectedOrder.reduce((s, i) => s + i.cost, 0).toFixed(0)}</span>
@@ -851,6 +1129,24 @@ export default function InventarioPage() {
                 <input type="text" value={formCategory} onChange={(e) => setFormCategory(e.target.value)}
                   placeholder="Ej: Lácteos"
                   className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">
+                  Proveedor <span className="text-gray-300">(opcional)</span>
+                </label>
+                <select value={formProveedorId} onChange={(e) => setFormProveedorId(e.target.value)}
+                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910] bg-white"
+                  aria-label="Proveedor del producto">
+                  <option value="">Sin proveedor</option>
+                  {proveedores.map((p) => (
+                    <option key={p.id} value={p.id}>{p.nombre}</option>
+                  ))}
+                </select>
+                {proveedores.length === 0 && (
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Agrega proveedores en la sección "Proveedores" de esta página para agrupar tus órdenes de compra.
+                  </p>
+                )}
               </div>
               <div className="flex gap-2 pt-2">
                 <button onClick={() => { setShowForm(false); setEditingId(null) }}

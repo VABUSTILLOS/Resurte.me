@@ -6,11 +6,14 @@ import { useToast } from "@/components/toast"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useEffect, useCallback, useRef } from "react"
+import { normalizeName } from "@/lib/normalize"
+import { foodCostStatus, usePanelConfig } from "@/lib/panel-config"
+import { convertQty } from "@/lib/panel-units"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp,
   Calendar, ClipboardCheck, ArrowRight, ChefHat, Store,
   PieChart, DollarSign, BarChart3, Zap, Clock, Percent, Package, Receipt, Copy,
-  AlertTriangle, Bell, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Search, Flame,
+  AlertTriangle, Bell, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Search, Flame, Target, Gift,
 } from "lucide-react"
 import { GlobalSearch } from "@/components/global-search"
 
@@ -19,6 +22,28 @@ const PAYMENT_METHODS = [
   { key: "tarjeta", label: "Tarjeta", icon: "💳" },
   { key: "transferencia", label: "Transferencia", icon: "🏦" },
 ] as const
+
+type HubVenta = {
+  id: string
+  dishId: string
+  dishName: string
+  quantity: number
+  date: string
+  unitPrice: number
+  unitCost: number
+  paymentMethod?: string
+  channel?: string
+  discount?: { type: "monto" | "porcentaje"; value: number }
+  clienteId?: string
+}
+
+function hubEntryTotal(e: HubVenta): number {
+  const gross = e.quantity * e.unitPrice
+  if (!e.discount) return gross
+  return e.discount.type === "porcentaje"
+    ? gross * (1 - e.discount.value / 100)
+    : Math.max(gross - e.discount.value, 0)
+}
 
 const COLLECTION_ICONS: Record<string, string> = {
   "hamburguesas-hot-dogs": "🍔",
@@ -142,9 +167,14 @@ export default function PanelPage() {
   const [monthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
   const [shoppingList] = useLocalStorage<{ key: string; name: string; pricePerKg: number; quantityKg: number }[]>("temporada-shopping-list", [], slug)
   const [inventarioItems] = useLocalStorage<{ id: string; name: string; stock: number; minStock: number; unit: string; pricePerUnit: number; category?: string }[]>("inventario-items", [], slug)
-  const [ventasEntries] = useLocalStorage<{ id: string; dishId: string; dishName: string; quantity: number; date: string; unitPrice: number; unitCost: number; paymentMethod?: string; channel?: string }[]>("ventas-entries", [], slug)
+  const [ventasEntries] = useLocalStorage<HubVenta[]>("ventas-entries", [], slug)
+  const [ventasMetaDia] = useLocalStorage<number>("ventas-meta-dia", 0, slug)
+  const [ventasUmbralTicket] = useLocalStorage<number>("ventas-umbral-ticket", 3000, slug)
+  const [clientes] = useLocalStorage<{ id: string; nombre: string; telefono?: string; puntos: number; visitas: number; totalGastado: number; createdAt: string }[]>("clientes", [], slug)
+  const [puntosTasa] = useLocalStorage<number>("ventas-puntos-tasa", 100, slug)
   const [comandaStatuses] = useLocalStorage<Record<string, { status: "pendiente" | "en-cocina" | "listo"; startedAt?: number; readyAt?: number }>>("comanda-statuses", {}, slug)
   const [covers] = useLocalStorage<number>("planner-covers", 0, slug)
+  const panelCfg = usePanelConfig(slug)
 
   const [showAlerts, setShowAlerts] = useState(true)
   const [showSearch, setShowSearch] = useState(false)
@@ -181,28 +211,28 @@ export default function PanelPage() {
     const seasonalSavings = shoppingList.reduce((s, item) => s + item.quantityKg * item.pricePerKg, 0)
     const green = sharedDishes.filter((d) => {
       const cost = d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0)
-      return d.sellingPrice > 0 && (cost / d.sellingPrice) * 100 <= 30
+      return d.sellingPrice > 0 && foodCostStatus((cost / d.sellingPrice) * 100, panelCfg) === "green"
     }).length
     const red = sharedDishes.filter((d) => {
       const cost = d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0)
-      return d.sellingPrice > 0 && (cost / d.sellingPrice) * 100 > 38
+      return d.sellingPrice > 0 && foodCostStatus((cost / d.sellingPrice) * 100, panelCfg) === "red"
     }).length
     return { totalCosteo, totalMerma, green, red, dishesCount: sharedDishes.length, mermaCount: mermaEntries.length, aperturaCount: aperturaChecked.length, avgFoodCost, avgMargin, monthLoss, mermaVsGoal, seasonalSavings, totalPrice, monthlyGoal }
-  }, [sharedDishes, mermaEntries, aperturaChecked, selectedCollection, monthlyGoal, shoppingList])
+  }, [sharedDishes, mermaEntries, aperturaChecked, selectedCollection, monthlyGoal, shoppingList, panelCfg])
 
   // Sales widget: today revenue, COGS, margin, ticket count, payment methods, merma
   const todaySales = useMemo(() => {
     if (!selectedCollection) return null
     const today = new Date().toISOString().slice(0, 10)
     const todayEntries = ventasEntries.filter((e) => e.date === today)
-    const revenue = todayEntries.reduce((s, e) => s + e.quantity * e.unitPrice, 0)
+    const revenue = todayEntries.reduce((s, e) => s + hubEntryTotal(e), 0)
     const cost = todayEntries.reduce((s, e) => s + e.quantity * e.unitCost, 0)
     const units = todayEntries.reduce((s, e) => s + e.quantity, 0)
     const byMethod = new Map<string, { revenue: number; count: number }>()
     todayEntries.forEach((e) => {
       const m = e.paymentMethod || "efectivo"
       const cur = byMethod.get(m) || { revenue: 0, count: 0 }
-      cur.revenue += e.quantity * e.unitPrice
+      cur.revenue += hubEntryTotal(e)
       cur.count += 1
       byMethod.set(m, cur)
     })
@@ -226,6 +256,24 @@ export default function PanelPage() {
     }
   }, [ventasEntries, mermaEntries, selectedCollection])
 
+  // Loyalty points awarded today (sales linked to a client)
+  const puntosHoy = useMemo(() => {
+    if (!selectedCollection) return 0
+    const today = new Date().toISOString().slice(0, 10)
+    const tasa = puntosTasa > 0 ? puntosTasa : 100
+    return ventasEntries
+      .filter((e) => e.date === today && e.clienteId)
+      .reduce((s, e) => s + Math.floor(hubEntryTotal(e) / tasa), 0)
+  }, [selectedCollection, ventasEntries, puntosTasa])
+
+  // Daily goal progress from ventas meta
+  const goalProgress = useMemo(() => {
+    if (!selectedCollection || !todaySales) return null
+    const pct = ventasMetaDia > 0 ? (todaySales.revenue / ventasMetaDia) * 100 : 0
+    const projected = ventasMetaDia > 0 ? Math.round(pct) : 0
+    return { pct, projected, goal: ventasMetaDia }
+  }, [selectedCollection, todaySales, ventasMetaDia])
+
   // Active kitchen orders: today's sales still pendiente or en-cocina
   const activeComandas = useMemo(() => {
     if (!selectedCollection) return { active: 0, pendiente: 0, enCocina: 0, readyToday: 0 }
@@ -247,19 +295,26 @@ export default function PanelPage() {
   // Planned-menu stock projection: ingredients needed for covers vs inventory
   const projectionShortfall = useMemo(() => {
     if (!selectedCollection || !covers || covers <= 0) return 0
-    const needs = new Map<string, number>()
+    const needs = new Map<string, { qty: number; unit: string }>()
     sharedDishes.forEach((d) => {
       d.ingredients.forEach((ing) => {
-        const key = ing.ingredientName.toLowerCase().trim()
+        const key = normalizeName(ing.ingredientName)
         if (!key) return
-        const neededKg = (ing.quantity || 0) * covers / 1000
-        needs.set(key, (needs.get(key) || 0) + neededKg)
+        const qty = (ing.quantity || 0) * covers
+        const prev = needs.get(key)
+        if (prev) prev.qty += qty
+        else needs.set(key, { qty, unit: ing.unit || "g" })
       })
     })
     let missing = 0
-    needs.forEach((neededKg, key) => {
-      const item = inventarioItems.find((i) => i.name.toLowerCase().trim() === key)
-      if (!item || item.stock < neededKg) missing++
+    needs.forEach((need, key) => {
+      const item = inventarioItems.find((i) => normalizeName(i.name) === key)
+      if (!item) {
+        missing++
+        return
+      }
+      const neededInItemUnit = convertQty(need.qty, need.unit, item.unit) ?? need.qty
+      if (item.stock < neededInItemUnit) missing++
     })
     return missing
   }, [sharedDishes, covers, inventarioItems, selectedCollection])
@@ -349,6 +404,7 @@ export default function PanelPage() {
       active.forEach((m) => lines.push(`${m.icon} ${m.label}: $${m.revenue.toFixed(0)} (${m.count} venta${m.count > 1 ? "s" : ""})`))
     }
     lines.push(`Merma de hoy: $${s.todayMerma.toFixed(0)}`)
+    lines.push(`Puntos otorgados hoy: ${puntosHoy}`)
     lines.push("", "📈 Registrado en resurte.me")
     navigator.clipboard.writeText(lines.join("\n"))
     toast("Resumen del día copiado", "success")
@@ -384,10 +440,10 @@ export default function PanelPage() {
     // 2. High food cost dishes
     const highCostDishes = sharedDishes.filter((d) => {
       const cost = d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0)
-      return d.sellingPrice > 0 && (cost / d.sellingPrice) * 100 > 38
+      return d.sellingPrice > 0 && foodCostStatus((cost / d.sellingPrice) * 100, panelCfg) === "red"
     })
     if (highCostDishes.length > 0) {
-      result.push({ id: "high-foodcost", type: "danger", icon: AlertTriangle, title: `${highCostDishes.length} platillo(s) con food cost > 38%`, detail: `${highCostDishes.map((d) => d.name).join(", ")}`, href: "/panel/rentabilidad" })
+      result.push({ id: "high-foodcost", type: "danger", icon: AlertTriangle, title: `${highCostDishes.length} platillo(s) con food cost > ${panelCfg.foodCostRedAbove}%`, detail: `${highCostDishes.map((d) => d.name).join(", ")}`, href: "/panel/rentabilidad" })
     }
 
     // 3. Merma close to/exceeding goal
@@ -430,9 +486,64 @@ export default function PanelPage() {
       result.push({ id: "projection-shortfall", type: "warning", icon: AlertTriangle, title: `Te falta stock para tu menú planeado (${projectionShortfall} ingrediente${projectionShortfall !== 1 ? "s" : ""})`, detail: `Con ${covers} comensales planificados, revisa los faltantes calculados por receta`, href: "/panel/inventario" })
     }
 
-    // Limit to 5
-    return result.slice(0, 5)
-  }, [selectedCollection, inventarioItems, sharedDishes, mermaEntries, monthlyGoal, shoppingList, aperturaChecked, projectionShortfall, covers, activeComandas])
+    // 7. Sales goal — behind pace at midday
+    if (ventasMetaDia > 0 && todaySales) {
+      const hour = new Date().getHours()
+      if (hour >= 14 && todaySales.revenue / ventasMetaDia < 0.5) {
+        result.push({
+          id: "ventas-goal-behind",
+          type: "warning",
+          icon: Zap,
+          title: "Vas por debajo del 50% de tu meta de ventas",
+          detail: `$${todaySales.revenue.toFixed(0)} de $${ventasMetaDia.toFixed(0)} (${Math.round((todaySales.revenue / ventasMetaDia) * 100)}%) — media jornada superada`,
+          href: "/panel/ventas",
+        })
+      }
+    }
+
+    // 8. Irregular sales (antifraud heuristics on today's entries)
+    if (todaySales && todaySales.count > 0) {
+      const today = new Date().toISOString().slice(0, 10)
+      const todayEntries = ventasEntries.filter((e) => e.date === today)
+      const irregular = todayEntries.filter((e) => {
+        const total = hubEntryTotal(e)
+        if (ventasUmbralTicket > 0 && total > ventasUmbralTicket) return true
+        if (e.quantity >= 20) return true
+        if (e.discount && e.discount.type === "porcentaje" && e.discount.value > 30) return true
+        if (e.unitPrice <= 0) return true
+        return false
+      })
+      if (irregular.length > 0) {
+        result.push({
+          id: "ventas-irregular",
+          type: "danger",
+          icon: AlertTriangle,
+          title: `Posibles ventas irregulares (${irregular.length})`,
+          detail: `${irregular.slice(0, 2).map((e) => e.dishName).join(", ")}${irregular.length > 2 ? ` +${irregular.length - 2} más` : ""} — revisa el panel de alertas en Ventas`,
+          href: "/panel/ventas",
+        })
+      }
+    }
+
+    // 9. Loyalty — frequent customers worth rewarding
+    if (clientes.length > 0) {
+      const frecuentes = clientes.filter((c) => c.visitas >= 10 || c.puntos >= 500)
+      if (frecuentes.length > 0) {
+        const top = [...frecuentes].sort((a, b) => (b.puntos + b.visitas * 10) - (a.puntos + a.visitas * 10))[0]
+        result.push({
+          id: "clientes-frecuentes",
+          type: "success",
+          icon: Gift,
+          title: `${frecuentes.length} cliente${frecuentes.length !== 1 ? "s" : ""} frecuente${frecuentes.length !== 1 ? "s" : ""} para premiar`,
+          detail: `${top.nombre} tiene ${top.puntos} pts y ${top.visitas} visitas — ofrécele un descuento por fidelidad`,
+          href: "/panel/ventas",
+        })
+      }
+    }
+
+    // Limit to alertCap
+    return result.slice(0, panelCfg.alertCap)
+  }, [selectedCollection, inventarioItems, sharedDishes, mermaEntries, monthlyGoal, shoppingList, aperturaChecked, projectionShortfall, covers, activeComandas, ventasMetaDia, todaySales, ventasEntries, ventasUmbralTicket, panelCfg, clientes])
 
   return (
     <div>
@@ -512,14 +623,14 @@ export default function PanelPage() {
             <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-2">
               <Percent className="w-4 h-4 text-blue-600" />
             </div>
-            <p className={`text-xl font-extrabold ${stats.avgFoodCost > 38 ? "text-red-700" : stats.avgFoodCost > 30 ? "text-amber-700" : "text-green-700"}`}>
+            <p className={`text-xl font-extrabold ${stats.avgFoodCost > panelCfg.foodCostRedAbove ? "text-red-700" : stats.avgFoodCost > panelCfg.foodCostGreenMax ? "text-amber-700" : "text-green-700"}`}>
               {stats.dishesCount > 0 ? `${stats.avgFoodCost.toFixed(1)}%` : "—"}
             </p>
             <p className="text-[11px] text-gray-400">Food cost promedio</p>
             {stats.dishesCount > 0 && (
               <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
                 <div
-                  className={`h-full rounded-full ${stats.avgFoodCost > 38 ? "bg-red-500" : stats.avgFoodCost > 30 ? "bg-amber-500" : "bg-green-500"}`}
+                  className={`h-full rounded-full ${stats.avgFoodCost > panelCfg.foodCostRedAbove ? "bg-red-500" : stats.avgFoodCost > panelCfg.foodCostGreenMax ? "bg-amber-500" : "bg-green-500"}`}
                   style={{ width: `${Math.min(stats.avgFoodCost, 100)}%` }}
                 />
               </div>
@@ -548,7 +659,7 @@ export default function PanelPage() {
             {stats.monthlyGoal > 0 && (
               <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
                 <div
-                  className={`h-full rounded-full ${stats.mermaVsGoal > 100 ? "bg-red-500" : stats.mermaVsGoal > 75 ? "bg-amber-500" : "bg-emerald-500"}`}
+                  className={`h-full rounded-full ${stats.mermaVsGoal > 100 ? "bg-red-500" : stats.mermaVsGoal > 100 - panelCfg.mermaMaxPct ? "bg-amber-500" : "bg-emerald-500"}`}
                   style={{ width: `${Math.min(stats.mermaVsGoal, 100)}%` }}
                 />
               </div>
@@ -658,9 +769,34 @@ export default function PanelPage() {
                 <span className="text-[11px] bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-gray-700">
                   {todaySales.count} registro{todaySales.count !== 1 ? "s" : ""}
                 </span>
+                <span className="text-[11px] bg-amber-50 border border-amber-100 rounded-lg px-2 py-1 text-amber-700">
+                  🎁 Puntos otorgados hoy: <b>{puntosHoy}</b>
+                </span>
               </div>
             </div>
           </div>
+          {goalProgress && goalProgress.goal > 0 && (
+            <div className="border-t border-gray-100 px-4 py-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-semibold text-gray-400 uppercase flex items-center gap-1">
+                  <Target className="w-3.5 h-3.5 text-purple-600" />
+                  Meta del día
+                </span>
+                <span className={`text-xs font-bold ${goalProgress.pct >= 100 ? "text-green-600" : goalProgress.pct >= 50 ? "text-[#108910]" : "text-amber-600"}`}>
+                  ${todaySales.revenue.toFixed(0)} / ${goalProgress.goal.toFixed(0)} ({goalProgress.projected}%)
+                </span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${goalProgress.pct >= 100 ? "bg-green-500" : goalProgress.pct >= 50 ? "bg-[#108910]" : "bg-amber-500"}`}
+                  style={{ width: `${Math.min(goalProgress.pct, 100)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1.5">
+                {goalProgress.pct >= 100 ? "¡Meta cumplida! 🎉" : goalProgress.pct >= 50 ? `Vas al ${goalProgress.projected}% de tu meta del día.` : "Aún por debajo del 50% de tu meta."}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -924,7 +1060,7 @@ export default function PanelPage() {
           </div>
         </div>
       )}
-      <GlobalSearch open={showSearch} onClose={() => setShowSearch(false)} />
+      <GlobalSearch open={showSearch} onClose={() => setShowSearch(false)} slug={slug} />
     </div>
   )
 }

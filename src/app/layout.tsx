@@ -117,6 +117,12 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased overflow-x-clip`}
     >
       <body className="min-h-full flex flex-col bg-[#faf8f5] text-[#343538] antialiased max-w-full overflow-x-clip">
+        {/* Apply stored theme before hydration to avoid flash of wrong theme */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("resurte-theme");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-theme",t)}}catch(e){}})();`,
+          }}
+        />
         {/* Skip to main content — keyboard accessibility */}
         <a href="#main-content" className="skip-to-main">
           Saltar al contenido principal

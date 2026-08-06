@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { RestaurantProvider, useRestaurant } from "@/contexts/restaurant-context"
 import { ToastProvider } from "@/components/toast"
+import ThemeToggle from "@/components/panel/ThemeToggle"
 import type { RestaurantCollection } from "@/types"
 import {
   Store, ChefHat, ChevronDown, Sparkles,
@@ -58,7 +59,7 @@ function PanelContent({ children }: { children: React.ReactNode }) {
   }, [loading, selectedCollection, router])
 
   return (
-    <div className="min-h-screen bg-[#faf8f5]">
+    <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}>
       {/* Top bar with restaurant type selector */}
       <div className="sticky top-[var(--header-top-offset)] z-40 bg-white/90 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
@@ -70,9 +71,12 @@ function PanelContent({ children }: { children: React.ReactNode }) {
               </h1>
             </div>
 
-            <div className="relative">
-              <button
-                onClick={() => setShowPicker(!showPicker)}
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+
+              <div className="relative">
+                <button
+                  onClick={() => setShowPicker(!showPicker)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
                   selectedCollection
                     ? "border-[#108910]/30 bg-[#F0FDF4] text-[#108910]"
@@ -135,6 +139,7 @@ function PanelContent({ children }: { children: React.ReactNode }) {
                 </>
               )}
             </div>
+          </div>
           </div>
 
           {/* Selected collection banner */}
