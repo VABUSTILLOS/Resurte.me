@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
@@ -14,7 +15,15 @@ export default function CashbackLayout({
 }) {
   return (
     <div className="min-h-screen bg-gray-950">
-      {children}
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+          </div>
+        }
+      >
+        {children}
+      </Suspense>
     </div>
   );
 }

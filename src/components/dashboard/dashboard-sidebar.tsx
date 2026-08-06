@@ -17,6 +17,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   LayoutDashboard,
+  Users,
 } from "lucide-react"
 import Link from "next/link"
 import type { User as SupabaseUser } from "@supabase/supabase-js"

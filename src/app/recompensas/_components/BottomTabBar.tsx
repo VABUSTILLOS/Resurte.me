@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, Wallet, Store, User } from "lucide-react";
+import { Home, Wallet, Store, User, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Tab } from "./types";
 
@@ -8,6 +8,7 @@ const tabs: { id: Tab; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Inicio", icon: Home },
   { id: "wallet", label: "Cartera", icon: Wallet },
   { id: "store", label: "Tienda", icon: Store },
+  { id: "referidos", label: "Referidos", icon: Users },
   { id: "profile", label: "Perfil", icon: User },
 ];
 

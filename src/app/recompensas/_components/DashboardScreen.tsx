@@ -9,15 +9,10 @@ import { NotificationBell } from "./NotificationBell";
 import { ImpactStories } from "./ImpactStories";
 import { SERVICES } from "./StoreScreen";
 import { TIER_CONFIGS } from "./types";
+import { LoyaltyTierBanner, useLoyaltyTier, TIER_ORDER } from "./LoyaltyTierCard";
+import { ReferralDashboard } from "@/components/referral-dashboard";
 import type { Tier } from "./types";
 import type { ServiceItem } from "./types";
-
-const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "negro"];
-
-// Simulated user state
-const USER_TIER: Tier = "plata";
-const USER_WEEKS_THIS_MONTH = 2;
-const USER_MONTHLY_SPEND = 32000;
 
 interface DashboardScreenProps {
   onOpenCalculator: (service?: ServiceItem) => void;
@@ -26,6 +21,7 @@ interface DashboardScreenProps {
   onViewOrders?: () => void;
   walletView?: boolean;
   profileView?: boolean;
+  referralView?: boolean;
 }
 
 export function DashboardScreen({
@@ -40,6 +36,9 @@ export function DashboardScreen({
   }
   if (profileView) {
     return <ProfileView />;
+  }
+  if (referralView) {
+    return <ReferralDashboard />;
   }
 
   // Pick 3 featured services for the home preview
@@ -63,6 +62,7 @@ export function DashboardScreen({
         {/* Left Column: Wallet + Quick Actions */}
         <div className="lg:col-span-2">
           <div className="px-0 md:px-6 lg:px-0">
+            <LoyaltyTierBanner />
             <GrowthWalletBanner
               balance={12450}
               nextUnlock={{
@@ -165,17 +165,15 @@ export function DashboardScreen({
 }
 
 function WalletView() {
-  const monthlySpend = USER_MONTHLY_SPEND;
-  const currentTierConfig = TIER_CONFIGS[USER_TIER];
-  const monthlyCashback = Math.round(monthlySpend * (currentTierConfig.rate / 100));
+  const { tier, monthlyCashback } = useLoyaltyTier()
+  const currentTierConfig = TIER_CONFIGS[tier]
 
-  // Simulated automatic orders
   const recentOrders = [
     { id: "PED-1042", supplier: "Distribuidora El Sol", amount: 15000, date: "15 Jul 2026", cashback: Math.round(15000 * (currentTierConfig.rate / 100)) },
     { id: "PED-1038", supplier: "Carnes Selectas del Norte", amount: 12400, date: "8 Jul 2026", cashback: Math.round(12400 * (currentTierConfig.rate / 100)) },
     { id: "PED-1035", supplier: "Frutas y Verduras del Valle", amount: 8700, date: "2 Jul 2026", cashback: Math.round(8700 * (currentTierConfig.rate / 100)) },
     { id: "PED-1032", supplier: "Lácteos La Pradera", amount: 5200, date: "28 Jun 2026", cashback: Math.round(5200 * (currentTierConfig.rate / 100)) },
-  ];
+  ]
 
   return (
     <div className="px-4 pt-6 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
@@ -258,7 +256,8 @@ function WalletView() {
 }
 
 function ProfileView() {
-  const currentTierIdx = TIER_ORDER.indexOf(USER_TIER);
+  const { tier, weekCount } = useLoyaltyTier()
+  const currentTierIdx = TIER_ORDER.indexOf(tier)
 
   // Tier unlock conditions
   const tierConditions: Record<Tier, { weeks: number; minWeekly: number; label: string }> = {
@@ -355,17 +354,17 @@ function ProfileView() {
                       <div className="mt-2">
                         <div className="flex justify-between text-[10px] mb-1">
                           <span className="text-gray-500">
-                            {USER_WEEKS_THIS_MONTH} de {cond.weeks} semanas este mes
+                          {weekCount} de {cond.weeks} semanas este mes
                           </span>
                           <span className={cfg.textColor}>
-                            {Math.round((USER_WEEKS_THIS_MONTH / cond.weeks) * 100)}%
+                          {cond.weeks > 0 ? Math.round((weekCount / cond.weeks) * 100) : 100}%
                           </span>
                         </div>
                         <div className="h-1.5 rounded-full bg-gray-800 overflow-hidden">
                           <motion.div
                             className={`h-full rounded-full bg-${cfg.color}-500`}
                             initial={{ width: 0 }}
-                            animate={{ width: `${(USER_WEEKS_THIS_MONTH / cond.weeks) * 100}%` }}
+                          animate={{ width: `${cond.weeks > 0 ? (weekCount / cond.weeks) * 100 : 100}%` }}
                             transition={{ duration: 0.8, delay: 0.3 }}
                           />
                         </div>

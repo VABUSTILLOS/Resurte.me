@@ -1,4 +1,4 @@
-export type Tab = "home" | "wallet" | "store" | "profile";
+export type Tab = "home" | "wallet" | "store" | "profile" | "referidos";
 
 export type Tier = "verde" | "plata" | "oro" | "negro";
 

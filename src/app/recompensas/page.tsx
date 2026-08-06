@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BottomTabBar } from "./_components/BottomTabBar";
 import { DashboardScreen } from "./_components/DashboardScreen";
@@ -14,9 +15,11 @@ import { OnboardingScreen } from "./_components/OnboardingScreen";
 import type { Tab, ServiceItem } from "./_components/types";
 
 export default function CashbackPage() {
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get("tab") as Tab) || "home";
   const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()));
 
-  const [activeTab, setActiveTab] = useState<Tab>("home");
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [showCalculator, setShowCalculator] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -168,6 +171,13 @@ export default function CashbackPage() {
                   onOpenCalculator={handleOpenCalculator}
                   onServiceSelect={handleServiceSelect}
                   profileView
+                />
+              )}
+              {activeTab === "referidos" && (
+                <DashboardScreen
+                  onOpenCalculator={handleOpenCalculator}
+                  onServiceSelect={handleServiceSelect}
+                  referralView
                 />
               )}
             </div>
