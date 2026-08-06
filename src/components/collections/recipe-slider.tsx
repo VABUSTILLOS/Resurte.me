@@ -39,12 +39,25 @@ function significantWords(s: string): string[] {
   return normalize(s).split(" ").filter((w) => w.length >= 3)
 }
 
+/**
+ * Aliases para ingredientes que no coinciden por texto con el nombre del
+ * producto (sinónimos o nombres comunes del catálogo).
+ */
+const INGREDIENT_ALIASES: Record<string, string> = {
+  "masa de maiz para tamal": "masa para tamal",
+  "harina de maiz precocida": "harina pan",
+  "papas blancas": "papa blanca",
+  "mostaza amarilla": "mostaza 400g",
+}
+
 function matchIngredient(
   ingredient: string,
   products: (Product & { price: number; sale_price: number | null; stock_status: string })[]
 ): MatchedProduct | null {
-  const ing = normalize(ingredient)
-  const words = significantWords(ingredient)
+  const normalized = normalize(ingredient)
+  const alias = INGREDIENT_ALIASES[normalized]
+  const ing = alias ?? normalized
+  const words = significantWords(alias ?? ingredient)
   if (!ing || words.length === 0) return null
 
   const normProducts = products.map((p) => ({ p, norm: normalize(p.name) }))
