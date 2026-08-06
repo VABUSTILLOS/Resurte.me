@@ -6,7 +6,7 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* Instacart-inspired green palette — pure vivid green, not teal-emerald */
+  /* Resurte green palette — pure vivid green, not teal-emerald */
   --color-brand-50: #F6FDF6;
   --color-brand-100: #E9FBE9;
   --color-brand-200: #B8EDB8;
@@ -29,7 +29,7 @@
   --color-cream-600: #999893;
   --color-cream-700: #6b6b6b;
 
-  /* Cornershop-inspired electric green (for success states) */
+  /* Electric green (for success states) */
   --color-cs-green-50: #E6FFEE;
   --color-cs-green-100: #B3FFCD;
   --color-cs-green-200: #80FFAD;
@@ -41,7 +41,7 @@
   --color-cs-green-800: #008B33;
   --color-cs-green-900: #006E28;
 
-  /* Warm grays from Instacart's IDS system */
+  /* Warm grays */
   --color-warm-50: #F7F5F0;
   --color-warm-100: #EFE9E1;
   --color-warm-200: #E8E9EB;

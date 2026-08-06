@@ -23,9 +23,6 @@ import Link from "next/link"
 
 interface ProductCardProps {
   product: Product & { price: number; sale_price?: number | null; stock_status?: string }
-  storeId?: number
-  storeName?: string
-  storeSlug?: string
   whatsappNumber?: string | null
   citySlug: string
   onAddToCart?: () => void
@@ -33,9 +30,6 @@ interface ProductCardProps {
 
 export const ProductCard = memo(function ProductCard({
   product,
-  storeId,
-  storeName,
-  storeSlug,
   whatsappNumber,
   citySlug,
   onAddToCart,
@@ -65,9 +59,6 @@ export const ProductCard = memo(function ProductCard({
 
     addItem({
       product_id: product.id,
-      store_id: storeId,
-      store_name: storeName,
-      store_slug: storeSlug,
       name: product.name,
       slug: product.slug,
       image_url: product.image_url,
@@ -225,9 +216,6 @@ export const ProductCard = memo(function ProductCard({
 
 interface ProductCardGridProps {
   products: ProductCardProps["product"][]
-  storeId?: number
-  storeName?: string
-  storeSlug?: string
   whatsappNumber?: string | null
   citySlug: string
   onAddToCart?: () => void
@@ -235,9 +223,6 @@ interface ProductCardGridProps {
 
 export function ProductCardGrid({
   products,
-  storeId,
-  storeName,
-  storeSlug,
   whatsappNumber,
   citySlug,
   onAddToCart,
@@ -256,9 +241,6 @@ export function ProductCardGrid({
         <ProductCard
           key={product.id}
           product={product}
-          storeId={storeId}
-          storeName={storeName}
-          storeSlug={storeSlug}
           whatsappNumber={whatsappNumber}
           citySlug={citySlug}
           onAddToCart={onAddToCart}

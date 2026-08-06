@@ -13,12 +13,10 @@ import Link from "next/link"
 
 type SortOption = "name" | "price-asc" | "price-desc"
 
-type FlattenedProduct = Product & { price: number; sale_price: number | null; stock_status: string }
-
 interface SearchPageClientProps {
   citySlug: string
   cityName: string
-  products: FlattenedProduct[]
+  products: Product[]
   categories: Category[]
   totalProducts: number
   pageSize: number
@@ -29,7 +27,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
   const query = searchParams.get("q") ?? ""
 
   // Accumulated products (grows with infinite scroll)
-  const [allProducts, setAllProducts] = useState<FlattenedProduct[]>(products)
+  const [allProducts, setAllProducts] = useState<Product[]>(products)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(products.length < totalProducts)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -276,7 +274,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {sortedResults.map((product, idx) => (
                 <ScrollReveal key={product.id} direction="scale" delay={Math.min(idx * 0.03, 0.3)}>
-                  <ProductCard product={product} storeId={1} storeName="Resurte.me" storeSlug="resurte" citySlug={citySlug} />
+                  <ProductCard product={product} citySlug={citySlug} />
                 </ScrollReveal>
               ))}
             </div>

@@ -153,7 +153,6 @@ async function handleOnboarding(
 
     // Log onboarding event to workflow logs
     await supabase.from("whatsapp_messages").insert({
-      store_id: 1,
       from_number: profile?.phone || "N/A",
       message_type: "workflow:onboarding",
       content: JSON.stringify({

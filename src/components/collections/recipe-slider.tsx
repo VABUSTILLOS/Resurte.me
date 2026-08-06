@@ -66,9 +66,6 @@ function RecipeIngredient({
     const existing = cart.items.find((i) => i.product_id === matched.id)
     addItem({
       product_id: matched.id,
-      store_id: 1,
-      store_name: "Resurte.me",
-      store_slug: "resurte",
       name: matched.name,
       slug: matched.slug,
       image_url: matched.image_url,

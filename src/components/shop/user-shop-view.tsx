@@ -6,15 +6,9 @@ import { ProductCard } from "@/components/product/product-card"
 import { getCategoryIcon } from "@/lib/utils"
 import type { Category, Product } from "@/types"
 
-type FlatProduct = Product & {
-  price: number
-  sale_price: number | null
-  stock_status: string
-}
-
 interface Props {
   categories: Category[]
-  products: FlatProduct[]
+  products: Product[]
   citySlug: string
 }
 
@@ -24,7 +18,7 @@ export function UserShopView({ categories, products, citySlug }: Props) {
 
   // Build category→products map once
   const productsByCategory = useMemo(() => {
-    const map = new Map<number, FlatProduct[]>()
+    const map = new Map<number, Product[]>()
     products.forEach((p) => {
       const list = map.get(p.category_id) || []
       list.push(p)
@@ -161,9 +155,6 @@ export function UserShopView({ categories, products, citySlug }: Props) {
               <ProductCard
                 key={product.id}
                 product={product}
-                storeId={1}
-                storeName="Resurte.me"
-                storeSlug="resurte"
                 citySlug={citySlug}
               />
             ))}

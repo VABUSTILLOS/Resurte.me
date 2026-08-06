@@ -23,7 +23,6 @@ import type { AutomationType } from "@/types"
 const MOCK_AUTOMATIONS = [
   {
     id: 1,
-    store_id: 1,
     automation_type: "payment_recovery" as AutomationType,
     trigger_delay_hours: 1,
     template_id: 1,
@@ -32,7 +31,6 @@ const MOCK_AUTOMATIONS = [
   },
   {
     id: 2,
-    store_id: 1,
     automation_type: "cart_abandonment" as AutomationType,
     trigger_delay_hours: 2,
     template_id: 2,
@@ -41,7 +39,6 @@ const MOCK_AUTOMATIONS = [
   },
   {
     id: 3,
-    store_id: 1,
     automation_type: "birthday" as AutomationType,
     trigger_delay_hours: 0,
     template_id: 3,
@@ -50,7 +47,6 @@ const MOCK_AUTOMATIONS = [
   },
   {
     id: 4,
-    store_id: 1,
     automation_type: "reactivation" as AutomationType,
     trigger_delay_hours: 720,
     template_id: 4,
@@ -59,7 +55,6 @@ const MOCK_AUTOMATIONS = [
   },
   {
     id: 5,
-    store_id: 1,
     automation_type: "post_delivery_rating" as AutomationType,
     trigger_delay_hours: 24,
     template_id: 5,
@@ -68,7 +63,6 @@ const MOCK_AUTOMATIONS = [
   },
   {
     id: 6,
-    store_id: 1,
     automation_type: "onboarding" as AutomationType,
     trigger_delay_hours: 0,
     template_id: 6,
@@ -82,12 +76,7 @@ const MOCK_AUTOMATIONS = [
 // ============================================================
 
 export async function GET(req: NextRequest) {
-  const storeId = req.nextUrl.searchParams.get("store_id")
-
-  let automations = MOCK_AUTOMATIONS
-  if (storeId) {
-    automations = automations.filter((a) => a.store_id === Number(storeId))
-  }
+  const automations = MOCK_AUTOMATIONS
 
   return NextResponse.json({
     automations: automations.map((a) => ({
@@ -105,11 +94,11 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
-    const { store_id, automation_type, trigger_delay_hours, is_active, config } = body
+    const { automation_type, trigger_delay_hours, is_active, config } = body
 
-    if (!store_id || !automation_type) {
+    if (!automation_type) {
       return NextResponse.json(
-        { error: "store_id and automation_type are required" },
+        { error: "automation_type is required" },
         { status: 400 }
       )
     }
@@ -121,7 +110,6 @@ export async function POST(req: NextRequest) {
       success: true,
       automation: {
         id: Date.now(),
-        store_id,
         automation_type,
         trigger_delay_hours: trigger_delay_hours || 0,
         is_active: is_active ?? true,

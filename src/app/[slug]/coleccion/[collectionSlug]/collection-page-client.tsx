@@ -34,9 +34,7 @@ interface CollectionPageClientProps {
     image_url: string | null
     tags: string[]
   }
-  products: (Product & {
-    product_stores: { store_id: number; price: number; sale_price: number | null; is_available: boolean; stock_status: string }[]
-  })[]
+  products: Product[]
 }
 
 /**
@@ -63,16 +61,8 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
     is_active: true,
   }))
 
-  // Flatten product_store data
-  const flatProducts = products.map((p) => ({
-    ...p,
-    price: p.product_stores[0]?.price ?? 0,
-    sale_price: p.product_stores[0]?.sale_price ?? null,
-    stock_status: p.product_stores[0]?.stock_status ?? "in_stock",
-  }))
-
-  // Split products into 4 chunks to interleave 3 value sections
-  const productChunks = chunkProducts(flatProducts, 4)
+  // Use products directly (price/sale_price now on Product)
+  const productChunks = chunkProducts(products, 4)
 
   return (
     <div className="min-h-screen bg-[#faf8f5]">
@@ -128,7 +118,7 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
         <section className="max-w-7xl mx-auto px-5 sm:px-8 py-12 sm:py-16 bg-[#faf8f5]">
           <RecipeSlider
             recipes={recipes}
-            products={flatProducts}
+            products={products}
             citySlug={citySlug}
           />
         </section>
@@ -138,7 +128,7 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
       {productChunks[0]?.length > 0 && (
         <ProductGridSection
           products={productChunks[0]}
-          total={flatProducts.length}
+          total={products.length}
           citySlug={citySlug}
         />
       )}
@@ -150,7 +140,7 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
       {productChunks[1]?.length > 0 && (
         <ProductGridSection
           products={productChunks[1]}
-          total={flatProducts.length}
+          total={products.length}
           citySlug={citySlug}
           hideHeader
         />
@@ -163,7 +153,7 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
       {productChunks[2]?.length > 0 && (
         <ProductGridSection
           products={productChunks[2]}
-          total={flatProducts.length}
+          total={products.length}
           citySlug={citySlug}
           hideHeader
         />
@@ -176,14 +166,14 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
       {productChunks[3]?.length > 0 && (
         <ProductGridSection
           products={productChunks[3]}
-          total={flatProducts.length}
+          total={products.length}
           citySlug={citySlug}
           hideHeader
         />
       )}
 
       {/* ── 11. Empty state ── */}
-      {flatProducts.length === 0 && (
+      {products.length === 0 && (
         <div className="text-center py-20 sm:py-28 bg-[#faf8f5] border-t border-[#ede8df]">
           <div className="text-5xl sm:text-6xl mb-4 sm:mb-5 opacity-60">{icon}</div>
           <p className="text-[#5a5a5a] text-base sm:text-lg font-light">Estamos curando los mejores insumos para esta colección.</p>
@@ -224,19 +214,13 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
  *
  * Se reutiliza para cada chunk del catálogo intercalado.
  */
-type FlatProduct = Product & {
-  price: number
-  sale_price: number | null
-  stock_status: string
-}
-
 function ProductGridSection({
   products,
   total,
   citySlug,
   hideHeader = false,
 }: {
-  products: FlatProduct[]
+  products: Product[]
   total: number
   citySlug: string
   hideHeader?: boolean
@@ -259,9 +243,6 @@ function ProductGridSection({
           <ScrollReveal key={product.id} direction="scale" delay={idx * 0.04}>
             <ProductCard
               product={product}
-              storeId={1}
-              storeName="Resurte.me"
-              storeSlug="resurte"
               citySlug={citySlug}
             />
           </ScrollReveal>

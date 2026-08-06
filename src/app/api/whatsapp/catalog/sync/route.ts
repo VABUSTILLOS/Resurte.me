@@ -14,29 +14,25 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
-    const { store_id, products } = body as {
-      store_id: number
+    const { products } = body as {
       products: WhatsAppProduct[]
     }
 
-    if (!store_id || !products) {
+    if (!products) {
       return NextResponse.json(
-        { error: "store_id and products are required" },
+        { error: "products are required" },
         { status: 400 }
       )
     }
 
     // TODO: Verify admin authentication
-    // TODO: Get store's WhatsApp config (wabaId, accessToken) from Supabase
 
     const result = await syncCatalog(products)
 
     // TODO: Log sync to Supabase
-    // TODO: Update last_synced_at timestamp on store
 
     return NextResponse.json({
       success: true,
-      store_id,
       added: result.added,
       removed: result.removed,
       total_in_catalog: products.length,

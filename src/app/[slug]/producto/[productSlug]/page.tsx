@@ -56,16 +56,11 @@ export default async function ProductPage({ params }: Props) {
 
   const supabase = await createClient()
 
-  // Fetch product with store data and category
+  // Fetch product with category
   const { data: product } = await supabase
     .from("products")
-    .select(`
-      id, name, slug, description, image_url, images, brand, category_id, unit,
-      show_in_whatsapp, whatsapp_product_id,
-      product_stores!inner(store_id, price, sale_price, is_available, stock_status)
-    `)
+    .select("*")
     .eq("slug", productSlug)
-    .eq("product_stores.store_id", 1)
     .single()
 
   if (!product) notFound()
@@ -80,14 +75,10 @@ export default async function ProductPage({ params }: Props) {
   // Fetch related products (same category, excluding current)
   const { data: relatedSameCategory } = await supabase
     .from("products")
-    .select(`
-      id, name, slug, description, image_url, images, brand, category_id, unit,
-      show_in_whatsapp, whatsapp_product_id,
-      product_stores!inner(store_id, price, sale_price, is_available, stock_status)
-    `)
+    .select("*")
     .eq("category_id", product.category_id)
+    .eq("is_visible", true)
     .neq("id", product.id)
-    .eq("product_stores.store_id", 1)
     .limit(4)
     .order("name")
 
@@ -98,13 +89,9 @@ export default async function ProductPage({ params }: Props) {
     const existingIds = [product.id, ...related.map((p) => p.id)]
     const { data: otherProducts } = await supabase
       .from("products")
-      .select(`
-        id, name, slug, description, image_url, images, brand, category_id, unit,
-        show_in_whatsapp, whatsapp_product_id,
-        product_stores!inner(store_id, price, sale_price, is_available, stock_status)
-      `)
+      .select("*")
+      .eq("is_visible", true)
       .not("id", "in", `(${existingIds.join(",")})`)
-      .eq("product_stores.store_id", 1)
       .limit(4 - related.length)
       .order("name")
 

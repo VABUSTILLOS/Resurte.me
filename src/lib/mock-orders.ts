@@ -1,18 +1,11 @@
 import type { Order, OrderItem } from "@/types"
 
 export interface MockOrder extends Order {
-  store_name: string
-  store_slug: string
-  store_logo: string
   items: (OrderItem & {
     product_name: string
     product_image: string
   })[]
 }
-
-const STORE_POOL = [
-  { id: 1, name: "Resurte.me", slug: "resurte", logo: "🛒" },
-]
 
 const PRODUCT_POOL = [
   { id: 1, name: "Aguacate Hass", image: "" },
@@ -54,7 +47,6 @@ function daysAgo(days: number): string {
 
 export function generateMockOrders(count = 8): MockOrder[] {
   return Array.from({ length: count }, (_, i) => {
-    const store = STORE_POOL[i % STORE_POOL.length]
     const subtotal = randomSubtotal()
     const deliveryFee = i % 3 === 0 ? 0 : 39
     const status = i === 0 ? "pending" : i === 1 ? "out_for_delivery" : randomFrom(STATUSES)
@@ -76,7 +68,6 @@ export function generateMockOrders(count = 8): MockOrder[] {
     return {
       id: i + 1,
       user_id: "user-1",
-      store_id: store.id,
       city_id: 1,
       address_id: 1,
       status,
@@ -90,9 +81,6 @@ export function generateMockOrders(count = 8): MockOrder[] {
       scheduled_for: new Date(Date.now() + 86400000).toISOString(),
       source: i % 5 === 0 ? "whatsapp" : "web",
       created_at: daysAgo(i * 3),
-      store_name: store.name,
-      store_slug: store.slug,
-      store_logo: store.logo,
       items,
     }
   })

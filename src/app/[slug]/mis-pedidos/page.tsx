@@ -22,9 +22,6 @@ export default function OrderHistoryPage() {
     order.items.forEach((item) => {
       addItem({
         product_id: item.product_id,
-        store_id: order.store_id,
-        store_name: order.store_name,
-        store_slug: order.store_slug,
         name: item.product_name || `Producto #${item.product_id}`,
         slug: `producto-${item.product_id}`,
         image_url: item.product_image || "",

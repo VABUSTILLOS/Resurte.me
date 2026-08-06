@@ -1,21 +1,17 @@
 "use server"
 
-import { getProductsByStorePaginated } from "@/lib/data"
+import { getProductsPaginated } from "@/lib/data"
 import type { Product } from "@/types"
 
-const STORE_ID = 1
 const PAGE_SIZE = 24
 
-type FlattenedProduct = Product & { price: number; sale_price: number | null; stock_status: string }
-
 export async function loadMoreProducts(page: number): Promise<{
-  products: FlattenedProduct[]
+  products: Product[]
   hasMore: boolean
 }> {
-  const { products, hasMore } = await getProductsByStorePaginated(
-    STORE_ID,
+  const { products, hasMore } = await getProductsPaginated(
     page,
     PAGE_SIZE
   )
-  return { products: products as FlattenedProduct[], hasMore }
+  return { products, hasMore }
 }

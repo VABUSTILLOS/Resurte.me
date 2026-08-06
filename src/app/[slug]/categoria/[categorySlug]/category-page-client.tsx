@@ -12,19 +12,11 @@ interface CategoryPageClientProps {
   citySlug: string
   cityName: string
   category: { id: number; name: string; slug: string; icon: string; description?: string | null; parent_id?: number | null }
-  products: (Product & {
-    product_stores: { store_id: number; price: number; sale_price: number | null; is_available: boolean; stock_status: string }[]
-  })[]
+  products: Product[]
 }
 
 export function CategoryPageClient({ citySlug, cityName, category, products }: CategoryPageClientProps) {
-  // Flatten product_store data
-  const flatProducts = products.map((p) => ({
-    ...p,
-    price: p.product_stores[0]?.price ?? 0,
-    sale_price: p.product_stores[0]?.sale_price ?? null,
-    stock_status: p.product_stores[0]?.stock_status ?? "in_stock",
-  }))
+  // Products now have price/sale_price/stock_status directly
 
   return (
     <div className="min-h-screen bg-[#faf8f5]">
@@ -67,11 +59,11 @@ export function CategoryPageClient({ citySlug, cityName, category, products }: C
         <div className="flex items-center gap-2 mb-6">
           <ShoppingBag className="w-5 h-5 text-[#108910]" />
           <h2 className="text-lg font-semibold text-[#1a1a1a]">
-            {flatProducts.length} producto{flatProducts.length !== 1 ? "s" : ""}
+            {products.length} producto{products.length !== 1 ? "s" : ""}
           </h2>
         </div>
 
-        {flatProducts.length === 0 ? (
+        {products.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-[#999893]">No hay productos en esta categoría por el momento.</p>
             <Link
@@ -84,13 +76,10 @@ export function CategoryPageClient({ citySlug, cityName, category, products }: C
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-            {flatProducts.map((product, idx) => (
+            {products.map((product, idx) => (
               <ScrollReveal key={product.id} direction="scale" delay={idx * 0.04}>
                 <ProductCard
                   product={product}
-                  storeId={1}
-                  storeName="Resurte.me"
-                  storeSlug="resurte"
                   citySlug={citySlug}
                 />
               </ScrollReveal>

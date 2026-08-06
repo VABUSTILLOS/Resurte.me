@@ -4,7 +4,7 @@ import { Metadata } from "next"
 import { SearchPageClient } from "@/components/search/search-page-client"
 import { Suspense } from "react"
 import { createClient } from "@/lib/supabase/server"
-import { getProductsByStorePaginated } from "@/lib/data"
+import { getProductsPaginated } from "@/lib/data"
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -51,7 +51,7 @@ export default async function SearchPage({ params }: Props) {
     .select("id, name, slug, icon, parent_id")
     .order("id")
 
-  const productsPromise = getProductsByStorePaginated(1, 0, INITIAL_PAGE_SIZE)
+  const productsPromise = getProductsPaginated(0, INITIAL_PAGE_SIZE)
 
   const [{ data: categories }, { products, total }] = await Promise.all([
     categoriesPromise,

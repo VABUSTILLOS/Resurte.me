@@ -10,7 +10,6 @@ interface OrderItemInput {
 }
 
 interface CreateOrderBody {
-  store_id: number
   city_id: number
   address: {
     label: string
@@ -45,7 +44,6 @@ export async function POST(request: NextRequest) {
   try {
     const body: CreateOrderBody = await request.json()
     const {
-      store_id,
       city_id,
       address,
       schedule,
@@ -58,13 +56,12 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     const missing: string[] = []
-    if (!store_id) missing.push("store_id")
     if (!city_id) missing.push("city_id")
     if (!items?.length) missing.push("items")
     if (!total) missing.push("total")
 
     if (missing.length) {
-      console.error("Order validation failed - missing:", missing, { store_id, city_id, items_count: items?.length, total })
+      console.error("Order validation failed - missing:", missing, { city_id, items_count: items?.length, total })
       return NextResponse.json(
         { error: `Faltan campos requeridos: ${missing.join(", ")}` },
         { status: 400 }
@@ -109,7 +106,6 @@ export async function POST(request: NextRequest) {
       .from("orders")
       .insert({
         user_id: null, // anonymous checkout
-        store_id,
         city_id,
         address_id: addr.id,
         status: "pending",

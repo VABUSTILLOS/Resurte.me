@@ -51,7 +51,7 @@ export default function CotizacionesPage() {
             {
               icon: Box,
               title: "Del kilo a la tonelada",
-              desc: "Fruta, verdura, abarrotes, lácteos, carnes. Manejamos desde pedidos consolidados con múltiples proveedores hasta entregas de un solo producto por tonelada.",
+              desc: "Fruta, verdura, abarrotes, lácteos, carnes. Manejamos desde entregas unitarias hasta pedidos por tonelada, consolidando todo en una sola entrega.",
             },
             {
               icon: MessageCircle,

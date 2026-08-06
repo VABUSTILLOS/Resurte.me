@@ -58,17 +58,10 @@ export default async function CollectionPage({ params }: Props) {
 
   let products: Record<string, unknown>[] = []
   if (tags.length > 0) {
-    // Fetch all available products and filter by tags server-side.
-    // (PostgREST jsonb overlap via "ov" has type-casting issues.)
     const { data } = await supabase
       .from("products")
-      .select(`
-        id, name, slug, description, image_url, images, brand, category_id, unit,
-        show_in_whatsapp, whatsapp_product_id, tags,
-        product_stores!inner(store_id, price, sale_price, is_available, stock_status)
-      `)
-      .eq("product_stores.store_id", 1)
-      .eq("product_stores.is_available", true)
+      .select("*")
+      .eq("is_visible", true)
       .order("name")
 
     const allProducts = (data ?? []) as Record<string, unknown>[]
@@ -83,7 +76,7 @@ export default async function CollectionPage({ params }: Props) {
       citySlug={slug}
       cityName={city.name}
       collection={collection as { id: number; name: string; slug: string; description: string | null; image_url: string | null; tags: string[] }}
-      products={products as unknown as (Product & { product_stores: { store_id: number; price: number; sale_price: number | null; is_available: boolean; stock_status: string }[] })[]}
+      products={products as unknown as Product[]}
     />
   )
 }

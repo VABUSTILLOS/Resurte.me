@@ -167,7 +167,6 @@ export default function CheckoutPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          store_id: cart.store_id || 1,
           city_id: city.id,
           address: {
             label: address.label,

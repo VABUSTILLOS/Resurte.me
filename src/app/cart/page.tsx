@@ -81,7 +81,7 @@ export default function CartPage() {
             >
               {/* Image */}
               <Link
-                href={`/${item.store_slug || "resurte"}/producto/${item.slug}`}
+                href={`/resurte/producto/${item.slug}`}
                 className="w-20 h-20 rounded-lg bg-[#faf8f5] flex items-center justify-center overflow-hidden shrink-0"
               >
                 {item.image_url ? (
@@ -98,7 +98,7 @@ export default function CartPage() {
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <Link
-                  href={`/${item.store_slug || "resurte"}/producto/${item.slug}`}
+                  href={`/resurte/producto/${item.slug}`}
                   className="font-semibold text-[#242529] text-sm line-clamp-2 hover:text-[#108910] transition-colors"
                 >
                   {item.name}

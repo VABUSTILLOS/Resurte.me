@@ -26,7 +26,6 @@ interface AddressInput {
 }
 
 interface PlaceOrderInput {
-  store_id: number
   city_id: number
   address: AddressInput
   schedule: { date: string; time: string }
@@ -79,7 +78,6 @@ function extractTime(timeRange: string): string {
  */
 export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResult> {
   const {
-    store_id,
     city_id,
     address,
     schedule,
@@ -92,7 +90,6 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
 
   // ── Validación de campos requeridos ──
   const missing: string[] = []
-  if (!store_id) missing.push("store_id")
   if (!city_id) missing.push("city_id")
   if (!items?.length) missing.push("items")
   if (!total) missing.push("total")
@@ -141,7 +138,6 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
     .from("orders")
     .insert({
       user_id: user?.id ?? null,         // ← el trigger usa esto para asociar cashback
-      store_id,
       city_id,
       address_id: addr.id,
       status: "pending",

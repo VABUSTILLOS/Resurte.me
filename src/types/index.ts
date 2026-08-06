@@ -8,22 +8,6 @@ export interface City {
   is_active: boolean
 }
 
-export interface Store {
-  id: number
-  name: string
-  slug: string
-  description: string
-  logo_url: string
-  banner_url: string
-  min_order: number
-  delivery_fee: number
-  avg_delivery_time: string
-  whatsapp_number: string | null
-  whatsapp_catalog_id: string | null
-  whatsapp_waba_id: string | null
-  is_active: boolean
-}
-
 export interface Category {
   id: number
   name: string
@@ -53,6 +37,9 @@ export interface Product {
   images?: string[]
   brand: string
   category_id: number
+  price: number
+  sale_price: number | null
+  stock_status: 'in_stock' | 'low_stock' | 'out_of_stock'
   show_in_whatsapp: boolean
   whatsapp_product_id: string | null
   unit?: string
@@ -71,15 +58,6 @@ export interface CollectionRecipe {
   image_url: string | null
   display_order: number
   is_active: boolean
-}
-
-export interface ProductStore {
-  product_id: number
-  store_id: number
-  price: number
-  sale_price: number | null
-  is_available: boolean
-  stock_status: 'in_stock' | 'low_stock' | 'out_of_stock'
 }
 
 export interface Profile {
@@ -143,7 +121,6 @@ export type PaymentStatus =
 export interface Order {
   id: number
   user_id: string
-  store_id: number
   city_id: number
   address_id: number
   status: OrderStatus
@@ -179,7 +156,6 @@ export interface DeliveryZone {
 
 export interface WhatsAppMessage {
   id: number
-  store_id: number
   from_number: string
   message_type: string
   content: string
@@ -201,7 +177,6 @@ export type WhatsAppTemplateStatus = 'approved' | 'pending' | 'rejected'
 
 export interface WhatsAppTemplate {
   id: number
-  store_id: number
   template_name: string
   template_id: string
   template_type: WhatsAppTemplateType
@@ -219,7 +194,6 @@ export type AutomationType =
 
 export interface WhatsAppAutomation {
   id: number
-  store_id: number
   automation_type: AutomationType
   trigger_delay_hours: number
   template_id: number
@@ -243,9 +217,6 @@ export interface Coupon {
 
 export interface CartItem {
   product_id: number
-  store_id?: number
-  store_name?: string
-  store_slug?: string
   name: string
   slug: string
   image_url: string
@@ -257,9 +228,6 @@ export interface CartItem {
 }
 
 export interface Cart {
-  store_id?: number | null
-  store_name?: string | null
-  store_slug?: string | null
   items: CartItem[]
 }
 
@@ -302,7 +270,6 @@ export interface WalletTransaction {
 export interface OrderWithCashback {
   id: number
   user_id: string
-  store_id: number
   city_id: number
   address_id: number | null
   status: OrderStatus

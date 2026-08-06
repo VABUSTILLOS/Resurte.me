@@ -30,7 +30,7 @@ export default function AdminOrdersPage() {
 
   const filtered = orders.filter((o) => {
     if (statusFilter !== "all" && o.status !== statusFilter) return false
-    if (search && !o.store_name.toLowerCase().includes(search.toLowerCase()) && !String(o.id).includes(search)) return false
+    if (search && !String(o.id).includes(search)) return false
     return true
   })
 

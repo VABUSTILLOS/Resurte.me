@@ -75,15 +75,13 @@ export function CartDrawer() {
           </button>
         </div>
 
-        {/* Store info */}
-        {cart.store_name && (
-          <div className="px-5 py-2.5 bg-[#F6FDF6] border-b border-brand-100">
-            <p className="text-xs text-brand-700 flex items-center gap-1">
-              <ShoppingBag className="w-3.5 h-3.5" />
-              De: <span className="font-semibold">{cart.store_name}</span>
-            </p>
-          </div>
-        )}
+        {/* Cart header */}
+        <div className="px-5 py-2.5 bg-[#F6FDF6] border-b border-brand-100 hidden">
+          <p className="text-xs text-brand-700 flex items-center gap-1">
+            <ShoppingBag className="w-3.5 h-3.5" />
+            Tu pedido Resurte.me
+          </p>
+        </div>
 
         {/* Items */}
         <div className="flex-1 overflow-y-auto px-5">

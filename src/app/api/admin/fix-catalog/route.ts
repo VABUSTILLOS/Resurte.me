@@ -3,6 +3,13 @@ import { NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
 
+/**
+ * GET /api/admin/fix-catalog
+ *
+ * Verifies all products have the required fields (price, stock_status).
+ * Since the multi-vendor architecture was removed, products now own their
+ * pricing and visibility directly — no product_stores table needed.
+ */
 export async function GET() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,35 +22,47 @@ export async function GET() {
   try {
     const { data: products, error: prodErr } = await supabase
       .from("products")
-      .select("id,name")
+      .select("id,name,price,stock_status,is_visible")
       .order("id")
 
     if (prodErr) return NextResponse.json({ error: prodErr.message }, { status: 500 })
 
-    const { data: stores, error: storeErr } = await supabase
-      .from("product_stores")
-      .select("product_id")
+    const missingPrice = products?.filter((p) => !p.price) || []
+    const missingStock = products?.filter((p) => !p.stock_status) || []
 
-    if (storeErr) return NextResponse.json({ error: storeErr.message }, { status: 500 })
+    results.push(`Total: ${products?.length}`)
+    results.push(`Missing price: ${missingPrice.length}`)
+    results.push(`Missing stock_status: ${missingStock.length}`)
 
-    const storeIds = new Set(stores.map((s) => s.product_id))
-    const missing = products?.filter((p) => !storeIds.has(p.id)) || []
-
-    results.push(`Total: ${products?.length}, In catalog: ${storeIds.size}, Missing: ${missing.length}`)
-
-    for (const p of missing) {
+    // Fix products without price
+    for (const p of missingPrice) {
       const { error } = await supabase
-        .from("product_stores")
-        .insert({ product_id: p.id, store_id: 1, price: 0 })
+        .from("products")
+        .update({ price: 0 })
+        .eq("id", p.id)
 
-      if (error && error.code !== "23505") {
+      if (error) {
         results.push(`❌ [${p.id}] ${p.name}: ${error.message}`)
       } else {
-        results.push(`✅ [${p.id}] ${p.name}`)
+        results.push(`✅ [${p.id}] ${p.name} — price set to 0`)
       }
     }
 
-    if (missing.length === 0) results.push("All good!")
+    // Fix products without stock_status
+    for (const p of missingStock) {
+      const { error } = await supabase
+        .from("products")
+        .update({ stock_status: "in_stock" })
+        .eq("id", p.id)
+
+      if (error) {
+        results.push(`❌ [${p.id}] ${p.name}: ${error.message}`)
+      } else {
+        results.push(`✅ [${p.id}] ${p.name} — stock_status set to in_stock`)
+      }
+    }
+
+    if (missingPrice.length === 0 && missingStock.length === 0) results.push("All good!")
 
     return NextResponse.json({ success: true, results })
   } catch (err: any) {

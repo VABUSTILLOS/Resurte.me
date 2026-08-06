@@ -47,7 +47,7 @@ interface CartContextValue extends CartState {
 // Reducer
 // ============================================================
 
-const EMPTY_CART: Cart = { store_id: null, store_name: null, store_slug: null, items: [] }
+const EMPTY_CART: Cart = { items: [] }
 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
@@ -65,19 +65,9 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         items.push(newItem)
       }
 
-      // Propagate store info to cart level from the item
-      const storeId = state.cart.store_id ?? newItem.store_id ?? null
-      const storeName = state.cart.store_name ?? newItem.store_name ?? null
-      const storeSlug = state.cart.store_slug ?? newItem.store_slug ?? null
-
       return {
         ...state,
-        cart: {
-          store_id: storeId,
-          store_name: storeName,
-          store_slug: storeSlug,
-          items,
-        },
+        cart: { items },
       }
     }
 
@@ -123,22 +113,6 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       return { ...state, coupon: null }
 
     case "LOAD_CART":
-      // Populate cart-level store info from items if missing
-      if (!action.payload.cart.store_id && action.payload.cart.items.length > 0) {
-        const firstItem = action.payload.cart.items[0]
-        action.payload.cart.store_id = firstItem.store_id ?? 1
-        action.payload.cart.store_name = firstItem.store_name ?? "Resurte.me"
-        action.payload.cart.store_slug = firstItem.store_slug ?? "resurte"
-      }
-      // Also ensure all items have store_id for legacy cart data
-      if (action.payload.cart.store_id && action.payload.cart.items.length > 0) {
-        action.payload.cart.items = action.payload.cart.items.map((i) => ({
-          ...i,
-          store_id: i.store_id ?? action.payload.cart.store_id ?? 1,
-          store_name: i.store_name ?? action.payload.cart.store_name ?? "Resurte.me",
-          store_slug: i.store_slug ?? action.payload.cart.store_slug ?? "resurte",
-        }))
-      }
       return { ...action.payload, isLoaded: true }
 
     default:

@@ -9,7 +9,6 @@ interface MockProduct {
   slug: string
   category: string
   brand: string
-  store_name: string
   price: number
   sale_price: number | null
   is_available: boolean
@@ -18,16 +17,16 @@ interface MockProduct {
 }
 
 const MOCK_PRODUCTS: MockProduct[] = [
-  { id: 1, name: "Aguacate Hass", slug: "aguacate-hass", category: "Frutas y Verduras", brand: "Genérico", store_name: "Resurte.me", price: 35, sale_price: 29, is_available: true, show_in_whatsapp: true, image_url: "" },
-  { id: 2, name: "Pechuga de pollo 500g", slug: "pechuga-pollo", category: "Carnes", brand: "Bachoco", store_name: "Resurte.me", price: 89, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
-  { id: 3, name: "Leche Lala entera 1L", slug: "leche-lala", category: "Lácteos", brand: "Lala", store_name: "Resurte.me", price: 28, sale_price: 24, is_available: true, show_in_whatsapp: true, image_url: "" },
-  { id: 4, name: "Tortillas de maíz 1kg", slug: "tortillas-maiz", category: "Tortillería", brand: "Genérico", store_name: "Resurte.me", price: 22, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
-  { id: 5, name: "Jitomate saladet", slug: "jitomate-saladet", category: "Frutas y Verduras", brand: "Genérico", store_name: "Resurte.me", price: 18, sale_price: 15, is_available: false, show_in_whatsapp: true, image_url: "" },
-  { id: 6, name: "Pan Bimbo integral", slug: "pan-bimbo", category: "Panadería", brand: "Bimbo", store_name: "Resurte.me", price: 45, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
-  { id: 7, name: "Queso Oaxaca 400g", slug: "queso-oaxaca", category: "Lácteos", brand: "Esmeralda", store_name: "Resurte.me", price: 72, sale_price: 65, is_available: true, show_in_whatsapp: true, image_url: "" },
-  { id: 8, name: "Huevo blanco 18pz", slug: "huevo-blanco", category: "Abarrotes", brand: "San Juan", store_name: "Resurte.me", price: 52, sale_price: null, is_available: true, show_in_whatsapp: true, image_url: "" },
-  { id: 9, name: "Arroz Morelos 1kg", slug: "arroz-morelos", category: "Abarrotes", brand: "Verde Valle", store_name: "Resurte.me", price: 32, sale_price: 28, is_available: true, show_in_whatsapp: false, image_url: "" },
-  { id: 10, name: "Jabón Zote blanco", slug: "jabon-zote", category: "Limpieza", brand: "Zote", store_name: "Resurte.me", price: 15, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
+  { id: 1, name: "Aguacate Hass", slug: "aguacate-hass", category: "Frutas y Verduras", brand: "Genérico", price: 35, sale_price: 29, is_available: true, show_in_whatsapp: true, image_url: "" },
+  { id: 2, name: "Pechuga de pollo 500g", slug: "pechuga-pollo", category: "Carnes", brand: "Bachoco", price: 89, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
+  { id: 3, name: "Leche Lala entera 1L", slug: "leche-lala", category: "Lácteos", brand: "Lala", price: 28, sale_price: 24, is_available: true, show_in_whatsapp: true, image_url: "" },
+  { id: 4, name: "Tortillas de maíz 1kg", slug: "tortillas-maiz", category: "Tortillería", brand: "Genérico", price: 22, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
+  { id: 5, name: "Jitomate saladet", slug: "jitomate-saladet", category: "Frutas y Verduras", brand: "Genérico", price: 18, sale_price: 15, is_available: false, show_in_whatsapp: true, image_url: "" },
+  { id: 6, name: "Pan Bimbo integral", slug: "pan-bimbo", category: "Panadería", brand: "Bimbo", price: 45, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
+  { id: 7, name: "Queso Oaxaca 400g", slug: "queso-oaxaca", category: "Lácteos", brand: "Esmeralda", price: 72, sale_price: 65, is_available: true, show_in_whatsapp: true, image_url: "" },
+  { id: 8, name: "Huevo blanco 18pz", slug: "huevo-blanco", category: "Abarrotes", brand: "San Juan", price: 52, sale_price: null, is_available: true, show_in_whatsapp: true, image_url: "" },
+  { id: 9, name: "Arroz Morelos 1kg", slug: "arroz-morelos", category: "Abarrotes", brand: "Verde Valle", price: 32, sale_price: 28, is_available: true, show_in_whatsapp: false, image_url: "" },
+  { id: 10, name: "Jabón Zote blanco", slug: "jabon-zote", category: "Limpieza", brand: "Zote", price: 15, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
 ]
 
 export default function AdminProductsPage() {
@@ -38,8 +37,7 @@ export default function AdminProductsPage() {
     (p) =>
       !search ||
       p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.category.toLowerCase().includes(search.toLowerCase()) ||
-      p.store_name.toLowerCase().includes(search.toLowerCase())
+      p.category.toLowerCase().includes(search.toLowerCase())
   )
 
   const toggleAvailable = (id: number) => {

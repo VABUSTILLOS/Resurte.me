@@ -61,9 +61,7 @@ export function CityLanding({
 }: {
   citySlug?: string
   categories: Category[]
-  products: (Product & {
-    product_stores: { store_id: number; price: number; sale_price: number | null; is_available: boolean; stock_status: string }[]
-  })[]
+  products: Product[]
   collections?: RestaurantCollection[]
   isLoggedIn?: boolean
 }) {
@@ -87,24 +85,18 @@ export function CityLanding({
 
   const currentCity = MEXICO_CITIES.find(c => c.slug === resolvedSlug) || MEXICO_CITIES.find(c => c.slug === DEFAULT_CITY_SLUG)
 
-  // Flatten product_store data — memoized to avoid recalculation on every render
-  const flatProducts = useMemo(() => products.map((p) => ({
-    ...p,
-    price: p.product_stores[0]?.price ?? 0,
-    sale_price: p.product_stores[0]?.sale_price ?? null,
-    stock_status: p.product_stores[0]?.stock_status ?? "in_stock",
-  })), [products])
+  // Products now have price/sale_price/stock_status directly
 
   // Group by category — memoized
   const productsByCategory = useMemo(() => {
-    const map = new Map<number, typeof flatProducts>()
-    flatProducts.forEach((p) => {
+    const map = new Map<number, typeof products>()
+    products.forEach((p) => {
       const list = map.get(p.category_id) || []
       list.push(p)
       map.set(p.category_id, list)
     })
     return map
-  }, [flatProducts])
+  }, [products])
 
   // Only show categories that have products — memoized
   const activeCategories = useMemo(() =>
@@ -142,7 +134,7 @@ export function CityLanding({
     return (
       <UserShopView
         categories={categories}
-        products={flatProducts}
+        products={products}
         citySlug={currentCity?.slug || DEFAULT_CITY_SLUG}
       />
     )
@@ -361,7 +353,7 @@ export function CityLanding({
               Todo lo que tu cocina necesita
             </h2>
             <p className="text-base text-[#6b6b6b] mt-3 max-w-xl mx-auto leading-relaxed">
-              De la central de abastos a tu negocio. {flatProducts.length} productos — por caja, bulto o pieza.
+              De la central de abastos a tu negocio. {products.length} productos — por caja, bulto o pieza.
             </p>
           </ScrollReveal>
 
@@ -398,9 +390,6 @@ export function CityLanding({
                     <ProductCard
                       key={product.id}
                       product={product}
-                      storeId={1}
-                      storeName="Resurte.me"
-                      storeSlug="resurte"
                       citySlug={currentCity?.slug || DEFAULT_CITY_SLUG}
                     />
                   ))}
@@ -438,7 +427,7 @@ export function CityLanding({
         </div>
       </section>
 
-      {/* Pricing highlight banner — MayoreoTotal + Instacart efficiency */}
+      {/* Pricing highlight banner — MayoreoTotal, eficiencia y precio justo */}
       <section className="bg-[#108910] text-white py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">

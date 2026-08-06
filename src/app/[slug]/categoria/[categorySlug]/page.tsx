@@ -50,16 +50,12 @@ export default async function CategoryPage({ params }: Props) {
 
   if (!category) notFound()
 
-  // Fetch products in this category with pricing from store 1 (Resurte.me) — default view
+  // Fetch products in this category
   const { data: products } = await supabase
     .from("products")
-    .select(`
-      id, name, slug, description, image_url, images, brand, category_id, unit,
-      show_in_whatsapp, whatsapp_product_id,
-      product_stores!inner(store_id, price, sale_price, is_available, stock_status)
-    `)
+    .select("*")
     .eq("category_id", category.id)
-    .eq("product_stores.store_id", 1)
+    .eq("is_visible", true)
     .order("name")
 
   return (

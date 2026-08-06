@@ -48,7 +48,6 @@ export interface WorkflowLog {
 export interface OrderWithDetails {
   id: number
   user_id: string
-  store_id: number
   status: OrderStatus
   payment_status: PaymentStatus
   payment_method: string
@@ -59,20 +58,16 @@ export interface OrderWithDetails {
   source: "web" | "whatsapp"
   created_at: string
   // Joined fields
-  store_name?: string
-  store_slug?: string
-  store_whatsapp?: string
   customer_name?: string
   customer_phone?: string
   staff_phones?: string[]
   items?: { name: string; quantity: number }[]
 }
 
-/** Raw shape of order joined with store and profile from Supabase */
+/** Raw shape of order joined with profile from Supabase */
 interface RawOrderRow {
   id: number
   user_id: string
-  store_id: number
   status: string
   payment_status: string
   payment_method: string
@@ -82,7 +77,6 @@ interface RawOrderRow {
   scheduled_for: string | null
   source: string
   created_at: string
-  store: { name: string; slug: string; whatsapp_number: string | null }
   profile: { full_name: string; phone: string | null }
 }
 
@@ -108,10 +102,6 @@ async function logWorkflow(
     const supabase = await createServiceClient()
     // Try to insert into whatsapp_messages table (reuse existing schema)
     await supabase.from("whatsapp_messages").insert({
-      store_id: 1, // Will be overridden with actual store_id when available
-      from_number: recipient,
-      message_type: `workflow:${workflowType}`,
-      content: JSON.stringify({ order_id: orderId, workflow_type: workflowType, message_id: messageId, status, error }),
       order_id: orderId,
       direction: "outbound",
     })
@@ -131,7 +121,6 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
     .from("orders")
     .select(`
       *,
-      store:stores(name, slug, whatsapp_number),
       profile:profiles!orders_user_id_fkey(full_name, phone)
     `)
     .eq("id", orderId)
@@ -155,16 +144,13 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
 
   const rawItems = (items as unknown as RawOrderItemRow[]) || []
 
-  // Fetch staff phones for this store
-  // For now, use the store's whatsapp_number as staff contact
-  // In production, you'd have a staff/team table
-  const storeWhatsapp = rawOrder.store?.whatsapp_number || null
-  const staffPhones = storeWhatsapp ? [storeWhatsapp] : []
+  // Use default WhatsApp number for staff contacts
+  const defaultWhatsapp = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
+  const staffPhones = [defaultWhatsapp]
 
   return {
     id: rawOrder.id,
     user_id: rawOrder.user_id,
-    store_id: rawOrder.store_id,
     status: rawOrder.status as OrderStatus,
     payment_status: rawOrder.payment_status as PaymentStatus,
     payment_method: rawOrder.payment_method,
@@ -174,9 +160,6 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
     scheduled_for: rawOrder.scheduled_for,
     source: rawOrder.source as "web" | "whatsapp",
     created_at: rawOrder.created_at,
-    store_name: rawOrder.store?.name || "Resurte.me",
-    store_slug: rawOrder.store?.slug || "",
-    store_whatsapp: storeWhatsapp ?? undefined,
     customer_name: rawOrder.profile?.full_name || "Cliente",
     customer_phone: rawOrder.profile?.phone ?? undefined,
     staff_phones: staffPhones,
@@ -221,7 +204,7 @@ function buildNewOrderStaffMessage(order: OrderWithDetails): string {
   return [
     `🛎 *¡Nuevo pedido #${order.id}!*`,
     ``,
-    `*Tienda:* ${order.store_name}`,
+    `*Tienda:* Resurte.me`,
     `*Cliente:* ${order.customer_name}`,
     `*Total:* $${order.total.toFixed(2)} MXN`,
     `*Método de pago:* ${paymentMethod}`,
@@ -239,7 +222,7 @@ function buildNewOrderCustomerMessage(order: OrderWithDetails): string {
   return [
     `👋 ¡Hola ${order.customer_name}!`,
     ``,
-    `Gracias por tu compra en *${order.store_name}*.`,
+    `Gracias por tu compra en *Resurte.me*.`,
     ``,
     `📋 *Pedido #${order.id}*`,
     items ? `\n${items}\n` : "",
@@ -266,7 +249,7 @@ function buildStatusUpdateMessage(order: OrderWithDetails): string {
   }
 
   const specificMessage = messages[order.status]
-  const baseMessage = `${emoji} Actualización de tu pedido #${order.id} en *${order.store_name}*.\n\nEstado: *${label}*`
+  const baseMessage = `${emoji} Actualización de tu pedido #${order.id} en *Resurte.me*.\n\nEstado: *${label}*`
 
   return specificMessage || baseMessage
 }
@@ -284,7 +267,7 @@ function buildPaymentReminderMessage(order: OrderWithDetails, hoursAgo: number):
     ``,
     `Hola ${order.customer_name},`,
     ``,
-    `El pago de tu pedido #${order.id} por *$${order.total.toFixed(2)} MXN* en ${order.store_name} sigue pendiente.`,
+    `El pago de tu pedido #${order.id} por *$${order.total.toFixed(2)} MXN* en Resurte.me sigue pendiente.`,
     ``,
     `Método de pago: *${paymentMethod}*`,
     ``,
@@ -304,7 +287,7 @@ function buildPaymentConfirmedMessage(order: OrderWithDetails): string {
     ``,
     `Tu pedido será procesado y te notificaremos cuando esté listo.`,
     ``,
-    `¡Gracias por tu compra en ${order.store_name}! 🎉`,
+    `¡Gracias por tu compra en Resurte.me! 🎉`,
   ].join("\n")
 }
 
@@ -342,7 +325,7 @@ export async function notifyStaffNewOrder(orderId: number): Promise<WorkflowLog[
 
   // If no staff phones configured, skip
   if (!order.staff_phones || order.staff_phones.length === 0) {
-    console.log(`[Workflow] No staff phones configured for store ${order.store_id}`)
+    console.log(`[Workflow] No staff phones configured — using default`)
     return results
   }
 

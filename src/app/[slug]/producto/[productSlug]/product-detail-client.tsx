@@ -9,14 +9,12 @@ import Link from "next/link"
 import type { Category, Product } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
 
-type ProductWithStore = Product & {
-  product_stores: { store_id: number; price: number; sale_price: number | null; is_available: boolean; stock_status: string }[]
-}
+type ProductWithStore = Product
 
 interface ProductDetailClientProps {
-  product: ProductWithStore
+  product: Product
   category?: Category
-  relatedProducts: ProductWithStore[]
+  relatedProducts: Product[]
   relatedCategoryMap: Map<number, Category>
   citySlug: string
   cityName: string
@@ -30,29 +28,25 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
 
   const allImages = product.images?.length ? product.images : [product.image_url]
 
-  const storeData = product.product_stores[0]
-  const displayPrice = storeData?.sale_price ?? storeData?.price ?? 0
-  const originalPrice = storeData?.price ?? 0
-  const hasDiscount = storeData?.sale_price && storeData.sale_price < storeData.price
-  const discountPercent = hasDiscount ? Math.round((1 - storeData.sale_price! / storeData.price) * 100) : 0
-  const outOfStock = storeData?.stock_status === "out_of_stock"
-  const lowStock = storeData?.stock_status === "low_stock"
+  const displayPrice = product.sale_price ?? product.price ?? 0
+  const originalPrice = product.price ?? 0
+  const hasDiscount = !!product.sale_price && product.sale_price < (product.price ?? 0)
+  const discountPercent = hasDiscount ? Math.round((1 - product.sale_price! / product.price!) * 100) : 0
+  const outOfStock = product.stock_status === "out_of_stock"
+  const lowStock = product.stock_status === "low_stock"
 
   const handleAdd = () => {
     for (let i = 0; i < quantity; i++) {
       addItem({
         product_id: product.id,
-        store_id: storeData?.store_id,
-        store_name: "Resurte.me",
-        store_slug: "resurte",
         name: product.name,
         slug: product.slug,
         image_url: product.image_url,
         brand: product.brand,
         price: originalPrice,
-        sale_price: storeData?.sale_price ?? null,
+        sale_price: product.sale_price ?? null,
         quantity: 1,
-        stock_status: (storeData?.stock_status ?? "in_stock") as "in_stock" | "low_stock" | "out_of_stock",
+        stock_status: (product.stock_status ?? "in_stock") as "in_stock" | "low_stock" | "out_of_stock",
       })
     }
     setAdded(true)
@@ -402,24 +396,13 @@ export function ProductDetailClient({ product, category, relatedProducts, relate
                 También te puede interesar
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-              {relatedProducts.map((rp) => {
-                const storeData = rp.product_stores[0]
-                return (
+              {relatedProducts.map((rp) => (
                   <ProductCard
                     key={rp.id}
-                    product={{
-                      ...rp,
-                      price: storeData?.price ?? 0,
-                      sale_price: storeData?.sale_price ?? null,
-                      stock_status: storeData?.stock_status ?? "in_stock",
-                    }}
-                    storeId={1}
-                    storeName="Resurte.me"
-                    storeSlug="resurte"
+                    product={rp}
                     citySlug={citySlug}
                   />
-                )
-              })}
+              ))}
             </div>
           </section>
         </ScrollReveal>
