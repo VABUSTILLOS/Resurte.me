@@ -169,17 +169,27 @@ export async function POST(request: Request) {
     errors: [] as string[],
   };
 
+  // Step 0: Check which slugs already exist
+  const allSlugs = PRODUCTS.map((p) => p[1]);
+  const { data: existing, error: existErr } = await supabase
+    .from("products")
+    .select("slug")
+    .in("slug", allSlugs);
+  if (existErr) {
+    return NextResponse.json({ error: "Failed to check existing slugs: " + existErr.message }, { status: 500 });
+  }
+  const existingSlugs = new Set((existing ?? []).map((p) => p.slug));
+  const newProducts = PRODUCTS.filter((p) => !existingSlugs.has(p[1]));
+
   // Step 1: Insert products in batches of 30
   const BATCH = 30;
-  for (let i = 0; i < PRODUCTS.length; i += BATCH) {
-    const batch = PRODUCTS.slice(i, i + BATCH).map(
+  for (let i = 0; i < newProducts.length; i += BATCH) {
+    const batch = newProducts.slice(i, i + BATCH).map(
       ([name, slug, description, image_url, brand, category_id, show_in_whatsapp, unit]) => ({
         name, slug, description, image_url, brand, category_id, show_in_whatsapp, unit,
       })
     );
-    const { error } = await supabase
-      .from("products")
-      .upsert(batch, { onConflict: "slug" });
+    const { error } = await supabase.from("products").insert(batch);
     if (error) {
       results.errors.push(`Batch ${i / BATCH}: ${error.message}`);
     } else {
@@ -187,12 +197,11 @@ export async function POST(request: Request) {
     }
   }
 
-  // Step 2: Fetch inserted product IDs by slug
-  const slugs = PRODUCTS.map((p) => p[1]);
+  // Step 2: Fetch ALL product IDs (existing + new) for pricing by slug
   const { data: inserted, error: fetchErr } = await supabase
     .from("products")
     .select("id,category_id,slug")
-    .in("slug", slugs);
+    .in("slug", allSlugs);
 
   if (fetchErr) {
     return NextResponse.json({ ...results, error: fetchErr.message }, { status: 500 });
