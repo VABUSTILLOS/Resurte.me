@@ -19,6 +19,7 @@ import { PostCTA } from "@/components/blog/post-cta"
 import { RelatedPosts } from "@/components/blog/related-posts"
 import { ReadingProgress } from "@/components/blog/reading-progress"
 import { BlogShare } from "@/components/blog/blog-share"
+import { BlogShareRail } from "@/components/blog/blog-share-rail"
 import { BlogNewsletter } from "@/components/blog/blog-newsletter"
 
 export const dynamicParams = false
@@ -94,6 +95,7 @@ export default async function BlogPostPage({
   return (
     <article className="bg-white">
       <ReadingProgress />
+      <BlogShareRail title={post.data.title} url={getPostUrl(slug)} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

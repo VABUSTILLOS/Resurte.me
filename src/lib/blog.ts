@@ -32,6 +32,7 @@ export interface BlogPostMeta {
   title: string
   description: string
   category: string
+  contentType?: string
   date: string
   updatedAt: string
   author: string
@@ -96,6 +97,7 @@ function normalizeFrontmatter(
     title,
     description: raw,
     category: String(data.category ?? "industria"),
+    contentType: data.contentType ? String(data.contentType) : undefined,
     date,
     updatedAt,
     author: String(data.author ?? "Resurte.me"),
@@ -323,6 +325,19 @@ export function getPostCta(post: BlogPostMeta): ResolvedPostCta {
     ...base,
     ...post.cta,
     variant,
+  }
+}
+
+/** CTA de cierre del index del blog (como el de TenClientes en /blog). */
+export function getBlogIndexCta(): ResolvedPostCta {
+  return {
+    variant: "coleccion",
+    eyebrow: "Colecciones Resurte.me",
+    title:
+      "Compara precios reales por mayoreo de los insumos de tu cocina y compra directo a distribuidores.",
+    cta: "Ver precios por mayoreo",
+    collectionSlug: "comida-mexicana-corrida",
+    collectionName: "Comida mexicana corrida",
   }
 }
 

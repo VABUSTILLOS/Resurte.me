@@ -2,11 +2,11 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
-import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
 import {
   Package, Plus, Edit3, Trash2, ShoppingCart,
-  ArrowDownToLine, Copy, AlertTriangle,
+  ArrowDownToLine, Copy, AlertTriangle, CheckCircle2,
   Clock, Download, ChevronDown, ChevronUp, BarChart3, X,
 } from "lucide-react"
 
@@ -21,6 +21,15 @@ interface InventoryItem {
   category?: string
 }
 
+interface StockMovement {
+  fecha: string
+  itemId: string
+  itemName: string
+  tipo: "entrada" | "salida" | "ajuste"
+  delta: number
+  motivo: string
+}
+
 type SortField = "name" | "stock" | "pricePerUnit" | "status"
 
 export default function InventarioPage() {
@@ -30,7 +39,13 @@ export default function InventarioPage() {
 
   const [items, setItems] = useLocalStorage<InventoryItem[]>("inventario-items", [], slug)
   const [sortBy, setSortBy] = useLocalStorage<SortField>("inventario-sort", "name", slug)
-  const [manualQtys] = useLocalStorage<Record<string, number>>("planificador-qtys", {}, slug)
+  // NOTE: planificador writes to "planner-manual-qtys" (was previously "planificador-qtys")
+  const [manualQtys] = useLocalStorage<Record<string, number>>("planner-manual-qtys", {}, slug)
+  const [covers] = useLocalStorage<number>("planner-covers", 50, slug)
+  const [sharedDishes] = useSharedDishes(slug)
+  const [movements, setMovements] = useLocalStorage<StockMovement[]>("inventario-movimientos", [], slug)
+  const [showMovements, setShowMovements] = useState(false)
+  const [projectionIncluded, setProjectionIncluded] = useState(false)
 
   // Form state
   const [showForm, setShowForm] = useState(false)
@@ -98,9 +113,100 @@ export default function InventarioPage() {
     })
   }, [lowStock, outOfStock])
 
-  const totalOrder = useMemo(() => {
-    return purchaseOrder.reduce((sum, item) => sum + item.cost, 0)
-  }, [purchaseOrder])
+  // ── Stock projection from recipe menu (shared dishes × covers) ──
+  const ingredientNeeds = useMemo(() => {
+    if (sharedDishes.length === 0 || covers <= 0) return new Map<string, number>()
+    const needs = new Map<string, number>()
+    sharedDishes.forEach((dish) => {
+      dish.ingredients.forEach((ing) => {
+        // Planificador convention: quantity × covers = grams → kg
+        const neededKg = (ing.quantity || 0) * covers / 1000
+        const key = ing.ingredientName.toLowerCase().trim()
+        if (!key) return
+        needs.set(key, (needs.get(key) || 0) + neededKg)
+      })
+    })
+    return needs
+  }, [sharedDishes, covers])
+
+  const projection = useMemo(() => {
+    if (ingredientNeeds.size === 0) return []
+    const rows: {
+      key: string
+      name: string
+      neededKg: number
+      stockKg: number | null
+      shortfallKg: number
+      itemId: string | null
+      status: "ok" | "justo" | "falta"
+      label: string
+      icon: string
+    }[] = []
+    ingredientNeeds.forEach((neededKg, key) => {
+      const match = items.find((i) => i.name.toLowerCase().trim() === key)
+      const stockKg = match ? match.stock : null
+      let status: "ok" | "justo" | "falta"
+      let label: string
+      if (stockKg === null) {
+        status = "falta"
+        label = "No registrado en inventario"
+      } else if (stockKg >= neededKg * 1.1) {
+        status = "ok"
+        label = "Suficiente"
+      } else if (stockKg >= neededKg) {
+        status = "justo"
+        label = "Justo (mínimo)"
+      } else {
+        status = "falta"
+        label = "Falta pedir"
+      }
+      const icon = status === "ok" ? "🟢" : status === "justo" ? "🟡" : "🔴"
+      rows.push({
+        key,
+        name: key.charAt(0).toUpperCase() + key.slice(1),
+        neededKg,
+        stockKg,
+        shortfallKg: stockKg === null ? neededKg : Math.max(0, neededKg - stockKg),
+        itemId: match?.id || null,
+        status,
+        label,
+        icon,
+      })
+    })
+    return rows.sort((a, b) => {
+      const order = { falta: 0, justo: 1, ok: 2 } as const
+      return order[a.status] - order[b.status]
+    })
+  }, [ingredientNeeds, items])
+
+  const missingCount = useMemo(() => projection.filter((p) => p.status !== "ok").length, [projection])
+
+  // Merge projected shortfalls into the purchase order when enabled
+  const projectedOrder = useMemo(() => {
+    if (!projectionIncluded) return purchaseOrder
+    const base = [...purchaseOrder]
+    projection
+      .filter((p) => p.status !== "ok" && p.shortfallKg > 0)
+      .forEach((p) => {
+        const existing = base.find((b) => b.name.toLowerCase().trim() === p.key)
+        if (existing) {
+          existing.toBuy = Math.max(existing.toBuy, Math.ceil(p.shortfallKg))
+          existing.cost = existing.toBuy * existing.pricePerUnit
+        } else {
+          base.push({
+            id: `proj-${p.key}`,
+            name: p.name,
+            toBuy: Math.ceil(p.shortfallKg),
+            unit: "kg",
+            stock: 0,
+            minStock: 0,
+            pricePerUnit: p.itemId ? items.find((i) => i.id === p.itemId)?.pricePerUnit || 0 : 0,
+            cost: Math.ceil(p.shortfallKg) * (p.itemId ? items.find((i) => i.id === p.itemId)?.pricePerUnit || 0 : 0),
+          })
+        }
+      })
+    return base
+  }, [purchaseOrder, projection, projectionIncluded, items])
 
   // ── CRUD ──────────────────────────────────────────────
   const openAddForm = () => {
@@ -139,13 +245,23 @@ export default function InventarioPage() {
     }
 
     if (editingId) {
-      setItems((prev) =>
-        prev.map((i) =>
+      const prev = items.find((i) => i.id === editingId)
+      setItems((prevArr) =>
+        prevArr.map((i) =>
           i.id === editingId
             ? { ...i, name: formName.trim(), stock, minStock, unit: formUnit, pricePerUnit, category: formCategory || undefined }
             : i
         )
       )
+      if (prev && prev.stock !== stock) {
+        logMovement({
+          itemId: editingId,
+          itemName: formName.trim(),
+          tipo: "ajuste",
+          delta: stock - prev.stock,
+          motivo: "Edición del producto (stock actualizado)",
+        })
+      }
       toast("Producto actualizado", "success")
     } else {
       const newItem: InventoryItem = {
@@ -171,11 +287,32 @@ export default function InventarioPage() {
   }
 
   const adjustStock = (id: string, delta: number) => {
+    const item = items.find((i) => i.id === id)
     setItems((prev) =>
       prev.map((i) =>
         i.id === id ? { ...i, stock: Math.max(0, i.stock + delta) } : i
       )
     )
+    if (item) {
+      const tipo = delta > 0 ? "entrada" : "salida"
+      logMovement({
+        itemId: item.id,
+        itemName: item.name,
+        tipo,
+        delta,
+        motivo: `Ajuste manual (${delta > 0 ? "+" : ""}${delta})`,
+      })
+    }
+  }
+
+  const logMovement = (m: Omit<StockMovement, "fecha">) => {
+    setMovements((prev) => {
+      const entry: StockMovement = {
+        ...m,
+        fecha: new Date().toISOString(),
+      }
+      return [entry, ...prev].slice(0, 50)
+    })
   }
 
   // Keyboard shortcuts: Ctrl+N new item, Escape closes modal
@@ -232,16 +369,29 @@ export default function InventarioPage() {
         pricePerUnit: 20,
       }))
     setItems([...merged, ...trulyNew])
+    const deltaNames = [...merged, ...trulyNew].filter((i) => planItems.some((p) => p.name.toLowerCase() === i.name.toLowerCase()))
+    deltaNames.forEach((i) => {
+      const plan = planItems.find((p) => p.name.toLowerCase() === i.name.toLowerCase())
+      if (plan) {
+        logMovement({
+          itemId: i.id,
+          itemName: i.name,
+          tipo: "entrada",
+          delta: plan.stock,
+          motivo: "Importación desde el planificador",
+        })
+      }
+    })
     toast(`Se importaron ${trulyNew.length} productos nuevos y se actualizaron los existentes`, "success")
   }
 
   // ── Copy / Export ───────────────────────────────────────
   const copyOrder = () => {
-    const lines = purchaseOrder.map(
+    const lines = projectedOrder.map(
       (item) => `${item.name}: ${item.toBuy} ${item.unit} × $${item.pricePerUnit} = $${item.cost.toFixed(0)}`
     )
     const header = `🛒 Orden de compra — ${selectedCollection?.name || "Mi inventario"}`
-    const total = `\n💰 Total estimado: $${totalOrder.toFixed(0)}`
+    const total = `\n💰 Total estimado: $${projectedOrder.reduce((s, i) => s + i.cost, 0).toFixed(0)}`
     const footer = `\n📦 Pedir en resurte.me`
     navigator.clipboard.writeText([header, ...lines, total, footer].join("\n"))
     toast("Orden de compra copiada", "success")
@@ -327,7 +477,7 @@ export default function InventarioPage() {
       </div>
 
       {/* ── Value cards ────────────────────────────────── */}
-      <div className="grid sm:grid-cols-2 gap-3 mb-6">
+      <div className="grid sm:grid-cols-2 gap-3 mb-3">
         <div className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3">
           <BarChart3 className="w-5 h-5 text-[#108910] shrink-0" />
           <div>
@@ -343,6 +493,25 @@ export default function InventarioPage() {
           </div>
         </div>
       </div>
+      {items.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 p-4 mb-6">
+          <p className="text-[10px] text-gray-400 mb-2">Valor por estado</p>
+          <div className="grid grid-cols-3 gap-3 text-center text-xs">
+            <div className="bg-green-50 rounded-lg py-2">
+              <p className="text-gray-500">🟢 Suficiente</p>
+              <p className="font-bold text-green-700">${okStock.reduce((s, i) => s + i.stock * i.pricePerUnit, 0).toFixed(0)}</p>
+            </div>
+            <div className="bg-amber-50 rounded-lg py-2">
+              <p className="text-gray-500">🟡 Bajo</p>
+              <p className="font-bold text-amber-700">${lowStock.reduce((s, i) => s + i.stock * i.pricePerUnit, 0).toFixed(0)}</p>
+            </div>
+            <div className="bg-red-50 rounded-lg py-2">
+              <p className="text-gray-500">🔴 Agotado</p>
+              <p className="font-bold text-red-700">${outOfStock.reduce((s, i) => s + i.stock * i.pricePerUnit, 0).toFixed(0)}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Import from planificador ───────────────────── */}
       {Object.keys(manualQtys).some((k) => manualQtys[k] > 0) && (
@@ -364,6 +533,58 @@ export default function InventarioPage() {
           <p className="text-[10px] text-indigo-400 mt-2">
             Los productos con cantidades manuales del planificador se agregarán al inventario.
             Los que ya existen se actualizarán con stock adicional.
+          </p>
+        </div>
+      )}
+
+      {/* ── Recipe-aware stock projection ──────────────── */}
+      {projection.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-[#108910]" />
+              <h3 className="font-bold text-gray-900 text-sm">Tu menú planeado para {covers} comensales</h3>
+            </div>
+            {missingCount > 0 && (
+              <button
+                onClick={() => {
+                  setProjectionIncluded(!projectionIncluded)
+                  toast(
+                    projectionIncluded
+                      ? "Se quitó la proyección de la orden de compra"
+                      : `Se agregaron ${missingCount} faltantes del menú a la orden de compra`,
+                    "success"
+                  )
+                }}
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+                  projectionIncluded ? "bg-[#108910] text-white" : "bg-cyan-50 text-cyan-700 hover:bg-cyan-100"
+                }`}
+                title="Agregar los faltantes calculados a la orden de compra"
+              >
+                <ShoppingCart className="w-3.5 h-3.5" />
+                {projectionIncluded ? "En la orden de compra ✓" : "Agregar faltantes a la orden"}
+              </button>
+            )}
+          </div>
+          <div className="space-y-1.5 mb-2">
+            {projection.map((p) => (
+              <div key={p.key} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 text-xs">
+                <span className="shrink-0 text-sm">{p.icon}</span>
+                <span className="font-semibold text-gray-700 truncate">{p.name}</span>
+                <span className={`ml-auto shrink-0 font-medium ${
+                  p.status === "ok" ? "text-green-600" : p.status === "justo" ? "text-amber-600" : "text-red-600"
+                }`}>
+                  {p.label}
+                </span>
+                <span className="text-gray-400 shrink-0">
+                  {p.stockKg === null ? "—" : `${p.stockKg} kg`} / {p.neededKg.toFixed(1)} kg
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400">
+            Proyección = ingredientes de tus {sharedDishes.length} platillos costeados × {covers} comensales (kg).
+            Compara contra tu inventario actual para no quedarte corto en el servicio.
           </p>
         </div>
       )}
@@ -476,26 +697,29 @@ export default function InventarioPage() {
       )}
 
       {/* ── Purchase order section ─────────────────────── */}
-      {purchaseOrder.length > 0 && (
+      {(projectedOrder.length > 0) && (
         <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
           <button onClick={() => setOrderExpanded(!orderExpanded)} className="flex items-center justify-between w-full text-left">
             <div className="flex items-center gap-2">
               <ShoppingCart className="w-5 h-5 text-[#108910]" />
-              <h3 className="font-bold text-gray-900 text-sm">Orden de compra sugerida ({purchaseOrder.length} productos)</h3>
+              <h3 className="font-bold text-gray-900 text-sm">Orden de compra sugerida ({projectedOrder.length} productos)</h3>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-[#108910]">${totalOrder.toFixed(0)}</span>
+              <span className="text-sm font-bold text-[#108910]">${projectedOrder.reduce((s, i) => s + i.cost, 0).toFixed(0)}</span>
               {orderExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
             </div>
           </button>
           {orderExpanded && (
             <div className="mt-4">
               <div className="space-y-2 mb-4">
-                {purchaseOrder.map((item) => (
+                {projectedOrder.map((item) => (
                   <div key={item.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2 text-xs">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span>{getStatus(item).icon}</span>
+                      <span>{item.id.startsWith("proj-") ? "🔍" : getStatus(item).icon}</span>
                       <span className="font-semibold text-gray-700 truncate">{item.name}</span>
+                      {item.id.startsWith("proj-") && (
+                        <span className="text-[9px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded-full font-medium">Proyección</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <span className="text-gray-500">Comprar {item.toBuy} {item.unit}</span>
@@ -514,8 +738,42 @@ export default function InventarioPage() {
                   <Copy className="w-3.5 h-3.5" /> Copiar lista
                 </button>
                 <p className="text-[10px] text-gray-400">Pega en WhatsApp o notas</p>
-                <span className="ml-auto text-xs font-bold text-gray-700">Total: ${totalOrder.toFixed(0)}</span>
+                <span className="ml-auto text-xs font-bold text-gray-700">Total: ${projectedOrder.reduce((s, i) => s + i.cost, 0).toFixed(0)}</span>
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Movement history ───────────────────────────── */}
+      {movements.length > 0 && (
+        <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
+          <button onClick={() => setShowMovements(!showMovements)} className="flex items-center justify-between w-full text-left">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-bold text-gray-900 text-sm">Historial de movimientos ({movements.length})</h3>
+            </div>
+            {showMovements ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          </button>
+          {showMovements && (
+            <div className="mt-4 space-y-1.5 max-h-64 overflow-y-auto">
+              {movements.slice(0, 20).map((m, i) => (
+                <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5 text-xs">
+                  <span className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    m.tipo === "entrada" ? "bg-green-100 text-green-700" : m.tipo === "salida" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                  }`}>
+                    {m.tipo === "entrada" ? "+" : m.tipo === "salida" ? "−" : "±"}
+                  </span>
+                  <span className="font-semibold text-gray-700 truncate">{m.itemName}</span>
+                  <span className="text-gray-400 shrink-0">{m.motivo}</span>
+                  <span className={`ml-auto shrink-0 font-bold ${m.delta >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {m.delta > 0 ? "+" : ""}{m.delta}
+                  </span>
+                  <span className="text-[10px] text-gray-300 shrink-0 w-24 text-right">
+                    {new Date(m.fecha).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })} {new Date(m.fecha).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </div>

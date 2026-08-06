@@ -57,3 +57,64 @@ export function getCategory(slug: string): BlogCategory {
     }
   )
 }
+
+// ============================================================
+// Tipos de contenido del blog (filtro junto a las categorías)
+// ============================================================
+
+export interface BlogContentType {
+  slug: string
+  label: string
+  emoji: string
+  description: string
+}
+
+export const BLOG_CONTENT_TYPES: BlogContentType[] = [
+  {
+    slug: "guia",
+    label: "Guías",
+    emoji: "📖",
+    description: "Artículos completos paso a paso.",
+  },
+  {
+    slug: "tutorial",
+    label: "Tutoriales",
+    emoji: "🛠️",
+    description: "Uso práctico de herramientas del Panel.",
+  },
+  {
+    slug: "plantilla",
+    label: "Plantillas",
+    emoji: "📋",
+    description: "Formatos listos para copiar y usar.",
+  },
+  {
+    slug: "checklist",
+    label: "Checklists",
+    emoji: "✅",
+    description: "Listas de verificación accionables.",
+  },
+  {
+    slug: "caso",
+    label: "Casos reales",
+    emoji: "📈",
+    description: "Ejemplos reales con resultados.",
+  },
+  {
+    slug: "datos",
+    label: "Datos y análisis",
+    emoji: "📊",
+    description: "Cifras y tendencias del sector.",
+  },
+  {
+    slug: "calculadora",
+    label: "Calculadoras",
+    emoji: "🧮",
+    description: "Herramientas para calcular por ti mismo.",
+  },
+]
+
+export function getContentType(slug?: string): BlogContentType | undefined {
+  if (!slug) return undefined
+  return BLOG_CONTENT_TYPES.find((t) => t.slug === slug)
+}

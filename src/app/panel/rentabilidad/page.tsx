@@ -152,6 +152,7 @@ export default function RentabilidadPage() {
   const [editValue, setEditValue] = useState("")
   const [sortBy, setSortBy] = useLocalStorage<string>("rentabilidad-sort", "name", slug)
   const [costMultiplier, setCostMultiplier] = useLocalStorage<number>("rentabilidad-sim", 0, slug)
+  const [categoryFilter, setCategoryFilter] = useState<string>("all")
 
   // Merge: base mock data + dishes from costeo tool
   const mockDishes = selectedCollection
@@ -203,9 +204,39 @@ export default function RentabilidadPage() {
     return merged
   }, [mockDishes, costeoDishes, priceOverrides, sortBy, costMultiplier])
 
+  // Category analysis: counts, avg food cost, avg margin, semaphore per category
+  const categoryAnalysis = useMemo(() => {
+    const groups = new Map<string, { count: number; cost: number; price: number }>()
+    dishes.forEach((d) => {
+      const g = groups.get(d.category) || { count: 0, cost: 0, price: 0 }
+      g.count += 1
+      g.cost += d.cost
+      g.price += d.price
+      groups.set(d.category, g)
+    })
+    return Array.from(groups.entries())
+      .map(([category, g]) => {
+        const avgFc = (g.cost / g.price) * 100
+        const avgMargin = (g.price - g.cost) / g.count
+        const status = avgFc <= 30 ? "ok" : avgFc <= 38 ? "justo" : "mal"
+        return { category, count: g.count, avgFc, avgMargin, status }
+      })
+      .sort((a, b) => a.avgFc - b.avgFc)
+  }, [dishes])
+
+  const worstCategory = useMemo(() => {
+    if (categoryAnalysis.length === 0) return null
+    return categoryAnalysis.reduce((worst, c) => (c.avgFc > worst.avgFc ? c : worst))
+  }, [categoryAnalysis])
+
+  const filteredDishes = useMemo(() => {
+    if (categoryFilter === "all") return dishes
+    return dishes.filter((d) => d.category === categoryFilter)
+  }, [dishes, categoryFilter])
+
   function exportCSV() {
     const header = "Platillo,Categoría,Costo,Precio Venta,Margen,Food Cost %,Estado"
-    const rows = dishes.map((d) => {
+    const rows = filteredDishes.map((d) => {
       const fc = ((d.cost / d.price) * 100).toFixed(1)
       const status = parseFloat(fc) <= 30 ? "Excelente" : parseFloat(fc) <= 38 ? "Aceptable" : "Revisar"
       return `"${d.name}","${d.category}",${d.cost.toFixed(2)},${d.price.toFixed(2)},${(d.price - d.cost).toFixed(2)},${fc}%,${status}`
@@ -305,6 +336,47 @@ export default function RentabilidadPage() {
         </div>
       </div>
 
+      {/* Category analysis */}
+      {categoryAnalysis.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-[#108910]" />
+              <h3 className="font-bold text-gray-900 text-sm">Análisis por categoría</h3>
+            </div>
+            {worstCategory && worstCategory.avgFc > 38 && (
+              <span className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-full font-semibold">
+                ⚠️ {worstCategory.category}: peor food cost ({worstCategory.avgFc.toFixed(1)}%)
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+            {categoryAnalysis.map((c) => (
+              <div
+                key={c.category}
+                className={`rounded-xl border p-3 text-xs ${
+                  c.status === "ok" ? "bg-green-50 border-green-200" :
+                  c.status === "justo" ? "bg-amber-50 border-amber-200" :
+                  "bg-red-50 border-red-200"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span>{c.status === "ok" ? "🟢" : c.status === "justo" ? "🟡" : "🔴"}</span>
+                  <span className="font-semibold text-gray-800 truncate">{c.category}</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-500 mt-1">
+                  <span>{c.count} platillo{c.count !== 1 ? "s" : ""}</span>
+                  <span className={`font-bold ${c.status === "ok" ? "text-green-700" : c.status === "justo" ? "text-amber-700" : "text-red-700"}`}>
+                    {c.avgFc.toFixed(1)}% FC
+                  </span>
+                </div>
+                <p className="text-gray-400 mt-1">Margen prom. ${c.avgMargin.toFixed(0)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Alert box */}
       {alerts.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
@@ -338,7 +410,23 @@ export default function RentabilidadPage() {
             <option value="category">Categoría</option>
           </select>
         </div>
-        <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 px-3 py-2 flex-1 min-w-0">
+        <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 px-3 py-2">
+          <span className="text-xs text-gray-400 shrink-0">Categoría:</span>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="text-xs font-semibold text-gray-700 bg-transparent focus:outline-none"
+            aria-label="Filtrar por categoría"
+          >
+            <option value="all">Todas ({dishes.length})</option>
+            {categoryAnalysis.map((c) => (
+              <option key={c.category} value={c.category}>
+                {c.category} ({c.count})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 px-3 py-2">
           <span className="text-xs text-gray-400 shrink-0">Simulador:</span>
           <input
             type="range"
@@ -380,7 +468,7 @@ export default function RentabilidadPage() {
 
       {/* Dish cards */}
       <div className="space-y-3">
-        {dishes.map((dish, idx) => {
+        {filteredDishes.map((dish, idx) => {
           const status = getStatus(dish.cost, dish.price)
           const foodCost = ((dish.cost / dish.price) * 100).toFixed(1)
           const margin = dish.price - dish.cost

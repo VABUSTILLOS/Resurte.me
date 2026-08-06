@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
@@ -159,6 +159,7 @@ export default function PlanificadorPage() {
     : DEFAULT_PRODUCTS
 
   const [covers, setCovers] = useLocalStorage<number>("planner-covers", 50, slug)
+  const [ventasEntries] = useLocalStorage<{ id: string; dishId: string; dishName: string; quantity: number; date: string; unitPrice: number; unitCost: number }[]>("ventas-entries", [], slug)
   const [wastePcts, setWastePcts] = useLocalStorage<Record<string, number>>("planner-waste-pcts", {}, slug)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
   const [showOrder, setShowOrder] = useState(false)
@@ -181,6 +182,22 @@ export default function PlanificadorPage() {
     existing.push(p)
     categories.set(p.category, existing)
   })
+
+  // Real demand from recent sales: avg dishes sold per day (last 7 days)
+  const realDemand = useMemo(() => {
+    if (!slug || ventasEntries.length === 0) return null
+    const today = new Date()
+    const cutoff = new Date()
+    cutoff.setDate(today.getDate() - 6)
+    const iso = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    const cutoffStr = iso(cutoff)
+    const todayStr = iso(today)
+    const last7 = ventasEntries.filter((e) => e.date >= cutoffStr && e.date <= todayStr)
+    if (last7.length === 0) return null
+    const units = last7.reduce((s, e) => s + e.quantity, 0)
+    return { avg: Math.max(1, Math.round(units / 7)), units, days: last7.length }
+  }, [ventasEntries, slug])
 
   if (!selectedCollection) {
     return (
@@ -367,6 +384,27 @@ export default function PlanificadorPage() {
               +
             </button>
           </div>
+          {realDemand && (
+            <div className="mt-3 flex items-center gap-2 bg-emerald-50 rounded-xl px-3 py-2">
+              <TrendingUp className="w-4 h-4 text-emerald-600 shrink-0" />
+              <p className="text-xs text-emerald-800 min-w-0">
+                <span className="font-semibold">📈 Demanda real: {realDemand.avg} platillos/día</span>
+                <span className="block text-[10px] text-emerald-600">
+                  Promedio de ventas en los últimos 7 días ({realDemand.days} registros)
+                </span>
+              </p>
+              <button
+                onClick={() => {
+                  setCovers(realDemand.avg)
+                  toast(`Comensales ajustados a la demanda real (${realDemand.avg})`, "success")
+                }}
+                className="ml-auto text-xs font-semibold bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors shrink-0"
+                aria-label="Usar demanda real como comensales esperados"
+              >
+                Usar
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 p-5">

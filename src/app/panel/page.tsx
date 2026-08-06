@@ -2,16 +2,23 @@
 
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
+import { useToast } from "@/components/toast"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo, useState, useEffect, useCallback } from "react"
+import { useMemo, useState, useEffect, useCallback, useRef } from "react"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp,
   Calendar, ClipboardCheck, ArrowRight, ChefHat, Store,
-  PieChart, DollarSign, BarChart3, Zap, Clock, Percent, Package,
-  AlertTriangle, Bell, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Search,
+  PieChart, DollarSign, BarChart3, Zap, Clock, Percent, Package, Receipt, Copy,
+  AlertTriangle, Bell, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Search, Flame,
 } from "lucide-react"
 import { GlobalSearch } from "@/components/global-search"
+
+const PAYMENT_METHODS = [
+  { key: "efectivo", label: "Efectivo", icon: "💵" },
+  { key: "tarjeta", label: "Tarjeta", icon: "💳" },
+  { key: "transferencia", label: "Transferencia", icon: "🏦" },
+] as const
 
 const COLLECTION_ICONS: Record<string, string> = {
   "hamburguesas-hot-dogs": "🍔",
@@ -104,21 +111,46 @@ const TOOLS: Tool[] = [
     bgColor: "bg-cyan-50",
     collectionDesc: (name) => `Controla el inventario de tu ${name} y nunca te quedes sin insumos.`,
   },
+  {
+    title: "Ventas del día",
+    description: "Registra tus ventas y conoce en tiempo real tus ingresos, costo de venta, margen bruto y ticket promedio. Compara tus últimos 7 días.",
+    icon: Receipt,
+    href: "/panel/ventas",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50",
+    collectionDesc: (name) => `Registra las ventas de tu ${name} y conoce tu margen real del día.`,
+  },
+  {
+    title: "Monitor de cocina",
+    description: "Cada venta genera una comanda para tu cocina. Lleva el ciclo pendiente → en cocina → listo, clasifica por tipo de servicio y mide tus tiempos de producción.",
+    icon: Flame,
+    href: "/panel/comanda",
+    color: "text-orange-600",
+    bgColor: "bg-orange-50",
+    collectionDesc: (name) => `Despacha las comandas de tu ${name} por tipo de servicio y controla los tiempos en cocina.`,
+  },
 ]
 
 export default function PanelPage() {
   const { selectedCollection, collections, setSelectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
   const router = useRouter()
+  const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
   const [mermaEntries] = useLocalStorage<{ amountKg: number; costPerKg: number; category: string; id: string; date: string }[]>("mermas-entries", [], slug)
   const [aperturaChecked] = useLocalStorage<string[]>("apertura-checked", [], slug)
   const [monthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
   const [shoppingList] = useLocalStorage<{ key: string; name: string; pricePerKg: number; quantityKg: number }[]>("temporada-shopping-list", [], slug)
   const [inventarioItems] = useLocalStorage<{ id: string; name: string; stock: number; minStock: number; unit: string; pricePerUnit: number; category?: string }[]>("inventario-items", [], slug)
+  const [ventasEntries] = useLocalStorage<{ id: string; dishId: string; dishName: string; quantity: number; date: string; unitPrice: number; unitCost: number; paymentMethod?: string; channel?: string }[]>("ventas-entries", [], slug)
+  const [comandaStatuses] = useLocalStorage<Record<string, { status: "pendiente" | "en-cocina" | "listo"; startedAt?: number; readyAt?: number }>>("comanda-statuses", {}, slug)
+  const [covers] = useLocalStorage<number>("planner-covers", 0, slug)
 
   const [showAlerts, setShowAlerts] = useState(true)
   const [showSearch, setShowSearch] = useState(false)
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
+  const [pendingBackup, setPendingBackup] = useState<Record<string, unknown> | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Cmd+K handler
   useEffect(() => {
@@ -158,11 +190,187 @@ export default function PanelPage() {
     return { totalCosteo, totalMerma, green, red, dishesCount: sharedDishes.length, mermaCount: mermaEntries.length, aperturaCount: aperturaChecked.length, avgFoodCost, avgMargin, monthLoss, mermaVsGoal, seasonalSavings, totalPrice, monthlyGoal }
   }, [sharedDishes, mermaEntries, aperturaChecked, selectedCollection, monthlyGoal, shoppingList])
 
+  // Sales widget: today revenue, COGS, margin, ticket count, payment methods, merma
+  const todaySales = useMemo(() => {
+    if (!selectedCollection) return null
+    const today = new Date().toISOString().slice(0, 10)
+    const todayEntries = ventasEntries.filter((e) => e.date === today)
+    const revenue = todayEntries.reduce((s, e) => s + e.quantity * e.unitPrice, 0)
+    const cost = todayEntries.reduce((s, e) => s + e.quantity * e.unitCost, 0)
+    const units = todayEntries.reduce((s, e) => s + e.quantity, 0)
+    const byMethod = new Map<string, { revenue: number; count: number }>()
+    todayEntries.forEach((e) => {
+      const m = e.paymentMethod || "efectivo"
+      const cur = byMethod.get(m) || { revenue: 0, count: 0 }
+      cur.revenue += e.quantity * e.unitPrice
+      cur.count += 1
+      byMethod.set(m, cur)
+    })
+    const methods = PAYMENT_METHODS.map((m) => ({
+      ...m,
+      ...(byMethod.get(m.key) || { revenue: 0, count: 0 }),
+    }))
+    const todayMerma = mermaEntries
+      .filter((e) => e.date.slice(0, 10) === today)
+      .reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
+    return {
+      revenue,
+      margin: revenue - cost,
+      marginPct: revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0,
+      foodCost: revenue > 0 ? (cost / revenue) * 100 : 0,
+      units,
+      count: todayEntries.length,
+      avgTicket: todayEntries.length > 0 ? revenue / todayEntries.length : 0,
+      methods,
+      todayMerma,
+    }
+  }, [ventasEntries, mermaEntries, selectedCollection])
+
+  // Active kitchen orders: today's sales still pendiente or en-cocina
+  const activeComandas = useMemo(() => {
+    if (!selectedCollection) return { active: 0, pendiente: 0, enCocina: 0, readyToday: 0 }
+    const today = new Date().toISOString().slice(0, 10)
+    const todayIds = new Set(ventasEntries.filter((e) => e.date === today).map((e) => e.id))
+    let active = 0
+    let pendiente = 0
+    let enCocina = 0
+    Object.entries(comandaStatuses).forEach(([id, s]) => {
+      if (!todayIds.has(id)) return
+      if (s.status === "listo") return
+      active++
+      if (s.status === "pendiente") pendiente++
+      else enCocina++
+    })
+    return { active, pendiente, enCocina, readyToday: todayIds.size - active }
+  }, [ventasEntries, comandaStatuses, selectedCollection])
+
+  // Planned-menu stock projection: ingredients needed for covers vs inventory
+  const projectionShortfall = useMemo(() => {
+    if (!selectedCollection || !covers || covers <= 0) return 0
+    const needs = new Map<string, number>()
+    sharedDishes.forEach((d) => {
+      d.ingredients.forEach((ing) => {
+        const key = ing.ingredientName.toLowerCase().trim()
+        if (!key) return
+        const neededKg = (ing.quantity || 0) * covers / 1000
+        needs.set(key, (needs.get(key) || 0) + neededKg)
+      })
+    })
+    let missing = 0
+    needs.forEach((neededKg, key) => {
+      const item = inventarioItems.find((i) => i.name.toLowerCase().trim() === key)
+      if (!item || item.stock < neededKg) missing++
+    })
+    return missing
+  }, [sharedDishes, covers, inventarioItems, selectedCollection])
+
+  // ── JSON backup / restore (collection-scoped resurte-* keys) ──
+  const backupData = useCallback(() => {
+    if (!selectedCollection) return
+    const prefix = `resurte-`
+    const suffix = `-${selectedCollection.slug}`
+    const data: Record<string, unknown> = {}
+    let count = 0
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key || !key.startsWith(prefix) || !key.endsWith(suffix)) continue
+      try {
+        data[key] = JSON.parse(localStorage.getItem(key) || "null")
+        count++
+      } catch {
+        // Skip corrupt entries
+      }
+    }
+    const payload = { app: "resurte-me", version: 1, collection: selectedCollection.slug, exportedAt: new Date().toISOString(), data }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `resurte-${selectedCollection.slug}-respaldo-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast(`Respaldo exportado (${count} datos de ${selectedCollection.name})`, "success")
+  }, [selectedCollection, toast])
+
+  const onRestoreFileSelected = useCallback((file: File) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result))
+        if (!parsed || typeof parsed !== "object" || !parsed.data || typeof parsed.data !== "object") {
+          toast("Archivo de respaldo no válido", "warning")
+          return
+        }
+        if (selectedCollection && parsed.collection && parsed.collection !== selectedCollection.slug) {
+          toast(`Este respaldo es de "${parsed.collection}", no de ${selectedCollection.slug}`, "warning")
+          return
+        }
+        setPendingBackup(parsed.data as Record<string, unknown>)
+        setShowRestoreConfirm(true)
+      } catch {
+        toast("No se pudo leer el archivo JSON", "warning")
+      }
+    }
+    reader.readAsText(file)
+  }, [selectedCollection, toast])
+
+  const confirmRestore = useCallback(() => {
+    if (!pendingBackup) return
+    let restored = 0
+    try {
+      Object.entries(pendingBackup).forEach(([key, value]) => {
+        localStorage.setItem(key, JSON.stringify(value))
+        restored++
+      })
+      window.dispatchEvent(new Event("storage"))
+      toast(`Datos restaurados correctamente (${restored} claves)`, "success")
+    } catch {
+      toast("Error al restaurar los datos", "warning")
+    }
+    setShowRestoreConfirm(false)
+    setPendingBackup(null)
+  }, [pendingBackup, toast])
+
+  const copyDaySummary = () => {
+    if (!todaySales) return
+    const s = todaySales
+    const lines = [
+      `📊 Resumen del día — Hoy (${selectedCollection?.name || ""})`,
+      "",
+      `Ingresos: $${s.revenue.toFixed(0)}`,
+      `Margen bruto: $${s.margin.toFixed(0)} (${s.marginPct.toFixed(1)}%)`,
+      `Food cost real: ${s.foodCost.toFixed(1)}%`,
+      `Platillos vendidos: ${s.units}`,
+      `Ticket promedio: $${s.avgTicket.toFixed(0)}`,
+    ]
+    const active = s.methods.filter((m) => m.count > 0)
+    if (active.length > 0) {
+      lines.push("", "Por método de pago:")
+      active.forEach((m) => lines.push(`${m.icon} ${m.label}: $${m.revenue.toFixed(0)} (${m.count} venta${m.count > 1 ? "s" : ""})`))
+    }
+    lines.push(`Merma de hoy: $${s.todayMerma.toFixed(0)}`)
+    lines.push("", "📈 Registrado en resurte.me")
+    navigator.clipboard.writeText(lines.join("\n"))
+    toast("Resumen del día copiado", "success")
+  }
+
   // Alerts computation
   const alerts = useMemo(() => {
     if (!selectedCollection) return []
     type Alert = { id: string; type: "danger" | "warning" | "info" | "success"; icon: typeof AlertTriangle; title: string; detail: string; href: string }
     const result: Alert[] = []
+
+    // 0. Active kitchen orders
+    if (activeComandas.active > 0) {
+      result.push({
+        id: "comandas-active",
+        type: activeComandas.pendiente > 0 ? "warning" : "info",
+        icon: Flame,
+        title: `${activeComandas.active} comanda(s) activa(s) en cocina`,
+        detail: `${activeComandas.pendiente} pendiente(s) · ${activeComandas.enCocina} en cocina — despacha el monitor de producción`,
+        href: "/panel/comanda",
+      })
+    }
 
     // 1. Low stock from inventario
     const lowStock = inventarioItems.filter((i) => i.stock <= i.minStock && i.stock > 0)
@@ -217,9 +425,14 @@ export default function PanelPage() {
       result.push({ id: "apertura-not-started", type: "info", icon: ClipboardCheck, title: "Kit de apertura sin iniciar", detail: "Empieza a verificar los pasos para abrir tu restaurante", href: "/panel/apertura" })
     }
 
+    // 6. Planned-menu stock projection alert
+    if (projectionShortfall > 0 && sharedDishes.length > 0) {
+      result.push({ id: "projection-shortfall", type: "warning", icon: AlertTriangle, title: `Te falta stock para tu menú planeado (${projectionShortfall} ingrediente${projectionShortfall !== 1 ? "s" : ""})`, detail: `Con ${covers} comensales planificados, revisa los faltantes calculados por receta`, href: "/panel/inventario" })
+    }
+
     // Limit to 5
     return result.slice(0, 5)
-  }, [selectedCollection, inventarioItems, sharedDishes, mermaEntries, monthlyGoal, shoppingList, aperturaChecked])
+  }, [selectedCollection, inventarioItems, sharedDishes, mermaEntries, monthlyGoal, shoppingList, aperturaChecked, projectionShortfall, covers, activeComandas])
 
   return (
     <div>
@@ -372,6 +585,122 @@ export default function PanelPage() {
         </div>
       )}
 
+      {/* Day summary — Resumen del día */}
+      {selectedCollection && todaySales && (
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
+          <div className="flex items-center justify-between p-4 pb-3">
+            <div className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-[#108910]" />
+              <h3 className="font-semibold text-gray-900 text-sm">Resumen del día</h3>
+              {todaySales.count === 0 && (
+                <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Sin ventas aún</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={copyDaySummary}
+                disabled={todaySales.count === 0 && todaySales.todayMerma === 0}
+                className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Copiar resumen del día"
+                aria-label="Copiar resumen del día"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Copiar resumen
+              </button>
+              <Link href="/panel/ventas" className="text-xs font-semibold text-[#108910] hover:text-green-800 flex items-center gap-1">
+                Registrar ventas
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-4 pb-4">
+            <div className="bg-green-50 rounded-xl p-3 text-center">
+              <p className="text-[10px] text-green-600">Ingresos hoy</p>
+              <p className="text-lg font-extrabold text-green-700">${todaySales.revenue.toFixed(0)}</p>
+            </div>
+            <div className="bg-blue-50 rounded-xl p-3 text-center">
+              <p className="text-[10px] text-blue-600">Margen bruto</p>
+              <p className="text-lg font-extrabold text-blue-700">${todaySales.margin.toFixed(0)}</p>
+            </div>
+            <div className="bg-purple-50 rounded-xl p-3 text-center">
+              <p className="text-[10px] text-purple-600">Ticket promedio</p>
+              <p className="text-lg font-extrabold text-purple-700">{todaySales.count > 0 ? `$${todaySales.avgTicket.toFixed(0)}` : "—"}</p>
+            </div>
+            <div className="bg-amber-50 rounded-xl p-3 text-center">
+              <p className="text-[10px] text-amber-600">Unidades</p>
+              <p className="text-lg font-extrabold text-amber-700">{todaySales.units}</p>
+            </div>
+          </div>
+          <div className="border-t border-gray-100 px-4 py-3 grid sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase">Por método de pago</p>
+              {todaySales.methods.filter((m) => m.count > 0).length === 0 ? (
+                <p className="text-xs text-gray-400">Sin ventas registradas hoy.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {todaySales.methods.filter((m) => m.count > 0).map((m) => (
+                    <span key={m.key} className="text-[11px] bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-gray-700">
+                      {m.icon} {m.label}: <b>${m.revenue.toFixed(0)}</b> ({m.count})
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase">Hoy</p>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="text-[11px] bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-gray-700">
+                  Food cost real: <b>{todaySales.foodCost.toFixed(1)}%</b>
+                </span>
+                <span className="text-[11px] bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-gray-700">
+                  Merma: <b>${todaySales.todayMerma.toFixed(0)}</b>
+                </span>
+                <span className="text-[11px] bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-gray-700">
+                  {todaySales.count} registro{todaySales.count !== 1 ? "s" : ""}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Kitchen monitor — comandas activas */}
+      {selectedCollection && (
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
+          <div className="flex items-center justify-between p-4 pb-3">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-orange-500" />
+              <h3 className="font-semibold text-gray-900 text-sm">Monitor de cocina</h3>
+              {activeComandas.active > 0 ? (
+                <span className="text-[10px] bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full font-medium">
+                  {activeComandas.active} activa{activeComandas.active !== 1 ? "s" : ""}
+                </span>
+              ) : (
+                <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Sin comandas activas</span>
+              )}
+            </div>
+            <Link href="/panel/comanda" className="text-xs font-semibold text-[#108910] hover:text-green-800 flex items-center gap-1">
+              Abrir monitor
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-2 px-4 pb-4">
+            <div className="bg-gray-50 rounded-xl p-3 text-center">
+              <p className="text-[10px] text-gray-500">Pendientes</p>
+              <p className="text-lg font-extrabold text-amber-600">{activeComandas.pendiente}</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3 text-center">
+              <p className="text-[10px] text-gray-500">En cocina</p>
+              <p className="text-lg font-extrabold text-blue-600">{activeComandas.enCocina}</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3 text-center">
+              <p className="text-[10px] text-gray-500">Listas hoy</p>
+              <p className="text-lg font-extrabold text-green-600">{activeComandas.readyToday}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Legend when no collection selected */}
       {!selectedCollection && (
         <p className="text-center text-sm text-gray-400 mb-6">
@@ -460,6 +789,32 @@ export default function PanelPage() {
           >
             ✓ Checklist apertura
           </button>
+          <span className="text-[10px] text-gray-300 mx-1">|</span>
+          <button
+            onClick={backupData}
+            className="text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+            title="Exportar todos los datos de esta colección a un archivo JSON"
+          >
+            💾 Respaldo
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+            title="Restaurar datos desde un archivo JSON de respaldo"
+          >
+            📥 Restaurar
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) onRestoreFileSelected(file)
+              e.target.value = ""
+            }}
+          />
         </div>
       )}
 
@@ -539,6 +894,36 @@ export default function PanelPage() {
           </Link>
         ))}
       </div>
+      {showRestoreConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              <h3 className="font-bold text-gray-900">¿Restaurar respaldo?</h3>
+            </div>
+            <p className="text-sm text-gray-500 mb-2">
+              Se reemplazarán los datos actuales de esta colección con los del archivo. Esta acción no se puede deshacer.
+            </p>
+            <p className="text-xs text-gray-400 mb-4">
+              {pendingBackup ? Object.keys(pendingBackup).length : 0} secciones de datos serán restauradas.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setShowRestoreConfirm(false); setPendingBackup(null) }}
+                className="text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmRestore}
+                className="text-xs font-semibold text-white bg-[#108910] hover:bg-green-800 px-4 py-2 rounded-lg transition-colors"
+              >
+                Restaurar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <GlobalSearch open={showSearch} onClose={() => setShowSearch(false)} />
     </div>
   )

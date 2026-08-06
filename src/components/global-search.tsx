@@ -110,6 +110,29 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
       }
     } catch {}
 
+    // Index ventas entries
+    try {
+      const raw = localStorage.getItem("resurte-ventas-entries-default")
+      if (raw) {
+        const sales: { dishName: string; quantity: number; date: string; unitPrice: number }[] = JSON.parse(raw)
+        const seen = new Set<string>()
+        sales.forEach((s) => {
+          if (s.dishName && s.dishName.toLowerCase().includes(q) && !seen.has(s.dishName)) {
+            seen.add(s.dishName)
+            items.push({
+              id: `venta-${s.dishName}`,
+              label: s.dishName,
+              subtitle: `${s.quantity} vendidos · $${s.unitPrice} · ${s.date || "fecha pendiente"}`,
+              tool: "ventas",
+              toolLabel: "Ventas del día",
+              url: "/panel/ventas",
+              emoji: "💰",
+            })
+          }
+        })
+      }
+    } catch {}
+
     // Limit to 8 results max
     return items.slice(0, 8)
   }, [query])

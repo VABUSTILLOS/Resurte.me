@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
-import { getAllPosts } from "@/lib/blog"
+import { getAllPosts, getBlogIndexCta } from "@/lib/blog"
 import { getBlogIndexSchema, getBlogBreadcrumbSchema } from "@/lib/blog-schema"
 import { BlogHero } from "@/components/blog/blog-hero"
+import { PostCTA } from "@/components/blog/post-cta"
 import { BlogIndexClient } from "./blog-index-client"
 
 export const metadata: Metadata = {
@@ -64,6 +65,14 @@ export default async function BlogIndexPage({
         initialQuery={q ?? ""}
         initialCategory={categoria ?? "all"}
       />
+      <div className="pb-16">
+        <PostCTA
+          config={getBlogIndexCta()}
+          heading="¿Listo para impulsar tu restaurante?"
+          secondaryHref="/panel"
+          secondaryLabel="Explorar el Panel de Herramientas"
+        />
+      </div>
     </>
   )
 }

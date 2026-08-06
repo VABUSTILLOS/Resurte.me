@@ -19,7 +19,17 @@ const ICONS = {
  * frontmatter) y se pasa como prop; la ciudad se lee del contexto del usuario
  * para las colecciones.
  */
-export function PostCTA({ config }: { config: ResolvedPostCta }) {
+export function PostCTA({
+  config,
+  heading = "¿Listo para llevar tu restaurante al siguiente nivel?",
+  secondaryHref = "/blog",
+  secondaryLabel = "Seguir leyendo el blog",
+}: {
+  config: ResolvedPostCta
+  heading?: string
+  secondaryHref?: string
+  secondaryLabel?: string
+}) {
   const { city } = useCity()
   const Icon = ICONS[config.variant]
 
@@ -51,7 +61,7 @@ export function PostCTA({ config }: { config: ResolvedPostCta }) {
             {config.eyebrow}
           </span>
           <h2 className="mt-4 text-2xl font-extrabold leading-tight text-white sm:text-3xl">
-            ¿Listo para llevar tu restaurante al siguiente nivel?
+            {heading}
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-brand-50/95">
             {config.title}
@@ -66,11 +76,11 @@ export function PostCTA({ config }: { config: ResolvedPostCta }) {
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
             <Link
-              href="/blog"
+              href={secondaryHref}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/35 px-7 py-3 text-sm font-semibold text-white transition hover:bg-white/10 sm:w-auto"
             >
               <BookOpen className="h-4 w-4" aria-hidden="true" />
-              Seguir leyendo el blog
+              {secondaryLabel}
             </Link>
           </div>
         </div>

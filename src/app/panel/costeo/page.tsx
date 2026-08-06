@@ -6,8 +6,9 @@ import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
 import Link from "next/link"
 import {
-  Calculator, Plus, Trash2, PieChart, ArrowLeft,
+  Calculator, Plus, Trash2, PieChart, ArrowLeft, Gift, Tag,
   Percent, TrendingDown, AlertCircle, Edit3, Download, CheckSquare,
+  Copy, Printer,
 } from "lucide-react"
 
 // Mock ingredients per collection type — in production this comes from Resurte.me catalog
@@ -162,6 +163,28 @@ const DISH_CATEGORIES = [
   { key: "acompanamiento", label: "Acompañamiento", color: "bg-green-100 text-green-700" },
 ]
 
+const CATEGORY_EMOJI: Record<string, string> = {
+  entrada: "🥗",
+  "plato-fuerte": "🍽️",
+  postre: "🍰",
+  bebida: "🥤",
+  acompanamiento: "🍟",
+  todas: "📋",
+}
+
+interface ComboItem {
+  dishId: string
+  dishName: string
+  qty: number
+}
+
+interface Combo {
+  id: string
+  name: string
+  items: ComboItem[]
+  price: number
+}
+
 let dishCounter = 0
 function nextId() { dishCounter++; return `dish-${Date.now()}-${dishCounter}` }
 
@@ -193,6 +216,7 @@ export default function CosteoPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("todas")
+  const [viewMode, setViewMode] = useLocalStorage<string>("costeo-view", "lista", slug)
   const [newDishCategory, setNewDishCategory] = useState("plato-fuerte")
   const [newDishPortions, setNewDishPortions] = useState(4)
   const [inventarioItems] = useLocalStorage<{ name: string; stock: number; minStock: number; unit: string; pricePerUnit: number }[]>("inventario-items", [], slug)
@@ -200,6 +224,13 @@ export default function CosteoPage() {
   const [undoIndex, setUndoIndex] = useState(-1)
   const [selectedDishes, setSelectedDishes] = useState<Set<string>>(new Set())
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false)
+  // Combos y promociones
+  const [combos, setCombos] = useLocalStorage<Combo[]>("costeo-combos", [], slug)
+  const [showComboForm, setShowComboForm] = useState(false)
+  const [newComboName, setNewComboName] = useState("")
+  const [newComboItems, setNewComboItems] = useState<ComboItem[]>([])
+  const [newComboPrice, setNewComboPrice] = useState("")
+  const [comboDeleteConfirm, setComboDeleteConfirm] = useState<string | null>(null)
 
   // Filtered dishes by search query and category
   const filteredDishes = useMemo(() => {
@@ -272,6 +303,74 @@ export default function CosteoPage() {
     setBatchDeleteConfirm(false)
   }
 
+  // ── Combos y promociones ──────────────────────────────
+  const dishCostById = (id: string) => {
+    const d = dishes.find((dish) => dish.id === id)
+    if (!d) return 0
+    return d.ingredients.reduce((s, i) => s + (i.quantity * i.unitPrice), 0)
+  }
+
+  const comboCost = (items: ComboItem[]) =>
+    items.reduce((s, it) => s + dishCostById(it.dishId) * it.qty, 0)
+
+  const suggestedComboPrice = (items: ComboItem[]) => {
+    const cost = comboCost(items)
+    return targetFoodCost > 0 ? Math.round((cost / (targetFoodCost / 100)) * 100) / 100 : 0
+  }
+
+  function toggleComboDish(dishId: string, dishName: string) {
+    setNewComboItems((prev) => {
+      const exists = prev.find((it) => it.dishId === dishId)
+      if (exists) return prev.filter((it) => it.dishId !== dishId)
+      return [...prev, { dishId, dishName, qty: 1 }]
+    })
+  }
+
+  function setComboQty(dishId: string, qty: number) {
+    setNewComboItems((prev) => prev.map((it) => (it.dishId === dishId ? { ...it, qty: Math.max(1, qty) } : it)))
+  }
+
+  function addCombo() {
+    if (!newComboName.trim()) {
+      toast("Ponle un nombre al combo", "warning")
+      return
+    }
+    if (newComboItems.length < 2) {
+      toast("Selecciona al menos 2 platillos", "warning")
+      return
+    }
+    const price = parseFloat(newComboPrice)
+    if (!price || price <= 0) {
+      toast("Define un precio de venta para el combo", "warning")
+      return
+    }
+    const combo: Combo = {
+      id: `combo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: newComboName.trim(),
+      items: newComboItems.map((it) => ({ ...it })),
+      price,
+    }
+    setCombos([...combos, combo])
+    setShowComboForm(false)
+    setNewComboName("")
+    setNewComboItems([])
+    setNewComboPrice("")
+    toast(`Combo "${combo.name}" guardado`, "success")
+  }
+
+  function removeCombo(id: string) {
+    setComboDeleteConfirm(id)
+  }
+
+  function confirmDeleteCombo() {
+    if (comboDeleteConfirm) {
+      const name = combos.find((c) => c.id === comboDeleteConfirm)?.name || "Combo"
+      setCombos(combos.filter((c) => c.id !== comboDeleteConfirm))
+      toast(`Combo "${name}" eliminado`, "warning")
+      setComboDeleteConfirm(null)
+    }
+  }
+
   // Export CSV
   function exportCSV() {
     const dishesToExport = filteredDishes
@@ -293,6 +392,24 @@ export default function CosteoPage() {
     a.download = `costeo-menu-${slug || "menu"}.csv`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // Copy menu (carta) to clipboard in menu view
+  function copyCarta() {
+    const sections = new Map<string, string[]>()
+    filteredDishes.forEach((d) => {
+      const catKey = d.category && d.category !== "todas" ? d.category : "plato-fuerte"
+      const label = DISH_CATEGORIES.find((c) => c.key === catKey)?.label || "Plato fuerte"
+      if (!sections.has(label)) sections.set(label, [])
+      sections.get(label)!.push(`  ${d.name} .................................. $${d.sellingPrice.toFixed(0)}`)
+    })
+    const lines: string[] = [`📋 Carta — ${selectedCollection?.name || "Mi menú"}`]
+    sections.forEach((items, label) => {
+      lines.push(`\n${label.toUpperCase()}`)
+      lines.push(...items)
+    })
+    navigator.clipboard.writeText(lines.join("\n"))
+    toast("Carta copiada al portapapeles", "success")
   }
 
   // Keyboard shortcuts
@@ -472,6 +589,19 @@ export default function CosteoPage() {
                 Exportar CSV
               </button>
             )}
+            {dishes.length > 0 && (
+              <button
+                onClick={() => setViewMode(viewMode === "lista" ? "menu" : "lista")}
+                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors ${
+                  viewMode === "menu"
+                    ? "bg-[#108910] text-white"
+                    : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                }`}
+                title="Alternar entre lista de costeo y vista de menú digital"
+              >
+                {viewMode === "menu" ? "📋 Ver costeo" : "🥘 Menú digital"}
+              </button>
+            )}
           </div>
           <p className="text-sm text-gray-400">{selectedCollection.name}</p>
         </div>
@@ -564,8 +694,83 @@ export default function CosteoPage() {
         </div>
       )}
 
+      {/* Menu digital view */}
+      {viewMode === "menu" && filteredDishes.length > 0 && (
+        <div className="mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4 print:hidden">
+            <p className="text-xs text-gray-400">
+              Vista previa de tu carta — {filteredDishes.length} platillo{filteredDishes.length !== 1 ? "s" : ""}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={copyCarta}
+                className="flex items-center gap-1.5 text-xs font-semibold text-[#108910] bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Copiar carta
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
+                aria-label="Imprimir menú digital"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Imprimir
+              </button>
+            </div>
+          </div>
+          <div className="max-w-md mx-auto bg-white rounded-3xl border border-gray-100 shadow-lg overflow-hidden">
+            <div className="bg-gradient-to-br from-[#108910] to-green-800 px-6 py-5 text-center">
+              <p className="text-[10px] tracking-widest uppercase text-green-100">Bienvenido a</p>
+              <h3 className="text-lg font-extrabold text-white">{selectedCollection?.name || "Mi menú"}</h3>
+              <p className="text-[10px] text-green-200 mt-0.5">Hecho con Resurte.me</p>
+            </div>
+            <div className="p-5">
+              {DISH_CATEGORIES.filter((c) => c.key !== "todas").map((cat) => {
+                const inCat = filteredDishes.filter((d) => (d.category || "plato-fuerte") === cat.key)
+                if (inCat.length === 0) return null
+                return (
+                  <div key={cat.key} className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">{CATEGORY_EMOJI[cat.key] || "🍽️"}</span>
+                      <h4 className="font-bold text-gray-900 text-sm uppercase tracking-wide">{cat.label}</h4>
+                      <div className="flex-1 border-t border-dashed border-gray-200 mx-1" />
+                    </div>
+                    <div className="space-y-2.5">
+                      {inCat.map((dish) => {
+                        const totalCost = dish.ingredients.reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0)
+                        const suggested = dish.sellingPrice
+                        const portions = dish.portions || 4
+                        return (
+                          <div key={dish.id} className="flex items-center gap-3">
+                            <div className="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-br from-green-50 to-gray-50 border border-gray-100 flex items-center justify-center text-xl">
+                              {CATEGORY_EMOJI[dish.category] || "🍽️"}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-baseline justify-between gap-2">
+                                <p className="font-semibold text-gray-800 text-sm truncate">{dish.name}</p>
+                                <p className="font-bold text-[#108910] text-sm shrink-0">${suggested.toFixed(0)}</p>
+                              </div>
+                              <p className="text-[10px] text-gray-400 truncate">
+                                {dish.ingredients.slice(0, 3).map((i) => i.ingredientName).join(" · ")}
+                                {dish.ingredients.length > 3 && " · …"}
+                                {portions > 1 && ` · ${portions} porc.`}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Dishes list */}
-      {filteredDishes.length > 0 && (
+      {viewMode === "lista" && filteredDishes.length > 0 && (
         <div className="space-y-3 mb-6">
           {filteredDishes.map((dish) => {
             const totalCost = dish.ingredients.reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0)
@@ -843,6 +1048,195 @@ export default function CosteoPage() {
         </button>
       )}
 
+      {/* Combos y promociones */}
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Gift className="w-5 h-5 text-amber-600" />
+            <h3 className="font-semibold text-gray-900">Combos y promociones</h3>
+            {combos.length > 0 && (
+              <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium">{combos.length}</span>
+            )}
+          </div>
+          {!showComboForm && (
+            <button
+              onClick={() => setShowComboForm(true)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Nuevo combo
+            </button>
+          )}
+        </div>
+
+        {combos.length === 0 && !showComboForm && (
+          <p className="text-xs text-gray-400 mb-4">
+            Arma combos con 2+ platillos de tu menú para aumentar el ticket promedio. Sugerimos el precio según tu food cost objetivo.
+          </p>
+        )}
+
+        {/* Combo list */}
+        {combos.length > 0 && (
+          <div className="space-y-3 mb-4">
+            {combos.map((combo) => {
+              const cost = comboCost(combo.items)
+              const margin = combo.price - cost
+              const fc = combo.price > 0 ? (cost / combo.price) * 100 : 0
+              const isGood = fc <= 32
+              const isOk = fc <= 38
+              return (
+                <div key={combo.id} className="bg-white rounded-2xl border border-gray-100 p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-amber-500" />
+                      <h4 className="font-bold text-gray-900">{combo.name}</h4>
+                    </div>
+                    <button
+                      onClick={() => removeCombo(combo.id)}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                      title="Eliminar combo"
+                      aria-label={`Eliminar combo ${combo.name}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {combo.items.map((it) => (
+                      <span key={it.dishId} className="text-[10px] bg-amber-50 text-amber-700 px-2 py-1 rounded-lg font-medium">
+                        {it.qty} × {it.dishName}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                    <div className="bg-gray-50 rounded-xl p-2.5">
+                      <p className="text-[10px] text-gray-400">Costo combo</p>
+                      <p className="font-bold text-gray-900">${cost.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-2.5">
+                      <p className="text-[10px] text-gray-400">Precio venta</p>
+                      <p className="font-bold text-[#108910]">${combo.price.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-2.5">
+                      <p className="text-[10px] text-gray-400">Margen</p>
+                      <p className={`font-bold ${margin > 0 ? "text-green-600" : "text-red-600"}`}>${margin.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-2.5">
+                      <p className="text-[10px] text-gray-400">Food cost</p>
+                      <p className={`font-bold ${isGood ? "text-green-600" : isOk ? "text-amber-600" : "text-red-600"}`}>
+                        {fc.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                  <div className={`mt-2 flex items-center gap-2 text-xs font-medium rounded-lg px-3 py-1.5 ${
+                    isGood ? "bg-green-50 text-green-700" : isOk ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"
+                  }`}>
+                    {isGood ? <TrendingDown className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                    {isGood
+                      ? "¡Combo rentable! Aumenta tu ticket promedio."
+                      : isOk
+                        ? "Combo aceptable, revisa el precio."
+                        : `Estás regalando margen. Precio sugerido: $${suggestedComboPrice(combo.items).toFixed(2)}`}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* New combo form */}
+        {showComboForm && (
+          <div className="bg-white rounded-2xl border border-amber-200 p-5 mb-4">
+            <h4 className="font-semibold text-gray-900 mb-4">Nuevo combo</h4>
+            <input
+              type="text"
+              value={newComboName}
+              onChange={(e) => setNewComboName(e.target.value)}
+              placeholder="Nombre del combo (ej. Combo familiar)"
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm mb-3 focus:outline-none focus:border-amber-500"
+            />
+            <div className="mb-3">
+              <p className="text-xs text-gray-400 mb-2">Selecciona los platillos del menú (mínimo 2):</p>
+              {dishes.length === 0 ? (
+                <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2">
+                  Primero costea tu menú para poder armar combos.
+                </p>
+              ) : (
+                <div className="max-h-44 overflow-y-auto space-y-1.5 border border-gray-100 rounded-xl p-2">
+                  {dishes.map((dish) => {
+                    const selected = newComboItems.find((it) => it.dishId === dish.id)
+                    return (
+                      <div key={dish.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                        selected ? "bg-amber-50 border border-amber-200" : "hover:bg-gray-50"
+                      }`}>
+                        <input
+                          type="checkbox"
+                          checked={!!selected}
+                          onChange={() => toggleComboDish(dish.id, dish.name)}
+                          className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+                        />
+                        <span className="flex-1 text-sm text-gray-700 truncate">{dish.name}</span>
+                        {selected && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setComboQty(dish.id, selected.qty - 1)}
+                              className="w-6 h-6 rounded bg-amber-100 text-amber-700 font-bold hover:bg-amber-200 transition-colors"
+                              aria-label={`Reducir cantidad de ${dish.name}`}
+                            >−</button>
+                            <span className="w-6 text-center text-xs font-bold text-gray-800">{selected.qty}</span>
+                            <button
+                              onClick={() => setComboQty(dish.id, selected.qty + 1)}
+                              className="w-6 h-6 rounded bg-amber-100 text-amber-700 font-bold hover:bg-amber-200 transition-colors"
+                              aria-label={`Aumentar cantidad de ${dish.name}`}
+                            >+</button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {newComboItems.length >= 2 && (
+              <div className="mb-3 bg-amber-50 rounded-xl px-3 py-2.5 grid grid-cols-3 gap-2 text-center text-xs">
+                <div>
+                  <p className="text-amber-700/70">Costo combo</p>
+                  <p className="font-bold text-gray-900">${comboCost(newComboItems).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-amber-700/70">Precio sugerido ({targetFoodCost}%)</p>
+                  <p className="font-bold text-amber-700">${suggestedComboPrice(newComboItems).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-amber-700/70">Precio del combo</p>
+                  <input
+                    type="number"
+                    value={newComboPrice}
+                    onChange={(e) => setNewComboPrice(e.target.value)}
+                    placeholder="$$$"
+                    min="0"
+                    step="0.5"
+                    className="w-full px-2 py-1.5 rounded-lg border border-amber-300 text-sm text-center font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={addCombo} className="flex-1 bg-amber-500 text-white font-semibold py-2.5 rounded-xl hover:bg-amber-600 transition-colors">
+                Guardar combo
+              </button>
+              <button
+                onClick={() => { setShowComboForm(false); setNewComboName(""); setNewComboItems([]); setNewComboPrice("") }}
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Summary */}
       {dishes.length > 0 && (
         <div className="mt-6 bg-gradient-to-r from-[#F0FDF4] to-white rounded-2xl border border-[#108910]/10 p-5">
@@ -900,6 +1294,26 @@ export default function CosteoPage() {
                 Sí, eliminar
               </button>
               <button onClick={() => setDeleteConfirmId(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-50 text-sm">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Combo delete confirmation modal */}
+      {comboDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
+            <h4 className="font-bold text-gray-900 mb-2">¿Eliminar este combo?</h4>
+            <p className="text-sm text-gray-500 mb-4">
+              Esta acción no se puede deshacer. Se eliminará el combo de tus promociones.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={confirmDeleteCombo} className="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-xl hover:bg-red-700 text-sm">
+                Sí, eliminar
+              </button>
+              <button onClick={() => setComboDeleteConfirm(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-50 text-sm">
                 Cancelar
               </button>
             </div>
