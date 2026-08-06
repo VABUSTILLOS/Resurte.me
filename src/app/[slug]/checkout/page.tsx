@@ -119,6 +119,23 @@ export default function CheckoutPage() {
   const deliveryFee = itemCount > 0 ? 35 : 0
   const total = subtotal - discount + deliveryFee
 
+  // Persist the order summary so the confirmation page can fire a complete
+  // `purchase` event after the cart is cleared.
+  const saveLastOrder = () => {
+    sessionStorage.setItem(
+      "last_order",
+      JSON.stringify({
+        total,
+        items: cart.items.map((i) => ({
+          id: String(i.product_id),
+          name: i.name,
+          quantity: i.quantity,
+          price: i.sale_price ?? i.price,
+        })),
+      })
+    )
+  }
+
   // Address form update
   const updateAddress = (field: keyof AddressForm, value: string) => {
     setAddress((prev) => ({ ...prev, [field]: value }))
@@ -211,6 +228,7 @@ export default function CheckoutPage() {
       }
 
       // Non-card payment → redirect to confirmation
+      saveLastOrder()
       clearCart()
       router.push(`/${city.slug}/pedido-confirmado`)
     } catch (err) {
@@ -222,6 +240,7 @@ export default function CheckoutPage() {
   }
 
   const handleStripeSuccess = (_paymentIntentId: string) => {
+    saveLastOrder()
     clearCart()
     router.push(`/${city.slug}/pedido-confirmado`)
   }

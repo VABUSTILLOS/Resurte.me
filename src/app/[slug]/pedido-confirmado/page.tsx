@@ -17,9 +17,32 @@ export default function OrderConfirmedPage() {
   const { city } = useCity()
   const [orderId] = useState(() => generateOrderId())
 
-  // Track purchase on page mount
+  // Track purchase on page mount (total/items come from sessionStorage,
+  // set right before the cart was cleared on the checkout page)
   useEffect(() => {
-    trackEvent("purchase", { transaction_id: orderId, currency: "MXN" })
+    let value: number | undefined
+    let items:
+      | Array<{ id: string; name: string; quantity: number; price: number }>
+      | undefined
+
+    try {
+      const raw = sessionStorage.getItem("last_order")
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        value = parsed.total
+        items = parsed.items
+        sessionStorage.removeItem("last_order")
+      }
+    } catch {
+      // Ignore malformed session data
+    }
+
+    trackEvent("purchase", {
+      transaction_id: orderId,
+      currency: "MXN",
+      value,
+      items,
+    })
   }, [orderId])
 
   if (!city) {
