@@ -22,18 +22,31 @@ export function Header() {
   const [showCitySelector, setShowCitySelector] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [cashbackBalance] = useState<number | null>(() => {
-    if (typeof window === "undefined") return null
-    const saved = localStorage.getItem("cashback-balance")
-    return saved ? Number(saved) : null
-  })
+  const [cashbackBalance, setCashbackBalance] = useState<number | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Detect auth state on mount
+  // Detect auth state on mount and fetch wallet balance
   useEffect(() => {
     if (!supabase) return
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user ?? null)
+    supabase.auth.getUser().then(async ({ data }) => {
+      const currentUser = data.user ?? null
+      setUser(currentUser)
+
+      // Fetch wallet balance from Supabase if logged in
+      if (currentUser) {
+        try {
+          const { data: wallet } = await supabase
+            .from("wallets")
+            .select("balance_credits")
+            .eq("user_id", currentUser.id)
+            .single()
+          setCashbackBalance(wallet ? Number(wallet.balance_credits) : 0)
+        } catch {
+          // Fallback to localStorage for offline/unauthenticated
+          const saved = localStorage.getItem("cashback-balance")
+          setCashbackBalance(saved ? Number(saved) : null)
+        }
+      }
     })
   }, [supabase])
 

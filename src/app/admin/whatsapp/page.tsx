@@ -180,6 +180,9 @@ export default function AdminWhatsAppPage() {
                   <img
                     src={product.image_url}
                     alt={product.name}
+                    loading="lazy"
+                    width={48}
+                    height={48}
                     className="w-full h-full object-contain p-1"
                   />
                 ) : (

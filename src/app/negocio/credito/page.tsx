@@ -26,7 +26,7 @@ export default function CreditoPage() {
 
       {/* Trust stats */}
       <section className="max-w-3xl mx-auto px-4 pb-10">
-        <div className="bg-white border border-[#E5E7EB] rounded-[16px] p-6 grid grid-cols-3 gap-4 text-center">
+        <div className="bg-white border border-[#E5E7EB] rounded-[16px] p-6 grid gap-4 text-center sm:grid-cols-3">
           {[
             { value: "24h", label: "Respuesta máxima" },
             { value: "85%", label: "Tasa de aprobación" },

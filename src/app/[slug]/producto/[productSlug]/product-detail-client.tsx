@@ -137,7 +137,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                         : "border-[#ede8df] hover:border-[#108910]/40"
                     }`}
                   >
-                    <img src={img} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-contain p-1" />
+                    <img src={img} alt={`${product.name} ${idx + 1}`} loading="lazy" width={64} height={64} className="w-full h-full object-contain p-1" />
                   </button>
                 ))}
               </div>

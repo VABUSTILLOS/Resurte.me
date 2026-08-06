@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import Link from "next/link"
@@ -177,11 +177,63 @@ export default function CosteoPage() {
   const [customUnit, setCustomUnit] = useState("kg")
   const [customPrice, setCustomPrice] = useState("")
   const [showCustom, setShowCustom] = useState(false)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [undoStack, setUndoStack] = useState<Dish[][]>([])
+  const [undoIndex, setUndoIndex] = useState(-1)
+
+  // Filtered dishes by search query
+  const filteredDishes = useMemo(() => {
+    if (!searchQuery.trim()) return dishes
+    const q = searchQuery.toLowerCase()
+    return dishes.filter((d) =>
+      d.name.toLowerCase().includes(q) ||
+      d.ingredients.some((i) => i.ingredientName.toLowerCase().includes(q))
+    )
+  }, [dishes, searchQuery])
 
   // Keep shared dishes in sync
   useEffect(() => {
     setSharedDishes(dishes)
   }, [dishes, setSharedDishes])
+
+  // Wrapped setter with undo history
+  function pushHistory(newDishes: Dish[]) {
+    setUndoStack((prev) => {
+      const trimmed = prev.slice(0, undoIndex + 1)
+      return [...trimmed.slice(-19), newDishes]
+    })
+    setUndoIndex((prev) => Math.min(prev + 1, 19))
+    setDishes(newDishes)
+  }
+
+  function undo() {
+    if (undoIndex > 0) {
+      const newIdx = undoIndex - 1
+      setUndoIndex(newIdx)
+      setDishes(undoStack[newIdx])
+    }
+  }
+
+  function redo() {
+    if (undoIndex < undoStack.length - 1) {
+      const newIdx = undoIndex + 1
+      setUndoIndex(newIdx)
+      setDishes(undoStack[newIdx])
+    }
+  }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === "z" && !e.shiftKey) { e.preventDefault(); undo() }
+        if ((e.key === "y") || (e.key === "z" && e.shiftKey)) { e.preventDefault(); redo() }
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  })
 
   function resetForm() {
     setNewDishName("")
@@ -260,15 +312,22 @@ export default function CosteoPage() {
     }
 
     if (editingDishId) {
-      setDishes((prev) => prev.map((d) => (d.id === editingDishId ? dish : d)))
+      pushHistory(dishes.map((d) => (d.id === editingDishId ? dish : d)))
     } else {
-      setDishes((prev) => [...prev, dish])
+      pushHistory([...dishes, dish])
     }
     resetForm()
   }
 
   function removeDish(id: string) {
-    setDishes((prev) => prev.filter((d) => d.id !== id))
+    setDeleteConfirmId(id)
+  }
+
+  function confirmDeleteDish() {
+    if (deleteConfirmId) {
+      pushHistory(dishes.filter((d) => d.id !== deleteConfirmId))
+      setDeleteConfirmId(null)
+    }
   }
 
   if (!selectedCollection) {
@@ -325,10 +384,28 @@ export default function CosteoPage() {
         </p>
       </div>
 
-      {/* Dishes list */}
+      {/* Search bar */}
       {dishes.length > 0 && (
+        <div className="mb-4">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar platillo o ingrediente..."
+            className="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#108910]/20 focus:border-[#108910] placeholder-gray-400"
+          />
+          {searchQuery.trim() && (
+            <p className="text-xs text-gray-400 mt-1.5">
+              {filteredDishes.length} de {dishes.length} platillos
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Dishes list */}
+      {filteredDishes.length > 0 && (
         <div className="space-y-3 mb-6">
-          {dishes.map((dish) => {
+          {filteredDishes.map((dish) => {
             const totalCost = dish.ingredients.reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0)
             const margin = dish.sellingPrice - totalCost
             const actualFoodCost = dish.sellingPrice > 0 ? (totalCost / dish.sellingPrice) * 100 : 0
@@ -558,6 +635,24 @@ export default function CosteoPage() {
           Cuando los precios cambien en nuestra plataforma, regresa aquí para actualizar tus costos automáticamente.
         </p>
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
+            <h4 className="font-bold text-gray-900 mb-2">¿Eliminar este platillo?</h4>
+            <p className="text-sm text-gray-500 mb-4">Esta acción no se puede deshacer. Perderás todos los ingredientes y precios de este platillo.</p>
+            <div className="flex gap-3">
+              <button onClick={confirmDeleteDish} className="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-xl hover:bg-red-700 text-sm">
+                Sí, eliminar
+              </button>
+              <button onClick={() => setDeleteConfirmId(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-50 text-sm">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -83,14 +83,14 @@ export default function AdminVisibilityPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Control de Visibilidad</h1>
           <p className="text-sm text-gray-500 mt-1">
             {visibleCount} visibles · {hiddenCount} ocultos · {products.length} total
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
             <button
               onClick={() => setCategoryFilter(null)}

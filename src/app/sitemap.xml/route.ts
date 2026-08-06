@@ -1,4 +1,5 @@
 import { MEXICO_CITIES } from "@/lib/cities"
+import { getAllPosts } from "@/lib/blog"
 import { generateSitemapXml } from "@/lib/structured-data"
 import type { SitemapEntry } from "@/lib/structured-data"
 
@@ -20,6 +21,17 @@ export async function GET() {
   entries.push({ url: `${BASE_URL}/admin`, changeFrequency: "weekly", priority: 0.4 })
   entries.push({ url: `${BASE_URL}/admin/pedidos`, changeFrequency: "weekly", priority: 0.4 })
   entries.push({ url: `${BASE_URL}/admin/whatsapp`, changeFrequency: "weekly", priority: 0.5 })
+
+  // Blog
+  entries.push({ url: `${BASE_URL}/blog`, changeFrequency: "weekly", priority: 0.8 })
+  for (const post of getAllPosts()) {
+    entries.push({
+      url: `${BASE_URL}/blog/${post.slug}`,
+      changeFrequency: "monthly",
+      priority: 0.7,
+      lastModified: post.updatedAt,
+    })
+  }
 
   const xml = generateSitemapXml(entries)
 

@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useCity } from "@/contexts/city-context"
 import { CheckCircle2, ArrowRight, Package, Clock, MapPin, Store, Share2 } from "lucide-react"
 import Link from "next/link"
+import { trackEvent } from "@/lib/analytics"
 
 function generateOrderId(): string {
   const prefix = "RT"
@@ -15,6 +16,11 @@ function generateOrderId(): string {
 export default function OrderConfirmedPage() {
   const { city } = useCity()
   const [orderId] = useState(() => generateOrderId())
+
+  // Track purchase on page mount
+  useEffect(() => {
+    trackEvent("purchase", { transaction_id: orderId, currency: "MXN" })
+  }, [orderId])
 
   if (!city) {
     return (
@@ -100,6 +106,7 @@ export default function OrderConfirmedPage() {
           )}`}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => trackEvent("share", { method: "whatsapp", content_type: "referral" })}
           className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-[#25D366] text-white font-semibold rounded-xl hover:bg-[#20BD5A] transition-colors"
         >
           <Share2 className="w-4 h-4" />

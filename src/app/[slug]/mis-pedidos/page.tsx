@@ -5,6 +5,7 @@ import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { generateMockOrders, STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL, type MockOrder } from "@/lib/mock-orders"
 import { Package, Clock, ChevronRight, ArrowLeft, RotateCcw, ShoppingCart } from "lucide-react"
+import { trackEvent } from "@/lib/analytics"
 import Link from "next/link"
 
 export default function OrderHistoryPage() {
@@ -32,6 +33,8 @@ export default function OrderHistoryPage() {
         stock_status: "in_stock",
       })
     })
+
+    trackEvent("repeat_order", { order_id: order.id, item_count: order.items.length })
 
     setTimeout(() => setReorderingId(null), 1500)
   }

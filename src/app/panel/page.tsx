@@ -1,10 +1,13 @@
 "use client"
 
 import { useRestaurant } from "@/contexts/restaurant-context"
+import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
+import { useMemo } from "react"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp,
   Calendar, ClipboardCheck, ArrowRight, ChefHat, Store,
+  PieChart, DollarSign, BarChart3,
 } from "lucide-react"
 
 const COLLECTION_ICONS: Record<string, string> = {
@@ -93,6 +96,25 @@ const TOOLS: Tool[] = [
 
 export default function PanelPage() {
   const { selectedCollection, collections, setSelectedCollection } = useRestaurant()
+  const slug = selectedCollection?.slug || null
+  const [sharedDishes] = useSharedDishes(slug)
+  const [mermaEntries] = useLocalStorage<{ amountKg: number; costPerKg: number; category: string; id: string }[]>("mermas-entries", [], slug)
+  const [aperturaChecked] = useLocalStorage<string[]>("apertura-checked", [], slug)
+
+  const stats = useMemo(() => {
+    if (!selectedCollection) return null
+    const totalCosteo = sharedDishes.reduce((s, d) => s + d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0), 0)
+    const totalMerma = mermaEntries.reduce((s, e) => s + (e.amountKg * e.costPerKg), 0)
+    const green = sharedDishes.filter((d) => {
+      const cost = d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0)
+      return d.sellingPrice > 0 && (cost / d.sellingPrice) * 100 <= 30
+    }).length
+    const red = sharedDishes.filter((d) => {
+      const cost = d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0)
+      return d.sellingPrice > 0 && (cost / d.sellingPrice) * 100 > 38
+    }).length
+    return { totalCosteo, totalMerma, green, red, dishesCount: sharedDishes.length, mermaCount: mermaEntries.length, aperturaCount: aperturaChecked.length }
+  }, [sharedDishes, mermaEntries, aperturaChecked, selectedCollection])
 
   return (
     <div>
@@ -154,6 +176,60 @@ export default function PanelPage() {
           </div>
         )}
       </div>
+
+      {/* Live stats widgets */}
+      {selectedCollection && stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+            <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <PieChart className="w-4 h-4 text-blue-600" />
+            </div>
+            <p className="text-xl font-extrabold text-gray-900">{stats.dishesCount}</p>
+            <p className="text-[11px] text-gray-400">Platillos costeados</p>
+            {stats.totalCosteo > 0 && (
+              <p className="text-[10px] text-blue-600 font-medium mt-1">Costo: ${stats.totalCosteo.toFixed(0)}</p>
+            )}
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+            <div className="w-9 h-9 bg-red-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <DollarSign className="w-4 h-4 text-red-600" />
+            </div>
+            <p className={`text-xl font-extrabold ${stats.totalMerma > 1000 ? "text-red-700" : "text-gray-900"}`}>
+              ${stats.totalMerma.toFixed(0)}
+            </p>
+            <p className="text-[11px] text-gray-400">Pérdida por merma</p>
+            {stats.mermaCount > 0 && (
+              <p className="text-[10px] text-red-500 font-medium mt-1">{stats.mermaCount} registros</p>
+            )}
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+            <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <TrendingUp className="w-4 h-4 text-green-600" />
+            </div>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-xl font-extrabold text-green-700">{stats.green}</span>
+              {stats.red > 0 && (
+                <span className="text-xl font-extrabold text-red-500">{stats.red}</span>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400">Semáforo rentabilidad</p>
+            <p className="text-[10px] text-gray-400 mt-1">
+              <span className="text-green-600">● {stats.green}</span>{" "}
+              <span className="text-red-500">● {stats.red}</span>
+            </p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+            <div className="w-9 h-9 bg-indigo-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <ClipboardCheck className="w-4 h-4 text-indigo-600" />
+            </div>
+            <p className="text-xl font-extrabold text-gray-900">{stats.aperturaCount}</p>
+            <p className="text-[11px] text-gray-400">Pasos completados</p>
+            {stats.aperturaCount > 0 && (
+              <p className="text-[10px] text-indigo-600 font-medium mt-1">Kit de apertura</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Legend when no collection selected */}
       {!selectedCollection && (

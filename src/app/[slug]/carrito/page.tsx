@@ -77,7 +77,7 @@ export default function CartPage() {
             >
               <div className="w-20 h-20 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
                 {item.image_url ? (
-                  <img src={item.image_url} alt={item.name} className="w-full h-full object-cover rounded-lg" />
+                  <img src={item.image_url} alt={item.name} loading="lazy" width={80} height={80} className="w-full h-full object-cover rounded-lg" />
                 ) : (
                   <ShoppingBag className="w-7 h-7 text-brand-300" />
                 )}

@@ -48,6 +48,42 @@ const SEASONAL_TIPS: Record<string, { season: string; months: string; tip: strin
     { season: "Primavera", months: "Mar-May", tip: "Cuaresma: máxima demanda. Aprovecha mango y piña de temporada para ceviches y aguachiles.", savings: "~18% en fruta para acompañamiento" },
     { season: "Verano", months: "Jun-Ago", tip: "Temporada de aguacate barato. Ideal para promocionar tostadas y platillos con aguacate.", savings: "~25% en aguacate" },
   ],
+  "sushi-comida-asiatica": [
+    { season: "Primavera", months: "Mar-May", tip: "Aguacate en su mejor momento. Ideal para rolls con aguacate. Aprovecha el pepino y jengibre de temporada.", savings: "~15% en complementos frescos" },
+    { season: "Otoño-Invierno", months: "Sep-Feb", tip: "Salmón de mejor calidad en meses fríos. Lanza promociones de ramen con verduras de temporada fría.", savings: "~10% en insumos importados" },
+  ],
+  "cortes-carne-asaderos": [
+    { season: "Primavera-Verano", months: "Mar-Ago", tip: "Temporada alta de parrilladas. Aprovecha elotes y cebollitas de temporada para guarniciones frescas.", savings: "~20% en guarnición" },
+    { season: "Otoño-Invierno", months: "Sep-Feb", tip: "Ofrece cortes con guarniciones calientes. Papas y calabazas de temporada fría como acompañamiento.", savings: "~12% en verdura de estación" },
+  ],
+  "pollo-alitas": [
+    { season: "Todo el año", months: "Ene-Dic", tip: "El pollo tiene precio estable todo el año. Enfócate en salsas de temporada: mango-habanero en verano, BBQ ahumada en invierno.", savings: "~5% variando salsas" },
+    { season: "Verano", months: "Jun-Ago", tip: "Aprovecha el limón y chile de temporada para salsas frescas. Promociona alitas para ver partidos.", savings: "~15% en cítricos" },
+  ],
+  "cafeterias-crepas-desayunos": [
+    { season: "Primavera-Verano", months: "Mar-Ago", tip: "Fresas y frutos rojos de temporada. Lanza crepas y malteadas con fruta fresca de estación.", savings: "~20% en fruta fresca" },
+    { season: "Otoño-Invierno", months: "Sep-Feb", tip: "Temporada de naranja y guayaba. Promociona jugos naturales y crepas con frutas de invierno.", savings: "~15% en fruta de invierno" },
+  ],
+  "saludable-ensaladas-pokes": [
+    { season: "Primavera-Verano", months: "Mar-Ago", tip: "Mango, sandía y aguacate frescos para pokes. Arma bowls con fruta de temporada como topping.", savings: "~22% en fruta fresca" },
+    { season: "Otoño-Invierno", months: "Sep-Feb", tip: "Calabaza horneada y naranja para ensaladas de invierno. Promociona bowls calientes con quinoa.", savings: "~12% en verdura" },
+  ],
+  "postres-panaderia-helados": [
+    { season: "Primavera-Verano", months: "Mar-Ago", tip: "Fresa, mango y piña de temporada. Helados artesanales y pays de fruta fresca.", savings: "~25% en fruta para repostería" },
+    { season: "Otoño-Invierno", months: "Sep-Feb", tip: "Guayaba y naranja de temporada. Postres con frutas de horno como peras y manzanas.", savings: "~18% en fruta de invierno" },
+  ],
+  "comida-arabe-griega": [
+    { season: "Primavera-Verano", months: "Mar-Ago", tip: "Limón, pepino y jitomate abundantes. Ideal para ensalada griega y tabule frescos.", savings: "~15% en verdura fresca" },
+    { season: "Otoño-Invierno", months: "Sep-Feb", tip: "Garbanzo y berenjena de temporada. Promociona hummus y baba ganoush con pan pita caliente.", savings: "~10% en legumbres" },
+  ],
+  "comida-venezolana-latina": [
+    { season: "Primavera-Verano", months: "Mar-Ago", tip: "Aguacate y plátano macho abundantes. Lanza promociones de arepas con reina pepiada.", savings: "~20% en aguacate y plátano" },
+    { season: "Otoño-Invierno", months: "Sep-Feb", tip: "Frijol negro y jitomate de temporada. Ofrece pabellón criollo con ingredientes de estación.", savings: "~12% en granos" },
+  ],
+  "bebidas-bares-botanas": [
+    { season: "Primavera-Verano", months: "Mar-Ago", tip: "Limón y chile abundantes para micheladas y botanas. Promociona cocteles con frutas tropicales.", savings: "~20% en cítricos y chile" },
+    { season: "Otoño-Invierno", months: "Sep-Feb", tip: "Cacahuates y botanas calientes de temporada. Ofrece bebidas calientes con especias de invierno.", savings: "~10% en botanas" },
+  ],
 }
 
 const DEFAULT_TIPS = [
@@ -216,7 +252,8 @@ export default function TemporadaPage() {
             ))}
           </div>
           {/* Rows */}
-          {Object.entries(SEASONS).slice(0, 10).map(([key, item]) => (
+          <div className="max-h-[440px] overflow-y-auto pr-1">
+          {Object.entries(SEASONS).map(([key, item]) => (
             <div key={key} className="grid grid-cols-[120px_repeat(12,1fr)] gap-1 items-center mb-1">
               <span className="text-xs text-gray-600 truncate">{item.icon} {item.name}</span>
               {Array.from({ length: 12 }, (_, i) => (
@@ -228,6 +265,7 @@ export default function TemporadaPage() {
               ))}
             </div>
           ))}
+          </div>
         </div>
       </div>
 

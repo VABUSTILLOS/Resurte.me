@@ -8,6 +8,7 @@ import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { CityDetector } from "@/components/city/city-detector"
 import { CartDrawer, MobileCartBar } from "@/components/cart/cart-drawer"
 import { WhatsAppButton } from "@/components/whatsapp/whatsapp-button"
+import { Analytics } from "@/lib/analytics"
 import { getOrganizationSchema } from "@/lib/structured-data"
 import "./globals.css"
 
@@ -133,6 +134,7 @@ export default function RootLayout({
             __html: JSON.stringify(getOrganizationSchema()),
           }}
         />
+        <Analytics />
         <CityProvider>
           <CartProvider>
             <Header />

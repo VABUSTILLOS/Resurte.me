@@ -3,7 +3,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import { trackEvent } from "@/lib/analytics"
 
 interface AuthFormProps {
   mode: "login" | "register"
@@ -17,6 +18,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const referralCode = searchParams.get("ref")
   // Lazy browser-only client: creating it during SSR would throw when
   // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
   const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
@@ -49,7 +52,9 @@ export function AuthForm({ mode }: AuthFormProps) {
 
         // Trigger onboarding WhatsApp coupon via API
         if (data.user) {
+          trackEvent("sign_up", { method: "email" })
           try {
+            // Trigger onboarding workflow
             await fetch("/api/workflows/trigger", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -60,6 +65,21 @@ export function AuthForm({ mode }: AuthFormProps) {
                 full_name: fullName,
               }),
             })
+
+            // Apply referral code if present in URL
+            if (referralCode) {
+              fetch("/api/workflows/trigger", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  workflow_type: "referral",
+                  user_id: data.user.id,
+                  email,
+                  full_name: fullName,
+                  referral_code: referralCode,
+                }),
+              }).catch(() => {})
+            }
           } catch {
             // Silent fail — don't block registration if workflow fails
           }

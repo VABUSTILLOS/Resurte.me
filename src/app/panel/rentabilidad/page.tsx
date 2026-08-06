@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
-import { useSharedDishes } from "@/hooks/use-local-storage"
+import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   TrendingUp, ArrowLeft, Circle, AlertTriangle, CheckCircle2,
@@ -50,6 +50,87 @@ const DISH_DATA: Record<string, DishData[]> = {
     { name: "Enchiladas (4 pz)", cost: 28, price: 80, category: "Plato fuerte" },
     { name: "Flautas (5 pz)", cost: 22, price: 70, category: "Antojitos" },
   ],
+  "sushi-comida-asiatica": [
+    { name: "California roll (8 pz)", cost: 42, price: 155, category: "Rolls" },
+    { name: "Philadelphia roll (8 pz)", cost: 55, price: 185, category: "Rolls" },
+    { name: "Spicy tuna roll", cost: 48, price: 170, category: "Rolls" },
+    { name: "Ramen de cerdo", cost: 38, price: 145, category: "Caldos" },
+    { name: "Gyozas (6 pz)", cost: 25, price: 85, category: "Entradas" },
+    { name: "Edamame", cost: 15, price: 55, category: "Entradas" },
+    { name: "Nigiri mix (5 pz)", cost: 68, price: 220, category: "Especialidades", alert: "Costo elevado — revisa precio de salmón" },
+  ],
+  "cortes-carne-asaderos": [
+    { name: "Ribeye 350g", cost: 215, price: 520, category: "Cortes" },
+    { name: "Arrachera 300g", cost: 105, price: 320, category: "Cortes" },
+    { name: "Chorizo argentino", cost: 35, price: 110, category: "Embutidos" },
+    { name: "Papa asada", cost: 12, price: 45, category: "Guarnición" },
+    { name: "Cebollitas cambray", cost: 18, price: 55, category: "Guarnición" },
+    { name: "Tabla mixta (2 personas)", cost: 280, price: 650, category: "Especialidades" },
+  ],
+  "pollo-alitas": [
+    { name: "Alitas 10 pz", cost: 42, price: 140, category: "Alitas" },
+    { name: "Boneless 300g", cost: 48, price: 155, category: "Boneless" },
+    { name: "Papas fritas (grande)", cost: 18, price: 70, category: "Acompañamiento" },
+    { name: "Aros de cebolla", cost: 15, price: 60, category: "Acompañamiento" },
+    { name: "Combo 20 alitas + papas", cost: 72, price: 220, category: "Combos" },
+    { name: "Dedos de queso (6 pz)", cost: 22, price: 75, category: "Entradas" },
+  ],
+  "mariscos-pescados": [
+    { name: "Ceviche de camarón", cost: 55, price: 160, category: "Entradas" },
+    { name: "Aguachile", cost: 45, price: 150, category: "Entradas" },
+    { name: "Filete empanizado", cost: 42, price: 145, category: "Plato fuerte" },
+    { name: "Tacos de camarón (3 pz)", cost: 48, price: 140, category: "Tacos" },
+    { name: "Pulpo a las brasas", cost: 72, price: 210, category: "Especialidades" },
+    { name: "Tostada de atún", cost: 35, price: 105, category: "Entradas", alert: "Margen bajo — revisa porción" },
+  ],
+  "cafeterias-crepas-desayunos": [
+    { name: "Crepa de Nutella con fresa", cost: 25, price: 89, category: "Crepas dulces" },
+    { name: "Crepa de jamón y queso", cost: 22, price: 79, category: "Crepas saladas" },
+    { name: "Hot cakes (3 pz)", cost: 18, price: 69, category: "Desayunos" },
+    { name: "Omelette 3 ingredientes", cost: 28, price: 95, category: "Desayunos" },
+    { name: "Café latte 12oz", cost: 12, price: 52, category: "Bebidas" },
+    { name: "Chai latte 12oz", cost: 10, price: 48, category: "Bebidas" },
+  ],
+  "saludable-ensaladas-pokes": [
+    { name: "Poke de salmón", cost: 55, price: 165, category: "Pokes" },
+    { name: "Poke de atún", cost: 48, price: 155, category: "Pokes" },
+    { name: "Ensalada César con pollo", cost: 35, price: 120, category: "Ensaladas" },
+    { name: "Bowl de quinoa", cost: 32, price: 115, category: "Bowls" },
+    { name: "Wrap de pollo", cost: 28, price: 95, category: "Wraps" },
+    { name: "Smoothie verde", cost: 22, price: 78, category: "Bebidas" },
+  ],
+  "postres-panaderia-helados": [
+    { name: "Pastel de chocolate (rebanada)", cost: 18, price: 72, category: "Pasteles" },
+    { name: "Cheesecake", cost: 22, price: 85, category: "Pasteles" },
+    { name: "Croissant de almendra", cost: 12, price: 48, category: "Panadería" },
+    { name: "Concha gourmet", cost: 8, price: 35, category: "Panadería" },
+    { name: "Helado artesanal (2 bolas)", cost: 15, price: 60, category: "Helados" },
+    { name: "Macarons (3 pz)", cost: 18, price: 65, category: "Especialidades" },
+  ],
+  "comida-arabe-griega": [
+    { name: "Shawarma de cordero", cost: 45, price: 145, category: "Plato fuerte" },
+    { name: "Shawarma de pollo", cost: 28, price: 105, category: "Plato fuerte" },
+    { name: "Falafel (5 pz)", cost: 18, price: 70, category: "Entradas" },
+    { name: "Hummus con pan pita", cost: 15, price: 60, category: "Entradas" },
+    { name: "Gyros de cerdo", cost: 35, price: 120, category: "Plato fuerte" },
+    { name: "Ensalada griega", cost: 22, price: 80, category: "Ensaladas" },
+  ],
+  "comida-venezolana-latina": [
+    { name: "Arepa de carne mechada", cost: 22, price: 75, category: "Arepas" },
+    { name: "Arepa reina pepiada", cost: 25, price: 80, category: "Arepas" },
+    { name: "Cachapa con queso", cost: 20, price: 70, category: "Especialidades" },
+    { name: "Patacón con carne", cost: 28, price: 90, category: "Plato fuerte" },
+    { name: "Pabellón criollo", cost: 35, price: 120, category: "Plato fuerte" },
+    { name: "Tequeños (5 pz)", cost: 18, price: 65, category: "Entradas" },
+  ],
+  "bebidas-bares-botanas": [
+    { name: "Orden de alitas (8 pz)", cost: 38, price: 130, category: "Alitas" },
+    { name: "Cacahuates japoneses", cost: 8, price: 35, category: "Botana" },
+    { name: "Cueritos preparados", cost: 12, price: 45, category: "Botana" },
+    { name: "Papas fritas caseras", cost: 15, price: 60, category: "Acompañamiento" },
+    { name: "Tabla de botanas (4 pax)", cost: 55, price: 180, category: "Especialidades" },
+    { name: "Palomitas con chile", cost: 5, price: 28, category: "Botana", alert: "Precio bajo — margen mínimo" },
+  ],
 }
 
 const DEFAULT_DISHES: DishData[] = [
@@ -62,6 +143,9 @@ export default function RentabilidadPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
   const [sharedDishes] = useSharedDishes(slug)
+  const [priceOverrides, setPriceOverrides] = useLocalStorage<Record<string, number>>("rentabilidad-prices", {}, slug)
+  const [editingName, setEditingName] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState("")
 
   // Merge: base mock data + dishes from costeo tool
   const mockDishes = selectedCollection
@@ -87,8 +171,13 @@ export default function RentabilidadPage() {
     // Deduplicate by name (costeo dishes override mock ones)
     const costeoNames = new Set(costeoDishes.map((d) => d.name.toLowerCase()))
     const filteredMock = mockDishes.filter((d) => !costeoNames.has(d.name.toLowerCase()))
-    return [...costeoDishes, ...filteredMock]
-  }, [mockDishes, costeoDishes])
+    const merged = [...costeoDishes, ...filteredMock]
+    // Apply price overrides
+    return merged.map((d) => ({
+      ...d,
+      price: priceOverrides[d.name] ?? d.price,
+    }))
+  }, [mockDishes, costeoDishes, priceOverrides])
 
   function exportCSV() {
     const header = "Platillo,Categoría,Costo,Precio Venta,Margen,Food Cost %,Estado"
@@ -238,7 +327,43 @@ export default function RentabilidadPage() {
                 </div>
                 <div className="text-center">
                   <p className="text-[10px] text-gray-400">Precio</p>
-                  <p className="font-bold text-sm text-[#108910]">${dish.price}</p>
+                  {editingName === dish.name ? (
+                    <input
+                      autoFocus
+                      type="number"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={() => {
+                        const newPrice = parseFloat(editValue)
+                        if (!isNaN(newPrice) && newPrice > 0) {
+                          setPriceOverrides((prev) => ({ ...prev, [dish.name]: newPrice }))
+                        }
+                        setEditingName(null)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const newPrice = parseFloat(editValue)
+                          if (!isNaN(newPrice) && newPrice > 0) {
+                            setPriceOverrides((prev) => ({ ...prev, [dish.name]: newPrice }))
+                          }
+                          setEditingName(null)
+                        }
+                        if (e.key === "Escape") setEditingName(null)
+                      }}
+                      className="w-20 text-center font-bold text-sm text-[#108910] border-b-2 border-[#108910] bg-green-50 rounded px-1 py-0.5 outline-none"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => { setEditingName(dish.name); setEditValue(String(dish.price)) }}
+                      className="font-bold text-sm text-[#108910] hover:text-green-800 hover:underline transition-colors"
+                      title="Click para editar precio de venta"
+                    >
+                      ${dish.price}
+                      {priceOverrides[dish.name] !== undefined && (
+                        <span className="block text-[9px] text-amber-500">editado</span>
+                      )}
+                    </button>
+                  )}
                 </div>
                 <div className="text-center">
                   <p className="text-[10px] text-gray-400">Margen</p>

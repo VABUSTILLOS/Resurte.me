@@ -18,13 +18,17 @@ const FOOTER_LINKS = {
     { label: "Facturación electrónica", href: "/negocio/facturacion" },
     { label: "Cotizaciones por volumen", href: "/negocio/cotizaciones" },
   ],
+  Recursos: [
+    { label: "Blog", href: "/blog" },
+    { label: "RSS", href: "/rss.xml" },
+  ],
 }
 
 export function Footer() {
   return (
     <footer className="bg-[#242529] text-[#C7C8CD] mt-auto site-footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-[calc(3rem+env(safe-area-inset-bottom))]">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
           {/* Brand */}
           <div>
             <Link href="/" className="inline-block mb-4" aria-label="Resurte.me — Ir al inicio">

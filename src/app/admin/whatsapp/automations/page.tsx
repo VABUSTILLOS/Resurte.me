@@ -180,7 +180,8 @@ export default function AdminAutomationsPage() {
               </div>
               <button
                 onClick={() => toggleAutomation(auto.type)}
-                className="shrink-0"
+                className="shrink-0 p-2 -m-2"
+                aria-label={auto.isActive ? "Desactivar automatización" : "Activar automatización"}
               >
                 {auto.isActive ? (
                   <ToggleRight className="w-8 h-8 text-green-500" />
@@ -209,7 +210,7 @@ export default function AdminAutomationsPage() {
 
                 {/* Trigger info */}
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-1.5">
+                  <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-1.5 flex-wrap">
                     <Calendar className="w-3.5 h-3.5" />
                     {auto.triggerLabel}
                     {auto.delayHours > 0 && (

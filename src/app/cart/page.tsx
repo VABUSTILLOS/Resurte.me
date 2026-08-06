@@ -88,6 +88,9 @@ export default function CartPage() {
                   <img
                     src={item.image_url}
                     alt={item.name}
+                    loading="lazy"
+                    width={80}
+                    height={80}
                     className="w-full h-full object-contain p-1.5"
                   />
                 ) : (

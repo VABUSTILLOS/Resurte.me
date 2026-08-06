@@ -44,6 +44,80 @@ const COLLECTION_PRODUCTS: Record<string, { name: string; unit: string; price: n
     { name: "Tortillas", unit: "kg", price: 28, perPerson: 0.08, category: "Tortillas" },
     { name: "Aceite vegetal", unit: "L", price: 45, perPerson: 0.008, category: "Aceites" },
   ],
+  "sushi-comida-asiatica": [
+    { name: "Salmón grado sushi", unit: "kg", price: 480, perPerson: 0.1, category: "Proteína" },
+    { name: "Arroz para sushi", unit: "kg", price: 55, perPerson: 0.12, category: "Granos" },
+    { name: "Alga nori", unit: "hoja", price: 2.5, perPerson: 2, category: "Algas" },
+    { name: "Aguacate", unit: "kg", price: 65, perPerson: 0.05, category: "Fruta" },
+    { name: "Queso crema", unit: "kg", price: 150, perPerson: 0.03, category: "Lácteos" },
+    { name: "Salsa de soya", unit: "L", price: 72, perPerson: 0.01, category: "Salsas" },
+  ],
+  "cortes-carne-asaderos": [
+    { name: "Ribeye", unit: "kg", price: 580, perPerson: 0.35, category: "Proteína" },
+    { name: "Arrachera", unit: "kg", price: 320, perPerson: 0.3, category: "Proteína" },
+    { name: "Chorizo argentino", unit: "kg", price: 185, perPerson: 0.15, category: "Proteína" },
+    { name: "Papa para asar", unit: "kg", price: 35, perPerson: 0.2, category: "Guarnición" },
+    { name: "Chile morrón", unit: "kg", price: 45, perPerson: 0.08, category: "Verdura" },
+  ],
+  "pollo-alitas": [
+    { name: "Alitas de pollo", unit: "kg", price: 95, perPerson: 0.35, category: "Proteína" },
+    { name: "Boneless", unit: "kg", price: 130, perPerson: 0.3, category: "Proteína" },
+    { name: "Salsa Buffalo", unit: "L", price: 85, perPerson: 0.04, category: "Salsas" },
+    { name: "Papas fritas", unit: "kg", price: 52, perPerson: 0.15, category: "Acompañamiento" },
+    { name: "Aderezo ranch", unit: "L", price: 68, perPerson: 0.02, category: "Salsas" },
+  ],
+  "cafeterias-crepas-desayunos": [
+    { name: "Huevo", unit: "docena", price: 48, perPerson: 0.17, category: "Proteína" },
+    { name: "Harina hot cakes", unit: "kg", price: 38, perPerson: 0.12, category: "Harinas" },
+    { name: "Café en grano", unit: "kg", price: 220, perPerson: 0.015, category: "Bebidas" },
+    { name: "Leche", unit: "L", price: 28, perPerson: 0.2, category: "Lácteos" },
+    { name: "Jarabe de maple", unit: "L", price: 130, perPerson: 0.015, category: "Endulzantes" },
+  ],
+  "mariscos-pescados": [
+    { name: "Camarón mediano", unit: "kg", price: 320, perPerson: 0.2, category: "Proteína" },
+    { name: "Filete de pescado", unit: "kg", price: 180, perPerson: 0.25, category: "Proteína" },
+    { name: "Pulpo cocido", unit: "kg", price: 380, perPerson: 0.15, category: "Proteína" },
+    { name: "Tostadas", unit: "paquete 20pz", price: 22, perPerson: 0.15, category: "Base" },
+    { name: "Limón", unit: "kg", price: 30, perPerson: 0.05, category: "Fruta" },
+    { name: "Aguacate", unit: "kg", price: 65, perPerson: 0.08, category: "Fruta" },
+  ],
+  "saludable-ensaladas-pokes": [
+    { name: "Salmón fresco", unit: "kg", price: 450, perPerson: 0.15, category: "Proteína" },
+    { name: "Atún fresco", unit: "kg", price: 380, perPerson: 0.15, category: "Proteína" },
+    { name: "Quinoa", unit: "kg", price: 85, perPerson: 0.08, category: "Granos" },
+    { name: "Mix lechugas", unit: "kg", price: 72, perPerson: 0.12, category: "Verdura" },
+    { name: "Edamame", unit: "kg", price: 65, perPerson: 0.05, category: "Proteína" },
+  ],
+  "postres-panaderia-helados": [
+    { name: "Harina de trigo", unit: "kg", price: 32, perPerson: 0.15, category: "Harinas" },
+    { name: "Mantequilla", unit: "kg", price: 160, perPerson: 0.05, category: "Lácteos" },
+    { name: "Chocolate belga", unit: "kg", price: 280, perPerson: 0.04, category: "Chocolate" },
+    { name: "Crema para batir", unit: "L", price: 75, perPerson: 0.06, category: "Lácteos" },
+    { name: "Azúcar", unit: "kg", price: 35, perPerson: 0.05, category: "Endulzantes" },
+    { name: "Huevo", unit: "docena", price: 48, perPerson: 0.08, category: "Proteína" },
+  ],
+  "comida-arabe-griega": [
+    { name: "Carne de cordero", unit: "kg", price: 340, perPerson: 0.2, category: "Proteína" },
+    { name: "Pechuga de pollo", unit: "kg", price: 120, perPerson: 0.2, category: "Proteína" },
+    { name: "Garbanzo", unit: "kg", price: 42, perPerson: 0.1, category: "Granos" },
+    { name: "Tahini", unit: "kg", price: 160, perPerson: 0.015, category: "Salsas" },
+    { name: "Pan pita", unit: "pza", price: 4, perPerson: 2, category: "Pan" },
+    { name: "Yogur griego", unit: "L", price: 65, perPerson: 0.04, category: "Lácteos" },
+  ],
+  "comida-venezolana-latina": [
+    { name: "Harina P.A.N.", unit: "kg", price: 45, perPerson: 0.15, category: "Harinas" },
+    { name: "Carne mechada", unit: "kg", price: 195, perPerson: 0.18, category: "Proteína" },
+    { name: "Plátano macho", unit: "kg", price: 30, perPerson: 0.2, category: "Acompañamiento" },
+    { name: "Queso blanco", unit: "kg", price: 140, perPerson: 0.06, category: "Lácteos" },
+    { name: "Frijol negro", unit: "kg", price: 35, perPerson: 0.08, category: "Granos" },
+  ],
+  "bebidas-bares-botanas": [
+    { name: "Cacahuate", unit: "kg", price: 72, perPerson: 0.05, category: "Botana" },
+    { name: "Cueritos", unit: "kg", price: 55, perPerson: 0.06, category: "Botana" },
+    { name: "Alitas", unit: "kg", price: 95, perPerson: 0.2, category: "Proteína" },
+    { name: "Limón", unit: "kg", price: 30, perPerson: 0.03, category: "Fruta" },
+    { name: "Chile en polvo", unit: "kg", price: 85, perPerson: 0.003, category: "Condimentos" },
+  ],
 }
 
 const DEFAULT_PRODUCTS = [
@@ -63,6 +137,7 @@ export default function PlanificadorPage() {
   const [covers, setCovers] = useLocalStorage<number>("planner-covers", 50, slug)
   const [wastePercent, setWastePercent] = useLocalStorage<number>("planner-waste", 8, slug)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
+  const [showOrder, setShowOrder] = useState(false)
 
   // Group by category
   const categories = new Map<string, typeof products>()
@@ -300,17 +375,68 @@ export default function PlanificadorPage() {
       )}
 
       {/* CTA */}
-      <div className="mt-4 bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-        <div className="flex items-start gap-3">
-          <TrendingUp className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-emerald-800 mb-1">
-              ¿Listo para hacer tu pedido?
-            </p>
-            <p className="text-xs text-emerald-600">
-              Todos estos insumos están disponibles en Resurte.me. Arma tu carrito con las cantidades sugeridas 
-              y recibe todo en una sola entrega. Los precios son en tiempo real de nuestro catálogo.
-            </p>
+      <div className="mt-4 space-y-3">
+        <button
+          onClick={() => setShowOrder(!showOrder)}
+          className="w-full flex items-center justify-center gap-2 bg-[#108910] hover:bg-green-800 text-white font-bold py-3 rounded-2xl transition-colors"
+        >
+          <ShoppingCart className="w-5 h-5" />
+          {showOrder ? "Ocultar lista de pedido" : "Generar lista de pedido"}
+        </button>
+
+        {/* Order summary */}
+        {showOrder && (
+          <div className="bg-white rounded-2xl border-2 border-[#108910]/20 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-bold text-gray-900">📋 Lista de pedido — {selectedCollection.name}</h4>
+              <button
+                onClick={() => {
+                  const text = products.map((p) => {
+                    const needed = (p.perPerson * covers * (1 + wastePercent / 100)).toFixed(2)
+                    return `• ${p.name}: ${needed} ${p.unit} — $${(parseFloat(needed) * p.price).toFixed(0)} MXN ($${p.price}/${p.unit})`
+                  }).join("\n")
+                  const header = `Pedido para ${covers} comensales (+${wastePercent}% merma) — ${selectedCollection.name}\n\n`
+                  navigator.clipboard.writeText(header + text + `\n\nTotal estimado: $${totalCost.toFixed(0)} MXN\nPedido generado con Resurte.me`)
+                }}
+                className="text-xs font-semibold text-[#108910] hover:text-green-800 transition-colors"
+              >
+                📋 Copiar
+              </button>
+            </div>
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {products.map((p) => {
+                const needed = (p.perPerson * covers * (1 + wastePercent / 100)).toFixed(2)
+                const subtotal = parseFloat(needed) * p.price
+                return (
+                  <div key={p.name} className="flex items-center justify-between text-sm py-1 border-b border-gray-50 last:border-0">
+                    <div>
+                      <span className="font-medium text-gray-800">{p.name}</span>
+                      <span className="text-gray-400 ml-1">{needed} {p.unit}</span>
+                    </div>
+                    <span className="font-semibold text-gray-700 text-xs">${subtotal.toFixed(0)}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between">
+              <span className="font-bold text-gray-900">Total estimado</span>
+              <span className="font-extrabold text-[#108910] text-lg">${totalCost.toFixed(0)} MXN</span>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+          <div className="flex items-start gap-3">
+            <TrendingUp className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-emerald-800 mb-1">
+                ¿Listo para hacer tu pedido?
+              </p>
+              <p className="text-xs text-emerald-600">
+                Todos estos insumos están disponibles en Resurte.me. Arma tu carrito con las cantidades sugeridas 
+                y recibe todo en una sola entrega. Los precios son en tiempo real de nuestro catálogo.
+              </p>
+            </div>
           </div>
         </div>
       </div>

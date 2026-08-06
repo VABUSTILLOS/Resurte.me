@@ -5,6 +5,7 @@ import Image from "next/image"
 import type { Product } from "@/types"
 import { useCart } from "@/contexts/cart-context"
 import { getProductTagline } from "@/lib/utils"
+import { trackEvent } from "@/lib/analytics"
 import { useState, memo } from "react"
 import Link from "next/link"
 
@@ -66,6 +67,13 @@ export const ProductCard = memo(function ProductCard({
       sale_price: product.sale_price ?? null,
       quantity: 1,
       stock_status: product.stock_status as "in_stock" | "low_stock" | "out_of_stock",
+    })
+
+    trackEvent("add_to_cart", {
+      currency: "MXN",
+      value: price,
+      item_name: product.name,
+      item_id: String(product.id),
     })
 
     setAdded(true)

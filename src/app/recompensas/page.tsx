@@ -24,6 +24,7 @@ export default function CashbackPage() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [balance, setBalance] = useState(0);
 
   // Check auth state on mount
   useEffect(() => {
@@ -32,6 +33,17 @@ export default function CashbackPage() {
       const authed = !!session;
       setIsAuthenticated(authed);
       if (authed) {
+        // Fetch real wallet balance
+        supabase
+          .from("wallets")
+          .select("balance_credits")
+          .eq("user_id", session.user.id)
+          .single()
+          .then(({ data }) => {
+            if (data) setBalance(Number(data.balance_credits));
+          })
+          .catch(() => {});
+
         // Only show onboarding if user hasn't completed it before
         const onboarded = localStorage.getItem("cashback-onboarded");
         if (!onboarded) setShowOnboarding(true);
@@ -53,8 +65,6 @@ export default function CashbackPage() {
 
     return () => subscription.unsubscribe();
   }, [supabase]);
-
-  const balance = 12450;
 
   const handleServiceSelect = useCallback((service: ServiceItem) => {
     setSelectedService(service);

@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
       return await handleOnboarding(user_id, email, full_name)
     }
 
+    // Handle referral code application (triggered on registration)
+    if (resolvedType === "referral") {
+      return await handleReferral(user_id, email, full_name, body.referral_code)
+    }
+
     if (!orderId || !resolvedType) {
       return NextResponse.json(
         { error: "orderId and workflowType are required" },
@@ -180,5 +185,98 @@ async function handleOnboarding(
       message_sent: false,
       error: err instanceof Error ? err.message : "Unknown error",
     })
+  }
+}
+
+/**
+ * Handle referral code application — links a new user to their referrer.
+ * Called during registration when a referral code is provided.
+ */
+async function handleReferral(
+  userId: string,
+  email: string,
+  fullName: string,
+  referralCode: string
+): Promise<NextResponse> {
+  if (!userId || !referralCode) {
+    return NextResponse.json(
+      { error: "user_id and referral_code are required" },
+      { status: 400 }
+    )
+  }
+
+  try {
+    const supabase = await createServiceClient()
+
+    // Buscar al referidor por su código
+    const { data: referrer } = await supabase
+      .from("profiles")
+      .select("id, referral_code, full_name")
+      .eq("referral_code", String(referralCode).toUpperCase().trim())
+      .single()
+
+    if (!referrer) {
+      return NextResponse.json({ error: "Código de referido inválido" }, { status: 404 })
+    }
+
+    if (referrer.id === userId) {
+      return NextResponse.json(
+        { error: "No puedes usar tu propio código de referido" },
+        { status: 400 }
+      )
+    }
+
+    // Verificar que no tenga ya referidor
+    const { data: currentProfile } = await supabase
+      .from("profiles")
+      .select("referred_by")
+      .eq("id", userId)
+      .single()
+
+    if (currentProfile?.referred_by) {
+      return NextResponse.json(
+        { message: "Ya tienes un referidor — todo bien" },
+        { status: 200 }
+      )
+    }
+
+    // Asignar referidor
+    const { error } = await supabase
+      .from("profiles")
+      .update({ referred_by: referrer.id })
+      .eq("id", userId)
+
+    if (error) throw error
+
+    // Notificar al referidor por WhatsApp
+    try {
+      const { data: referrerProfile } = await supabase
+        .from("profiles")
+        .select("phone")
+        .eq("id", referrer.id)
+        .single()
+
+      if (referrerProfile?.phone) {
+        const { sendTextMessage } = await import("@/lib/whatsapp")
+        await sendTextMessage({
+          to: referrerProfile.phone,
+          text: `🎉 ¡${referrer.full_name || "Alguien"} usó tu código de referido!\n\n${
+            fullName || email
+          } se registró con tu código *${referrer.referral_code}*.\n\nCuando haga su primera compra, recibirás $100 Créditos Resurte. 💰`,
+        })
+      }
+    } catch {
+      // Silent fail
+    }
+
+    return NextResponse.json({
+      success: true,
+      workflow_type: "referral",
+      user_id: userId,
+      referrer_id: referrer.id,
+    })
+  } catch (err) {
+    console.error("[API] Referral error:", err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
@@ -59,6 +59,18 @@ export default function MermasPage() {
   const [costPerKg, setCostPerKg] = useState("")
   const [expandedTip, setExpandedTip] = useState<string | null>(null)
   const [showTrends, setShowTrends] = useState(false)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [dateFilter, setDateFilter] = useState<"all" | "week" | "month">("all")
+
+  // Filtro por rango de fechas — calculado siempre (nunca después de un early return)
+  const filteredEntries = useMemo(() => {
+    if (dateFilter === "all") return entries
+    const now = new Date()
+    const cutoff = new Date()
+    if (dateFilter === "week") cutoff.setDate(now.getDate() - 7)
+    else if (dateFilter === "month") cutoff.setDate(now.getDate() - 30)
+    return entries.filter((e) => new Date(e.date) >= cutoff)
+  }, [entries, dateFilter])
 
   function addEntry() {
     const kg = parseFloat(amountKg)
@@ -77,7 +89,14 @@ export default function MermasPage() {
   }
 
   function removeEntry(id: string) {
-    setEntries((prev) => prev.filter((e) => e.id !== id))
+    setDeleteConfirmId(id)
+  }
+
+  function confirmDeleteEntry() {
+    if (deleteConfirmId) {
+      setEntries((prev) => prev.filter((e) => e.id !== deleteConfirmId))
+      setDeleteConfirmId(null)
+    }
   }
 
   if (!selectedCollection) {
@@ -92,9 +111,9 @@ export default function MermasPage() {
     )
   }
 
-  const totalLoss = entries.reduce((sum, e) => sum + (e.amountKg * e.costPerKg), 0)
+  const totalLoss = filteredEntries.reduce((sum, e) => sum + (e.amountKg * e.costPerKg), 0)
   const categoryTotals = new Map<string, number>()
-  entries.forEach((e) => {
+  filteredEntries.forEach((e) => {
     categoryTotals.set(e.category, (categoryTotals.get(e.category) || 0) + (e.amountKg * e.costPerKg))
   })
 
@@ -110,8 +129,29 @@ export default function MermasPage() {
         </div>
       </div>
 
+      {/* Date filter */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xs text-gray-400">Filtrar:</span>
+        <div className="flex bg-gray-100 rounded-lg p-1">
+          {(["all", "week", "month"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setDateFilter(f)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                dateFilter === f ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {f === "all" ? "Todo" : f === "week" ? "7 días" : "30 días"}
+            </button>
+          ))}
+        </div>
+        <span className="text-[10px] text-gray-400 ml-auto">
+          {filteredEntries.length} de {entries.length} registros
+        </span>
+      </div>
+
       {/* Total loss banner */}
-      <div className={`rounded-2xl p-6 mb-6 ${totalLoss > 5000 ? "bg-red-50 border border-red-200" : totalLoss > 1000 ? "bg-amber-50 border border-amber-200" : "bg-green-50 border border-green-200"}`}>
+      <div className={`rounded-2xl p-6 mb-4 ${totalLoss > 5000 ? "bg-red-50 border border-red-200" : totalLoss > 1000 ? "bg-amber-50 border border-amber-200" : "bg-green-50 border border-green-200"}`}>
         <div className="flex items-center gap-3">
           <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${totalLoss > 5000 ? "bg-red-100" : totalLoss > 1000 ? "bg-amber-100" : "bg-green-100"}`}>
             <DollarSign className={`w-6 h-6 ${totalLoss > 5000 ? "text-red-600" : totalLoss > 1000 ? "text-amber-600" : "text-green-600"}`} />
@@ -122,16 +162,16 @@ export default function MermasPage() {
               ${totalLoss.toFixed(2)}
             </p>
             <p className="text-xs text-gray-400">
-              {entries.length > 0 ? `${entries.length} registros` : "Sin registros aún"}
+              {filteredEntries.length > 0 ? `${filteredEntries.length} registros` : "Sin registros aún"}
             </p>
           </div>
         </div>
       </div>
 
       {/* Entries */}
-      {entries.length > 0 && (
+      {filteredEntries.length > 0 && (
         <div className="space-y-2 mb-6">
-          {entries.map((entry) => {
+          {filteredEntries.map((entry) => {
             const cat = WASTE_CATEGORIES.find((c) => c.key === entry.category)
             return (
               <div key={entry.id} className="flex items-center justify-between bg-white rounded-xl border border-gray-100 p-3">
@@ -310,6 +350,24 @@ export default function MermasPage() {
           Resurte.me te ayuda con entregas frecuentes para que compres solo lo que necesitas.
         </p>
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
+            <h4 className="font-bold text-gray-900 mb-2">¿Eliminar este registro?</h4>
+            <p className="text-sm text-gray-500 mb-4">Esta acción no se puede deshacer. Perderás el registro de merma y su costo asociado.</p>
+            <div className="flex gap-3">
+              <button onClick={confirmDeleteEntry} className="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-xl hover:bg-red-700 text-sm">
+                Sí, eliminar
+              </button>
+              <button onClick={() => setDeleteConfirmId(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-50 text-sm">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
