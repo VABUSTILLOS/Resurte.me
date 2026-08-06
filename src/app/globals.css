@@ -282,14 +282,14 @@ label[for] {
   to { transform: translateX(0); }
 }
 .animate-slide-in-right {
-  animation: slideInRight 0.25s ease-out;
+  animation: slideInRight 0.25s ease-out backwards;
 }
 @keyframes slideUp {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
 }
 .animate-slide-up {
-  animation: slideUp 0.3s cubic-bezier(0, 0, 0, 1);
+  animation: slideUp 0.3s cubic-bezier(0, 0, 0, 1) backwards;
 }
 
 /* ============================================
@@ -342,6 +342,8 @@ label[for] {
   .reveal-hidden-right,
   .reveal-hidden-scale,
   .animate-fade-up,
+  .animate-slide-up,
+  .animate-slide-in-right,
   .accordion-body,
   .accordion-icon,
   .quick-add-btn,

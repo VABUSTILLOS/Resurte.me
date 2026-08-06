@@ -6,6 +6,7 @@ import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
 import { SearchBar } from "@/components/search/search-bar"
+import { CART_DRAWER_EVENT } from "@/components/cart/cart-drawer"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
@@ -125,10 +126,26 @@ export function Header() {
               <MapPin className="w-5 h-5 text-[#343538]" aria-hidden="true" />
             </button>
 
+            {/* Mobile: cart icon opens the drawer instantly (no page load).
+                Desktop: keep the full /cart page (coupons, checkout). */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
+              aria-label={`Abrir carrito de compras${itemCount > 0 ? `, ${itemCount} artículos` : ""}`}
+              className="sm:hidden relative p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
+            >
+              <ShoppingCart className="w-5 h-5 text-[#343538]" aria-hidden="true" />
+              {itemCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#108910] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5" role="status">
+                  {itemCount > 99 ? "99+" : itemCount}
+                </span>
+              )}
+            </button>
+
             <Link
               href="/cart"
               aria-label={`Carrito de compras${itemCount > 0 ? `, ${itemCount} artículos` : ""}`}
-              className="relative p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
+              className="hidden sm:flex relative p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
             >
               <ShoppingCart className="w-5 h-5 text-[#343538]" aria-hidden="true" />
               {itemCount > 0 && (

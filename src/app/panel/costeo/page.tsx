@@ -6,7 +6,7 @@ import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   Calculator, Plus, Trash2, PieChart, ArrowLeft,
-  Percent, TrendingDown, AlertCircle, Edit3, Save, X,
+  Percent, TrendingDown, AlertCircle, Edit3,
 } from "lucide-react"
 
 // Mock ingredients per collection type — in production this comes from Resurte.me catalog
@@ -63,6 +63,70 @@ const MOCK_INGREDIENTS: Record<string, { name: string; unit: string; price: numb
     { name: "Salsa BBQ", unit: "L", price: 78 },
     { name: "Aceite por bidón", unit: "L", price: 42 },
     { name: "Aderezo blue cheese", unit: "L", price: 95 },
+  ],
+  "sushi-comida-asiatica": [
+    { name: "Salmón grado sushi", unit: "kg", price: 480 },
+    { name: "Arroz para sushi", unit: "kg", price: 55 },
+    { name: "Alga nori", unit: "paquete 50h", price: 120 },
+    { name: "Aguacate hass", unit: "kg", price: 65 },
+    { name: "Queso crema Philadelphia", unit: "kg", price: 150 },
+    { name: "Salsa de soya", unit: "L", price: 72 },
+  ],
+  "cortes-carne-asaderos": [
+    { name: "Ribeye importado", unit: "kg", price: 580 },
+    { name: "Arrachera marinada", unit: "kg", price: 320 },
+    { name: "Chorizo argentino", unit: "kg", price: 185 },
+    { name: "Papa para asar", unit: "kg", price: 35 },
+    { name: "Chile morrón", unit: "kg", price: 45 },
+    { name: "Sal de grano", unit: "kg", price: 28 },
+  ],
+  "cafeterias-crepas-desayunos": [
+    { name: "Huevo fresco", unit: "docena", price: 48 },
+    { name: "Harina para hot cakes", unit: "kg", price: 38 },
+    { name: "Café en grano", unit: "kg", price: 220 },
+    { name: "Leche entera", unit: "L", price: 28 },
+    { name: "Jarabe de maple", unit: "L", price: 130 },
+    { name: "Nutella", unit: "kg", price: 180 },
+  ],
+  "saludable-ensaladas-pokes": [
+    { name: "Salmón fresco", unit: "kg", price: 450 },
+    { name: "Atún fresco", unit: "kg", price: 380 },
+    { name: "Quinoa", unit: "kg", price: 85 },
+    { name: "Mix de lechugas baby", unit: "kg", price: 72 },
+    { name: "Edamame", unit: "kg", price: 65 },
+    { name: "Aderezo de jengibre", unit: "L", price: 95 },
+  ],
+  "postres-panaderia-helados": [
+    { name: "Harina de trigo", unit: "kg", price: 32 },
+    { name: "Mantequilla sin sal", unit: "kg", price: 160 },
+    { name: "Chocolate belga", unit: "kg", price: 280 },
+    { name: "Crema para batir", unit: "L", price: 75 },
+    { name: "Azúcar glass", unit: "kg", price: 35 },
+    { name: "Vainilla natural", unit: "L", price: 350 },
+  ],
+  "comida-arabe-griega": [
+    { name: "Carne de cordero", unit: "kg", price: 340 },
+    { name: "Pechuga de pollo", unit: "kg", price: 120 },
+    { name: "Garbanzo seco", unit: "kg", price: 42 },
+    { name: "Tahini", unit: "kg", price: 160 },
+    { name: "Pan pita", unit: "paquete 10pz", price: 38 },
+    { name: "Yogur griego natural", unit: "L", price: 65 },
+  ],
+  "comida-venezolana-latina": [
+    { name: "Harina P.A.N.", unit: "kg", price: 45 },
+    { name: "Carne mechada", unit: "kg", price: 195 },
+    { name: "Plátano macho", unit: "kg", price: 30 },
+    { name: "Queso blanco duro", unit: "kg", price: 140 },
+    { name: "Frijol negro", unit: "kg", price: 35 },
+    { name: "Aguacate hass", unit: "kg", price: 65 },
+  ],
+  "bebidas-bares-botanas": [
+    { name: "Cacahuate japonés", unit: "kg", price: 72 },
+    { name: "Cueritos encurtidos", unit: "kg", price: 55 },
+    { name: "Alitas de pollo", unit: "kg", price: 95 },
+    { name: "Limón", unit: "kg", price: 30 },
+    { name: "Sal de grano", unit: "kg", price: 28 },
+    { name: "Chile en polvo", unit: "kg", price: 85 },
   ],
 }
 

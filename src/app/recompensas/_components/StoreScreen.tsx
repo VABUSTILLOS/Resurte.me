@@ -463,7 +463,7 @@ function ServiceDetailSheet({
         exit={{ y: "100%" }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
         className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md rounded-t-3xl bg-gray-900 
-          border border-white/10 p-6 max-h-[80vh] overflow-y-auto"
+          border border-white/10 px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-h-[80vh] overflow-y-auto"
       >
         {/* Handle */}
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-700" />

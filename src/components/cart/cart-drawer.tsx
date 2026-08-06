@@ -291,13 +291,23 @@ export function CartDrawer() {
 
             {/* Continue shopping link */}
             {city && (
-              <Link
-                href={`/${city.slug}`}
-                onClick={() => setIsOpen(false)}
-                className="block text-center text-xs text-[#108910] hover:text-[#0D720D]"
-              >
-                ← Seguir comprando
-              </Link>
+              <div className="flex items-center justify-center gap-4 text-xs">
+                <Link
+                  href={`/${city.slug}`}
+                  onClick={() => setIsOpen(false)}
+                  className="text-[#108910] hover:text-[#0D720D]"
+                >
+                  ← Seguir comprando
+                </Link>
+                <span className="text-[#E8E9EB]" aria-hidden="true">|</span>
+                <Link
+                  href="/cart"
+                  onClick={() => setIsOpen(false)}
+                  className="text-[#108910] font-medium hover:text-[#0D720D]"
+                >
+                  Ver carrito completo →
+                </Link>
+              </div>
             )}
           </div>
         )}
@@ -339,13 +349,13 @@ export function MobileCartBar() {
         <div className="flex items-center gap-2 ml-auto">
           <Link
             href={city ? `/${city.slug}/buscar` : "#"}
-            className="px-3 sm:px-5 py-2.5 text-sm font-semibold text-[#242529] bg-[#F7F5F0] hover:bg-[#EDEAE4] rounded-[10px] transition-colors whitespace-nowrap"
+            className="px-3 sm:px-5 py-2.5 text-sm font-semibold text-[#242529] bg-[#F7F5F0] hover:bg-[#EDEAE4] rounded-[10px] transition-colors whitespace-nowrap touch-target"
           >
             Ver más productos
           </Link>
           <Link
             href={city ? `/${city.slug}/checkout` : "#"}
-            className="flex items-center gap-1.5 px-3 sm:px-5 py-2.5 text-sm font-semibold text-white bg-[#108910] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 sm:px-5 py-2.5 text-sm font-semibold text-white bg-[#108910] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap touch-target"
           >
             Hacer Checkout
             <ArrowRight className="w-4 h-4" />

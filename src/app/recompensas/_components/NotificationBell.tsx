@@ -133,7 +133,7 @@ export function NotificationBell() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-x-4 top-20 z-50 mx-auto max-w-md lg:absolute lg:inset-auto 
+              className="fixed inset-x-4 top-[calc(5rem+var(--header-inset-top))] z-50 mx-auto max-w-md lg:absolute lg:inset-auto 
                 lg:right-0 lg:top-full lg:mt-2 lg:w-96 rounded-2xl bg-gray-900 border border-white/10 
                 shadow-2xl shadow-black/50 overflow-hidden"
             >

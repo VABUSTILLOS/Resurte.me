@@ -1,6 +1,11 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useCallback, useSyncExternalStore } from "react"
+
+// Cache parsed values keyed by storage key so getSnapshot returns a
+// referentially stable snapshot between renders (required by
+// useSyncExternalStore to avoid infinite re-renders).
+const snapshotCache = new Map<string, { raw: string | null; value: unknown }>()
 
 /**
  * Persistent state hook backed by localStorage.
@@ -16,33 +21,52 @@ export function useLocalStorage<T>(
     ? `resurte-${key}-${collectionSlug}`
     : `resurte-${key}`
 
-  const [state, setState] = useState<T>(initialValue)
+  const subscribe = useCallback((onStoreChange: () => void) => {
+    window.addEventListener("storage", onStoreChange)
+    return () => window.removeEventListener("storage", onStoreChange)
+  }, [])
 
-  // Hydrate from localStorage on mount
-  useEffect(() => {
+  const getSnapshot = useCallback((): T => {
     try {
-      const stored = localStorage.getItem(storageKey)
-      if (stored) {
-        setState(JSON.parse(stored))
+      const raw = localStorage.getItem(storageKey)
+      const cached = snapshotCache.get(storageKey)
+      if (cached && cached.raw === raw) return cached.value as T
+      const value = raw != null ? (JSON.parse(raw) as T) : initialValue
+      snapshotCache.set(storageKey, { raw, value })
+      return value
+    } catch {
+      return initialValue
+    }
+  }, [storageKey, initialValue])
+
+  // On the server (SSR/SSG) there is no localStorage, so the snapshot is
+  // the initial value — keeps hydration output in sync.
+  const getServerSnapshot = useCallback((): T => initialValue, [initialValue])
+
+  const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+
+  const setState = useCallback(
+    (value: T | ((prev: T) => T)) => {
+      const next = value instanceof Function ? value(state) : value
+      try {
+        const raw = JSON.stringify(next)
+        localStorage.setItem(storageKey, raw)
+        snapshotCache.set(storageKey, { raw, value: next })
+        // The native storage event only fires in other tabs; dispatch one
+        // locally so this tab re-renders with the new snapshot.
+        window.dispatchEvent(new Event("storage"))
+      } catch {
+        // Storage full — silently degrade
       }
-    } catch {
-      // Ignore corrupt entries
-    }
-  }, [storageKey])
-
-  // Persist to localStorage on change
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(state))
-    } catch {
-      // Storage full — silently degrade
-    }
-  }, [storageKey, state])
+    },
+    [storageKey, state],
+  )
 
   const clear = useCallback(() => {
     try {
       localStorage.removeItem(storageKey)
-      setState(initialValue)
+      snapshotCache.set(storageKey, { raw: null, value: initialValue })
+      window.dispatchEvent(new Event("storage"))
     } catch {
       // Ignore
     }

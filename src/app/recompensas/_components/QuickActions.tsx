@@ -77,7 +77,7 @@ export function QuickActions({ onViewOrders, onBrowseStore }: QuickActionsProps)
     dialog.className =
       "fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm p-4";
     dialog.innerHTML = `
-      <div class="w-full max-w-sm rounded-2xl bg-gray-900 border border-white/10 p-5 mb-4">
+      <div class="w-full max-w-sm rounded-2xl bg-gray-900 border border-white/10 p-5 mb-[calc(1rem+env(safe-area-inset-bottom))]">
         <p class="text-white text-sm font-bold mb-4">Compartir con otro restaurantero</p>
         <div class="space-y-2">
           <a href="${waUrl}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-xl bg-green-600/20 border border-green-500/30 p-3 text-white text-sm font-medium hover:bg-green-600/30 transition-colors">

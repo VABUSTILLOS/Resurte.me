@@ -37,7 +37,7 @@ export function CitySelector({ onClose }: CitySelectorProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[calc(5rem+var(--header-inset-top))] px-4">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
