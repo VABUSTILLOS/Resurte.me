@@ -158,6 +158,13 @@ export function DashboardSidebar() {
           >
             <Gift className="w-4 h-4" />
           </Link>
+          <Link
+            href="/recompensas?tab=referidos"
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shrink-0"
+            title="Invitar amigos"
+          >
+            <Users className="w-4 h-4" />
+          </Link>
 
           <div className="flex-1" />
 
@@ -246,6 +253,16 @@ export function DashboardSidebar() {
               <Gift className="w-4 h-4 shrink-0" />
               Recompensas
               <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold ml-auto">
+                Nuevo
+              </span>
+            </Link>
+            <Link
+              href="/recompensas?tab=referidos"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors"
+            >
+              <Users className="w-4 h-4 shrink-0" />
+              Invitar amigos
+              <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-bold ml-auto">
                 Nuevo
               </span>
             </Link>
