@@ -22,7 +22,7 @@ interface SearchPageClientProps {
   pageSize: number
 }
 
-export function SearchPageClient({ citySlug, cityName, products, categories, totalProducts, pageSize }: SearchPageClientProps) {
+export function SearchPageClient({ citySlug, cityName, products, categories, totalProducts }: SearchPageClientProps) {
   const searchParams = useSearchParams()
   const query = searchParams.get("q") ?? ""
 
@@ -166,14 +166,14 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
         {/* Filter & sort bar — sticky on scroll */}
         <div
           ref={filterBarRef}
-          className="sticky top-0 z-20 bg-[#faf8f5]/95 backdrop-blur-sm -mx-4 px-4 sm:mx-0 sm:px-0 py-3 mb-6 border-b border-[#ede8df]"
+          className="sticky top-[var(--header-top-offset)] z-20 bg-[#faf8f5]/95 backdrop-blur-sm -mx-4 px-4 sm:mx-0 sm:px-0 py-3 mb-6 border-b border-[#ede8df]"
         >
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             {/* Category chips */}
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1">
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide scroll-fade-x snap-x snap-mandatory flex-1">
               <button
                 onClick={() => setSelectedCategory(null)}
-                className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 snap-start ${
                   selectedCategory === null
                     ? "bg-[#108910] text-white shadow-md"
                     : "bg-white text-[#1a1a1a] border border-[#e0dbd2] hover:border-[#108910]/30 hover:bg-[#f7f5f0]"
@@ -190,7 +190,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
                   <button
                     key={cat.id}
                     onClick={() => handleCategoryToggle(cat.id)}
-                    className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                    className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 snap-start ${
                       selectedCategory === cat.id
                         ? "bg-[#108910] text-white shadow-md"
                         : "bg-white text-[#1a1a1a] border border-[#e0dbd2] hover:border-[#108910]/30 hover:bg-[#f7f5f0]"

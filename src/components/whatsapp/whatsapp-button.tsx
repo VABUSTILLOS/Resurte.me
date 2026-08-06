@@ -26,8 +26,12 @@ export function WhatsAppButton({
   // Cart empty: WhatsApp sits at the same bottom level as "Ver más productos" would.
   // Cart has items: WhatsApp moves up to clear the MobileCartBar (~60px).
   const hasCartItems = itemCount > 0
-  const bottomMobile = hasCartItems ? "bottom-[80px]" : "bottom-[20px]"
-  const bottomDesktop = hasCartItems ? "sm:bottom-[84px]" : "sm:bottom-[24px]"
+  const bottomMobile = hasCartItems
+    ? "bottom-[calc(80px+env(safe-area-inset-bottom))]"
+    : "bottom-[calc(20px+env(safe-area-inset-bottom))]"
+  const bottomDesktop = hasCartItems
+    ? "sm:bottom-[calc(84px+env(safe-area-inset-bottom))]"
+    : "sm:bottom-[calc(24px+env(safe-area-inset-bottom))]"
 
   return (
     <a

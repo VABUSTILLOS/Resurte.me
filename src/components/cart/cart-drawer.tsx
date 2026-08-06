@@ -119,9 +119,10 @@ export function CartDrawer() {
                         </h4>
                         <button
                           onClick={() => removeItem(item.product_id)}
-                          className="p-1 rounded hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                          aria-label={`Eliminar ${item.name} del carrito`}
+                          className="p-2.5 sm:p-1 rounded-md hover:bg-red-50 md:opacity-0 md:group-hover:opacity-100 transition-all touch-target"
                         >
-                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                          <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-red-400" />
                         </button>
                       </div>
                       <p className="text-xs text-[#8F939B]">{item.brand}</p>
@@ -157,9 +158,10 @@ export function CartDrawer() {
                             onClick={() =>
                               updateQuantity(item.product_id, item.quantity - 1)
                             }
-                            className="p-1.5 rounded-md hover:bg-[#F7F5F0] transition-colors"
+                            aria-label={`Reducir cantidad de ${item.name}`}
+                            className="p-2.5 sm:p-1.5 rounded-md hover:bg-[#F7F5F0] transition-colors touch-target"
                           >
-                            <Minus className="w-3.5 h-3.5 text-[#72767E]" />
+                            <Minus className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#72767E]" />
                           </button>
                           <span className="w-8 text-center text-sm font-medium text-[#242529]">
                             {item.quantity}
@@ -168,9 +170,10 @@ export function CartDrawer() {
                             onClick={() =>
                               updateQuantity(item.product_id, item.quantity + 1)
                             }
-                            className="p-1.5 rounded-md hover:bg-[#F7F5F0] transition-colors"
+                            aria-label={`Aumentar cantidad de ${item.name}`}
+                            className="p-2.5 sm:p-1.5 rounded-md hover:bg-[#F7F5F0] transition-colors touch-target"
                           >
-                            <Plus className="w-3.5 h-3.5 text-[#72767E]" />
+                            <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#72767E]" />
                           </button>
                         </div>
                       </div>
@@ -184,7 +187,7 @@ export function CartDrawer() {
 
         {/* Footer */}
         {cart.items.length > 0 && (
-          <div className="border-t border-[#E8E9EB] bg-white px-5 pt-3 pb-5 space-y-3">
+          <div className="border-t border-[#E8E9EB] bg-white px-5 pt-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))] space-y-3">
             {/* Subtotal */}
             <div className="flex items-center justify-between text-sm">
               <span className="text-[#72767E]">Subtotal</span>
@@ -299,28 +302,6 @@ export function CartDrawer() {
           </div>
         )}
       </div>
-
-      {/* Slide-in animation */}
-      <style jsx>{`
-        @keyframes slideInRight {
-          from {
-            transform: translateX(100%);
-          }
-          to {
-            transform: translateX(0);
-          }
-        }
-        .animate-slide-in-right {
-          animation: slideInRight 0.25s ease-out;
-        }
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
-        }
-        .animate-slide-up {
-          animation: slideUp 0.3s cubic-bezier(0, 0, 0, 1);
-        }
-      `}</style>
     </>
   )
 }
@@ -331,15 +312,15 @@ export function CartDrawer() {
  * Works on both mobile and desktop.
  */
 export function MobileCartBar() {
-  const { cart, itemCount, subtotal } = useCart()
-  const [mounted, setMounted] = useState(true)
+  const { itemCount, subtotal } = useCart()
+  const [mounted] = useState(true)
   const { city } = useCity()
 
   if (!mounted || itemCount === 0) return null
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
-      <div className="flex items-center gap-3 px-4 py-3.5 bg-white border-t border-[#E8E9EB] shadow-[0_-4px_24px_rgba(0,0,0,0.1)]">
+      <div className="flex items-center gap-3 px-4 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] bg-white border-t border-[#E8E9EB] shadow-[0_-4px_24px_rgba(0,0,0,0.1)]">
         {/* Tap to open drawer — always visible */}
         <button
           onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}

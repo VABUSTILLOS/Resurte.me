@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, TrendingUp, Star, Megaphone, Gift, Sparkles, X } from "lucide-react";
+import { Bell, TrendingUp, Star, Megaphone, Gift, Sparkles } from "lucide-react";
 import type { Notification } from "./types";
 
 const sampleNotifications: Notification[] = [

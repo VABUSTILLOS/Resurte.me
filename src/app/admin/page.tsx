@@ -7,10 +7,8 @@ import {
   Store,
   Users,
   DollarSign,
-  TrendingUp,
   ArrowUpRight,
   ArrowDownRight,
-  Package,
 } from "lucide-react"
 import { generateMockOrders, STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/mock-orders"
 import type { MockOrder } from "@/lib/mock-orders"

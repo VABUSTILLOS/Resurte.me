@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, Box, Calculator, MessageCircle, Clock, Star } from "lucide-react"
+import { ArrowRight, Box, Calculator, MessageCircle, Clock } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Cotizaciones por volumen — Resurte.me",

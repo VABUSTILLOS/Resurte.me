@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
@@ -221,7 +221,7 @@ export default function CheckoutPage() {
     }
   }
 
-  const handleStripeSuccess = (paymentIntentId: string) => {
+  const handleStripeSuccess = (_paymentIntentId: string) => {
     clearCart()
     router.push(`/${city.slug}/pedido-confirmado`)
   }

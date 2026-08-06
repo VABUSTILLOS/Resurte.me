@@ -12,7 +12,6 @@ import {
   Gift,
   Clock,
   CheckCircle2,
-  XCircle,
   Truck,
   AlertCircle,
   Zap,

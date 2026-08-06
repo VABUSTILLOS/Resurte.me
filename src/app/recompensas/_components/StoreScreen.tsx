@@ -206,13 +206,13 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator }: StoreScreenPr
       </motion.div>
 
       {/* Category filter chips */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-3">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide scroll-fade-x snap-x snap-mandatory mb-3">
         {categories.map((cat) => (
           <button
             key={cat.id}
             onClick={() => setActiveCategory(cat.id)}
             className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium 
-              whitespace-nowrap transition-all ${
+              whitespace-nowrap transition-all snap-start ${
                 activeCategory === cat.id
                   ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30"
                   : "bg-white/5 text-gray-400 hover:bg-white/10"

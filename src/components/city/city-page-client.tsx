@@ -88,10 +88,10 @@ export function CityPageClient({ slug }: Props) {
 
       {/* Categories */}
       <section className="mb-10">
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide scroll-fade-x snap-x snap-mandatory">
           <button
             onClick={() => setActiveCategory(null)}
-            className={`shrink-0 px-4 py-2 rounded-[10px] text-sm font-medium transition-colors ${
+            className={`shrink-0 px-4 py-2 rounded-[10px] text-sm font-medium transition-colors snap-start ${
               activeCategory === null
                 ? "bg-[#108910] text-white"
                 : "bg-[#F7F5F0] text-[#72767E] hover:bg-[#EDEBE6]"
@@ -103,7 +103,7 @@ export function CityPageClient({ slug }: Props) {
             <button
               key={cat.slug}
               onClick={() => setActiveCategory(cat.id)}
-              className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-sm font-medium transition-colors ${
+              className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-sm font-medium transition-colors snap-start ${
                 activeCategory === cat.id
                   ? "bg-[#108910] text-white"
                   : "bg-[#F7F5F0] text-[#72767E] hover:bg-[#EDEBE6]"

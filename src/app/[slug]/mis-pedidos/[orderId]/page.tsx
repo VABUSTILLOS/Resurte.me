@@ -6,7 +6,6 @@ import { useCity } from "@/contexts/city-context"
 import {
   generateMockOrders,
   STATUS_LABEL,
-  STATUS_COLOR,
   PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_LABEL,
 } from "@/lib/mock-orders"

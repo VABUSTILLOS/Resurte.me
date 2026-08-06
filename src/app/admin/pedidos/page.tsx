@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import {
   generateMockOrders,
   STATUS_LABEL,
@@ -10,7 +9,7 @@ import {
   PAYMENT_STATUS_LABEL,
   type MockOrder,
 } from "@/lib/mock-orders"
-import { Search, Filter, ChevronDown } from "lucide-react"
+import { Search } from "lucide-react"
 import type { OrderStatus } from "@/types"
 
 const STATUS_FILTERS: { label: string; value: OrderStatus | "all" }[] = [

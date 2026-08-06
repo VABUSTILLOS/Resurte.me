@@ -18,7 +18,7 @@
  *    Production should use sendTemplate() with Meta-approved templates
  */
 
-import { sendTextMessage, sendTemplate } from "@/lib/whatsapp"
+import { sendTextMessage } from "@/lib/whatsapp"
 import { createServiceClient } from "@/lib/supabase/service"
 import type { OrderStatus, PaymentStatus } from "@/types"
 
@@ -102,6 +102,9 @@ async function logWorkflow(
     const supabase = await createServiceClient()
     // Try to insert into whatsapp_messages table (reuse existing schema)
     await supabase.from("whatsapp_messages").insert({
+      from_number: recipient,
+      message_type: `workflow:${workflowType}`,
+      content: JSON.stringify({ message_id: messageId, status, error: error || null }),
       order_id: orderId,
       direction: "outbound",
     })

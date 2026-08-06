@@ -42,7 +42,6 @@ function xmlEscape(s) {
 
 function buildSvg(name, cat) {
   const [from, to] = CATEGORY_COLORS[cat] || DEFAULT
-  const display = xmlEscape(name)
   // Word-wrap name at ~18 chars/line
   const words = name.split(' ')
   const lines = []

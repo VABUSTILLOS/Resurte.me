@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
+import { useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   Trash2, ArrowLeft, DollarSign, TrendingDown, Lightbulb,
-  Plus, X,
+  Plus, X, BarChart3,
 } from "lucide-react"
 
 const WASTE_CATEGORIES = [
@@ -42,32 +43,41 @@ interface WasteEntry {
   category: string
   amountKg: number
   costPerKg: number
+  date: string // ISO date
 }
 
 let wasteId = 0
-function nextWasteId() { wasteId++; return `waste-${wasteId}` }
+function nextWasteId() { wasteId++; return `waste-${Date.now()}-${wasteId}` }
 
 export default function MermasPage() {
   const { selectedCollection } = useRestaurant()
-  const [entries, setEntries] = useState<WasteEntry[]>([])
+  const slug = selectedCollection?.slug || null
+  const [entries, setEntries] = useLocalStorage<WasteEntry[]>("mermas-entries", [], slug)
   const [showForm, setShowForm] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(WASTE_CATEGORIES[0].key)
   const [amountKg, setAmountKg] = useState("")
   const [costPerKg, setCostPerKg] = useState("")
   const [expandedTip, setExpandedTip] = useState<string | null>(null)
+  const [showTrends, setShowTrends] = useState(false)
 
   function addEntry() {
     const kg = parseFloat(amountKg)
     const cost = parseFloat(costPerKg)
     if (!selectedCategory || !kg || !cost || kg <= 0 || cost <= 0) return
-    setEntries([...entries, { id: nextWasteId(), category: selectedCategory, amountKg: kg, costPerKg: cost }])
+    setEntries((prev) => [...prev, {
+      id: nextWasteId(),
+      category: selectedCategory,
+      amountKg: kg,
+      costPerKg: cost,
+      date: new Date().toISOString(),
+    }])
     setAmountKg("")
     setCostPerKg("")
     setShowForm(false)
   }
 
   function removeEntry(id: string) {
-    setEntries(entries.filter((e) => e.id !== id))
+    setEntries((prev) => prev.filter((e) => e.id !== id))
   }
 
   if (!selectedCollection) {
@@ -204,6 +214,53 @@ export default function MermasPage() {
           <Plus className="w-5 h-5" />
           Registrar merma
         </button>
+      )}
+
+      {/* Category breakdown & trends */}
+      {entries.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
+          <button
+            onClick={() => setShowTrends(!showTrends)}
+            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-semibold text-gray-900">Desglose por categoría</h3>
+            </div>
+            <span className="text-xs text-gray-400">{showTrends ? "Ocultar" : "Ver"}</span>
+          </button>
+          {showTrends && (
+            <div className="border-t border-gray-100 p-4 space-y-3">
+              {WASTE_CATEGORIES.map((cat) => {
+                const catEntries = entries.filter((e) => e.category === cat.key)
+                const catLoss = catEntries.reduce((s, e) => s + (e.amountKg * e.costPerKg), 0)
+                const catKg = catEntries.reduce((s, e) => s + e.amountKg, 0)
+                const pctOfTotal = totalLoss > 0 ? (catLoss / totalLoss) * 100 : 0
+                if (catLoss === 0) return null
+                return (
+                  <div key={cat.key} className="flex items-center gap-3">
+                    <span className="text-lg w-8 text-center">{cat.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium text-gray-700">{cat.label}</span>
+                        <span className="text-sm font-bold text-red-600">${catLoss.toFixed(2)}</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-red-500 h-full rounded-full transition-all"
+                          style={{ width: `${Math.max(pctOfTotal, 2)}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {catKg.toFixed(1)} kg ({catEntries.length} registros)
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Tips */}

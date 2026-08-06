@@ -58,6 +58,36 @@
 :root {
   --background: #faf8f5;
   --foreground: #1a1a1a;
+  /* iOS safe areas + header offset (header h-16 = 4rem) */
+  --header-inset-top: env(safe-area-inset-top, 0px);
+  --header-top-offset: calc(4rem + var(--header-inset-top));
+  --inset-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Mobile: no tap highlight, no auto-zoom on focus, snappier taps */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+a,
+button,
+[role="button"],
+select,
+input[type="submit"],
+input[type="button"],
+label[for] {
+  touch-action: manipulation;
+}
+
+/* Prevent iOS auto-zoom when focusing form controls on small screens */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -86,6 +116,12 @@
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* --- Right-edge fade for horizontally scrollable chip rows --- */
+.scroll-fade-x {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
 }
 
 /* --- Scroll reveal base states --- */
@@ -157,11 +193,20 @@
   transform: translateY(8px);
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
-.group:hover .quick-add-btn,
-.product-card:hover .quick-add-btn,
-.quick-add-btn:focus-visible {
-  opacity: 1;
-  transform: translateY(0);
+@media (hover: hover) and (pointer: fine) {
+  .group:hover .quick-add-btn,
+  .product-card:hover .quick-add-btn,
+  .quick-add-btn:focus-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* Touch devices: always show the quick-add button */
+@media (hover: none), (pointer: coarse) {
+  .quick-add-btn {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* --- Smooth accordion (Erewhon-style) --- */
@@ -226,6 +271,26 @@
 .animate-fade-up:nth-child(3) { animation-delay: 0.3s; }
 .animate-fade-up:nth-child(4) { animation-delay: 0.45s; }
 .animate-fade-up:nth-child(5) { animation-delay: 0.6s; }
+
+/* ============================================
+   SLIDE ANIMATIONS — drawer & bottom sheets
+   (defined globally so they work before the
+   drawer first opens)
+   ============================================ */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in-right {
+  animation: slideInRight 0.25s ease-out;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0, 0, 0, 1);
+}
 
 /* ============================================
    CATEGORY CARD OVERLAY (Erewhon gradient hover)

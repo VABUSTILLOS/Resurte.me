@@ -87,7 +87,9 @@ export function DashboardSidebar() {
 
   // Match WhatsApp button vertical position: higher when MobileCartBar is visible
   const hasCartItems = itemCount > 0
-  const pillBottom = hasCartItems ? "bottom-[80px]" : "bottom-[20px]"
+  const pillBottom = hasCartItems
+    ? "bottom-[calc(80px+env(safe-area-inset-bottom))]"
+    : "bottom-[calc(20px+env(safe-area-inset-bottom))]"
 
   useEffect(() => {
     if (!supabase) return
@@ -111,7 +113,7 @@ export function DashboardSidebar() {
     <>
       {/* Desktop sidebar — collapsed */}
       {collapsed ? (
-        <aside className="hidden lg:flex w-[56px] bg-white border-r border-gray-100 flex-col shrink-0 min-h-[calc(100vh-64px)] sticky top-16 items-center gap-2 py-3">
+        <aside className="hidden lg:flex w-[56px] bg-white border-r border-gray-100 flex-col shrink-0 min-h-[calc(100vh-64px)] sticky top-[var(--header-top-offset)] items-center gap-2 py-3">
           {/* Toggle expand */}
           <button
             onClick={toggleCollapsed}
@@ -169,7 +171,7 @@ export function DashboardSidebar() {
         </aside>
       ) : (
         /* Desktop sidebar — expanded */
-        <aside className="hidden lg:flex w-[272px] bg-white border-r border-gray-100 flex-col shrink-0 min-h-[calc(100vh-64px)] sticky top-16">
+        <aside className="hidden lg:flex w-[272px] bg-white border-r border-gray-100 flex-col shrink-0 min-h-[calc(100vh-64px)] sticky top-[var(--header-top-offset)]">
           {/* Collapse toggle */}
           <div className="flex justify-end p-2">
             <button
@@ -348,7 +350,7 @@ export function DashboardSidebar() {
             className="fixed inset-0 bg-black/50 z-[65]"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="fixed inset-x-0 bottom-0 z-[70] bg-white rounded-t-2xl shadow-2xl max-h-[80vh] overflow-y-auto animate-slide-up">
+          <div className="fixed inset-x-0 bottom-0 z-[70] bg-white rounded-t-2xl shadow-2xl max-h-[80vh] overflow-y-auto animate-slide-up pb-[env(safe-area-inset-bottom)]">
             <div className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-100 p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#108910] to-[#16a34a] flex items-center justify-center text-white font-bold text-sm">

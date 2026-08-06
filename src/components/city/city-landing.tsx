@@ -636,12 +636,12 @@ export function CityLanding({
 
               {/* Action CTA */}
               <div className="mt-6 flex gap-3">
-                <a
+                <Link
                   href="/auth/register"
                   className="inline-flex items-center gap-2 bg-[#108910] text-white text-sm font-semibold px-5 py-2.5 rounded-[10px] hover:bg-[#0D720D] transition-colors"
                 >
                   Registra tu negocio
-                </a>
+                </Link>
                 <a
                   href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}?text=${encodeURIComponent("Me interesa conocer su catálogo de productos y programa de recompensas")}`}
                   target="_blank"

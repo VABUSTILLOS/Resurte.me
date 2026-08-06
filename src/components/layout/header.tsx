@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package } from "lucide-react"
+import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package, Search } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
@@ -57,7 +57,10 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 glass-header">
+    <header
+      className="sticky top-0 z-50 glass-header"
+      style={{ paddingTop: "var(--header-inset-top)" }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16 gap-3">
           {/* Logo — Erewhon-style with refined type */}
@@ -102,6 +105,17 @@ export function Header() {
 
           {/* Right actions */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Mobile search shortcut */}
+            {city && (
+              <Link
+                href={`/${city.slug}/buscar`}
+                aria-label="Buscar productos"
+                className="sm:hidden p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
+              >
+                <Search className="w-5 h-5 text-[#343538]" aria-hidden="true" />
+              </Link>
+            )}
+
             {/* Mobile city trigger */}
             <button
               onClick={() => setShowCitySelector(!showCitySelector)}

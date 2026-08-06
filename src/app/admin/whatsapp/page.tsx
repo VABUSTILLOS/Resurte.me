@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Search, MessageCircle, Check, Eye, EyeOff, RefreshCw, AlertCircle, ImageIcon } from "lucide-react"
+import { Search, MessageCircle, Check, Eye, EyeOff, RefreshCw, ImageIcon } from "lucide-react"
 import { MOCK_PRODUCTS, MOCK_CATEGORIES } from "@/lib/mock-products"
 import { getCategoryIcon } from "@/lib/utils"
 
@@ -20,8 +20,6 @@ export default function AdminWhatsAppPage() {
     })
   }, [products, search, selectedCategory])
 
-  const inCatalog = filtered.filter((p) => p.show_in_whatsapp)
-  const notInCatalog = filtered.filter((p) => !p.show_in_whatsapp)
   const totalInCatalog = products.filter((p) => p.show_in_whatsapp).length
 
   const toggleProduct = (productId: number) => {

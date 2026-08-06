@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, ShoppingBag, Grid3X3 } from "lucide-react"
+import { ArrowLeft, ShoppingBag } from "lucide-react"
 import { ProductCard } from "@/components/product/product-card"
 import { SearchBar } from "@/components/search/search-bar"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"

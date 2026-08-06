@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, Plus, Minus, Check, MessageCircle, ShoppingCart, Package, ChevronDown } from "lucide-react"
+import { ArrowLeft, Plus, Minus, Check, MessageCircle, ShoppingCart, Package } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
 import { ProductCard } from "@/components/product/product-card"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
@@ -9,18 +9,15 @@ import Link from "next/link"
 import type { Category, Product } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
 
-type ProductWithStore = Product
-
 interface ProductDetailClientProps {
   product: Product
   category?: Category
   relatedProducts: Product[]
-  relatedCategoryMap: Map<number, Category>
   citySlug: string
   cityName: string
 }
 
-export function ProductDetailClient({ product, category, relatedProducts, relatedCategoryMap, citySlug, cityName }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, category, relatedProducts, citySlug, cityName }: ProductDetailClientProps) {
   const { addItem } = useCart()
   const [added, setAdded] = useState(false)
   const [quantity, setQuantity] = useState(1)

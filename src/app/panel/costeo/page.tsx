@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
+import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
-  Calculator, Plus, Trash2, DollarSign, PieChart, ArrowLeft,
-  Percent, TrendingDown, TrendingUp, AlertCircle,
+  Calculator, Plus, Trash2, PieChart, ArrowLeft,
+  Percent, TrendingDown, AlertCircle, Edit3, Save, X,
 } from "lucide-react"
 
 // Mock ingredients per collection type — in production this comes from Resurte.me catalog
@@ -86,21 +87,49 @@ interface Dish {
 }
 
 let dishCounter = 0
-function nextId() { dishCounter++; return `dish-${dishCounter}` }
+function nextId() { dishCounter++; return `dish-${Date.now()}-${dishCounter}` }
 
 export default function CosteoPage() {
   const { selectedCollection } = useRestaurant()
+  const slug = selectedCollection?.slug || null
+
   const ingredients = selectedCollection
     ? (MOCK_INGREDIENTS[selectedCollection.slug] || DEFAULT_INGREDIENTS)
     : DEFAULT_INGREDIENTS
 
-  const [dishes, setDishes] = useState<Dish[]>([])
+  // Persist dishes per collection
+  const [dishes, setDishes] = useLocalStorage<Dish[]>("costeo-dishes", [], slug)
+  // Sync with shared cross-tool store
+  const [, setSharedDishes] = useSharedDishes(slug)
   const [showForm, setShowForm] = useState(false)
+  const [editingDishId, setEditingDishId] = useState<string | null>(null)
   const [newDishName, setNewDishName] = useState("")
   const [newDishIngredients, setNewDishIngredients] = useState<DishIngredient[]>([
     { ingredientName: ingredients[0]?.name || "", quantity: 0, unit: ingredients[0]?.unit || "", unitPrice: ingredients[0]?.price || 0 },
   ])
-  const [targetFoodCost, setTargetFoodCost] = useState(30)
+  const [targetFoodCost, setTargetFoodCost] = useLocalStorage<number>("costeo-target-fc", 30, slug)
+  // Custom ingredient mode
+  const [customName, setCustomName] = useState("")
+  const [customUnit, setCustomUnit] = useState("kg")
+  const [customPrice, setCustomPrice] = useState("")
+  const [showCustom, setShowCustom] = useState(false)
+
+  // Keep shared dishes in sync
+  useEffect(() => {
+    setSharedDishes(dishes)
+  }, [dishes, setSharedDishes])
+
+  function resetForm() {
+    setNewDishName("")
+    setNewDishIngredients([{
+      ingredientName: ingredients[0]?.name || "",
+      quantity: 0,
+      unit: ingredients[0]?.unit || "",
+      unitPrice: ingredients[0]?.price || 0,
+    }])
+    setEditingDishId(null)
+    setShowForm(false)
+  }
 
   function addIngredient() {
     setNewDishIngredients([...newDishIngredients, {
@@ -131,30 +160,51 @@ export default function CosteoPage() {
     setNewDishIngredients(updated)
   }
 
-  function addDish() {
+  function addCustomIngredient() {
+    const name = customName.trim()
+    const price = parseFloat(customPrice)
+    if (!name || !price || price <= 0) return
+    setNewDishIngredients([...newDishIngredients, {
+      ingredientName: name,
+      quantity: 1,
+      unit: customUnit,
+      unitPrice: price,
+    }])
+    setCustomName("")
+    setCustomPrice("")
+    setShowCustom(false)
+  }
+
+  function startEditDish(dish: Dish) {
+    setEditingDishId(dish.id)
+    setNewDishName(dish.name)
+    setNewDishIngredients(dish.ingredients.map((ing) => ({ ...ing })))
+    setShowForm(true)
+  }
+
+  function saveDish() {
     if (!newDishName.trim() || newDishIngredients.length === 0) return
     const totalCost = newDishIngredients.reduce((sum, ing) => sum + (ing.quantity * ing.unitPrice), 0)
     const sellingPrice = targetFoodCost > 0 ? totalCost / (targetFoodCost / 100) : 0
 
-    setDishes([...dishes, {
-      id: nextId(),
+    const dish: Dish = {
+      id: editingDishId || nextId(),
       name: newDishName.trim(),
       ingredients: [...newDishIngredients],
       foodCostPercent: targetFoodCost,
       sellingPrice: Math.round(sellingPrice * 100) / 100,
-    }])
-    setNewDishName("")
-    setNewDishIngredients([{
-      ingredientName: ingredients[0]?.name || "",
-      quantity: 0,
-      unit: ingredients[0]?.unit || "",
-      unitPrice: ingredients[0]?.price || 0,
-    }])
-    setShowForm(false)
+    }
+
+    if (editingDishId) {
+      setDishes((prev) => prev.map((d) => (d.id === editingDishId ? dish : d)))
+    } else {
+      setDishes((prev) => [...prev, dish])
+    }
+    resetForm()
   }
 
   function removeDish(id: string) {
-    setDishes(dishes.filter((d) => d.id !== id))
+    setDishes((prev) => prev.filter((d) => d.id !== id))
   }
 
   if (!selectedCollection) {
@@ -225,9 +275,14 @@ export default function CosteoPage() {
               <div key={dish.id} className="bg-white rounded-2xl border border-gray-100 p-5">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-bold text-gray-900">{dish.name}</h4>
-                  <button onClick={() => removeDish(dish.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => startEditDish(dish)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title="Editar platillo">
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => removeDish(dish.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar platillo">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-1.5 mb-3">
                   {dish.ingredients.map((ing, i) => (
@@ -269,7 +324,9 @@ export default function CosteoPage() {
       {/* Add dish form */}
       {showForm ? (
         <div className="bg-white rounded-2xl border border-[#108910]/30 p-5 mb-6">
-          <h4 className="font-semibold text-gray-900 mb-4">Nuevo platillo</h4>
+          <h4 className="font-semibold text-gray-900 mb-4">
+            {editingDishId ? "Editar platillo" : "Nuevo platillo"}
+          </h4>
           <input
             type="text"
             value={newDishName}
@@ -314,18 +371,70 @@ export default function CosteoPage() {
             ))}
           </div>
 
-          <button
-            onClick={addIngredient}
-            className="text-sm text-[#108910] font-semibold hover:underline mb-4 inline-block"
-          >
-            + Agregar ingrediente
-          </button>
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <button
+              onClick={addIngredient}
+              className="text-sm text-[#108910] font-semibold hover:underline"
+            >
+              + Agregar ingrediente del catálogo
+            </button>
+            <button
+              onClick={() => setShowCustom(!showCustom)}
+              className="text-sm text-blue-600 font-semibold hover:underline"
+            >
+              + Ingrediente personalizado
+            </button>
+          </div>
+
+          {/* Custom ingredient mini-form */}
+          {showCustom && (
+            <div className="bg-blue-50 rounded-xl p-3 mb-4 space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="Nombre del ingrediente"
+                  className="flex-1 px-3 py-2 rounded-lg border border-blue-200 text-sm focus:outline-none focus:border-blue-400 bg-white"
+                />
+                <select
+                  value={customUnit}
+                  onChange={(e) => setCustomUnit(e.target.value)}
+                  className="w-24 px-2 py-2 rounded-lg border border-blue-200 text-sm bg-white"
+                >
+                  <option value="kg">kg</option>
+                  <option value="g">g</option>
+                  <option value="L">L</option>
+                  <option value="mL">mL</option>
+                  <option value="pza">pza</option>
+                  <option value="docena">docena</option>
+                  <option value="manojo">manojo</option>
+                  <option value="rebanada">rebanada</option>
+                </select>
+                <input
+                  type="number"
+                  value={customPrice}
+                  onChange={(e) => setCustomPrice(e.target.value)}
+                  placeholder="$ precio"
+                  className="w-24 px-3 py-2 rounded-lg border border-blue-200 text-sm focus:outline-none focus:border-blue-400 bg-white"
+                  min="0"
+                  step="0.5"
+                />
+                <button
+                  onClick={addCustomIngredient}
+                  className="px-3 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-3">
-            <button onClick={addDish} className="flex-1 bg-[#108910] text-white font-semibold py-2.5 rounded-xl hover:bg-[#0D720D] transition-colors">
-              Guardar platillo
+            <button onClick={saveDish} className="flex-1 bg-[#108910] text-white font-semibold py-2.5 rounded-xl hover:bg-[#0D720D] transition-colors">
+              {editingDishId ? "Guardar cambios" : "Guardar platillo"}
             </button>
-            <button onClick={() => setShowForm(false)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50">
+            <button onClick={resetForm} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50">
               Cancelar
             </button>
           </div>

@@ -86,11 +86,6 @@ const MOCK_ORDER = {
 // Message builders (same as workflows.ts)
 // ============================================================
 
-const STATUS_EMOJI: Record<string, string> = {
-  pending: "⏳", confirmed: "✅", preparing: "👨‍🍳",
-  out_for_delivery: "🛵", delivered: "📦", cancelled: "❌",
-}
-
 function itemsText(items: { name: string; quantity: number }[]) {
   return items.map((i) => `  • ${i.quantity}x ${i.name}`).join("\n")
 }
@@ -129,7 +124,7 @@ Si tienes dudas, responde a este mensaje.`,
     Actualización de tu pedido #1043 en *La Comer*.
     Estado: *${status === "confirmed" ? "Confirmado" : status}*`,
 
-  payment_reminder: (hours: number) =>
+  payment_reminder: (_hours: number) =>
     `💡 Recordatorio
 
 Hola ${MOCK_ORDER.customer_name},

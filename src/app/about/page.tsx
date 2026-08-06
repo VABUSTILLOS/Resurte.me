@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, Leaf, Truck, Users, Star, Shield, Building2 } from "lucide-react"
+import { ArrowRight, Leaf, Truck, Users, Shield, Building2 } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Sobre nosotros — Resurte.me",

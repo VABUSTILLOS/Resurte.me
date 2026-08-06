@@ -5,7 +5,7 @@ import { useRestaurant } from "@/contexts/restaurant-context"
 import Link from "next/link"
 import {
   ClipboardCheck, ArrowLeft, CheckCircle2, Circle, DollarSign,
-  Package, ChefHat, Store,
+  Package, Store,
 } from "lucide-react"
 
 interface ChecklistItem {

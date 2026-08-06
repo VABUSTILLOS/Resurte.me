@@ -185,7 +185,6 @@ function Step1Confirm({
 }
 
 function Step2Context({
-  service,
   onNext,
 }: {
   service: ServiceItem;

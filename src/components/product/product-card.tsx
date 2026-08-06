@@ -30,7 +30,6 @@ interface ProductCardProps {
 
 export const ProductCard = memo(function ProductCard({
   product,
-  whatsappNumber,
   citySlug,
   onAddToCart,
 }: ProductCardProps) {
@@ -193,7 +192,7 @@ export const ProductCard = memo(function ProductCard({
         <button
           onClick={handleAdd}
           aria-label={`Agregar ${product.name} al carrito`}
-          className={`quick-add-btn absolute -bottom-2 left-1/2 -translate-x-1/2 z-10 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ease-out shadow-lg touch-target ${
+          className={`quick-add-btn absolute -bottom-2 left-1/2 -translate-x-1/2 z-10 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ease-out shadow-lg touch-target active:scale-95 ${
             added
               ? "bg-green-500 text-white"
               : "bg-[#108910] text-white hover:bg-[#0D720D] hover:shadow-xl"

@@ -1,8 +1,8 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
-import { TrendingUp, Star, Quote, ArrowRight, Play } from "lucide-react";
+import { motion } from "framer-motion";
+import { TrendingUp, Quote, ArrowRight, Play } from "lucide-react";
 import type { ImpactStory } from "./types";
 
 const stories: ImpactStory[] = [

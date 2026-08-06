@@ -185,7 +185,6 @@ async function main() {
   }
 
   // Step 3: Insert prices for store 1
-  let priceIdx = {}
   for (const [catId, ids] of Object.entries(byCat)) {
     for (let i = 0; i < ids.length; i++) {
       const s = { store_id: 1, price: catPrices[catId][i] }

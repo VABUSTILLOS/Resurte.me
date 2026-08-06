@@ -63,7 +63,7 @@ export function UserShopView({ categories, products, citySlug }: Props) {
   return (
     <div className="min-h-screen flex flex-col bg-[#faf8f5]">
       {/* Sticky top bar: search + category pills */}
-      <div className="sticky top-16 z-30 bg-white border-b border-[#E8E9EB] shadow-sm">
+      <div className="sticky top-[var(--header-top-offset)] z-30 bg-white border-b border-[#E8E9EB] shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           {/* Search bar */}
           <div className="py-3">
@@ -90,12 +90,12 @@ export function UserShopView({ categories, products, citySlug }: Props) {
           </div>
 
           {/* Category pills — horizontal scroll */}
-          <div className="pb-3 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto scrollbar-hide">
+          <div className="pb-3 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto scrollbar-hide scroll-fade-x snap-x snap-mandatory">
             <div className="flex gap-2 min-w-max">
               {/* "Todos" pill */}
               <button
                 onClick={() => handleCategoryClick(null)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 snap-start ${
                   activeCategoryId === null
                     ? "bg-[#108910] text-white shadow-md shadow-[#108910]/20"
                     : "bg-white text-[#5C6068] border border-[#E8E9EB] hover:border-[#108910]/30 hover:text-[#108910]"
@@ -113,7 +113,7 @@ export function UserShopView({ categories, products, citySlug }: Props) {
                   <button
                     key={cat.id}
                     onClick={() => handleCategoryClick(cat.id)}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 snap-start ${
                       isActive
                         ? "bg-[#108910] text-white shadow-md shadow-[#108910]/20"
                         : "bg-white text-[#5C6068] border border-[#E8E9EB] hover:border-[#108910]/30 hover:text-[#108910]"

@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
+import { useSharedDishes } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   TrendingUp, ArrowLeft, Circle, AlertTriangle, CheckCircle2,
-  DollarSign, Percent,
+  DollarSign, Download,
 } from "lucide-react"
 
 interface DishData { name: string; cost: number; price: number; category: string; alert?: string }

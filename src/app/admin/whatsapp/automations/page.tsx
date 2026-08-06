@@ -13,7 +13,6 @@ import {
   ToggleRight,
   Save,
 } from "lucide-react"
-import { AUTOMATION_TEMPLATE_MAP } from "@/lib/whatsapp"
 import type { AutomationType } from "@/types"
 
 // ============================================================

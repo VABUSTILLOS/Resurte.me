@@ -128,7 +128,7 @@ export default function CartPage() {
                   <div className="flex items-center gap-1 border border-gray-200 rounded-lg">
                     <button
                       onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
-                      className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                      className="p-2 rounded-md hover:bg-gray-100 transition-colors touch-target"
                     >
                       <Minus className="w-4 h-4 text-gray-500" />
                     </button>
@@ -137,7 +137,7 @@ export default function CartPage() {
                     </span>
                     <button
                       onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                      className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                      className="p-2 rounded-md hover:bg-gray-100 transition-colors touch-target"
                     >
                       <Plus className="w-4 h-4 text-gray-500" />
                     </button>
@@ -158,7 +158,7 @@ export default function CartPage() {
 
         {/* Order Summary */}
         <div className="lg:col-span-1">
-          <div className="sticky top-24 space-y-4">
+          <div className="sticky top-[calc(6rem+var(--header-inset-top))] space-y-4">
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
               <h2 className="font-bold text-gray-900 text-lg">Resumen</h2>
 

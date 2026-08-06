@@ -28,6 +28,10 @@ export async function GET(req: NextRequest) {
       query = query.eq("order_id", parseInt(orderId))
     }
 
+    if (workflowType) {
+      query = query.eq("message_type", `workflow:${workflowType}`)
+    }
+
     const { data, error } = await query
 
     if (error) {

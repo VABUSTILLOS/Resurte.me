@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef, useEffect } from "react"
-import { Search, X, ShoppingBag, MapPin } from "lucide-react"
+import { Search, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 interface SearchBarProps {

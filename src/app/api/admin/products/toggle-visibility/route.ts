@@ -27,7 +27,8 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json({ success: true, productId, isVisible })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error interno del servidor"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

@@ -6,7 +6,7 @@ import {
   useElements,
 } from "@stripe/react-stripe-js"
 import { useState, type FormEvent } from "react"
-import { CreditCard, Lock, AlertCircle, CheckCircle2 } from "lucide-react"
+import { CreditCard, Lock, AlertCircle } from "lucide-react"
 
 interface StripePaymentFormProps {
   /** Total amount being charged (for display only) */

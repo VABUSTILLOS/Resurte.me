@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, Users, TrendingUp, MapPin } from "lucide-react"
+import { Users, TrendingUp, MapPin } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Trabaja con nosotros — Resurte.me",

@@ -85,19 +85,6 @@ function buildSvg(name, cat) {
 </svg>`
 }
 
-/** Collect existing product webp basenames (without extension). */
-function existingProducts() {
-  const set = new Set()
-  for (const dir of ['public/images/products', 'public/images/products/recipe', 'public/images/products/generic']) {
-    const full = path.join(REPO, dir)
-    if (!fs.existsSync(full)) continue
-    for (const f of fs.readdirSync(full)) {
-      if (f.endsWith('.webp')) set.add(f.replace(/\.webp$/, ''))
-    }
-  }
-  return set
-}
-
 /** Parse products from add_missing_products.js. */
 function parseProducts() {
   const src = fs.readFileSync(SCRIPT, 'utf8')
@@ -108,7 +95,6 @@ function parseProducts() {
 
 async function main() {
   const products = parseProducts()
-  const existing = existingProducts()
   const remaps = new Map() // img path -> replacement path
   const toGenerate = []
 

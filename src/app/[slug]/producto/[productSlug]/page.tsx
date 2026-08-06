@@ -98,23 +98,11 @@ export default async function ProductPage({ params }: Props) {
     if (otherProducts) related.push(...otherProducts)
   }
 
-  // Fetch category names for related products
-  const relatedCategoryIds = [...new Set(related.map((p) => p.category_id))]
-  const { data: relatedCategories } = relatedCategoryIds.length > 0
-    ? await supabase
-        .from("categories")
-        .select("id, name, slug, icon, parent_id")
-        .in("id", relatedCategoryIds)
-    : { data: [] }
-
-  const categoryMap = new Map((relatedCategories ?? []).map((c) => [c.id, c]))
-
   return (
     <ProductDetailClient
       product={product}
       category={category ?? undefined}
       relatedProducts={related}
-      relatedCategoryMap={categoryMap}
       citySlug={slug}
       cityName={city.name}
     />

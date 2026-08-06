@@ -47,14 +47,6 @@ const sampleActivities: ActivityItem[] = [
   },
 ];
 
-const iconMap = {
-  invoice: TrendingUp,
-  redemption: CheckCircle,
-  milestone: ({ className }: { className?: string }) => (
-    <span className={className}>🎉</span>
-  ),
-};
-
 export function ActivityFeed() {
   return (
     <div className="mx-4 mt-4 md:mx-0">

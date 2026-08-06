@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, TrendingUp, Star, Clock, CheckCircle, Lock } from "lucide-react";
+import { ArrowRight, TrendingUp, Star, CheckCircle, Lock } from "lucide-react";
 import { GrowthWalletBanner } from "./GrowthWalletBanner";
 import { QuickActions } from "./QuickActions";
 import { ActivityFeed } from "./ActivityFeed";
@@ -30,7 +30,6 @@ interface DashboardScreenProps {
 
 export function DashboardScreen({
   onOpenCalculator,
-  onServiceSelect,
   onNavigateStore,
   onViewOrders,
   walletView,

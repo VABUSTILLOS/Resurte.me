@@ -95,7 +95,6 @@ async function handleIncomingMessage(
   const metadata = value.metadata as Record<string, unknown> | undefined
   const from = (message.from as string) || metadata?.display_phone_number || "unknown"
   const messageType = (message.type as string) || "unknown"
-  const timestamp = (message.timestamp as string) || new Date().toISOString()
 
   console.log(`📲 WhatsApp incoming: ${from} — ${messageType}`)
 

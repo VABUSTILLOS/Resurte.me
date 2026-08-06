@@ -59,7 +59,7 @@ function PanelContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#faf8f5]">
       {/* Top bar with restaurant type selector */}
-      <div className="sticky top-16 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100">
+      <div className="sticky top-[var(--header-top-offset)] z-40 bg-white/90 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 min-w-0">
@@ -98,7 +98,7 @@ function PanelContent({ children }: { children: React.ReactNode }) {
                     className="fixed inset-0 z-10"
                     onClick={() => setShowPicker(false)}
                   />
-                  <div className="absolute right-0 top-full mt-1 w-80 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-20 max-h-80 overflow-y-auto">
+                  <div className="absolute right-0 top-full mt-1 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-20 max-h-80 overflow-y-auto">
                     <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                       ¿Qué tipo de cocina tienes?
                     </div>

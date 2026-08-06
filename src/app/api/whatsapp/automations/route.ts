@@ -75,7 +75,7 @@ const MOCK_AUTOMATIONS = [
 // GET — List automations
 // ============================================================
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const automations = MOCK_AUTOMATIONS
 
   return NextResponse.json({

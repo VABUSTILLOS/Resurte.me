@@ -2,10 +2,11 @@
 
 import { useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
+import { useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   ShoppingCart, ArrowLeft, Users, TrendingUp, AlertCircle,
-  Package, ChevronDown, ChevronUp, Calculator,
+  Package, ChevronDown, ChevronUp, Calculator, TrendingDown,
 } from "lucide-react"
 
 // Suggested items per collection based on typical restaurant needs
@@ -53,12 +54,13 @@ const DEFAULT_PRODUCTS = [
 
 export default function PlanificadorPage() {
   const { selectedCollection } = useRestaurant()
+  const slug = selectedCollection?.slug || null
   const products = selectedCollection
     ? (COLLECTION_PRODUCTS[selectedCollection.slug] || DEFAULT_PRODUCTS)
     : DEFAULT_PRODUCTS
 
-  const [covers, setCovers] = useState(50)
-  const [wastePercent, setWastePercent] = useState(8)
+  const [covers, setCovers] = useLocalStorage<number>("planner-covers", 50, slug)
+  const [wastePercent, setWastePercent] = useLocalStorage<number>("planner-waste", 8, slug)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
 
   // Group by category
@@ -227,6 +229,36 @@ export default function PlanificadorPage() {
           </span>
         </div>
       </div>
+
+      {/* Waste savings delta */}
+      {wastePercent > 5 && (
+        <div className="mt-4 bg-amber-50 rounded-2xl border border-amber-200 p-5">
+          <div className="flex items-start gap-3">
+            <TrendingDown className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <h4 className="font-semibold text-amber-800 text-sm mb-1">
+                Oportunidad de ahorro por reducción de merma
+              </h4>
+              <p className="text-xs text-amber-700 mb-2">
+                Si reduces tu merma del <strong>{wastePercent}%</strong> al <strong>5%</strong> (nivel óptimo), 
+                ahorrarías aproximadamente:
+              </p>
+              <p className="text-2xl font-extrabold text-amber-700">
+                ${(() => {
+                  const costNow = products.reduce((sum, p) => {
+                    return sum + (p.perPerson * covers * (1 + wastePercent / 100) * p.price)
+                  }, 0)
+                  const costIdeal = products.reduce((sum, p) => {
+                    return sum + (p.perPerson * covers * (1 + 5 / 100) * p.price)
+                  }, 0)
+                  return (costNow - costIdeal).toFixed(0)
+                })()}
+                <span className="text-sm font-medium text-amber-500"> MXN</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CTA */}
       <div className="mt-4 bg-emerald-50 rounded-xl p-4 border border-emerald-100">

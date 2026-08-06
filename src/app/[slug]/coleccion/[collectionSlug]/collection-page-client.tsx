@@ -79,7 +79,7 @@ export function CollectionPageClient({ citySlug, cityName, collection, products,
       />
 
       {/* ── 2. B2B VALUE BADGES + SEARCH (compact bar) ── */}
-      <div className="bg-white border-b border-[#ede8df] sticky top-0 z-30">
+      <div className="bg-white border-b border-[#ede8df] sticky top-[var(--header-top-offset)] z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
             {/* Value badges — compact on mobile */}
