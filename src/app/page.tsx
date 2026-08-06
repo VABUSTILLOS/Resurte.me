@@ -1,5 +1,6 @@
 import { CityLanding } from "@/components/city/city-landing"
 import { createClient } from "@/lib/supabase/server"
+import type { Category, Product } from "@/types"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -12,22 +13,40 @@ export const metadata: Metadata = {
 }
 
 export default async function Home() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  let user: unknown = null
+  let categories: Category[] = []
+  let products: Product[] = []
 
-  const [categories, products] = await Promise.all([
-    supabase
-      .from("categories")
-      .select("id, name, slug, icon, parent_id")
-      .order("id")
-      .then(({ data }) => data ?? []),
-    supabase
-      .from("products")
-      .select("*")
-      .eq("is_visible", true)
-      .order("name")
-      .then(({ data }) => data ?? []),
-  ])
+  try {
+    const supabase = await createClient()
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    user = currentUser
+
+    const [cats, prods] = await Promise.all([
+      supabase
+        .from("categories")
+        .select("id, name, slug, icon, parent_id")
+        .order("id")
+        .then(({ data }) => data ?? []),
+      supabase
+        .from("products")
+        .select("*")
+        .eq("is_visible", true)
+        .order("name")
+        .then(({ data }) => data ?? []),
+    ])
+    categories = cats
+    products = prods
+  } catch (error) {
+    // Sin Supabase configurado (dev local/preview sin secrets) la landing
+    // renderiza vacía en lugar de fallar. Los errores reales de la DB no se
+    // silencian: `createClient` solo lanza cuando faltan las env vars.
+    if (error instanceof Error && error.message.includes("Supabase no está configurado")) {
+      console.warn("Home renderizó sin Supabase (env no configurado).")
+    } else {
+      throw error
+    }
+  }
 
   return (
     <CityLanding

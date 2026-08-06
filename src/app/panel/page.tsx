@@ -3,11 +3,12 @@
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useMemo } from "react"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp,
   Calendar, ClipboardCheck, ArrowRight, ChefHat, Store,
-  PieChart, DollarSign, BarChart3,
+  PieChart, DollarSign, BarChart3, Zap, Clock,
 } from "lucide-react"
 
 const COLLECTION_ICONS: Record<string, string> = {
@@ -97,8 +98,9 @@ const TOOLS: Tool[] = [
 export default function PanelPage() {
   const { selectedCollection, collections, setSelectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
+  const router = useRouter()
   const [sharedDishes] = useSharedDishes(slug)
-  const [mermaEntries] = useLocalStorage<{ amountKg: number; costPerKg: number; category: string; id: string }[]>("mermas-entries", [], slug)
+  const [mermaEntries] = useLocalStorage<{ amountKg: number; costPerKg: number; category: string; id: string; date: string }[]>("mermas-entries", [], slug)
   const [aperturaChecked] = useLocalStorage<string[]>("apertura-checked", [], slug)
 
   const stats = useMemo(() => {
@@ -236,6 +238,66 @@ export default function PanelPage() {
         <p className="text-center text-sm text-gray-400 mb-6">
           Escoge tu tipo de restaurante para activar las herramientas
         </p>
+      )}
+
+      {/* Quick actions */}
+      {selectedCollection && (
+        <div className="flex items-center gap-2 mb-6">
+          <span className="text-xs text-gray-400 flex items-center gap-1">
+            <Zap className="w-3.5 h-3.5" />
+            Acciones rápidas:
+          </span>
+          <button
+            onClick={() => router.push("/panel/costeo")}
+            className="text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            + Nuevo platillo
+          </button>
+          <button
+            onClick={() => router.push("/panel/mermas")}
+            className="text-xs font-semibold bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            + Registrar merma
+          </button>
+          <button
+            onClick={() => router.push("/panel/apertura")}
+            className="text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            ✓ Checklist apertura
+          </button>
+        </div>
+      )}
+
+      {/* Recent activity */}
+      {selectedCollection && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-gray-400" /> Actividad reciente
+          </h3>
+          <div className="space-y-2">
+            {sharedDishes.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                <span><strong>{sharedDishes.length}</strong> platillos en tu menú costeado</span>
+              </div>
+            )}
+            {mermaEntries.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                <span><strong>{mermaEntries.length}</strong> registros de merma — ${mermaEntries.reduce((s, e) => s + (e.amountKg * e.costPerKg), 0).toFixed(0)} en pérdidas</span>
+              </div>
+            )}
+            {aperturaChecked.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                <span><strong>{aperturaChecked.length}</strong> pasos completados del kit de apertura</span>
+              </div>
+            )}
+            {sharedDishes.length === 0 && mermaEntries.length === 0 && aperturaChecked.length === 0 && (
+              <p className="text-xs text-gray-400">Aún no hay actividad. ¡Empieza a usar las herramientas!</p>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Tool cards grid */}

@@ -146,6 +146,8 @@ export default function RentabilidadPage() {
   const [priceOverrides, setPriceOverrides] = useLocalStorage<Record<string, number>>("rentabilidad-prices", {}, slug)
   const [editingName, setEditingName] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
+  const [sortBy, setSortBy] = useLocalStorage<string>("rentabilidad-sort", "name", slug)
+  const [costMultiplier, setCostMultiplier] = useLocalStorage<number>("rentabilidad-sim", 0, slug)
 
   // Merge: base mock data + dishes from costeo tool
   const mockDishes = selectedCollection
@@ -171,13 +173,31 @@ export default function RentabilidadPage() {
     // Deduplicate by name (costeo dishes override mock ones)
     const costeoNames = new Set(costeoDishes.map((d) => d.name.toLowerCase()))
     const filteredMock = mockDishes.filter((d) => !costeoNames.has(d.name.toLowerCase()))
-    const merged = [...costeoDishes, ...filteredMock]
+    let merged = [...costeoDishes, ...filteredMock]
     // Apply price overrides
-    return merged.map((d) => ({
+    merged = merged.map((d) => ({
       ...d,
       price: priceOverrides[d.name] ?? d.price,
     }))
-  }, [mockDishes, costeoDishes, priceOverrides])
+    // Apply cost multiplier (simulator)
+    if (costMultiplier !== 0) {
+      merged = merged.map((d) => ({
+        ...d,
+        cost: +(d.cost * (1 + costMultiplier / 100)).toFixed(2),
+      }))
+    }
+    // Sort
+    merged = [...merged].sort((a, b) => {
+      switch (sortBy) {
+        case "margin": return (b.price - b.cost * (1 + costMultiplier / 100)) - (a.price - a.cost * (1 + costMultiplier / 100))
+        case "foodcost": return ((a.cost * (1 + costMultiplier / 100)) / a.price) - ((b.cost * (1 + costMultiplier / 100)) / b.price)
+        case "name": return a.name.localeCompare(b.name)
+        case "category": return a.category.localeCompare(b.category)
+        default: return 0
+      }
+    })
+    return merged
+  }, [mockDishes, costeoDishes, priceOverrides, sortBy, costMultiplier])
 
   function exportCSV() {
     const header = "Platillo,Categoría,Costo,Precio Venta,Margen,Food Cost %,Estado"
@@ -285,6 +305,51 @@ export default function RentabilidadPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Sort + Simulator controls */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 px-3 py-2">
+          <span className="text-xs text-gray-400 shrink-0">Ordenar:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="text-xs font-semibold text-gray-700 bg-transparent focus:outline-none"
+          >
+            <option value="name">Nombre A-Z</option>
+            <option value="margin">Mayor margen</option>
+            <option value="foodcost">Menor food cost</option>
+            <option value="category">Categoría</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 px-3 py-2 flex-1 min-w-0">
+          <span className="text-xs text-gray-400 shrink-0">Simulador:</span>
+          <input
+            type="range"
+            min="-30"
+            max="30"
+            value={costMultiplier}
+            onChange={(e) => setCostMultiplier(parseFloat(e.target.value))}
+            className="flex-1 min-w-0 h-1.5 accent-[#108910]"
+          />
+          <span className={`text-xs font-bold w-14 text-right ${costMultiplier > 0 ? "text-red-600" : costMultiplier < 0 ? "text-emerald-600" : "text-gray-400"}`}>
+            {costMultiplier > 0 ? "+" : ""}{costMultiplier}%
+          </span>
+          {costMultiplier !== 0 && (
+            <button
+              onClick={() => setCostMultiplier(0)}
+              className="text-[10px] text-gray-400 hover:text-gray-600 underline whitespace-nowrap"
+            >
+              Restablecer
+            </button>
+          )}
+        </div>
+      </div>
+      {costMultiplier !== 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 mb-4 text-xs text-amber-700 flex items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          Simulando {costMultiplier > 0 ? "aumento" : "reducción"} de {Math.abs(costMultiplier)}% en costos de insumos. Los food cost % están ajustados.
         </div>
       )}
 

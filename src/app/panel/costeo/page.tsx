@@ -148,7 +148,17 @@ interface Dish {
   ingredients: DishIngredient[]
   foodCostPercent: number
   sellingPrice: number
+  category: string
 }
+
+const DISH_CATEGORIES = [
+  { key: "todas", label: "Todas", color: "bg-gray-100 text-gray-700" },
+  { key: "entrada", label: "Entrada", color: "bg-amber-100 text-amber-700" },
+  { key: "plato-fuerte", label: "Plato fuerte", color: "bg-red-100 text-red-700" },
+  { key: "postre", label: "Postre", color: "bg-pink-100 text-pink-700" },
+  { key: "bebida", label: "Bebida", color: "bg-blue-100 text-blue-700" },
+  { key: "acompanamiento", label: "Acompañamiento", color: "bg-green-100 text-green-700" },
+]
 
 let dishCounter = 0
 function nextId() { dishCounter++; return `dish-${Date.now()}-${dishCounter}` }
@@ -179,18 +189,26 @@ export default function CosteoPage() {
   const [showCustom, setShowCustom] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState("todas")
+  const [newDishCategory, setNewDishCategory] = useState("plato-fuerte")
   const [undoStack, setUndoStack] = useState<Dish[][]>([])
   const [undoIndex, setUndoIndex] = useState(-1)
 
-  // Filtered dishes by search query
+  // Filtered dishes by search query and category
   const filteredDishes = useMemo(() => {
-    if (!searchQuery.trim()) return dishes
-    const q = searchQuery.toLowerCase()
-    return dishes.filter((d) =>
-      d.name.toLowerCase().includes(q) ||
-      d.ingredients.some((i) => i.ingredientName.toLowerCase().includes(q))
-    )
-  }, [dishes, searchQuery])
+    let result = dishes
+    if (categoryFilter !== "todas") {
+      result = result.filter((d) => d.category === categoryFilter)
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter((d) =>
+        d.name.toLowerCase().includes(q) ||
+        d.ingredients.some((i) => i.ingredientName.toLowerCase().includes(q))
+      )
+    }
+    return result
+  }, [dishes, searchQuery, categoryFilter])
 
   // Keep shared dishes in sync
   useEffect(() => {
@@ -245,6 +263,17 @@ export default function CosteoPage() {
     }])
     setEditingDishId(null)
     setShowForm(false)
+    setNewDishCategory("plato-fuerte")
+  }
+
+  function duplicateDish(dish: Dish) {
+    const copy: Dish = {
+      ...dish,
+      id: nextId(),
+      name: `${dish.name} (copia)`,
+      ingredients: dish.ingredients.map((i) => ({ ...i })),
+    }
+    pushHistory([...dishes, copy])
   }
 
   function addIngredient() {
@@ -309,6 +338,7 @@ export default function CosteoPage() {
       ingredients: [...newDishIngredients],
       foodCostPercent: targetFoodCost,
       sellingPrice: Math.round(sellingPrice * 100) / 100,
+      category: newDishCategory,
     }
 
     if (editingDishId) {
@@ -384,6 +414,25 @@ export default function CosteoPage() {
         </p>
       </div>
 
+      {/* Category filter tabs */}
+      {dishes.length > 0 && (
+        <div className="flex gap-1.5 mb-3 flex-wrap">
+          {DISH_CATEGORIES.map((cat) => (
+            <button
+              key={cat.key}
+              onClick={() => setCategoryFilter(cat.key)}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                categoryFilter === cat.key
+                  ? cat.color
+                  : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Search bar */}
       {dishes.length > 0 && (
         <div className="mb-4">
@@ -415,8 +464,21 @@ export default function CosteoPage() {
             return (
               <div key={dish.id} className="bg-white rounded-2xl border border-gray-100 p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-bold text-gray-900">{dish.name}</h4>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h4 className="font-bold text-gray-900 truncate">{dish.name}</h4>
+                    {(() => {
+                      const cat = DISH_CATEGORIES.find((c) => c.key === dish.category)
+                      return cat && cat.key !== "todas" ? (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${cat.color}`}>
+                          {cat.label}
+                        </span>
+                      ) : null
+                    })()}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => duplicateDish(dish)} className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-500 transition-colors" title="Duplicar platillo">
+                      <Plus className="w-4 h-4" />
+                    </button>
                     <button onClick={() => startEditDish(dish)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title="Editar platillo">
                       <Edit3 className="w-4 h-4" />
                     </button>
@@ -473,8 +535,28 @@ export default function CosteoPage() {
             value={newDishName}
             onChange={(e) => setNewDishName(e.target.value)}
             placeholder="Nombre del platillo"
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm mb-4 focus:outline-none focus:border-[#108910]"
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm mb-3 focus:outline-none focus:border-[#108910]"
           />
+
+          {/* Category selector */}
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs text-gray-400">Categoría:</span>
+            <div className="flex flex-wrap gap-1.5">
+              {DISH_CATEGORIES.filter((c) => c.key !== "todas").map((cat) => (
+                <button
+                  key={cat.key}
+                  onClick={() => setNewDishCategory(cat.key)}
+                  className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
+                    newDishCategory === cat.key
+                      ? cat.color
+                      : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="space-y-3 mb-4">
             {newDishIngredients.map((ing, idx) => (

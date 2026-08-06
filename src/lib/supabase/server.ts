@@ -1,12 +1,23 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import { notFound } from "next/navigation"
+import {
+  isSupabaseConfigured,
+  supabaseUrl,
+  supabaseAnonKey,
+  supabaseConfigError,
+} from "@/lib/supabase/env"
 
 export async function createClient() {
+  if (!isSupabaseConfigured()) {
+    throw new Error(supabaseConfigError())
+  }
+
   const cookieStore = await cookies()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl()!,
+    supabaseAnonKey()!,
     {
       cookies: {
         getAll() {
@@ -25,4 +36,20 @@ export async function createClient() {
       },
     }
   )
+}
+
+/**
+ * Igual que createClient pero degrada a 404 cuando Supabase no está
+ * configurado en el entorno (dev local o preview sin secrets). Ideal para
+ * páginas de catálogo que no tienen datos que mostrar sin backend.
+ */
+export async function createClientOrNotFound() {
+  try {
+    return await createClient()
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Supabase no está configurado")) {
+      notFound()
+    }
+    throw error
+  }
 }

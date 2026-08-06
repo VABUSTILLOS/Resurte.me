@@ -1,12 +1,28 @@
 import { createClient } from "@/lib/supabase/server"
 import type { City, Category, Product, RestaurantCollection } from "@/types"
 
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
+
+/**
+ * Crea el cliente Supabase degradando con gracia cuando el entorno no tiene
+ * secrets configurados (dev local o preview): devuelve null y los consumidores
+ * renderizan estados vacíos en lugar de crashear.
+ */
+async function tryCreateClient(): Promise<SupabaseServerClient | null> {
+  try {
+    return await createClient()
+  } catch {
+    return null
+  }
+}
+
 // ============================================================
 // CIUDADES
 // ============================================================
 
 export async function getCities(): Promise<City[]> {
-  const supabase = await createClient()
+  const supabase = await tryCreateClient()
+  if (!supabase) return []
   const { data } = await supabase
     .from("cities")
     .select("*")
@@ -16,7 +32,8 @@ export async function getCities(): Promise<City[]> {
 }
 
 export async function getCityBySlug(slug: string): Promise<City | null> {
-  const supabase = await createClient()
+  const supabase = await tryCreateClient()
+  if (!supabase) return null
   const { data } = await supabase
     .from("cities")
     .select("*")
@@ -30,7 +47,8 @@ export async function getCityBySlug(slug: string): Promise<City | null> {
 // ============================================================
 
 export async function getCategories(): Promise<Category[]> {
-  const supabase = await createClient()
+  const supabase = await tryCreateClient()
+  if (!supabase) return []
   const { data } = await supabase
     .from("categories")
     .select("*")
@@ -46,7 +64,8 @@ export async function getProducts(
   categoryId?: number,
   includeHidden: boolean = false
 ): Promise<Product[]> {
-  const supabase = await createClient()
+  const supabase = await tryCreateClient()
+  if (!supabase) return []
   let query = supabase
     .from("products")
     .select("*")
@@ -77,7 +96,8 @@ export async function getProductsPaginated(
   total: number
   hasMore: boolean
 }> {
-  const supabase = await createClient()
+  const supabase = await tryCreateClient()
+  if (!supabase) return { products: [], total: 0, hasMore: false }
   const from = page * pageSize
   const to = from + pageSize - 1
 
@@ -105,7 +125,8 @@ export async function getProductsPaginated(
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
-  const supabase = await createClient()
+  const supabase = await tryCreateClient()
+  if (!supabase) return null
   const { data } = await supabase
     .from("products")
     .select("*")
@@ -126,7 +147,8 @@ export async function searchAll(
   query: string,
   _cityId?: number
 ): Promise<SearchResults> {
-  const supabase = await createClient()
+  const supabase = await tryCreateClient()
+  if (!supabase) return { products: [] }
   const searchTerm = `%${query}%`
 
   const { data: products } = await supabase
@@ -150,7 +172,8 @@ export async function searchAll(
  * Cada colección agrupa productos por tags (sin duplicar inventario).
  */
 export async function getRestaurantCollections(): Promise<RestaurantCollection[]> {
-  const supabase = await createClient()
+  const supabase = await tryCreateClient()
+  if (!supabase) return []
   const { data } = await supabase
     .from("restaurant_collections")
     .select("*")
@@ -165,7 +188,8 @@ export async function getRestaurantCollections(): Promise<RestaurantCollection[]
 export async function getRestaurantCollectionBySlug(
   slug: string
 ): Promise<RestaurantCollection | null> {
-  const supabase = await createClient()
+  const supabase = await tryCreateClient()
+  if (!supabase) return null
   const { data } = await supabase
     .from("restaurant_collections")
     .select("*")
@@ -185,7 +209,8 @@ export async function getRestaurantCollectionBySlug(
 export async function getProductsByCollection(
   collectionSlug: string
 ): Promise<Product[]> {
-  const supabase = await createClient()
+  const supabase = await tryCreateClient()
+  if (!supabase) return []
 
   // 1. Obtener la colección y sus tags
   const { data: collection } = await supabase

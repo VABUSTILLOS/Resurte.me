@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
-import { createClient } from "@/lib/supabase/server"
+import { createClientOrNotFound } from "@/lib/supabase/server"
 import { Metadata } from "next"
 import { CategoryPageClient } from "./category-page-client"
 
@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, categorySlug } = await params
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
 
-  const supabase = await createClient()
+  const supabase = await createClientOrNotFound()
   const { data: category } = await supabase
     .from("categories")
     .select("name")
@@ -39,7 +39,7 @@ export default async function CategoryPage({ params }: Props) {
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   if (!city) notFound()
 
-  const supabase = await createClient()
+  const supabase = await createClientOrNotFound()
 
   // Fetch category
   const { data: category } = await supabase

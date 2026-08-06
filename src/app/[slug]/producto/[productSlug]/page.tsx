@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { Metadata } from "next"
-import { createClient } from "@/lib/supabase/server"
+import { createClientOrNotFound } from "@/lib/supabase/server"
 import { ProductDetailClient } from "./product-detail-client"
 
 // ISR: revalidate product pages every hour for fresh pricing
@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   if (!city) return { title: "Producto no encontrado — Resurte.me" }
 
-  const supabase = await createClient()
+  const supabase = await createClientOrNotFound()
   const { data: product } = await supabase
     .from("products")
     .select("name, description, image_url")
@@ -54,7 +54,7 @@ export default async function ProductPage({ params }: Props) {
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   if (!city) notFound()
 
-  const supabase = await createClient()
+  const supabase = await createClientOrNotFound()
 
   // Fetch product with category
   const { data: product } = await supabase

@@ -6,7 +6,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   ClipboardCheck, ArrowLeft, CheckCircle2, Circle, DollarSign,
-  Package, Store, CalendarClock,
+  Package, Store, CalendarClock, Printer,
 } from "lucide-react"
 
 interface ChecklistItem {
@@ -303,6 +303,10 @@ export default function AperturaPage() {
   const [checked, setChecked] = useLocalStorage<string[]>("apertura-checked", [], slug)
   const [showCalculator, setShowCalculator] = useState(false)
   const [phaseDates, setPhaseDates] = useLocalStorage<Record<string, string>>("apertura-dates", {}, slug)
+  const [customItems, setCustomItems] = useLocalStorage<{ name: string; low: number; high: number }[]>("apertura-custom", [], slug)
+  const [newCustomName, setNewCustomName] = useState("")
+  const [newCustomLow, setNewCustomLow] = useState("")
+  const [newCustomHigh, setNewCustomHigh] = useState("")
 
   const checkedSet = new Set(checked)
 
@@ -328,8 +332,8 @@ export default function AperturaPage() {
 
   const completedCount = checklist.filter((c) => checkedSet.has(c.id)).length
   const progress = checklist.length > 0 ? (completedCount / checklist.length) * 100 : 0
-  const invLow = investment.reduce((s, i) => s + i.low, 0)
-  const invHigh = investment.reduce((s, i) => s + i.high, 0)
+  const invLow = investment.reduce((s, i) => s + i.low, 0) + customItems.reduce((s, i) => s + i.low, 0)
+  const invHigh = investment.reduce((s, i) => s + i.high, 0) + customItems.reduce((s, i) => s + i.high, 0)
 
   if (!selectedCollection) {
     return (
@@ -353,6 +357,13 @@ export default function AperturaPage() {
           <h2 className="text-xl font-bold text-gray-900">Kit de apertura</h2>
           <p className="text-sm text-gray-400">{selectedCollection.name}</p>
         </div>
+        <button
+          onClick={() => window.print()}
+          className="ml-auto flex items-center gap-2 text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors"
+        >
+          <Printer className="w-4 h-4" />
+          Imprimir
+        </button>
       </div>
 
       {/* Progress bar */}
@@ -460,6 +471,61 @@ export default function AperturaPage() {
                   </span>
                 </div>
               ))}
+              {/* Custom items */}
+              {customItems.map((item, idx) => (
+                <div key={`custom-${idx}`} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">{item.name}</span>
+                    <button
+                      onClick={() => setCustomItems((prev) => prev.filter((_, i) => i !== idx))}
+                      className="text-[10px] text-red-400 hover:text-red-600"
+                    >
+                      eliminar
+                    </button>
+                  </div>
+                  <span className="text-sm font-mono font-semibold text-indigo-600">
+                    ${item.low.toLocaleString()} – ${item.high.toLocaleString()}
+                  </span>
+                </div>
+              ))}
+              {/* Add custom item form */}
+              <div className="flex flex-wrap items-end gap-2 pt-3 border-t border-gray-100">
+                <input
+                  type="text"
+                  placeholder="Nombre del rubro"
+                  value={newCustomName}
+                  onChange={(e) => setNewCustomName(e.target.value)}
+                  className="flex-1 min-w-[120px] px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#108910]"
+                />
+                <input
+                  type="number"
+                  placeholder="Min $"
+                  value={newCustomLow}
+                  onChange={(e) => setNewCustomLow(e.target.value)}
+                  className="w-20 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#108910]"
+                />
+                <input
+                  type="number"
+                  placeholder="Max $"
+                  value={newCustomHigh}
+                  onChange={(e) => setNewCustomHigh(e.target.value)}
+                  className="w-20 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#108910]"
+                />
+                <button
+                  onClick={() => {
+                    if (!newCustomName || !newCustomLow || !newCustomHigh) return
+                    setCustomItems((prev) => [...prev, {
+                      name: newCustomName,
+                      low: parseFloat(newCustomLow),
+                      high: parseFloat(newCustomHigh),
+                    }])
+                    setNewCustomName(""); setNewCustomLow(""); setNewCustomHigh("")
+                  }}
+                  className="text-xs font-semibold bg-[#108910] text-white px-3 py-1.5 rounded-lg hover:bg-[#0D720D] transition-colors"
+                >
+                  Agregar
+                </button>
+              </div>
             </div>
             <div className="border-t border-gray-100 pt-3 flex justify-between">
               <span className="font-bold text-gray-900">Total estimado</span>

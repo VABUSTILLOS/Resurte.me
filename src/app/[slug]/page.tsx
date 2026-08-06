@@ -4,6 +4,7 @@ import { Metadata } from "next"
 import { CityLanding } from "@/components/city/city-landing"
 import { getCityLandingSchema } from "@/lib/structured-data"
 import { createClient } from "@/lib/supabase/server"
+import type { Category, Product, RestaurantCollection } from "@/types"
 
 // ISR: revalidate every hour so new collections/products appear without manual deploy
 export const revalidate = 3600
@@ -58,27 +59,44 @@ export default async function CityPage({ params }: Props) {
 
   if (!city) notFound()
 
-  // Check auth
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Check auth + fetch catalog. Sin Supabase configurado (dev local/preview)
+  // la ciudad renderiza vacía en lugar de fallar.
+  let user: unknown = null
+  let categories: Category[] = []
+  let products: Product[] = []
+  let collections: RestaurantCollection[] = []
 
-  const { data: categories } = await supabase
-    .from("categories")
-    .select("id, name, slug, icon, parent_id")
-    .order("id")
+  try {
+    const supabase = await createClient()
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    user = currentUser
 
-  const { data: products } = await supabase
-    .from("products")
-    .select("*")
-    .eq("is_visible", true)
-    .order("name")
-
-  // Fetch active restaurant collections
-  const { data: collections } = await supabase
-    .from("restaurant_collections")
-    .select("*")
-    .eq("is_active", true)
-    .order("display_order")
+    const [cats, prods, colls] = await Promise.all([
+      supabase
+        .from("categories")
+        .select("id, name, slug, icon, parent_id")
+        .order("id"),
+      supabase
+        .from("products")
+        .select("*")
+        .eq("is_visible", true)
+        .order("name"),
+      supabase
+        .from("restaurant_collections")
+        .select("*")
+        .eq("is_active", true)
+        .order("display_order"),
+    ])
+    categories = (cats.data as Category[]) ?? []
+    products = (prods.data as Product[]) ?? []
+    collections = (colls.data as RestaurantCollection[]) ?? []
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Supabase no está configurado")) {
+      console.warn(`CityPage(${slug}) renderizó sin Supabase (env no configurado).`)
+    } else {
+      throw error
+    }
+  }
 
   return (
     <>
@@ -90,9 +108,9 @@ export default async function CityPage({ params }: Props) {
       />
       <CityLanding
         citySlug={slug}
-        categories={categories ?? []}
-        products={products ?? []}
-        collections={collections ?? []}
+        categories={categories}
+        products={products}
+        collections={collections}
         isLoggedIn={!!user}
       />
     </>

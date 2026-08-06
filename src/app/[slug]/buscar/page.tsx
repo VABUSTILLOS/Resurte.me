@@ -3,7 +3,7 @@ import { MEXICO_CITIES } from "@/lib/cities"
 import { Metadata } from "next"
 import { SearchPageClient } from "@/components/search/search-page-client"
 import { Suspense } from "react"
-import { createClient } from "@/lib/supabase/server"
+import { createClientOrNotFound } from "@/lib/supabase/server"
 import { getProductsPaginated } from "@/lib/data"
 
 interface Props {
@@ -44,7 +44,7 @@ export default async function SearchPage({ params }: Props) {
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   if (!city) notFound()
 
-  const supabase = await createClient()
+  const supabase = await createClientOrNotFound()
 
   const categoriesPromise = supabase
     .from("categories")

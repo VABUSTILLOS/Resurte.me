@@ -1,8 +1,9 @@
 import { createBrowserClient } from "@supabase/ssr"
+import { isSupabaseConfigured, supabaseUrl, supabaseAnonKey } from "@/lib/supabase/env"
 
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  // Sin secrets configurados devolvemos null para que la UI degrade con
+  // gracia (los consumidores ya hacen `if (!supabase) return`).
+  if (!isSupabaseConfigured()) return null
+  return createBrowserClient(supabaseUrl()!, supabaseAnonKey()!)
 }

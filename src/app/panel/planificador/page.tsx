@@ -138,6 +138,7 @@ export default function PlanificadorPage() {
   const [wastePercent, setWastePercent] = useLocalStorage<number>("planner-waste", 8, slug)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
   const [showOrder, setShowOrder] = useState(false)
+  const [manualQtys, setManualQtys] = useLocalStorage<Record<string, number>>("planner-manual-qtys", {}, slug)
 
   // Group by category
   const categories = new Map<string, typeof products>()
@@ -160,7 +161,8 @@ export default function PlanificadorPage() {
   }
 
   const totalCost = products.reduce((sum, p) => {
-    const needed = p.perPerson * covers * (1 + wastePercent / 100)
+    const autoNeeded = p.perPerson * covers * (1 + wastePercent / 100)
+    const needed = p.name in manualQtys ? manualQtys[p.name] : autoNeeded
     return sum + (needed * p.price)
   }, 0)
 
@@ -293,21 +295,38 @@ export default function PlanificadorPage() {
             {expandedCategory === category && (
               <div className="border-t border-gray-100 divide-y divide-gray-50">
                 {items.map((item, idx) => {
-                  const needed = item.perPerson * covers * (1 + wastePercent / 100)
+                  const autoNeeded = item.perPerson * covers * (1 + wastePercent / 100)
+                  const isManual = item.name in manualQtys
+                  const needed = isManual ? manualQtys[item.name] : autoNeeded
                   const cost = needed * item.price
                   return (
                     <div key={idx} className="flex items-center justify-between px-4 py-3 text-sm">
-                      <div className="min-w-0 mr-4">
+                      <div className="min-w-0 mr-4 flex-1">
                         <p className="font-medium text-gray-800 truncate">{item.name}</p>
                         <p className="text-xs text-gray-400">${item.price}/{item.unit}</p>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-mono font-bold text-gray-900">
-                          {needed < 1
-                            ? `${(needed * 1000).toFixed(0)} g`
-                            : `${needed.toFixed(2)} ${item.unit}`}
-                        </p>
-                        <p className="text-xs text-emerald-600 font-medium">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <input
+                          type="number"
+                          value={needed < 1 ? parseFloat((needed * 1000).toFixed(0)) : parseFloat(needed.toFixed(2))}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0
+                            const unitVal = item.unit === "kg" || item.unit === "L" ? val : val / 1000
+                            if (val === 0) {
+                              setManualQtys((prev) => { const { [item.name]: _, ...rest } = prev; return rest })
+                            } else {
+                              setManualQtys((prev) => ({ ...prev, [item.name]: unitVal }))
+                            }
+                          }}
+                          className={`w-20 text-right text-sm font-mono font-bold py-1 px-2 rounded-lg border focus:outline-none ${
+                            isManual ? "border-amber-300 bg-amber-50 text-amber-800" : "border-transparent bg-gray-50 text-gray-900 hover:border-gray-200"
+                          }`}
+                          step={item.unit === "kg" || item.unit === "L" ? "0.01" : "1"}
+                          min="0"
+                          title={isManual ? "Cantidad manual" : "Click para ajustar"}
+                        />
+                        <span className="text-xs text-gray-400 w-12 text-left">{item.unit === "kg" || item.unit === "L" || needed >= 1 ? item.unit : "g"}</span>
+                        <p className="text-xs text-emerald-600 font-medium w-16 text-right">
                           ${cost.toFixed(2)}
                         </p>
                       </div>

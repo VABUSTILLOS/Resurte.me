@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
-import { createClient } from "@/lib/supabase/server"
+import { createClientOrNotFound } from "@/lib/supabase/server"
 import { Metadata } from "next"
 import { CollectionPageClient } from "./collection-page-client"
 import type { Product } from "@/types"
@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, collectionSlug } = await params
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
 
-  const supabase = await createClient()
+  const supabase = await createClientOrNotFound()
   const { data: collection } = await supabase
     .from("restaurant_collections")
     .select("name")
@@ -41,7 +41,7 @@ export default async function CollectionPage({ params }: Props) {
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   if (!city) notFound()
 
-  const supabase = await createClient()
+  const supabase = await createClientOrNotFound()
 
   // Fetch collection metadata
   const { data: collection } = await supabase

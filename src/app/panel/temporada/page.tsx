@@ -10,23 +10,23 @@ import {
 } from "lucide-react"
 
 // Mexican seasonal produce calendar (when things are abundant/cheapest)
-const SEASONS: Record<string, { name: string; months: number[]; icon: string }> = {
-  aguacate: { name: "Aguacate", months: [1, 2, 6, 7, 8, 9, 10, 11], icon: "🥑" },
-  jitomate: { name: "Jitomate", months: [1, 2, 3, 7, 8, 9, 10, 11, 12], icon: "🍅" },
-  cebolla: { name: "Cebolla", months: [1, 2, 3, 4, 5, 9, 10, 11, 12], icon: "🧅" },
-  limon: { name: "Limón", months: [1, 2, 3, 4, 5, 6, 7, 8], icon: "🍋" },
-  chile: { name: "Chile serrano", months: [1, 2, 3, 7, 8, 9, 10, 11, 12], icon: "🌶️" },
-  cilantro: { name: "Cilantro", months: [1, 2, 3, 10, 11, 12], icon: "🌿" },
-  mango: { name: "Mango", months: [3, 4, 5, 6, 7], icon: "🥭" },
-  fresa: { name: "Fresa", months: [1, 2, 3, 11, 12], icon: "🍓" },
-  calabaza: { name: "Calabaza", months: [6, 7, 8, 9, 10], icon: "🎃" },
-  elote: { name: "Elote", months: [6, 7, 8, 9], icon: "🌽" },
-  nopal: { name: "Nopal", months: [1, 2, 3, 4, 5, 6, 7, 8, 9], icon: "🌵" },
-  papaya: { name: "Papaya", months: [2, 3, 4, 5, 6], icon: "🍈" },
-  pina: { name: "Piña", months: [3, 4, 5, 6, 7], icon: "🍍" },
-  sandia: { name: "Sandía", months: [4, 5, 6, 7], icon: "🍉" },
-  guayaba: { name: "Guayaba", months: [10, 11, 12], icon: "🍐" },
-  naranja: { name: "Naranja", months: [11, 12, 1, 2, 3], icon: "🍊" },
+const SEASONS: Record<string, { name: string; months: number[]; icon: string; highPrice: number; lowPrice: number }> = {
+  aguacate: { name: "Aguacate", months: [1, 2, 6, 7, 8, 9, 10, 11], icon: "🥑", highPrice: 49, lowPrice: 85 },
+  jitomate: { name: "Jitomate", months: [1, 2, 3, 7, 8, 9, 10, 11, 12], icon: "🍅", highPrice: 18, lowPrice: 35 },
+  cebolla: { name: "Cebolla", months: [1, 2, 3, 4, 5, 9, 10, 11, 12], icon: "🧅", highPrice: 15, lowPrice: 28 },
+  limon: { name: "Limón", months: [1, 2, 3, 4, 5, 6, 7, 8], icon: "🍋", highPrice: 20, lowPrice: 55 },
+  chile: { name: "Chile serrano", months: [1, 2, 3, 7, 8, 9, 10, 11, 12], icon: "🌶️", highPrice: 25, lowPrice: 48 },
+  cilantro: { name: "Cilantro", months: [1, 2, 3, 10, 11, 12], icon: "🌿", highPrice: 30, lowPrice: 60 },
+  mango: { name: "Mango", months: [3, 4, 5, 6, 7], icon: "🥭", highPrice: 22, lowPrice: 45 },
+  fresa: { name: "Fresa", months: [1, 2, 3, 11, 12], icon: "🍓", highPrice: 48, lowPrice: 75 },
+  calabaza: { name: "Calabaza", months: [6, 7, 8, 9, 10], icon: "🎃", highPrice: 18, lowPrice: 32 },
+  elote: { name: "Elote", months: [6, 7, 8, 9], icon: "🌽", highPrice: 12, lowPrice: 22 },
+  nopal: { name: "Nopal", months: [1, 2, 3, 4, 5, 6, 7, 8, 9], icon: "🌵", highPrice: 14, lowPrice: 25 },
+  papaya: { name: "Papaya", months: [2, 3, 4, 5, 6], icon: "🍈", highPrice: 18, lowPrice: 35 },
+  pina: { name: "Piña", months: [3, 4, 5, 6, 7], icon: "🍍", highPrice: 22, lowPrice: 38 },
+  sandia: { name: "Sandía", months: [4, 5, 6, 7], icon: "🍉", highPrice: 10, lowPrice: 22 },
+  guayaba: { name: "Guayaba", months: [10, 11, 12], icon: "🍐", highPrice: 20, lowPrice: 40 },
+  naranja: { name: "Naranja", months: [11, 12, 1, 2, 3], icon: "🍊", highPrice: 16, lowPrice: 30 },
 }
 
 const MONTHS = [
@@ -161,12 +161,24 @@ export default function TemporadaPage() {
             <h4 className="text-sm font-semibold text-gray-700">De temporada en {MONTHS[viewMonth]}</h4>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {inSeasonNow.map((item) => (
-              <div key={item.key} className="flex items-center gap-2 bg-emerald-50 rounded-xl px-3 py-2.5 border border-emerald-100">
-                <span className="text-lg">{item.icon}</span>
-                <span className="text-sm font-medium text-emerald-800">{item.name}</span>
-              </div>
-            ))}
+           {inSeasonNow.map((item) => {
+             const savings = item.highPrice > 0 ? Math.round((1 - item.highPrice / item.lowPrice) * 100) : 0
+             return (
+             <div key={item.key} className="bg-emerald-50 rounded-xl px-3 py-2.5 border border-emerald-100">
+               <div className="flex items-center gap-2 mb-1.5">
+                 <span className="text-lg">{item.icon}</span>
+                 <span className="text-sm font-medium text-emerald-800 leading-tight">{item.name}</span>
+               </div>
+               <div className="flex items-center gap-1.5">
+                 <span className="text-xs font-bold text-emerald-700">${item.highPrice}/kg</span>
+                 <span className="text-[10px] text-gray-400 line-through">${item.lowPrice}</span>
+                 <span className="text-[10px] bg-emerald-200 text-emerald-800 px-1 py-0.5 rounded-full font-bold">
+                   -{savings}%
+                 </span>
+               </div>
+             </div>
+             )
+           })}
             {inSeasonNow.length === 0 && (
               <p className="col-span-full text-sm text-gray-400 text-center py-4">
                 Pocos productos de temporada este mes. Buen momento para enfocarte en proteínas y secos.

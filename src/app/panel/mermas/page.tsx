@@ -59,8 +59,11 @@ export default function MermasPage() {
   const [costPerKg, setCostPerKg] = useState("")
   const [expandedTip, setExpandedTip] = useState<string | null>(null)
   const [showTrends, setShowTrends] = useState(false)
+  const [showTrendChart, setShowTrendChart] = useState(false)
+  const [showMonthlyGoal, setShowMonthlyGoal] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [dateFilter, setDateFilter] = useState<"all" | "week" | "month">("all")
+  const [monthlyGoal, setMonthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
 
   // Filtro por rango de fechas — calculado siempre (nunca después de un early return)
   const filteredEntries = useMemo(() => {
@@ -112,6 +115,10 @@ export default function MermasPage() {
   }
 
   const totalLoss = filteredEntries.reduce((sum, e) => sum + (e.amountKg * e.costPerKg), 0)
+  const monthLoss = entries
+    .filter((e) => new Date(e.date).getMonth() === new Date().getMonth())
+    .reduce((sum, e) => sum + e.amountKg * e.costPerKg, 0)
+  const goalProgress = monthlyGoal > 0 ? (monthLoss / monthlyGoal) * 100 : 0
   const categoryTotals = new Map<string, number>()
   filteredEntries.forEach((e) => {
     categoryTotals.set(e.category, (categoryTotals.get(e.category) || 0) + (e.amountKg * e.costPerKg))
@@ -302,6 +309,109 @@ export default function MermasPage() {
           )}
         </div>
       )}
+
+      {/* Trend chart */}
+      {entries.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
+          <button
+            onClick={() => setShowTrendChart(!showTrendChart)}
+            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <TrendingDown className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-semibold text-gray-900">Tendencia 7 días</h3>
+            </div>
+            <span className="text-xs text-gray-400">{showTrendChart ? "Ocultar" : "Ver"}</span>
+          </button>
+          {showTrendChart && (
+            <div className="border-t border-gray-100 p-4">
+              {(() => {
+                const days: { label: string; loss: number }[] = []
+                for (let i = 6; i >= 0; i--) {
+                  const d = new Date()
+                  d.setDate(d.getDate() - i)
+                  const dateStr = d.toISOString().split("T")[0]
+                  const dayLoss = entries
+                    .filter((e) => e.date.split("T")[0] === dateStr)
+                    .reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
+                  days.push({
+                    label: i === 0 ? "Hoy" : i === 1 ? "Ayer" : d.toLocaleDateString("es-MX", { weekday: "short" }),
+                    loss: dayLoss,
+                  })
+                }
+                const maxLoss = Math.max(...days.map((d) => d.loss), 1)
+                return (
+                  <div className="flex items-end gap-2 h-32">
+                    {days.map((day, idx) => (
+                      <div key={idx} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                        <span className="text-[10px] font-mono font-bold text-red-600">
+                          ${day.loss.toFixed(0)}
+                        </span>
+                        <div className="w-full flex-1 bg-gray-100 rounded-t-lg relative overflow-hidden">
+                          <div
+                            className="absolute bottom-0 w-full bg-gradient-to-t from-red-500 to-red-400 rounded-t-lg transition-all"
+                            style={{ height: `${(day.loss / maxLoss) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-400">{day.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Monthly goal */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
+        <button
+          onClick={() => setShowMonthlyGoal(!showMonthlyGoal)}
+          className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-emerald-600" />
+            <h3 className="font-semibold text-gray-900">Meta mensual de merma</h3>
+          </div>
+          <span className="text-xs text-gray-400">{monthlyGoal > 0 ? `${goalProgress.toFixed(0)}%` : "Configurar"}</span>
+        </button>
+        {showMonthlyGoal && (
+          <div className="border-t border-gray-100 p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-600 shrink-0">Meta máxima:</label>
+              <input
+                type="number"
+                value={monthlyGoal || ""}
+                onChange={(e) => setMonthlyGoal(parseFloat(e.target.value) || 0)}
+                placeholder="$5,000"
+                className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+              />
+              <span className="text-sm text-gray-400">MXN</span>
+            </div>
+            {monthlyGoal > 0 && (
+              <>
+                <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      goalProgress > 100 ? "bg-red-500" : goalProgress > 75 ? "bg-amber-500" : "bg-emerald-500"
+                    }`}
+                    style={{ width: `${Math.min(goalProgress, 100)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500">
+                    ${monthLoss.toFixed(0)} de ${monthlyGoal.toFixed(0)}
+                  </span>
+                  <span className={`font-bold ${goalProgress > 100 ? "text-red-600" : "text-emerald-600"}`}>
+                    {goalProgress > 100 ? `¡Excedido por ${(goalProgress - 100).toFixed(0)}%!` : `${goalProgress.toFixed(0)}% usado`}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Tips */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">

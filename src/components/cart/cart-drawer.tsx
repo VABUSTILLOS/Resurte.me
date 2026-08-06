@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { trackEvent } from "@/lib/analytics"
+import { useABTest } from "@/lib/feature-flags"
 
 // Global event bus to control drawer from header
 export const CART_DRAWER_EVENT = "resurte:toggle-cart-drawer"
@@ -24,6 +25,12 @@ export function CartDrawer() {
   const { cart, itemCount, subtotal, removeItem, updateQuantity, clearCart } = useCart()
   const { city } = useCity()
   const router = useRouter()
+
+  // A/B test: free shipping messaging
+  const shippingTestVariant = useABTest("free-shipping-copy", [
+    { key: "urgency", weight: 0.5 },
+    { key: "value", weight: 0.5 },
+  ])
 
   // Listen for toggle events from header
   useEffect(() => {
@@ -264,10 +271,15 @@ export function CartDrawer() {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-[#72767E] flex items-center gap-1">
-                      <span>🚚</span> Envío gratis desde $2,500
+                      <span>🚚</span>{" "}
+                      {shippingTestVariant === "value"
+                        ? `Ahorra $150: completa tu pedido hasta $2,500`
+                        : "Envío gratis desde $2,500"}
                     </span>
                     <span className="font-semibold text-[#108910]">
-                      Te faltan ${remaining.toFixed(0)}
+                      {shippingTestVariant === "urgency"
+                        ? `¡Solo $${remaining.toFixed(0)}!`
+                        : `Te faltan $${remaining.toFixed(0)}`}
                     </span>
                   </div>
                   <div className="h-2 bg-[#F0EDE5] rounded-full overflow-hidden">
