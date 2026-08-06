@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useToast } from "@/components/toast"
 import Link from "next/link"
 import {
   Trash2, ArrowLeft, DollarSign, TrendingDown, Lightbulb,
@@ -76,6 +77,7 @@ function nextWasteId() { wasteId++; return `waste-${Date.now()}-${wasteId}` }
 
 export default function MermasPage() {
   const { selectedCollection } = useRestaurant()
+  const { toast } = useToast()
   const slug = selectedCollection?.slug || null
   const [entries, setEntries] = useLocalStorage<WasteEntry[]>("mermas-entries", [], slug)
   const [showForm, setShowForm] = useState(false)
@@ -118,6 +120,7 @@ export default function MermasPage() {
         costPerKg: cost,
         note: note.trim() || undefined,
       } : e))
+      toast("Entrada de merma actualizada", "success")
     } else {
       setEntries((prev) => [...prev, {
         id: nextWasteId(),
@@ -128,6 +131,7 @@ export default function MermasPage() {
         date: new Date().toISOString(),
         note: note.trim() || undefined,
       }])
+      toast("Entrada de merma registrada", "warning")
     }
     setAmountKg("")
     setCostPerKg("")
@@ -163,6 +167,7 @@ export default function MermasPage() {
   function confirmDeleteEntry() {
     if (deleteConfirmId) {
       setEntries((prev) => prev.filter((e) => e.id !== deleteConfirmId))
+      toast("Entrada de merma eliminada", "error")
       setDeleteConfirmId(null)
     }
   }
@@ -372,49 +377,95 @@ export default function MermasPage() {
 
       {/* Category breakdown & trends */}
       {entries.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
-          <button
-            onClick={() => setShowTrends(!showTrends)}
-            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-indigo-600" />
-              <h3 className="font-semibold text-gray-900">Desglose por categoría</h3>
-            </div>
-            <span className="text-xs text-gray-400">{showTrends ? "Ocultar" : "Ver"}</span>
-          </button>
-          {showTrends && (
-            <div className="border-t border-gray-100 p-4 space-y-3">
-              {WASTE_CATEGORIES.map((cat) => {
-                const catEntries = entries.filter((e) => e.category === cat.key)
-                const catLoss = catEntries.reduce((s, e) => s + (e.amountKg * e.costPerKg), 0)
-                const catKg = catEntries.reduce((s, e) => s + e.amountKg, 0)
-                const pctOfTotal = totalLoss > 0 ? (catLoss / totalLoss) * 100 : 0
-                if (catLoss === 0) return null
-                return (
-                  <div key={cat.key} className="flex items-center gap-3">
-                    <span className="text-lg w-8 text-center">{cat.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-700">{cat.label}</span>
-                        <span className="text-sm font-bold text-red-600">${catLoss.toFixed(2)}</span>
+        <>
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
+            <button
+              onClick={() => setShowTrends(!showTrends)}
+              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-semibold text-gray-900">Desglose por categoría</h3>
+              </div>
+              <span className="text-xs text-gray-400">{showTrends ? "Ocultar" : "Ver"}</span>
+            </button>
+            {showTrends && (
+              <div className="border-t border-gray-100 p-4 space-y-3">
+                {WASTE_CATEGORIES.map((cat) => {
+                  const catEntries = entries.filter((e) => e.category === cat.key)
+                  const catLoss = catEntries.reduce((s, e) => s + (e.amountKg * e.costPerKg), 0)
+                  const catKg = catEntries.reduce((s, e) => s + e.amountKg, 0)
+                  const pctOfTotal = totalLoss > 0 ? (catLoss / totalLoss) * 100 : 0
+                  if (catLoss === 0) return null
+                  return (
+                    <div key={cat.key} className="flex items-center gap-3">
+                      <span className="text-lg w-8 text-center">{cat.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium text-gray-700">{cat.label}</span>
+                          <span className="text-sm font-bold text-red-600">${catLoss.toFixed(2)}</span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="bg-red-500 h-full rounded-full transition-all"
+                            style={{ width: `${Math.max(pctOfTotal, 2)}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {catKg.toFixed(1)} kg ({catEntries.length} registros)
+                        </p>
                       </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-red-500 h-full rounded-full transition-all"
-                          style={{ width: `${Math.max(pctOfTotal, 2)}%` }}
-                        />
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Top cause section */}
+          {(() => {
+            const byCause = new Map<string, number>()
+            entries.forEach((e) => {
+              const key = e.cause || "otro"
+              byCause.set(key, (byCause.get(key) || 0) + e.amountKg * e.costPerKg)
+            })
+            const sorted = Array.from(byCause.entries()).sort((a, b) => b[1] - a[1])
+            const topCause = sorted[0]
+            const topCauseData = CAUSAS.find((c) => c.key === topCause?.[0])
+            return (
+              <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">🎯</span>
+                  <h3 className="font-semibold text-gray-900">Causa principal de merma</h3>
+                </div>
+                {topCause && topCauseData ? (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-2xl">{topCauseData.icon}</span>
+                      <div>
+                        <p className="text-base font-bold text-gray-800">{topCauseData.label}</p>
+                        <p className="text-sm text-red-600 font-semibold">${topCause[1].toFixed(2)} ({((topCause[1] / totalLoss) * 100).toFixed(0)}% del total)</p>
                       </div>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {catKg.toFixed(1)} kg ({catEntries.length} registros)
-                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {sorted.map(([key, amount]) => {
+                        const d = CAUSAS.find((c) => c.key === key)
+                        const pct = totalLoss > 0 ? ((amount / totalLoss) * 100).toFixed(0) : 0
+                        return (
+                          <span key={key} className="text-[10px] px-2 py-1 rounded-lg bg-gray-100 text-gray-600">
+                            {d?.icon} {d?.label}: {pct}%
+                          </span>
+                        )
+                      })}
                     </div>
                   </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
+                ) : (
+                  <p className="text-sm text-gray-400">Sin datos suficientes para determinar la causa principal.</p>
+                )}
+              </div>
+            )
+          })()}
+        </>
       )}
 
       {/* Trend chart — 6 months */}

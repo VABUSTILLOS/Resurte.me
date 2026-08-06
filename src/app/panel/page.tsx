@@ -4,12 +4,14 @@ import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo } from "react"
+import { useMemo, useState, useEffect, useCallback } from "react"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp,
   Calendar, ClipboardCheck, ArrowRight, ChefHat, Store,
   PieChart, DollarSign, BarChart3, Zap, Clock, Percent, Package,
+  AlertTriangle, Bell, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Search,
 } from "lucide-react"
+import { GlobalSearch } from "@/components/global-search"
 
 const COLLECTION_ICONS: Record<string, string> = {
   "hamburguesas-hot-dogs": "🍔",
@@ -113,6 +115,25 @@ export default function PanelPage() {
   const [aperturaChecked] = useLocalStorage<string[]>("apertura-checked", [], slug)
   const [monthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
   const [shoppingList] = useLocalStorage<{ key: string; name: string; pricePerKg: number; quantityKg: number }[]>("temporada-shopping-list", [], slug)
+  const [inventarioItems] = useLocalStorage<{ id: string; name: string; stock: number; minStock: number; unit: string; pricePerUnit: number; category?: string }[]>("inventario-items", [], slug)
+
+  const [showAlerts, setShowAlerts] = useState(true)
+  const [showSearch, setShowSearch] = useState(false)
+
+  // Cmd+K handler
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        setShowSearch((v) => !v)
+      }
+    }
+    // Also listen for the custom event from GlobalSearch
+    const toggle = () => setShowSearch((v) => !v)
+    window.addEventListener("global-search-toggle", toggle)
+    window.addEventListener("keydown", handler)
+    return () => { window.removeEventListener("keydown", handler); window.removeEventListener("global-search-toggle", toggle) }
+  }, [])
 
   const stats = useMemo(() => {
     if (!selectedCollection) return null
@@ -136,6 +157,69 @@ export default function PanelPage() {
     }).length
     return { totalCosteo, totalMerma, green, red, dishesCount: sharedDishes.length, mermaCount: mermaEntries.length, aperturaCount: aperturaChecked.length, avgFoodCost, avgMargin, monthLoss, mermaVsGoal, seasonalSavings, totalPrice, monthlyGoal }
   }, [sharedDishes, mermaEntries, aperturaChecked, selectedCollection, monthlyGoal, shoppingList])
+
+  // Alerts computation
+  const alerts = useMemo(() => {
+    if (!selectedCollection) return []
+    type Alert = { id: string; type: "danger" | "warning" | "info" | "success"; icon: typeof AlertTriangle; title: string; detail: string; href: string }
+    const result: Alert[] = []
+
+    // 1. Low stock from inventario
+    const lowStock = inventarioItems.filter((i) => i.stock <= i.minStock && i.stock > 0)
+    const outOfStock = inventarioItems.filter((i) => i.stock === 0)
+    if (outOfStock.length > 0) {
+      result.push({ id: "stock-out", type: "danger", icon: AlertTriangle, title: `${outOfStock.length} producto(s) agotado(s)`, detail: `${outOfStock.slice(0, 2).map((i) => i.name).join(", ")}${outOfStock.length > 2 ? ` +${outOfStock.length - 2} más` : ""}`, href: "/panel/inventario" })
+    } else if (lowStock.length > 0) {
+      result.push({ id: "stock-low", type: "warning", icon: AlertCircle, title: `${lowStock.length} producto(s) con stock bajo`, detail: `${lowStock.slice(0, 2).map((i) => `${i.name} (${i.stock} ${i.unit})`).join(", ")}${lowStock.length > 2 ? ` +${lowStock.length - 2} más` : ""}`, href: "/panel/inventario" })
+    }
+
+    // 2. High food cost dishes
+    const highCostDishes = sharedDishes.filter((d) => {
+      const cost = d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0)
+      return d.sellingPrice > 0 && (cost / d.sellingPrice) * 100 > 38
+    })
+    if (highCostDishes.length > 0) {
+      result.push({ id: "high-foodcost", type: "danger", icon: AlertTriangle, title: `${highCostDishes.length} platillo(s) con food cost > 38%`, detail: `${highCostDishes.map((d) => d.name).join(", ")}`, href: "/panel/rentabilidad" })
+    }
+
+    // 3. Merma close to/exceeding goal
+    if (monthlyGoal > 0) {
+      const monthLoss = mermaEntries.filter((e) => new Date(e.date).getMonth() === new Date().getMonth()).reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
+      const pct = (monthLoss / monthlyGoal) * 100
+      if (pct > 100) {
+        result.push({ id: "merma-over-goal", type: "danger", icon: AlertTriangle, title: "Merma del mes excedió la meta", detail: `$${monthLoss.toFixed(0)} vs meta de $${monthlyGoal.toFixed(0)} (${pct.toFixed(0)}%)`, href: "/panel/mermas" })
+      } else if (pct > 80) {
+        result.push({ id: "merma-near-goal", type: "warning", icon: AlertCircle, title: "Merma cerca de la meta mensual", detail: `${pct.toFixed(0)}% de la meta alcanzada ($${monthLoss.toFixed(0)} de $${monthlyGoal.toFixed(0)})`, href: "/panel/mermas" })
+      }
+    }
+
+    // 4. Temporada — seasonal produce available
+    const now = new Date()
+    const currentMonth = now.getMonth() + 1
+    // Quick seasonal check: if there are items in shopping list, note it
+    if (shoppingList.length > 0) {
+      result.push({ id: "seasonal-available", type: "info", icon: TrendingUp, title: `${shoppingList.length} productos en tu lista de compras estacional`, detail: `Ahorro estimado: $${shoppingList.reduce((s, i) => s + i.quantityKg * i.pricePerKg, 0).toFixed(0)}`, href: "/panel/temporada" })
+    } else {
+      // Generic seasonal alert
+      const estacionalInfo = currentMonth >= 3 && currentMonth <= 5 ? "Primavera — ideal para verduras frescas y frutas" :
+        currentMonth >= 6 && currentMonth <= 8 ? "Verano — mangos, aguacates, jitomates en su mejor momento" :
+        currentMonth >= 9 && currentMonth <= 11 ? "Otoño — calabazas, chiles, granos de temporada" :
+        "Invierno — cítricos y verduras de hoja verde en temporada"
+      result.push({ id: "seasonal-tip", type: "info", icon: Calendar, title: "Productos de temporada disponibles", detail: estacionalInfo, href: "/panel/temporada" })
+    }
+
+    // 5. Apertura checklist low completion
+    const aperturaTotal = 6 // approximate minimum for any collection
+    const aperturaPct = aperturaTotal > 0 ? (aperturaChecked.length / aperturaTotal) * 100 : 0
+    if (aperturaChecked.length > 0 && aperturaPct < 50) {
+      result.push({ id: "apertura-incomplete", type: "warning", icon: AlertCircle, title: "Kit de apertura: menos del 50% completado", detail: `Solo ${aperturaChecked.length} de ~${aperturaTotal} pasos verificados`, href: "/panel/apertura" })
+    } else if (aperturaChecked.length === 0 && aperturaTotal > 0) {
+      result.push({ id: "apertura-not-started", type: "info", icon: ClipboardCheck, title: "Kit de apertura sin iniciar", detail: "Empieza a verificar los pasos para abrir tu restaurante", href: "/panel/apertura" })
+    }
+
+    // Limit to 5
+    return result.slice(0, 5)
+  }, [selectedCollection, inventarioItems, sharedDishes, mermaEntries, monthlyGoal, shoppingList, aperturaChecked])
 
   return (
     <div>
@@ -295,7 +379,63 @@ export default function PanelPage() {
         </p>
       )}
 
-      {/* Quick actions */}
+      {/* Alerts panel */}
+      {selectedCollection && alerts.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
+          <button
+            onClick={() => setShowAlerts(!showAlerts)}
+            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Bell className="w-5 h-5 text-amber-500" />
+              <h3 className="font-semibold text-gray-900">Alertas</h3>
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{alerts.length}</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-gray-400">
+              {showAlerts ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </div>
+          </button>
+          {showAlerts && (
+            <div className="border-t border-gray-100 divide-y divide-gray-50">
+              {alerts.map((alert) => {
+                const colorMap: Record<string, string> = {
+                  danger: "bg-red-50 border-red-200",
+                  warning: "bg-amber-50 border-amber-200",
+                  info: "bg-blue-50 border-blue-200",
+                  success: "bg-green-50 border-green-200",
+                }
+                const iconColorMap: Record<string, string> = {
+                  danger: "text-red-500",
+                  warning: "text-amber-500",
+                  info: "text-blue-500",
+                  success: "text-green-500",
+                }
+                return (
+                  <Link
+                    key={alert.id}
+                    href={alert.href}
+                    className={`flex items-start gap-3 p-3.5 mx-3 my-1.5 rounded-xl border transition-colors hover:shadow-sm ${colorMap[alert.type]}`}
+                  >
+                    <alert.icon className={`w-4 h-4 shrink-0 mt-0.5 ${iconColorMap[alert.type]}`} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">{alert.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{alert.detail}</p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-gray-300 shrink-0 ml-auto" />
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedCollection && alerts.length === 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-6 flex items-center gap-3">
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+          <span className="text-sm text-gray-600">Todo en orden ✅ — No hay alertas pendientes.</span>
+        </div>
+      )}
       {selectedCollection && (
         <div className="flex items-center gap-2 mb-6">
           <span className="text-xs text-gray-400 flex items-center gap-1">
@@ -354,7 +494,15 @@ export default function PanelPage() {
           </div>
         </div>
       )}
-
+      {selectedCollection && (
+        <button onClick={() => setShowSearch(true)} className="w-full mb-6 bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center gap-3 text-sm text-gray-400 hover:border-gray-200 hover:text-gray-500 transition-colors group">
+          <Search className="w-4 h-4 shrink-0" />
+          <span className="flex-1 text-left">Buscar platillos, productos, inventario...</span>
+          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-50 text-[10px] font-medium text-gray-300 font-mono border border-gray-100 group-hover:border-gray-200">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </button>
+      )}
       {/* Tool cards grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {TOOLS.map((tool) => (
@@ -391,6 +539,7 @@ export default function PanelPage() {
           </Link>
         ))}
       </div>
+      <GlobalSearch open={showSearch} onClose={() => setShowSearch(false)} />
     </div>
   )
 }

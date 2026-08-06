@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
+import { useToast } from "@/components/toast"
 import Link from "next/link"
 import {
   Calculator, Plus, Trash2, PieChart, ArrowLeft,
@@ -166,6 +167,7 @@ function nextId() { dishCounter++; return `dish-${Date.now()}-${dishCounter}` }
 
 export default function CosteoPage() {
   const { selectedCollection } = useRestaurant()
+  const { toast } = useToast()
   const slug = selectedCollection?.slug || null
 
   const ingredients = selectedCollection
@@ -193,6 +195,7 @@ export default function CosteoPage() {
   const [categoryFilter, setCategoryFilter] = useState("todas")
   const [newDishCategory, setNewDishCategory] = useState("plato-fuerte")
   const [newDishPortions, setNewDishPortions] = useState(4)
+  const [inventarioItems] = useLocalStorage<{ name: string; stock: number; minStock: number; unit: string; pricePerUnit: number }[]>("inventario-items", [], slug)
   const [undoStack, setUndoStack] = useState<Dish[][]>([])
   const [undoIndex, setUndoIndex] = useState(-1)
   const [selectedDishes, setSelectedDishes] = useState<Set<string>>(new Set())
@@ -397,8 +400,10 @@ export default function CosteoPage() {
 
     if (editingDishId) {
       pushHistory(dishes.map((d) => (d.id === editingDishId ? dish : d)))
+      toast("Platillo actualizado", "success")
     } else {
       pushHistory([...dishes, dish])
+      toast("Platillo agregado al menú", "success")
     }
     resetForm()
   }
@@ -409,7 +414,9 @@ export default function CosteoPage() {
 
   function confirmDeleteDish() {
     if (deleteConfirmId) {
+      const name = dishes.find((d) => d.id === deleteConfirmId)?.name || "Platillo"
       pushHistory(dishes.filter((d) => d.id !== deleteConfirmId))
+      toast(`"${name}" eliminado`, "warning")
       setDeleteConfirmId(null)
     }
   }
@@ -677,7 +684,10 @@ export default function CosteoPage() {
           </div>
 
           <div className="space-y-3 mb-4">
-            {newDishIngredients.map((ing, idx) => (
+            {newDishIngredients.map((ing, idx) => {
+              const invMatch = inventarioItems.find((i) => i.name.toLowerCase() === ing.ingredientName.toLowerCase())
+              return (
+              <>
               <div key={idx} className="flex items-center gap-2">
                 <select
                   value={ing.ingredientName}
@@ -709,7 +719,29 @@ export default function CosteoPage() {
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
-            ))}
+              {invMatch && (
+                <div className="flex items-center gap-1 ml-0.5 -mt-1 mb-1">
+                  <button
+                    type="button"
+                    onClick={() => updateIngredient(idx, "unitPrice", invMatch.pricePerUnit)}
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors ${
+                      ing.unitPrice === invMatch.pricePerUnit
+                        ? "bg-cyan-100 text-cyan-700 border border-cyan-300"
+                        : "bg-cyan-50 text-cyan-600 border border-cyan-200 hover:bg-cyan-100"
+                    }`}
+                    title="Click para usar el precio de tu inventario"
+                  >
+                    📦 Inv: ${invMatch.pricePerUnit}/{invMatch.unit}
+                    {ing.unitPrice === invMatch.pricePerUnit && " ✓"}
+                  </button>
+                  {ing.unitPrice !== invMatch.pricePerUnit && (
+                    <span className="text-[10px] text-gray-400">→ click para usar precio de inventario</span>
+                  )}
+                </div>
+              )}
+              </>
+              )
+            })}
           </div>
 
           <div className="flex items-center gap-3 mb-4 flex-wrap">

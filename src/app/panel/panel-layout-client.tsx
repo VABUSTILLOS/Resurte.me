@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { RestaurantProvider, useRestaurant } from "@/contexts/restaurant-context"
+import { ToastProvider } from "@/components/toast"
 import type { RestaurantCollection } from "@/types"
 import {
   Store, ChefHat, ChevronDown, Sparkles,
@@ -148,7 +149,7 @@ function PanelContent({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </div>
     </div>
   )
