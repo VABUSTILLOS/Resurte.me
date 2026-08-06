@@ -2,6 +2,7 @@
 
 import { MessageCircle } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
+import { trackEvent } from "@/lib/analytics"
 
 interface WhatsAppButtonProps {
   phoneNumber: string
@@ -21,6 +22,10 @@ export function WhatsAppButton({
   const encodedMessage = encodeURIComponent(message)
   const waLink = `https://wa.me/${cleanNumber}?text=${encodedMessage}`
 
+  const handleWhatsAppClick = () => {
+    trackEvent("lead")
+  }
+
   const positionClass = position === "bottom-right" ? "right-4 sm:right-6" : "left-4 sm:left-6"
 
   // Cart empty: WhatsApp sits at the same bottom level as "Ver más productos" would.
@@ -38,6 +43,7 @@ export function WhatsAppButton({
       href={waLink}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={handleWhatsAppClick}
       className={`fixed ${bottomMobile} ${bottomDesktop} ${positionClass} z-50 flex items-center gap-2 px-4 py-3 bg-green-500 text-white font-semibold rounded-full shadow-lg hover:bg-green-600 hover:shadow-xl transition-all group`}
     >
       <MessageCircle className="w-5 h-5" />

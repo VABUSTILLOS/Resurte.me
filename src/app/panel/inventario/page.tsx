@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useToast } from "@/components/toast"
 import {
   Package, Plus, Edit3, Trash2, ShoppingCart,
   ArrowDownToLine, Copy, AlertTriangle,
@@ -25,6 +26,7 @@ type SortField = "name" | "stock" | "pricePerUnit" | "status"
 export default function InventarioPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || "default"
+  const { toast } = useToast()
 
   const [items, setItems] = useLocalStorage<InventoryItem[]>("inventario-items", [], slug)
   const [sortBy, setSortBy] = useLocalStorage<SortField>("inventario-sort", "name", slug)
@@ -127,7 +129,14 @@ export default function InventarioPage() {
     const stock = parseFloat(formStock) || 0
     const minStock = parseFloat(formMinStock) || 5
     const pricePerUnit = parseFloat(formPrice) || 0
-    if (!formName.trim()) return
+    if (!formName.trim()) {
+      toast("El nombre del producto es obligatorio", "warning")
+      return
+    }
+    if (stock < 0 || minStock < 0 || pricePerUnit < 0) {
+      toast("Las cantidades y precios no pueden ser negativos", "error")
+      return
+    }
 
     if (editingId) {
       setItems((prev) =>
@@ -137,6 +146,7 @@ export default function InventarioPage() {
             : i
         )
       )
+      toast("Producto actualizado", "success")
     } else {
       const newItem: InventoryItem = {
         id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
@@ -148,6 +158,7 @@ export default function InventarioPage() {
         category: formCategory || undefined,
       }
       setItems((prev) => [...prev, newItem])
+      toast("Producto agregado al inventario", "success")
     }
     setShowForm(false)
     setEditingId(null)
@@ -156,6 +167,7 @@ export default function InventarioPage() {
   const deleteItem = (id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id))
     setDeleteConfirm(null)
+    toast("Producto eliminado", "warning")
   }
 
   const adjustStock = (id: string, delta: number) => {
@@ -165,6 +177,34 @@ export default function InventarioPage() {
       )
     )
   }
+
+  // Keyboard shortcuts: Ctrl+N new item, Escape closes modal
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
+        e.preventDefault()
+        openAddForm()
+      }
+      if (e.key === "Escape") {
+        setDeleteConfirm(null)
+        if (showForm) setShowForm(false)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [showForm])
+
+  // Warn before leaving if the add/edit form has unsaved changes
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (showForm) {
+        e.preventDefault()
+        e.returnValue = ""
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [showForm])
 
   // ── Import from planificador ────────────────────────────
   const importFromPlanificador = () => {
@@ -192,6 +232,7 @@ export default function InventarioPage() {
         pricePerUnit: 20,
       }))
     setItems([...merged, ...trulyNew])
+    toast(`Se importaron ${trulyNew.length} productos nuevos y se actualizaron los existentes`, "success")
   }
 
   // ── Copy / Export ───────────────────────────────────────
@@ -203,6 +244,7 @@ export default function InventarioPage() {
     const total = `\n💰 Total estimado: $${totalOrder.toFixed(0)}`
     const footer = `\n📦 Pedir en resurte.me`
     navigator.clipboard.writeText([header, ...lines, total, footer].join("\n"))
+    toast("Orden de compra copiada", "success")
   }
 
   const exportCSV = () => {
@@ -218,6 +260,7 @@ export default function InventarioPage() {
     a.download = `inventario-${slug}.csv`
     a.click()
     URL.revokeObjectURL(url)
+    toast("Inventario exportado a CSV", "success")
   }
 
   if (!selectedCollection) {
@@ -248,6 +291,7 @@ export default function InventarioPage() {
               onClick={exportCSV}
               className="p-2 text-gray-400 hover:text-[#108910] hover:bg-green-50 rounded-xl transition-colors"
               title="Exportar CSV"
+              aria-label="Exportar inventario a CSV"
             >
               <Download className="w-4 h-4" />
             </button>
@@ -403,19 +447,21 @@ export default function InventarioPage() {
                             onClick={() => adjustStock(item.id, -1)}
                             className="w-6 h-6 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 text-xs font-bold transition-colors"
                             disabled={item.stock <= 0}
+                            aria-label={`Disminuir stock de ${item.name}`}
                           >−</button>
                           <button
                             onClick={() => adjustStock(item.id, 1)}
                             className="w-6 h-6 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 text-xs font-bold transition-colors"
+                            aria-label={`Aumentar stock de ${item.name}`}
                           >+</button>
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => openEditForm(item)} className="p-1.5 text-gray-400 hover:text-[#108910] hover:bg-green-50 rounded-lg transition-colors" title="Editar">
+                          <button onClick={() => openEditForm(item)} className="p-1.5 text-gray-400 hover:text-[#108910] hover:bg-green-50 rounded-lg transition-colors" title="Editar" aria-label={`Editar ${item.name}`}>
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
-                          <button onClick={() => setDeleteConfirm(item.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                          <button onClick={() => setDeleteConfirm(item.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar" aria-label={`Eliminar ${item.name}`}>
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>

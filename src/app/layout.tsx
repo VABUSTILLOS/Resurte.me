@@ -9,6 +9,7 @@ import { CityDetector } from "@/components/city/city-detector"
 import { CartDrawer, MobileCartBar } from "@/components/cart/cart-drawer"
 import { WhatsAppButton } from "@/components/whatsapp/whatsapp-button"
 import { Analytics } from "@/lib/analytics"
+import { CookieConsent } from "@/components/ui/cookie-consent"
 import { getOrganizationSchema } from "@/lib/structured-data"
 import "./globals.css"
 
@@ -148,6 +149,7 @@ export default function RootLayout({
               message="¡Hola! Quiero hacer un pedido en Resurte.me"
               label="Pedir por WhatsApp"
             />
+            <CookieConsent />
           </CartProvider>
         </CityProvider>
       </body>

@@ -301,11 +301,30 @@ export default function CosteoPage() {
       if (e.ctrlKey || e.metaKey) {
         if (e.key === "z" && !e.shiftKey) { e.preventDefault(); undo() }
         if ((e.key === "y") || (e.key === "z" && e.shiftKey)) { e.preventDefault(); redo() }
+        if (e.key === "n") {
+          e.preventDefault()
+          setShowForm(true)
+          setEditingDishId(null)
+          setNewDishName("")
+        }
       }
+      if (e.key === "Escape" && showForm) resetForm()
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   })
+
+  // Warn before leaving if the add/edit form has unsaved changes
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (showForm) {
+        e.preventDefault()
+        e.returnValue = ""
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [showForm])
 
   function resetForm() {
     setNewDishName("")
@@ -576,13 +595,13 @@ export default function CosteoPage() {
                     })()}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => duplicateDish(dish)} className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-500 transition-colors" title="Duplicar platillo">
+                    <button onClick={() => duplicateDish(dish)} className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-500 transition-colors" title="Duplicar platillo" aria-label={`Duplicar ${dish.name}`}>
                       <Plus className="w-4 h-4" />
                     </button>
-                    <button onClick={() => startEditDish(dish)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title="Editar platillo">
+                    <button onClick={() => startEditDish(dish)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title="Editar platillo" aria-label={`Editar ${dish.name}`}>
                       <Edit3 className="w-4 h-4" />
                     </button>
-                    <button onClick={() => removeDish(dish.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar platillo">
+                    <button onClick={() => removeDish(dish.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar platillo" aria-label={`Eliminar ${dish.name}`}>
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -715,6 +734,8 @@ export default function CosteoPage() {
                   onClick={() => removeIngredient(idx)}
                   className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"
                   disabled={newDishIngredients.length === 1}
+                  aria-label="Quitar ingrediente"
+                  title="Quitar ingrediente"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

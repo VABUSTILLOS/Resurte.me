@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
@@ -172,6 +172,39 @@ export default function MermasPage() {
     }
   }
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "n") {
+        e.preventDefault()
+        setShowForm(true)
+        setEditingId(null)
+        setAmountKg("")
+        setCostPerKg("")
+        setNote("")
+        setSelectedCause(CAUSAS[0].key)
+      }
+      if (e.key === "Escape") {
+        if (deleteConfirmId) setDeleteConfirmId(null)
+        else if (showForm) cancelForm()
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  })
+
+  // Warn before leaving if the add/edit form has unsaved changes
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (showForm) {
+        e.preventDefault()
+        e.returnValue = ""
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [showForm])
+
   if (!selectedCollection) {
     return (
       <div className="text-center py-16">
@@ -274,7 +307,7 @@ export default function MermasPage() {
                   <button onClick={() => startEditEntry(entry)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title="Editar registro">
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => removeEntry(entry.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500">
+                  <button onClick={() => removeEntry(entry.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500" aria-label="Eliminar registro" title="Eliminar registro">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>

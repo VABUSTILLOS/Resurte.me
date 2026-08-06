@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useToast } from "@/components/toast"
 import Link from "next/link"
 import {
   Calendar, ArrowLeft, Sun, Leaf, DollarSign, TrendingDown,
@@ -96,6 +97,7 @@ export default function TemporadaPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
   const router = useRouter()
+  const { toast } = useToast()
   const today = new Date()
   const [viewMonth, setViewMonth] = useLocalStorage<number>("temporada-month", today.getMonth() + 1, slug)
   
@@ -119,6 +121,7 @@ export default function TemporadaPage() {
       if (prev.some((s) => s.key === item.key)) return prev
       return [...prev, { key: item.key, name: item.name, icon: item.icon, pricePerKg: item.highPrice, quantityKg: 1 }]
     })
+    toast(`${item.icon} ${item.name} agregado a la lista`, "success")
   }
 
   function transferToPlanner(item: { name: string; icon: string; highPrice: number }) {
@@ -127,11 +130,14 @@ export default function TemporadaPage() {
       if (exists) return prev.map((t) => t.name === item.name ? { ...t, qtyKg: t.qtyKg + 5 } : t)
       return [...prev, { name: item.name, icon: item.icon, price: item.highPrice, qtyKg: 5, unit: "kg" }]
     })
+    toast(`${item.icon} ${item.name} enviado al planificador`, "success")
     router.push("/panel/planificador")
   }
 
   function removeFromShoppingList(key: string) {
     setShoppingList((prev) => prev.filter((s) => s.key !== key))
+    const item = shoppingList.find((s) => s.key === key)
+    if (item) toast(`${item.icon} ${item.name} quitado de la lista`, "warning")
   }
 
   function updateShoppingQty(key: string, qty: number) {
@@ -143,6 +149,7 @@ export default function TemporadaPage() {
     const total = shoppingList.reduce((sum, s) => sum + s.quantityKg * s.pricePerKg, 0)
     const text = `Lista de compras de temporada — ${MONTHS[viewMonth]}\n\n${lines.join("\n")}\n\nTotal estimado: $${total.toFixed(0)} MXN\nGenerado con Resurte.me`
     navigator.clipboard.writeText(text)
+    toast("Lista de compras copiada", "success")
   }
 
   if (!selectedCollection) {
@@ -175,6 +182,8 @@ export default function TemporadaPage() {
           <button
             onClick={() => setViewMonth(viewMonth === 1 ? 12 : viewMonth - 1)}
             className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+            aria-label="Mes anterior"
+            title="Mes anterior"
           >
             <ChevronLeft className="w-5 h-5 text-gray-400" />
           </button>
@@ -187,6 +196,8 @@ export default function TemporadaPage() {
           <button
             onClick={() => setViewMonth(viewMonth === 12 ? 1 : viewMonth + 1)}
             className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+            aria-label="Mes siguiente"
+            title="Mes siguiente"
           >
             <ChevronRight className="w-5 h-5 text-gray-400" />
           </button>
@@ -276,6 +287,7 @@ export default function TemporadaPage() {
                       <button
                         onClick={() => updateShoppingQty(s.key, s.quantityKg - 0.5)}
                         className="w-5 h-5 rounded bg-white text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors"
+                        aria-label={`Reducir cantidad de ${s.name}`}
                       >
                         −
                       </button>
@@ -285,6 +297,7 @@ export default function TemporadaPage() {
                       <button
                         onClick={() => updateShoppingQty(s.key, s.quantityKg + 0.5)}
                         className="w-5 h-5 rounded bg-white text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors"
+                        aria-label={`Aumentar cantidad de ${s.name}`}
                       >
                         +
                       </button>
@@ -295,6 +308,8 @@ export default function TemporadaPage() {
                     <button
                       onClick={() => removeFromShoppingList(s.key)}
                       className="p-0.5 rounded text-gray-400 hover:text-red-500 transition-colors"
+                      aria-label={`Quitar ${s.name} de la lista`}
+                      title={`Quitar ${s.name} de la lista`}
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>

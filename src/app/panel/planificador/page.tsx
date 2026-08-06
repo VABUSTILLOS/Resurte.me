@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
+import { useToast } from "@/components/toast"
 import Link from "next/link"
 import {
   ShoppingCart, ArrowLeft, Users, TrendingUp, AlertCircle,
@@ -151,6 +152,7 @@ function getWasteCategory(productCategory: string): string {
 export default function PlanificadorPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
+  const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
   const products = selectedCollection
     ? (COLLECTION_PRODUCTS[selectedCollection.slug] || DEFAULT_PRODUCTS)
@@ -169,6 +171,7 @@ export default function PlanificadorPage() {
       setManualQtys((prev) => ({ ...prev, [t.icon + " " + t.name]: t.qtyKg }))
     })
     setTransfers([])
+    toast(`${transfers.length} producto(s) de temporada agregados al pedido`, "success")
   }
 
   // Group by category
@@ -273,6 +276,7 @@ export default function PlanificadorPage() {
                       const cleaned: Record<string, number> = { ...manualQtys }
                       ingredientNames.forEach((n) => { delete cleaned[n] })
                       setManualQtys(cleaned)
+                      toast(`"${dish.name}" quitado del pedido`, "warning")
                     } else {
                       // Add them with per-person scaling
                       const newQtys: Record<string, number> = { ...manualQtys }
@@ -280,6 +284,7 @@ export default function PlanificadorPage() {
                         newQtys[ing.ingredientName] = ing.quantity * covers
                       })
                       setManualQtys(newQtys)
+                      toast(`"${dish.name}" importado (${dish.ingredients.length} ingredientes)`, "success")
                     }
                   }}
                   className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
@@ -344,6 +349,7 @@ export default function PlanificadorPage() {
             <button
               onClick={() => setCovers(Math.max(5, covers - 10))}
               className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 text-lg transition-colors"
+              aria-label="Reducir comensales"
             >
               −
             </button>
@@ -356,6 +362,7 @@ export default function PlanificadorPage() {
             <button
               onClick={() => setCovers(covers + 10)}
               className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 text-lg transition-colors"
+              aria-label="Aumentar comensales"
             >
               +
             </button>
@@ -532,6 +539,7 @@ export default function PlanificadorPage() {
                   }).join("\n")
                   const header = `Pedido para ${covers} comensales (+${avgWastePct}% merma) — ${selectedCollection.name}\n\n`
                   navigator.clipboard.writeText(header + text + `\n\nTotal estimado: $${totalCost.toFixed(0)} MXN\nPedido generado con Resurte.me`)
+                  toast("Lista de pedido copiada", "success")
                 }}
                 className="text-xs font-semibold text-[#108910] hover:text-green-800 transition-colors"
               >

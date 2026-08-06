@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ArrowLeft, Plus, Minus, Check, MessageCircle, ShoppingCart, Package } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
 import { ProductCard } from "@/components/product/product-card"
@@ -8,6 +8,7 @@ import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import Link from "next/link"
 import type { Category, Product } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
+import { trackEvent } from "@/lib/analytics"
 
 interface ProductDetailClientProps {
   product: Product
@@ -32,6 +33,20 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
   const outOfStock = product.stock_status === "out_of_stock"
   const lowStock = product.stock_status === "low_stock"
 
+  // Track product view on page load
+  useEffect(() => {
+    trackEvent("view_item", {
+      currency: "MXN",
+      value: displayPrice,
+      items: [{
+        item_id: String(product.id),
+        item_name: product.name,
+        item_category: category?.name,
+      }],
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleAdd = () => {
     for (let i = 0; i < quantity; i++) {
       addItem({
@@ -46,6 +61,15 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
         stock_status: (product.stock_status ?? "in_stock") as "in_stock" | "low_stock" | "out_of_stock",
       })
     }
+    trackEvent("add_to_cart", {
+      currency: "MXN",
+      value: displayPrice * quantity,
+      items: [{
+        item_id: String(product.id),
+        item_name: product.name,
+        quantity,
+      }],
+    })
     setAdded(true)
     setQuantity(1)
     setTimeout(() => setAdded(false), 1500)

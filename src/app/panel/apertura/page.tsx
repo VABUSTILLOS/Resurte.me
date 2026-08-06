@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useToast } from "@/components/toast"
 import Link from "next/link"
 import {
   ClipboardCheck, ArrowLeft, CheckCircle2, Circle, DollarSign,
@@ -300,6 +301,7 @@ const DEFAULT_INVESTMENT = [
 export default function AperturaPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
+  const { toast } = useToast()
   const [checked, setChecked] = useLocalStorage<string[]>("apertura-checked", [], slug)
   const [showCalculator, setShowCalculator] = useState(false)
   const [phaseDates, setPhaseDates] = useLocalStorage<Record<string, string>>("apertura-dates", {}, slug)
@@ -321,7 +323,11 @@ export default function AperturaPage() {
   function toggleCheck(id: string) {
     setChecked((prev) => {
       const arr = Array.isArray(prev) ? prev : []
-      if (arr.includes(id)) return arr.filter((i) => i !== id)
+      if (arr.includes(id)) {
+        toast("Elemento desmarcado", "warning")
+        return arr.filter((i) => i !== id)
+      }
+      toast("Elemento marcado como listo", "success")
       return [...arr, id]
     })
   }
@@ -360,6 +366,7 @@ export default function AperturaPage() {
         <button
           onClick={() => window.print()}
           className="ml-auto flex items-center gap-2 text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors"
+          aria-label="Imprimir kit de apertura"
         >
           <Printer className="w-4 h-4" />
           Imprimir
@@ -479,6 +486,7 @@ export default function AperturaPage() {
                     <button
                       onClick={() => setCustomItems((prev) => prev.filter((_, i) => i !== idx))}
                       className="text-[10px] text-red-400 hover:text-red-600"
+                      aria-label={`Eliminar rubro ${item.name}`}
                     >
                       eliminar
                     </button>
@@ -499,6 +507,7 @@ export default function AperturaPage() {
                 />
                 <input
                   type="number"
+                  min="0"
                   placeholder="Min $"
                   value={newCustomLow}
                   onChange={(e) => setNewCustomLow(e.target.value)}
@@ -506,6 +515,7 @@ export default function AperturaPage() {
                 />
                 <input
                   type="number"
+                  min="0"
                   placeholder="Max $"
                   value={newCustomHigh}
                   onChange={(e) => setNewCustomHigh(e.target.value)}
@@ -514,12 +524,19 @@ export default function AperturaPage() {
                 <button
                   onClick={() => {
                     if (!newCustomName || !newCustomLow || !newCustomHigh) return
+                    const low = parseFloat(newCustomLow)
+                    const high = parseFloat(newCustomHigh)
+                    if (low < 0 || high < 0 || high < low) {
+                      toast("Verifica los montos (sin negativos y máximo ≥ mínimo)", "error")
+                      return
+                    }
                     setCustomItems((prev) => [...prev, {
                       name: newCustomName,
-                      low: parseFloat(newCustomLow),
-                      high: parseFloat(newCustomHigh),
+                      low,
+                      high,
                     }])
                     setNewCustomName(""); setNewCustomLow(""); setNewCustomHigh("")
+                    toast("Rubro de inversión agregado", "success")
                   }}
                   className="text-xs font-semibold bg-[#108910] text-white px-3 py-1.5 rounded-lg hover:bg-[#0D720D] transition-colors"
                 >

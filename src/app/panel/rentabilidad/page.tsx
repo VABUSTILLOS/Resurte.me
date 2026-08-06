@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
+import { useToast } from "@/components/toast"
 import Link from "next/link"
 import {
   TrendingUp, ArrowLeft, Circle, AlertTriangle, CheckCircle2,
@@ -142,6 +143,7 @@ const DEFAULT_DISHES: DishData[] = [
 export default function RentabilidadPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
+  const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
   const [mermaEntries] = useLocalStorage<{ amountKg: number; costPerKg: number; id: string; date: string }[]>("mermas-entries", [], slug)
   const [monthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
@@ -216,6 +218,7 @@ export default function RentabilidadPage() {
     a.download = `rentabilidad-${slug || "menu"}.csv`
     a.click()
     URL.revokeObjectURL(url)
+    toast("Rentabilidad exportada a CSV", "success")
   }
 
   if (!selectedCollection) {
@@ -263,6 +266,7 @@ export default function RentabilidadPage() {
             <button
               onClick={exportCSV}
               className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors"
+              aria-label="Exportar rentabilidad a CSV"
             >
               <Download className="w-3.5 h-3.5" />
               Exportar CSV
@@ -443,6 +447,7 @@ export default function RentabilidadPage() {
                       onClick={() => { setEditingName(dish.name); setEditValue(String(dish.price)) }}
                       className="font-bold text-sm text-[#108910] hover:text-green-800 hover:underline transition-colors"
                       title="Click para editar precio de venta"
+                      aria-label={`Editar precio de ${dish.name}`}
                     >
                       ${dish.price}
                       {priceOverrides[dish.name] !== undefined && (

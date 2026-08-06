@@ -707,6 +707,26 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
+              {/* Trust badges — payment security assurance */}
+              <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 space-y-3">
+                <div className="flex items-center gap-2 text-xs text-[#6b6b6b]">
+                  <CheckCircle2 className="w-4 h-4 text-[#108910]" />
+                  <span>Pago seguro con encriptación SSL</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-[#6b6b6b]">
+                  <CheckCircle2 className="w-4 h-4 text-[#108910]" />
+                  <span>Factura electrónica (CFDI 4.0) incluida</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-[#6b6b6b]">
+                  <CheckCircle2 className="w-4 h-4 text-[#108910]" />
+                  <span>Soporte vía WhatsApp antes, durante y después del pedido</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-[#6b6b6b]">
+                  <CheckCircle2 className="w-4 h-4 text-[#108910]" />
+                  <span>Garantía de frescura: si algo no llega bien, te lo reponemos</span>
+                </div>
+              </div>
+
               {/* Total reminder */}
               <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
                 <div className="flex justify-between">

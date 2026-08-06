@@ -18,6 +18,8 @@ import { BlogFAQ } from "@/components/blog/blog-faq"
 import { PostCTA } from "@/components/blog/post-cta"
 import { RelatedPosts } from "@/components/blog/related-posts"
 import { ReadingProgress } from "@/components/blog/reading-progress"
+import { BlogShare } from "@/components/blog/blog-share"
+import { BlogNewsletter } from "@/components/blog/blog-newsletter"
 
 export const dynamicParams = false
 
@@ -143,6 +145,10 @@ export default async function BlogPostPage({
         <div className="mt-6">
           <BlogAuthor post={post.data} />
         </div>
+        {/* Social sharing */}
+        <div className="mt-4 flex justify-end">
+          <BlogShare title={post.data.title} url={getPostUrl(slug)} />
+        </div>
       </header>
 
       {/* Portada */}
@@ -168,6 +174,11 @@ export default async function BlogPostPage({
           <BlogFAQ items={post.data.faq} />
         </div>
       )}
+
+      {/* Newsletter signup */}
+      <div className="mx-auto max-w-3xl px-4 pb-8 sm:px-6">
+        <BlogNewsletter />
+      </div>
 
       {/* Caja CTA de cierre */}
       <PostCTA config={getPostCta(post.data)} />
