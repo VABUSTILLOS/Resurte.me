@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
@@ -94,11 +95,14 @@ const DEFAULT_TIPS = [
 export default function TemporadaPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
+  const router = useRouter()
   const today = new Date()
   const [viewMonth, setViewMonth] = useLocalStorage<number>("temporada-month", today.getMonth() + 1, slug)
   
   interface ShoppingItem { key: string; name: string; icon: string; pricePerKg: number; quantityKg: number }
   const [shoppingList, setShoppingList] = useLocalStorage<ShoppingItem[]>("temporada-shopping-list", [], slug)
+  interface TransferItem { name: string; icon: string; price: number; qtyKg: number; unit: string }
+  const [transfers, setTransfers] = useLocalStorage<TransferItem[]>("temporada-transfer", [], slug)
 
   const tips = selectedCollection
     ? (SEASONAL_TIPS[selectedCollection.slug] || DEFAULT_TIPS)
@@ -115,6 +119,15 @@ export default function TemporadaPage() {
       if (prev.some((s) => s.key === item.key)) return prev
       return [...prev, { key: item.key, name: item.name, icon: item.icon, pricePerKg: item.highPrice, quantityKg: 1 }]
     })
+  }
+
+  function transferToPlanner(item: { name: string; icon: string; highPrice: number }) {
+    setTransfers((prev) => {
+      const exists = prev.find((t) => t.name === item.name)
+      if (exists) return prev.map((t) => t.name === item.name ? { ...t, qtyKg: t.qtyKg + 5 } : t)
+      return [...prev, { name: item.name, icon: item.icon, price: item.highPrice, qtyKg: 5, unit: "kg" }]
+    })
+    router.push("/panel/planificador")
   }
 
   function removeFromShoppingList(key: string) {
@@ -206,13 +219,19 @@ export default function TemporadaPage() {
                    {inList ? <X className="w-3 h-3" /> : "+"}
                  </button>
                </div>
-               <div className="flex items-center gap-1.5">
+               <div className="flex items-center gap-1.5 mb-2">
                  <span className="text-xs font-bold text-emerald-700">${item.highPrice}/kg</span>
                  <span className="text-[10px] text-gray-400 line-through">${item.lowPrice}</span>
                  <span className="text-[10px] bg-emerald-200 text-emerald-800 px-1 py-0.5 rounded-full font-bold">
                    -{savings}%
                  </span>
                </div>
+               <button
+                 onClick={() => transferToPlanner(item)}
+                 className="w-full text-[10px] font-semibold bg-white text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 rounded-lg py-1 transition-colors flex items-center justify-center gap-1"
+               >
+                 <ShoppingCart className="w-3 h-3" /> Agregar al planificador
+               </button>
              </div>
              )
            })}
