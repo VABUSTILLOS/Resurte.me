@@ -9,12 +9,13 @@ import {
   type ReactNode,
 } from "react"
 
+import { MEXICO_CITIES } from "@/lib/cities"
+import type { City } from "@/types"
+
 interface CityProviderProps {
   children: ReactNode
   initialCitySlug?: string | null
 }
-import { MEXICO_CITIES } from "@/lib/cities"
-import type { City } from "@/types"
 
 interface CityContextValue {
   city: City | null
