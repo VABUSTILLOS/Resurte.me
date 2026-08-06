@@ -682,7 +682,10 @@ BEGIN
 
 END $$;
 
-
+-- ============================================================
+-- COLECCIONES DE RESTAURANTE (14 giros)
+-- ============================================================
+INSERT INTO restaurant_collections (name, slug, description, image_url, tags, display_order) VALUES
   ('Hamburguesas y Hot Dogs', 'hamburguesas-hot-dogs',
    'Carne molida sirloin/chuck, pan brioche, queso cheddar, papas congeladas, tocino y aderezos. Proveeduría completa para burger joints y hot dog stands.',
    'https://upload.wikimedia.org/wikipedia/commons/e/ef/Hamburger_and_onion_rings.jpg',
