@@ -34,15 +34,14 @@ export default function CashbackPage() {
       setIsAuthenticated(authed);
       if (authed) {
         // Fetch real wallet balance
-        supabase
-          .from("wallets")
-          .select("balance_credits")
-          .eq("user_id", session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) setBalance(Number(data.balance_credits));
-          })
-          .catch(() => {});
+        ;(async () => {
+          const { data } = await supabase
+            .from("wallets")
+            .select("balance_credits")
+            .eq("user_id", session.user.id)
+            .single()
+          if (data) setBalance(Number(data.balance_credits))
+        })()
 
         // Only show onboarding if user hasn't completed it before
         const onboarded = localStorage.getItem("cashback-onboarded");
