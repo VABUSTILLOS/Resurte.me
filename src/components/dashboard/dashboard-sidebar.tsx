@@ -451,6 +451,17 @@ export function DashboardSidebar() {
                 Programa de recompensas
                 <ChevronRight className="w-4 h-4 ml-auto" />
               </Link>
+              <Link
+                href="/recompensas?tab=referidos"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-3 p-3.5 rounded-xl bg-purple-50 text-purple-800 font-semibold"
+              >
+                <Users className="w-5 h-5" />
+                Invitar amigos y ganar $100
+                <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full font-bold ml-auto">
+                  Nuevo
+                </span>
+              </Link>
 
               {orders.length > 0 && (
                 <div>

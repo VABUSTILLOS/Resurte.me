@@ -16,6 +16,7 @@ import Link from "next/link"
 import type { Category, Product, RestaurantCollection } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
 import { CollectionSlider } from "@/components/collections/collection-slider"
+import { TestimonialCarousel } from "@/components/ui/testimonial-carousel"
 
 const DEFAULT_CITY_SLUG = "chihuahua"
 
@@ -29,27 +30,6 @@ const FEATURED_CATEGORY_SLUGS = [
   "lacteos-huevos",
   "despensa",
   "bebidas",
-]
-
-const TESTIMONIALS = [
-  {
-    quote: "Desde que pedimos con Resurte, nuestra merma bajó un 30%. La verdura llega más fresca que cuando íbamos a la central.",
-    author: "Chef Ricardo M.",
-    role: "Dueño de La Piccola Trattoria",
-    city: "Chihuahua",
-  },
-  {
-    quote: "Los precios son estables y la facturación es inmediata. Para un restaurante pequeño como el mío, eso es oro.",
-    author: "María Elena G.",
-    role: "Propietaria de Las Tlayudas de Doña Mary",
-    city: "Chihuahua",
-  },
-  {
-    quote: "Programo mi pedido el lunes y el martes a las 8 AM ya tengo todo en la cocina. Así da gusto hacer negocios.",
-    author: "Carlos R.",
-    role: "Chef ejecutivo, Hotel Casa Grande",
-    city: "Chihuahua",
-  },
 ]
 
 export function CityLanding({
@@ -840,31 +820,7 @@ export function CityLanding({
               Cocineros que confían en nosotros
             </h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((t) => (
-              <div
-                key={t.author}
-                className="relative bg-[#F7F5F0] rounded-2xl p-6 pt-10 border border-[#E8E9EB]"
-              >
-                {/* Quote mark */}
-                <span className="absolute top-4 left-6 text-5xl leading-none text-[#108910]/20 font-serif select-none">
-                  &ldquo;
-                </span>
-                <p className="text-sm text-[#5C6068] leading-relaxed relative z-10">
-                  {t.quote}
-                </p>
-                <div className="mt-5 pt-4 border-t border-[#E8E9EB] flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#108910]/10 flex items-center justify-center text-sm font-bold text-[#108910] shrink-0">
-                    {t.author.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-[#242529]">{t.author}</p>
-                    <p className="text-xs text-[#72767E]">{t.role} · {t.city}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <TestimonialCarousel />
         </div>
       </section>
 

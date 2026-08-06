@@ -1,9 +1,10 @@
 /**
  * POST /api/workflows/trigger
- * 
- * Manually trigger a workflow for an order or user onboarding.
- * Used by the admin panel for manual workflow execution and auth flow.
- * 
+ * GET  /api/workflows/trigger?job=abandoned-cart|reactivation
+ *
+ * POST — manually trigger a workflow for an order or user onboarding.
+ * GET  — cron endpoint for email jobs (abandoned cart recovery, reactivation).
+ *
  * Body (order workflows): { orderId: number, workflowType: WorkflowType }
  * Body (onboarding): { workflow_type: "onboarding", user_id: string, email: string, full_name: string }
  */
@@ -28,6 +29,41 @@ const VALID_WORKFLOWS: WorkflowType[] = [
   "payment_confirmed",
   "fulfillment_update",
 ]
+
+export async function GET(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get("authorization")
+    const cronSecret = process.env.CRON_SECRET
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const job = req.nextUrl.searchParams.get("job")
+
+    if (job === "abandoned-cart") {
+      const { checkAbandonedCarts } = await import("@/lib/email-workflows")
+      const result = await checkAbandonedCarts()
+      return NextResponse.json(result)
+    }
+
+    if (job === "reactivation") {
+      const { checkInactiveUsers } = await import("@/lib/email-workflows")
+      const result = await checkInactiveUsers()
+      return NextResponse.json(result)
+    }
+
+    return NextResponse.json(
+      { error: "Missing or invalid job param. Use ?job=abandoned-cart or ?job=reactivation" },
+      { status: 400 }
+    )
+  } catch (err) {
+    console.error("[CRON-EMAIL] Fatal error:", err)
+    return NextResponse.json(
+      { success: false, error: err instanceof Error ? err.message : "Internal error" },
+      { status: 500 }
+    )
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {

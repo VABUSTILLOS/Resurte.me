@@ -30,6 +30,7 @@ export function DashboardScreen({
   onViewOrders,
   walletView,
   profileView,
+  referralView,
 }: DashboardScreenProps) {
   if (walletView) {
     return <WalletView />;
