@@ -90,13 +90,13 @@ function normalizeFrontmatter(
   }
 
   const title = String(data.title ?? slug)
-  const raw = body?.trim() || String(data.description ?? "")
-  const readingTime = estimateReadingTime(raw)
+  const description = String(data.description ?? "")
+  const readingTime = estimateReadingTime(body?.trim() || description)
 
   return {
     slug,
     title,
-    description: raw,
+    description,
     category: String(data.category ?? "industria"),
     contentType: data.contentType ? String(data.contentType) : undefined,
     date,

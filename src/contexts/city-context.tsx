@@ -8,6 +8,11 @@ import {
   useCallback,
   type ReactNode,
 } from "react"
+
+interface CityProviderProps {
+  children: ReactNode
+  initialCitySlug?: string | null
+}
 import { MEXICO_CITIES } from "@/lib/cities"
 import type { City } from "@/types"
 
@@ -51,11 +56,12 @@ function setCityLocalStorage(slug: string) {
 
 const DEFAULT_CITY_SLUG = "chihuahua"
 
-export function CityProvider({ children }: { children: ReactNode }) {
+export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
   const [city, setCityState] = useState<City | null>(() => {
-    if (typeof window === "undefined") return null
-    const slug =
-      getCityFromCookie() || getCityFromLocalStorage() || DEFAULT_CITY_SLUG
+    // Server receives the cookie value from the layout via initialCitySlug,
+    // so the first client render matches the server-rendered HTML (no hydration mismatch).
+    if (typeof window === "undefined" && !initialCitySlug) return null
+    const slug = initialCitySlug || getCityFromCookie() || getCityFromLocalStorage() || DEFAULT_CITY_SLUG
     const found = MEXICO_CITIES.find((c) => c.slug === slug)
     return (found as City) || null
   })

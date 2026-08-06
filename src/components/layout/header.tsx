@@ -104,7 +104,10 @@ export function Header() {
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] hover:bg-[#F7F5F0] transition-colors text-sm shrink-0 touch-target"
           >
             <MapPin className="w-4 h-4 text-[#108910]" aria-hidden="true" />
-            <span className="font-medium text-[#343538]">
+            <span
+              className="font-medium text-[#343538]"
+              suppressHydrationWarning
+            >
               {city ? city.name : "Seleccionar ciudad"}
             </span>
             <ChevronDown className="w-4 h-4 text-[#72767E]" aria-hidden="true" />

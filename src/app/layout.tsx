@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next"
+import { cookies } from "next/headers"
 import { Geist, Geist_Mono } from "next/font/google"
 import { CityProvider } from "@/contexts/city-context"
 import { CartProvider } from "@/contexts/cart-context"
@@ -105,11 +106,14 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const cookieStore = await cookies()
+  const initialCitySlug =
+    cookieStore.get("city-slug")?.value ?? null
   return (
     <html
       lang="es-MX"
@@ -143,7 +147,7 @@ export default function RootLayout({
           }}
         />
         <Analytics />
-        <CityProvider>
+        <CityProvider initialCitySlug={initialCitySlug}>
           <CartProvider>
             <OnboardingWizard />
             <Header />
