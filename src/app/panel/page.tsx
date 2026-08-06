@@ -8,7 +8,7 @@ import { useMemo } from "react"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp,
   Calendar, ClipboardCheck, ArrowRight, ChefHat, Store,
-  PieChart, DollarSign, BarChart3, Zap, Clock,
+  PieChart, DollarSign, BarChart3, Zap, Clock, Percent, Package,
 } from "lucide-react"
 
 const COLLECTION_ICONS: Record<string, string> = {
@@ -93,6 +93,15 @@ const TOOLS: Tool[] = [
     bgColor: "bg-indigo-50",
     collectionDesc: (name) => `Todo lo que necesitas para abrir tu ${name}, en un solo lugar.`,
   },
+  {
+    title: "Mi inventario",
+    description: "Gestiona tu stock de productos con indicadores 🟢🟡🔴. Genera órdenes de compra automáticas basadas en niveles mínimos y lo que planeaste pedir.",
+    icon: Package,
+    href: "/panel/inventario",
+    color: "text-cyan-600",
+    bgColor: "bg-cyan-50",
+    collectionDesc: (name) => `Controla el inventario de tu ${name} y nunca te quedes sin insumos.`,
+  },
 ]
 
 export default function PanelPage() {
@@ -102,11 +111,21 @@ export default function PanelPage() {
   const [sharedDishes] = useSharedDishes(slug)
   const [mermaEntries] = useLocalStorage<{ amountKg: number; costPerKg: number; category: string; id: string; date: string }[]>("mermas-entries", [], slug)
   const [aperturaChecked] = useLocalStorage<string[]>("apertura-checked", [], slug)
+  const [monthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
+  const [shoppingList] = useLocalStorage<{ key: string; name: string; pricePerKg: number; quantityKg: number }[]>("temporada-shopping-list", [], slug)
 
   const stats = useMemo(() => {
     if (!selectedCollection) return null
     const totalCosteo = sharedDishes.reduce((s, d) => s + d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0), 0)
+    const totalPrice = sharedDishes.reduce((s, d) => s + d.sellingPrice, 0)
+    const avgFoodCost = totalPrice > 0 ? ((totalCosteo / totalPrice) * 100) : 0
+    const avgMargin = sharedDishes.length > 0 ? (totalPrice - totalCosteo) / sharedDishes.length : 0
     const totalMerma = mermaEntries.reduce((s, e) => s + (e.amountKg * e.costPerKg), 0)
+    const monthLoss = mermaEntries
+      .filter((e) => new Date(e.date).getMonth() === new Date().getMonth())
+      .reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
+    const mermaVsGoal = monthlyGoal > 0 ? (monthLoss / monthlyGoal) * 100 : 0
+    const seasonalSavings = shoppingList.reduce((s, item) => s + item.quantityKg * item.pricePerKg, 0)
     const green = sharedDishes.filter((d) => {
       const cost = d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0)
       return d.sellingPrice > 0 && (cost / d.sellingPrice) * 100 <= 30
@@ -115,8 +134,8 @@ export default function PanelPage() {
       const cost = d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0)
       return d.sellingPrice > 0 && (cost / d.sellingPrice) * 100 > 38
     }).length
-    return { totalCosteo, totalMerma, green, red, dishesCount: sharedDishes.length, mermaCount: mermaEntries.length, aperturaCount: aperturaChecked.length }
-  }, [sharedDishes, mermaEntries, aperturaChecked, selectedCollection])
+    return { totalCosteo, totalMerma, green, red, dishesCount: sharedDishes.length, mermaCount: mermaEntries.length, aperturaCount: aperturaChecked.length, avgFoodCost, avgMargin, monthLoss, mermaVsGoal, seasonalSavings, totalPrice, monthlyGoal }
+  }, [sharedDishes, mermaEntries, aperturaChecked, selectedCollection, monthlyGoal, shoppingList])
 
   return (
     <div>
@@ -181,7 +200,7 @@ export default function PanelPage() {
 
       {/* Live stats widgets */}
       {selectedCollection && stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
           <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
             <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-2">
               <PieChart className="w-4 h-4 text-blue-600" />
@@ -190,6 +209,23 @@ export default function PanelPage() {
             <p className="text-[11px] text-gray-400">Platillos costeados</p>
             {stats.totalCosteo > 0 && (
               <p className="text-[10px] text-blue-600 font-medium mt-1">Costo: ${stats.totalCosteo.toFixed(0)}</p>
+            )}
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+            <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <Percent className="w-4 h-4 text-blue-600" />
+            </div>
+            <p className={`text-xl font-extrabold ${stats.avgFoodCost > 38 ? "text-red-700" : stats.avgFoodCost > 30 ? "text-amber-700" : "text-green-700"}`}>
+              {stats.dishesCount > 0 ? `${stats.avgFoodCost.toFixed(1)}%` : "—"}
+            </p>
+            <p className="text-[11px] text-gray-400">Food cost promedio</p>
+            {stats.dishesCount > 0 && (
+              <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${stats.avgFoodCost > 38 ? "bg-red-500" : stats.avgFoodCost > 30 ? "bg-amber-500" : "bg-green-500"}`}
+                  style={{ width: `${Math.min(stats.avgFoodCost, 100)}%` }}
+                />
+              </div>
             )}
           </div>
           <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
@@ -202,6 +238,23 @@ export default function PanelPage() {
             <p className="text-[11px] text-gray-400">Pérdida por merma</p>
             {stats.mermaCount > 0 && (
               <p className="text-[10px] text-red-500 font-medium mt-1">{stats.mermaCount} registros</p>
+            )}
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+            <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <BarChart3 className="w-4 h-4 text-emerald-600" />
+            </div>
+            <p className={`text-xl font-extrabold ${stats.mermaVsGoal > 100 ? "text-red-700" : "text-emerald-700"}`}>
+              {stats.monthlyGoal > 0 ? `${stats.mermaVsGoal.toFixed(0)}%` : "—"}
+            </p>
+            <p className="text-[11px] text-gray-400">Merma vs meta</p>
+            {stats.monthlyGoal > 0 && (
+              <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${stats.mermaVsGoal > 100 ? "bg-red-500" : stats.mermaVsGoal > 75 ? "bg-amber-500" : "bg-emerald-500"}`}
+                  style={{ width: `${Math.min(stats.mermaVsGoal, 100)}%` }}
+                />
+              </div>
             )}
           </div>
           <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
@@ -221,13 +274,15 @@ export default function PanelPage() {
             </p>
           </div>
           <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-            <div className="w-9 h-9 bg-indigo-50 rounded-lg flex items-center justify-center mx-auto mb-2">
-              <ClipboardCheck className="w-4 h-4 text-indigo-600" />
+            <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <ShoppingCart className="w-4 h-4 text-purple-600" />
             </div>
-            <p className="text-xl font-extrabold text-gray-900">{stats.aperturaCount}</p>
-            <p className="text-[11px] text-gray-400">Pasos completados</p>
-            {stats.aperturaCount > 0 && (
-              <p className="text-[10px] text-indigo-600 font-medium mt-1">Kit de apertura</p>
+            <p className={`text-xl font-extrabold ${stats.seasonalSavings > 0 ? "text-purple-700" : "text-gray-400"}`}>
+              {stats.seasonalSavings > 0 ? `$${stats.seasonalSavings.toFixed(0)}` : "—"}
+            </p>
+            <p className="text-[11px] text-gray-400">Ahorro estacional</p>
+            {stats.seasonalSavings > 0 && (
+              <p className="text-[10px] text-purple-500 font-medium mt-1">Lista de compras</p>
             )}
           </div>
         </div>

@@ -6,7 +6,7 @@ import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   TrendingUp, ArrowLeft, Circle, AlertTriangle, CheckCircle2,
-  DollarSign, Download,
+  DollarSign, Download, Trash2,
 } from "lucide-react"
 
 interface DishData { name: string; cost: number; price: number; category: string; alert?: string }
@@ -143,6 +143,8 @@ export default function RentabilidadPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
   const [sharedDishes] = useSharedDishes(slug)
+  const [mermaEntries] = useLocalStorage<{ amountKg: number; costPerKg: number; id: string; date: string }[]>("mermas-entries", [], slug)
+  const [monthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
   const [priceOverrides, setPriceOverrides] = useLocalStorage<Record<string, number>>("rentabilidad-prices", {}, slug)
   const [editingName, setEditingName] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
@@ -239,6 +241,15 @@ export default function RentabilidadPage() {
   const amberCount = dishes.filter((d) => { const p = (d.cost / d.price) * 100; return p > 30 && p <= 38 }).length
   const redCount = dishes.filter((d) => (d.cost / d.price) * 100 > 38).length
   const alerts = dishes.filter((d) => d.alert)
+
+  // Merma factor for simulator display
+  const mermaStats = useMemo(() => {
+    const monthLoss = mermaEntries
+      .filter((e) => new Date(e.date).getMonth() === new Date().getMonth())
+      .reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
+    const mermaPct = monthlyGoal > 0 ? (monthLoss / monthlyGoal) * 100 : 0
+    return { monthLoss, mermaPct, hasMerma: mermaEntries.length > 0 }
+  }, [mermaEntries, monthlyGoal])
 
   return (
     <div>
@@ -352,6 +363,16 @@ export default function RentabilidadPage() {
           Simulando {costMultiplier > 0 ? "aumento" : "reducción"} de {Math.abs(costMultiplier)}% en costos de insumos. Los food cost % están ajustados.
         </div>
       )}
+      {mermaStats.hasMerma && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-2 mb-4 text-xs text-red-700 flex items-center gap-2">
+          <Trash2 className="w-3.5 h-3.5 shrink-0" />
+          Pérdida mensual por merma: <strong>${mermaStats.monthLoss.toFixed(0)}</strong>
+          {monthlyGoal > 0 && (
+            <span> — {mermaStats.mermaPct.toFixed(0)}% de tu meta de ${monthlyGoal.toFixed(0)}</span>
+          )}
+          <span className="ml-auto text-red-500">Considera este impacto en tus márgenes reales</span>
+        </div>
+      )}
 
       {/* Dish cards */}
       <div className="space-y-3">
@@ -437,6 +458,18 @@ export default function RentabilidadPage() {
                   </p>
                 </div>
               </div>
+              {mermaStats.hasMerma && mermaStats.monthLoss > 0 && (
+                <div className="mt-2 pt-2 border-t border-red-100 flex items-center justify-between text-[10px] bg-red-50/50 rounded-lg px-3 py-1.5">
+                  <span className="text-red-500 flex items-center gap-1">
+                    <Trash2 className="w-3 h-3" />
+                    Costo ajustado por merma
+                  </span>
+                  <span className="font-bold text-red-600">
+                    ${(dish.cost + (dish.cost * (mermaStats.mermaPct / 100))).toFixed(0)}
+                    <span className="text-red-400 ml-1">(+{mermaStats.mermaPct.toFixed(0)}%)</span>
+                  </span>
+                </div>
+              )}
             </div>
           )
         })}

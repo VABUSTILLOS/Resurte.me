@@ -110,6 +110,28 @@ export default function TemporadaPage() {
       .map(([key, data]) => ({ key, ...data }))
   }, [viewMonth])
 
+  function addToShoppingList(item: { key: string; name: string; icon: string; highPrice: number }) {
+    setShoppingList((prev) => {
+      if (prev.some((s) => s.key === item.key)) return prev
+      return [...prev, { key: item.key, name: item.name, icon: item.icon, pricePerKg: item.highPrice, quantityKg: 1 }]
+    })
+  }
+
+  function removeFromShoppingList(key: string) {
+    setShoppingList((prev) => prev.filter((s) => s.key !== key))
+  }
+
+  function updateShoppingQty(key: string, qty: number) {
+    setShoppingList((prev) => prev.map((s) => s.key === key ? { ...s, quantityKg: Math.max(0.5, qty) } : s))
+  }
+
+  function copyShoppingList() {
+    const lines = shoppingList.map((s) => `• ${s.icon} ${s.name}: ${s.quantityKg} kg × $${s.pricePerKg}/kg = $${(s.quantityKg * s.pricePerKg).toFixed(0)} MXN`)
+    const total = shoppingList.reduce((sum, s) => sum + s.quantityKg * s.pricePerKg, 0)
+    const text = `Lista de compras de temporada — ${MONTHS[viewMonth]}\n\n${lines.join("\n")}\n\nTotal estimado: $${total.toFixed(0)} MXN\nGenerado con Resurte.me`
+    navigator.clipboard.writeText(text)
+  }
+
   if (!selectedCollection) {
     return (
       <div className="text-center py-16">
@@ -166,11 +188,23 @@ export default function TemporadaPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
            {inSeasonNow.map((item) => {
              const savings = item.highPrice > 0 ? Math.round((1 - item.highPrice / item.lowPrice) * 100) : 0
+             const inList = shoppingList.some((s) => s.key === item.key)
              return (
-             <div key={item.key} className="bg-emerald-50 rounded-xl px-3 py-2.5 border border-emerald-100">
-               <div className="flex items-center gap-2 mb-1.5">
-                 <span className="text-lg">{item.icon}</span>
-                 <span className="text-sm font-medium text-emerald-800 leading-tight">{item.name}</span>
+             <div key={item.key} className={`rounded-xl px-3 py-2.5 border ${inList ? "bg-emerald-100 border-emerald-300" : "bg-emerald-50 border-emerald-100"}`}>
+               <div className="flex items-center justify-between gap-1 mb-1.5">
+                 <div className="flex items-center gap-2">
+                   <span className="text-lg">{item.icon}</span>
+                   <span className="text-sm font-medium text-emerald-800 leading-tight">{item.name}</span>
+                 </div>
+                 <button
+                   onClick={() => inList ? removeFromShoppingList(item.key) : addToShoppingList(item)}
+                   className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                     inList ? "bg-emerald-600 text-white" : "bg-white text-emerald-600 hover:bg-emerald-600 hover:text-white border border-emerald-200"
+                   }`}
+                   title={inList ? "Quitar de la lista" : "Agregar a lista de compras"}
+                 >
+                   {inList ? <X className="w-3 h-3" /> : "+"}
+                 </button>
                </div>
                <div className="flex items-center gap-1.5">
                  <span className="text-xs font-bold text-emerald-700">${item.highPrice}/kg</span>
@@ -189,6 +223,74 @@ export default function TemporadaPage() {
             )}
           </div>
         </div>
+
+        {/* Shopping list */}
+        {shoppingList.length > 0 && (
+          <div className="bg-white rounded-2xl border border-emerald-200 p-5 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="w-5 h-5 text-emerald-600" />
+                <h4 className="text-sm font-semibold text-gray-700">
+                  Lista de compras — {MONTHS[viewMonth]}
+                </h4>
+                <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                  {shoppingList.length} producto{shoppingList.length > 1 ? "s" : ""}
+                </span>
+              </div>
+              <button
+                onClick={copyShoppingList}
+                className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg transition-colors"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Copiar lista
+              </button>
+            </div>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {shoppingList.map((s) => (
+                <div key={s.key} className="flex items-center justify-between bg-emerald-50 rounded-xl px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{s.icon}</span>
+                    <span className="text-sm font-medium text-gray-700">{s.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => updateShoppingQty(s.key, s.quantityKg - 0.5)}
+                        className="w-5 h-5 rounded bg-white text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors"
+                      >
+                        −
+                      </button>
+                      <span className="text-xs font-bold text-emerald-800 w-10 text-center">
+                        {s.quantityKg} kg
+                      </span>
+                      <button
+                        onClick={() => updateShoppingQty(s.key, s.quantityKg + 0.5)}
+                        className="w-5 h-5 rounded bg-white text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <span className="text-sm font-bold text-emerald-700 w-20 text-right">
+                      ${(s.quantityKg * s.pricePerKg).toFixed(0)} MXN
+                    </span>
+                    <button
+                      onClick={() => removeFromShoppingList(s.key)}
+                      className="p-0.5 rounded text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 pt-3 border-t border-emerald-100 flex justify-between items-center">
+              <span className="text-xs text-gray-500">Subtotal estimado</span>
+              <span className="font-extrabold text-emerald-700 text-lg">
+                ${shoppingList.reduce((sum, s) => sum + s.quantityKg * s.pricePerKg, 0).toFixed(0)} MXN
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Seasonal tips for this collection */}

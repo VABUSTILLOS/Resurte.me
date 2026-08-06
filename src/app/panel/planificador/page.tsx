@@ -213,6 +213,48 @@ export default function PlanificadorPage() {
           <p className="text-[10px] text-gray-400 mt-2">
             Estimación basada en las cantidades por platillo × {covers} comensales. Agrega {wastePercent}% de merma.
           </p>
+          <details className="mt-3">
+            <summary className="text-xs font-semibold text-[#108910] cursor-pointer hover:text-green-800 transition-colors">
+              + Importar ingredientes de un platillo al planificador
+            </summary>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {sharedDishes.map((dish) => (
+                <button
+                  key={dish.id}
+                  onClick={() => {
+                    const ingredientNames = dish.ingredients.map((i) => i.ingredientName)
+                    // Check if any ingredient is already in manualQtys
+                    const alreadyImported = ingredientNames.some((n) => n in manualQtys)
+                    if (alreadyImported) {
+                      // Remove them
+                      const cleaned: Record<string, number> = { ...manualQtys }
+                      ingredientNames.forEach((n) => { delete cleaned[n] })
+                      setManualQtys(cleaned)
+                    } else {
+                      // Add them with per-person scaling
+                      const newQtys: Record<string, number> = { ...manualQtys }
+                      dish.ingredients.forEach((ing) => {
+                        newQtys[ing.ingredientName] = ing.quantity * covers
+                      })
+                      setManualQtys(newQtys)
+                    }
+                  }}
+                  className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
+                    dish.ingredients.every((i) => i.ingredientName in manualQtys)
+                      ? "bg-green-200 text-green-800"
+                      : "bg-white border border-green-200 text-green-700 hover:bg-green-50"
+                  }`}
+                >
+                  {dish.ingredients.every((i) => i.ingredientName in manualQtys) ? "✓ " : "+ "}
+                  {dish.name} ({dish.ingredients.length} ing.)
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-2">
+              Al importar un platillo, sus ingredientes se agregan como cantidades manuales (resaltadas en ámbar). 
+              Click de nuevo para quitar. Las cantidades se escalan a {covers} comensales.
+            </p>
+          </details>
         </div>
       )}
 
