@@ -12,12 +12,6 @@ SET logo_url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Mexica
     updated_at = now()
 WHERE slug = 'resurte-me' AND (logo_url LIKE '%images.unsplash.com%' OR banner_url LIKE '%images.unsplash.com%');
 
-UPDATE stores
-SET logo_url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Butcher_shop_display.jpg/640px-Butcher_shop_display.jpg',
-    banner_url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Meat_counter_display.jpg/1280px-Meat_counter_display.jpg',
-    updated_at = now()
-WHERE slug = 'carnemart' AND (logo_url LIKE '%images.unsplash.com%' OR banner_url LIKE '%images.unsplash.com%');
-
--- Verify: both should return 0 rows
+-- Verify: should return 0 rows
 -- SELECT id, name, image_url FROM products WHERE image_url LIKE '%images.unsplash.com%';
 -- SELECT id, name, logo_url, banner_url FROM stores WHERE logo_url LIKE '%images.unsplash.com%' OR banner_url LIKE '%images.unsplash.com%';

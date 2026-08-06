@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Box, TrendingUp } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
+import { getCollectionCover } from "@/lib/collection-images"
 import type { RestaurantCollection } from "@/types"
 
 /**
@@ -143,6 +144,7 @@ export function CollectionSlider({ collections, citySlug }: CollectionSliderProp
             {collections.map((collection, idx) => {
               const icon = COLLECTION_ICONS[collection.slug] || "📦"
               const tagline = COLLECTION_TAGLINES[collection.slug] || "Insumos al mayoreo para tu negocio"
+              const cover = getCollectionCover(collection.slug) ?? collection.image_url
 
               return (
                 <Link
@@ -154,9 +156,9 @@ export function CollectionSlider({ collections, citySlug }: CollectionSliderProp
                     <div className="relative overflow-hidden rounded-2xl bg-white border border-[#e8e4dc] hover:border-[#108910]/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-all duration-300 hover:-translate-y-1">
                       {/* Image container — 4:3 aspect ratio */}
                       <div className="relative w-full aspect-[4/3] overflow-hidden bg-[#e8e4dc]">
-                        {collection.image_url ? (
+                        {cover ? (
                           <Image
-                            src={collection.image_url}
+                            src={cover}
                             alt={collection.name}
                             fill
                             sizes="(max-width: 640px) 280px, 320px"

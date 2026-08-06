@@ -14,7 +14,7 @@ import { OnboardingScreen } from "./_components/OnboardingScreen";
 import type { Tab, ServiceItem } from "./_components/types";
 
 export default function CashbackPage() {
-  const supabase = createClient();
+  const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()));
 
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [showCalculator, setShowCalculator] = useState(false);
@@ -27,6 +27,7 @@ export default function CashbackPage() {
 
   // Check auth state on mount
   useEffect(() => {
+    if (!supabase) return
     supabase.auth.getSession().then(({ data: { session } }) => {
       const authed = !!session;
       setIsAuthenticated(authed);
@@ -51,7 +52,7 @@ export default function CashbackPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   const balance = 12450;
 

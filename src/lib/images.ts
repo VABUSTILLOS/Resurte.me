@@ -1,49 +1,48 @@
-// --- Restaurant Collection Covers (Wikimedia Commons direct URLs — NO /thumb/ pattern) ---
+// --- Restaurant Collection Covers (local optimized WebP) ---
 // 1. Hamburguesas y Hot Dogs — burger & onion rings
-export const COLLECTION_BURGER = "https://upload.wikimedia.org/wikipedia/commons/e/ef/Hamburger_and_onion_rings.jpg"
+export const COLLECTION_BURGER = "/images/collections/burger.webp"
 // 2. Taquerías y Antojitos — tacos platter
-export const COLLECTION_TAQUERIA = "https://upload.wikimedia.org/wikipedia/commons/7/73/001_Tacos_de_carnitas%2C_carne_asada_y_al_pastor.jpg"
+export const COLLECTION_TAQUERIA = "/images/collections/taqueria.webp"
 // 3. Sushi y Comida Asiática — sushi roll
-export const COLLECTION_SUSHI = "https://upload.wikimedia.org/wikipedia/commons/3/37/Sushi_roll.jpg"
+export const COLLECTION_SUSHI = "/images/collections/sushi.webp"
 // 4. Pizzas y Comida Italiana — pizza margherita
-export const COLLECTION_PIZZA = "https://upload.wikimedia.org/wikipedia/commons/a/a3/Eq_it-na_pizza-margherita_sep2005_sml.jpg"
+export const COLLECTION_PIZZA = "/images/collections/pizza.webp"
 // 5. Pollo y Alitas — chicken wings
-export const COLLECTION_POLLO = "https://upload.wikimedia.org/wikipedia/commons/6/69/Home-Made-Fried-Chicken-Wings-2008.jpg"
+export const COLLECTION_POLLO = "/images/collections/pollo.webp"
 // 6. Comida Mexicana — chileajo (oaxacan stew)
-export const COLLECTION_FONDA = "https://upload.wikimedia.org/wikipedia/commons/c/c2/Chileajo.jpg"
+export const COLLECTION_FONDA = "/images/collections/fonda.webp"
 // 7. Mariscos y Pescados — seafood platter
-export const COLLECTION_MARISCOS = "https://upload.wikimedia.org/wikipedia/commons/8/8a/Seafood_and_fish_dish.jpg"
+export const COLLECTION_MARISCOS = "/images/collections/mariscos.webp"
 // 8. Cortes de Carne y Asaderos — steak dinner
-export const COLLECTION_CORTES = "https://upload.wikimedia.org/wikipedia/commons/6/69/Steak_dinner.jpg"
+export const COLLECTION_CORTES = "/images/collections/cortes.webp"
 // 9. Cafeterías y Desayunos — coffee cup
-export const COLLECTION_CAFE = "https://upload.wikimedia.org/wikipedia/commons/7/76/Coffee_cup.jpg"
+export const COLLECTION_CAFE = "/images/collections/cafe.webp"
 // 10. Saludable y Pokés — salad bowl
-export const COLLECTION_SALUDABLE = "https://upload.wikimedia.org/wikipedia/commons/8/89/Food-salad-healthy-vegetables-1_%2823959011279%29.jpg"
+export const COLLECTION_SALUDABLE = "/images/collections/saludable.webp"
 // 11. Postres y Panadería — dessert spread
-export const COLLECTION_POSTRES = "https://upload.wikimedia.org/wikipedia/commons/2/2a/Dessert-_coffee_jelly%2C_ginger_ice_cream_and_banana%2C_matcha_cake%2C_mochi_and_fruit.jpg"
+export const COLLECTION_POSTRES = "/images/collections/postres.webp"
 // 12. Comida Árabe y Griega — shawarma
-export const COLLECTION_ARABE = "https://upload.wikimedia.org/wikipedia/commons/f/f9/Shawarma.jpg"
+export const COLLECTION_ARABE = "/images/collections/arabe.webp"
 // 13. Comida Venezolana y Latina — arepa
-export const COLLECTION_LATINA = "https://upload.wikimedia.org/wikipedia/commons/0/05/Arepa.jpg"
+export const COLLECTION_LATINA = "/images/collections/latina.webp"
 // 14. Bebidas y Bares — beer glass
-export const COLLECTION_BEBIDAS = "https://upload.wikimedia.org/wikipedia/commons/9/95/Beer_glass.jpg"
+export const COLLECTION_BEBIDAS = "/images/collections/bebidas.webp"
 
 // Product images: resurte.me store images (GCS) for products sold in the store,
-// Alsuper local images for generic fresh produce / packaged goods.
+// plus local product images for generic fresh produce / packaged goods.
 // Hero is a local produce market image.
 
 // HERO
 export const HERO_GROCERY = "/images/hero-grocery.webp"
-export const HERO_FRUITS = "/images/hero-grocery.jpg"
 
 // FRUITS — resurte.me store images
 export const IMG_APPLE = "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png"       // Manzana Roja
 export const IMG_ORANGE = "https://storage.googleapis.com/takeapp/media/cmijnpm2z000904lbg1e59xve.png"      // Naranja Valencia
 export const IMG_BANANA = "https://storage.googleapis.com/takeapp/media/cmijo779j000204jz2yrwe753.png"      // Plátano Chiapas
 export const IMG_GRAPES = "https://storage.googleapis.com/takeapp/media/cmikmo2xq000304l8d0pmawqd.png"      // Uva Blanca
-export const IMG_STRAWBERRY = "/images/products/8.webp"   // Fresa (Alsuper)
+export const IMG_STRAWBERRY = "/images/products/8.webp"   // Fresa 
 export const IMG_PAPAYA = "https://storage.googleapis.com/takeapp/media/cmijostxx001o04jv3tl8b2v9.png"     // Papaya Maradol
-export const IMG_MANGO = "/images/products/10.webp"       // Mango Ataúlfo (Alsuper)
+export const IMG_MANGO = "/images/products/10.webp"       // Mango Ataúlfo 
 export const IMG_WATERMELON = "https://storage.googleapis.com/takeapp/media/cmijq38em001604l7hja83595.png" // Sandía
 
 // VEGETABLES — resurte.me store images
@@ -56,7 +55,7 @@ export const IMG_POTATO = "https://storage.googleapis.com/takeapp/media/cmifgtjl
 export const IMG_LETTUCE = "https://storage.googleapis.com/takeapp/media/cmiguf9xj000c04ih2kpi7szc.png"     // Lechuga Bola
 export const IMG_CILANTRO = "https://storage.googleapis.com/takeapp/media/cmilwesph000704ikfang4orw.png"    // Cilantro
 
-// MEATS & PROTEIN — Alsuper local images
+// MEATS & PROTEIN — local images
 export const IMG_CHICKEN_BREAST = "/images/products/105.webp"  // Pechuga de Pollo
 export const IMG_BEEF_STEAK = "/images/products/111.webp"      // Milanesa de Res
 export const IMG_PORK = "/images/products/119.webp"            // Chuleta de Cerdo
@@ -65,32 +64,25 @@ export const IMG_GROUND_BEEF = "/images/products/112.webp"     // Carne Molida
 export const IMG_EGGS = "https://storage.googleapis.com/takeapp/media/cmidk59fi00000imqacaggoal.webp"       // Huevo Blanco (store)
 
 // DAIRY — mixed
-export const IMG_MILK = "/images/products/90.webp"      // Leche Descremada (Alsuper)
-export const IMG_CHEESE = "/images/products/97.webp"    // Queso Oaxaca (Alsuper)
-export const IMG_YOGURT = "/images/products/102.webp"   // Yogurt Natural (Alsuper)
+export const IMG_MILK = "/images/products/90.webp"      // Leche Descremada 
+export const IMG_CHEESE = "/images/products/97.webp"    // Queso Oaxaca 
+export const IMG_YOGURT = "/images/products/102.webp"   // Yogurt Natural 
 export const IMG_BUTTER = "https://storage.googleapis.com/takeapp/media/cmidk5ucg00000ijff55kb0k6.webp"     // Mantequilla sin Sal (store)
 
 // BAKERY & GRAINS — mixed
-export const IMG_BREAD = "/images/products/138.webp"     // Pan Hamburguesa (Alsuper)
+export const IMG_BREAD = "/images/products/138.webp"     // Pan Hamburguesa 
 export const IMG_TORTILLAS = "https://storage.googleapis.com/takeapp/media/cmidk5ovr00000hka85jr5bzf.webp" // Tortillas de Harina (store)
-export const IMG_RICE = "/images/products/51.webp"       // Arroz Blanco (Alsuper)
-export const IMG_PASTA = "/images/products/64.webp"      // Pasta Spaghetti (Alsuper)
+export const IMG_RICE = "/images/products/51.webp"       // Arroz Blanco 
+export const IMG_PASTA = "/images/products/64.webp"      // Pasta Spaghetti 
 
-// BEVERAGES — Alsuper local images
+// BEVERAGES — local images
 export const IMG_COCA_COLA = "https://storage.googleapis.com/takeapp/media/cmidk5hmj00000if2e2qc0ads.webp" // Coca Cola 2.5L (store)
 export const IMG_WATER = "/images/products/150.webp"     // Agua Bonafont
 
-// PANTRY — Alsuper local images
+// PANTRY — local images
 export const IMG_OIL = "/images/products/59.webp"     // Aceite de Canola
 export const IMG_BEANS = "/images/products/53.webp"   // Frijol Negro
 
-// STORE BANNERS — using product images as store representations
-export const STORE_BANNER_LA_COMER = "/images/products/1.webp"
-export const STORE_BANNER_SORIANA = "/images/products/4.webp"
-export const STORE_BANNER_WALMART = "/images/products/6.webp"
-export const STORE_BANNER_CHEDRAUI = "/images/products/12.webp"
-export const STORE_BANNER_FRESKO = "/images/products/16.webp"
-export const STORE_BANNER_CITY_MARKET = "/images/products/10.webp"
 
 // Product image map for easy lookup by product name
 export const PRODUCT_IMAGES: Record<string, string> = {

@@ -251,7 +251,7 @@ export function CityLanding({
         </div>
       </section>
 
-      {/* Social proof stats — Carnemart bold confidence + Erewhon number treatment */}
+      {/* Social proof stats */}
       <section className="bg-white border-b border-[#E8E9EB]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
@@ -569,7 +569,7 @@ export function CityLanding({
         </div>
       </section>
 
-      {/* Aliado de tu negocio — Carnemart positioning + Alsuper warmth */}
+      {/* Aliado de tu negocio */}
       <section className="bg-[#F7F5F0] py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
@@ -829,7 +829,7 @@ export function CityLanding({
         </div>
       </section>
 
-      {/* Testimonials — Carnemart trust + Erewhon presentation */}
+      {/* Testimonials */}
       <section className="bg-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
@@ -868,7 +868,7 @@ export function CityLanding({
         </div>
       </section>
 
-      {/* Newsletter / WhatsApp CTA — Carnemart practical + Erewhon clean */}
+      {/* Newsletter / WhatsApp CTA */}
       <section className="bg-[#1A1A1A] py-16">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
           <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#3CC73C] mb-3">

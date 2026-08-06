@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { Eye, EyeOff, Search, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -21,7 +21,9 @@ interface Category {
 }
 
 export default function AdminVisibilityPage() {
-  const supabase = createClient()
+  // Lazy browser-only client: creating it during SSR would throw when
+  // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
+  const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
 
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -30,21 +32,23 @@ export default function AdminVisibilityPage() {
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<number | null>(null)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    const [prodRes, catRes] = await Promise.all([
-      supabase.from("products").select("id,name,slug,brand,category_id,is_visible,image_url").order("name"),
-      supabase.from("categories").select("id,name,slug").order("name"),
-    ])
-
-    if (prodRes.data) setProducts(prodRes.data)
-    if (catRes.data) setCategories(catRes.data)
-    setLoading(false)
-  }, [supabase])
-
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    if (!supabase) return
+    let cancelled = false
+    ;(async () => {
+      const [prodRes, catRes] = await Promise.all([
+        supabase.from("products").select("id,name,slug,brand,category_id,is_visible,image_url").order("name"),
+        supabase.from("categories").select("id,name,slug").order("name"),
+      ])
+      if (cancelled) return
+      if (prodRes.data) setProducts(prodRes.data)
+      if (catRes.data) setCategories(catRes.data)
+      setLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [supabase])
 
   const toggle = async (productId: number, current: boolean) => {
     setToggling((prev) => new Set(prev).add(productId))

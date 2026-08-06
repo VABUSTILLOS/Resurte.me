@@ -17,12 +17,15 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
+  // Lazy browser-only client: creating it during SSR would throw when
+  // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
+  const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
 
   const isLogin = mode === "login"
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!supabase) return
     setLoading(true)
     setError(null)
     setSuccessMessage(null)
@@ -81,6 +84,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   }
 
   async function handleGoogleSignIn() {
+    if (!supabase) return
     setLoading(true)
     setError(null)
 

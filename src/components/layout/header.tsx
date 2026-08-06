@@ -15,11 +15,13 @@ export function Header() {
   const { city } = useCity()
   const { itemCount } = useCart()
   const router = useRouter()
-  const supabase = createClient()
+  // Lazy browser-only client: creating it during SSR would throw when
+  // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
+  const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
   const [showCitySelector, setShowCitySelector] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [cashbackBalance, setCashbackBalance] = useState<number | null>(() => {
+  const [cashbackBalance] = useState<number | null>(() => {
     if (typeof window === "undefined") return null
     const saved = localStorage.getItem("cashback-balance")
     return saved ? Number(saved) : null
@@ -28,6 +30,7 @@ export function Header() {
 
   // Detect auth state on mount
   useEffect(() => {
+    if (!supabase) return
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user ?? null)
     })
@@ -45,6 +48,7 @@ export function Header() {
   }, [])
 
   async function handleSignOut() {
+    if (!supabase) return
     await supabase.auth.signOut()
     setUser(null)
     setShowUserMenu(false)

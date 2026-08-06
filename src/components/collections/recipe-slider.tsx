@@ -21,18 +21,47 @@ interface MatchedProduct {
   stock_status: string
 }
 
+/** Normaliza texto para matching: minúsculas, sin acentos, sin unidades/cantidades. */
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // quita acentos
+    .replace(/[^\p{L}\p{N}\s]/gu, " ") // quita símbolos
+    .replace(/\b(kg|kilo|kilos|g|gr|gramo|gramos|l|lt|litro|litros|ml|pz|pieza|piezas|paq|paquete|sobre|botella|frasco|lata|caja|charola|tarrina|cuña|bolsa|manojo|taza|en)\b/gi, " ")
+    .replace(/\b\d+(\.\d+)?\s*(kg|g|l|ml|pz)?\b/gi, " ") // quita cantidades
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+/** Extrae las palabras significativas (≥3 letras) de un ingrediente. */
+function significantWords(s: string): string[] {
+  return normalize(s).split(" ").filter((w) => w.length >= 3)
+}
+
 function matchIngredient(
   ingredient: string,
   products: (Product & { price: number; sale_price: number | null; stock_status: string })[]
 ): MatchedProduct | null {
-  const ing = ingredient.toLowerCase().trim()
-  // Exact match
-  let match = products.find((p) => p.name.toLowerCase() === ing)
-  if (!match) {
-    // Partial match — ingredient word appears in product name
-    match = products.find((p) => p.name.toLowerCase().includes(ing) || ing.includes(p.name.toLowerCase()))
+  const ing = normalize(ingredient)
+  const words = significantWords(ingredient)
+  if (!ing || words.length === 0) return null
+
+  const normProducts = products.map((p) => ({ p, norm: normalize(p.name) }))
+
+  // 1. Exact match del nombre completo normalizado
+  let hit = normProducts.find(({ norm }) => norm === ing)
+  if (!hit) {
+    // 2. El nombre del producto contiene el ingrediente completo (o viceversa)
+    hit = normProducts.find(({ norm }) => norm.includes(ing) || ing.includes(norm))
   }
-  if (!match) return null
+  if (!hit && words.length > 0) {
+    // 3. Coincidencia por palabras: el producto debe contener TODAS las palabras clave
+    hit = normProducts.find(({ norm }) => words.every((w) => norm.includes(w)))
+  }
+  if (!hit) return null
+
+  const { p: match } = hit
   return {
     id: match.id,
     name: match.name,
@@ -57,13 +86,12 @@ function RecipeIngredient({
   citySlug: string
 }) {
   const [open, setOpen] = useState(false)
-  const { addItem, cart } = useCart()
+  const { addItem } = useCart()
   const matched = matchIngredient(name, products)
 
   // Close on outside click
   const handleAddToCart = useCallback(() => {
     if (!matched) return
-    const existing = cart.items.find((i) => i.product_id === matched.id)
     addItem({
       product_id: matched.id,
       name: matched.name,
@@ -76,7 +104,7 @@ function RecipeIngredient({
       stock_status: matched.stock_status as "in_stock" | "low_stock" | "out_of_stock",
     })
     setOpen(false)
-  }, [matched, addItem, cart.items])
+  }, [matched, addItem])
 
   return (
     <div className="relative">
@@ -137,6 +165,44 @@ function RecipeIngredient({
             </div>
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+// ── Ingredient list (expandable) ─────────────────────────────
+const VISIBLE_INGREDIENTS = 6
+
+function RecipeIngredients({
+  ingredients,
+  products,
+  citySlug,
+}: {
+  ingredients: string[]
+  products: (Product & { price: number; sale_price: number | null; stock_status: string })[]
+  citySlug: string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const shown = expanded ? ingredients : ingredients.slice(0, VISIBLE_INGREDIENTS)
+  const hidden = ingredients.length - VISIBLE_INGREDIENTS
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {shown.map((ing, j) => (
+        <RecipeIngredient
+          key={j}
+          name={ing}
+          products={products}
+          citySlug={citySlug}
+        />
+      ))}
+      {hidden > 0 && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="inline-block px-2.5 py-1 bg-[#f7f4ef] text-[#999893] text-xs rounded-full font-medium border border-transparent hover:border-[#108910]/20 hover:text-[#108910] cursor-pointer transition-all duration-150 active:scale-95"
+        >
+          {expanded ? `− mostrar menos` : `+${hidden} más`}
+        </button>
       )}
     </div>
   )
@@ -280,21 +346,11 @@ export default function RecipeSlider({ recipes, products, citySlug }: RecipeSlid
                   <p className="text-[10px] font-semibold text-[#999893] uppercase tracking-widest mb-2.5">
                     Ingredientes
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {recipe.ingredients.slice(0, 6).map((ing, j) => (
-                      <RecipeIngredient
-                        key={j}
-                        name={ing}
-                        products={products}
-                        citySlug={citySlug}
-                      />
-                    ))}
-                    {recipe.ingredients.length > 6 && (
-                      <span className="inline-block px-2.5 py-1 bg-[#f7f4ef] text-[#999893] text-xs rounded-full font-medium">
-                        +{recipe.ingredients.length - 6} más
-                      </span>
-                    )}
-                  </div>
+                  <RecipeIngredients
+                    ingredients={recipe.ingredients}
+                    products={products}
+                    citySlug={citySlug}
+                  />
                 </div>
               </div>
             </div>

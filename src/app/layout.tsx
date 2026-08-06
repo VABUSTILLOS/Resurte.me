@@ -119,7 +119,6 @@ export default function RootLayout({
         {/* Preconnect to external origins for faster resource loading */}
         <link rel="preconnect" href="https://storage.googleapis.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://storage.googleapis.com" />
-        <link rel="dns-prefetch" href="https://upload.wikimedia.org" />
         <link rel="dns-prefetch" href="https://isogthougrpctnfzcdes.supabase.co" />
         <link rel="preload" href="/images/hero-grocery.webp" as="image" fetchPriority="high" />
         <link rel="manifest" href="/manifest.json" />

@@ -57,6 +57,11 @@ export default async function CollectionPage({ params }: Props) {
   const tags = (collection as { tags: string[] }).tags || []
 
   let products: Record<string, unknown>[] = []
+  // Full visible catalog used for recipe ingredient → product matching.
+  // Ingredients like "Sal", "Aceite vegetal" or "Pan brioche" may not be tagged
+  // with this collection, so we match against the whole store, not just the
+  // collection-filtered grid.
+  let allProducts: Record<string, unknown>[] = []
   if (tags.length > 0) {
     const { data } = await supabase
       .from("products")
@@ -64,11 +69,18 @@ export default async function CollectionPage({ params }: Props) {
       .eq("is_visible", true)
       .order("name")
 
-    const allProducts = (data ?? []) as Record<string, unknown>[]
+    allProducts = (data ?? []) as Record<string, unknown>[]
     products = allProducts.filter((p) => {
       const productTags: string[] = Array.isArray(p.tags) ? (p.tags as string[]) : []
       return productTags.some((t: string) => tags.includes(t))
     })
+  } else {
+    const { data } = await supabase
+      .from("products")
+      .select("*")
+      .eq("is_visible", true)
+      .order("name")
+    allProducts = (data ?? []) as Record<string, unknown>[]
   }
 
   return (
@@ -77,6 +89,7 @@ export default async function CollectionPage({ params }: Props) {
       cityName={city.name}
       collection={collection as { id: number; name: string; slug: string; description: string | null; image_url: string | null; tags: string[] }}
       products={products as unknown as Product[]}
+      allProducts={allProducts as unknown as Product[]}
     />
   )
 }

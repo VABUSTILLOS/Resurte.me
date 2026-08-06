@@ -180,7 +180,7 @@ async function main() {
   for (const [name, slug, description, category_id, unit, tags] of NEW_PRODUCTS) {
     // Generate image path
     const imgSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '').substring(0, 30)
-    const imagePath = `/images/products/${imgSlug}.jpg`
+    const imagePath = `/images/products/${imgSlug}.webp`
 
     // Check if product already exists
     const { data: existing } = await supabase

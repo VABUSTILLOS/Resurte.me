@@ -3,7 +3,7 @@
  *
  * Updates product images in Supabase.
  * - 53 products use original resurte.me store images (GCS)
- * - 86 products use local Alsuper images
+ * - 86 products use local product images
  * - 48 products without images are deleted from DB
  */
 import { NextRequest, NextResponse } from "next/server"

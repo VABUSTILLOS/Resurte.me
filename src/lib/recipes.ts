@@ -23,7 +23,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Carne molida 80/20", "Pan brioche", "Queso cheddar rebanado", "Pepinillos", "Cebolla blanca", "Lechuga", "Jitomate bola", "Mostaza", "Catsup"],
       prep_time: "25 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=80",
+      image_url: "/images/recipes/burger-smash.webp",
       display_order: 1,
     },
     {
@@ -32,7 +32,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Salchicha jumbo", "Pan para hot dog", "Pepinillos encurtidos", "Jitomate bola", "Cebolla blanca", "Chiles jalapeños", "Mostaza amarilla", "Catsup"],
       prep_time: "20 min",
       servings: "6 porciones",
-      image_url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80",
+      image_url: "/images/recipes/hotdog-chicago.webp",
       display_order: 2,
     },
     {
@@ -41,7 +41,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Papas congeladas", "Queso cheddar rebanado", "Tocino", "Cebolla blanca", "Aceite vegetal"],
       prep_time: "15 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&q=80",
+      image_url: "/images/recipes/papas-gourmet.webp",
       display_order: 3,
     },
     {
@@ -50,7 +50,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Carne molida 80/20", "Pan brioche", "Tocino", "Queso cheddar rebanado", "Aros de cebolla", "Salsa BBQ", "Lechuga"],
       prep_time: "25 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=80",
+      image_url: "/images/recipes/recipe-1565299585323-38d6b0865b47.webp",
       display_order: 4,
     },
     {
@@ -59,7 +59,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Salchicha envuelta en tocino", "Pan para hot dog", "Frijoles refritos", "Jitomate saladet", "Cebolla blanca", "Mayonesa", "Chile jalapeño"],
       prep_time: "20 min",
       servings: "6 porciones",
-      image_url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80",
+      image_url: "/images/recipes/recipe-1568901346375-23c9450c58cd.webp",
       display_order: 5,
     },
     {
@@ -68,7 +68,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Cebolla blanca", "Panko", "Harina de trigo", "Huevo fresco", "Aceite vegetal", "Aderezo ranch"],
       prep_time: "20 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&q=80",
+      image_url: "/images/recipes/recipe-1579871494447-9811cf80d66c.webp",
       display_order: 6,
     },
   ],
@@ -81,7 +81,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Pierna de cerdo", "Achiote en pasta", "Piña miel", "Cebolla blanca", "Cilantro fresco", "Tortillas de maíz", "Chiles secos", "Vinagre"],
       prep_time: "2 hrs (marinado) + 30 min",
       servings: "20 tacos",
-      image_url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&q=80",
+      image_url: "/images/recipes/tacos-pastor.webp",
       display_order: 1,
     },
     {
@@ -90,7 +90,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Bistec de res", "Cebolla cambray", "Cilantro fresco", "Tortillas de maíz", "Limón agrio", "Chile guajillo"],
       prep_time: "30 min",
       servings: "15 tacos",
-      image_url: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=600&q=80",
+      image_url: "/images/recipes/tacos-bistec.webp",
       display_order: 2,
     },
     {
@@ -99,7 +99,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina de maíz", "Pechuga de pollo", "Frijoles refritos", "Crema ácida", "Queso fresco", "Lechuga", "Jitomate saladet"],
       prep_time: "45 min",
       servings: "8 sopes",
-      image_url: "https://images.unsplash.com/photo-1559847844-5315695dadae?w=600&q=80",
+      image_url: "/images/recipes/sopes-pollo.webp",
       display_order: 3,
     },
     {
@@ -108,7 +108,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Pierna de cerdo", "Manteca de cerdo", "Naranja Valencia", "Hoja de laurel", "Cebolla blanca", "Cilantro fresco", "Tortillas de maíz"],
       prep_time: "3 hrs",
       servings: "20 tacos",
-      image_url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&q=80",
+      image_url: "/images/recipes/recipe-1513104890138-7c749659a591.webp",
       display_order: 4,
     },
     {
@@ -117,7 +117,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Tortillas de maíz", "Flor de calabaza", "Queso Oaxaca", "Epazote", "Cebolla blanca", "Aceite vegetal"],
       prep_time: "25 min",
       servings: "10 quesadillas",
-      image_url: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=600&q=80",
+      image_url: "/images/recipes/recipe-1509042239860-f550ce710b93.webp",
       display_order: 5,
     },
     {
@@ -126,7 +126,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Tostadas", "Pechuga de pollo", "Chile chipotle", "Jitomate saladet", "Cebolla blanca", "Frijoles refritos", "Crema ácida", "Queso fresco"],
       prep_time: "40 min",
       servings: "10 tostadas",
-      image_url: "https://images.unsplash.com/photo-1559847844-5315695dadae?w=600&q=80",
+      image_url: "/images/recipes/recipe-1559847844-5315695dadae.webp",
       display_order: 6,
     },
   ],
@@ -139,7 +139,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Arroz para sushi", "Alga nori", "Surimi", "Aguacate hass", "Pepino", "Ajonjolí", "Salsa de soya", "Jengibre encurtido"],
       prep_time: "40 min",
       servings: "4 rollos (32 piezas)",
-      image_url: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80",
+      image_url: "/images/recipes/california-roll.webp",
       display_order: 1,
     },
     {
@@ -148,7 +148,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Huesos de cerdo", "Fideos ramen", "Huevo fresco", "Cebolla cambray", "Ajo", "Jengibre", "Salsa de soya"],
       prep_time: "4 hrs (caldo) + 30 min",
       servings: "4 tazones",
-      image_url: "https://images.unsplash.com/photo-1600891964092-4316c288032e?w=600&q=80",
+      image_url: "/images/recipes/ramen-tonkotsu.webp",
       display_order: 2,
     },
     {
@@ -157,7 +157,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Pierna y muslo de pollo", "Salsa de soya", "Azúcar", "Jengibre", "Ajo", "Arroz para sushi", "Brócoli", "Zanahoria"],
       prep_time: "35 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1608039829572-f785535a8346?w=600&q=80",
+      image_url: "/images/recipes/pollo-teriyaki.webp",
       display_order: 3,
     },
     {
@@ -166,7 +166,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Carne de cerdo molida", "Col china", "Cebollín", "Jengibre", "Ajo", "Pasta wonton", "Salsa de soya"],
       prep_time: "45 min",
       servings: "20 piezas",
-      image_url: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80",
+      image_url: "/images/recipes/recipe-1504674900247-0877df9cc836.webp",
       display_order: 4,
     },
     {
@@ -175,7 +175,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Fideos de arroz", "Camarón", "Huevo fresco", "Pasta de tamarindo", "Cacahuate", "Germinado de soya", "Cebollín"],
       prep_time: "30 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1600891964092-4316c288032e?w=600&q=80",
+      image_url: "/images/recipes/recipe-1600891964092-4316c288032e.webp",
       display_order: 5,
     },
     {
@@ -184,7 +184,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Arroz para sushi", "Alga nori", "Camarón", "Aguacate hass", "Pepino", "Salsa de anguila", "Ajonjolí"],
       prep_time: "45 min",
       servings: "4 rollos (32 piezas)",
-      image_url: "https://images.unsplash.com/photo-1608039829572-f785535a8346?w=600&q=80",
+      image_url: "/images/recipes/recipe-1608039829572-f785535a8346.webp",
       display_order: 6,
     },
   ],
@@ -197,7 +197,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina de trigo", "Puré de tomate enlatado", "Queso mozzarella", "Albahaca fresca", "Aceite de oliva", "Sal", "Levadura"],
       prep_time: "2 hrs (masa) + 15 min",
       servings: "2 pizzas medianas",
-      image_url: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80",
+      image_url: "/images/recipes/pizza-margherita.webp",
       display_order: 1,
     },
     {
@@ -206,7 +206,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina de trigo", "Puré de tomate enlatado", "Queso mozzarella", "Pepperoni", "Champiñones frescos", "Pimiento morrón"],
       prep_time: "2 hrs (masa) + 20 min",
       servings: "2 pizzas grandes",
-      image_url: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&q=80",
+      image_url: "/images/recipes/pizza-pepperoni.webp",
       display_order: 2,
     },
     {
@@ -215,7 +215,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Pasta fettuccine", "Pechuga de pollo", "Mantequilla", "Queso parmesano", "Crema para batir", "Ajo", "Pimienta negra"],
       prep_time: "30 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80",
+      image_url: "/images/recipes/pasta-alfredo.webp",
       display_order: 3,
     },
     {
@@ -224,7 +224,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina de trigo", "Queso mozzarella", "Queso gorgonzola", "Queso parmesano", "Queso provolone", "Aceite de oliva", "Levadura"],
       prep_time: "2 hrs (masa) + 15 min",
       servings: "2 pizzas medianas",
-      image_url: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80",
+      image_url: "/images/recipes/recipe-1512621776951-a57141f2eefd.webp",
       display_order: 4,
     },
     {
@@ -233,7 +233,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Pasta para lasaña", "Carne molida 80/20", "Jitomate en puré", "Leche entera", "Mantequilla", "Harina de trigo", "Queso parmesano", "Queso mozzarella"],
       prep_time: "1.5 hrs",
       servings: "8 porciones",
-      image_url: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&q=80",
+      image_url: "/images/recipes/recipe-1488477181946-6428a0291777.webp",
       display_order: 5,
     },
     {
@@ -242,7 +242,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Soletillas", "Queso mascarpone", "Café espresso", "Huevo fresco", "Azúcar", "Cocoa en polvo"],
       prep_time: "30 min + 4 hrs refrigeración",
       servings: "10 porciones",
-      image_url: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80",
+      image_url: "/images/recipes/recipe-1544025162-d76694265947.webp",
       display_order: 6,
     },
   ],
@@ -255,7 +255,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Alitas de pollo", "Salsa buffalo", "Mantequilla", "Aceite vegetal", "Apio", "Zanahoria", "Queso azul"],
       prep_time: "35 min",
       servings: "24 alitas",
-      image_url: "https://images.unsplash.com/photo-1583608205776-bd8e38e3ae76?w=600&q=80",
+      image_url: "/images/recipes/alitas-buffalo.webp",
       display_order: 1,
     },
     {
@@ -264,7 +264,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Pechuga de pollo", "Pan molido", "Huevo fresco", "Salsa BBQ", "Aceite vegetal"],
       prep_time: "30 min",
       servings: "6 porciones",
-      image_url: "https://images.unsplash.com/photo-1551024506-0bccd828d307?w=600&q=80",
+      image_url: "/images/recipes/boneless-bbq.webp",
       display_order: 2,
     },
     {
@@ -273,7 +273,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Pollo entero", "Ajo", "Limón agrio", "Romero", "Tomillo", "Mantequilla", "Papas cambray"],
       prep_time: "1.5 hrs",
       servings: "1 pollo (4-6 porciones)",
-      image_url: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=80",
+      image_url: "/images/recipes/pollo-rostizado.webp",
       display_order: 3,
     },
     {
@@ -282,7 +282,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Alitas de pollo", "Mango", "Chile habanero", "Miel de abeja", "Vinagre", "Ajo", "Aceite vegetal"],
       prep_time: "35 min",
       servings: "24 alitas",
-      image_url: "https://images.unsplash.com/photo-1583608205776-bd8e38e3ae76?w=600&q=80",
+      image_url: "/images/recipes/recipe-1583608205776-bd8e38e3ae76.webp",
       display_order: 4,
     },
     {
@@ -291,7 +291,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Alitas de pollo", "Ajo", "Mantequilla", "Perejil fresco", "Limón agrio", "Aceite de oliva"],
       prep_time: "30 min",
       servings: "24 alitas",
-      image_url: "https://images.unsplash.com/photo-1551024506-0bccd828d307?w=600&q=80",
+      image_url: "/images/recipes/recipe-1551024506-0bccd828d307.webp",
       display_order: 5,
     },
     {
@@ -300,7 +300,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Pechuga de pollo", "Pan molido", "Huevo fresco", "Harina de trigo", "Aceite vegetal", "Sal", "Pimienta"],
       prep_time: "30 min",
       servings: "6 porciones",
-      image_url: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=80",
+      image_url: "/images/recipes/recipe-1565299585323-38d6b0865b47.webp",
       display_order: 6,
     },
   ],
@@ -313,7 +313,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Chile poblano", "Queso asadero", "Huevo fresco", "Jitomate saladet", "Cebolla blanca", "Ajo", "Aceite vegetal"],
       prep_time: "1 hr",
       servings: "6 chiles",
-      image_url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80",
+      image_url: "/images/recipes/chiles-rellenos.webp",
       display_order: 1,
     },
     {
@@ -322,7 +322,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Chile mulato", "Chile ancho", "Chile pasilla", "Chocolate de mesa", "Ajonjolí", "Almendras", "Pasas", "Plátano macho", "Pollo entero"],
       prep_time: "3 hrs",
       servings: "12 porciones",
-      image_url: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&q=80",
+      image_url: "/images/recipes/mole-poblano.webp",
       display_order: 2,
     },
     {
@@ -331,7 +331,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Tortillas de maíz", "Pechuga de pollo", "Tomate verde", "Chile serrano", "Crema ácida", "Queso fresco", "Cilantro fresco"],
       prep_time: "40 min",
       servings: "12 enchiladas",
-      image_url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&q=80",
+      image_url: "/images/recipes/enchiladas-verdes.webp",
       display_order: 3,
     },
     {
@@ -340,7 +340,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Maíz cacahuazintle", "Pierna de cerdo", "Chile guajillo", "Chile ancho", "Ajo", "Cebolla blanca", "Lechuga", "Rábano", "Orégano"],
       prep_time: "3 hrs",
       servings: "10 porciones",
-      image_url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80",
+      image_url: "/images/recipes/recipe-1568901346375-23c9450c58cd.webp",
       display_order: 4,
     },
     {
@@ -349,7 +349,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Chile poblano", "Carne molida 80/20", "Manzana", "Pera", "Nuez de castilla", "Crema ácida", "Queso de cabra", "Granada"],
       prep_time: "2 hrs",
       servings: "6 chiles",
-      image_url: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&q=80",
+      image_url: "/images/recipes/recipe-1579871494447-9811cf80d66c.webp",
       display_order: 5,
     },
     {
@@ -358,7 +358,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Masa de maíz para tamal", "Pechuga de pollo", "Tomate verde", "Chile serrano", "Manteca de cerdo", "Hoja de maíz", "Caldo de pollo"],
       prep_time: "2 hrs",
       servings: "20 tamales",
-      image_url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&q=80",
+      image_url: "/images/recipes/recipe-1513104890138-7c749659a591.webp",
       display_order: 6,
     },
   ],
@@ -371,7 +371,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Camarón", "Limón agrio", "Jitomate saladet", "Cebolla morada", "Cilantro fresco", "Aguacate hass", "Pepino", "Salsa inglesa"],
       prep_time: "25 min",
       servings: "6 porciones",
-      image_url: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=600&q=80",
+      image_url: "/images/recipes/ceviche-camaron.webp",
       display_order: 1,
     },
     {
@@ -380,7 +380,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Filete de pescado blanco", "Panko", "Huevo fresco", "Harina de trigo", "Lechuga", "Jitomate bola", "Limón agrio"],
       prep_time: "25 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1559847844-5315695dadae?w=600&q=80",
+      image_url: "/images/recipes/pescado-empanizado.webp",
       display_order: 2,
     },
     {
@@ -389,7 +389,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Camarón", "Catsup", "Jugo de tomate", "Cebolla blanca", "Cilantro fresco", "Aguacate hass", "Limón agrio", "Salsa picante"],
       prep_time: "20 min",
       servings: "6 cócteles",
-      image_url: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80",
+      image_url: "/images/recipes/coctel-camaron.webp",
       display_order: 3,
     },
     {
@@ -398,7 +398,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Camarón", "Chile serrano", "Limón agrio", "Pepino", "Cebolla morada", "Cilantro fresco", "Sal"],
       prep_time: "20 min",
       servings: "6 porciones",
-      image_url: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=600&q=80",
+      image_url: "/images/recipes/recipe-1509042239860-f550ce710b93.webp",
       display_order: 4,
     },
     {
@@ -407,7 +407,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Camarón", "Ajo", "Mantequilla", "Aceite de oliva", "Limón agrio", "Perejil fresco", "Arroz blanco"],
       prep_time: "20 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1559847844-5315695dadae?w=600&q=80",
+      image_url: "/images/recipes/recipe-1559847844-5315695dadae.webp",
       display_order: 5,
     },
     {
@@ -416,7 +416,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Pescado huachinango entero", "Chile guajillo", "Chile ancho", "Ajo", "Naranja Valencia", "Mayonesa", "Cebolla morada"],
       prep_time: "1 hr",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80",
+      image_url: "/images/recipes/recipe-1504674900247-0877df9cc836.webp",
       display_order: 6,
     },
   ],
@@ -429,7 +429,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Ribeye", "Sal de grano", "Pimienta negra", "Aceite de oliva", "Papas cambray", "Perejil fresco", "Ajo", "Vinagre"],
       prep_time: "25 min",
       servings: "2 cortes",
-      image_url: "https://images.unsplash.com/photo-1600891964092-4316c288032e?w=600&q=80",
+      image_url: "/images/recipes/ribeye-parrilla.webp",
       display_order: 1,
     },
     {
@@ -438,7 +438,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Arrachera", "Naranja Valencia", "Ajo", "Cebolla blanca", "Sal", "Pimienta", "Cebolla cambray"],
       prep_time: "4 hrs (marinado) + 20 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1608039829572-f785535a8346?w=600&q=80",
+      image_url: "/images/recipes/arrachera.webp",
       display_order: 2,
     },
     {
@@ -447,7 +447,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Queso asadero", "Chorizo", "Tortillas de harina", "Chile serrano", "Cilantro fresco"],
       prep_time: "15 min",
       servings: "6 porciones",
-      image_url: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80",
+      image_url: "/images/recipes/queso-fundido.webp",
       display_order: 3,
     },
     {
@@ -456,7 +456,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["T-bone", "Sal de grano", "Pimienta negra", "Mantequilla", "Romero", "Papas cambray", "Aceite de oliva"],
       prep_time: "30 min",
       servings: "2 cortes",
-      image_url: "https://images.unsplash.com/photo-1600891964092-4316c288032e?w=600&q=80",
+      image_url: "/images/recipes/recipe-1600891964092-4316c288032e.webp",
       display_order: 4,
     },
     {
@@ -465,7 +465,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Costillas de cerdo", "Salsa BBQ", "Azúcar mascabado", "Pimentón", "Ajo en polvo", "Cebolla en polvo"],
       prep_time: "3 hrs",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1608039829572-f785535a8346?w=600&q=80",
+      image_url: "/images/recipes/recipe-1608039829572-f785535a8346.webp",
       display_order: 5,
     },
     {
@@ -474,7 +474,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Suadero de res", "Manteca de cerdo", "Tortillas de maíz", "Cebolla blanca", "Cilantro fresco", "Salsa verde"],
       prep_time: "2 hrs",
       servings: "20 tacos",
-      image_url: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80",
+      image_url: "/images/recipes/recipe-1512621776951-a57141f2eefd.webp",
       display_order: 6,
     },
   ],
@@ -487,7 +487,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina de trigo", "Huevo fresco", "Leche entera", "Mantequilla", "Nutella", "Fresa", "Crema para batir"],
       prep_time: "20 min",
       servings: "4 crepas",
-      image_url: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&q=80",
+      image_url: "/images/recipes/crepa-nutella.webp",
       display_order: 1,
     },
     {
@@ -496,7 +496,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Huevo fresco", "Tortillas de maíz", "Jitomate saladet", "Chile serrano", "Cebolla blanca", "Frijoles refritos", "Aceite vegetal"],
       prep_time: "25 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80",
+      image_url: "/images/recipes/huevos-rancheros.webp",
       display_order: 2,
     },
     {
@@ -505,7 +505,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina para hot cakes", "Huevo fresco", "Leche entera", "Mantequilla", "Miel de maple"],
       prep_time: "20 min",
       servings: "8 hot cakes",
-      image_url: "https://images.unsplash.com/photo-1583608205776-bd8e38e3ae76?w=600&q=80",
+      image_url: "/images/recipes/hotcakes.webp",
       display_order: 3,
     },
     {
@@ -514,7 +514,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Café en grano", "Leche entera", "Azúcar"],
       prep_time: "10 min",
       servings: "1 taza",
-      image_url: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&q=80",
+      image_url: "/images/recipes/recipe-1488477181946-6428a0291777.webp",
       display_order: 4,
     },
     {
@@ -523,7 +523,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina de trigo", "Huevo fresco", "Leche entera", "Mantequilla", "Fresa", "Zarzamora", "Miel de maple"],
       prep_time: "25 min",
       servings: "4 waffles",
-      image_url: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80",
+      image_url: "/images/recipes/recipe-1544025162-d76694265947.webp",
       display_order: 5,
     },
     {
@@ -532,7 +532,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Totopos", "Tomate verde", "Chile serrano", "Pechuga de pollo", "Crema ácida", "Queso fresco", "Cebolla blanca"],
       prep_time: "25 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1583608205776-bd8e38e3ae76?w=600&q=80",
+      image_url: "/images/recipes/recipe-1583608205776-bd8e38e3ae76.webp",
       display_order: 6,
     },
   ],
@@ -545,7 +545,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Atún fresco", "Arroz para sushi", "Salsa de soya", "Ajonjolí", "Aguacate hass", "Pepino", "Edamame", "Alga nori"],
       prep_time: "20 min",
       servings: "4 bowls",
-      image_url: "https://images.unsplash.com/photo-1551024506-0bccd828d307?w=600&q=80",
+      image_url: "/images/recipes/poke-atun.webp",
       display_order: 1,
     },
     {
@@ -554,7 +554,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Lechuga romana", "Pechuga de pollo", "Queso parmesano", "Pan para crutones", "Limón agrio", "Aceite de oliva", "Ajo"],
       prep_time: "20 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=80",
+      image_url: "/images/recipes/ensalada-cesar.webp",
       display_order: 2,
     },
     {
@@ -563,7 +563,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Espinaca fresca", "Piña miel", "Plátano tabasco", "Jengibre fresco", "Miel de abeja"],
       prep_time: "10 min",
       servings: "2 smoothies",
-      image_url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80",
+      image_url: "/images/recipes/smoothie-verde.webp",
       display_order: 3,
     },
     {
@@ -572,7 +572,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Salmón fresco", "Arroz integral", "Edamame", "Mango", "Aguacate hass", "Salsa de soya", "Miel de abeja"],
       prep_time: "20 min",
       servings: "4 bowls",
-      image_url: "https://images.unsplash.com/photo-1551024506-0bccd828d307?w=600&q=80",
+      image_url: "/images/recipes/recipe-1551024506-0bccd828d307.webp",
       display_order: 4,
     },
     {
@@ -581,7 +581,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Quinoa", "Pepino", "Jitomate cherry", "Aceituna kalamata", "Queso feta", "Aceite de oliva", "Limón agrio"],
       prep_time: "20 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=80",
+      image_url: "/images/recipes/recipe-1565299585323-38d6b0865b47.webp",
       display_order: 5,
     },
     {
@@ -590,7 +590,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Tortilla integral", "Pechuga de pollo", "Espinaca fresca", "Zanahoria", "Yogur griego", "Limón agrio"],
       prep_time: "20 min",
       servings: "4 wraps",
-      image_url: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80",
+      image_url: "/images/recipes/recipe-1568901346375-23c9450c58cd.webp",
       display_order: 6,
     },
   ],
@@ -603,7 +603,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina de trigo", "Cocoa en polvo", "Huevo fresco", "Mantequilla", "Azúcar", "Chispas de chocolate", "Crema para batir"],
       prep_time: "1 hr",
       servings: "12 rebanadas",
-      image_url: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&q=80",
+      image_url: "/images/recipes/pastel-chocolate.webp",
       display_order: 1,
     },
     {
@@ -612,7 +612,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina de trigo", "Azúcar", "Mantequilla", "Huevo fresco", "Levadura", "Leche entera", "Vainilla"],
       prep_time: "2.5 hrs",
       servings: "12 conchas",
-      image_url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&q=80",
+      image_url: "/images/recipes/conchas.webp",
       display_order: 2,
     },
     {
@@ -621,7 +621,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Crema para batir", "Leche entera", "Yemas de huevo", "Azúcar", "Vainilla"],
       prep_time: "45 min + 4 hrs congelado",
       servings: "1 litro",
-      image_url: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=600&q=80",
+      image_url: "/images/recipes/helado-vainilla.webp",
       display_order: 3,
     },
     {
@@ -630,7 +630,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Leche condensada", "Leche evaporada", "Huevo fresco", "Azúcar", "Vainilla"],
       prep_time: "1 hr + 4 hrs refrigeración",
       servings: "8 porciones",
-      image_url: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&q=80",
+      image_url: "/images/recipes/recipe-1579871494447-9811cf80d66c.webp",
       display_order: 4,
     },
     {
@@ -639,7 +639,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Galletas Marías", "Mantequilla", "Leche condensada", "Limón agrio", "Crema para batir"],
       prep_time: "40 min + 3 hrs refrigeración",
       servings: "8 rebanadas",
-      image_url: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&q=80",
+      image_url: "/images/recipes/recipe-1513104890138-7c749659a591.webp",
       display_order: 5,
     },
     {
@@ -648,7 +648,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina de trigo", "Mantequilla", "Huevo fresco", "Azúcar", "Canela en polvo", "Cajeta", "Aceite vegetal"],
       prep_time: "30 min",
       servings: "20 churros",
-      image_url: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=600&q=80",
+      image_url: "/images/recipes/recipe-1509042239860-f550ce710b93.webp",
       display_order: 6,
     },
   ],
@@ -661,7 +661,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Pechuga de pollo", "Pan pita", "Jocoque", "Pepino", "Jitomate bola", "Cebolla morada", "Comino", "Pimentón"],
       prep_time: "40 min",
       servings: "6 shawarmas",
-      image_url: "https://images.unsplash.com/photo-1559847844-5315695dadae?w=600&q=80",
+      image_url: "/images/recipes/shawarma-pollo.webp",
       display_order: 1,
     },
     {
@@ -670,7 +670,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Pierna de cerdo", "Pan pita", "Yogur griego", "Pepino", "Ajo", "Eneldo", "Limón agrio", "Aceite de oliva"],
       prep_time: "1 hr",
       servings: "6 gyros",
-      image_url: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80",
+      image_url: "/images/recipes/gyro-cerdo.webp",
       display_order: 2,
     },
     {
@@ -679,7 +679,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Garbanzo", "Tahini", "Limón agrio", "Ajo", "Aceite de oliva", "Pimentón", "Pan pita"],
       prep_time: "15 min",
       servings: "8 porciones",
-      image_url: "https://images.unsplash.com/photo-1600891964092-4316c288032e?w=600&q=80",
+      image_url: "/images/recipes/hummus.webp",
       display_order: 3,
     },
     {
@@ -688,7 +688,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Garbanzo", "Cilantro fresco", "Comino", "Ajo", "Pan pita", "Tahini", "Aceite vegetal"],
       prep_time: "40 min",
       servings: "20 piezas",
-      image_url: "https://images.unsplash.com/photo-1559847844-5315695dadae?w=600&q=80",
+      image_url: "/images/recipes/recipe-1559847844-5315695dadae.webp",
       display_order: 4,
     },
     {
@@ -697,7 +697,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Jitomate bola", "Pepino", "Cebolla morada", "Aceituna kalamata", "Queso feta", "Aceite de oliva", "Orégano"],
       prep_time: "15 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80",
+      image_url: "/images/recipes/recipe-1504674900247-0877df9cc836.webp",
       display_order: 5,
     },
     {
@@ -706,7 +706,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Pasta filo", "Nuez de castilla", "Pistache", "Mantequilla", "Miel de abeja", "Azúcar", "Canela en polvo"],
       prep_time: "1 hr",
       servings: "16 piezas",
-      image_url: "https://images.unsplash.com/photo-1600891964092-4316c288032e?w=600&q=80",
+      image_url: "/images/recipes/recipe-1600891964092-4316c288032e.webp",
       display_order: 6,
     },
   ],
@@ -719,7 +719,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina PAN", "Pechuga de pollo", "Aguacate hass", "Mayonesa", "Cebolla blanca", "Cilantro fresco", "Limón agrio"],
       prep_time: "40 min",
       servings: "6 arepas",
-      image_url: "https://images.unsplash.com/photo-1608039829572-f785535a8346?w=600&q=80",
+      image_url: "/images/recipes/arepas.webp",
       display_order: 1,
     },
     {
@@ -728,7 +728,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Plátano macho", "Aceite vegetal", "Sal", "Ajo en polvo"],
       prep_time: "20 min",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80",
+      image_url: "/images/recipes/patacones.webp",
       display_order: 2,
     },
     {
@@ -737,7 +737,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina de maíz precocida", "Carne molida 80/20", "Papas blancas", "Cebolla blanca", "Comino", "Achiote", "Aceite vegetal"],
       prep_time: "50 min",
       servings: "12 empanadas",
-      image_url: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&q=80",
+      image_url: "/images/recipes/empanadas-colombianas.webp",
       display_order: 3,
     },
     {
@@ -746,7 +746,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Maíz tierno", "Queso de mano", "Leche entera", "Azúcar", "Mantequilla"],
       prep_time: "25 min",
       servings: "6 cachapas",
-      image_url: "https://images.unsplash.com/photo-1608039829572-f785535a8346?w=600&q=80",
+      image_url: "/images/recipes/recipe-1608039829572-f785535a8346.webp",
       display_order: 4,
     },
     {
@@ -755,7 +755,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Harina de trigo", "Queso blanco", "Huevo fresco", "Aceite vegetal"],
       prep_time: "40 min",
       servings: "24 piezas",
-      image_url: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80",
+      image_url: "/images/recipes/recipe-1512621776951-a57141f2eefd.webp",
       display_order: 5,
     },
     {
@@ -764,7 +764,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Frijoles rojos", "Arroz blanco", "Carne molida 80/20", "Chicharrón", "Huevo fresco", "Plátano macho", "Aguacate hass"],
       prep_time: "1.5 hrs",
       servings: "4 porciones",
-      image_url: "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&q=80",
+      image_url: "/images/recipes/recipe-1488477181946-6428a0291777.webp",
       display_order: 6,
     },
   ],
@@ -777,7 +777,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Cerveza clara", "Limón agrio", "Salsa inglesa", "Salsa picante", "Sal", "Hielo", "Chile en polvo"],
       prep_time: "5 min",
       servings: "1 michelada",
-      image_url: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80",
+      image_url: "/images/recipes/michelada.webp",
       display_order: 1,
     },
     {
@@ -786,7 +786,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Totopos", "Queso cheddar rebanado", "Carne molida 80/20", "Jalapeños en escabeche", "Crema ácida", "Aguacate hass", "Jitomate saladet"],
       prep_time: "20 min",
       servings: "6 porciones",
-      image_url: "https://images.unsplash.com/photo-1583608205776-bd8e38e3ae76?w=600&q=80",
+      image_url: "/images/recipes/nachos.webp",
       display_order: 2,
     },
     {
@@ -795,7 +795,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Limón agrio", "Azúcar", "Agua mineral", "Hielo", "Hierbabuena fresca"],
       prep_time: "10 min",
       servings: "2 litros",
-      image_url: "https://images.unsplash.com/photo-1551024506-0bccd828d307?w=600&q=80",
+      image_url: "/images/recipes/limonada.webp",
       display_order: 3,
     },
     {
@@ -804,7 +804,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Tequila blanco", "Licor de naranja", "Limón agrio", "Sal", "Hielo"],
       prep_time: "5 min",
       servings: "1 margarita",
-      image_url: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80",
+      image_url: "/images/recipes/recipe-1544025162-d76694265947.webp",
       display_order: 4,
     },
     {
@@ -813,7 +813,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Aguacate hass", "Jitomate saladet", "Cebolla blanca", "Cilantro fresco", "Chile serrano", "Limón agrio", "Sal"],
       prep_time: "15 min",
       servings: "6 porciones",
-      image_url: "https://images.unsplash.com/photo-1583608205776-bd8e38e3ae76?w=600&q=80",
+      image_url: "/images/recipes/recipe-1583608205776-bd8e38e3ae76.webp",
       display_order: 5,
     },
     {
@@ -822,7 +822,7 @@ const RECIPES: Record<string, RecipeInput[]> = {
       ingredients: ["Ron blanco", "Hierbabuena fresca", "Limón agrio", "Azúcar", "Agua mineral", "Hielo"],
       prep_time: "10 min",
       servings: "1 mojito",
-      image_url: "https://images.unsplash.com/photo-1551024506-0bccd828d307?w=600&q=80",
+      image_url: "/images/recipes/recipe-1551024506-0bccd828d307.webp",
       display_order: 6,
     },
   ],

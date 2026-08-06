@@ -67,7 +67,9 @@ export function DashboardSidebar() {
   const { city } = useCity()
   const { itemCount } = useCart()
   const router = useRouter()
-  const supabase = createClient()
+  // Lazy browser-only client: creating it during SSR would throw when
+  // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
+  const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [orders] = useState<OrderSummary[]>(() => generateMockOrders(5))
   const [cashback] = useState(0)
@@ -88,15 +90,12 @@ export function DashboardSidebar() {
   const pillBottom = hasCartItems ? "bottom-[80px]" : "bottom-[20px]"
 
   useEffect(() => {
+    if (!supabase) return
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
   }, [supabase])
 
-  useEffect(() => {
-    const saved = localStorage.getItem("cashback-balance")
-    // trigger setCashback if needed — using state directly from initial
-  }, [])
-
   async function handleSignOut() {
+    if (!supabase) return
     await supabase.auth.signOut()
     setUser(null)
     router.refresh()

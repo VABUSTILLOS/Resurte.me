@@ -10,6 +10,7 @@ import { CollectionStorySection } from "@/components/collections/collection-stor
 import { CollectionValueHighlight } from "@/components/collections/collection-value-highlight"
 import { getCollectionContent } from "@/lib/collection-content"
 import { getCollectionRecipes } from "@/lib/recipes"
+import { getCollectionCover } from "@/lib/collection-images"
 import RecipeSlider from "@/components/collections/recipe-slider"
 import type { Product, CollectionRecipe } from "@/types"
 
@@ -35,6 +36,7 @@ interface CollectionPageClientProps {
     tags: string[]
   }
   products: Product[]
+  allProducts?: Product[]
 }
 
 /**
@@ -51,7 +53,7 @@ function chunkProducts<T>(products: T[], chunks: number): T[][] {
   return result
 }
 
-export function CollectionPageClient({ citySlug, cityName, collection, products }: CollectionPageClientProps) {
+export function CollectionPageClient({ citySlug, cityName, collection, products, allProducts }: CollectionPageClientProps) {
   const icon = COLLECTION_ICONS[collection.slug] || "📦"
   const content = getCollectionContent(collection.slug)
   const recipes: CollectionRecipe[] = getCollectionRecipes(collection.slug).map((r, i) => ({
@@ -70,7 +72,7 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
       <CollectionHero
         collectionName={collection.name}
         tagline={content.heroTagline}
-        imageUrl={collection.image_url}
+        imageUrl={getCollectionCover(collection.slug) ?? collection.image_url}
         icon={icon}
         citySlug={citySlug}
         cityName={cityName}
@@ -118,7 +120,7 @@ export function CollectionPageClient({ citySlug, cityName, collection, products 
         <section className="max-w-7xl mx-auto px-5 sm:px-8 py-12 sm:py-16 bg-[#faf8f5]">
           <RecipeSlider
             recipes={recipes}
-            products={products}
+            products={allProducts && allProducts.length > 0 ? allProducts : products}
             citySlug={citySlug}
           />
         </section>

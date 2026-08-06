@@ -28,13 +28,16 @@ const COLLECTION_ICONS: Record<string, string> = {
 
 function PanelContent({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const supabase = createClient()
+  // Lazy browser-only client: creating it during SSR would throw when
+  // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
+  const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
   const { selectedCollection, setSelectedCollection, collections, setCollections } = useRestaurant()
   const [loading, setLoading] = useState(true)
   const [showPicker, setShowPicker] = useState(false)
 
   useEffect(() => {
     async function load() {
+      if (!supabase) return
       const { data } = await supabase
         .from("restaurant_collections")
         .select("*")
