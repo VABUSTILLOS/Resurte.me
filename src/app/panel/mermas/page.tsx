@@ -18,6 +18,14 @@ const WASTE_CATEGORIES = [
   { key: "bebidas", label: "Bebidas", icon: "🥤", avgWastePercent: 3 },
 ]
 
+const CAUSAS = [
+  { key: "preparacion", label: "Preparación", icon: "🔪" },
+  { key: "caducidad", label: "Caducidad", icon: "📅" },
+  { key: "sobreproduccion", label: "Sobreproducción", icon: "📦" },
+  { key: "devolucion", label: "Devolución", icon: "↩️" },
+  { key: "otro", label: "Otro", icon: "❓" },
+]
+
 const TIPS: Record<string, string[]> = {
   "frutas_verduras": [
     "Refrigera verduras de hoja verde envueltas en papel para absorber humedad.",
@@ -60,6 +68,7 @@ interface WasteEntry {
   costPerKg: number
   date: string // ISO date
   note?: string
+  cause: string // key from CAUSAS
 }
 
 let wasteId = 0
@@ -74,6 +83,7 @@ export default function MermasPage() {
   const [amountKg, setAmountKg] = useState("")
   const [costPerKg, setCostPerKg] = useState("")
   const [note, setNote] = useState("")
+  const [selectedCause, setSelectedCause] = useState(CAUSAS[0].key)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedTip, setExpandedTip] = useState<string | null>(null)
   const [showTrends, setShowTrends] = useState(false)
@@ -96,13 +106,14 @@ export default function MermasPage() {
   function addEntry() {
     const kg = parseFloat(amountKg)
     const cost = parseFloat(costPerKg)
-    if (!selectedCategory || !kg || !cost || kg <= 0 || cost <= 0) return
+    if (!selectedCategory || !selectedCause || !kg || !cost || kg <= 0 || cost <= 0) return
     
     if (editingId) {
       // Update existing entry
       setEntries((prev) => prev.map((e) => e.id === editingId ? {
         ...e,
         category: selectedCategory,
+        cause: selectedCause,
         amountKg: kg,
         costPerKg: cost,
         note: note.trim() || undefined,
@@ -111,6 +122,7 @@ export default function MermasPage() {
       setEntries((prev) => [...prev, {
         id: nextWasteId(),
         category: selectedCategory,
+        cause: selectedCause,
         amountKg: kg,
         costPerKg: cost,
         date: new Date().toISOString(),
@@ -120,6 +132,7 @@ export default function MermasPage() {
     setAmountKg("")
     setCostPerKg("")
     setNote("")
+    setSelectedCause(CAUSAS[0].key)
     setEditingId(null)
     setShowForm(false)
   }
@@ -127,6 +140,7 @@ export default function MermasPage() {
   function startEditEntry(entry: WasteEntry) {
     setEditingId(entry.id)
     setSelectedCategory(entry.category)
+    setSelectedCause(entry.cause || CAUSAS[0].key)
     setAmountKg(String(entry.amountKg))
     setCostPerKg(String(entry.costPerKg))
     setNote(entry.note || "")
@@ -139,6 +153,7 @@ export default function MermasPage() {
     setAmountKg("")
     setCostPerKg("")
     setNote("")
+    setSelectedCause(CAUSAS[0].key)
   }
 
   function removeEntry(id: string) {
@@ -235,7 +250,12 @@ export default function MermasPage() {
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="text-lg">{cat?.icon}</span>
                   <div>
-                    <p className="text-sm font-medium text-gray-800">{cat?.label}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-gray-800">{cat?.label}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-50 text-red-600 font-medium">
+                        {CAUSAS.find((c) => c.key === entry.cause)?.icon} {CAUSAS.find((c) => c.key === entry.cause)?.label || "Sin causa"}
+                      </span>
+                    </div>
                     <p className="text-xs text-gray-400">{entry.amountKg} kg × ${entry.costPerKg}/kg</p>
                     {entry.note && (
                       <p className="text-xs text-gray-500 italic mt-0.5">"{entry.note}"</p>
@@ -299,6 +319,25 @@ export default function MermasPage() {
                   min="0"
                   step="0.5"
                 />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 mb-1 block">Causa de la merma</label>
+              <div className="flex flex-wrap gap-1.5">
+                {CAUSAS.map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    onClick={() => setSelectedCause(c.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      selectedCause === c.key
+                        ? "bg-red-100 text-red-700 border border-red-300"
+                        : "bg-gray-50 text-gray-500 border border-gray-200 hover:border-red-200"
+                    }`}
+                  >
+                    {c.icon} {c.label}
+                  </button>
+                ))}
               </div>
             </div>
             <div>
@@ -378,7 +417,7 @@ export default function MermasPage() {
         </div>
       )}
 
-      {/* Trend chart */}
+      {/* Trend chart — 6 months */}
       {entries.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
           <button
@@ -387,43 +426,63 @@ export default function MermasPage() {
           >
             <div className="flex items-center gap-2">
               <TrendingDown className="w-5 h-5 text-indigo-600" />
-              <h3 className="font-semibold text-gray-900">Tendencia 7 días</h3>
+              <h3 className="font-semibold text-gray-900">Tendencia 6 meses</h3>
             </div>
             <span className="text-xs text-gray-400">{showTrendChart ? "Ocultar" : "Ver"}</span>
           </button>
           {showTrendChart && (
             <div className="border-t border-gray-100 p-4">
               {(() => {
-                const days: { label: string; loss: number }[] = []
-                for (let i = 6; i >= 0; i--) {
-                  const d = new Date()
-                  d.setDate(d.getDate() - i)
-                  const dateStr = d.toISOString().split("T")[0]
-                  const dayLoss = entries
-                    .filter((e) => e.date.split("T")[0] === dateStr)
-                    .reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
-                  days.push({
-                    label: i === 0 ? "Hoy" : i === 1 ? "Ayer" : d.toLocaleDateString("es-MX", { weekday: "short" }),
-                    loss: dayLoss,
+                const months: { label: string; loss: number; byCause: Record<string, number> }[] = []
+                const today = new Date()
+                for (let i = 5; i >= 0; i--) {
+                  const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
+                  const monthStart = new Date(d.getFullYear(), d.getMonth(), 1)
+                  const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
+                  const monthEntries = entries.filter((e) => {
+                    const date = new Date(e.date)
+                    return date >= monthStart && date <= monthEnd
+                  })
+                  const loss = monthEntries.reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
+                  const byCause: Record<string, number> = {}
+                  monthEntries.forEach((e) => {
+                    byCause[e.cause || "otro"] = (byCause[e.cause || "otro"] || 0) + e.amountKg * e.costPerKg
+                  })
+                  const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+                  months.push({
+                    label: `${monthNames[d.getMonth()]} ${d.getFullYear()}`,
+                    loss,
+                    byCause,
                   })
                 }
-                const maxLoss = Math.max(...days.map((d) => d.loss), 1)
+                const maxLoss = Math.max(...months.map((m) => m.loss), 1)
                 return (
-                  <div className="flex items-end gap-2 h-32">
-                    {days.map((day, idx) => (
-                      <div key={idx} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-                        <span className="text-[10px] font-mono font-bold text-red-600">
-                          ${day.loss.toFixed(0)}
-                        </span>
-                        <div className="w-full flex-1 bg-gray-100 rounded-t-lg relative overflow-hidden">
-                          <div
-                            className="absolute bottom-0 w-full bg-gradient-to-t from-red-500 to-red-400 rounded-t-lg transition-all"
-                            style={{ height: `${(day.loss / maxLoss) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-gray-400">{day.label}</span>
+                  <div className="space-y-2">
+                    <div className="flex items-end gap-2 h-32">
+                      {months.map((m, idx) => {
+                        const isOverGoal = monthlyGoal > 0 && m.loss > monthlyGoal
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center gap-1 min-w-0" title={m.byCause ? Object.entries(m.byCause).map(([k, v]) => `${CAUSAS.find((c) => c.key === k)?.label || k}: $${v.toFixed(0)}`).join(", ") : ""}>
+                            <span className={`text-[10px] font-mono font-bold ${isOverGoal ? "text-red-600" : "text-gray-500"}`}>
+                              ${m.loss.toFixed(0)}
+                            </span>
+                            <div className="w-full flex-1 bg-gray-100 rounded-t-lg relative overflow-hidden">
+                              <div
+                                className={`absolute bottom-0 w-full rounded-t-lg transition-all ${isOverGoal ? "bg-gradient-to-t from-red-500 to-red-400" : "bg-gradient-to-t from-indigo-400 to-indigo-300"}`}
+                                style={{ height: `${Math.max((m.loss / maxLoss) * 100, 2)}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-gray-400">{m.label}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {monthlyGoal > 0 && (
+                      <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                        <div className="w-3 h-0 border-t border-dashed border-red-400" />
+                        Meta mensual: ${monthlyGoal.toFixed(0)}
                       </div>
-                    ))}
+                    )}
                   </div>
                 )
               })()}

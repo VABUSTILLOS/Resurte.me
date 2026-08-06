@@ -5,7 +5,7 @@ import { ChevronRight } from "lucide-react"
 import type { Metadata } from "next"
 import { compileMDX } from "next-mdx-remote/rsc"
 import remarkGfm from "remark-gfm"
-import { getPostBySlug, getPostSlugs, getPostUrl } from "@/lib/blog"
+import { getPostBySlug, getPostSlugs, getPostUrl, getPostCta } from "@/lib/blog"
 import {
   getBlogPostingSchema,
   getFAQSchema,
@@ -15,6 +15,7 @@ import { getCategory } from "@/lib/blog-categories"
 import { mdxComponents } from "@/components/blog/mdx-components"
 import { BlogAuthor } from "@/components/blog/blog-author"
 import { BlogFAQ } from "@/components/blog/blog-faq"
+import { PostCTA } from "@/components/blog/post-cta"
 import { RelatedPosts } from "@/components/blog/related-posts"
 import { ReadingProgress } from "@/components/blog/reading-progress"
 
@@ -167,6 +168,9 @@ export default async function BlogPostPage({
           <BlogFAQ items={post.data.faq} />
         </div>
       )}
+
+      {/* Caja CTA de cierre */}
+      <PostCTA config={getPostCta(post.data)} />
 
       {/* Posts relacionados */}
       <div className="mx-auto max-w-5xl px-4 pb-16 sm:px-6">

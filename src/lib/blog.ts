@@ -14,6 +14,19 @@ export interface BlogFAQ {
   answer: string
 }
 
+/** Activos de Resurte.me a los que puede llevar un CTA. */
+export type BlogCTAVariant = "coleccion" | "herramienta" | "crecimiento"
+
+/** Configuración del CTA de cierre de un post (override por frontmatter). */
+export interface BlogCTAConfig {
+  variant: BlogCTAVariant
+  title?: string
+  cta?: string
+  href?: string
+  collectionSlug?: string
+  collectionName?: string
+}
+
 export interface BlogPostMeta {
   slug: string
   title: string
@@ -29,6 +42,7 @@ export interface BlogPostMeta {
   featured?: boolean
   readingTime: number // minutos de lectura estimados
   faq?: BlogFAQ[]
+  cta?: BlogCTAConfig
 }
 
 function normalizeFrontmatter(
@@ -50,6 +64,29 @@ function normalizeFrontmatter(
         }))
     : undefined
 
+  // CTA de cierre: opcional por frontmatter; si no viene, se deriva por categoría.
+  let cta: BlogCTAConfig | undefined
+  if (data.cta && typeof data.cta === "object" && !Array.isArray(data.cta)) {
+    const c = data.cta as Record<string, unknown>
+    const variant = ["coleccion", "herramienta", "crecimiento"].includes(
+      String(c.variant)
+    )
+      ? (String(c.variant) as BlogCTAVariant)
+      : undefined
+    cta = variant
+      ? {
+          variant,
+          title: c.title ? String(c.title) : undefined,
+          cta: c.cta ? String(c.cta) : undefined,
+          href: c.href ? String(c.href) : undefined,
+          collectionSlug: c.collectionSlug ? String(c.collectionSlug) : undefined,
+          collectionName: c.collectionName
+            ? String(c.collectionName)
+            : undefined,
+        }
+      : undefined
+  }
+
   const title = String(data.title ?? slug)
   const raw = String(data.description ?? "")
   const readingTime = estimateReadingTime(raw)
@@ -69,6 +106,7 @@ function normalizeFrontmatter(
     featured: data.featured === true,
     readingTime,
     faq,
+    cta,
   }
 }
 
@@ -113,12 +151,179 @@ export function getPostSlugs(): string[] {
 }
 
 /** Posts de la misma categoría, excluyendo el post actual. */
+/** Normaliza una categoría a su slug canónico (sinónimos → canónico). */
+export function normalizeCategory(slug: string): string {
+  const s = slug.trim().toLowerCase()
+  return CATEGORY_SYNONYMS[s] ?? s
+}
+
+/** Normaliza un tag para comparar de forma consistente. */
+function normalizeTag(tag: string): string {
+  return tag
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+}
+
+/**
+ * Devuelve los posts más relacionados al indicado: puntúa por categoría
+ * (con sinónimos normalizados) y por etiquetas compartidas, y rompe
+ * empates favoreciendo los artículos más recientes.
+ */
 export function getRelatedPosts(slug: string, limit = 3): BlogPostMeta[] {
   const current = getPostBySlug(slug)
   if (!current) return []
+
+  const currentCategory = normalizeCategory(current.data.category)
+  const currentTags = new Set(current.data.tags.map(normalizeTag))
+  const currentTime = new Date(current.data.date).getTime() || 0
+  const DAY = 24 * 60 * 60 * 1000
+
   return getAllPosts()
-    .filter((p) => p.slug !== slug && p.category === current.data.category)
+    .filter((p) => p.slug !== slug)
+    .map((p) => {
+      let score = 0
+      if (normalizeCategory(p.category) === currentCategory) score += 2
+      for (const tag of p.tags.map(normalizeTag)) {
+        if (currentTags.has(tag)) score += 3
+      }
+      // Pequeño ajuste de recencia (±0.5 máx) para favorecer artículos recientes.
+      const pTime = new Date(p.date).getTime() || 0
+      score += Math.max(-0.5, Math.min(0.5, (pTime - currentTime) / (30 * DAY)))
+      return { post: p, score }
+    })
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        (new Date(b.post.date).getTime() || 0) - (new Date(a.post.date).getTime() || 0)
+    )
     .slice(0, limit)
+    .map((r) => r.post)
+}
+
+/** CTA de cierre resuelto para un post (frontmatter o default por categoría). */
+export interface ResolvedPostCta {
+  variant: BlogCTAVariant
+  eyebrow: string
+  title: string
+  cta: string
+  href?: string
+  collectionSlug?: string
+  collectionName?: string
+}
+
+const CATEGORY_SYNONYMS: Record<string, string> = {
+  operaciones: "operacion",
+  administracion: "costos",
+  admin: "costos",
+  abastecimiento: "proveeduria",
+  proveedores: "proveeduria",
+  compras: "proveeduria",
+  crecimiento: "marketing",
+  tecnologia: "herramientas",
+}
+
+const DEFAULT_CTA_TEXTS: Record<BlogCTAVariant, ResolvedPostCta> = {
+  coleccion: {
+    variant: "coleccion",
+    eyebrow: "Colecciones Resurte.me",
+    title:
+      "Compara precios reales por mayoreo de los insumos de tu cocina y compra directo a distribuidores.",
+    cta: "Ver colección",
+    collectionSlug: "comida-mexicana-corrida",
+    collectionName: "Comida mexicana corrida",
+  },
+  herramienta: {
+    variant: "herramienta",
+    eyebrow: "Herramienta Resurte.me",
+    title:
+      "Mide, controla y haz crecer la rentabilidad de tu restaurante con las herramientas del Panel.",
+    cta: "Abrir herramienta",
+    href: "/panel/costeo",
+  },
+  crecimiento: {
+    variant: "crecimiento",
+    eyebrow: "Tienda de Crecimiento",
+    title:
+      "Guías, plantillas y estrategias listas para llenar tu restaurante de clientes.",
+    cta: "Ir a la Tienda de Crecimiento",
+    href: "/recompensas",
+  },
+}
+
+const CATEGORY_CTA: Record<string, Partial<ResolvedPostCta>> = {
+  costos: {
+    variant: "herramienta",
+    eyebrow: "Herramienta Resurte.me",
+    title:
+      "Costea tu menú y recupera margen con la calculadora de food cost del Panel.",
+    cta: "Calcular mi food cost",
+    href: "/panel/costeo",
+  },
+  operacion: {
+    variant: "herramienta",
+    eyebrow: "Herramienta Resurte.me",
+    title:
+      "Controla mermas e inventario sin hojas de cálculo con el Panel de Resurte.me.",
+    cta: "Probar control de mermas",
+    href: "/panel/mermas",
+  },
+  administracion: {
+    variant: "herramienta",
+    eyebrow: "Herramienta Resurte.me",
+    title:
+      "Facturación y cotizaciones sin dolores de cabeza para tu negocio de comida.",
+    cta: "Ver cómo facturar",
+    href: "/negocio/facturacion",
+  },
+  proveeduria: {
+    variant: "coleccion",
+    eyebrow: "Colecciones Resurte.me",
+    title:
+      "Encuentra los insumos de tu tipo de cocina con precios por mayoreo de tu zona.",
+    cta: "Ver precios por mayoreo",
+    collectionSlug: "comida-mexicana-corrida",
+    collectionName: "Comida mexicana corrida",
+  },
+  marketing: {
+    variant: "crecimiento",
+    eyebrow: "Tienda de Crecimiento",
+    title:
+      "Guías y plantillas para atraer más clientes a tu restaurante y fidelizarlos.",
+    cta: "Explorar la Tienda de Crecimiento",
+    href: "/recompensas",
+  },
+  herramientas: {
+    variant: "herramienta",
+    eyebrow: "Herramientas Resurte.me",
+    title:
+      "Planificador, inventario, rentabilidad y más: todo el Panel para tu restaurante.",
+    cta: "Abrir el Panel",
+    href: "/panel",
+  },
+}
+
+export function getPostCta(post: BlogPostMeta): ResolvedPostCta {
+  const normalized = normalizeCategory(post.category)
+  const categoryCfg = CATEGORY_CTA[normalized]
+  const variant: BlogCTAVariant =
+    post.cta?.variant ?? categoryCfg?.variant ?? "crecimiento"
+
+  // Base = defaults del variante final + overrides de categoría (solo si la
+  // categoría coincide con la variante final).
+  const base: ResolvedPostCta = {
+    ...DEFAULT_CTA_TEXTS[variant],
+    ...(categoryCfg && categoryCfg.variant === variant ? categoryCfg : {}),
+  }
+
+  if (!post.cta) return base
+
+  return {
+    ...base,
+    ...post.cta,
+    variant,
+  }
 }
 
 /** Filtro simple por texto (título, descripción y tags). */

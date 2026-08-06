@@ -14,10 +14,19 @@ export function RelatedPosts({ slug, limit = 3 }: RelatedPostsProps) {
 
   return (
     <section className="mt-14 border-t border-warm-200 pt-10">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="h-8 w-1 shrink-0 rounded-full bg-gradient-to-b from-brand-500 to-brand-700"
+        />
         <h2 className="text-xl font-bold text-warm-900 sm:text-2xl">
-          Sigue aprendiendo
+          Artículos Relacionados
         </h2>
+      </div>
+      <div className="mt-3 flex items-center justify-between">
+        <p className="text-sm text-warm-600">
+          Sigue aprendiendo con los posts más relacionados a este tema.
+        </p>
         <Link
           href="/blog"
           className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline"

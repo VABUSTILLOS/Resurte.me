@@ -126,6 +126,28 @@ const DEFAULT_PRODUCTS = [
   { name: "Verdura", unit: "kg", price: 30, perPerson: 0.08, category: "Verdura" },
 ]
 
+// Waste super-categories with default percentages
+const WASTE_CATEGORIES = [
+  { key: "Proteína", label: "Proteínas", defaultPct: 8, color: "red" },
+  { key: "Verdura", label: "Verduras", defaultPct: 12, color: "green" },
+  { key: "Lácteos", label: "Lácteos", defaultPct: 5, color: "blue" },
+  { key: "Secos", label: "Granos / Harinas / Secos", defaultPct: 3, color: "amber" },
+  { key: "Otros", label: "Otros (salsas, condimentos, bebidas)", defaultPct: 2, color: "gray" },
+]
+
+// Map product category names to waste super-categories
+function getWasteCategory(productCategory: string): string {
+  const proteina = ["Proteína", "Carne"]
+  const verdura = ["Verdura", "Fruta", "Acompañamiento"]
+  const lacteos = ["Lácteos", "Queso"]
+  const secos = ["Granos", "Harinas", "Endulzantes", "Chocolate", "Pan"]
+  if (proteina.some((k) => productCategory.includes(k))) return "Proteína"
+  if (verdura.some((k) => productCategory.includes(k))) return "Verdura"
+  if (lacteos.some((k) => productCategory.includes(k))) return "Lácteos"
+  if (secos.some((k) => productCategory.includes(k))) return "Secos"
+  return "Otros"
+}
+
 export default function PlanificadorPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
@@ -135,7 +157,7 @@ export default function PlanificadorPage() {
     : DEFAULT_PRODUCTS
 
   const [covers, setCovers] = useLocalStorage<number>("planner-covers", 50, slug)
-  const [wastePercent, setWastePercent] = useLocalStorage<number>("planner-waste", 8, slug)
+  const [wastePcts, setWastePcts] = useLocalStorage<Record<string, number>>("planner-waste-pcts", {}, slug)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
   const [showOrder, setShowOrder] = useState(false)
   const [manualQtys, setManualQtys] = useLocalStorage<Record<string, number>>("planner-manual-qtys", {}, slug)
@@ -160,8 +182,20 @@ export default function PlanificadorPage() {
     )
   }
 
+  const getWastePct = (productCategory: string) => {
+    const wc = getWasteCategory(productCategory)
+    return wastePcts[wc] ?? WASTE_CATEGORIES.find((w) => w.key === wc)?.defaultPct ?? 8
+  }
+
+  const avgWastePct = (() => {
+    const cats = new Set(products.map((p) => getWasteCategory(p.category)))
+    const pcts = Array.from(cats).map((c) => wastePcts[c] ?? WASTE_CATEGORIES.find((w) => w.key === c)?.defaultPct ?? 8)
+    return Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length)
+  })()
+
   const totalCost = products.reduce((sum, p) => {
-    const autoNeeded = p.perPerson * covers * (1 + wastePercent / 100)
+    const waste = getWastePct(p.category)
+    const autoNeeded = p.perPerson * covers * (1 + waste / 100)
     const needed = p.name in manualQtys ? manualQtys[p.name] : autoNeeded
     return sum + (needed * p.price)
   }, 0)
@@ -211,7 +245,7 @@ export default function PlanificadorPage() {
             })}
           </div>
           <p className="text-[10px] text-gray-400 mt-2">
-            Estimación basada en las cantidades por platillo × {covers} comensales. Agrega {wastePercent}% de merma.
+            Estimación basada en las cantidades por platillo × {covers} comensales. Agrega ~{avgWastePct}% de merma promedio.
           </p>
           <details className="mt-3">
             <summary className="text-xs font-semibold text-[#108910] cursor-pointer hover:text-green-800 transition-colors">
@@ -290,28 +324,26 @@ export default function PlanificadorPage() {
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <div className="flex items-center gap-2 mb-3">
             <AlertCircle className="w-5 h-5 text-amber-600" />
-            <h3 className="font-semibold text-gray-900">% de merma estimada</h3>
+            <h3 className="font-semibold text-gray-900">% de merma por categoría</h3>
           </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setWastePercent(Math.max(0, wastePercent - 2))}
-              className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 text-lg transition-colors"
-            >
-              −
-            </button>
-            <input
-              type="number"
-              value={wastePercent}
-              onChange={(e) => setWastePercent(Math.max(0, parseInt(e.target.value) || 0))}
-              className="w-20 text-center text-2xl font-bold text-amber-600 bg-transparent border-b-2 border-gray-200 focus:border-amber-500 focus:outline-none py-1"
-            />
-            <span className="text-2xl font-bold text-amber-600">%</span>
-            <button
-              onClick={() => setWastePercent(Math.min(30, wastePercent + 2))}
-              className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 text-lg transition-colors"
-            >
-              +
-            </button>
+          <div className="space-y-2">
+            {WASTE_CATEGORIES.map((wc) => {
+              const pct = wastePcts[wc.key] ?? wc.defaultPct
+              return (
+                <div key={wc.key} className="flex items-center gap-2">
+                  <span className="text-[10px] text-gray-500 w-20 shrink-0">{wc.label}</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="25"
+                    value={pct}
+                    onChange={(e) => setWastePcts((prev) => ({ ...prev, [wc.key]: parseInt(e.target.value) }))}
+                    className="flex-1 accent-amber-500 h-1.5"
+                  />
+                  <span className="text-xs font-bold text-amber-600 w-10 text-right">{pct}%</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -337,7 +369,8 @@ export default function PlanificadorPage() {
             {expandedCategory === category && (
               <div className="border-t border-gray-100 divide-y divide-gray-50">
                 {items.map((item, idx) => {
-                  const autoNeeded = item.perPerson * covers * (1 + wastePercent / 100)
+                  const waste = getWastePct(item.category)
+                  const autoNeeded = item.perPerson * covers * (1 + waste / 100)
                   const isManual = item.name in manualQtys
                   const needed = isManual ? manualQtys[item.name] : autoNeeded
                   const cost = needed * item.price
@@ -400,13 +433,13 @@ export default function PlanificadorPage() {
             ${(totalCost / covers).toFixed(2)} por comensal
           </span>
           <span className="bg-white rounded-lg px-2.5 py-1">
-            +{wastePercent}% incluido por merma
+            +~{avgWastePct}% promedio incluido por merma
           </span>
         </div>
       </div>
 
       {/* Waste savings delta */}
-      {wastePercent > 5 && (
+      {avgWastePct > 5 && (
         <div className="mt-4 bg-amber-50 rounded-2xl border border-amber-200 p-5">
           <div className="flex items-start gap-3">
             <TrendingDown className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
@@ -415,13 +448,13 @@ export default function PlanificadorPage() {
                 Oportunidad de ahorro por reducción de merma
               </h4>
               <p className="text-xs text-amber-700 mb-2">
-                Si reduces tu merma del <strong>{wastePercent}%</strong> al <strong>5%</strong> (nivel óptimo), 
+                Si reduces tu merma del <strong>{avgWastePct}%</strong> al <strong>5%</strong> (nivel óptimo), 
                 ahorrarías aproximadamente:
               </p>
               <p className="text-2xl font-extrabold text-amber-700">
                 ${(() => {
                   const costNow = products.reduce((sum, p) => {
-                    return sum + (p.perPerson * covers * (1 + wastePercent / 100) * p.price)
+                    return sum + (p.perPerson * covers * (1 + avgWastePct / 100) * p.price)
                   }, 0)
                   const costIdeal = products.reduce((sum, p) => {
                     return sum + (p.perPerson * covers * (1 + 5 / 100) * p.price)
@@ -453,10 +486,10 @@ export default function PlanificadorPage() {
               <button
                 onClick={() => {
                   const text = products.map((p) => {
-                    const needed = (p.perPerson * covers * (1 + wastePercent / 100)).toFixed(2)
+                    const needed = (p.perPerson * covers * (1 + avgWastePct / 100)).toFixed(2)
                     return `• ${p.name}: ${needed} ${p.unit} — $${(parseFloat(needed) * p.price).toFixed(0)} MXN ($${p.price}/${p.unit})`
                   }).join("\n")
-                  const header = `Pedido para ${covers} comensales (+${wastePercent}% merma) — ${selectedCollection.name}\n\n`
+                  const header = `Pedido para ${covers} comensales (+${avgWastePct}% merma) — ${selectedCollection.name}\n\n`
                   navigator.clipboard.writeText(header + text + `\n\nTotal estimado: $${totalCost.toFixed(0)} MXN\nPedido generado con Resurte.me`)
                 }}
                 className="text-xs font-semibold text-[#108910] hover:text-green-800 transition-colors"
@@ -466,7 +499,7 @@ export default function PlanificadorPage() {
             </div>
             <div className="space-y-1.5 max-h-64 overflow-y-auto">
               {products.map((p) => {
-                const needed = (p.perPerson * covers * (1 + wastePercent / 100)).toFixed(2)
+                const needed = (p.perPerson * covers * (1 + avgWastePct / 100)).toFixed(2)
                 const subtotal = parseFloat(needed) * p.price
                 return (
                   <div key={p.name} className="flex items-center justify-between text-sm py-1 border-b border-gray-50 last:border-0">

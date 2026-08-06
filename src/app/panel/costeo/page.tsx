@@ -149,6 +149,7 @@ interface Dish {
   foodCostPercent: number
   sellingPrice: number
   category: string
+  portions: number
 }
 
 const DISH_CATEGORIES = [
@@ -191,6 +192,7 @@ export default function CosteoPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("todas")
   const [newDishCategory, setNewDishCategory] = useState("plato-fuerte")
+  const [newDishPortions, setNewDishPortions] = useState(4)
   const [undoStack, setUndoStack] = useState<Dish[][]>([])
   const [undoIndex, setUndoIndex] = useState(-1)
   const [selectedDishes, setSelectedDishes] = useState<Set<string>>(new Set())
@@ -271,13 +273,14 @@ export default function CosteoPage() {
   function exportCSV() {
     const dishesToExport = filteredDishes
     if (dishesToExport.length === 0) return
-    const header = "Nombre,Categoría,Ingredientes,Costo Total,Precio Venta,Margen,Food Cost %"
+    const header = "Nombre,Categoría,Porciones,Costo por porción,Precio por porción,Ingredientes,Costo Total,Precio Venta,Margen,Food Cost %"
     const rows = dishesToExport.map((d) => {
       const cost = d.ingredients.reduce((s, i) => s + (i.quantity * i.unitPrice), 0)
       const margin = d.sellingPrice - cost
       const fc = d.sellingPrice > 0 ? ((cost / d.sellingPrice) * 100).toFixed(1) : "0"
+      const portions = d.portions || 4
       const ingList = d.ingredients.map((i) => `${i.ingredientName} (${i.quantity}${i.unit})`).join("; ")
-      return `"${d.name}","${d.category}","${ingList}",${cost.toFixed(2)},${d.sellingPrice.toFixed(2)},${margin.toFixed(2)},${fc}%`
+      return `"${d.name}","${d.category}",${portions},${(cost / portions).toFixed(2)},${(d.sellingPrice / portions).toFixed(2)},"${ingList}",${cost.toFixed(2)},${d.sellingPrice.toFixed(2)},${margin.toFixed(2)},${fc}%`
     })
     const csv = [header, ...rows].join("\n")
     const blob = new Blob([csv], { type: "text/csv" })
@@ -312,6 +315,7 @@ export default function CosteoPage() {
     setEditingDishId(null)
     setShowForm(false)
     setNewDishCategory("plato-fuerte")
+    setNewDishPortions(4)
   }
 
   function duplicateDish(dish: Dish) {
@@ -372,6 +376,7 @@ export default function CosteoPage() {
     setEditingDishId(dish.id)
     setNewDishName(dish.name)
     setNewDishIngredients(dish.ingredients.map((ing) => ({ ...ing })))
+    setNewDishPortions(dish.portions || 4)
     setShowForm(true)
   }
 
@@ -387,6 +392,7 @@ export default function CosteoPage() {
       foodCostPercent: targetFoodCost,
       sellingPrice: Math.round(sellingPrice * 100) / 100,
       category: newDishCategory,
+      portions: newDishPortions,
     }
 
     if (editingDishId) {
@@ -598,6 +604,18 @@ export default function CosteoPage() {
                     </p>
                   </div>
                 </div>
+                {(dish.portions || 4) > 0 && (
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-center text-[10px] bg-gray-50 rounded-xl px-3 py-2">
+                    <div>
+                      <span className="text-gray-400">Costo por porción</span>
+                      <p className="font-semibold text-gray-700">${(totalCost / (dish.portions || 4)).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Precio por porción</span>
+                      <p className="font-semibold text-[#108910]">${(dish.sellingPrice / (dish.portions || 4)).toFixed(2)}</p>
+                    </div>
+                  </div>
+                )}
                 <div className={`mt-2 flex items-center gap-2 text-xs font-medium rounded-lg px-3 py-1.5 ${
                   isGood ? "bg-green-50 text-green-700" : isOk ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"
                 }`}>
@@ -643,6 +661,19 @@ export default function CosteoPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Portions input */}
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs text-gray-400">Rinde:</span>
+            <input
+              type="number"
+              value={newDishPortions || ""}
+              onChange={(e) => setNewDishPortions(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-20 px-3 py-2 rounded-lg border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+              min="1"
+            />
+            <span className="text-xs text-gray-400">porciones</span>
           </div>
 
           <div className="space-y-3 mb-4">
