@@ -6,7 +6,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   Trash2, ArrowLeft, DollarSign, TrendingDown, Lightbulb,
-  Plus, X, BarChart3,
+  Plus, X, BarChart3, Edit3,
 } from "lucide-react"
 
 const WASTE_CATEGORIES = [
@@ -36,6 +36,21 @@ const TIPS: Record<string, string[]> = {
     "La crema y nata se pueden congelar si es para cocinar (no para montar).",
     "Revisa fechas de caducidad al recibir mercancía de Resurte.me.",
   ],
+  "granos": [
+    "Almacena harinas y granos en contenedores herméticos para evitar humedad y plagas.",
+    "Usa el sistema PEPS: rota el stock viejo al frente y el nuevo atrás.",
+    "Revisa periódicamente señales de gorgojo o polilla en harinas y cereales.",
+  ],
+  "preparados": [
+    "Etiqueta siempre con fecha de preparación y caducidad (máx. 3 días en refrigeración).",
+    "Enfría rápidamente los preparados calientes antes de refrigerar para evitar proliferación bacteriana.",
+    "Congela porciones individuales de salsas y caldos para usar solo lo necesario.",
+  ],
+  "bebidas": [
+    "Revisa fechas de caducidad al recibir y rota el inventario mensualmente.",
+    "Almacena botellas abiertas de vino o licor con tapa hermética y úsalas en máximo 1 semana.",
+    "Los concentrados y jarabes abiertos deben refrigerarse y etiquetarse con fecha de apertura.",
+  ],
 }
 
 interface WasteEntry {
@@ -44,6 +59,7 @@ interface WasteEntry {
   amountKg: number
   costPerKg: number
   date: string // ISO date
+  note?: string
 }
 
 let wasteId = 0
@@ -57,6 +73,8 @@ export default function MermasPage() {
   const [selectedCategory, setSelectedCategory] = useState(WASTE_CATEGORIES[0].key)
   const [amountKg, setAmountKg] = useState("")
   const [costPerKg, setCostPerKg] = useState("")
+  const [note, setNote] = useState("")
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedTip, setExpandedTip] = useState<string | null>(null)
   const [showTrends, setShowTrends] = useState(false)
   const [showTrendChart, setShowTrendChart] = useState(false)
@@ -79,16 +97,48 @@ export default function MermasPage() {
     const kg = parseFloat(amountKg)
     const cost = parseFloat(costPerKg)
     if (!selectedCategory || !kg || !cost || kg <= 0 || cost <= 0) return
-    setEntries((prev) => [...prev, {
-      id: nextWasteId(),
-      category: selectedCategory,
-      amountKg: kg,
-      costPerKg: cost,
-      date: new Date().toISOString(),
-    }])
+    
+    if (editingId) {
+      // Update existing entry
+      setEntries((prev) => prev.map((e) => e.id === editingId ? {
+        ...e,
+        category: selectedCategory,
+        amountKg: kg,
+        costPerKg: cost,
+        note: note.trim() || undefined,
+      } : e))
+    } else {
+      setEntries((prev) => [...prev, {
+        id: nextWasteId(),
+        category: selectedCategory,
+        amountKg: kg,
+        costPerKg: cost,
+        date: new Date().toISOString(),
+        note: note.trim() || undefined,
+      }])
+    }
     setAmountKg("")
     setCostPerKg("")
+    setNote("")
+    setEditingId(null)
     setShowForm(false)
+  }
+
+  function startEditEntry(entry: WasteEntry) {
+    setEditingId(entry.id)
+    setSelectedCategory(entry.category)
+    setAmountKg(String(entry.amountKg))
+    setCostPerKg(String(entry.costPerKg))
+    setNote(entry.note || "")
+    setShowForm(true)
+  }
+
+  function cancelForm() {
+    setShowForm(false)
+    setEditingId(null)
+    setAmountKg("")
+    setCostPerKg("")
+    setNote("")
   }
 
   function removeEntry(id: string) {
@@ -187,12 +237,18 @@ export default function MermasPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-800">{cat?.label}</p>
                     <p className="text-xs text-gray-400">{entry.amountKg} kg × ${entry.costPerKg}/kg</p>
+                    {entry.note && (
+                      <p className="text-xs text-gray-500 italic mt-0.5">"{entry.note}"</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="font-bold text-red-600 text-sm">
                     ${(entry.amountKg * entry.costPerKg).toFixed(2)}
                   </span>
+                  <button onClick={() => startEditEntry(entry)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title="Editar registro">
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
                   <button onClick={() => removeEntry(entry.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500">
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -206,7 +262,9 @@ export default function MermasPage() {
       {/* Add form */}
       {showForm ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-          <h4 className="font-semibold text-gray-900 mb-4">Registrar merma</h4>
+          <h4 className="font-semibold text-gray-900 mb-4">
+            {editingId ? "Editar registro de merma" : "Registrar merma"}
+          </h4>
           <div className="space-y-3">
             <select
               value={selectedCategory}
@@ -243,12 +301,22 @@ export default function MermasPage() {
                 />
               </div>
             </div>
+            <div>
+              <label className="text-xs text-gray-400 mb-1 block">Nota o motivo (opcional)</label>
+              <input
+                type="text"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Ej: Se echó a perder por cadena de frío..."
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+              />
+            </div>
           </div>
           <div className="flex gap-3 mt-4">
             <button onClick={addEntry} className="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-xl hover:bg-red-700 transition-colors">
-              Registrar pérdida
+              {editingId ? "Guardar cambios" : "Registrar pérdida"}
             </button>
-            <button onClick={() => setShowForm(false)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50">
+            <button onClick={cancelForm} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50">
               Cancelar
             </button>
           </div>

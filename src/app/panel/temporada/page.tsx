@@ -6,7 +6,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   Calendar, ArrowLeft, Sun, Leaf, DollarSign, TrendingDown,
-  ChevronLeft, ChevronRight, Eye,
+  ChevronLeft, ChevronRight, Eye, ShoppingCart, Copy, X,
 } from "lucide-react"
 
 // Mexican seasonal produce calendar (when things are abundant/cheapest)
@@ -96,6 +96,9 @@ export default function TemporadaPage() {
   const slug = selectedCollection?.slug || null
   const today = new Date()
   const [viewMonth, setViewMonth] = useLocalStorage<number>("temporada-month", today.getMonth() + 1, slug)
+  
+  interface ShoppingItem { key: string; name: string; icon: string; pricePerKg: number; quantityKg: number }
+  const [shoppingList, setShoppingList] = useLocalStorage<ShoppingItem[]>("temporada-shopping-list", [], slug)
 
   const tips = selectedCollection
     ? (SEASONAL_TIPS[selectedCollection.slug] || DEFAULT_TIPS)

@@ -6,7 +6,7 @@ import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   Calculator, Plus, Trash2, PieChart, ArrowLeft,
-  Percent, TrendingDown, AlertCircle, Edit3,
+  Percent, TrendingDown, AlertCircle, Edit3, Download, CheckSquare,
 } from "lucide-react"
 
 // Mock ingredients per collection type — in production this comes from Resurte.me catalog
@@ -193,6 +193,8 @@ export default function CosteoPage() {
   const [newDishCategory, setNewDishCategory] = useState("plato-fuerte")
   const [undoStack, setUndoStack] = useState<Dish[][]>([])
   const [undoIndex, setUndoIndex] = useState(-1)
+  const [selectedDishes, setSelectedDishes] = useState<Set<string>>(new Set())
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false)
 
   // Filtered dishes by search query and category
   const filteredDishes = useMemo(() => {
@@ -239,6 +241,52 @@ export default function CosteoPage() {
       setUndoIndex(newIdx)
       setDishes(undoStack[newIdx])
     }
+  }
+
+  // Batch selection
+  function toggleSelect(id: string) {
+    setSelectedDishes((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id) else next.add(id)
+      return next
+    })
+  }
+
+  function selectAllFiltered() {
+    setSelectedDishes(new Set(filteredDishes.map((d) => d.id)))
+  }
+
+  function deselectAll() {
+    setSelectedDishes(new Set())
+  }
+
+  function batchDelete() {
+    const keep = dishes.filter((d) => !selectedDishes.has(d.id))
+    pushHistory(keep)
+    setSelectedDishes(new Set())
+    setBatchDeleteConfirm(false)
+  }
+
+  // Export CSV
+  function exportCSV() {
+    const dishesToExport = filteredDishes
+    if (dishesToExport.length === 0) return
+    const header = "Nombre,Categoría,Ingredientes,Costo Total,Precio Venta,Margen,Food Cost %"
+    const rows = dishesToExport.map((d) => {
+      const cost = d.ingredients.reduce((s, i) => s + (i.quantity * i.unitPrice), 0)
+      const margin = d.sellingPrice - cost
+      const fc = d.sellingPrice > 0 ? ((cost / d.sellingPrice) * 100).toFixed(1) : "0"
+      const ingList = d.ingredients.map((i) => `${i.ingredientName} (${i.quantity}${i.unit})`).join("; ")
+      return `"${d.name}","${d.category}","${ingList}",${cost.toFixed(2)},${d.sellingPrice.toFixed(2)},${margin.toFixed(2)},${fc}%`
+    })
+    const csv = [header, ...rows].join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `costeo-menu-${slug || "menu"}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   // Keyboard shortcuts
@@ -380,7 +428,19 @@ export default function CosteoPage() {
           <ArrowLeft className="w-5 h-5 text-gray-400" />
         </Link>
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Costeando mi menú</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-gray-900">Costeando mi menú</h2>
+            {dishes.length > 0 && (
+              <button
+                onClick={exportCSV}
+                className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
+                title="Exportar platillos del filtro activo a CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Exportar CSV
+              </button>
+            )}
+          </div>
           <p className="text-sm text-gray-400">{selectedCollection.name}</p>
         </div>
       </div>
@@ -451,6 +511,26 @@ export default function CosteoPage() {
         </div>
       )}
 
+      {/* Batch selection toolbar */}
+      {filteredDishes.length > 0 && (
+        <div className="flex items-center gap-2 mb-3">
+          <button
+            onClick={selectedDishes.size > 0 ? deselectAll : selectAllFiltered}
+            className="text-xs font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            {selectedDishes.size > 0 ? `Deseleccionar (${selectedDishes.size})` : "Seleccionar todos"}
+          </button>
+          {selectedDishes.size > 0 && (
+            <button
+              onClick={() => setBatchDeleteConfirm(true)}
+              className="text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+            >
+              <Trash2 className="w-3 h-3" />
+              Eliminar {selectedDishes.size} seleccionado{selectedDishes.size > 1 ? "s" : ""}
+            </button>
+          )}
+        </div>
+
       {/* Dishes list */}
       {filteredDishes.length > 0 && (
         <div className="space-y-3 mb-6">
@@ -465,6 +545,12 @@ export default function CosteoPage() {
               <div key={dish.id} className="bg-white rounded-2xl border border-gray-100 p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={selectedDishes.has(dish.id)}
+                      onChange={() => toggleSelect(dish.id)}
+                      className="w-4 h-4 rounded accent-[#108910] cursor-pointer shrink-0"
+                    />
                     <h4 className="font-bold text-gray-900 truncate">{dish.name}</h4>
                     {(() => {
                       const cat = DISH_CATEGORIES.find((c) => c.key === dish.category)
@@ -729,6 +815,27 @@ export default function CosteoPage() {
                 Sí, eliminar
               </button>
               <button onClick={() => setDeleteConfirmId(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-50 text-sm">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch delete confirmation modal */}
+      {batchDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
+            <h4 className="font-bold text-gray-900 mb-2">¿Eliminar {selectedDishes.size} platillo{selectedDishes.size > 1 ? "s" : ""}?</h4>
+            <p className="text-sm text-gray-500 mb-4">
+              Esta acción no se puede deshacer. Perderás todos los ingredientes y precios de los platillos seleccionados.
+              Puedes deshacer con Ctrl+Z después de eliminar.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={batchDelete} className="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-xl hover:bg-red-700 text-sm">
+                Sí, eliminar
+              </button>
+              <button onClick={() => setBatchDeleteConfirm(false)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-50 text-sm">
                 Cancelar
               </button>
             </div>

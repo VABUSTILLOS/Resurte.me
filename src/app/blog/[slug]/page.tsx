@@ -16,6 +16,7 @@ import { mdxComponents } from "@/components/blog/mdx-components"
 import { BlogAuthor } from "@/components/blog/blog-author"
 import { BlogFAQ } from "@/components/blog/blog-faq"
 import { RelatedPosts } from "@/components/blog/related-posts"
+import { ReadingProgress } from "@/components/blog/reading-progress"
 
 export const dynamicParams = false
 
@@ -89,6 +90,7 @@ export default async function BlogPostPage({
 
   return (
     <article className="bg-white">
+      <ReadingProgress />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
