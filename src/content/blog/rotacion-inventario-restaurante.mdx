@@ -109,4 +109,72 @@ La rotación calculada solo con compras es optimista: si compras 100 kg, usas 80
 - [ ] Calculé rotación real (con mermas)
 - [ ] Definí el pedido del próximo mes con datos
 
+## Ejemplo paso a paso: calcular la rotación real de un restaurante en 20 minutos
+
+Tomemos un restaurante mexicano con venta mensual de $350,000 y gasto en insumos de $122,500 (35% food cost). Así se calcula su rotación real, categoría por categoría:
+
+1. **Reúne tus 3 datos base:** inventario inicial del mes ($28,000), compras del mes ($120,000), inventario final ($24,000).
+2. **Calcula el costo de insumos realmente consumidos:** $28,000 + $120,000 − $24,000 = $124,000. Nota que esto es ligeramente mayor a tu costo teórico de $122,500 — esa diferencia de $1,500 es tu merma del mes.
+3. **Calcula tu inventario promedio:** (28,000 + 24,000) / 2 = $26,000.
+4. **Calcula tu rotación:** $124,000 / $26,000 = 4.77 veces al mes.
+5. **Calcula tus días de inventario:** 30 / 4.77 = 6.3 días.
+6. **Interpreta:** con 6.3 días de inventario promedio, este restaurante está en un rango sano para un menú con producto fresco. Si el resultado hubiera sido 15-20 días, indicaría sobrecompra o insumos de baja rotación estancados.
+7. **Desglosa por categoría** (carnes, secos, congelados, bebidas) para ver si el promedio esconde un problema puntual — por ejemplo, bebidas con 45 días de inventario mientras carnes están en 3 días.
+
+Repetir este cálculo cada mes, categoría por categoría, te da una tendencia — y la tendencia es más valiosa que el número aislado de un solo mes.
+
+## Tabla de rotación objetivo vs. capital invertido por categoría
+
+Esta tabla te ayuda a dimensionar en pesos cuánto capital "debería" estar invertido en cada categoría según tu venta mensual, usando como ejemplo un restaurante con $350,000 de venta y 35% de food cost ($122,500 en insumos al mes):
+
+| Categoría | % del gasto en insumos | Gasto mensual aprox. | Rotación objetivo | Inventario promedio ideal |
+|---|---|---|---|---|
+| Carnes y mariscos | 35% | $42,875 | 8-12 veces/mes | $3,600–$5,400 |
+| Verduras y frutas | 20% | $24,500 | 10-15 veces/mes | $1,600–$2,450 |
+| Lácteos y quesos | 10% | $12,250 | 6-8 veces/mes | $1,500–$2,000 |
+| Secos y abarrotes | 15% | $18,375 | 1-2 veces/mes | $9,200–$18,375 |
+| Congelados | 10% | $12,250 | 0.5-1 vez/mes | $12,250–$24,500 |
+| Bebidas y alcohol | 10% | $12,250 | 1-3 veces/mes | $4,000–$12,250 |
+
+<BlogCallout variant="warning" title="Cuando el capital atrapado supera el 20% de tu gasto mensual">
+Si al sumar tu inventario promedio real de todas las categorías obtienes una cifra superior al 20% de tu gasto mensual en insumos, tienes una señal de alerta: probablemente hay más de $10,000-$15,000 de capital que podría estar generando flujo en vez de esperar en un anaquel. Revisa primero secos, congelados y bebidas — son las categorías donde el sobreinventario se esconde más fácil porque "no se echan a perder rápido".
+</BlogCallout>
+
+## Rotación y su relación con tu costeo y tu merma
+
+La rotación de inventario no vive sola: está directamente conectada con tu [costeo de cada platillo nuevo](/blog/costeo-platillo-nuevo-restaurante) (si tu food cost teórico no coincide con tu consumo real, tu rotación "real" será distinta a la que esperabas) y con los [errores más comunes de inventario](/blog/errores-inventario-restaurante) que distorsionan tanto tus compras como tu cálculo de rotación. Si notas una rotación errática mes a mes, es señal de que tu [conteo cíclico de inventario](/blog/inventario-conteo-ciclico-restaurante) necesita mayor disciplina — sin datos confiables de inventario inicial y final, la rotación calculada es puro ruido.
+
+## Errores comunes al calcular o interpretar tu rotación
+
+| Error | Consecuencia | Corrección |
+|---|---|---|
+| Calcular rotación con compras en vez de consumo real | Rotación "inflada" que esconde merma | Usa siempre: inicial + compras − final |
+| Mezclar todas las categorías en un solo número | Se esconden problemas puntuales | Calcula rotación por categoría (A, B, C, D) |
+| No tener inventario inicial/final confiable | Rotación calculada es inútil | Fortalece tu conteo cíclico primero |
+| Buscar "rotación alta" como meta única | Puede generar quiebres de stock costosos | Busca el equilibrio: cobertura sin sobreinventario |
+| No revisar tendencia mes a mes | Se pierden patrones estacionales | Registra tu rotación cada mes en una misma tabla |
+
+## Checklist operativo de rotación: acción trimestral
+
+- [ ] Calculé mi rotación general del trimestre (no solo un mes aislado)
+- [ ] Desglosé la rotación por categoría (carnes, secos, congelados, bebidas)
+- [ ] Identifiqué qué categoría tiene más capital atrapado en pesos
+- [ ] Revisé si mis mínimos de compra están forzando sobreinventario
+- [ ] Negocié con al menos un proveedor una reducción de mínimo o mayor frecuencia
+- [ ] Eliminé o reduje al menos un insumo de rotación muy baja
+- [ ] Comparé mi rotación real vs. teórica para dimensionar mi merma
+- [ ] Documenté la tendencia trimestral en una tabla simple
+
+## Rutina de implementación de 30 días para mejorar tu rotación
+
+**Semana 1 — Línea base:** calcula tu rotación actual general y por categoría con los datos del mes pasado. No cambies nada todavía, solo diagnostica.
+
+**Semana 2 — Ataca la categoría más lenta:** identifica cuál categoría tiene más días de inventario de lo recomendado (usualmente congelados o secos) y negocia con tu proveedor un pedido más pequeño y frecuente.
+
+**Semana 3 — Elimina insumos muertos:** revisa tu almacén físicamente y detecta productos que llevan más de 30-45 días sin moverse. Decide si los usas en una promoción, los regresas al proveedor o los das de baja.
+
+**Semana 4 — Recalcula y compara:** vuelve a calcular tu rotación con los datos de la semana 4 y compárala contra tu línea base de la semana 1. Documenta cuánto capital liberaste en pesos.
+
 **La rotación de inventario es tu termómetro de compras: te dice si tu despensa trabaja para ti o contra ti.** Calcula tu rotación y tus días de inventario, compáralos contra las metas de cada categoría, y ataca lo que te digan los datos: compras de más, stock parado, quiebres o merma. Cada punto de rotación que mejoras libera efectivo y reduce merma — dos palancas directas de margen. Tu inventario no es un mueble: es dinero que debe estar en movimiento.
+
+**Empieza esta semana: calcula tu rotación de este mes con la fórmula de arriba y compárala contra las metas de categoría — ese primer cálculo te dirá exactamente dónde está atrapado tu capital.**

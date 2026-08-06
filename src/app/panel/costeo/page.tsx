@@ -12,7 +12,7 @@ import Link from "next/link"
 import {
   Calculator, Plus, Trash2, PieChart, ArrowLeft, Gift, Tag,
   Percent, TrendingDown, AlertCircle, Edit3, Download, CheckSquare,
-  Copy, Printer,
+  Copy, Printer, BookOpen, Save, X,
 } from "lucide-react"
 import EmptyState from "@/components/panel/EmptyState"
 import ConfirmDialog from "@/components/panel/ConfirmDialog"
@@ -138,6 +138,326 @@ const MOCK_INGREDIENTS: Record<string, { name: string; unit: string; price: numb
   ],
 }
 
+// Recetas pregrabadas por tipo de colección — para costear platillos típicos al instante
+interface RecipeIngredient {
+  name: string
+  quantity: number
+  unit: string
+}
+
+interface Recipe {
+  id: string
+  name: string
+  category: string
+  portions: number
+  ingredients: RecipeIngredient[]
+}
+
+const PRESET_RECIPES: Record<string, Recipe[]> = {
+  "hamburguesas-hot-dogs": [
+    {
+      id: "rec-hamburguesa-clasica", name: "Hamburguesa clásica", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Pan brioche para hamburguesa", quantity: 1, unit: "pza" },
+        { name: "Carne molida sirloin 80/20", quantity: 0.16, unit: "kg" },
+        { name: "Queso cheddar rebanado", quantity: 1, unit: "rebanada" },
+        { name: "Lechuga iceberg", quantity: 0.03, unit: "pza" },
+        { name: "Jitomate bola", quantity: 0.04, unit: "kg" },
+      ],
+    },
+    {
+      id: "rec-hamburguesa-bacon", name: "Hamburguesa con tocino", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Pan brioche para hamburguesa", quantity: 1, unit: "pza" },
+        { name: "Carne molida sirloin 80/20", quantity: 0.18, unit: "kg" },
+        { name: "Tocino ahumado", quantity: 0.05, unit: "kg" },
+        { name: "Queso cheddar rebanado", quantity: 1, unit: "rebanada" },
+        { name: "Cebolla blanca", quantity: 0.02, unit: "kg" },
+      ],
+    },
+    {
+      id: "rec-papas-francesa", name: "Papas a la francesa", category: "acompanamiento", portions: 4,
+      ingredients: [
+        { name: "Papas congeladas", quantity: 1, unit: "kg" },
+      ],
+    },
+  ],
+  "taquerias-antojitos": [
+    {
+      id: "rec-tacos-pastor", name: "Tacos al pastor", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Carne de cerdo para pastor", quantity: 0.12, unit: "kg" },
+        { name: "Tortilla de maíz taquera", quantity: 0.12, unit: "kg" },
+        { name: "Cilantro fresco", quantity: 0.02, unit: "manojo" },
+        { name: "Cebolla blanca", quantity: 0.02, unit: "kg" },
+        { name: "Salsa verde preparada", quantity: 0.03, unit: "L" },
+      ],
+    },
+    {
+      id: "rec-tacos-bistec", name: "Tacos de bistec", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Bistec de res para asada", quantity: 0.14, unit: "kg" },
+        { name: "Tortilla de maíz taquera", quantity: 0.12, unit: "kg" },
+        { name: "Cilantro fresco", quantity: 0.02, unit: "manojo" },
+        { name: "Cebolla blanca", quantity: 0.02, unit: "kg" },
+      ],
+    },
+    {
+      id: "rec-quesadilla-asadero", name: "Quesadilla de asadero", category: "entrada", portions: 1,
+      ingredients: [
+        { name: "Tortilla de maíz taquera", quantity: 0.06, unit: "kg" },
+        { name: "Queso asadero", quantity: 0.06, unit: "kg" },
+      ],
+    },
+  ],
+  "pizzas-comida-italiana": [
+    {
+      id: "rec-pizza-margarita", name: "Pizza margarita", category: "plato-fuerte", portions: 2,
+      ingredients: [
+        { name: "Harina de fuerza 00", quantity: 0.28, unit: "kg" },
+        { name: "Puré de tomate enlatado", quantity: 0.15, unit: "lata 2.5kg" },
+        { name: "Queso mozzarella rallado", quantity: 0.2, unit: "kg" },
+        { name: "Aceite de oliva extra virgen", quantity: 0.02, unit: "L" },
+        { name: "Albahaca fresca", quantity: 0.02, unit: "manojo" },
+      ],
+    },
+    {
+      id: "rec-pizza-pepperoni", name: "Pizza de pepperoni", category: "plato-fuerte", portions: 2,
+      ingredients: [
+        { name: "Harina de fuerza 00", quantity: 0.28, unit: "kg" },
+        { name: "Puré de tomate enlatado", quantity: 0.15, unit: "lata 2.5kg" },
+        { name: "Queso mozzarella rallado", quantity: 0.2, unit: "kg" },
+        { name: "Pepperoni rebanado", quantity: 0.15, unit: "kg" },
+      ],
+    },
+  ],
+  "comida-mexicana-corrida": [
+    {
+      id: "rec-pollo-arroz", name: "Pollo con arroz", category: "plato-fuerte", portions: 4,
+      ingredients: [
+        { name: "Pechuga de pollo", quantity: 1, unit: "kg" },
+        { name: "Arroz grano largo", quantity: 0.5, unit: "kg" },
+        { name: "Aceite vegetal", quantity: 0.08, unit: "L" },
+        { name: "Jitomate bola", quantity: 0.2, unit: "kg" },
+      ],
+    },
+    {
+      id: "rec-arroz-mexicana", name: "Arroz a la mexicana", category: "acompanamiento", portions: 4,
+      ingredients: [
+        { name: "Arroz grano largo", quantity: 0.5, unit: "kg" },
+        { name: "Jitomate bola", quantity: 0.3, unit: "kg" },
+        { name: "Aceite vegetal", quantity: 0.06, unit: "L" },
+      ],
+    },
+    {
+      id: "rec-frijoles-charros", name: "Frijoles charros", category: "acompanamiento", portions: 6,
+      ingredients: [
+        { name: "Frijol negro", quantity: 0.6, unit: "kg" },
+        { name: "Tortilla de maíz", quantity: 0.1, unit: "kg" },
+        { name: "Chile serrano", quantity: 0.05, unit: "kg" },
+      ],
+    },
+  ],
+  "mariscos-pescados": [
+    {
+      id: "rec-ceviche-camaron", name: "Ceviche de camarón", category: "entrada", portions: 4,
+      ingredients: [
+        { name: "Camarón mediano crudo", quantity: 0.8, unit: "kg" },
+        { name: "Limón", quantity: 0.3, unit: "kg" },
+        { name: "Tostadas de maíz", quantity: 1, unit: "paquete 20pz" },
+        { name: "Aguacate hass", quantity: 0.2, unit: "kg" },
+      ],
+    },
+    {
+      id: "rec-filete-plancha", name: "Filete de pescado a la plancha", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Filete de pescado blanco", quantity: 0.2, unit: "kg" },
+        { name: "Limón", quantity: 0.03, unit: "kg" },
+      ],
+    },
+    {
+      id: "rec-tostadas-pulpo", name: "Tostadas de pulpo", category: "entrada", portions: 4,
+      ingredients: [
+        { name: "Pulpo cocido", quantity: 0.6, unit: "kg" },
+        { name: "Tostadas de maíz", quantity: 1, unit: "paquete 20pz" },
+        { name: "Aguacate hass", quantity: 0.3, unit: "kg" },
+      ],
+    },
+  ],
+  "pollo-alitas": [
+    {
+      id: "rec-alitas-bbq", name: "Alitas BBQ", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Alitas de pollo", quantity: 0.3, unit: "kg" },
+        { name: "Salsa BBQ", quantity: 0.04, unit: "L" },
+        { name: "Aceite por bidón", quantity: 0.03, unit: "L" },
+      ],
+    },
+    {
+      id: "rec-boneless-buffalo", name: "Boneless Buffalo", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Boneless de pollo", quantity: 0.25, unit: "kg" },
+        { name: "Salsa Buffalo", quantity: 0.05, unit: "L" },
+        { name: "Aderezo blue cheese", quantity: 0.03, unit: "L" },
+      ],
+    },
+  ],
+  "sushi-comida-asiatica": [
+    {
+      id: "rec-roll-philadelphia", name: "Roll de salmón Philadelphia", category: "plato-fuerte", portions: 2,
+      ingredients: [
+        { name: "Salmón grado sushi", quantity: 0.2, unit: "kg" },
+        { name: "Arroz para sushi", quantity: 0.3, unit: "kg" },
+        { name: "Alga nori", quantity: 0.5, unit: "paquete 50h" },
+        { name: "Aguacate hass", quantity: 0.1, unit: "kg" },
+        { name: "Queso crema Philadelphia", quantity: 0.1, unit: "kg" },
+      ],
+    },
+    {
+      id: "rec-nigiri-salmon", name: "Nigiri de salmón", category: "plato-fuerte", portions: 4,
+      ingredients: [
+        { name: "Salmón grado sushi", quantity: 0.15, unit: "kg" },
+        { name: "Arroz para sushi", quantity: 0.2, unit: "kg" },
+        { name: "Alga nori", quantity: 0.25, unit: "paquete 50h" },
+      ],
+    },
+  ],
+  "cortes-carne-asaderos": [
+    {
+      id: "rec-ribeye", name: "Ribeye a la parrilla", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Ribeye importado", quantity: 0.35, unit: "kg" },
+        { name: "Sal de grano", quantity: 0.01, unit: "kg" },
+      ],
+    },
+    {
+      id: "rec-arrachera-papas", name: "Arrachera con papas", category: "plato-fuerte", portions: 2,
+      ingredients: [
+        { name: "Arrachera marinada", quantity: 0.6, unit: "kg" },
+        { name: "Papa para asar", quantity: 0.6, unit: "kg" },
+        { name: "Sal de grano", quantity: 0.01, unit: "kg" },
+      ],
+    },
+  ],
+  "cafeterias-crepas-desayunos": [
+    {
+      id: "rec-hotcakes-maple", name: "Hot cakes con maple", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Harina para hot cakes", quantity: 0.2, unit: "kg" },
+        { name: "Huevo fresco", quantity: 0.25, unit: "docena" },
+        { name: "Leche entera", quantity: 0.15, unit: "L" },
+        { name: "Jarabe de maple", quantity: 0.05, unit: "L" },
+      ],
+    },
+    {
+      id: "rec-crepa-nutella", name: "Crepa de Nutella", category: "postre", portions: 1,
+      ingredients: [
+        { name: "Harina para hot cakes", quantity: 0.06, unit: "kg" },
+        { name: "Leche entera", quantity: 0.1, unit: "L" },
+        { name: "Huevo fresco", quantity: 0.08, unit: "docena" },
+        { name: "Nutella", quantity: 0.05, unit: "kg" },
+      ],
+    },
+  ],
+  "saludable-ensaladas-pokes": [
+    {
+      id: "rec-poke-salmon", name: "Poke de salmón", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Salmón fresco", quantity: 0.15, unit: "kg" },
+        { name: "Quinoa", quantity: 0.08, unit: "kg" },
+        { name: "Mix de lechugas baby", quantity: 0.05, unit: "kg" },
+        { name: "Edamame", quantity: 0.05, unit: "kg" },
+        { name: "Aderezo de jengibre", quantity: 0.03, unit: "L" },
+      ],
+    },
+    {
+      id: "rec-ensalada-atun", name: "Ensalada de atún", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Atún fresco", quantity: 0.15, unit: "kg" },
+        { name: "Mix de lechugas baby", quantity: 0.1, unit: "kg" },
+        { name: "Edamame", quantity: 0.05, unit: "kg" },
+        { name: "Aderezo de jengibre", quantity: 0.03, unit: "L" },
+      ],
+    },
+  ],
+  "postres-panaderia-helados": [
+    {
+      id: "rec-brownie", name: "Brownie de chocolate", category: "postre", portions: 8,
+      ingredients: [
+        { name: "Harina de trigo", quantity: 0.3, unit: "kg" },
+        { name: "Chocolate belga", quantity: 0.3, unit: "kg" },
+        { name: "Mantequilla sin sal", quantity: 0.2, unit: "kg" },
+        { name: "Azúcar glass", quantity: 0.15, unit: "kg" },
+      ],
+    },
+    {
+      id: "rec-pay-manzana", name: "Pay de manzana", category: "postre", portions: 8,
+      ingredients: [
+        { name: "Harina de trigo", quantity: 0.4, unit: "kg" },
+        { name: "Mantequilla sin sal", quantity: 0.25, unit: "kg" },
+        { name: "Azúcar glass", quantity: 0.2, unit: "kg" },
+        { name: "Crema para batir", quantity: 0.3, unit: "L" },
+      ],
+    },
+  ],
+  "comida-arabe-griega": [
+    {
+      id: "rec-shawarma-pollo", name: "Shawarma de pollo", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Pechuga de pollo", quantity: 0.15, unit: "kg" },
+        { name: "Pan pita", quantity: 0.1, unit: "paquete 10pz" },
+        { name: "Tahini", quantity: 0.02, unit: "kg" },
+        { name: "Yogur griego natural", quantity: 0.03, unit: "L" },
+      ],
+    },
+    {
+      id: "rec-hummus-pita", name: "Hummus con pita", category: "entrada", portions: 4,
+      ingredients: [
+        { name: "Garbanzo seco", quantity: 0.3, unit: "kg" },
+        { name: "Tahini", quantity: 0.1, unit: "kg" },
+        { name: "Pan pita", quantity: 1, unit: "paquete 10pz" },
+      ],
+    },
+  ],
+  "comida-venezolana-latina": [
+    {
+      id: "rec-arepa-reina", name: "Arepa reina pepiada", category: "plato-fuerte", portions: 1,
+      ingredients: [
+        { name: "Harina P.A.N.", quantity: 0.1, unit: "kg" },
+        { name: "Pechuga de pollo", quantity: 0.12, unit: "kg" },
+        { name: "Aguacate hass", quantity: 0.1, unit: "kg" },
+      ],
+    },
+    {
+      id: "rec-pabellon", name: "Pabellón criollo", category: "plato-fuerte", portions: 2,
+      ingredients: [
+        { name: "Carne mechada", quantity: 0.4, unit: "kg" },
+        { name: "Frijol negro", quantity: 0.3, unit: "kg" },
+        { name: "Plátano macho", quantity: 0.3, unit: "kg" },
+        { name: "Queso blanco duro", quantity: 0.1, unit: "kg" },
+      ],
+    },
+  ],
+  "bebidas-bares-botanas": [
+    {
+      id: "rec-alitas-chile", name: "Alitas con chile y limón", category: "acompanamiento", portions: 4,
+      ingredients: [
+        { name: "Alitas de pollo", quantity: 1, unit: "kg" },
+        { name: "Chile en polvo", quantity: 0.05, unit: "kg" },
+        { name: "Limón", quantity: 0.2, unit: "kg" },
+        { name: "Sal de grano", quantity: 0.02, unit: "kg" },
+      ],
+    },
+    {
+      id: "rec-cacahuates", name: "Cacahuates japoneses", category: "acompanamiento", portions: 4,
+      ingredients: [
+        { name: "Cacahuate japonés", quantity: 0.5, unit: "kg" },
+        { name: "Sal de grano", quantity: 0.02, unit: "kg" },
+      ],
+    },
+  ],
+}
+
 const DEFAULT_INGREDIENTS = [
   { name: "Ingrediente 1", unit: "kg", price: 0 },
   { name: "Ingrediente 2", unit: "kg", price: 0 },
@@ -177,6 +497,54 @@ const CATEGORY_EMOJI: Record<string, string> = {
   bebida: "🥤",
   acompanamiento: "🍟",
   todas: "📋",
+}
+
+function RecipeCard({ recipe, cost, onUse, onDelete, saved }: {
+  recipe: Recipe
+  cost: number
+  onUse: () => void
+  onDelete?: () => void
+  saved?: boolean
+}) {
+  const catLabel = DISH_CATEGORIES.find((c) => c.key === recipe.category)?.label || recipe.category
+  const catEmoji = CATEGORY_EMOJI[recipe.category] || "🍽️"
+  return (
+    <div className="border border-gray-100 rounded-xl p-3 flex flex-col gap-2 hover:border-purple-300 transition-colors">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-900 truncate">{catEmoji} {recipe.name}</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">
+            {catLabel} · {recipe.portions} porción(es) · {recipe.ingredients.length} ingredientes
+          </p>
+        </div>
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            className="text-gray-300 hover:text-red-500 transition-colors p-1 shrink-0"
+            aria-label={`Eliminar receta ${recipe.name}`}
+            title="Eliminar receta guardada"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-gray-700">
+          Costo est. <span className="text-[#108910]">${cost.toFixed(2)}</span>
+        </span>
+        <button
+          onClick={onUse}
+          className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors ${
+            saved
+              ? "bg-purple-600 text-white hover:bg-purple-700"
+              : "bg-[#108910] text-white hover:bg-[#0D720D]"
+          }`}
+        >
+          Usar
+        </button>
+      </div>
+    </div>
+  )
 }
 
 interface ComboItem {
@@ -251,6 +619,11 @@ export default function CosteoPage() {
   const [undoIndex, setUndoIndex] = useState(-1)
   const [selectedDishes, setSelectedDishes] = useState<Set<string>>(new Set())
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false)
+  // Recetas guardadas + selector
+  const [savedRecipes, setSavedRecipes] = useLocalStorage<Recipe[]>("costeo-recetas", [], slug)
+  const [showRecipes, setShowRecipes] = useState(false)
+  const [recipeSearch, setRecipeSearch] = useState("")
+  const [recipeConfirmDelete, setRecipeConfirmDelete] = useState<string | null>(null)
   // Combos y promociones
   const [combos, setCombos] = useLocalStorage<Combo[]>("costeo-combos", [], slug)
   const [showComboForm, setShowComboForm] = useState(false)
@@ -603,6 +976,64 @@ export default function CosteoPage() {
     resetForm()
   }
 
+  function loadRecipe(recipe: Recipe) {
+    const recipeIngredients: DishIngredient[] = recipe.ingredients.map((ing) => {
+      const found = ingredients.find((opt) => normalizeName(opt.name) === normalizeName(ing.name))
+      return {
+        ingredientName: ing.name,
+        quantity: ing.quantity,
+        unit: found?.unit || ing.unit,
+        unitPrice: found?.price || 0,
+      }
+    })
+    setEditingDishId(null)
+    setNewDishName(recipe.name)
+    setNewDishCategory(recipe.category)
+    setNewDishPortions(recipe.portions)
+    setNewDishIngredients(recipeIngredients)
+    setNewDishModifiers([])
+    setModName("")
+    setModPrice("")
+    setShowRecipes(false)
+    setShowForm(true)
+    toast(`Receta "${recipe.name}" cargada — ajusta cantidades y guarda el platillo`, "success")
+  }
+
+  function estimateRecipeCost(recipe: Recipe): number {
+    return recipe.ingredients.reduce((sum, ing) => {
+      const found = ingredients.find((opt) => normalizeName(opt.name) === normalizeName(ing.name))
+      return sum + ing.quantity * (found?.price || 0)
+    }, 0)
+  }
+
+  function saveCurrentAsRecipe() {
+    const name = newDishName.trim()
+    if (!name) { toast("Escribe un nombre para la receta", "warning"); return }
+    if (newDishIngredients.length === 0) { toast("Agrega al menos un ingrediente", "warning"); return }
+    const exists = savedRecipes.some((r) => normalizeName(r.name) === normalizeName(name))
+    if (exists) { toast("Ya existe una receta con ese nombre", "warning"); return }
+    const recipe: Recipe = {
+      id: uid("rec"),
+      name,
+      category: newDishCategory,
+      portions: newDishPortions,
+      ingredients: newDishIngredients.map((ing) => ({
+        name: ing.ingredientName,
+        quantity: ing.quantity,
+        unit: ing.unit,
+      })),
+    }
+    setSavedRecipes([...savedRecipes, recipe])
+    toast("Receta guardada — disponible en el selector", "success")
+  }
+
+  function removeSavedRecipe(id: string) {
+    const name = savedRecipes.find((r) => r.id === id)?.name || "Receta"
+    setSavedRecipes(savedRecipes.filter((r) => r.id !== id))
+    toast(`Receta "${name}" eliminada`, "warning")
+    setRecipeConfirmDelete(null)
+  }
+
   function removeDish(id: string) {
     setDeleteConfirmId(id)
   }
@@ -656,6 +1087,14 @@ export default function CosteoPage() {
                 Exportar CSV
               </button>
             )}
+            <button
+              onClick={() => setShowRecipes(true)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg transition-colors"
+              title="Recetas pregrabadas y guardadas para costear platillos"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Recetas
+            </button>
             {dishes.length > 0 && (
               <button
                 onClick={() => setViewMode(viewMode === "lista" ? "menu" : "lista")}
@@ -1183,6 +1622,15 @@ export default function CosteoPage() {
             <button onClick={saveDish} className="flex-1 bg-[#108910] text-white font-semibold py-2.5 rounded-xl hover:bg-[#0D720D] transition-colors">
               {editingDishId ? "Guardar cambios" : "Guardar platillo"}
             </button>
+            <button
+              onClick={saveCurrentAsRecipe}
+              disabled={!newDishName.trim() || newDishIngredients.length === 0}
+              className="flex items-center gap-1.5 px-4 py-2.5 border border-purple-200 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-50 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+              title="Guardar el platillo actual como receta reutilizable"
+            >
+              <Save className="w-4 h-4" />
+              Guardar como receta
+            </button>
             <button onClick={resetForm} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50">
               Cancelar
             </button>
@@ -1440,6 +1888,97 @@ export default function CosteoPage() {
           Si los precios cambian en la plataforma, agrega el ingrediente de nuevo para usar el precio actual.
         </p>
       </div>
+
+      {/* Recipe picker modal */}
+      {showRecipes && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowRecipes(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4 shrink-0">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-purple-600" />
+                <h4 className="font-bold text-gray-900">Recetas para costear</h4>
+                <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                  {savedRecipes.length} guardadas
+                </span>
+              </div>
+              <button onClick={() => setShowRecipes(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Cerrar recetas">×</button>
+            </div>
+
+            <input
+              type="text"
+              value={recipeSearch}
+              onChange={(e) => setRecipeSearch(e.target.value)}
+              placeholder="Buscar receta por nombre…"
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm mb-4 shrink-0 focus:outline-none focus:border-purple-400"
+            />
+
+            <div className="overflow-y-auto flex-1 space-y-5">
+              {/* Pregrabadas */}
+              <div>
+                <h5 className="text-[10px] font-semibold text-gray-400 uppercase mb-2 tracking-wide">
+                  📖 Pregrabadas · {selectedCollection.name}
+                </h5>
+                {(PRESET_RECIPES[slug || ""] || []).filter((r) => normalizeName(r.name).includes(normalizeName(recipeSearch.trim()))).length === 0 ? (
+                  <p className="text-sm text-gray-400">No hay recetas pregrabadas que coincidan con tu búsqueda para este tipo de cocina.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {(PRESET_RECIPES[slug || ""] || [])
+                      .filter((r) => normalizeName(r.name).includes(normalizeName(recipeSearch.trim())))
+                      .map((r) => (
+                        <RecipeCard key={r.id} recipe={r} cost={estimateRecipeCost(r)} onUse={() => loadRecipe(r)} />
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Guardadas */}
+              <div>
+                <h5 className="text-[10px] font-semibold text-gray-400 uppercase mb-2 tracking-wide">
+                  🔖 Mis recetas guardadas
+                </h5>
+                {savedRecipes.length === 0 ? (
+                  <p className="text-sm text-gray-400">
+                    Aún no guardas recetas. Llena el formulario de un platillo y usa <strong>Guardar como receta</strong> para tenerla a mano.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {savedRecipes
+                      .filter((r) => normalizeName(r.name).includes(normalizeName(recipeSearch.trim())))
+                      .map((r) => (
+                        <RecipeCard
+                          key={r.id}
+                          recipe={r}
+                          cost={estimateRecipeCost(r)}
+                          saved
+                          onUse={() => loadRecipe(r)}
+                          onDelete={() => setRecipeConfirmDelete(r.id)}
+                        />
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete saved recipe confirmation modal */}
+      {recipeConfirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
+            <h4 className="font-bold text-gray-900 mb-2">¿Eliminar esta receta guardada?</h4>
+            <p className="text-sm text-gray-500 mb-4">Esta acción no se puede deshacer. La receta se quitará de tus guardadas.</p>
+            <div className="flex gap-3">
+              <button onClick={() => removeSavedRecipe(recipeConfirmDelete)} className="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-xl hover:bg-red-700 text-sm">
+                Sí, eliminar
+              </button>
+              <button onClick={() => setRecipeConfirmDelete(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-50 text-sm">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation modal */}
       {deleteConfirmId && (

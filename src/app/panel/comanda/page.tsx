@@ -7,7 +7,7 @@ import { useToast } from "@/components/toast"
 import Link from "next/link"
 import {
   ArrowLeft, Flame, Play, Check, Undo2, Copy, List, LayoutGrid,
-  Plus, Trash2, ChefHat, Clock,
+  Plus, Trash2, ChefHat, Clock, UtensilsCrossed,
 } from "lucide-react"
 
 interface SaleEntryLike {
@@ -21,8 +21,16 @@ interface SaleEntryLike {
   paymentMethod?: string
   channel?: string
   clienteId?: string
+  mesaId?: string
   modificadores?: { nombre: string; precio: number }[]
   createdAt?: string
+}
+
+interface MesaLike {
+  id: string
+  nombre: string
+  capacidad?: number
+  zona?: string
 }
 
 interface ComandaStatus {
@@ -89,9 +97,11 @@ export default function ComandaPage() {
   const slug = selectedCollection?.slug || null
   const { toast } = useToast()
   const [entries] = useLocalStorage<SaleEntryLike[]>("ventas-entries", [], slug)
+  const [mesas] = useLocalStorage<MesaLike[]>("mesas", [], slug)
   const [statuses, setStatuses] = useLocalStorage<Record<string, ComandaStatus>>("comanda-statuses", {}, slug)
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [channelFilter, setChannelFilter] = useState<"todos" | ChannelKey>("todos")
+  const [mesaFilter, setMesaFilter] = useState<string>("todas")
   const [viewMode, setViewMode] = useState<"board" | "list">("board")
   const [sortNewest, setSortNewest] = useState(false)
   const [now, setNow] = useState(Date.now())
@@ -120,9 +130,18 @@ export default function ComandaPage() {
   }, [dayEntries, statuses])
 
   const filtered = useMemo(() => {
-    const rows = channelFilter === "todos" ? comandas : comandas.filter((c) => (c.entry.channel || "comedor") === channelFilter)
+    let rows = channelFilter === "todos" ? comandas : comandas.filter((c) => (c.entry.channel || "comedor") === channelFilter)
+    if (mesaFilter !== "todas") rows = rows.filter((c) => c.entry.mesaId === mesaFilter)
     return rows.slice().sort((a, b) => (sortNewest ? b.time - a.time : a.time - b.time))
-  }, [comandas, channelFilter, sortNewest])
+  }, [comandas, channelFilter, mesaFilter, sortNewest])
+
+  // Mesas ocupadas del día (para el filtro)
+  const mesasOcupadas = useMemo(() => {
+    const usedIds = new Set(dayEntries.filter((e) => e.mesaId).map((e) => e.mesaId))
+    return mesas.filter((m) => usedIds.has(m.id)).map((m) => ({ id: m.id, nombre: m.nombre }))
+  }, [dayEntries, mesas])
+
+  const mesaNombre = (id?: string) => (id ? mesas.find((m) => m.id === id)?.nombre || id : "")
 
   const byStatus = useMemo(() => {
     const map: Record<StatusKey, typeof filtered> = {
@@ -382,6 +401,19 @@ export default function ComandaPage() {
             </button>
           )
         })}
+        {mesasOcupadas.length > 0 && (
+          <select
+            value={mesaFilter}
+            onChange={(e) => setMesaFilter(e.target.value)}
+            className="ml-2 text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-600 focus:outline-none focus:border-[#108910]"
+            aria-label="Filtrar por mesa"
+          >
+            <option value="todas">🪑 Todas las mesas</option>
+            {mesasOcupadas.map((m) => (
+              <option key={m.id} value={m.id}>🪑 {m.nombre}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* ── Production stats ─────────────────────────────── */}
@@ -521,6 +553,11 @@ export default function ComandaPage() {
                             <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">
                               {chan?.icon} {chan?.label}
                             </span>
+                            {c.entry.mesaId && mesaNombre(c.entry.mesaId) && (
+                              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full font-semibold">
+                                🪑 {mesaNombre(c.entry.mesaId)}
+                              </span>
+                            )}
                             <span className="text-[10px] text-gray-400">🕐 {fmtTime(c.time)}</span>
                           </div>
                           <div className="flex items-center justify-between text-[10px] text-gray-400 mb-2">
@@ -616,6 +653,9 @@ export default function ComandaPage() {
                               </span>
                             ))}
                           </div>
+                        )}
+                        {c.entry.mesaId && mesaNombre(c.entry.mesaId) && (
+                          <p className="text-[9px] text-emerald-700 font-semibold mt-0.5">🪑 {mesaNombre(c.entry.mesaId)}</p>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-gray-800">×{c.entry.quantity}</td>

@@ -13,6 +13,7 @@ import {
   ArrowLeft, Plus, Trash2, DollarSign, TrendingUp, Receipt,
   Copy, BarChart3, Target, ChevronUp, ChevronDown, AlertCircle, Landmark, Flame,
   AlertTriangle, ShieldAlert, Percent, Settings2, Check, Users, Gift,
+  Clock, CreditCard, HandCoins, UtensilsCrossed,
 } from "lucide-react"
 
 interface SaleEntry {
@@ -27,6 +28,7 @@ interface SaleEntry {
   channel?: SaleChannel
   discount?: { type: "monto" | "porcentaje"; value: number }
   clienteId?: string
+  mesaId?: string
   modificadores?: { nombre: string; precio: number }[]
   createdAt?: string // ISO timestamp, set on addEntry
 }
@@ -41,10 +43,41 @@ interface Cliente {
   createdAt: string
 }
 
+interface Mesa {
+  id: string
+  nombre: string
+  capacidad: number
+  zona?: string
+}
+
+interface Empleado {
+  id: string
+  nombre: string
+  rol?: string
+  tarifa: number
+}
+
+interface Fichaje {
+  id: string
+  empleadoId: string
+  entrada: string // ISO timestamp
+  salida?: string // ISO timestamp
+}
+
+interface TarjetaRegalo {
+  id: string
+  codigo: string
+  monto: number
+  saldo: number
+  estado: "activa" | "agotada"
+  creada: string
+}
+
 const PAYMENT_METHODS = [
   { key: "efectivo", label: "Efectivo", icon: "💵" },
   { key: "tarjeta", label: "Tarjeta", icon: "💳" },
   { key: "transferencia", label: "Transferencia", icon: "🏦" },
+  { key: "regalo", label: "Regalo", icon: "🎁" },
 ] as const
 
 type PaymentMethod = (typeof PAYMENT_METHODS)[number]["key"]
@@ -123,6 +156,11 @@ export default function VentasPage() {
   const [puntosTasa, setPuntosTasa] = useLocalStorage<number>("ventas-puntos-tasa", 100, slug)
   const [puntosCanje, setPuntosCanje] = useLocalStorage<number>("ventas-puntos-canje", 1, slug)
   const [tipoCambio, setTipoCambio] = useLocalStorage<number>("ventas-tipo-cambio", 1, slug)
+  const [mesas, setMesas] = useLocalStorage<Mesa[]>("mesas", [], slug)
+  const [empleados, setEmpleados] = useLocalStorage<Empleado[]>("reloj-empleados", [], slug)
+  const [fichajes, setFichajes] = useLocalStorage<Fichaje[]>("reloj-fichajes", [], slug)
+  const [tarjetas, setTarjetas] = useLocalStorage<TarjetaRegalo[]>("tarjetas-regalo", [], slug)
+  const [comisiones, setComisiones] = useLocalStorage<Record<string, number>>("ventas-comisiones", {}, slug)
   // Keep comanda statuses in sync: deleting a sale must remove its comanda status
   const [, setComandaStatuses] = useLocalStorage<Record<string, unknown>>("comanda-statuses", {}, slug)
   const [formDishId, setFormDishId] = useState("")
@@ -135,8 +173,24 @@ export default function VentasPage() {
   const [formClienteId, setFormClienteId] = useState("")
   const [formRedeemPts, setFormRedeemPts] = useState("")
   const [formMods, setFormMods] = useState<string[]>([])
+  const [formMesaId, setFormMesaId] = useState("")
+  const [formGiftCode, setFormGiftCode] = useState("")
   const [showGoals, setShowGoals] = useState(false)
   const [showClientes, setShowClientes] = useState(false)
+  const [showMesas, setShowMesas] = useState(false)
+  const [showReloj, setShowReloj] = useState(false)
+  const [showTarjetas, setShowTarjetas] = useState(false)
+  const [mesaName, setMesaName] = useState("")
+  const [mesaCapacidad, setMesaCapacidad] = useState("")
+  const [mesaZona, setMesaZona] = useState("")
+  const [mesaEditId, setMesaEditId] = useState<string | null>(null)
+  const [mesaDeleteId, setMesaDeleteId] = useState<string | null>(null)
+  const [empNombre, setEmpNombre] = useState("")
+  const [empRol, setEmpRol] = useState("")
+  const [empTarifa, setEmpTarifa] = useState("")
+  const [empEditId, setEmpEditId] = useState<string | null>(null)
+  const [empDeleteId, setEmpDeleteId] = useState<string | null>(null)
+  const [tarjetaMonto, setTarjetaMonto] = useState("")
   const [clienteName, setClienteName] = useState("")
   const [clientePhone, setClientePhone] = useState("")
   const [clientePts, setClientePts] = useState("")
@@ -158,6 +212,23 @@ export default function VentasPage() {
   const dishPrice = (id: string) => sharedDishes.find((d) => d.id === id)?.sellingPrice || 0
 
   const dayEntries = useMemo(() => entries.filter((e) => e.date === selectedDate), [entries, selectedDate])
+
+  // ── Mesas: ocupación del día y mesas libres para el formulario ──
+  const mesasOcupadasHoy = useMemo(() => {
+    const occupied = new Map<string, number>() // mesaId -> first createdAt ts
+    dayEntries.forEach((e) => {
+      if (!e.mesaId) return
+      const ts = e.createdAt ? Date.parse(e.createdAt) : Date.now()
+      const prev = occupied.get(e.mesaId)
+      if (prev == null || ts < prev) occupied.set(e.mesaId, ts)
+    })
+    return occupied
+  }, [dayEntries])
+
+  const freeMesasForForm = useMemo(() => {
+    const used = new Set(entries.filter((e) => e.date === formDate && e.mesaId).map((e) => e.mesaId))
+    return mesas.filter((m) => !used.has(m.id) || m.id === formMesaId)
+  }, [entries, formDate, mesas, formMesaId])
 
   const dayStats = useMemo(() => {
     const revenue = dayEntries.reduce((s, e) => s + entryTotal(e), 0)
@@ -335,6 +406,163 @@ export default function VentasPage() {
     return SALE_CHANNELS.map((c) => ({ ...c, revenue: byChannel.get(c.key) || 0 })).filter((c) => c.revenue > 0)
   }, [reportEntries])
 
+  // ── Comisiones por canal ──────────────────────────────
+  const comisionesHoy = useMemo(() => {
+    return dayEntries.reduce((s, e) => {
+      const c = (e.channel || "comedor") as SaleChannel
+      return s + (entryTotal(e) * (comisiones[c] || 0)) / 100
+    }, 0)
+  }, [dayEntries, comisiones])
+
+  const comisionesReporte = useMemo(() => {
+    return reportEntries.reduce((s, e) => {
+      const c = (e.channel || "comedor") as SaleChannel
+      return s + (entryTotal(e) * (comisiones[c] || 0)) / 100
+    }, 0)
+  }, [reportEntries, comisiones])
+
+  // ── Reloj checador ────────────────────────────────────
+  const fichajesHoy = useMemo(() => {
+    const start = new Date(`${selectedDate}T00:00:00`).getTime()
+    const end = new Date(`${selectedDate}T23:59:59`).getTime()
+    const byEmp = new Map<string, { nombre: string; rol?: string; tarifa: number; minutos: number; fichajes: number; abierto: boolean }>()
+    empleados.forEach((emp) => {
+      byEmp.set(emp.id, { nombre: emp.nombre, rol: emp.rol, tarifa: emp.tarifa, minutos: 0, fichajes: 0, abierto: false })
+    })
+    fichajes.forEach((f) => {
+      const t = Date.parse(f.entrada)
+      if (Number.isNaN(t) || t < start || t > end) return
+      const emp = byEmp.get(f.empleadoId)
+      if (!emp) return
+      emp.fichajes += 1
+      const out = f.salida ? Date.parse(f.salida) : Date.now()
+      if (!f.salida) emp.abierto = true
+      emp.minutos += Math.max(0, (out - t) / 60000)
+    })
+    const rows = Array.from(byEmp.values()).filter((r) => r.fichajes > 0)
+    const totalMin = rows.reduce((s, r) => s + r.minutos, 0)
+    const totalCosto = rows.reduce((s, r) => s + (r.minutos / 60) * r.tarifa, 0)
+    return { rows, totalMin, totalCosto }
+  }, [empleados, fichajes, selectedDate])
+
+  const empleadosHoy = useMemo(() => {
+    const hoy = todayStr()
+    return empleados.map((emp) => {
+      const hs = fichajes.filter((f) => f.empleadoId === emp.id && f.entrada.startsWith(hoy))
+      const abierto = hs.some((f) => !f.salida)
+      const minutos = hs.reduce(
+        (s, f) => s + Math.max(0, ((f.salida ? Date.parse(f.salida) : Date.now()) - Date.parse(f.entrada)) / 60000),
+        0,
+      )
+      return { ...emp, minutos, abierto, fichajesHoy: hs.length }
+    })
+  }, [empleados, fichajes])
+
+  const ficharEntrada = (empleadoId: string) => {
+    const open = fichajes.find((f) => f.empleadoId === empleadoId && !f.salida)
+    if (open) {
+      toast("Ya tiene un fichaje de entrada abierto", "warning")
+      return
+    }
+    setFichajes((prev) => [...prev, { id: uid("fichaje"), empleadoId, entrada: new Date().toISOString() }])
+    toast("Entrada registrada", "success")
+  }
+
+  const ficharSalida = (empleadoId: string) => {
+    const open = fichajes.find((f) => f.empleadoId === empleadoId && !f.salida)
+    if (!open) {
+      toast("No hay fichaje de entrada abierto", "warning")
+      return
+    }
+    setFichajes((prev) => prev.map((f) => (f.id === open.id ? { ...f, salida: new Date().toISOString() } : f)))
+    toast("Salida registrada", "success")
+  }
+
+  const saveEmpleado = () => {
+    const nombre = empNombre.trim()
+    const tarifa = parseFloat(empTarifa)
+    if (!nombre || Number.isNaN(tarifa) || tarifa < 0) {
+      toast("Completa nombre y tarifa válida", "warning")
+      return
+    }
+    setEmpleados((prev) => {
+      const id = empEditId || uid("empleado")
+      const exists = prev.some((e) => e.id === id)
+      const nuevo: Empleado = { id, nombre, rol: empRol.trim() || undefined, tarifa }
+      return exists ? prev.map((e) => (e.id === id ? nuevo : e)) : [...prev, nuevo]
+    })
+    setEmpNombre("")
+    setEmpRol("")
+    setEmpTarifa("")
+    setEmpEditId(null)
+    toast(empEditId ? "Empleado actualizado" : "Empleado agregado", "success")
+  }
+
+  const copyHoras = () => {
+    if (fichajesHoy.rows.length === 0) {
+      toast("No hay fichajes para ese día", "warning")
+      return
+    }
+    const lines = [
+      `⏰ Reporte de horas — ${dateLabel(selectedDate)} (${selectedCollection?.name || ""})`,
+      ...fichajesHoy.rows.map(
+        (r) => `${r.nombre}${r.rol ? ` (${r.rol})` : ""}: ${Math.floor(r.minutos / 60)}h ${Math.round(r.minutos % 60)}min — $${((r.minutos / 60) * r.tarifa).toFixed(0)}${r.abierto ? " (en curso)" : ""}`,
+      ),
+      `Total: ${Math.floor(fichajesHoy.totalMin / 60)}h ${Math.round(fichajesHoy.totalMin % 60)}min — $${fichajesHoy.totalCosto.toFixed(0)}`,
+      "",
+      "📈 Registrado en resurte.me",
+    ]
+    navigator.clipboard.writeText(lines.join("\n"))
+    toast("Reporte de horas copiado", "success")
+  }
+
+  // ── Tarjetas de regalo ────────────────────────────────
+  const emitirTarjeta = () => {
+    const monto = parseFloat(tarjetaMonto)
+    if (Number.isNaN(monto) || monto <= 0) {
+      toast("Ingresa un monto válido", "warning")
+      return
+    }
+    const code = `RT-${Math.random().toString(36).slice(2, 6).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+    setTarjetas((prev) => [...prev, { id: uid("tarjeta"), codigo: code, monto, saldo: monto, estado: "activa", creada: new Date().toISOString() }])
+    setTarjetaMonto("")
+    toast(`Tarjeta ${code} emitida con $${monto.toFixed(0)}`, "success")
+  }
+
+  const copyCodigoTarjeta = (codigo: string) => {
+    navigator.clipboard.writeText(codigo)
+    toast("Código copiado", "success")
+  }
+
+  // ── Comparativa contra período anterior ──────────────
+  const comparison = useMemo(() => {
+    const days = reportPeriod === "hoy" ? 1 : reportPeriod === "7d" ? 7 : 30
+    const curStart = new Date()
+    curStart.setDate(curStart.getDate() - (days - 1))
+    curStart.setHours(0, 0, 0, 0)
+    const curStartKey = `${curStart.getFullYear()}-${String(curStart.getMonth() + 1).padStart(2, "0")}-${String(curStart.getDate()).padStart(2, "0")}`
+    const prevStart = new Date(curStart)
+    prevStart.setDate(prevStart.getDate() - days)
+    const prevStartKey = `${prevStart.getFullYear()}-${String(prevStart.getMonth() + 1).padStart(2, "0")}-${String(prevStart.getDate()).padStart(2, "0")}`
+    const prevEnd = new Date(curStart.getTime() - 1)
+    const prevEndKey = `${prevEnd.getFullYear()}-${String(prevEnd.getMonth() + 1).padStart(2, "0")}-${String(prevEnd.getDate()).padStart(2, "0")}`
+    const stats = (list: SaleEntry[]) => {
+      const revenue = list.reduce((s, e) => s + entryTotal(e), 0)
+      const orders = list.length
+      return { revenue, orders, avgTicket: orders > 0 ? revenue / orders : 0 }
+    }
+    const cur = stats(entries.filter((e) => e.date >= curStartKey && e.date <= today))
+    const prev = stats(entries.filter((e) => e.date >= prevStartKey && e.date <= prevEndKey))
+    const delta = (a: number, b: number) => (b > 0 ? ((a - b) / b) * 100 : a > 0 ? 100 : 0)
+    return {
+      cur,
+      prev,
+      revenueDelta: delta(cur.revenue, prev.revenue),
+      ordersDelta: delta(cur.orders, prev.orders),
+      avgDelta: delta(cur.avgTicket, prev.avgTicket),
+    }
+  }, [reportPeriod, entries, today])
+
   const copyGerencial = () => {
     const label = reportPeriod === "hoy" ? "Hoy" : reportPeriod === "7d" ? "Últimos 7 días" : "Últimos 30 días"
     const lines = [
@@ -347,10 +575,17 @@ export default function VentasPage() {
       `Platillos vendidos: ${reportStats.units}`,
     ]
     if (reportStats.discount > 0) lines.push(`Descuentos otorgados: -$${reportStats.discount.toFixed(0)}`)
+    if (comisionesReporte > 0) lines.push(`Comisiones por canal: -$${comisionesReporte.toFixed(0)}`)
     if (tipoCambio !== 1) lines.push(`Aprox. USD: $${(reportStats.revenue / tipoCambio).toFixed(2)}`)
     if (reportMethods.length > 0) lines.push("", "Por método de pago:", ...reportMethods.map((m) => `${m.icon} ${m.label}: $${m.revenue.toFixed(0)}`))
     if (reportChannels.length > 1) lines.push("", "Por canal:", ...reportChannels.map((c) => `${c.icon} ${c.label}: $${c.revenue.toFixed(0)}`))
     if (reportTop.length > 0) lines.push("", "Top productos:", ...reportTop.map((t, i) => `${i + 1}. ${t.name} — ${t.qty} pz ($${t.revenue.toFixed(0)})`))
+    if (comparison.prev.orders > 0 || comparison.prev.revenue > 0) {
+      lines.push(
+        "",
+        `vs período anterior: ingresos ${comparison.revenueDelta >= 0 ? "+" : ""}${comparison.revenueDelta.toFixed(0)}% · tickets ${comparison.ordersDelta >= 0 ? "+" : ""}${comparison.ordersDelta.toFixed(0)}% · ticket prom. ${comparison.avgDelta >= 0 ? "+" : ""}${comparison.avgDelta.toFixed(0)}%`,
+      )
+    }
     lines.push("", "📈 Registrado en resurte.me")
     navigator.clipboard.writeText(lines.join("\n"))
     toast("Reporte gerencial copiado", "success")
@@ -391,12 +626,36 @@ export default function VentasPage() {
       paymentMethod: formPayment,
       channel: formChannel,
       clienteId: formClienteId || undefined,
+      mesaId: formMesaId || undefined,
       modificadores: mods.length > 0 ? mods.map((m) => ({ nombre: m.nombre, precio: m.precio })) : undefined,
       discount: redeemValue > 0
         ? { type: "monto", value: redeemValue }
         : discountValue > 0 ? { type: formDiscountType, value: discountValue } : undefined,
       createdAt: new Date().toISOString(),
     }
+    const total = entryTotal(entry)
+
+    // Gift card payment: validate the code covers the total and reduce its balance
+    if (formPayment === "regalo") {
+      const code = formGiftCode.trim().toUpperCase()
+      const card = tarjetas.find((t) => t.codigo === code && t.estado === "activa" && t.saldo > 0)
+      if (!card) {
+        toast("Código de tarjeta de regalo no válido o sin saldo", "warning")
+        return
+      }
+      if (card.saldo < total) {
+        toast(`El saldo de la tarjeta ($${card.saldo.toFixed(0)}) no cubre el total ($${total.toFixed(0)})`, "warning")
+        return
+      }
+      setTarjetas((prev) =>
+        prev.map((t) => {
+          if (t.id !== card.id) return t
+          const saldo = Math.max(0, t.saldo - total)
+          return { ...t, saldo, estado: saldo <= 0 ? "agotada" : "activa" }
+        }),
+      )
+    }
+
     setEntries((prev) => [...prev, entry])
     setSelectedDate(formDate)
 
@@ -420,6 +679,8 @@ export default function VentasPage() {
     setFormRedeemPts("")
     setFormMods([])
     setFormDiscountValue("")
+    setFormMesaId("")
+    setFormGiftCode("")
 
     // Optional: deduct dish ingredients from inventory (opt-in)
     let deducted = 0
@@ -535,6 +796,50 @@ export default function VentasPage() {
     toast("Cliente eliminado", "warning")
   }
 
+  // ── Mesas CRUD ──────────────────────────────────────────
+  const saveMesa = () => {
+    const nombre = mesaName.trim()
+    if (!nombre) {
+      toast("Escribe el nombre de la mesa", "warning")
+      return
+    }
+    const capacidad = Math.max(1, mesaCapacidad ? parseInt(mesaCapacidad) || 1 : 1)
+    if (mesaEditId) {
+      setMesas((prev) =>
+        prev.map((m) => (m.id === mesaEditId ? { ...m, nombre, capacidad, zona: mesaZona.trim() || undefined } : m)),
+      )
+      toast("Mesa actualizada", "success")
+    } else {
+      setMesas((prev) => [...prev, { id: uid("mesa"), nombre, capacidad, zona: mesaZona.trim() || undefined }])
+      toast("Mesa agregada", "success")
+    }
+    setMesaName("")
+    setMesaCapacidad("")
+    setMesaZona("")
+    setMesaEditId(null)
+  }
+
+  const startEditMesa = (m: Mesa) => {
+    setMesaEditId(m.id)
+    setMesaName(m.nombre)
+    setMesaCapacidad(String(m.capacidad))
+    setMesaZona(m.zona || "")
+  }
+
+  const confirmDeleteMesa = () => {
+    if (!mesaDeleteId) return
+    setMesas((prev) => prev.filter((m) => m.id !== mesaDeleteId))
+    setMesaDeleteId(null)
+    toast("Mesa eliminada", "warning")
+  }
+
+  const confirmDeleteEmpleado = () => {
+    if (!empDeleteId) return
+    setEmpleados((prev) => prev.filter((e) => e.id !== empDeleteId))
+    setEmpDeleteId(null)
+    toast("Empleado eliminado", "warning")
+  }
+
   const copyClientes = () => {
     if (clientes.length === 0) {
       toast("No hay clientes registrados", "warning")
@@ -569,11 +874,13 @@ export default function VentasPage() {
       : []
     if (tipoCambio !== 1) lines.push(`Aprox. USD: $${(dayStats.revenue / tipoCambio).toFixed(2)}`)
     const clienteName = (id?: string) => clientes.find((c) => c.id === id)?.nombre || ""
+    const mesaLabel = (id?: string) => mesas.find((m) => m.id === id)?.nombre || ""
     const entries = dayEntries.length > 0
       ? ["", "Ventas del día:", ...dayEntries.map((e, i) => {
           const mods = e.modificadores && e.modificadores.length > 0 ? ` [+${e.modificadores.map((m) => m.nombre).join(", ")}]` : ""
           const cli = e.clienteId ? ` · ${clienteName(e.clienteId)}` : ""
-          return `${i + 1}. ${e.dishName}${mods} ×${e.quantity}${cli} — $${(e.unitPrice * e.quantity).toFixed(0)}`
+          const mesaTxt = e.mesaId && mesaLabel(e.mesaId) ? ` · 🪑 ${mesaLabel(e.mesaId)}` : ""
+          return `${i + 1}. ${e.dishName}${mods} ×${e.quantity}${cli}${mesaTxt} — $${(e.unitPrice * e.quantity).toFixed(0)}`
         })]
       : []
     navigator.clipboard.writeText([header, ...lines, ...entries, ...methodLines, ...channelLines, ...top, "", "📈 Registrado en resurte.me"].join("\n"))
@@ -591,6 +898,8 @@ export default function VentasPage() {
             .map((c) => `${c.icon} ${c.label}: $${c.revenue.toFixed(0)} (${c.count} venta${c.count > 1 ? "s" : ""})`)]
         : []),
       ...(dayStats.discount > 0 ? [`Descuentos otorgados: -$${dayStats.discount.toFixed(0)}`] : []),
+      ...(comisionesHoy > 0 ? [`Comisiones por canal: -$${comisionesHoy.toFixed(0)}`] : []),
+      ...(mesasOcupadasHoy.size > 0 ? [`Mesas ocupadas: ${mesasOcupadasHoy.size}`] : []),
       ...(tipoCambio !== 1 ? [`Aprox. USD: $${(dayStats.revenue / tipoCambio).toFixed(2)}`] : []),
       ...(dayEntries.some((e) => e.modificadores?.length) ? ["", "Con modificadores:", ...dayEntries.filter((e) => e.modificadores?.length).map((e) => `${e.dishName} [+${e.modificadores!.map((m) => m.nombre).join(", ")}] ×${e.quantity}`)] : []),
       "",
@@ -753,6 +1062,22 @@ export default function VentasPage() {
               ))}
             </select>
           </div>
+          {mesas.length > 0 && (
+            <div className="w-32">
+              <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Mesa</label>
+              <select
+                value={formMesaId}
+                onChange={(e) => setFormMesaId(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#108910]"
+                aria-label="Mesa del salón"
+              >
+                <option value="">Sin mesa</option>
+                {freeMesasForForm.map((m) => (
+                  <option key={m.id} value={m.id}>🪑 {m.nombre}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="w-28">
             <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Descuento</label>
             <select
@@ -786,6 +1111,20 @@ export default function VentasPage() {
             Registrar
           </button>
         </div>
+        {formPayment === "regalo" && (
+          <div className="mt-3">
+            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Código de tarjeta de regalo</label>
+            <input
+              type="text"
+              value={formGiftCode}
+              onChange={(e) => setFormGiftCode(e.target.value.toUpperCase())}
+              placeholder="RT-XXXX-XXXX"
+              className="w-full max-w-xs px-3 py-2 rounded-xl border border-gray-200 text-sm uppercase focus:outline-none focus:border-[#108910]"
+              aria-label="Código de tarjeta de regalo"
+            />
+            <p className="text-[10px] text-gray-400 mt-1">El saldo de la tarjeta debe cubrir el total de la venta.</p>
+          </div>
+        )}
         {formDishId && (() => {
           const dish = sharedDishes.find((d) => d.id === formDishId)
           const mods = dish?.modificadores || []
@@ -909,6 +1248,7 @@ export default function VentasPage() {
         </div>
 
         {showGoals ? (
+          <>
           <div className="grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
             <div>
               <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Meta diaria ($)</label>
@@ -942,6 +1282,30 @@ export default function VentasPage() {
               Guardar
             </button>
           </div>
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">Comisiones por canal (%)</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {SALE_CHANNELS.map((c) => (
+                <label key={c.key} className="block">
+                  <span className="block text-[10px] text-gray-500 mb-1">{c.icon} {c.label}</span>
+                  <input
+                    type="number"
+                    value={comisiones[c.key] || 0}
+                    onChange={(e) => setComisiones((prev) => ({ ...prev, [c.key]: Math.max(0, parseFloat(e.target.value) || 0) }))}
+                    min="0"
+                    step="0.5"
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#108910]"
+                    aria-label={`Comisión por canal ${c.label}`}
+                  />
+                </label>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1.5">
+              <HandCoins className="w-3 h-3 inline-block mr-1 text-[#108910]" />
+              Se calcula sobre los ingresos del día/período según el canal de cada venta.
+            </p>
+          </div>
+          </>
         ) : (
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
@@ -1173,6 +1537,408 @@ export default function VentasPage() {
         )}
       </div>
 
+      {/* ── Mesas del salón ──────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <UtensilsCrossed className="w-4 h-4 text-[#108910]" />
+          <h3 className="text-sm font-semibold text-gray-900">Mesas del salón</h3>
+          {mesas.length > 0 && (
+            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+              {mesasOcupadasHoy.size} ocupada{mesasOcupadasHoy.size !== 1 ? "s" : ""} de {mesas.length}
+            </span>
+          )}
+          <button
+            onClick={() => setShowMesas(!showMesas)}
+            className="ml-auto flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
+            aria-expanded={showMesas}
+            aria-label="Mostrar u ocultar mesas del salón"
+          >
+            <Settings2 className="w-3.5 h-3.5" />
+            {showMesas ? "Cerrar" : "Gestionar"}
+          </button>
+        </div>
+
+        {showMesas && (
+          <div className="space-y-4">
+            <div className="grid sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Nombre</label>
+                <input
+                  type="text"
+                  value={mesaName}
+                  onChange={(e) => setMesaName(e.target.value)}
+                  placeholder={mesaEditId ? "Editar nombre…" : "Ej. Mesa 3"}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                  aria-label="Nombre de la mesa"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Capacidad</label>
+                <input
+                  type="number"
+                  value={mesaCapacidad}
+                  onChange={(e) => setMesaCapacidad(e.target.value)}
+                  min="1"
+                  placeholder="4"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+                  aria-label="Capacidad de la mesa"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Zona</label>
+                <input
+                  type="text"
+                  value={mesaZona}
+                  onChange={(e) => setMesaZona(e.target.value)}
+                  placeholder="Opcional · Ej. Terraza"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                  aria-label="Zona de la mesa"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={saveMesa}
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+              >
+                <Check className="w-3.5 h-3.5" />
+                {mesaEditId ? "Guardar cambios" : "Agregar mesa"}
+              </button>
+              {mesaEditId && (
+                <button
+                  onClick={() => { setMesaEditId(null); setMesaName(""); setMesaCapacidad(""); setMesaZona("") }}
+                  className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
+            {mesas.length === 0 ? (
+              <p className="text-[11px] text-gray-400">Aún no registras mesas. Agrégalas para asignarlas a tus ventas y ver la ocupación del día.</p>
+            ) : (
+              <div className="border-t border-gray-100 pt-3">
+                <ul className="divide-y divide-gray-50">
+                  {mesas.map((m) => {
+                    const firstTs = mesasOcupadasHoy.get(m.id)
+                    const ocupada = firstTs != null
+                    const mins = ocupada ? Math.max(1, Math.round((Date.now() - firstTs) / 60000)) : 0
+                    return (
+                      <li key={m.id} className="flex items-center gap-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-gray-800 truncate">🪑 {m.nombre}</p>
+                          <p className="text-[10px] text-gray-400">
+                            {m.zona ? `${m.zona} · ` : ""}Cap. {m.capacidad}
+                          </p>
+                        </div>
+                        {ocupada ? (
+                          <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full shrink-0">
+                            Ocupada · {Math.floor(mins / 60)}h {mins % 60}min
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full shrink-0">
+                            Libre
+                          </span>
+                        )}
+                        <button
+                          onClick={() => startEditMesa(m)}
+                          className="p-1.5 text-gray-400 hover:text-[#108910] rounded-lg hover:bg-emerald-50 transition-colors"
+                          title="Editar mesa"
+                          aria-label={`Editar mesa ${m.nombre}`}
+                        >
+                          <Settings2 className="w-4 h-4" />
+                        </button>
+                        {mesaDeleteId === m.id ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={confirmDeleteMesa}
+                              className="px-2 py-1 text-[10px] font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600"
+                            >
+                              Sí
+                            </button>
+                            <button
+                              onClick={() => setMesaDeleteId(null)}
+                              className="px-2 py-1 text-[10px] font-semibold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setMesaDeleteId(m.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                            title="Eliminar mesa"
+                            aria-label={`Eliminar mesa ${m.nombre}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Reloj checador ───────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Clock className="w-4 h-4 text-[#108910]" />
+          <h3 className="text-sm font-semibold text-gray-900">Reloj checador</h3>
+          {empleados.length > 0 && (
+            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+              {empleados.length} empleado{empleados.length !== 1 ? "s" : ""}
+            </span>
+          )}
+          <button
+            onClick={() => setShowReloj(!showReloj)}
+            className="ml-auto flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
+            aria-expanded={showReloj}
+            aria-label="Mostrar u ocultar reloj checador"
+          >
+            <Settings2 className="w-3.5 h-3.5" />
+            {showReloj ? "Cerrar" : "Gestionar"}
+          </button>
+        </div>
+
+        {showReloj && (
+          <div className="space-y-4">
+            <div className="grid sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Nombre</label>
+                <input
+                  type="text"
+                  value={empNombre}
+                  onChange={(e) => setEmpNombre(e.target.value)}
+                  placeholder={empEditId ? "Editar nombre…" : "Ej. Juan Pérez"}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                  aria-label="Nombre del empleado"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Rol</label>
+                <input
+                  type="text"
+                  value={empRol}
+                  onChange={(e) => setEmpRol(e.target.value)}
+                  placeholder="Opcional · Ej. Mesero"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                  aria-label="Rol del empleado"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Tarifa por hora ($)</label>
+                <input
+                  type="number"
+                  value={empTarifa}
+                  onChange={(e) => setEmpTarifa(e.target.value)}
+                  min="0"
+                  placeholder="Ej. 60"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+                  aria-label="Tarifa por hora del empleado"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={saveEmpleado}
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+              >
+                <Check className="w-3.5 h-3.5" />
+                {empEditId ? "Guardar cambios" : "Agregar empleado"}
+              </button>
+              {empEditId && (
+                <button
+                  onClick={() => { setEmpEditId(null); setEmpNombre(""); setEmpRol(""); setEmpTarifa("") }}
+                  className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
+            {empleados.length === 0 ? (
+              <p className="text-[11px] text-gray-400">Aún no registras empleados. Agrégalos para fichar entradas y salidas.</p>
+            ) : (
+              <div className="border-t border-gray-100 pt-3">
+                <ul className="divide-y divide-gray-50">
+                  {empleadosHoy.map((e) => (
+                    <li key={e.id} className="flex items-center gap-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-gray-800 truncate">
+                          {e.nombre}
+                          {e.abierto && <span className="ml-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">en turno</span>}
+                        </p>
+                        <p className="text-[10px] text-gray-400">
+                          {e.rol ? `${e.rol} · ` : ""}hoy {Math.floor(e.minutos / 60)}h {Math.round(e.minutos % 60)}min · ${((e.minutos / 60) * e.tarifa).toFixed(0)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => ficharEntrada(e.id)}
+                        className="px-2.5 py-1.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+                        aria-label={`Fichar entrada de ${e.nombre}`}
+                      >
+                        ⏱ Entrada
+                      </button>
+                      <button
+                        onClick={() => ficharSalida(e.id)}
+                        disabled={!e.abierto}
+                        className="px-2.5 py-1.5 text-[10px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        aria-label={`Fichar salida de ${e.nombre}`}
+                      >
+                        Salida
+                      </button>
+                      <button
+                        onClick={() => { setEmpEditId(e.id); setEmpNombre(e.nombre); setEmpRol(e.rol || ""); setEmpTarifa(String(e.tarifa)) }}
+                        className="p-1.5 text-gray-400 hover:text-[#108910] rounded-lg hover:bg-emerald-50 transition-colors"
+                        title="Editar empleado"
+                        aria-label={`Editar a ${e.nombre}`}
+                      >
+                        <Settings2 className="w-4 h-4" />
+                      </button>
+                      {empDeleteId === e.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={confirmDeleteEmpleado}
+                            className="px-2 py-1 text-[10px] font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600"
+                          >
+                            Sí
+                          </button>
+                          <button
+                            onClick={() => setEmpDeleteId(null)}
+                            className="px-2 py-1 text-[10px] font-semibold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setEmpDeleteId(e.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                          title="Eliminar empleado"
+                          aria-label={`Eliminar a ${e.nombre}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {fichajesHoy.rows.length > 0 && (
+              <div className="border-t border-gray-100 pt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Resumen de {dateLabel(selectedDate)}</p>
+                  <button
+                    onClick={copyHoras}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    Copiar reporte de horas
+                  </button>
+                </div>
+                <ul className="space-y-1.5">
+                  {fichajesHoy.rows.map((r) => (
+                    <li key={r.nombre} className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600">{r.nombre}{r.rol ? ` · ${r.rol}` : ""}</span>
+                      <span className="text-gray-500">
+                        {Math.floor(r.minutos / 60)}h {Math.round(r.minutos % 60)}min · ${((r.minutos / 60) * r.tarifa).toFixed(0)}{r.abierto ? " (en curso)" : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                  <span className="text-xs font-semibold text-gray-500">Total</span>
+                  <span className="text-xs font-bold text-gray-800">
+                    {Math.floor(fichajesHoy.totalMin / 60)}h {Math.round(fichajesHoy.totalMin % 60)}min · ${fichajesHoy.totalCosto.toFixed(0)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Tarjetas de regalo ───────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <CreditCard className="w-4 h-4 text-[#108910]" />
+          <h3 className="text-sm font-semibold text-gray-900">Tarjetas de regalo</h3>
+          {tarjetas.length > 0 && (
+            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+              {tarjetas.length} tarjeta{tarjetas.length !== 1 ? "s" : ""}
+            </span>
+          )}
+          <button
+            onClick={() => setShowTarjetas(!showTarjetas)}
+            className="ml-auto flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
+            aria-expanded={showTarjetas}
+            aria-label="Mostrar u ocultar tarjetas de regalo"
+          >
+            <Settings2 className="w-3.5 h-3.5" />
+            {showTarjetas ? "Cerrar" : "Gestionar"}
+          </button>
+        </div>
+
+        {showTarjetas && (
+          <div className="space-y-4">
+            <div className="flex items-end gap-3">
+              <div className="w-40">
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Monto ($)</label>
+                <input
+                  type="number"
+                  value={tarjetaMonto}
+                  onChange={(e) => setTarjetaMonto(e.target.value)}
+                  min="1"
+                  placeholder="Ej. 500"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+                  aria-label="Monto de la tarjeta de regalo"
+                />
+              </div>
+              <button
+                onClick={emitirTarjeta}
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+              >
+                <Gift className="w-3.5 h-3.5" />
+                Emitir tarjeta
+              </button>
+            </div>
+            {tarjetas.length === 0 ? (
+              <p className="text-[11px] text-gray-400">Aún no emites tarjetas de regalo. Al emitir una, podrás usarla como método de pago "Regalo" en tus ventas.</p>
+            ) : (
+              <div className="border-t border-gray-100 pt-3">
+                <ul className="divide-y divide-gray-50">
+                  {tarjetas.map((t) => (
+                    <li key={t.id} className="flex items-center gap-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-gray-800 font-mono truncate">{t.codigo}</p>
+                        <p className="text-[10px] text-gray-400">Emitida el {new Date(t.creada).toLocaleDateString("es-MX")}</p>
+                      </div>
+                      <span className={`text-xs font-bold shrink-0 ${t.estado === "activa" ? "text-emerald-700" : "text-gray-400"}`}>
+                        ${t.saldo.toFixed(0)} / ${t.monto.toFixed(0)}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${t.estado === "activa" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                        {t.estado === "activa" ? "Activa" : "Agotada"}
+                      </span>
+                      <button
+                        onClick={() => copyCodigoTarjeta(t.codigo)}
+                        className="p-1.5 text-gray-400 hover:text-[#108910] rounded-lg hover:bg-emerald-50 transition-colors shrink-0"
+                        title="Copiar código"
+                        aria-label={`Copiar código de ${t.codigo}`}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* ── Antifraud alerts ─────────────────────────────── */}
       {fraudAlerts.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-6">
@@ -1392,6 +2158,25 @@ export default function VentasPage() {
                 <p className="text-[10px] text-gray-400">otorgados</p>
               </div>
             </div>
+
+            {(reportEntries.length > 0 || comparison.prev.orders > 0) && (
+              <div className="grid sm:grid-cols-3 gap-3 mb-4">
+                {[
+                  { label: "Ingresos", cur: comparison.cur.revenue, prev: comparison.prev.revenue, delta: comparison.revenueDelta },
+                  { label: "Tickets", cur: comparison.cur.orders, prev: comparison.prev.orders, delta: comparison.ordersDelta },
+                  { label: "Ticket promedio", cur: comparison.cur.avgTicket, prev: comparison.prev.avgTicket, delta: comparison.avgDelta },
+                ].map((x) => (
+                  <div key={x.label} className="bg-gray-50 rounded-xl p-3 text-center border border-dashed border-gray-200">
+                    <p className="text-[10px] text-gray-500 mb-1">vs período anterior — {x.label}</p>
+                    <p className="text-sm font-extrabold text-gray-800">{x.label === "Tickets" ? x.cur : `$${x.cur.toFixed(0)}`}</p>
+                    <p className={`text-[10px] font-bold ${x.delta >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {x.delta >= 0 ? "↑" : "↓"} {Math.abs(x.delta).toFixed(0)}%
+                      <span className="text-gray-400 font-medium"> · prev {x.label === "Tickets" ? x.prev : `$${x.prev.toFixed(0)}`}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {reportEntries.length === 0 ? (
               <p className="text-xs text-gray-400">Sin ventas en este período.</p>

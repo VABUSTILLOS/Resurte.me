@@ -14,6 +14,7 @@ import {
   Calendar, ClipboardCheck, ArrowRight, ChefHat, Store,
   PieChart, DollarSign, BarChart3, Zap, Clock, Percent, Package, Receipt, Copy,
   AlertTriangle, Bell, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Search, Flame, Target, Gift,
+  UtensilsCrossed,
 } from "lucide-react"
 import { GlobalSearch } from "@/components/global-search"
 
@@ -35,6 +36,15 @@ type HubVenta = {
   channel?: string
   discount?: { type: "monto" | "porcentaje"; value: number }
   clienteId?: string
+  mesaId?: string
+  createdAt?: string
+}
+
+type HubMesa = {
+  id: string
+  nombre: string
+  capacidad: number
+  zona?: string
 }
 
 function hubEntryTotal(e: HubVenta): number {
@@ -168,6 +178,7 @@ export default function PanelPage() {
   const [shoppingList] = useLocalStorage<{ key: string; name: string; pricePerKg: number; quantityKg: number }[]>("temporada-shopping-list", [], slug)
   const [inventarioItems] = useLocalStorage<{ id: string; name: string; stock: number; minStock: number; unit: string; pricePerUnit: number; category?: string }[]>("inventario-items", [], slug)
   const [ventasEntries] = useLocalStorage<HubVenta[]>("ventas-entries", [], slug)
+  const [mesas] = useLocalStorage<HubMesa[]>("mesas", [], slug)
   const [ventasMetaDia] = useLocalStorage<number>("ventas-meta-dia", 0, slug)
   const [ventasUmbralTicket] = useLocalStorage<number>("ventas-umbral-ticket", 3000, slug)
   const [clientes] = useLocalStorage<{ id: string; nombre: string; telefono?: string; puntos: number; visitas: number; totalGastado: number; createdAt: string }[]>("clientes", [], slug)
@@ -291,6 +302,23 @@ export default function PanelPage() {
     })
     return { active, pendiente, enCocina, readyToday: todayIds.size - active }
   }, [ventasEntries, comandaStatuses, selectedCollection])
+
+  // Mesas: occupied today + those occupied longer than 3h
+  const mesasInfo = useMemo(() => {
+    if (!selectedCollection) return { occupied: 0, total: mesas.length, longCount: 0, longNames: [] as string[] }
+    const today = new Date().toISOString().slice(0, 10)
+    const firstTs = new Map<string, number>()
+    ventasEntries.forEach((e) => {
+      if (e.date !== today || !e.mesaId) return
+      const ts = e.createdAt ? Date.parse(e.createdAt) : NaN
+      const prev = firstTs.get(e.mesaId)
+      if (Number.isFinite(ts) && (prev == null || ts < prev)) firstTs.set(e.mesaId, ts)
+    })
+    const now = Date.now()
+    const longIds = [...firstTs.entries()].filter(([, ts]) => now - ts > 3 * 3600 * 1000).map(([id]) => id)
+    const longNames = longIds.map((id) => mesas.find((m) => m.id === id)?.nombre).filter(Boolean) as string[]
+    return { occupied: firstTs.size, total: mesas.length, longCount: longIds.length, longNames }
+  }, [selectedCollection, ventasEntries, mesas])
 
   // Planned-menu stock projection: ingredients needed for covers vs inventory
   const projectionShortfall = useMemo(() => {
@@ -428,6 +456,18 @@ export default function PanelPage() {
       })
     }
 
+    // 0b. Mesas occupied for more than 3 hours
+    if (mesasInfo.longCount > 0) {
+      result.push({
+        id: "mesas-long",
+        type: "warning",
+        icon: UtensilsCrossed,
+        title: `${mesasInfo.longCount} mesa(s) ocupada(s) por más de 3 h`,
+        detail: `${mesasInfo.longNames.slice(0, 2).join(", ")}${mesasInfo.longNames.length > 2 ? ` +${mesasInfo.longNames.length - 2} más` : ""} — revisa el servicio en mesas`,
+        href: "/panel/ventas",
+      })
+    }
+
     // 1. Low stock from inventario
     const lowStock = inventarioItems.filter((i) => i.stock <= i.minStock && i.stock > 0)
     const outOfStock = inventarioItems.filter((i) => i.stock === 0)
@@ -543,7 +583,7 @@ export default function PanelPage() {
 
     // Limit to alertCap
     return result.slice(0, panelCfg.alertCap)
-  }, [selectedCollection, inventarioItems, sharedDishes, mermaEntries, monthlyGoal, shoppingList, aperturaChecked, projectionShortfall, covers, activeComandas, ventasMetaDia, todaySales, ventasEntries, ventasUmbralTicket, panelCfg, clientes])
+  }, [selectedCollection, inventarioItems, sharedDishes, mermaEntries, monthlyGoal, shoppingList, aperturaChecked, projectionShortfall, covers, activeComandas, ventasMetaDia, todaySales, ventasEntries, ventasUmbralTicket, panelCfg, clientes, mesasInfo])
 
   return (
     <div>
@@ -608,7 +648,7 @@ export default function PanelPage() {
 
       {/* Live stats widgets */}
       {selectedCollection && stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-6">
           <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
             <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-2">
               <PieChart className="w-4 h-4 text-blue-600" />
@@ -691,6 +731,18 @@ export default function PanelPage() {
             <p className="text-[11px] text-gray-400">Ahorro estacional</p>
             {stats.seasonalSavings > 0 && (
               <p className="text-[10px] text-purple-500 font-medium mt-1">Lista de compras</p>
+            )}
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
+            <div className="w-9 h-9 bg-amber-50 rounded-lg flex items-center justify-center mx-auto mb-2">
+              <UtensilsCrossed className="w-4 h-4 text-amber-600" />
+            </div>
+            <p className={`text-xl font-extrabold ${mesasInfo.occupied > 0 ? "text-amber-700" : "text-gray-400"}`}>
+              {mesas.length > 0 ? `${mesasInfo.occupied}/${mesasInfo.total}` : "—"}
+            </p>
+            <p className="text-[11px] text-gray-400">Mesas ocupadas</p>
+            {mesasInfo.longCount > 0 && (
+              <p className="text-[10px] text-amber-600 font-medium mt-1">{`${mesasInfo.longCount} > 3 h`}</p>
             )}
           </div>
         </div>

@@ -140,6 +140,70 @@ Actúa en este orden: 1) re-negocia proveedores, 2) ajusta porciones, 3) sube pr
 - ❌ Recalcular solo una vez al año (los precios cambian todos los meses)
 - ❌ No separar el costo por tipo de cocina (un menú de mariscos y uno de pastas no tienen el mismo rango sano)
 
+## Cómo calcular el food cost de una receta a mano (para entender la lógica)
+
+Aunque la calculadora hace el trabajo, entender el cálculo a mano te ayuda a detectar errores y a explicar el número a tu equipo. Toma una receta y hazlo con tu platillo más vendido:
+
+| Paso | Ejemplo: taco de carne asada | Resultado |
+|---|---|---|
+| 1. Lista ingredientes y cantidades | 120 g de carne, 2 tortillas, 30 g de cebolla, 20 g de salsa | — |
+| 2. Convierte a costo por unidad | Carne $180/kg → $0.18/g | $21.60 |
+| 3. Costo de cada ingrediente | Tortillas $35/kg → $0.35 × 2 = $0.70; cebolla $25/kg → $0.75; salsa $40/kg → $0.80 | $1.50 |
+| 4. Suma el costo total del platillo | $21.60 + $1.50 + $0.75 + $0.80 | $24.65 |
+| 5. Divide entre el precio de venta | $24.65 ÷ $85 | 29% |
+
+<BlogCallout variant="tip" title="La unidad de compra define el costo">
+El error clásico es usar precios de distintas unidades: comparar el kilo de carne con el litro de salsa. Siempre convierte a la misma unidad (gramos o piezas) antes de multiplicar. En la calculadora del Panel registras el precio por unidad de compra y ella hace la conversión sola, pero entender el paso manual te permite cachar un error de captura en segundos.
+</BlogCallout>
+
+Si tu platillo usa rendimiento — una pieza de carne que al cocinarse pierde 20% de peso — el costo sube: $24.65 ÷ 0.80 = $30.81, y tu food cost pasa de 29% a 36%. Ese ajuste de rendimiento es el que separa a los restaurantes que costean de verdad de los que solo adivinan.
+
+## Qué es el rendimiento y por qué mueve tu food cost 5 puntos
+
+El rendimiento es cuánto te queda utilizable de un insumo después de prepararlo. Compraste 1 kg de champiñones; al limpiarlos y cortarlos te quedan 850 g: rendimiento 85%. Compraste 1 kg de res y al cocinarla pierde agua y grasa: te quedan 750 g: rendimiento 75%.
+
+| Insumo | Pérdida típica | Rendimiento | Impacto en food cost |
+|---|---|---|---|
+| Verduras de hoja | 20-30% | 70-80% | Sube 3-5 puntos |
+| Carne asada | 15-25% | 75-85% | Sube 2-4 puntos |
+| Pescado entero | 30-40% | 60-70% | Sube 5-8 puntos |
+| Arroz y granos | 5-10% | 90-95% | Sube 1-2 puntos |
+| Lácteos | 2-5% | 95-98% | Mínimo |
+
+La mayoría de los dueños calcula el food cost con el peso comprado, no con el peso servible — y por eso su teórico siempre sale mejor que el real. Para cerrar la brecha entre teórico y real, el primer paso es capturar las recetas con el rendimiento real de tu cocina, no el ideal de la receta de internet.
+
+<BlogCallout variant="warning" title="El rendimiento es la brecha que más duele">
+Si tu food cost real es 4 puntos más alto que el teórico y no encuentras por qué, revisa primero el rendimiento: lo más probable es que la merma de preparación (pelar, desvenar, recortar) no esté considerada en tus recetas. Corregirlo en la calculadora hace que el teórico se acerque al real y que la brecha que queda sea merma real — que sí se puede atacar con control de inventario.
+</BlogCallout>
+
+## Food cost por tipo de cocina: tus rangos de referencia
+
+El 28-35% general no aplica igual a todos los formatos. Esta tabla te da tu rango de referencia según tu cocina, para que sepas si el número de tu calculadora es sano o una alerta:
+
+| Tipo de cocina | Rango sano de food cost | Nota |
+|---|---|---|
+| Taquería / antojitos | 25-30% | Porciones pequeñas, margen por volumen |
+| Restaurante casual familiar | 30-35% | El estándar de referencia |
+| Cafetería / brunch | 28-32% | Insumos caros pero ticket alto |
+| Marisquería | 33-38% | Frescura obliga a margen mayor |
+| Pizza / cocina italiana | 28-33% | Insumos de larga vida útil |
+| Hamburguesas / fast casual | 28-32% | Producción estandarizada |
+| Alta cocina / fine dining | 32-38% | Merma alta y precios de menú altos |
+
+<BlogCallout variant="tip" title="Tu histórico vale más que cualquier promedio">
+El promedio de tu formato es una referencia inicial, pero tu verdadera competencia eres tú mismo: tu food cost de hace 3 meses comparado con hoy. Si bajó, algo estás haciendo bien (negociación, porciones, menos merma); si subió, busca dónde. La calculadora con historial te muestra esa tendencia — es el dato más accionable de todos.
+</BlogCallout>
+
+## Preguntas frecuentes en 15 segundos
+
+**¿El food cost se calcula sobre el precio con o sin IVA?** Sobre el precio de venta al público que el cliente ve en el menú. Si tu menú dice $95, ese es tu divisor.
+
+**¿Incluyo la bebida en el food cost del platillo?** No. Las bebidas se costean aparte, porque su margen (bebida 20-25% de food cost) es muy distinto al de alimentos. Mezclarlos esconde ambos números.
+
+**¿Qué hago si un platillo tiene food cost de 45%?** Tres opciones en orden: reducir porción, negociar proveedor, subir precio. Si ninguna funciona sin perder ventas, considera rediseñar el platillo o sacarlo del menú.
+
+**¿El menú del día (platillo de $89) cuenta para el food cost?** Sí, y más importante: el menú del día suele usar excedentes, así que su food cost real es bajo. Úsalo estratégicamente para mover inventario próximo a vencer y bajar tu food cost general.
+
 ## Resumen: tu rutina de costeo con la calculadora
 
 | Frecuencia | Qué hacer |

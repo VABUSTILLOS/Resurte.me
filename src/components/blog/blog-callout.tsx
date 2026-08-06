@@ -5,7 +5,7 @@ import { AlertCircle, Lightbulb, Info } from "lucide-react"
  * Variantes: tip | note | warning
  */
 interface BlogCalloutProps {
-  variant?: "tip" | "note" | "warning"
+  variant?: "tip" | "note" | "info" | "warning"
   title?: string
   children?: React.ReactNode
 }
@@ -25,6 +25,13 @@ const STYLES = {
     title: "text-blue-900",
     body: "text-blue-800",
   },
+  info: {
+    icon: Info,
+    box: "border-sky-200 bg-sky-50",
+    iconColor: "text-sky-600",
+    title: "text-sky-900",
+    body: "text-sky-800",
+  },
   warning: {
     icon: AlertCircle,
     box: "border-red-200 bg-red-50",
@@ -37,6 +44,7 @@ const STYLES = {
 const DEFAULT_TITLE: Record<string, string> = {
   tip: "Tip profesional",
   note: "Nota",
+  info: "Info",
   warning: "Ojo aquí",
 }
 
