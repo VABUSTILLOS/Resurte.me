@@ -60,9 +60,52 @@ const DEFAULT_DISHES: DishData[] = [
 
 export default function RentabilidadPage() {
   const { selectedCollection } = useRestaurant()
-  const dishes = selectedCollection
+  const slug = selectedCollection?.slug || null
+  const [sharedDishes] = useSharedDishes(slug)
+
+  // Merge: base mock data + dishes from costeo tool
+  const mockDishes = selectedCollection
     ? (DISH_DATA[selectedCollection.slug] || DEFAULT_DISHES)
     : DEFAULT_DISHES
+
+  const costeoDishes: DishData[] = useMemo(() =>
+    sharedDishes.map((d) => {
+      const totalCost = d.ingredients.reduce((s, i) => s + (i.quantity * i.unitPrice), 0)
+      return {
+        name: d.name,
+        cost: Math.round(totalCost * 100) / 100,
+        price: d.sellingPrice,
+        category: "Mi menú",
+        alert: (totalCost / d.sellingPrice) * 100 > 38
+          ? "Food cost elevado — revisa ingredientes"
+          : undefined,
+      }
+    }),
+  [sharedDishes])
+
+  const dishes = useMemo(() => {
+    // Deduplicate by name (costeo dishes override mock ones)
+    const costeoNames = new Set(costeoDishes.map((d) => d.name.toLowerCase()))
+    const filteredMock = mockDishes.filter((d) => !costeoNames.has(d.name.toLowerCase()))
+    return [...costeoDishes, ...filteredMock]
+  }, [mockDishes, costeoDishes])
+
+  function exportCSV() {
+    const header = "Platillo,Categoría,Costo,Precio Venta,Margen,Food Cost %,Estado"
+    const rows = dishes.map((d) => {
+      const fc = ((d.cost / d.price) * 100).toFixed(1)
+      const status = parseFloat(fc) <= 30 ? "Excelente" : parseFloat(fc) <= 38 ? "Aceptable" : "Revisar"
+      return `"${d.name}","${d.category}",${d.cost.toFixed(2)},${d.price.toFixed(2)},${(d.price - d.cost).toFixed(2)},${fc}%,${status}`
+    })
+    const csv = [header, ...rows].join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `rentabilidad-${slug || "menu"}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   if (!selectedCollection) {
     return (
@@ -95,8 +138,24 @@ export default function RentabilidadPage() {
           <ArrowLeft className="w-5 h-5 text-gray-400" />
         </Link>
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Semáforo de rentabilidad</h2>
-          <p className="text-sm text-gray-400">{selectedCollection.name}</p>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-gray-900">Semáforo de rentabilidad</h2>
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Exportar CSV
+            </button>
+          </div>
+          <p className="text-sm text-gray-400">
+            {selectedCollection.name}
+            {costeoDishes.length > 0 && (
+              <span className="ml-2 text-[#108910] font-medium">
+                +{costeoDishes.length} platillos de Costeando mi menú
+              </span>
+            )}
+          </p>
         </div>
       </div>
 

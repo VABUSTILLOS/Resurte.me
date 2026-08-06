@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
-import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   ShoppingCart, ArrowLeft, Users, TrendingUp, AlertCircle,
@@ -55,6 +55,7 @@ const DEFAULT_PRODUCTS = [
 export default function PlanificadorPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
+  const [sharedDishes] = useSharedDishes(slug)
   const products = selectedCollection
     ? (COLLECTION_PRODUCTS[selectedCollection.slug] || DEFAULT_PRODUCTS)
     : DEFAULT_PRODUCTS
@@ -97,8 +98,46 @@ export default function PlanificadorPage() {
         <div>
           <h2 className="text-xl font-bold text-gray-900">Planificador de pedidos</h2>
           <p className="text-sm text-gray-400">{selectedCollection.name}</p>
+          {sharedDishes.length > 0 && (
+            <p className="text-xs text-[#108910] font-medium mt-0.5">
+              {sharedDishes.length} platillos de Costeando mi menú — revisa cantidades abajo
+            </p>
+          )}
         </div>
       </div>
+
+      {/* Shared dishes from Costeo — quick ingredient needs reference */}
+      {sharedDishes.length > 0 && (
+        <div className="bg-white rounded-2xl border border-green-100 p-5 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Package className="w-4 h-4 text-green-600" />
+            <h3 className="text-sm font-semibold text-gray-700">
+              Tus platillos activos ({sharedDishes.length})
+            </h3>
+            <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full ml-auto">
+              Del Costeador
+            </span>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+            {sharedDishes.map((dish) => {
+              const totalGrams = dish.ingredients.reduce((sum, ing) => sum + (ing.quantity || 0), 0)
+              const scaledGrams = totalGrams * covers
+              const scaledKg = (scaledGrams / 1000).toFixed(1)
+              return (
+                <div key={dish.id} className="flex items-center justify-between bg-green-50/50 rounded-xl px-3 py-2 text-xs">
+                  <span className="font-medium text-gray-700 truncate mr-2">{dish.name}</span>
+                  <span className="text-green-700 whitespace-nowrap font-medium">
+                    ~{scaledKg} kg para {covers} pax
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-2">
+            Estimación basada en las cantidades por platillo × {covers} comensales. Agrega {wastePercent}% de merma.
+          </p>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="grid sm:grid-cols-2 gap-4 mb-6">

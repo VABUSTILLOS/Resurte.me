@@ -2,10 +2,11 @@
 
 import { useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
+import { useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   ClipboardCheck, ArrowLeft, CheckCircle2, Circle, DollarSign,
-  Package, Store,
+  Package, Store, CalendarClock,
 } from "lucide-react"
 
 interface ChecklistItem {
@@ -119,8 +120,12 @@ const DEFAULT_INVESTMENT = [
 
 export default function AperturaPage() {
   const { selectedCollection } = useRestaurant()
-  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const slug = selectedCollection?.slug || null
+  const [checked, setChecked] = useLocalStorage<string[]>("apertura-checked", [], slug)
   const [showCalculator, setShowCalculator] = useState(false)
+  const [phaseDates, setPhaseDates] = useLocalStorage<Record<string, string>>("apertura-dates", {}, slug)
+
+  const checkedSet = new Set(checked)
 
   const checklist = selectedCollection
     ? (COLLECTION_CHECKLISTS[selectedCollection.slug] || DEFAULT_CHECKLIST)
@@ -131,13 +136,18 @@ export default function AperturaPage() {
     : DEFAULT_INVESTMENT
 
   function toggleCheck(id: string) {
-    const next = new Set(checked)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    setChecked(next)
+    setChecked((prev) => {
+      const arr = Array.isArray(prev) ? prev : []
+      if (arr.includes(id)) return arr.filter((i) => i !== id)
+      return [...arr, id]
+    })
   }
 
-  const completedCount = checklist.filter((c) => checked.has(c.id)).length
+  function setPhaseDate(phase: string, date: string) {
+    setPhaseDates((prev) => ({ ...prev, [phase]: date }))
+  }
+
+  const completedCount = checklist.filter((c) => checkedSet.has(c.id)).length
   const progress = checklist.length > 0 ? (completedCount / checklist.length) * 100 : 0
   const invLow = investment.reduce((s, i) => s + i.low, 0)
   const invHigh = investment.reduce((s, i) => s + i.high, 0)
@@ -196,36 +206,50 @@ export default function AperturaPage() {
         {PHASES.map((phase) => {
           const items = checklist.filter((c) => c.phase === phase)
           if (items.length === 0) return null
-          const phaseComplete = items.every((c) => checked.has(c.id))
+          const phaseComplete = items.every((c) => checkedSet.has(c.id))
+          const phaseDate = phaseDates[phase] || ""
           return (
-            <div key={phase} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              <div className={`px-5 py-3 flex items-center gap-2 border-b ${phaseComplete ? "bg-green-50 border-green-100" : "border-gray-50"}`}>
-                {phaseComplete
-                  ? <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  : <Circle className="w-4 h-4 text-gray-300" />
-                }
-                <h4 className="font-semibold text-sm text-gray-700">{phase}</h4>
-                <span className="text-xs text-gray-400 ml-auto">
-                  {items.filter((c) => checked.has(c.id)).length}/{items.length}
-                </span>
+          <div key={phase} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className={`px-5 py-3 flex items-center gap-2 border-b ${phaseComplete ? "bg-green-50 border-green-100" : "border-gray-50"}`}>
+              {phaseComplete
+                ? <CheckCircle2 className="w-4 h-4 text-green-500" />
+                : <Circle className="w-4 h-4 text-gray-300" />
+              }
+              <h4 className="font-semibold text-sm text-gray-700">{phase}</h4>
+              <span className="text-xs text-gray-400 ml-auto">
+                {items.filter((c) => checkedSet.has(c.id)).length}/{items.length}
+              </span>
+            </div>
+            {/* Phase date estimate */}
+            <div className="px-5 py-2 bg-gray-50/50 border-b border-gray-50">
+              <div className="flex items-center gap-2">
+                <CalendarClock className="w-3.5 h-3.5 text-gray-400" />
+                <input
+                  type="date"
+                  value={phaseDate}
+                  onChange={(e) => setPhaseDate(phase, e.target.value)}
+                  className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#108910] bg-white"
+                />
+                <span className="text-xs text-gray-400">Fecha objetivo</span>
               </div>
-              <div className="divide-y divide-gray-50">
-                {items.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => toggleCheck(item.id)}
-                    className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-gray-50 transition-colors"
-                  >
-                    {checked.has(item.id)
-                      ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-                      : <Circle className="w-5 h-5 text-gray-300 shrink-0" />
-                    }
-                    <span className={`text-sm ${checked.has(item.id) ? "text-gray-500 line-through" : "text-gray-700"}`}>
-                      {item.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {items.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => toggleCheck(item.id)}
+                  className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-gray-50 transition-colors"
+                >
+                  {checkedSet.has(item.id)
+                    ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                    : <Circle className="w-5 h-5 text-gray-300 shrink-0" />
+                  }
+                  <span className={`text-sm ${checkedSet.has(item.id) ? "text-gray-500 line-through" : "text-gray-700"}`}>
+                    {item.label}
+                  </span>
+                </button>
+              ))}
+            </div>
             </div>
           )
         })}

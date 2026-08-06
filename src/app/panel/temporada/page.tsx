@@ -2,10 +2,11 @@
 
 import { useState, useMemo } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
+import { useLocalStorage } from "@/hooks/use-local-storage"
 import Link from "next/link"
 import {
   Calendar, ArrowLeft, Sun, Leaf, DollarSign, TrendingDown,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Eye,
 } from "lucide-react"
 
 // Mexican seasonal produce calendar (when things are abundant/cheapest)
@@ -56,8 +57,9 @@ const DEFAULT_TIPS = [
 
 export default function TemporadaPage() {
   const { selectedCollection } = useRestaurant()
+  const slug = selectedCollection?.slug || null
   const today = new Date()
-  const [viewMonth, setViewMonth] = useState(today.getMonth() + 1) // 1-12
+  const [viewMonth, setViewMonth] = useLocalStorage<number>("temporada-month", today.getMonth() + 1, slug)
 
   const tips = selectedCollection
     ? (SEASONAL_TIPS[selectedCollection.slug] || DEFAULT_TIPS)
@@ -156,6 +158,45 @@ export default function TemporadaPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Next month preview */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Eye className="w-4 h-4 text-purple-600" />
+          <h4 className="text-sm font-semibold text-gray-700">
+            El próximo mes — {MONTHS[viewMonth === 12 ? 1 : viewMonth + 1]}
+          </h4>
+          <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-semibold">
+            Anticipa tu compra
+          </span>
+        </div>
+        {(() => {
+          const nextMonth = viewMonth === 12 ? 1 : viewMonth + 1
+          const nextItems = Object.entries(SEASONS)
+            .filter(([, data]) => data.months.includes(nextMonth))
+            .filter(([, data]) => !data.months.includes(viewMonth))
+          if (nextItems.length === 0) {
+            return (
+              <p className="text-sm text-gray-400">
+                Los mismos productos se mantienen en temporada. ¡Buen momento para planear con calma!
+              </p>
+            )
+          }
+          return (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {nextItems.map(([key, item]) => (
+                <div key={key} className="flex items-center gap-2 bg-purple-50 rounded-xl px-3 py-2.5 border border-purple-100">
+                  <span className="text-lg">{item.icon}</span>
+                  <div>
+                    <span className="text-sm font-medium text-purple-800">{item.name}</span>
+                    <p className="text-[10px] text-purple-500">Entra en temporada</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Full year quick view */}
