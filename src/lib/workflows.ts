@@ -77,6 +77,7 @@ interface RawOrderRow {
   scheduled_for: string | null
   source: string
   created_at: string
+  customer_phone: string | null
   profile: { full_name: string; phone: string | null }
 }
 
@@ -164,7 +165,7 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
     source: rawOrder.source as "web" | "whatsapp",
     created_at: rawOrder.created_at,
     customer_name: rawOrder.profile?.full_name || "Cliente",
-    customer_phone: rawOrder.profile?.phone ?? undefined,
+    customer_phone: rawOrder.customer_phone ?? rawOrder.profile?.phone ?? undefined,
     staff_phones: staffPhones,
     items: rawItems.map((item) => ({
       name: item.product?.name || "Producto",

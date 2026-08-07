@@ -13,6 +13,7 @@ import {
 } from "@/lib/mock-orders"
 import { Search, RefreshCw, X } from "lucide-react"
 import type { OrderStatus } from "@/types"
+import { ToastProvider, useToast } from "@/components/toast"
 
 function formatAdminAddress(a: NonNullable<AdminOrder["address"]>): string {
   const parts = [
@@ -37,6 +38,15 @@ const STATUS_FILTERS: { label: string; value: OrderStatus | "all" }[] = [
 ]
 
 export default function AdminOrdersPage() {
+  return (
+    <ToastProvider>
+      <AdminOrdersContent />
+    </ToastProvider>
+  )
+}
+
+function AdminOrdersContent() {
+  const { toast } = useToast()
   const [orders, setOrders] = useState<AdminOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -99,14 +109,14 @@ export default function AdminOrdersPage() {
         body: JSON.stringify({ payment_status: "paid" }),
       })
       if (res.ok) {
-        alert(`Pago del pedido #${id} confirmado. El cashback se abonó a la wallet del cliente.`)
+        toast(`Pago del pedido #${id} confirmado. El cashback se abonó a la wallet del cliente.`, "success")
         refresh()
       } else {
         const data = await res.json()
-        alert(data.error || "Error al confirmar el pago")
+        toast(data.error || "Error al confirmar el pago", "error")
       }
     } catch {
-      alert("Error de conexión")
+      toast("Error de conexión", "error")
     } finally {
       setUpdatingId(null)
     }
@@ -125,12 +135,13 @@ export default function AdminOrdersPage() {
         if (data.workflow?.length) {
           console.log(`📲 WhatsApp workflows triggered:`, data.workflow)
         }
+        toast(`Estado del pedido #${id} actualizado a ${newStatus}`, "success")
         refresh()
       } else {
-        alert("Error al actualizar el estado")
+        toast("Error al actualizar el estado", "error")
       }
     } catch {
-      alert("Error de conexión")
+      toast("Error de conexión", "error")
     } finally {
       setUpdatingId(null)
     }

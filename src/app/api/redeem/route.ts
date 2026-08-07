@@ -37,6 +37,36 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createServiceClient()
 
+    // ── Idempotencia: evitar doble-débito por doble-click/retry ──
+    // Si el usuario ya canjeó este mismo servicio en los últimos 5 minutos,
+    // devolvemos la redemción existente en lugar de debitar otra vez.
+    // (El RPC redeem_service ya bloquea la fila del wallet con FOR UPDATE,
+    // pero eso solo cubre concurrencia; un doble-click secuencial pasaría
+    // dos veces. Este chequeo dedupe ese caso.)
+    const dedupeWindowMinutes = 5
+    const { data: existing } = await supabase
+      .from("redemptions")
+      .select("id, service_id, service_name, cost_credits, created_at")
+      .eq("user_id", user.id)
+      .eq("service_id", service.id)
+      .gte("created_at", new Date(Date.now() - dedupeWindowMinutes * 60_000).toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+
+    if (existing && existing.length > 0) {
+      const redemption = existing[0]
+      return NextResponse.json({
+        success: true,
+        already_redeemed: true,
+        redemption: {
+          id: redemption.id,
+          service_id: redemption.service_id,
+          service_name: redemption.service_name,
+          cost_credits: redemption.cost_credits,
+        },
+      })
+    }
+
     // ── Ejecutar el canje con débito real (atómico) ──
     const { data, error } = await supabase.rpc("redeem_service", {
       p_user_id: user.id,

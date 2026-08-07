@@ -75,11 +75,20 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
   const [isDetecting, setIsDetecting] = useState(false)
   const [detectionError, setDetectionError] = useState<string | null>(null)
 
-  // Persist the default city cookie so subsequent visits keep it
+  // Persist the selected city so subsequent visits keep it.
+  // Prioridad: cookie > localStorage. Si hay cookie, esa manda y además se
+  // sincroniza localStorage. Si NO hay cookie pero sí localStorage (p.ej.
+  // sesión previa), se promueve ese valor a cookie en lugar de pisarlo con
+  // el default — antes ambos divergían y cada mount reseteaba la ciudad.
   useEffect(() => {
-    if (!getCityFromCookie()) {
-      setCityCookie(DEFAULT_CITY_SLUG)
-      setCityLocalStorage(DEFAULT_CITY_SLUG)
+    const cookieSlug = getCityFromCookie()
+    const lsSlug = getCityFromLocalStorage()
+    const effective = cookieSlug || lsSlug || DEFAULT_CITY_SLUG
+    if (!cookieSlug) {
+      setCityCookie(effective)
+    }
+    if (lsSlug !== effective) {
+      setCityLocalStorage(effective)
     }
   }, [])
 

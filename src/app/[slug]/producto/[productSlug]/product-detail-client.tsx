@@ -213,14 +213,6 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
               <div className="flex items-baseline gap-3">
                 <span className="text-2xl sm:text-3xl font-bold text-[#1a1a1a]">
                   ${displayPrice.toFixed(2)}
-
-            {/* Quality guarantee badge — prominent trust signal */}
-            <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-[#e8f5e9] rounded-xl border border-[#c8e6c8]">
-              <Check className="w-4 h-4 text-[#108910] shrink-0" />
-              <p className="text-xs font-medium text-[#1E6E1E]">
-                Calidad garantizada o te devolvemos tu dinero · Factura (CFDI) incluida
-              </p>
-            </div>
                 </span>
                 {hasDiscount && (
                   <>
@@ -243,6 +235,14 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                   Precio por {product.unit.toLowerCase()}
                 </p>
               )}
+            </div>
+
+            {/* Quality guarantee badge — prominent trust signal */}
+            <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-[#e8f5e9] rounded-xl border border-[#c8e6c8]">
+              <Check className="w-4 h-4 text-[#108910] shrink-0" />
+              <p className="text-xs font-medium text-[#1E6E1E]">
+                Calidad garantizada o te devolvemos tu dinero · Factura (CFDI) incluida
+              </p>
             </div>
 
             {/* Quantity selector */}

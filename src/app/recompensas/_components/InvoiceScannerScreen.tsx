@@ -147,6 +147,12 @@ function IdleState({
     >
       {/* Info Card */}
       <div className="w-full rounded-2xl bg-gradient-to-br from-emerald-900/40 to-teal-900/40 border border-emerald-500/20 p-5 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <span className="rounded-full bg-amber-500/15 border border-amber-500/20 px-2.5 py-1 text-[10px] font-semibold text-amber-400 uppercase tracking-wider">
+            Vista previa · Demo
+          </span>
+          <Sparkles className="h-4 w-4 text-emerald-400" />
+        </div>
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 flex-shrink-0">
             <Sparkles className="h-5 w-5 text-emerald-400" />
@@ -162,7 +168,15 @@ function IdleState({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="mt-4 rounded-xl bg-white/5 border border-white/5 px-3 py-2">
+          <p className="text-[10px] text-gray-500 leading-relaxed">
+            ⓘ Esta pantalla es una demostración: los montos y recompensas mostrados
+            son simulados y <span className="text-amber-400/80">no se acreditan créditos reales</span>.
+            La carga de facturas por OCR estará disponible próximamente.
+          </p>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-2">
           {[
             { value: "5%", label: "Recompensas" },
             { value: "24h", label: "Validación" },
@@ -399,7 +413,16 @@ function SuccessState({
       </motion.div>
 
       <h2 className="text-white text-2xl font-black">¡Factura registrada!</h2>
-      <p className="text-gray-400 text-sm mt-1">Tus recompensas han sido acreditadas</p>
+      <p className="text-gray-400 text-sm mt-1">
+        Recompensas simuladas (demo — no acreditadas a tu saldo)
+      </p>
+
+      <div className="mt-4 w-full rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+        <p className="text-[10px] text-amber-400/80 leading-relaxed">
+          ⓘ Esta es una vista previa. Los créditos mostrados abajo son simulados y
+          no han sido depositados en tu Cartera de Crecimiento.
+        </p>
+      </div>
 
       {/* Invoice details */}
       <div className="mt-6 w-full rounded-2xl bg-white/5 border border-white/10 p-5">

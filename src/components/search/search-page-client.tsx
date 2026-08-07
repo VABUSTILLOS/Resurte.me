@@ -61,9 +61,16 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
     return map
   }, [categories])
 
+  // Normalize text for accent-insensitive search: "cafe" → "café", "Café" → "cafe"
+  const normalize = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+
   // Compute filtered + searched results (derived state, no effect needed)
   const results = useMemo(() => {
-    const term = query.toLowerCase().trim()
+    const term = normalize(query.trim())
     const filtered = selectedCategory
       ? allProducts.filter((p) => p.category_id === selectedCategory)
       : allProducts
@@ -73,9 +80,9 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
 
     return filtered.filter(
       (p) =>
-        p.name.toLowerCase().includes(term) ||
-        p.description?.toLowerCase().includes(term) ||
-        p.brand?.toLowerCase().includes(term)
+        normalize(p.name).includes(term) ||
+        normalize(p.description ?? "").includes(term) ||
+        normalize(p.brand ?? "").includes(term)
     )
   }, [query, selectedCategory, allProducts])
 
@@ -115,6 +122,8 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
             setHasMore(more)
             setLoadingMore(false)
           }).catch(() => {
+            // Evitar loop infinito: si la carga falla, detener el scroll
+            setHasMore(false)
             setLoadingMore(false)
           })
         }

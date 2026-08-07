@@ -115,6 +115,7 @@ export const getCachedProductBySlug = unstable_cache(
       .from("products")
       .select("*")
       .eq("slug", slug)
+      .eq("is_visible", true)
       .single()
     return (data as Product) ?? null
   },

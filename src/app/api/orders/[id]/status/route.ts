@@ -76,7 +76,7 @@ export async function PATCH(
     // Fetch current order to get old status
     const { data: currentOrder, error: fetchError } = await supabase
       .from("orders")
-      .select("status, payment_status, customer_phone")
+      .select("status, payment_status, customer_phone, coupon_code")
       .eq("id", orderId)
       .single()
 
@@ -138,6 +138,25 @@ export async function PATCH(
         workflowResults = await onOrderStatusChange(orderId, oldStatus, status as OrderStatus)
       } catch (workflowErr) {
         console.error("[API] Workflow error (non-blocking):", workflowErr)
+      }
+    }
+
+    // Revertir la reserva del cupón si la orden se cancela.
+    // El cupón incrementó used_count al crearse la orden; cancelarla
+    // debe liberarlo para que otro pedido pueda usarlo.
+    if (status === "cancelled" && oldStatus !== "cancelled" && currentOrder.coupon_code) {
+      const { data: coupon } = await supabase
+        .from("coupons")
+        .select("id, used_count")
+        .ilike("code", currentOrder.coupon_code)
+        .maybeSingle()
+
+      if (coupon && coupon.used_count > 0) {
+        await supabase
+          .from("coupons")
+          .update({ used_count: coupon.used_count - 1 })
+          .eq("id", coupon.id)
+          .eq("used_count", coupon.used_count)
       }
     }
 

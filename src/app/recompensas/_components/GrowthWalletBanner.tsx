@@ -11,10 +11,18 @@ interface GrowthWalletBannerProps {
     cost: number;
     progressPercent: number;
   };
+  /** Créditos estimados que acumulas por mes. Si no se provee, se omite la proyección de meses. */
+  monthlyEarnings?: number;
 }
 
-export function GrowthWalletBanner({ balance, nextUnlock }: GrowthWalletBannerProps) {
-  const remaining = nextUnlock.cost - (balance * nextUnlock.progressPercent) / 100;
+export function GrowthWalletBanner({ balance, nextUnlock, monthlyEarnings }: GrowthWalletBannerProps) {
+  // remaining se calcula desde el progreso real (progressPercent ya refleja
+  // el balance). Antes se mezclaba balance * progressPercent, lo que
+  // inflaba el monto restante y mostraba el progreso al revés.
+  const remaining = Math.max(
+    0,
+    Math.round(nextUnlock.cost * (1 - nextUnlock.progressPercent / 100))
+  );
   const isNearUnlock = nextUnlock.progressPercent >= 85;
   const isAlmostThere = nextUnlock.progressPercent >= 70;
 
@@ -105,11 +113,13 @@ export function GrowthWalletBanner({ balance, nextUnlock }: GrowthWalletBannerPr
         </div>
 
         {/* Quick earn estimate */}
-        <div className="mt-3 flex items-center gap-2 rounded-lg bg-white/10 border border-white/10 px-3 py-1.5">
-          <span className="text-[11px] text-white/70">
-            Con tu consumo actual, lo desbloqueas en <strong className="text-white">~{Math.max(1, Math.ceil(nextUnlock.cost / 1600))} {Math.ceil(nextUnlock.cost / 1600) === 1 ? "mes" : "meses"}</strong>
-          </span>
-        </div>
+        {typeof monthlyEarnings === "number" && monthlyEarnings > 0 && (
+          <div className="mt-3 flex items-center gap-2 rounded-lg bg-white/10 border border-white/10 px-3 py-1.5">
+            <span className="text-[11px] text-white/70">
+              Con tu consumo actual, lo desbloqueas en <strong className="text-white">~{Math.max(1, Math.ceil(nextUnlock.cost / monthlyEarnings))} {Math.ceil(nextUnlock.cost / monthlyEarnings) === 1 ? "mes" : "meses"}</strong>
+            </span>
+          </div>
+        )}
       </div>
     </motion.div>
   );

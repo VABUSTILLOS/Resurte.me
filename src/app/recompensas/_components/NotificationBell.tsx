@@ -5,52 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bell, TrendingUp, Star, Megaphone, Gift, Sparkles } from "lucide-react";
 import type { Notification } from "./types";
 
-const sampleNotifications: Notification[] = [
-  {
-    id: "n1",
-    type: "cashback_earned",
-    title: "+$750 Créditos a tu cartera",
-    body: "Pedido #1024 de Distribuidora El Sol procesado exitosamente.",
-    timestamp: "Hace 2 min",
-    read: false,
-  },
-  {
-    id: "n2",
-    type: "milestone",
-    title: "¡Alcanzaste un hito!",
-    body: "Has acumulado más de $10,000 Créditos en recompensas totales. Sigue así.",
-    timestamp: "Hace 1 hora",
-    read: false,
-    actionLabel: "Ver cartera",
-  },
-  {
-    id: "n3",
-    type: "service_ready",
-    title: "Google Maps Optimizado — ¡Listo!",
-    body: "Tu perfil ya está optimizado. Revisa las fotos que subió nuestro equipo.",
-    timestamp: "Hace 3 horas",
-    read: false,
-    actionLabel: "Ver resultados",
-  },
-  {
-    id: "n4",
-    type: "cashback_earned",
-    title: "+$620 Créditos a tu cartera",
-    body: "Pedido #1020 de Carnes Selectas procesado exitosamente.",
-    timestamp: "Ayer",
-    read: true,
-  },
-  {
-    id: "n5",
-    type: "new_feature",
-    title: "Nuevo: Proyección de Crecimiento",
-    body: "Ahora puedes calcular cuánto necesitas consumir para desbloquear cada servicio.",
-    timestamp: "Hace 2 días",
-    read: true,
-    actionLabel: "Probar ahora",
-  },
-];
-
 const iconMap: Record<Notification["type"], { icon: typeof Bell; bg: string; color: string }> = {
   cashback_earned: { icon: TrendingUp, bg: "bg-emerald-500/15", color: "text-emerald-400" },
   milestone: { icon: Star, bg: "bg-amber-500/15", color: "text-amber-400" },
@@ -61,7 +15,9 @@ const iconMap: Record<Notification["type"], { icon: typeof Bell; bg: string; col
 
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState(sampleNotifications);
+  // Sin data fake: no existe tabla de notificaciones en Supabase.
+  // Arranca vacío y mostrará el estado "No hay notificaciones".
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLButtonElement>(null);
 

@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Check, CheckCircle, Sparkles } from "lucide-react";
 import type { ServiceItem } from "./types";
 import { createClient } from "@/lib/supabase/client";
-
 interface CheckoutFlowScreenProps {
   service: ServiceItem;
   onBack: () => void;
@@ -71,8 +70,7 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
       setStep(3);
       setTimeout(() => {
         onComplete(data.newBalance);
-      }, 2500);
-    } catch {
+      }, 2500);    } catch {
       setRedeemError("Error de conexión. Intenta de nuevo.");
       setIsRedeeming(false);
     }
@@ -229,11 +227,12 @@ function Step1Confirm({
 
       <button
         onClick={onNext}
+        disabled={remainingAfter < 0}
         className="mt-5 w-full rounded-2xl bg-emerald-600 py-4 text-base font-bold text-white 
           shadow-lg shadow-emerald-900/40 transition-all active:scale-[0.98] 
-          hover:bg-emerald-500"
+          hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
       >
-        Continuar
+        {remainingAfter < 0 ? "Saldo insuficiente" : "Continuar"}
       </button>
     </motion.div>
   );
@@ -250,6 +249,13 @@ function Step2Context({
   isRedeeming?: boolean;
   redeemError?: string;
 }) {
+  // Inputs controlados: conservan su valor ante re-renders (framer-motion
+  // desmonta/remonta el paso al navegar entre steps).
+  const [name, setName] = useState(restaurantName);
+  const [mapsLink, setMapsLink] = useState("");
+  const [social, setSocial] = useState("");
+  const [notes, setNotes] = useState("");
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -267,7 +273,8 @@ function Step2Context({
           </label>
           <input
             type="text"
-            defaultValue={restaurantName}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             placeholder="Nombre de tu restaurante"
             className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white text-sm 
               focus:outline-none focus:border-emerald-500/50 placeholder:text-gray-600"
@@ -280,6 +287,8 @@ function Step2Context({
           </label>
           <input
             type="text"
+            value={mapsLink}
+            onChange={(e) => setMapsLink(e.target.value)}
             placeholder="https://maps.google.com/..."
             className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white text-sm 
               focus:outline-none focus:border-emerald-500/50 placeholder:text-gray-600"
@@ -292,6 +301,8 @@ function Step2Context({
           </label>
           <input
             type="text"
+            value={social}
+            onChange={(e) => setSocial(e.target.value)}
             placeholder="@taqueriaelpariente"
             className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white text-sm 
               focus:outline-none focus:border-emerald-500/50 placeholder:text-gray-600"
@@ -303,6 +314,8 @@ function Step2Context({
             Notas para el equipo
           </label>
           <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
             placeholder="Ej. Quiero atraer más clientes en horario de comida (2-5pm)..."
             rows={3}
             className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white text-sm 

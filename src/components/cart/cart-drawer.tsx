@@ -10,12 +10,11 @@ import {
   Minus,
   Plus,
   Trash2,
-  Clock,
+  Truck,
   ArrowRight,
 } from "lucide-react"
 import Link from "next/link"
 import { trackEvent } from "@/lib/analytics"
-import { useABTest } from "@/lib/feature-flags"
 
 // Global event bus to control drawer from header
 export const CART_DRAWER_EVENT = "resurte:toggle-cart-drawer"
@@ -25,12 +24,6 @@ export function CartDrawer() {
   const { cart, itemCount, subtotal, removeItem, updateQuantity, clearCart } = useCart()
   const { city } = useCity()
   const router = useRouter()
-
-  // A/B test: free shipping messaging
-  const shippingTestVariant = useABTest("free-shipping-copy", [
-    { key: "urgency", weight: 0.5 },
-    { key: "value", weight: 0.5 },
-  ])
 
   // Listen for toggle events from header
   useEffect(() => {
@@ -249,53 +242,12 @@ export function CartDrawer() {
               </p>
             </div>
 
-            {/* Free shipping progress bar */}
-            {(() => {
-              const FREE_SHIPPING_THRESHOLD = 2500
-              const remaining = FREE_SHIPPING_THRESHOLD - subtotal
-              const progress = Math.min((subtotal / FREE_SHIPPING_THRESHOLD) * 100, 100)
-
-              if (remaining <= 0) {
-                return (
-                  <div className="flex items-center gap-2 rounded-lg bg-[#E9FBE9] border border-[#108910]/20 px-3 py-2">
-                    <span className="text-lg">🎉</span>
-                    <div>
-                      <p className="text-xs font-bold text-[#108910]">¡Envío gratis!</p>
-                      <p className="text-[10px] text-[#108910]/70">Tu pedido califica para entrega sin costo</p>
-                    </div>
-                  </div>
-                )
-              }
-
-              return (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-[#72767E] flex items-center gap-1">
-                      <span>🚚</span>{" "}
-                      {shippingTestVariant === "value"
-                        ? `Ahorra $150: completa tu pedido hasta $2,500`
-                        : "Envío gratis desde $2,500"}
-                    </span>
-                    <span className="font-semibold text-[#108910]">
-                      {shippingTestVariant === "urgency"
-                        ? `¡Solo $${remaining.toFixed(0)}!`
-                        : `Te faltan $${remaining.toFixed(0)}`}
-                    </span>
-                  </div>
-                  <div className="h-2 bg-[#F0EDE5] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#108910] rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* Delivery estimate */}
-            <div className="flex items-center gap-1.5 text-xs text-[#8F939B]">
-              <Clock className="w-3 h-3" />
-              <span>Envío calculado en el checkout</span>
+            {/* Delivery fee note (flat $35, server-side) */}
+            <div className="flex items-center gap-1.5 text-xs text-[#72767E]">
+              <Truck className="w-3.5 h-3.5" />
+              <span>
+                Envío a domicilio: <span className="font-semibold text-[#242529]">$35 MXN</span> por pedido
+              </span>
             </div>
 
             {/* Actions */}

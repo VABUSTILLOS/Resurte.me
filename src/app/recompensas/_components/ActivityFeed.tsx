@@ -1,62 +1,95 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle, Clock, TrendingUp } from "lucide-react";
 import type { ActivityItem } from "./types";
+import { createClient } from "@/lib/supabase/client";
 
-const sampleActivities: ActivityItem[] = [
-  {
-    id: "1",
-    type: "invoice",
-    title: "Pedido #1024 — Frutas, carnes y lácteos",
-    amount: 750,
-    date: "Hoy, 14:32",
+// Mapea los movimientos reales del monedero a items de actividad.
+// amount > 0 = cashback (invoice), amount < 0 = canje de servicio (redemption).
+function toActivityItem(tx: {
+  id: number;
+  amount: number;
+  concept: string;
+  created_at: string;
+}): ActivityItem {
+  return {
+    id: String(tx.id),
+    type: tx.amount > 0 ? "invoice" : "redemption",
+    title: tx.concept,
+    amount: tx.amount,
+    date: new Date(tx.created_at).toLocaleDateString("es-MX", {
+      day: "numeric",
+      month: "short",
+    }),
     status: "completed",
-  },
-  {
-    id: "2",
-    type: "redemption",
-    title: "Optimización Google Maps",
-    amount: -2800,
-    date: "Ayer, 10:15",
-    status: "completed",
-  },
-  {
-    id: "3",
-    type: "invoice",
-    title: "Pedido #1020 — Abarrotes y verduras",
-    amount: 620,
-    date: "15 Jul, 09:45",
-    status: "completed",
-  },
-  {
-    id: "4",
-    type: "invoice",
-    title: "Pedido #1018 — Carnes y especias",
-    amount: 340,
-    date: "14 Jul, 16:20",
-    status: "pending",
-  },
-  {
-    id: "5",
-    type: "milestone",
-    title: "¡Llegaste a $10,000 acumulados!",
-    amount: 0,
-    date: "10 Jul",
-    status: "completed",
-  },
-];
+  };
+}
 
 export function ActivityFeed() {
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [supabase] = useState(() =>
+    typeof window === "undefined" ? null : createClient()
+  );
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    async function fetchActivity() {
+      try {
+        const { data: { session } } = await supabase!.auth.getSession();
+        if (!session?.user?.id) return;
+
+        // Buscar el monedero del usuario (si no existe, no hay actividad).
+        const { data: wallet } = await supabase!
+          .from("wallets")
+          .select("id")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+
+        if (!wallet) {
+          setActivities([]);
+          return;
+        }
+
+        const { data: txs } = await supabase!
+          .from("wallet_transactions")
+          .select("id, amount, concept, created_at")
+          .eq("wallet_id", wallet.id)
+          .order("created_at", { ascending: false })
+          .limit(5);
+
+        if (txs) setActivities(txs.map(toActivityItem));
+      } catch {
+        setActivities([]);
+      }
+    }
+
+    fetchActivity();
+  }, [supabase]);
+
+  if (activities.length === 0) {
+    return (
+      <div className="mx-4 mt-4 md:mx-0">
+        <h2 className="text-white text-[15px] font-bold mb-2">Actividad Reciente</h2>
+        <div className="rounded-xl bg-white/5 border border-white/5 p-4">
+          <p className="text-gray-500 text-xs">
+            Aún no tienes movimientos. Tus cashbacks y canjes aparecerán aquí.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-4 mt-4 md:mx-0">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-white text-[15px] font-bold">Actividad Reciente</h2>
-        <button className="text-emerald-400 text-xs font-medium">Ver todo →</button>
       </div>
 
       <div className="space-y-2">
-        {sampleActivities.map((activity, i) => (
+        {activities.map((activity, i) => (
           <motion.div
             key={activity.id}
             initial={{ opacity: 0, x: -15 }}

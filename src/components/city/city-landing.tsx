@@ -1,7 +1,7 @@
 "use client"
 
 import { MapPin, ArrowRight, Search, Store, Truck, Building2, CreditCard, Grid3X3, Percent } from "lucide-react"
-import { useCity } from "@/contexts/city-context"
+import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { CitySelector } from "@/components/city/city-selector"
 import { useState, useEffect, useMemo } from "react"
 import Image from "next/image"
@@ -17,8 +17,6 @@ import type { Category, Product, RestaurantCollection } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
 import { CollectionSlider } from "@/components/collections/collection-slider"
 import { TestimonialCarousel } from "@/components/ui/testimonial-carousel"
-
-const DEFAULT_CITY_SLUG = "chihuahua"
 
 // Products per category to show on landing — show first 5, then "Ver Todo"
 const PREVIEW_COUNT = 4

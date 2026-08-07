@@ -2,7 +2,7 @@
 
 import { ArrowLeft, ShoppingCart, Trash2, Minus, Plus, Package, RefreshCw } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
-import { useCity } from "@/contexts/city-context"
+import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { useState, useEffect } from "react"
@@ -108,7 +108,7 @@ export default function CartPage() {
           Agrega productos desde el catálogo para comenzar tu pedido.
         </p>
         <Link
-          href="/"
+          href={`/${city?.slug ?? DEFAULT_CITY_SLUG}`}
           className="inline-flex items-center gap-2 px-6 py-3 bg-[#108910] text-white font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
         >
           Explorar productos
@@ -123,7 +123,7 @@ export default function CartPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <Link
-            href="/"
+            href={`/${city?.slug ?? DEFAULT_CITY_SLUG}`}
             className="inline-flex items-center gap-1.5 text-sm text-[#72767E] hover:text-[#108910] transition-colors mb-2"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -178,7 +178,7 @@ export default function CartPage() {
             >
               {/* Image */}
               <Link
-                href={`/resurte/producto/${item.slug}`}
+                href={`/${city?.slug ?? DEFAULT_CITY_SLUG}/producto/${item.slug}`}
                 className="w-20 h-20 rounded-lg bg-[#faf8f5] flex items-center justify-center overflow-hidden shrink-0"
               >
                 {item.image_url ? (
@@ -198,7 +198,7 @@ export default function CartPage() {
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <Link
-                  href={`/resurte/producto/${item.slug}`}
+                  href={`/${city?.slug ?? DEFAULT_CITY_SLUG}/producto/${item.slug}`}
                   className="font-semibold text-[#242529] text-sm line-clamp-2 hover:text-[#108910] transition-colors"
                 >
                   {item.name}
@@ -315,7 +315,7 @@ export default function CartPage() {
           Pedir por WhatsApp
         </a>
         <Link
-          href={`/${city?.slug ?? "chihuahua"}/checkout`}
+          href={`/${city?.slug ?? DEFAULT_CITY_SLUG}/checkout`}
           className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-[#108910] text-white font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
         >
           Ir a checkout
