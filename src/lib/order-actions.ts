@@ -105,6 +105,16 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   // ── Usar service_role para bypass de RLS al insertar en orders/order_items ──
   const serviceClient = await createServiceClient()
 
+  // ── Resolver la tienda del pedido (única activa; safety net con DEFAULT) ──
+  const { data: store } = await serviceClient
+    .from("stores")
+    .select("id")
+    .eq("is_active", true)
+    .order("id", { ascending: true })
+    .limit(1)
+    .single()
+  const storeId = store?.id ?? null
+
   // 1. Crear dirección
   const { data: addr, error: addrError } = await serviceClient
     .from("addresses")
@@ -138,6 +148,7 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
     .from("orders")
     .insert({
       user_id: user?.id ?? null,         // ← el trigger usa esto para asociar cashback
+      store_id: storeId,
       city_id,
       address_id: addr.id,
       status: "pending",

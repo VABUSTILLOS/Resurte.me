@@ -7,7 +7,7 @@ import { Star, Award, Zap } from "lucide-react"
 import { TIER_CONFIGS } from "./types"
 import type { Tier } from "./types"
 
-const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "negro"]
+const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "diamante"]
 
 interface TierData {
   tier: Tier
@@ -33,7 +33,7 @@ const TIER_BENEFITS: Record<Tier, string[]> = {
     "Asesor de cuenta dedicado",
     "Acceso anticipado a nuevos productos",
   ],
-  negro: [
+  diamante: [
     "20% de cashback en todas tus compras",
     "Envío gratis sin mínimo",
     "Asesor de cuenta VIP 24/7",
@@ -45,16 +45,28 @@ const TIER_BENEFITS: Record<Tier, string[]> = {
 const NEXT_TIER_LABEL: Record<Tier, string> = {
   verde: "2 semanas para desbloquear Plata y ganar 10%",
   plata: "3 semanas para desbloquear Oro y ganar 15%",
-  oro: "4 semanas para desbloquear Negro y ganar 20%",
-  negro: "¡Nivel máximo alcanzado! Sigue comprando para mantenerlo",
+  oro: "4 semanas para desbloquear Diamante y ganar 20%",
+  diamante: "¡Nivel máximo alcanzado! Sigue comprando para mantenerlo",
 }
 
 const TIER_PROGRESS_COLOR: Record<Tier, string> = {
   verde: "#10b981",
   plata: "#94a3b8",
   oro: "#f59e0b",
-  negro: "#8b5cf6",
+  diamante: "#8b5cf6",
 }
+
+/** Semana ISO de una fecha (1-53), igual que EXTRACT(WEEK ...) en Postgres */
+function isoWeek(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+}
+
+/** Mínimo acumulado por semana para que cuente como "semana calificada" */
+export const QUALIFYING_WEEK_MIN = 2500
 
 export function useLoyaltyTier() {
   const [data, setData] = useState<TierData>({
@@ -69,12 +81,14 @@ export function useLoyaltyTier() {
   )
 
   useEffect(() => {
-    if (!supabase) {
-      setLoading(false)
-      return
-    }
+    let cancelled = false
 
     async function fetchTier() {
+      if (!supabase) {
+        setLoading(false)
+        return
+      }
+
       try {
         const {
           data: { session },
@@ -88,7 +102,7 @@ export function useLoyaltyTier() {
 
         const { data: orders, error } = await supabase!
           .from("orders")
-          .select("week_of_month, total")
+          .select("created_at, total")
           .eq("user_id", session.user.id)
           .eq("month_year", monthYear)
           .neq("status", "cancelled")
@@ -99,10 +113,17 @@ export function useLoyaltyTier() {
           return
         }
 
-        const weeks = new Set(
-          orders.map((o) => o.week_of_month).filter(Boolean)
-        )
-        const weekCount = weeks.size
+        // Agrupar gasto por semana ISO: una semana califica si acumula >= $2,500
+        const spendByWeek = new Map<number, number>()
+        for (const o of orders) {
+          const createdAt = o.created_at ? new Date(o.created_at) : null
+          const week = createdAt && !isNaN(createdAt.getTime()) ? isoWeek(createdAt) : 0
+          spendByWeek.set(week, (spendByWeek.get(week) ?? 0) + Number(o.total ?? 0))
+        }
+
+        const weekCount = Array.from(spendByWeek.values()).filter(
+          (spend) => spend >= QUALIFYING_WEEK_MIN
+        ).length
         const monthlySpend = orders.reduce(
           (sum, o) => sum + Number(o.total ?? 0),
           0
@@ -114,7 +135,7 @@ export function useLoyaltyTier() {
           2: "plata",
           3: "oro",
         }
-        const tier: Tier = tierMap[weekCount] ?? "negro"
+        const tier: Tier = tierMap[weekCount] ?? "diamante"
         const rate = TIER_CONFIGS[tier].rate
         const monthlyCashback = Math.round(monthlySpend * (rate / 100))
 
@@ -122,11 +143,15 @@ export function useLoyaltyTier() {
       } catch {
         // Keep defaults
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchTier()
+
+    return () => {
+      cancelled = true
+    }
   }, [supabase])
 
   return { ...data, loading }
@@ -144,7 +169,7 @@ export function LoyaltyTierCard({
   const nextTierIdx = TIER_ORDER.indexOf(tier) + 1
   const weeksNeeded = Math.min(nextTierIdx + 1, 4)
   const progressPercent = Math.min((weekCount / weeksNeeded) * 100, 100)
-  const isMaxTier = tier === "negro"
+  const isMaxTier = tier === "diamante"
   const progressColor = TIER_PROGRESS_COLOR[tier]
 
   if (loading) {

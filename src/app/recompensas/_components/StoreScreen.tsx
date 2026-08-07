@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import type { ServiceItem, Tier } from "./types";
+import { useLoyaltyTier } from "./LoyaltyTierCard";
 
 export const SERVICES: ServiceItem[] = [
   {
@@ -119,7 +120,7 @@ export const SERVICES: ServiceItem[] = [
   {
     id: "web-completa",
     name: "Desarrollo Web Completo",
-    tier: "negro",
+    tier: "diamante",
     cost: 60000,
     category: "infraestructura",
     description:
@@ -154,8 +155,8 @@ const tierConfig: Record<Tier, { label: string; bg: string; text: string; border
     text: "text-amber-400",
     border: "border-amber-500/30",
   },
-  negro: {
-    label: "Negro",
+  diamante: {
+    label: "Diamante",
     bg: "bg-violet-600/20",
     text: "text-violet-400",
     border: "border-violet-500/30",
@@ -172,21 +173,22 @@ const categories = [
 interface StoreScreenProps {
   onServiceSelect: (service: ServiceItem) => void;
   onOpenCalculator: (service?: ServiceItem) => void;
+  balance?: number;
 }
 
-export function StoreScreen({ onServiceSelect, onOpenCalculator }: StoreScreenProps) {
+export function StoreScreen({ onServiceSelect, onOpenCalculator, balance = 0 }: StoreScreenProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [detailService, setDetailService] = useState<ServiceItem | null>(null);
+  const { monthlyCashback } = useLoyaltyTier();
 
   const filtered =
     activeCategory === "all"
       ? SERVICES
       : SERVICES.filter((s) => s.category === activeCategory);
 
-  const balance = 12450;
-  const monthlySpend = 32000;
-  const cashbackRate = 0.05;
-  const monthlyCashback = monthlySpend * cashbackRate;
+  // Datos reales del monedero y del nivel actual
+  const monthsToUnlockOf = (cost: number) =>
+    monthlyCashback > 0 ? Math.ceil(cost / monthlyCashback) : 1;
 
   return (
     <div className="px-4 pt-4 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
@@ -228,7 +230,7 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator }: StoreScreenPr
       <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
         <AnimatePresence mode="popLayout">
           {filtered.map((service, i) => {
-            const monthsToUnlock = Math.ceil(service.cost / monthlyCashback);
+            const monthsToUnlock = monthsToUnlockOf(service.cost);
             const isUnlocked = balance >= service.cost;
             const tier = tierConfig[service.tier];
 
@@ -442,7 +444,8 @@ function ServiceDetailSheet({
 }) {
   const isUnlocked = balance >= service.cost;
   const remaining = service.cost - balance;
-  const monthsToUnlock = Math.ceil(service.cost / monthlyCashback);
+  const monthsToUnlock =
+    monthlyCashback > 0 ? Math.ceil(service.cost / monthlyCashback) : 1;
   const tier = tierConfig[service.tier];
 
   return (

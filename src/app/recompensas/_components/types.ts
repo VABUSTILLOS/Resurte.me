@@ -1,6 +1,6 @@
 export type Tab = "home" | "wallet" | "store" | "profile" | "referidos";
 
-export type Tier = "verde" | "plata" | "oro" | "negro";
+export type Tier = "verde" | "plata" | "oro" | "diamante";
 
 export interface TierConfig {
   tier: Tier;
@@ -16,7 +16,7 @@ export const TIER_CONFIGS: Record<Tier, Omit<TierConfig, 'tier'>> = {
   verde: { name: "Verde", rate: 5, color: "emerald", borderColor: "border-emerald-500/20", textColor: "text-emerald-400", bgColor: "bg-emerald-500/10" },
   plata: { name: "Plata", rate: 10, color: "slate", borderColor: "border-slate-400/30", textColor: "text-slate-300", bgColor: "bg-slate-500/10" },
   oro: { name: "Oro", rate: 15, color: "amber", borderColor: "border-amber-500/30", textColor: "text-amber-400", bgColor: "bg-amber-500/10" },
-  negro: { name: "Negro", rate: 20, color: "violet", borderColor: "border-violet-400/30", textColor: "text-violet-300", bgColor: "bg-violet-500/10" },
+  diamante: { name: "Diamante", rate: 20, color: "violet", borderColor: "border-violet-400/30", textColor: "text-violet-300", bgColor: "bg-violet-500/10" },
 };
 
 export interface ServiceItem {

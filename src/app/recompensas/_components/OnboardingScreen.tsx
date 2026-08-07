@@ -20,7 +20,7 @@ interface OnboardingScreenProps {
   isAuthenticated: boolean;
 }
 
-const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "negro"];
+const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "diamante"];
 
 const steps = [
   {
@@ -255,7 +255,7 @@ export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScre
               <div className="space-y-3">
                 {TIER_ORDER.map((tier, i) => {
                   const cfg = TIER_CONFIGS[tier];
-                  const tierEmojis: Record<Tier, string> = { verde: "🟢", plata: "🥈", oro: "🥇", negro: "💎" };
+                  const tierEmojis: Record<Tier, string> = { verde: "🟢", plata: "🥈", oro: "🥇", diamante: "💎" };
                   return (
                     <motion.div
                       key={tier}
@@ -278,9 +278,9 @@ export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScre
                         </p>
                         <p className="text-gray-500 text-xs mt-0.5">
                           {i === 0 && "Empiezas aquí al registrarte"}
-                          {i === 1 && "2+ semanas con al menos 1 compra al mes"}
-                          {i === 2 && "3+ semanas al mes con compras de alto volumen"}
-                          {i === 3 && "Domicilias tus favoritos + 4 compras al mes"}
+                          {i === 1 && "2+ semanas calificadas al mes ($2,500 acumulados)"}
+                          {i === 2 && "3+ semanas calificadas al mes ($2,500 acumulados)"}
+                          {i === 3 && "4+ semanas calificadas al mes ($2,500 acumulados)"}
                         </p>
                       </div>
                     </motion.div>
@@ -302,7 +302,7 @@ export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScre
                   {[
                     { icon: TrendingUp, text: "Volumen de compras mensual", desc: "A mayor ticket, más rápido subes" },
                     { icon: Repeat, text: "Frecuencia semanal", desc: "Comprando más semanas al mes aceleras tu nivel" },
-                    { icon: CreditCard, text: "Suscripción recurrente", desc: "Domicilia tus favoritos y desbloquea el nivel Negro" },
+                    { icon: CreditCard, text: "Suscripción recurrente", desc: "Domicilia tus favoritos y desbloquea el nivel Diamante" },
                   ].map((item, i) => (
                     <div key={i} className="flex items-start gap-3">
                       <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 flex-shrink-0 mt-0.5">

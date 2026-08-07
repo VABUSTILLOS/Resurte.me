@@ -1,22 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Check, CheckCircle, Sparkles } from "lucide-react";
 import type { ServiceItem } from "./types";
+import { createClient } from "@/lib/supabase/client";
 
 interface CheckoutFlowScreenProps {
   service: ServiceItem;
   onBack: () => void;
   onComplete: () => void;
+  balance?: number;
 }
 
-export function CheckoutFlowScreen({ service, onBack, onComplete }: CheckoutFlowScreenProps) {
+export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }: CheckoutFlowScreenProps) {
   const [step, setStep] = useState(1);
+  const [restaurantName, setRestaurantName] = useState("");
   const totalSteps = 3;
 
-  const balance = 12450;
   const remainingAfter = balance - service.cost;
+
+  // Cargar el nombre real del restaurante (perfil) para el formulario
+  const [supabase] = useState(() =>
+    typeof window === "undefined" ? null : createClient()
+  );
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    async function loadName() {
+      try {
+        const { data: { session } } = await supabase!.auth.getSession();
+        if (!session?.user?.id) return;
+        const { data: profile } = await supabase!
+          .from("profiles")
+          .select("full_name")
+          .eq("id", session.user.id)
+          .single();
+        if (profile?.full_name) setRestaurantName(profile.full_name);
+      } catch {
+        // Keep empty
+      }
+    }
+
+    loadName();
+  }, [supabase]);
 
   const handleSubmit = () => {
     setStep(3);
@@ -89,6 +117,7 @@ export function CheckoutFlowScreen({ service, onBack, onComplete }: CheckoutFlow
             <Step2Context
               key="s2"
               service={service}
+              restaurantName={restaurantName}
               onNext={handleSubmit}
             />
           )}
@@ -186,8 +215,10 @@ function Step1Confirm({
 
 function Step2Context({
   onNext,
+  restaurantName,
 }: {
   service: ServiceItem;
+  restaurantName: string;
   onNext: () => void;
 }) {
   return (
@@ -207,7 +238,8 @@ function Step2Context({
           </label>
           <input
             type="text"
-            defaultValue="Taquería El Pariente"
+            defaultValue={restaurantName}
+            placeholder="Nombre de tu restaurante"
             className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white text-sm 
               focus:outline-none focus:border-emerald-500/50 placeholder:text-gray-600"
           />

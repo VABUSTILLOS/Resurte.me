@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, TrendingUp, Star, CheckCircle, Lock } from "lucide-react";
 import { GrowthWalletBanner } from "./GrowthWalletBanner";
@@ -11,8 +12,10 @@ import { SERVICES } from "./StoreScreen";
 import { TIER_CONFIGS } from "./types";
 import { LoyaltyTierBanner, useLoyaltyTier, TIER_ORDER } from "./LoyaltyTierCard";
 import { ReferralDashboard } from "@/components/referral-dashboard";
+import { createClient } from "@/lib/supabase/client";
 import type { Tier } from "./types";
 import type { ServiceItem } from "./types";
+import type { WalletTransaction } from "@/types";
 
 interface DashboardScreenProps {
   onOpenCalculator: (service?: ServiceItem) => void;
@@ -22,6 +25,8 @@ interface DashboardScreenProps {
   walletView?: boolean;
   profileView?: boolean;
   referralView?: boolean;
+  /** Saldo real de la wallet (fetched por la página) */
+  balance?: number;
 }
 
 export function DashboardScreen({
@@ -31,6 +36,7 @@ export function DashboardScreen({
   walletView,
   profileView,
   referralView,
+  balance = 0,
 }: DashboardScreenProps) {
   if (walletView) {
     return <WalletView />;
@@ -53,7 +59,7 @@ export function DashboardScreen({
       <div className="flex items-center justify-between px-4 mb-2 md:px-6 lg:px-8">
         <div>
           <p className="text-gray-400 text-[11px]">Buenos días</p>
-          <p className="text-white text-base font-bold">Taquería El Pariente 🌅</p>
+          <BusinessName />
         </div>
         <NotificationBell />
       </div>
@@ -65,11 +71,11 @@ export function DashboardScreen({
           <div className="px-0 md:px-6 lg:px-0">
             <LoyaltyTierBanner />
             <GrowthWalletBanner
-              balance={12450}
+              balance={balance}
               nextUnlock={{
                 name: "Campaña Meta Ads — Nivel Plata",
                 cost: 16000,
-                progressPercent: 72,
+                progressPercent: Math.min(Math.round((balance / 16000) * 100), 100),
               }}
             />
           </div>
@@ -165,16 +171,79 @@ export function DashboardScreen({
   );
 }
 
+/** Nombre real del negocio desde el perfil del usuario logueado */
+function BusinessName() {
+  const [name, setName] = useState<string>("Restaurante");
+  const [supabase] = useState(() =>
+    typeof window === "undefined" ? null : createClient()
+  );
+
+  useEffect(() => {
+    if (!supabase) return;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase!.auth.getSession();
+        if (!session?.user?.id) return;
+        const { data: profile } = await supabase!
+          .from("profiles")
+          .select("full_name")
+          .eq("id", session.user.id)
+          .single();
+        if (profile?.full_name) setName(profile.full_name);
+      } catch {
+        // Keep default
+      }
+    })();
+  }, [supabase]);
+
+  return (
+    <p className="text-white text-base font-bold">{name} 🌅</p>
+  );
+}
+
 function WalletView() {
   const { tier, monthlyCashback } = useLoyaltyTier()
   const currentTierConfig = TIER_CONFIGS[tier]
 
-  const recentOrders = [
-    { id: "PED-1042", supplier: "Distribuidora El Sol", amount: 15000, date: "15 Jul 2026", cashback: Math.round(15000 * (currentTierConfig.rate / 100)) },
-    { id: "PED-1038", supplier: "Carnes Selectas del Norte", amount: 12400, date: "8 Jul 2026", cashback: Math.round(12400 * (currentTierConfig.rate / 100)) },
-    { id: "PED-1035", supplier: "Frutas y Verduras del Valle", amount: 8700, date: "2 Jul 2026", cashback: Math.round(8700 * (currentTierConfig.rate / 100)) },
-    { id: "PED-1032", supplier: "Lácteos La Pradera", amount: 5200, date: "28 Jun 2026", cashback: Math.round(5200 * (currentTierConfig.rate / 100)) },
-  ]
+  const [balance, setBalance] = useState(0)
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([])
+  const [supabase] = useState(() =>
+    typeof window === "undefined" ? null : createClient()
+  )
+
+  useEffect(() => {
+    if (!supabase) return
+
+    async function fetchWallet() {
+      try {
+        const { data: { session } } = await supabase!.auth.getSession()
+        if (!session?.user?.id) return
+
+        const { data: wallet } = await supabase!
+          .from("wallets")
+          .select("id, balance_credits")
+          .eq("user_id", session.user.id)
+          .single()
+
+        if (wallet) {
+          setBalance(Number(wallet.balance_credits))
+
+          const { data: txs } = await supabase!
+            .from("wallet_transactions")
+            .select("id, wallet_id, amount, concept, order_id, created_at")
+            .eq("wallet_id", wallet.id)
+            .order("created_at", { ascending: false })
+            .limit(8)
+
+          if (txs) setTransactions(txs as WalletTransaction[])
+        }
+      } catch {
+        // Keep defaults
+      }
+    }
+
+    fetchWallet()
+  }, [supabase])
 
   return (
     <div className="px-4 pt-6 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
@@ -194,7 +263,7 @@ function WalletView() {
               Actualmente estás en nivel{" "}
               <span className={`font-bold ${currentTierConfig.textColor}`}>{currentTierConfig.name}</span>{" "}
               recibiendo <span className={`font-bold ${currentTierConfig.textColor}`}>{currentTierConfig.rate}%</span> de recompensas.
-              Tus pedidos en la Tienda de Crecimiento se registran automáticamente.
+              Tus compras generan créditos automáticamente.
             </p>
           </div>
         </div>
@@ -204,7 +273,7 @@ function WalletView() {
       <div className="rounded-2xl bg-white/5 border border-white/10 p-5 mb-4">
         <p className="text-gray-400 text-xs uppercase tracking-wider">Saldo Total</p>
         <p className="text-white text-4xl font-black tabular-nums mt-1">
-          $12,450 <span className="text-xl text-gray-400">Créditos</span>
+          ${balance.toLocaleString("es-MX")} <span className="text-xl text-gray-400">Créditos</span>
         </p>
         <div className="mt-5 grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/15 p-3">
@@ -222,35 +291,50 @@ function WalletView() {
         </div>
       </div>
 
-      {/* Recent Orders */}
+      {/* Recent Transactions */}
       <div className="mb-4">
-        <p className="text-white text-sm font-bold mb-3">Pedidos recientes</p>
-        <div className="space-y-2">
-          {recentOrders.map((order) => (
-            <motion.div
-              key={order.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/5 p-3"
-            >
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/15 flex-shrink-0">
-                <TrendingUp className="h-4 w-4 text-emerald-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-medium truncate">{order.supplier}</p>
-                <p className="text-gray-500 text-[10px]">{order.id} · {order.date}</p>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-white text-sm font-bold tabular-nums">
-                  ${order.amount.toLocaleString("es-MX")}
-                </p>
-                <p className="text-emerald-400 text-[10px] font-medium">
-                  +${order.cashback.toLocaleString("es-MX")}
-                </p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+        <p className="text-white text-sm font-bold mb-3">Movimientos recientes</p>
+        {transactions.length === 0 ? (
+          <div className="rounded-xl bg-white/5 border border-white/5 p-6 text-center">
+            <p className="text-gray-500 text-sm">
+              Aún no tienes movimientos. ¡Haz tu primera compra y empieza a generar créditos!
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {transactions.map((tx) => (
+              <motion.div
+                key={tx.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/5 p-3"
+              >
+                <div className={`flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0 ${
+                  Number(tx.amount) > 0 ? "bg-emerald-500/15" : "bg-red-500/15"
+                }`}>
+                  <TrendingUp className={`h-4 w-4 ${Number(tx.amount) > 0 ? "text-emerald-400" : "text-red-400"}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">
+                    {tx.order_id ? `Pedido #${tx.order_id}` : tx.concept}
+                  </p>
+                  <p className="text-gray-500 text-[10px]">
+                    {new Date(tx.created_at).toLocaleDateString("es-MX", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className={`text-sm font-bold tabular-nums ${Number(tx.amount) > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    {Number(tx.amount) > 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString("es-MX")}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -260,12 +344,80 @@ function ProfileView() {
   const { tier, weekCount } = useLoyaltyTier()
   const currentTierIdx = TIER_ORDER.indexOf(tier)
 
+  const [fullName, setFullName] = useState("Restaurante")
+  const [ordersThisMonth, setOrdersThisMonth] = useState<number | null>(null)
+  const [totalRewards, setTotalRewards] = useState(0)
+  const [monthsInProgram, setMonthsInProgram] = useState<number | null>(null)
+  const [supabase] = useState(() =>
+    typeof window === "undefined" ? null : createClient()
+  )
+
+  useEffect(() => {
+    if (!supabase) return
+
+    async function fetchProfile() {
+      try {
+        const { data: { session } } = await supabase!.auth.getSession()
+        if (!session?.user?.id) return
+        const userId = session.user.id
+
+        const { data: profile } = await supabase!
+          .from("profiles")
+          .select("full_name, created_at")
+          .eq("id", userId)
+          .single()
+
+        if (profile) {
+          if (profile.full_name) setFullName(profile.full_name)
+          if (profile.created_at) {
+            const months = Math.max(
+              1,
+              Math.floor(
+                (Date.now() - new Date(profile.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30)
+              )
+            )
+            setMonthsInProgram(months)
+          }
+        }
+
+        const monthYear = new Date().toISOString().slice(0, 7)
+        const { count: monthCount } = await supabase!
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .eq("month_year", monthYear)
+          .neq("status", "cancelled")
+        setOrdersThisMonth(monthCount ?? 0)
+
+        const { data: wallet } = await supabase!
+          .from("wallets")
+          .select("id")
+          .eq("user_id", userId)
+          .single()
+        if (wallet) {
+          const { data: txs } = await supabase!
+            .from("wallet_transactions")
+            .select("amount")
+            .eq("wallet_id", wallet.id)
+            .gt("amount", 0)
+          if (txs) {
+            setTotalRewards(txs.reduce((sum, t) => sum + Number(t.amount), 0))
+          }
+        }
+      } catch {
+        // Keep defaults
+      }
+    }
+
+    fetchProfile()
+  }, [supabase])
+
   // Tier unlock conditions
   const tierConditions: Record<Tier, { weeks: number; minWeekly: number; label: string }> = {
     verde: { weeks: 0, minWeekly: 0, label: "Primera compra" },
-    plata: { weeks: 2, minWeekly: 3500, label: "2+ semanas al mes con compras" },
-    oro: { weeks: 3, minWeekly: 3500, label: "3+ semanas al mes + alto volumen" },
-    negro: { weeks: 4, minWeekly: 3500, label: "4 semanas al mes + suscripción recurrente" },
+    plata: { weeks: 2, minWeekly: 2500, label: "2+ semanas calificadas al mes" },
+    oro: { weeks: 3, minWeekly: 2500, label: "3+ semanas calificadas al mes" },
+    diamante: { weeks: 4, minWeekly: 2500, label: "4+ semanas calificadas al mes" },
   };
 
   const inviteShare = async () => {
@@ -284,20 +436,19 @@ function ProfileView() {
       <div className="rounded-2xl bg-white/5 border border-white/10 p-5 mb-4">
         <div className="flex items-center gap-3">
           <div className="h-14 w-14 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xl font-bold">
-            TP
+            {fullName.charAt(0).toUpperCase()}
           </div>
           <div>
-            <p className="text-white font-bold text-lg">Taquería El Pariente</p>
-            <p className="text-gray-400 text-sm">Cocina Mexicana · CDMX</p>
+            <p className="text-white font-bold text-lg">{fullName}</p>
+            <p className="text-gray-400 text-sm">Socio Resurte</p>
           </div>
         </div>
       </div>
 
       <div className="space-y-2 mb-6">
-        <ProfileRow label="Pedidos este mes" value="4" />
-        <ProfileRow label="Servicios canjeados" value="2" />
-        <ProfileRow label="Meses en el programa" value="8" />
-        <ProfileRow label="Total recompensas acumuladas" value="$34,200 Créditos" />
+        <ProfileRow label="Pedidos este mes" value={ordersThisMonth === null ? "—" : String(ordersThisMonth)} />
+        <ProfileRow label="Meses en el programa" value={monthsInProgram === null ? "—" : String(monthsInProgram)} />
+        <ProfileRow label="Total recompensas acumuladas" value={`$${Math.round(totalRewards).toLocaleString("es-MX")} Créditos`} />
       </div>
 
       {/* Tier Progression Ladder */}
@@ -370,7 +521,7 @@ function ProfileView() {
                           />
                         </div>
                         <p className="text-gray-600 text-[9px] mt-1">
-                          Mínimo ${cond.minWeekly.toLocaleString("es-MX")} por semana
+                          Semana calificada: ${cond.minWeekly.toLocaleString("es-MX")} o más acumulados
                         </p>
                       </div>
                     )}
@@ -386,7 +537,7 @@ function ProfileView() {
       <div className="rounded-2xl bg-gradient-to-br from-purple-600/20 to-purple-800/20 border border-purple-500/15 p-4">
         <p className="text-white text-sm font-semibold">🎁 Crecer juntos sabe mejor</p>
         <p className="text-gray-400 text-xs mt-1">
-          Invita a otro restaurantero y ambos ganan $500 Créditos en recompensas.
+          Invita a otro restaurantero y ambos ganan $100 Créditos en recompensas.
         </p>
         <button
           onClick={inviteShare}

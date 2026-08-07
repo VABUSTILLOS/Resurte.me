@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { getStripe } from "@/lib/stripe"
 
@@ -38,7 +39,9 @@ interface CreateOrderBody {
  * Si payment_method es "card", también crea un PaymentIntent de Stripe
  * y devuelve el client_secret para que el frontend confirme el pago.
  *
- * Usa service_role para bypass de RLS (checkout no requiere auth).
+ * Usa service_role para bypass de RLS (checkout anónimo o logueado).
+ * Si hay sesión activa, el pedido y la dirección se vinculan al usuario,
+ * y el trigger process_cashback_for_order() genera sus créditos Resurte.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -68,13 +71,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // ── Sesión activa (si el usuario está logueado, el pedido queda vinculado) ──
+    const supabaseClient = await createClient()
+    const { data: { user } } = await supabaseClient.auth.getUser()
+    const userId = user?.id ?? null
+
     const supabase = await createServiceClient()
+
+    // ── Resolver la tienda del pedido (única activa; safety net con DEFAULT) ──
+    const { data: store } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("is_active", true)
+      .order("id", { ascending: true })
+      .limit(1)
+      .single()
+    const storeId = store?.id ?? null
 
     // 1. Create address (or use existing)
     const { data: addr, error: addrError } = await supabase
       .from("addresses")
       .insert({
-        user_id: null, // anonymous checkout
+        user_id: userId, // vinculada al usuario logueado (null si checkout anónimo)
         label: address.label,
         street: address.street,
         number: address.number,
@@ -102,10 +120,12 @@ export async function POST(request: NextRequest) {
       : new Date()
 
     // 3. Create the order
+    //    El trigger process_cashback_for_order() calcula el cashback al insertar.
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({
-        user_id: null, // anonymous checkout
+        user_id: userId, // ← vincula el pedido al usuario logueado
+        store_id: storeId,
         city_id,
         address_id: addr.id,
         status: "pending",
@@ -117,7 +137,7 @@ export async function POST(request: NextRequest) {
         scheduled_for: scheduledFor.toISOString(),
         source: "web",
       })
-      .select("id")
+      .select("id, cashback_credits, cashback_tier, total")
       .single()
 
     if (orderError) {
@@ -164,6 +184,7 @@ export async function POST(request: NextRequest) {
           metadata: {
             order_id: String(order.id),
             source: "resurte.me",
+            user_id: userId ?? "anonymous",
           },
         })
 
@@ -190,6 +211,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       orderId: order.id,
+      cashbackCredits: order.cashback_credits ?? 0,
+      cashbackTier: order.cashback_tier ?? undefined,
       clientSecret,
       paymentIntentId,
       total,

@@ -142,6 +142,7 @@ export default function CashbackPage() {
               service={selectedService}
               onBack={() => setShowCheckout(false)}
               onComplete={handleCheckoutComplete}
+              balance={balance}
             />
           ) : (
             <div key="main" className="flex-1 overflow-y-auto pb-20 md:pb-0">
@@ -151,12 +152,14 @@ export default function CashbackPage() {
                   onServiceSelect={handleServiceSelect}
                   onNavigateStore={handleNavigateStore}
                   onViewOrders={handleViewOrders}
+                  balance={balance}
                 />
               )}
               {activeTab === "store" && (
                 <StoreScreen
                   onServiceSelect={handleServiceSelect}
                   onOpenCalculator={handleOpenCalculator}
+                  balance={balance}
                 />
               )}
               {activeTab === "wallet" && (
@@ -164,6 +167,7 @@ export default function CashbackPage() {
                   onOpenCalculator={handleOpenCalculator}
                   onServiceSelect={handleServiceSelect}
                   walletView
+                  balance={balance}
                 />
               )}
               {activeTab === "profile" && (

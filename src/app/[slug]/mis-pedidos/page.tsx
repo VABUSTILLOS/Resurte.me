@@ -1,20 +1,101 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
-import { generateMockOrders, STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL, type MockOrder } from "@/lib/mock-orders"
+import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/mock-orders"
+import { createClient } from "@/lib/supabase/client"
+import type { OrderWithCashback, OrderItem } from "@/types"
 import { Package, Clock, ChevronRight, ArrowLeft, RotateCcw, ShoppingCart } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import Link from "next/link"
 
+interface OrderWithItems extends OrderWithCashback {
+  items: (OrderItem & {
+    product_name: string
+    product_image: string
+  })[]
+}
+
+interface OrderRow extends OrderWithCashback {
+  order_items: (OrderItem & {
+    products: { id: number; name: string; image_url: string | null; slug: string } | null
+  })[]
+}
+
 export default function OrderHistoryPage() {
   const { city } = useCity()
   const { addItem } = useCart()
-  const [orders] = useState<MockOrder[]>(() => generateMockOrders(6))
+  const [orders, setOrders] = useState<OrderWithItems[]>([])
+  const [loading, setLoading] = useState(true)
   const [reorderingId, setReorderingId] = useState<number | null>(null)
+  const [supabase] = useState(() =>
+    typeof window === "undefined" ? null : createClient()
+  )
 
-  const handleRepeatOrder = (order: MockOrder, e: React.MouseEvent) => {
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchOrders() {
+      if (!supabase) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        if (!session?.user?.id) {
+          setLoading(false)
+          return
+        }
+
+        const { data, error } = await supabase
+          .from("orders")
+          .select(
+            "*, order_items(*, products(id, name, image_url, slug))"
+          )
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false })
+
+        if (error || !data) {
+          setLoading(false)
+          return
+        }
+
+        if (cancelled) return
+
+        const enriched: OrderWithItems[] = (data as OrderRow[]).map((row) => {
+          const { order_items, ...order } = row
+          const items = (order_items ?? []).map((item) => ({
+            id: item.id,
+            order_id: item.order_id,
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            product_name: item.products?.name || `Producto #${item.product_id}`,
+            product_image: item.products?.image_url || "",
+          }))
+          return { ...order, items }
+        })
+
+        setOrders(enriched)
+      } catch {
+        // Keep defaults
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    fetchOrders()
+
+    return () => {
+      cancelled = true
+    }
+  }, [supabase])
+
+  const handleRepeatOrder = (order: OrderWithItems, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setReorderingId(order.id)
@@ -60,7 +141,11 @@ export default function OrderHistoryPage() {
         </div>
       </div>
 
-      {orders.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-16">
+          <p className="text-gray-500">Cargando tus pedidos...</p>
+        </div>
+      ) : orders.length === 0 ? (
         <div className="text-center py-16">
           <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h2 className="text-lg font-semibold text-gray-500 mb-2">Sin pedidos aún</h2>
@@ -104,7 +189,7 @@ export default function OrderHistoryPage() {
                 <div className="flex items-center gap-2 text-xs text-gray-500">
                   <span>{order.items.length} producto{order.items.length !== 1 ? "s" : ""}</span>
                   <span>·</span>
-                  <span>{PAYMENT_METHOD_LABEL[order.payment_method]}</span>
+                  <span>{PAYMENT_METHOD_LABEL[order.payment_method ?? "cash_on_delivery"]}</span>
                   {order.source === "whatsapp" && (
                     <>
                       <span>·</span>

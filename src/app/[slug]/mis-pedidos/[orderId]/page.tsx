@@ -1,17 +1,17 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { useMemo } from "react"
+import { useEffect, useState } from "react"
 import { useCity } from "@/contexts/city-context"
 import {
-  generateMockOrders,
   STATUS_LABEL,
   PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_LABEL,
 } from "@/lib/mock-orders"
+import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Package, MapPin, Clock, CreditCard, DollarSign, Store, Truck, CheckCircle2, Circle } from "lucide-react"
 import Link from "next/link"
-import type { OrderStatus } from "@/types"
+import type { OrderStatus, OrderWithCashback, OrderItem } from "@/types"
 
 const ORDER_STATUSES: OrderStatus[] = ["pending", "confirmed", "preparing", "out_for_delivery", "delivered"]
 
@@ -24,18 +24,101 @@ const STATUS_ICONS: Record<OrderStatus, React.ReactNode> = {
   cancelled: <Circle className="w-5 h-5" />,
 }
 
+interface OrderDetail extends OrderWithCashback {
+  items: (OrderItem & {
+    product_name: string
+    product_image: string
+  })[]
+}
+
+interface OrderRow extends OrderWithCashback {
+  order_items: (OrderItem & {
+    products: { id: number; name: string; image_url: string | null; slug: string } | null
+  })[]
+}
+
 export default function OrderDetailPage() {
   const params = useParams()
   const { city } = useCity()
   const orderId = Number(params.orderId)
 
-  const orders = useMemo(() => generateMockOrders(6), [])
-  const order = orders.find((o) => o.id === orderId)
+  const [order, setOrder] = useState<OrderDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [supabase] = useState(() =>
+    typeof window === "undefined" ? null : createClient()
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchOrder() {
+      if (!supabase || !orderId) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        if (!session?.user?.id) {
+          setLoading(false)
+          return
+        }
+
+        const { data, error } = await supabase
+          .from("orders")
+          .select(
+            "*, order_items(*, products(id, name, image_url, slug))"
+          )
+          .eq("user_id", session.user.id)
+          .eq("id", orderId)
+          .single()
+
+        if (error || !data) {
+          setLoading(false)
+          return
+        }
+
+        if (cancelled) return
+
+        const { order_items, ...row } = data as OrderRow
+        const items = (order_items ?? []).map((item) => ({
+          id: item.id,
+          order_id: item.order_id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          product_name: item.products?.name || `Producto #${item.product_id}`,
+          product_image: item.products?.image_url || "",
+        }))
+        setOrder({ ...row, items })
+      } catch {
+        // Keep defaults
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    fetchOrder()
+
+    return () => {
+      cancelled = true
+    }
+  }, [supabase, orderId])
 
   if (!city) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 text-center">
         <p className="text-gray-500">Cargando...</p>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-20 text-center">
+        <p className="text-gray-500">Cargando pedido...</p>
       </div>
     )
   }
@@ -143,7 +226,7 @@ export default function OrderDetailPage() {
           <div>
             <p className="text-xs text-gray-400">Entrega programada</p>
             <p className="text-sm font-medium text-gray-900">
-              {new Date(order.scheduled_for).toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })}
+              {order.scheduled_for ? new Date(order.scheduled_for).toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" }) : "A la brevedad"}
             </p>
           </div>
         </div>
@@ -151,7 +234,7 @@ export default function OrderDetailPage() {
           <CreditCard className="w-4 h-4 text-gray-400 mt-0.5" />
           <div>
             <p className="text-xs text-gray-400">Método de pago</p>
-            <p className="text-sm font-medium text-gray-900">{PAYMENT_METHOD_LABEL[order.payment_method]}</p>
+            <p className="text-sm font-medium text-gray-900">{PAYMENT_METHOD_LABEL[order.payment_method ?? "cash_on_delivery"]}</p>
             <p className="text-xs text-brand-600 font-medium">{PAYMENT_STATUS_LABEL[order.payment_status]}</p>
           </div>
         </div>
