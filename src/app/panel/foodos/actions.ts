@@ -559,9 +559,23 @@ export async function runCampaignNow(
   if (!campaign) throw new Error("Campaña no encontrada")
 
   const { runFoodosCampaign } = await import("@/lib/foodos-campaigns")
-  const result = await runFoodosCampaign(campaignId)
-  revalidatePath("/panel/foodos/clientes")
-  return result
+  try {
+    const result = await runFoodosCampaign(campaignId)
+    revalidatePath("/panel/foodos/clientes")
+    return result
+  } catch (err) {
+    // No dejar la campaña colgada en "scheduled" si la ejecución explota
+    const service = await createServiceClient()
+    await service
+      .from("foodos_campaigns")
+      .update({
+        status: "failed",
+        error: err instanceof Error ? err.message : "Error al ejecutar",
+      })
+      .eq("id", campaignId)
+    revalidatePath("/panel/foodos/clientes")
+    throw err
+  }
 }
 
 export async function deleteCampaign(id: string): Promise<void> {

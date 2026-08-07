@@ -75,30 +75,36 @@ function renderMessage(
 }
 
 // ------------------------------------------------------------
-// Selección de clientes objetivo según el tipo de automatización
+// Selección de clientes objetivo según el tipo de automatización.
+// Los filtros se empujan a la BD para no cargar toda la base.
 // ------------------------------------------------------------
 
-function targetCustomers(
+async function fetchTargetCustomers(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
   automation: FoodosAutomation,
-  customers: FoodosCustomer[]
-): FoodosCustomer[] {
+  restaurantId: string
+): Promise<FoodosCustomer[]> {
   const cfg = automation.trigger_config ?? {}
-  const segment = cfg.target_segment
+
+  let query = supabase
+    .from("foodos_customers")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
 
   if (automation.type === "winback") {
     const days = Number(cfg.days_without_order) || 30
-    const cutoff = Date.now() - days * 86_400_000
-    return customers.filter((c) => {
-      if (!c.last_order_at) return false
-      return new Date(c.last_order_at).getTime() < cutoff
-    })
+    const cutoff = new Date(Date.now() - days * 86_400_000).toISOString()
+    query = query.not("last_order_at", "is", null).lt("last_order_at", cutoff)
+  } else if (cfg.target_segment) {
+    // El segmento se recalcula en cliente (espejo del trigger) porque
+    // la columna puede estar desactualizada con el paso del tiempo.
+    const { data } = await query
+    const all = (data as FoodosCustomer[]) ?? []
+    return all.filter((c) => segmentCustomer(c) === cfg.target_segment)
   }
 
-  if (segment) {
-    return customers.filter((c) => segmentCustomer(c) === segment)
-  }
-
-  return customers
+  const { data } = await query
+  return (data as FoodosCustomer[]) ?? []
 }
 
 // ------------------------------------------------------------
@@ -149,14 +155,10 @@ export async function runFoodosCampaign(
     return { campaignId, sent: 0, failed: 0, skipped: 1 }
   }
 
-  const { data: allCustomers } = await supabase
-    .from("foodos_customers")
-    .select("*")
-    .eq("restaurant_id", campaign.restaurant_id)
-
-  let targets = targetCustomers(
+  let targets = await fetchTargetCustomers(
+    supabase,
     automation as FoodosAutomation,
-    (allCustomers as FoodosCustomer[]) ?? []
+    campaign.restaurant_id
   )
   if (campaign.customer_id) {
     targets = targets.filter((c) => c.id === campaign.customer_id)
@@ -166,6 +168,7 @@ export async function runFoodosCampaign(
   let sent = 0
   let failed = 0
   let skipped = 0
+  const childRows: Record<string, unknown>[] = []
 
   for (const customer of targets) {
     const phone = normalizePhone(customer.phone)
@@ -197,7 +200,8 @@ export async function runFoodosCampaign(
 
     if (isParent) {
       // Un registro hijo por cliente: historial auditable por destinatario.
-      await supabase.from("foodos_campaigns").insert({
+      // Se acumulan y se insertan en un solo round-trip al final.
+      childRows.push({
         restaurant_id: campaign.restaurant_id,
         automation_id: campaign.automation_id,
         customer_id: customer.id,
@@ -219,13 +223,22 @@ export async function runFoodosCampaign(
     }
   }
 
+  if (isParent && childRows.length > 0) {
+    await supabase.from("foodos_campaigns").insert(childRows)
+  }
+
   if (isParent) {
+    const noRecipients = sent === 0 && failed === 0
     await supabase
       .from("foodos_campaigns")
       .update({
-        status: failed > 0 && sent === 0 ? "failed" : "sent",
-        error:
-          failed > 0 ? `${failed} envío(s) fallidos de ${sent + failed}` : null,
+        // Sin destinatarios no es un envío exitoso: se marca fallida
+        status: noRecipients || (failed > 0 && sent === 0) ? "failed" : "sent",
+        error: noRecipients
+          ? "Sin clientes objetivo para esta automatización"
+          : failed > 0
+            ? `${failed} envío(s) fallidos de ${sent + failed}`
+            : null,
         sent_at: new Date().toISOString(),
       })
       .eq("id", campaignId)
