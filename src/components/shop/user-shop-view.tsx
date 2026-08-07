@@ -16,28 +16,57 @@ export function UserShopView({ categories, products, citySlug }: Props) {
   const [search, setSearch] = useState("")
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null)
 
+  // Priority map: Frutas y Verduras (0), Carnes (1), resto (2)
+  const categoryPriority = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const cat of categories) {
+      const slug = (cat.slug ?? "").toLowerCase()
+      const name = (cat.name ?? "").toLowerCase()
+      if (slug.includes("frut") || slug.includes("verdura") || name.includes("frutas y verduras")) {
+        map.set(cat.id, 0)
+      } else if (slug.includes("carne") || name.includes("carne")) {
+        map.set(cat.id, 1)
+      }
+    }
+    return map
+  }, [categories])
+
+  // Sort all products: Frutas y Verduras → Carnes → resto (orden estable por nombre)
+  const sortedProducts = useMemo(() => {
+    const priority = categoryPriority
+    return [...products].sort(
+      (a, b) => (priority.get(a.category_id) ?? 2) - (priority.get(b.category_id) ?? 2),
+    )
+  }, [products, categoryPriority])
+
   // Build category→products map once
   const productsByCategory = useMemo(() => {
     const map = new Map<number, Product[]>()
-    products.forEach((p) => {
+    sortedProducts.forEach((p) => {
       const list = map.get(p.category_id) || []
       list.push(p)
       map.set(p.category_id, list)
     })
     return map
-  }, [products])
+  }, [sortedProducts])
 
-  // Only show categories that have products
+  // Only show categories that have products, ordered by priority (Frutas y Verduras → Carnes → resto)
   const activeCategories = useMemo(
-    () => categories.filter((c) => productsByCategory.has(c.id)),
-    [categories, productsByCategory],
+    () =>
+      categories
+        .filter((c) => productsByCategory.has(c.id))
+        .sort(
+          (a, b) =>
+            (categoryPriority.get(a.id) ?? 2) - (categoryPriority.get(b.id) ?? 2),
+        ),
+    [categories, productsByCategory, categoryPriority],
   )
 
   // Filtered products based on search + active category
   const filteredProducts = useMemo(() => {
     let result = activeCategoryId
       ? productsByCategory.get(activeCategoryId) ?? []
-      : products
+      : sortedProducts
 
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -50,7 +79,7 @@ export function UserShopView({ categories, products, citySlug }: Props) {
     }
 
     return result
-  }, [products, productsByCategory, activeCategoryId, search])
+  }, [sortedProducts, productsByCategory, activeCategoryId, search])
 
   const handleCategoryClick = useCallback((catId: number | null) => {
     setActiveCategoryId((prev) => (prev === catId ? null : catId))
