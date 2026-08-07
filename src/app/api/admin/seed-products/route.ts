@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { revalidateCatalogCache } from "@/lib/catalog-cache";
 
 const PRODUCTS: Array<
   [
@@ -236,6 +237,9 @@ export async function POST(request: Request) {
       results.prices_upserted += batch.length;
     }
   }
+
+  // Reflejar los productos sembrados en la tienda sin esperar el TTL.
+  revalidateCatalogCache();
 
   return NextResponse.json(results);
 }

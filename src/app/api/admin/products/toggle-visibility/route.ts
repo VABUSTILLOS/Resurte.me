@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { NextResponse } from "next/server"
 
 /**
@@ -32,6 +33,9 @@ export async function PATCH(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    // Reflejar el cambio de visibilidad en la tienda sin esperar el TTL.
+    revalidateCatalogCache()
 
     return NextResponse.json({ success: true, productId, isVisible })
   } catch (error) {

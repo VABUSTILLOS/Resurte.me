@@ -1,4 +1,4 @@
-import { unstable_cache } from "next/cache"
+import { revalidateTag, unstable_cache } from "next/cache"
 import { createPublicClient } from "@/lib/supabase/public"
 import type { Category, Product, RestaurantCollection } from "@/types"
 
@@ -174,3 +174,16 @@ export const getCachedProductsPaginated = unstable_cache(
   ["catalog-products-paginated"],
   { revalidate: 300, tags: ["catalog", "products"] }
 )
+
+/**
+ * Invalida el caché del catálogo completo (productos, categorías y
+ * colecciones). Úsala después de escribir el catálogo desde el panel admin
+ * para que los cambios se reflejen en la tienda sin esperar el TTL.
+ *
+ * profile="max" usa stale-while-revalidate: la próxima visita sirve el
+ * contenido previo y refresca en background (recomendado por la doc de
+ * Next.js; la forma de un argumento está deprecada).
+ */
+export function revalidateCatalogCache(): void {
+  revalidateTag("catalog", "max")
+}
