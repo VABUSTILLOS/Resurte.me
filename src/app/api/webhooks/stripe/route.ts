@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
         const supabase = await createServiceClient()
 
-        // Update payment status
+        // Update payment status (pedidos B2B de Resurte)
         const { data: order, error } = await supabase
           .from("orders")
           .update({
@@ -49,6 +49,23 @@ export async function POST(request: NextRequest) {
           .eq("stripe_payment_intent_id", paymentIntent.id)
           .select("id, user_id")
           .single()
+
+        // Actualiza pedidos FoodOS (micrositio /r/[slug]) del mismo intent
+        const { data: foodosOrder, error: foodosError } = await supabase
+          .from("foodos_orders")
+          .update({
+            payment_status: "paid",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("stripe_payment_intent_id", paymentIntent.id)
+          .select("id")
+          .maybeSingle()
+
+        if (foodosError) {
+          console.error("Failed to update foodos order payment:", foodosError.message)
+        } else if (foodosOrder) {
+          console.log("✅ FoodOS payment succeeded for order:", foodosOrder.id)
+        }
 
         if (error) {
           console.error("Failed to update order payment:", error.message)
@@ -71,6 +88,10 @@ export async function POST(request: NextRequest) {
         const supabase = await createServiceClient()
         await supabase
           .from("orders")
+          .update({ payment_status: "failed", updated_at: new Date().toISOString() })
+          .eq("stripe_payment_intent_id", paymentIntent.id)
+        await supabase
+          .from("foodos_orders")
           .update({ payment_status: "failed", updated_at: new Date().toISOString() })
           .eq("stripe_payment_intent_id", paymentIntent.id)
         break

@@ -14,7 +14,7 @@ import {
   Calendar, ClipboardCheck, ArrowRight, ChefHat, Store,
   PieChart, DollarSign, BarChart3, Zap, Clock, Percent, Package, Receipt, Copy,
   AlertTriangle, Bell, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Search, Flame, Target, Gift,
-  UtensilsCrossed,
+  UtensilsCrossed, QrCode, Megaphone,
 } from "lucide-react"
 import { GlobalSearch } from "@/components/global-search"
 
@@ -80,6 +80,7 @@ interface Tool {
   color: string
   bgColor: string
   collectionDesc?: (name: string) => string
+  standalone?: boolean
 }
 
 const TOOLS: Tool[] = [
@@ -163,6 +164,52 @@ const TOOLS: Tool[] = [
     color: "text-orange-600",
     bgColor: "bg-orange-50",
     collectionDesc: (name) => `Despacha las comandas de tu ${name} por tipo de servicio y controla los tiempos en cocina.`,
+  },
+  // ---- Sistema de pedidos (FoodOS) ----
+  {
+    title: "Mi restaurante",
+    description: "Perfil público con tu marca, logo y sucursales. Obtén tu link directo de pedidos y el código QR para compartir en mesas, empaques y redes.",
+    icon: QrCode,
+    href: "/panel/foodos/restaurante",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50",
+    standalone: true,
+  },
+  {
+    title: "Menú digital",
+    description: "Publica tu menú en línea: categorías, platillos, destacados y disponibilidad. Impórtalo desde tu costeo de Resurte.me en un clic.",
+    icon: UtensilsCrossed,
+    href: "/panel/foodos/menu",
+    color: "text-orange-600",
+    bgColor: "bg-orange-50",
+    standalone: true,
+  },
+  {
+    title: "Combos y cross-sell",
+    description: "Crea combos y reglas de venta cruzada: si piden X sugiere Y, o sube el ticket con ofertas inteligentes en el checkout.",
+    icon: Gift,
+    href: "/panel/foodos/combos",
+    color: "text-purple-600",
+    bgColor: "bg-purple-50",
+    standalone: true,
+  },
+  {
+    title: "Clientes y recurrencia",
+    description: "Base de clientes con segmentos (nuevo, recurrente, VIP) y automatizaciones por WhatsApp: agradecimientos, recuperación y promos.",
+    icon: Megaphone,
+    href: "/panel/foodos/clientes",
+    color: "text-red-600",
+    bgColor: "bg-red-50",
+    standalone: true,
+  },
+  {
+    title: "Tablero FoodTech",
+    description: "Pedidos por día, canal y sucursal, ticket promedio, top platillos e ingresos. Mide la efectividad de combos y cross-sell.",
+    icon: BarChart3,
+    href: "/panel/foodos/tablero",
+    color: "text-blue-600",
+    bgColor: "bg-blue-50",
+    standalone: true,
   },
 ]
 
@@ -1048,7 +1095,7 @@ export default function PanelPage() {
       )}
       {/* Tool cards grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {TOOLS.map((tool) => (
+        {TOOLS.filter((t) => !t.standalone).map((tool) => (
           <Link
             key={tool.href}
             href={selectedCollection ? tool.href : "#"}
@@ -1079,6 +1126,32 @@ export default function PanelPage() {
                 </span>
               </div>
             )}
+          </Link>
+        ))}
+      </div>
+      {/* Sección Sistema de pedidos */}
+      <div className="mt-8 mb-3 flex items-center gap-2">
+        <UtensilsCrossed className="w-4 h-4 text-emerald-600" />
+        <h2 className="text-sm font-black text-stone-900 uppercase tracking-wide">Sistema de pedidos</h2>
+        <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full">Incluido gratis para clientes Resurte</span>
+        <div className="flex-1 h-px bg-stone-200" />
+      </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {TOOLS.filter((t) => t.standalone).map((tool) => (
+          <Link
+            key={tool.href}
+            href={tool.href}
+            className="group relative bg-white rounded-2xl border border-gray-100 p-5 hover:shadow-lg hover:border-gray-200 transition-all"
+          >
+            <div className={`w-11 h-11 ${tool.bgColor} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+              <tool.icon className={`w-5 h-5 ${tool.color}`} />
+            </div>
+            <h3 className="text-base font-bold text-gray-900 mb-1.5">{tool.title}</h3>
+            <p className="text-sm text-gray-500 leading-relaxed mb-3">{tool.description}</p>
+            <div className="flex items-center gap-1 text-sm font-semibold text-[#108910] group-hover:gap-2 transition-all">
+              Abrir herramienta
+              <ArrowRight className="w-4 h-4" />
+            </div>
           </Link>
         ))}
       </div>
