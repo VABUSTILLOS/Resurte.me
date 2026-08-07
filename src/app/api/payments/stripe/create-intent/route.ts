@@ -1,15 +1,28 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { getStripe } from "@/lib/stripe"
-// import { createClient } from "@/lib/supabase/server" — descomentar al conectar Supabase
+import { createClient } from "@/lib/supabase/server"
 
 /**
  * POST /api/payments/stripe/create-intent
  *
  * Crea un PaymentIntent de Stripe para procesar el pago con tarjeta.
  * Body: { amount: number (MXN), currency?: string, metadata?: Record<string, string> }
+ *
+ * Requiere sesión de usuario autenticado para evitar abuso del endpoint
+ * (crear PaymentIntents anónimamente sin orden asociada).
  */
 export async function POST(request: NextRequest) {
   try {
+    // Solo usuarios autenticados pueden crear intents de pago.
+    const supabaseClient = await createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseClient.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 })
+    }
+
     const stripe = getStripe()
     const body = await request.json()
     const { amount, currency = "mxn", metadata = {} } = body

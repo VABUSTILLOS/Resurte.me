@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import { requireAdmin } from "@/lib/admin-auth"
 import { onOrderStatusChange } from "@/lib/workflows"
 import type { OrderStatus, PaymentStatus } from "@/types"
 
@@ -27,6 +28,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Solo administradores pueden cambiar el estado de una orden o
+    // confirmar el pago manualmente (esto dispara el abono de cashback).
+    const { response: adminDenied } = await requireAdmin()
+    if (adminDenied) {
+      return adminDenied
+    }
+
     const { id } = await params
     const orderId = parseInt(id, 10)
 

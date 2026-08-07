@@ -176,12 +176,15 @@ export async function getMonthlyCashbackProgress(): Promise<{
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-  // Órdenes del mes con su total y cashback (todas las compras generan cashback)
+  // Órdenes PAGADAS del mes con su total y cashback (todas las compras
+  // generan cashback; solo las pagadas cuentan para nivel/semanas, igual
+  // que la migración 00029).
   const { data: orders, error } = await supabase
     .from("orders")
     .select("created_at, total, cashback_credits")
     .eq("user_id", user.id)
     .gte("created_at", monthStart)
+    .eq("payment_status", "paid")
     .neq("status", "cancelled")
 
   if (error || !orders) {

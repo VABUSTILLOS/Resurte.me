@@ -95,3 +95,26 @@ la metadata estimada (`week_of_month`, `month_year`, `cashback_credits`,
   NO sube el nivel.
 - **Reversión:** al cancelar o fallar el pago, `trg_reverse_cashback` revierte
   los créditos (solo si el cashback fue realmente abonado).
+
+## Panel admin y control de acceso
+
+### Cómo se valida al admin (código)
+
+`src/lib/admin-auth.ts` expone `requireAdmin()`, usado por:
+
+| Ruta / acción | Protección |
+|---|---|
+| `PATCH /api/orders/[id]/status` | Solo admin (confirmar pago dispara cashback) |
+| `PATCH /api/admin/products/update` | Solo admin |
+| `PATCH /api/admin/products/toggle-visibility` | Solo admin |
+| `POST /api/payments/stripe/create-intent` | Sesión autenticada (no anónimo) |
+| `src/app/admin/actions.ts` (`getAdminOrders`, `getActiveStoresCount`) | Solo admin |
+| `/admin` (dashboard y pedidos) | Los datos salen de server actions protegidas |
+
+Fuentes de verdad (en orden): variable de entorno `ADMIN_EMAILS` (lista de
+emails separada por coma) → tabla `admin_users` (opcional, requiere migración
+`00030_admin_users.sql`). Si `ADMIN_EMAILS` está vacía se consulta la tabla.
+
+> ⚠️ Sin `ADMIN_EMAILS` (o fila en `admin_users`) ningún usuario es admin: las
+> rutas devuelven 401/403 y el panel no carga datos. Definirla en Vercel y en
+> `.env.local`.

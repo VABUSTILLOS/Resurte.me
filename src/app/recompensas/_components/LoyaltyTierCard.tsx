@@ -100,6 +100,7 @@ export function useLoyaltyTier() {
           .select("created_at, total")
           .eq("user_id", session.user.id)
           .eq("month_year", monthYear)
+          .eq("payment_status", "paid")
           .neq("status", "cancelled")
 
         if (error || !orders?.length) {

@@ -1,15 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
-  generateMockOrders,
+  getAdminOrders,
+  type AdminOrder,
+} from "../actions"
+import {
   STATUS_LABEL,
   STATUS_COLOR,
   PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_LABEL,
-  type MockOrder,
 } from "@/lib/mock-orders"
-import { Search } from "lucide-react"
+import { Search, RefreshCw } from "lucide-react"
 import type { OrderStatus } from "@/types"
 
 const STATUS_FILTERS: { label: string; value: OrderStatus | "all" }[] = [
@@ -23,23 +25,138 @@ const STATUS_FILTERS: { label: string; value: OrderStatus | "all" }[] = [
 ]
 
 export default function AdminOrdersPage() {
-  const [orders] = useState<MockOrder[]>(() => generateMockOrders(15))
+  const [orders, setOrders] = useState<AdminOrder[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all")
   const [search, setSearch] = useState("")
+  const [updatingId, setUpdatingId] = useState<number | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchOrders() {
+      try {
+        const data = await getAdminOrders()
+        if (!cancelled) {
+          setOrders(data)
+          setError(null)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Error al cargar los pedidos")
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    fetchOrders()
+    return () => {
+      cancelled = true
+    }
+  }, [refreshKey])
+
+  function refresh() {
+    setLoading(true)
+    setRefreshKey((k) => k + 1)
+  }
 
   const filtered = orders.filter((o) => {
     if (statusFilter !== "all" && o.status !== statusFilter) return false
-    if (search && !String(o.id).includes(search)) return false
+    if (search) {
+      const q = search.toLowerCase()
+      if (
+        !String(o.id).includes(q) &&
+        !(o.customer_name ?? "").toLowerCase().includes(q)
+      ) {
+        return false
+      }
+    }
     return true
   })
+
+  async function updatePayment(id: number) {
+    setUpdatingId(id)
+    try {
+      const res = await fetch(`/api/orders/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_status: "paid" }),
+      })
+      if (res.ok) {
+        alert(`Pago del pedido #${id} confirmado. El cashback se abonó a la wallet del cliente.`)
+        refresh()
+      } else {
+        const data = await res.json()
+        alert(data.error || "Error al confirmar el pago")
+      }
+    } catch {
+      alert("Error de conexión")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  async function updateStatus(id: number, newStatus: string) {
+    setUpdatingId(id)
+    try {
+      const res = await fetch(`/api/orders/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.workflow?.length) {
+          console.log(`📲 WhatsApp workflows triggered:`, data.workflow)
+        }
+        refresh()
+      } else {
+        alert("Error al actualizar el estado")
+      }
+    } catch {
+      alert("Error de conexión")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+        Cargando pedidos...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <p className="text-red-600 text-sm font-medium">{error}</p>
+        <p className="text-gray-400 text-xs mt-1">Verifica que estés autenticado como administrador.</p>
+      </div>
+    )
+  }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Pedidos</h1>
-          <p className="text-sm text-gray-500">{filtered.length} pedido{filtered.length !== 1 ? "s" : ""}</p>
+          <p className="text-sm text-gray-500">
+            {filtered.length} pedido{filtered.length !== 1 ? "s" : ""} · datos reales de Supabase
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={refresh}
+          className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          Refrescar
+        </button>
       </div>
 
       {/* Filters */}
@@ -48,7 +165,7 @@ export default function AdminOrdersPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar por tienda o #pedido..."
+            placeholder="Buscar por #pedido o cliente..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
@@ -91,12 +208,16 @@ export default function AdminOrdersPage() {
               {filtered.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3 font-mono text-xs font-semibold text-gray-500">#{order.id}</td>
-                  <td className="px-5 py-3 text-xs text-gray-500">Usuario #{order.id * 7}</td>
+                  <td className="px-5 py-3 text-xs text-gray-500">
+                    {order.customer_name || `Usuario #${order.user_id.slice(0, 8)}`}
+                  </td>
                   <td className="px-5 py-3 font-semibold text-gray-900">${order.total.toFixed(2)}</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <div>
-                        <span className="text-xs text-gray-600">{PAYMENT_METHOD_LABEL[order.payment_method]}</span>
+                        <span className="text-xs text-gray-600">
+                          {order.payment_method ? PAYMENT_METHOD_LABEL[order.payment_method] ?? order.payment_method : "—"}
+                        </span>
                         <span
                           className={`ml-2 text-[10px] font-medium ${
                             order.payment_status === "paid" ? "text-green-600" :
@@ -109,56 +230,21 @@ export default function AdminOrdersPage() {
                       {order.payment_status === "pending" && order.payment_method !== "card" && (
                         <button
                           type="button"
-                          className="ml-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors"
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(`/api/orders/${order.id}/status`, {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ payment_status: "paid" }),
-                              })
-                              if (res.ok) {
-                                alert(`Pago del pedido #${order.id} confirmado. El cashback se abonó a la wallet del cliente.`)
-                              } else {
-                                const data = await res.json()
-                                alert(data.error || "Error al confirmar el pago")
-                              }
-                            } catch {
-                              alert("Error de conexión")
-                            }
-                          }}
+                          disabled={updatingId === order.id}
+                          className="ml-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50 transition-colors"
+                          onClick={() => updatePayment(order.id)}
                         >
-                          Confirmar pago
+                          {updatingId === order.id ? "..." : "Confirmar pago"}
                         </button>
                       )}
                     </div>
                   </td>
                   <td className="px-5 py-3">
                     <select
-                      defaultValue={order.status}
-                      className={`text-xs font-medium border rounded-lg px-2 py-1 cursor-pointer ${STATUS_COLOR[order.status]}`}
-                      onChange={async (e) => {
-                        const newStatus = e.target.value
-                        try {
-                          const res = await fetch(`/api/orders/${order.id}/status`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ status: newStatus }),
-                          })
-                          if (res.ok) {
-                            const data = await res.json()
-                            if (data.workflow?.length) {
-                              console.log(`📲 WhatsApp workflows triggered:`, data.workflow)
-                            }
-                          } else {
-                            alert("Error al actualizar el estado")
-                            e.target.value = order.status // Revert
-                          }
-                        } catch {
-                          alert("Error de conexión")
-                          e.target.value = order.status
-                        }
-                      }}
+                      value={order.status}
+                      disabled={updatingId === order.id}
+                      className={`text-xs font-medium border rounded-lg px-2 py-1 cursor-pointer disabled:opacity-50 ${STATUS_COLOR[order.status]}`}
+                      onChange={(e) => updateStatus(order.id, e.target.value)}
                     >
                       {Object.entries(STATUS_LABEL).map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
@@ -184,6 +270,13 @@ export default function AdminOrdersPage() {
                   </td>
                 </tr>
               ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-5 py-12 text-center text-gray-400 text-sm">
+                    No hay pedidos que coincidan con el filtro.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

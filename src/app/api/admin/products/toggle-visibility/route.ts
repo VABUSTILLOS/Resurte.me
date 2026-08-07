@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service"
+import { requireAdmin } from "@/lib/admin-auth"
 import { NextResponse } from "next/server"
 
 /**
@@ -7,6 +8,12 @@ import { NextResponse } from "next/server"
  */
 export async function PATCH(request: Request) {
   try {
+    // Solo administradores pueden cambiar la visibilidad del catálogo.
+    const { response: adminDenied } = await requireAdmin()
+    if (adminDenied) {
+      return adminDenied
+    }
+
     const { productId, isVisible } = await request.json()
 
     if (!productId || typeof isVisible !== "boolean") {

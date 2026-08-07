@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
   ShoppingBag,
@@ -11,47 +11,13 @@ import {
   ArrowDownRight,
   type LucideIcon,
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-
-interface RealOrder {
-  id: number
-  total: number
-  status: string
-  payment_method: string
-  created_at: string
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: "Pendiente",
-  confirmed: "Confirmado",
-  preparing: "Preparando",
-  out_for_delivery: "En camino",
-  delivered: "Entregado",
-  cancelled: "Cancelado",
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  pending: "bg-yellow-50 text-yellow-700 border-yellow-200",
-  confirmed: "bg-blue-50 text-blue-700 border-blue-200",
-  preparing: "bg-purple-50 text-purple-700 border-purple-200",
-  out_for_delivery: "bg-orange-50 text-orange-700 border-orange-200",
-  delivered: "bg-green-50 text-green-700 border-green-200",
-  cancelled: "bg-red-50 text-red-700 border-red-200",
-}
-
-const PAYMENT_METHOD_LABEL: Record<string, string> = {
-  spei: "SPEI",
-  oxxo: "OXXO",
-  cash_on_delivery: "Efectivo",
-  card: "Tarjeta",
-  mercado_pago: "Mercado Pago",
-  codi: "CoDi",
-}
+import { getAdminOrders, getActiveStoresCount, type AdminOrder } from "./actions"
+import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/mock-orders"
 
 export default function AdminDashboardPage() {
-  const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
-  const [orders, setOrders] = useState<RealOrder[]>([])
+  const [orders, setOrders] = useState<AdminOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState({
     ordersToday: 0,
     revenueToday: 0,
@@ -60,46 +26,50 @@ export default function AdminDashboardPage() {
   })
 
   useEffect(() => {
-    if (!supabase) return
+    let cancelled = false
 
-    async function fetchData() {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
+    async function fetchDashboard() {
+      try {
+        const [allOrders, activeStores] = await Promise.all([
+          getAdminOrders(50),
+          getActiveStoresCount(),
+        ])
+        if (cancelled) return
+        setOrders(allOrders)
 
-      // Fetch recent orders
-      const { data: orderData } = await supabase!
-        .from("orders")
-        .select("id, total, status, payment_method, created_at")
-        .order("created_at", { ascending: false })
-        .limit(20)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const todaysOrders = allOrders.filter(
+          (o) => new Date(o.created_at) >= today
+        )
+        const revenueToday = todaysOrders
+          .filter((o) => o.payment_status === "paid")
+          .reduce((sum, o) => sum + Number(o.total), 0)
+        const cancellations = todaysOrders.filter(
+          (o) => o.status === "cancelled"
+        ).length
 
-      const allOrders = (orderData as RealOrder[]) ?? []
-      setOrders(allOrders)
-
-      // Compute stats
-      const todaysOrders = allOrders.filter(
-        (o) => new Date(o.created_at) >= today
-      )
-      const revenue = todaysOrders.reduce((sum, o) => sum + Number(o.total), 0)
-      const cancelled = todaysOrders.filter((o) => o.status === "cancelled").length
-
-      // Fetch store count
-      const { count } = await supabase!
-        .from("stores")
-        .select("*", { count: "exact", head: true })
-        .eq("is_active", true)
-
-      setStats({
-        ordersToday: todaysOrders.length,
-        revenueToday: revenue,
-        activeStores: count ?? 0,
-        cancellations: cancelled,
-      })
-      setLoading(false)
+        setStats({
+          ordersToday: todaysOrders.length,
+          revenueToday,
+          activeStores,
+          cancellations,
+        })
+        setError(null)
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Error al cargar el dashboard")
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
 
-    fetchData()
-  }, [supabase])
+    fetchDashboard()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const recentOrders = orders.slice(0, 5)
   const statCards: {
@@ -148,6 +118,15 @@ export default function AdminDashboardPage() {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-brand-600" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <p className="text-red-600 text-sm font-medium">{error}</p>
+        <p className="text-gray-400 text-xs mt-1">Verifica que estés autenticado como administrador.</p>
       </div>
     )
   }
@@ -220,7 +199,7 @@ export default function AdminDashboardPage() {
                     ${order.total.toFixed(2)}
                   </td>
                   <td className="px-5 py-3 text-xs text-gray-500">
-                    {PAYMENT_METHOD_LABEL[order.payment_method] ?? order.payment_method}
+                    {order.payment_method ? PAYMENT_METHOD_LABEL[order.payment_method] ?? order.payment_method : "—"}
                   </td>
                   <td className="px-5 py-3">
                     <span
@@ -237,6 +216,13 @@ export default function AdminDashboardPage() {
                   </td>
                 </tr>
               ))}
+              {recentOrders.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-12 text-center text-gray-400 text-sm">
+                    No hay pedidos aún.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
