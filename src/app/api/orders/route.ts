@@ -78,6 +78,81 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createServiceClient()
 
+    // ── Validación server-side de precios y stock ──
+    // El subtotal/total/unit_price del body provienen del cliente y NO son de
+    // confiar: se recalcula contra los precios reales de la BD y se rechaza la
+    // orden si hay discrepancias o si algún item está agotado.
+    const productIds = items.map((i) => i.product_id)
+    const { data: dbProducts, error: productsErr } = await supabase
+      .from("products")
+      .select("id, price, sale_price, stock_status")
+      .in("id", productIds)
+
+    if (productsErr) {
+      console.error("Products fetch error:", productsErr)
+      return NextResponse.json(
+        { error: "Error al validar los productos del pedido" },
+        { status: 500 }
+      )
+    }
+
+    const priceByProduct = new Map<number, { price: number; sale_price: number | null; stock_status: string }>()
+    for (const p of dbProducts ?? []) {
+      priceByProduct.set(p.id, p)
+    }
+
+    // Items inexistentes en la BD
+    for (const item of items) {
+      if (!priceByProduct.has(item.product_id)) {
+        return NextResponse.json(
+          { error: `Producto no encontrado: ${item.product_id}` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Items agotados
+    for (const item of items) {
+      const db = priceByProduct.get(item.product_id)!
+      if (db.stock_status === "out_of_stock") {
+        return NextResponse.json(
+          { error: `El producto ${item.product_id} está agotado` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Recalcular subtotal con precios reales (sale_price gana si existe)
+    const realSubtotal = items.reduce((sum, item) => {
+      const db = priceByProduct.get(item.product_id)!
+      const unitPrice = db.sale_price ?? db.price
+      return sum + unitPrice * item.quantity
+    }, 0)
+
+    const subtotalDiff = Math.abs(realSubtotal - (subtotal ?? 0))
+    if (subtotalDiff > 0.01) {
+      console.error("Subtotal mismatch", { client: subtotal, server: realSubtotal, diff: subtotalDiff })
+      return NextResponse.json(
+        { error: "El subtotal no coincide con los precios del catálogo" },
+        { status: 400 }
+      )
+    }
+
+    // Delivery fee: solo 0 (recoger) o 35 MXN (envío), y 0 si no hay items
+    const validDeliveryFee = items.length > 0 ? (delivery_fee === 0 || delivery_fee === 35 ? delivery_fee : 35) : 0
+    // El checkout envía total = subtotal - discount + deliveryFee. La UI de
+    // cupones no está activa (applyCoupon nunca se dispara), por lo que el
+    // descuento real es siempre 0. Se exige total = subtotal + envío exacto.
+    const realTotal = realSubtotal + validDeliveryFee
+    const totalDiff = Math.abs(realTotal - (total ?? 0))
+    if (totalDiff > 0.01) {
+      console.error("Total mismatch", { client: total, server: realTotal, diff: totalDiff })
+      return NextResponse.json(
+        { error: "El total no coincide con los precios del catálogo" },
+        { status: 400 }
+      )
+    }
+
     // ── Resolver la tienda del pedido (única activa; safety net con DEFAULT) ──
     const { data: store } = await supabase
       .from("stores")
@@ -128,9 +203,9 @@ export async function POST(request: NextRequest) {
       city_id,
       address_id: addr.id,
       status: "pending",
-      subtotal,
-      delivery_fee,
-      total,
+      subtotal: realSubtotal,
+      delivery_fee: validDeliveryFee,
+      total: realTotal,
       payment_method,
       payment_status: "pending",
       scheduled_for: scheduledFor.toISOString(),
@@ -153,13 +228,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 4. Create order items
-    const orderItems = items.map((item) => ({
-      order_id: order.id,
-      product_id: item.product_id,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-    }))
+    // 4. Create order items (unit_price real de la BD, no el del cliente)
+    const orderItems = items.map((item) => {
+      const db = priceByProduct.get(item.product_id)!
+      return {
+        order_id: order.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: db.sale_price ?? db.price,
+      }
+    })
 
     const { error: itemsError } = await supabase
       .from("order_items")
@@ -220,7 +298,7 @@ export async function POST(request: NextRequest) {
       cashbackTier: order.cashback_tier ?? undefined,
       clientSecret,
       paymentIntentId,
-      total,
+      total: realTotal,
     })
   } catch (error) {
     console.error("Create order error:", error)

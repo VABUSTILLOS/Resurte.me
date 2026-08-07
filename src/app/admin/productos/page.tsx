@@ -1,51 +1,151 @@
 "use client"
 
-import { useState } from "react"
-import { Plus, Search, Edit2, Trash2, Package, Tag } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Search, Package, Tag, Loader2, Pencil, Check, X } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
-interface MockProduct {
+interface Product {
   id: number
   name: string
   slug: string
-  category: string
-  brand: string
-  price: number
+  brand: string | null
+  category_id: number | null
+  price: number | null
   sale_price: number | null
-  is_available: boolean
-  show_in_whatsapp: boolean
-  image_url: string
+  stock_status: "in_stock" | "low_stock" | "out_of_stock"
+  is_visible: boolean
+  show_in_whatsapp: boolean | null
+  image_url: string | null
 }
 
-const MOCK_PRODUCTS: MockProduct[] = [
-  { id: 1, name: "Aguacate Hass", slug: "aguacate-hass", category: "Frutas y Verduras", brand: "Genérico", price: 35, sale_price: 29, is_available: true, show_in_whatsapp: true, image_url: "" },
-  { id: 2, name: "Pechuga de pollo 500g", slug: "pechuga-pollo", category: "Carnes", brand: "Bachoco", price: 89, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
-  { id: 3, name: "Leche Lala entera 1L", slug: "leche-lala", category: "Lácteos", brand: "Lala", price: 28, sale_price: 24, is_available: true, show_in_whatsapp: true, image_url: "" },
-  { id: 4, name: "Tortillas de maíz 1kg", slug: "tortillas-maiz", category: "Tortillería", brand: "Genérico", price: 22, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
-  { id: 5, name: "Jitomate saladet", slug: "jitomate-saladet", category: "Frutas y Verduras", brand: "Genérico", price: 18, sale_price: 15, is_available: false, show_in_whatsapp: true, image_url: "" },
-  { id: 6, name: "Pan Bimbo integral", slug: "pan-bimbo", category: "Panadería", brand: "Bimbo", price: 45, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
-  { id: 7, name: "Queso Oaxaca 400g", slug: "queso-oaxaca", category: "Lácteos", brand: "Esmeralda", price: 72, sale_price: 65, is_available: true, show_in_whatsapp: true, image_url: "" },
-  { id: 8, name: "Huevo blanco 18pz", slug: "huevo-blanco", category: "Abarrotes", brand: "San Juan", price: 52, sale_price: null, is_available: true, show_in_whatsapp: true, image_url: "" },
-  { id: 9, name: "Arroz Morelos 1kg", slug: "arroz-morelos", category: "Abarrotes", brand: "Verde Valle", price: 32, sale_price: 28, is_available: true, show_in_whatsapp: false, image_url: "" },
-  { id: 10, name: "Jabón Zote blanco", slug: "jabon-zote", category: "Limpieza", brand: "Zote", price: 15, sale_price: null, is_available: true, show_in_whatsapp: false, image_url: "" },
-]
+interface Category {
+  id: number
+  name: string
+  slug: string
+}
+
+type StockStatus = Product["stock_status"]
+
+const STOCK_LABELS: Record<StockStatus, string> = {
+  in_stock: "En stock",
+  low_stock: "Stock bajo",
+  out_of_stock: "Agotado",
+}
 
 export default function AdminProductsPage() {
-  const [products, setProducts] = useState(MOCK_PRODUCTS)
+  // Lazy browser-only client: creating it during SSR would throw when
+  // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
+  const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
+
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState<Set<number>>(new Set())
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+  const [editingPrice, setEditingPrice] = useState<number | null>(null)
+  const [draftPrice, setDraftPrice] = useState<string>("")
+
+  useEffect(() => {
+    if (!supabase) return
+    let cancelled = false
+    ;(async () => {
+      const [prodRes, catRes] = await Promise.all([
+        supabase
+          .from("products")
+          .select(
+            "id,name,slug,brand,category_id,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url"
+          )
+          .order("name"),
+        supabase.from("categories").select("id,name,slug").order("name"),
+      ])
+      if (cancelled) return
+      if (prodRes.error) setError(prodRes.error.message)
+      if (prodRes.data) setProducts(prodRes.data)
+      if (catRes.data) setCategories(catRes.data)
+      setLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [supabase])
+
+  const categoryName = (id: number | null) =>
+    categories.find((c) => c.id === id)?.name ?? "Sin categoría"
 
   const filtered = products.filter(
     (p) =>
       !search ||
       p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.category.toLowerCase().includes(search.toLowerCase())
+      (p.brand ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      categoryName(p.category_id).toLowerCase().includes(search.toLowerCase())
   )
 
-  const toggleAvailable = (id: number) => {
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, is_available: !p.is_available } : p)))
+  const patchProduct = async (productId: number, fields: Record<string, unknown>) => {
+    setSaving((prev) => new Set(prev).add(productId))
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/products/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId, ...fields }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? "Error al actualizar")
+      }
+      // Aplica el cambio localmente
+      setProducts((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, ...fields } : p))
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al actualizar")
+    } finally {
+      setSaving((prev) => {
+        const next = new Set(prev)
+        next.delete(productId)
+        return next
+      })
+    }
   }
 
-  const toggleWhatsApp = (id: number) => {
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, show_in_whatsapp: !p.show_in_whatsapp } : p)))
+  const cycleStock = (p: Product) => {
+    const order: StockStatus[] = ["in_stock", "low_stock", "out_of_stock"]
+    const next = order[(order.indexOf(p.stock_status) + 1) % order.length]
+    patchProduct(p.id, { stock_status: next })
+  }
+
+  const toggleWhatsApp = (p: Product) => {
+    patchProduct(p.id, { show_in_whatsapp: !p.show_in_whatsapp })
+  }
+
+  const startEditPrice = (p: Product) => {
+    setEditingPrice(p.id)
+    setDraftPrice(String(p.sale_price ?? p.price ?? ""))
+  }
+
+  const savePrice = async (p: Product) => {
+    const parsed = parseFloat(draftPrice)
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setError("Precio inválido")
+      return
+    }
+    // Guarda como precio normal; si hay sale_price distinto, conservarlo.
+    const fields: Record<string, unknown> = { price: parsed }
+    if (p.sale_price !== null && p.sale_price !== undefined) {
+      fields.sale_price = p.sale_price
+    }
+    await patchProduct(p.id, fields)
+    setEditingPrice(null)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-gray-400">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+        Cargando productos...
+      </div>
+    )
   }
 
   return (
@@ -55,11 +155,21 @@ export default function AdminProductsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Productos</h1>
           <p className="text-sm text-gray-500">{products.length} productos registrados</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 transition-colors text-sm">
-          <Plus className="w-4 h-4" />
+        <button
+          disabled
+          title="Próximamente"
+          className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 transition-colors text-sm opacity-60 cursor-not-allowed"
+        >
+          <Package className="w-4 h-4" />
           Nuevo producto
         </button>
       </div>
+
+      {error && (
+        <div className="mb-4 px-4 py-3 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200">
+          {error}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative mb-6">
@@ -82,9 +192,9 @@ export default function AdminProductsPage() {
                 <th className="px-5 py-3">Producto</th>
                 <th className="px-5 py-3">Categoría</th>
                 <th className="px-5 py-3">Precio</th>
-                <th className="px-5 py-3">Disponible</th>
+                <th className="px-5 py-3">Stock</th>
+                <th className="px-5 py-3">Visible</th>
                 <th className="px-5 py-3">WhatsApp</th>
-                <th className="px-5 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -97,43 +207,99 @@ export default function AdminProductsPage() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-900">{product.name}</p>
-                        <p className="text-xs text-gray-400">{product.brand}</p>
+                        <p className="text-xs text-gray-400">{product.brand ?? "—"}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-5 py-3">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
                       <Tag className="w-3 h-3" />
-                      {product.category}
+                      {categoryName(product.category_id)}
                     </span>
                   </td>
                   <td className="px-5 py-3">
-                    {product.sale_price ? (
-                      <div>
-                        <span className="font-semibold text-brand-600">${product.sale_price}</span>
-                        <span className="ml-1.5 text-xs text-gray-400 line-through">${product.price}</span>
+                    {editingPrice === product.id ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={draftPrice}
+                          onChange={(e) => setDraftPrice(e.target.value)}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-500"
+                        />
+                        <button
+                          onClick={() => savePrice(product)}
+                          disabled={saving.has(product.id)}
+                          className="p-1 rounded-lg text-green-600 hover:bg-green-50"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setEditingPrice(null)}
+                          className="p-1 rounded-lg text-gray-400 hover:bg-gray-100"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
                     ) : (
-                      <span className="font-semibold text-gray-900">${product.price}</span>
+                      <button
+                        onClick={() => startEditPrice(product)}
+                        className="group flex items-center gap-1.5"
+                        title="Editar precio"
+                      >
+                        {product.sale_price ? (
+                          <div className="flex items-center">
+                            <span className="font-semibold text-brand-600">
+                              ${Number(product.sale_price).toFixed(2)}
+                            </span>
+                            <span className="ml-1.5 text-xs text-gray-400 line-through">
+                              ${Number(product.price ?? 0).toFixed(2)}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="font-semibold text-gray-900">
+                            ${Number(product.price ?? 0).toFixed(2)}
+                          </span>
+                        )}
+                        <Pencil className="w-3.5 h-3.5 text-gray-300 group-hover:text-brand-500" />
+                      </button>
                     )}
                   </td>
                   <td className="px-5 py-3">
                     <button
-                      onClick={() => toggleAvailable(product.id)}
-                      className={`relative w-9 h-5 rounded-full transition-colors ${
-                        product.is_available ? "bg-green-500" : "bg-gray-300"
+                      onClick={() => cycleStock(product)}
+                      disabled={saving.has(product.id)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        product.stock_status === "in_stock"
+                          ? "bg-green-50 text-green-700 border-green-200"
+                          : product.stock_status === "low_stock"
+                          ? "bg-amber-50 text-amber-700 border-amber-200"
+                          : "bg-red-50 text-red-700 border-red-200"
                       }`}
+                      title="Clic para cambiar stock"
                     >
-                      <span
-                        className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                          product.is_available ? "translate-x-4" : "translate-x-0.5"
-                        }`}
-                      />
+                      {saving.has(product.id) ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : null}
+                      {STOCK_LABELS[product.stock_status]}
                     </button>
                   </td>
                   <td className="px-5 py-3">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                        product.is_visible
+                          ? "bg-green-50 text-green-700"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      {product.is_visible ? "Visible" : "Oculto"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
                     <button
-                      onClick={() => toggleWhatsApp(product.id)}
+                      onClick={() => toggleWhatsApp(product)}
+                      disabled={saving.has(product.id)}
                       className={`relative w-9 h-5 rounded-full transition-colors ${
                         product.show_in_whatsapp ? "bg-green-500" : "bg-gray-300"
                       }`}
@@ -145,20 +311,15 @@ export default function AdminProductsPage() {
                       />
                     </button>
                   </td>
-                  <td className="px-5 py-3">
-                    <div className="flex gap-1">
-                      <button className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {filtered.length === 0 && (
+            <div className="px-5 py-12 text-center text-gray-400 text-sm">
+              No se encontraron productos
+            </div>
+          )}
         </div>
       </div>
     </div>
