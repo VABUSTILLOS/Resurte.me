@@ -12,6 +12,7 @@
  * 3. Subscribe to: messages, message_statuses
  */
 
+import { createHmac, timingSafeEqual } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 import { verifyWebhook } from "@/lib/whatsapp"
 
@@ -46,7 +47,19 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    const rawBody = await req.text()
+
+    // Fail-closed: sin app secret configurado no se aceptan eventos.
+    const appSecret = process.env.WHATSAPP_APP_SECRET
+    if (!appSecret) {
+      console.error("WhatsApp webhook: WHATSAPP_APP_SECRET no configurado")
+      return NextResponse.json({ error: "Not configured" }, { status: 503 })
+    }
+    if (!verifySignature(req, rawBody, appSecret)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
+    }
+
+    const body = JSON.parse(rawBody)
 
     // Meta sends an array of entries, each containing changes
     if (!body.entry || !Array.isArray(body.entry)) {
@@ -84,6 +97,24 @@ export async function POST(req: NextRequest) {
   }
 }
 
+/**
+ * Valida X-Hub-Signature-256 (HMAC-SHA256 del body crudo con el
+ * app secret de Meta) usando comparación en tiempo constante.
+ */
+function verifySignature(
+  req: NextRequest,
+  rawBody: string,
+  appSecret: string
+): boolean {
+  const signature = req.headers.get("x-hub-signature-256") ?? ""
+  const expected = signature.replace(/^sha256=/, "")
+  if (!expected) return false
+  const digest = createHmac("sha256", appSecret).update(rawBody).digest("hex")
+  const a = Buffer.from(expected, "utf8")
+  const b = Buffer.from(digest, "utf8")
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
 // ============================================================
 // Handlers
 // ============================================================
@@ -96,9 +127,24 @@ async function handleIncomingMessage(
   const from = (message.from as string) || metadata?.display_phone_number || "unknown"
   const messageType = (message.type as string) || "unknown"
 
-  console.log(`📲 WhatsApp incoming: ${from} — ${messageType}`)
+  // Registro estructurado del evento entrante. El almacenamiento en
+  // `whatsapp_messages` queda pendiente de decidir el modelo de tenant:
+  // esa tabla exige `store_id` (esquema B2B, BIGINT) y FoodOS usa UUID
+  // de `foodos_restaurants`, por lo que no hay mapeo fiable aún.
+  console.log(
+    JSON.stringify({
+      event: "whatsapp.incoming",
+      from,
+      type: messageType,
+      messageId: message.id ?? null,
+      timestamp: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : null,
+      content:
+        messageType === "text" && message.text
+          ? (message.text as { body?: string }).body ?? null
+          : null,
+    })
+  )
 
-  // TODO: Store message in Supabase whatsapp_messages table
   // TODO: Route message based on type:
   //   - text → Check for order keywords, product queries
   //   - interactive → Handle button/list replies
@@ -132,6 +178,14 @@ async function handleMessageStatus(
   // status.status = "sent" | "delivered" | "read" | "failed"
   // status.timestamp = when the status changed
   // status.recipient_id = phone number
-  console.log(`📬 WhatsApp status: ${status.id} → ${status.status}`)
-  // TODO: Update message status in Supabase
+  console.log(
+    JSON.stringify({
+      event: "whatsapp.status",
+      messageId: status.id ?? null,
+      status: status.status ?? null,
+      recipientId: status.recipient_id ?? null,
+      timestamp: status.timestamp ? new Date(Number(status.timestamp) * 1000).toISOString() : null,
+    })
+  )
+  // TODO: Update message status in Supabase (depende del modelo de tenant)
 }

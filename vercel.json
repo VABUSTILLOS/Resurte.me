@@ -48,7 +48,7 @@
     },
     {
       "path": "/api/foodos/campaigns/run",
-      "schedule": "0 18 * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }

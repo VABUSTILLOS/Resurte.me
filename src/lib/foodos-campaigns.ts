@@ -12,7 +12,7 @@
 // ============================================================
 
 import { createServiceClient } from "@/lib/supabase/service"
-import { segmentCustomer, normalizePhone } from "@/lib/foodos"
+import { normalizePhone } from "@/lib/foodos"
 import { sendTextMessage } from "@/lib/whatsapp"
 import type {
   FoodosAutomation,
@@ -20,6 +20,22 @@ import type {
   FoodosCustomer,
   FoodosRestaurant,
 } from "@/types/foodos"
+
+// México no usa horario de verano desde 2022: America/Mexico_City es
+// UTC-6 fijo todo el año. Los crons de Vercel corren en UTC, así que
+// la hora local se calcula restando 6h de forma determinista.
+const CDMX_OFFSET_MS = 6 * 60 * 60 * 1000
+
+/**
+ * Normaliza `scheduled_for` a un valor comparable contra UTC:
+ *  - Si ya trae zona (Z/offset), se usa tal cual.
+ *  - Si es "hora local naive" (p. ej. del datetime-local del panel),
+ *    se interpreta como hora CDMX y se convierte a UTC sumando 6h.
+ */
+function scheduledForToUTC(value: string): string {
+  if (/Z$|[+-]\d{2}:\d{2}$/.test(value)) return value
+  return new Date(new Date(value).getTime() + CDMX_OFFSET_MS).toISOString()
+}
 
 export interface CampaignRunResult {
   campaignId: string
@@ -51,7 +67,7 @@ function siteOrigin(): string {
   )
 }
 
-function renderMessage(
+export function renderMessage(
   template: string,
   ctx: {
     customer: FoodosCustomer
@@ -79,7 +95,7 @@ function renderMessage(
 // Los filtros se empujan a la BD para no cargar toda la base.
 // ------------------------------------------------------------
 
-async function fetchTargetCustomers(
+export async function fetchTargetCustomers(
   supabase: Awaited<ReturnType<typeof createServiceClient>>,
   automation: FoodosAutomation,
   restaurantId: string
@@ -96,11 +112,10 @@ async function fetchTargetCustomers(
     const cutoff = new Date(Date.now() - days * 86_400_000).toISOString()
     query = query.not("last_order_at", "is", null).lt("last_order_at", cutoff)
   } else if (cfg.target_segment) {
-    // El segmento se recalcula en cliente (espejo del trigger) porque
-    // la columna puede estar desactualizada con el paso del tiempo.
-    const { data } = await query
-    const all = (data as FoodosCustomer[]) ?? []
-    return all.filter((c) => segmentCustomer(c) === cfg.target_segment)
+    // Filtro en SQL por la columna `segment`, mantenida por el trigger
+    // `trg_foodos_order_customer`. Nota: puede quedar desactualizada con
+    // el tiempo; si hace falta precisión, re-evaluar con `segmentCustomer`.
+    query = query.eq("segment", cfg.target_segment)
   }
 
   const { data } = await query
@@ -140,6 +155,18 @@ export async function runFoodosCampaign(
     .maybeSingle()
   if (!restaurant) throw new Error("Restaurante no encontrado")
 
+  // No enviar WhatsApp de restaurantes que no están activos (draft/paused).
+  if (restaurant.status !== "active") {
+    await supabase
+      .from("foodos_campaigns")
+      .update({
+        status: "failed",
+        error: `Restaurante inactivo (${restaurant.status})`,
+      })
+      .eq("id", campaignId)
+    return { campaignId, sent: 0, failed: 0, skipped: 1 }
+  }
+
   const { data: automation } = campaign.automation_id
     ? await supabase
         .from("foodos_automations")
@@ -151,6 +178,14 @@ export async function runFoodosCampaign(
     await supabase
       .from("foodos_campaigns")
       .update({ status: "failed", error: "Automatización no encontrada" })
+      .eq("id", campaignId)
+    return { campaignId, sent: 0, failed: 0, skipped: 1 }
+  }
+  // Automatizaciones inactivas no deben enviar.
+  if (!automation.is_active) {
+    await supabase
+      .from("foodos_campaigns")
+      .update({ status: "failed", error: "Automatización inactiva" })
       .eq("id", campaignId)
     return { campaignId, sent: 0, failed: 0, skipped: 1 }
   }
@@ -254,16 +289,25 @@ export async function runDueFoodosCampaigns(
   limit = 25
 ): Promise<{ processed: number; results: CampaignRunResult[] }> {
   const supabase = await createServiceClient()
-  const { data: due } = await supabase
+  // Trae las programadas y filtra vencimiento en JS: `scheduled_for`
+  // puede venir como hora naive CDMX y normalizarla no es expresable
+  // en el filtro SQL.
+  const { data: scheduled } = await supabase
     .from("foodos_campaigns")
-    .select("id")
+    .select("id, scheduled_for")
     .eq("status", "scheduled")
-    .or(`scheduled_for.is.null,scheduled_for.lte.${new Date().toISOString()}`)
     .order("created_at")
-    .limit(limit)
+    .limit(200)
+
+  const now = Date.now()
+  const due = (scheduled ?? []).filter((c) => {
+    if (!c.scheduled_for) return true
+    return new Date(scheduledForToUTC(c.scheduled_for)).getTime() <= now
+  })
+  const batch = due.slice(0, limit)
 
   const results: CampaignRunResult[] = []
-  for (const row of due ?? []) {
+  for (const row of batch) {
     try {
       results.push(await runFoodosCampaign(row.id))
     } catch (err) {

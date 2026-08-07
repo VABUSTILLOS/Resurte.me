@@ -12,6 +12,7 @@ import {
   listCustomers,
   listAutomations,
   upsertAutomation,
+  toggleAutomation,
   listCampaigns,
   insertCampaign,
   runCampaignNow,
@@ -209,6 +210,19 @@ export default function ClientesPage() {
     setCampaigns(await listCampaigns(restaurant!.id))
   }
 
+  async function toggleAuto(a: FoodosAutomation) {
+    const next = !a.is_active
+    setError(null)
+    try {
+      await toggleAutomation(a.id, next)
+      setAutomations(
+        automations.map((x) => (x.id === a.id ? { ...x, is_active: next } : x))
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cambiar estado")
+    }
+  }
+
   if (!restaurant) {
     if (loading) {
       return (
@@ -347,11 +361,18 @@ export default function ClientesPage() {
                       <div className="flex gap-2 mt-2">
                         <button
                           onClick={() => runCampaign(a)}
-                          disabled={sendingCampaign === a.id}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                          disabled={sendingCampaign === a.id || !a.is_active}
+                          title={a.is_active ? "Ejecutar campaña ahora" : "Activa la automatización para ejecutarla"}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-40"
                         >
                           {sendingCampaign === a.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
                           Ejecutar
+                        </button>
+                        <button
+                          onClick={() => toggleAuto(a)}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-stone-200 text-stone-700 text-xs font-bold hover:bg-stone-300"
+                        >
+                          {a.is_active ? "Pausar" : "Activar"}
                         </button>
                       </div>
                     </div>

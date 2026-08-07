@@ -4,8 +4,12 @@ import { getStripe } from "@/lib/stripe"
 import { computeOrderTotals } from "@/lib/foodos"
 import type { FoodosOrderItem } from "@/types/foodos"
 
-// Rate limiting básico en memoria (sliding window por IP).
-// Suficiente para mitigar abuso; para multi-instancia usar Upstash/Redis.
+// Rate limiting v1: sliding window por IP en memoria (Map).
+// Limitaciones conocidas:
+//  - No persiste entre instancias serverless (Vercel puede usar varias).
+//  - Se reinicia al hacer deploy o escalar a 0.
+// Mejora v2: migrar a Upstash Redis (@upstash/ratelimit) para que el
+// conteo sea compartido y durable entre instancias.
 const RATE_LIMIT_MAX = 20
 const RATE_LIMIT_WINDOW_MS = 60_000
 const rateBuckets = new Map<string, number[]>()

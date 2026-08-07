@@ -491,6 +491,19 @@ export async function upsertAutomation(input: {
   revalidatePath("/panel/foodos/clientes")
 }
 
+export async function toggleAutomation(
+  id: string,
+  isActive: boolean
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_automations")
+    .update({ is_active: isActive })
+    .eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/clientes")
+}
+
 // ------------------------------------------------------------
 // Clientes (CRM)
 // ------------------------------------------------------------
@@ -527,7 +540,17 @@ export async function insertCampaign(input: {
   status?: string
   channel?: string
 }): Promise<{ data: FoodosCampaign }> {
-  const { supabase } = await requireAuth()
+  const { supabase, user } = await requireAuth()
+  // Defensa en profundidad: el RLS ya protege, pero verificamos la
+  // propiedad del restaurante explícitamente antes de insertar.
+  const { data: owned } = await supabase
+    .from("foodos_restaurants")
+    .select("id")
+    .eq("id", input.restaurant_id)
+    .eq("user_id", user.id)
+    .maybeSingle()
+  if (!owned) throw new Error("Restaurante no encontrado")
+
   const { data, error } = await supabase
     .from("foodos_campaigns")
     .insert({
@@ -579,7 +602,17 @@ export async function runCampaignNow(
 }
 
 export async function deleteCampaign(id: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase, user } = await requireAuth()
+  // Defensa en profundidad: el RLS ya protege, pero verificamos la
+  // propiedad antes de borrar (mismo patrón que runCampaignNow).
+  const { data: owned } = await supabase
+    .from("foodos_campaigns")
+    .select("id, foodos_restaurants!inner(user_id)")
+    .eq("id", id)
+    .eq("foodos_restaurants.user_id", user.id)
+    .maybeSingle()
+  if (!owned) throw new Error("Campaña no encontrada")
+
   const { error } = await supabase.from("foodos_campaigns").delete().eq("id", id)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/clientes")
