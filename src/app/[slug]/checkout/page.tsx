@@ -21,7 +21,7 @@ import {
   MessageCircle,
 } from "lucide-react"
 import Link from "next/link"
-import { PAYMENT_METHODS, type PaymentMethod } from "@/types"
+import { PAYMENT_METHODS, type PaymentMethod, type Address } from "@/types"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
 
@@ -91,7 +91,7 @@ const PAYMENT_ICONS: Record<PaymentMethod, React.ReactNode> = {
 // ============================================================
 
 export default function CheckoutPage() {
-  const { cart, itemCount, subtotal, discount, clearCart } = useCart()
+  const { cart, itemCount, subtotal, discount, clearCart, coupon } = useCart()
   const { city } = useCity()
   const router = useRouter()
 
@@ -112,6 +112,13 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
   const [isProcessing, setIsProcessing] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
+  // Teléfono de contacto: se guarda en orders.customer_phone para activar la
+  // confirmación por WhatsApp al cliente.
+  const [phone, setPhone] = useState("")
+
+  // Direcciones guardadas del usuario (solo visibles para dueño vía RLS)
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>([])
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
 
   // Detecta si el usuario tiene sesión para sugerirle iniciarla (historial +
   // créditos de recompensa). null = aún verificando / sin Supabase configurado.
@@ -126,6 +133,25 @@ export default function CheckoutPage() {
       cancelled = true
     }
   }, [])
+
+  // Carga las direcciones guardadas cuando hay sesión activa
+  useEffect(() => {
+    if (isLoggedIn !== true) return
+    let cancelled = false
+    const supabase = createClient()
+    if (!supabase) return
+    supabase
+      .from("addresses")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (!error && data) setSavedAddresses(data as Address[])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isLoggedIn])
 
   // Stripe integration state
   const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null)
@@ -162,6 +188,20 @@ export default function CheckoutPage() {
   // Address form update
   const updateAddress = (field: keyof AddressForm, value: string) => {
     setAddress((prev) => ({ ...prev, [field]: value }))
+  }
+
+  // Seleccionar una dirección guardada y precargarla en el formulario
+  const handleSelectSavedAddress = (addr: Address) => {
+    setSelectedAddressId(addr.id)
+    setAddress({
+      label: addr.label,
+      street: addr.street,
+      number: addr.number,
+      interior: addr.interior ?? "",
+      neighborhood: addr.neighborhood,
+      zip_code: addr.zip_code,
+      references: addr.references ?? "",
+    })
   }
 
   const isAddressValid =
@@ -222,9 +262,11 @@ export default function CheckoutPage() {
             time: schedule.time,
           },
           payment_method: paymentMethod,
+          phone,
           subtotal,
           delivery_fee: deliveryFee,
           total,
+          coupon_code: coupon?.code,
           items: cart.items.map((item) => ({
             product_id: item.product_id,
             quantity: item.quantity,
@@ -270,7 +312,8 @@ export default function CheckoutPage() {
   const handleStripeSuccess = (_paymentIntentId: string) => {
     saveLastOrder(createdOrderId ?? undefined, earnedCashback?.credits, earnedCashback?.tier)
     clearCart()
-    router.push(`/${city.slug}/pedido-confirmado`)  }
+    router.push(`/${city.slug}/pedido-confirmado`)
+  }
 
   const handleStripeBack = () => {
     setShowStripeForm(false)
@@ -382,6 +425,63 @@ export default function CheckoutPage() {
             Selecciona o agrega una dirección en {city.name}, {city.state}.
           </p>
 
+          {/* Direcciones guardadas (solo usuarios con sesión) */}
+          {isLoggedIn && savedAddresses.length > 0 && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Mis direcciones
+              </label>
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    setSelectedAddressId(null)
+                    setAddress({
+                      label: "Casa",
+                      street: "",
+                      number: "",
+                      interior: "",
+                      neighborhood: "",
+                      zip_code: "",
+                      references: "",
+                    })
+                  }}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
+                    selectedAddressId === null
+                      ? "border-brand-500 bg-brand-50"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <span className="w-4 h-4 rounded-full border-2 border-brand-500 flex items-center justify-center shrink-0">
+                    {selectedAddressId === null && <span className="w-2 h-2 rounded-full bg-brand-600" />}
+                  </span>
+                  <span className="text-sm font-medium text-gray-700">+ Nueva dirección</span>
+                </button>
+                {savedAddresses.map((addr) => (
+                  <button
+                    key={addr.id}
+                    onClick={() => handleSelectSavedAddress(addr)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
+                      selectedAddressId === addr.id
+                        ? "border-brand-500 bg-brand-50"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full border-2 border-brand-500 flex items-center justify-center shrink-0">
+                      {selectedAddressId === addr.id && <span className="w-2 h-2 rounded-full bg-brand-600" />}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-gray-900">{addr.label}</span>
+                      <span className="block text-xs text-gray-500 truncate">
+                        {addr.street} {addr.number}
+                        {addr.neighborhood ? `, ${addr.neighborhood}` : ""}, CP {addr.zip_code}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Address label */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -489,9 +589,28 @@ export default function CheckoutPage() {
             />
           </div>
 
+          {/* Phone — se guarda en orders.customer_phone para la confirmación por WhatsApp */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Teléfono de contacto *
+            </label>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+              placeholder="55 1234 5678"
+              maxLength={10}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Lo usamos para enviarte la confirmación de tu pedido por WhatsApp.
+            </p>
+          </div>
+
           <button
             onClick={() => setStep("schedule")}
-            disabled={!isAddressValid}
+            disabled={!isAddressValid || phone.trim().length < 10}
             className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Continuar

@@ -109,6 +109,7 @@ export const PAYMENT_STATUS_LABEL: Record<string, string> = {
   paid: "Pagado",
   failed: "Fallido",
   refunded: "Reembolsado",
+  amount_mismatch: "Monto incorrecto",
 }
 
 export const PAYMENT_METHOD_LABEL: Record<string, string> = {

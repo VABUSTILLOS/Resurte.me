@@ -31,7 +31,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    switch (event.type) {
+    const eventType = event.type as string
+    switch (eventType) {
       case "payment_intent.succeeded": {
         const paymentIntent = event.data.object as {
           id: string
@@ -43,17 +44,49 @@ export async function POST(request: NextRequest) {
 
         const supabase = await createServiceClient()
 
-        // Update payment status (pedidos B2B de Resurte)
+        // Valida el monto recibido contra el total del pedido antes de marcar
+        // como pagado. Evita marcar como pagado un intent con monto distinto
+        // (p.ej. cliente manipuló el total del body al crear el intent).
         const { data: order, error } = await supabase
           .from("orders")
-          .update({
-            payment_status: "paid",
-            status: "confirmed",
-            updated_at: new Date().toISOString(),
-          })
+          .select("id, user_id, total")
           .eq("stripe_payment_intent_id", paymentIntent.id)
-          .select("id, user_id")
-          .single()
+          .maybeSingle()
+
+        if (!error && order) {
+          const expectedCents = Math.round(Number(order.total) * 100)
+          if (paymentIntent.amount_received >= expectedCents) {
+            await supabase
+              .from("orders")
+              .update({
+                payment_status: "paid",
+                status: "confirmed",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", order.id)
+
+            // Trigger WhatsApp: payment confirmation + status update
+            confirmPaymentToCustomer(order.id).catch((e) =>
+              console.error("Workflow: payment_confirmed failed:", e)
+            )
+            notifyCustomerStatusUpdate(order.id, "confirmed").catch((e) =>
+              console.error("Workflow: status_update failed:", e)
+            )
+          } else {
+            await supabase
+              .from("orders")
+              .update({
+                payment_status: "amount_mismatch",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", order.id)
+            console.error(
+              `⚠️ Amount mismatch: order ${order.id} expected ${expectedCents}, received ${paymentIntent.amount_received}`
+            )
+          }
+        } else if (error) {
+          console.error("Failed to fetch order payment:", error.message)
+        }
 
         // Actualiza pedidos FoodOS (micrositio /r/[slug]) del mismo intent,
         // solo si el monto recibido coincide con el total del pedido.
@@ -86,18 +119,22 @@ export async function POST(request: NextRequest) {
             )
           }
         }
+        break
+      }
 
-        if (error) {
-          console.error("Failed to update order payment:", error.message)
-        } else if (order) {
-          // Trigger WhatsApp: payment confirmation + status update
-          confirmPaymentToCustomer(order.id).catch((e) =>
-            console.error("Workflow: payment_confirmed failed:", e)
-          )
-          notifyCustomerStatusUpdate(order.id, "confirmed").catch((e) =>
-            console.error("Workflow: status_update failed:", e)
-          )
-        }
+      case "payment_intent.refunded": {
+        const paymentIntent = event.data.object as { id: string }
+        console.log("💸 Payment refunded:", paymentIntent.id)
+
+        const supabase = await createServiceClient()
+        await supabase
+          .from("orders")
+          .update({ payment_status: "refunded", updated_at: new Date().toISOString() })
+          .eq("stripe_payment_intent_id", paymentIntent.id)
+        await supabase
+          .from("foodos_orders")
+          .update({ payment_status: "refunded", updated_at: new Date().toISOString() })
+          .eq("stripe_payment_intent_id", paymentIntent.id)
         break
       }
 

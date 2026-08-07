@@ -2,14 +2,18 @@
 
 import { ArrowLeft, ShoppingCart, Trash2, Minus, Plus, Package, RefreshCw } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
+import { useCity } from "@/contexts/city-context"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { useState, useEffect } from "react"
+import { CouponInput } from "@/components/cart/coupon-input"
 
 export default function CartPage() {
   const { cart, itemCount, subtotal, discount, coupon, removeItem, updateQuantity, clearCart, addItem } = useCart()
+  const { city } = useCity()
   const [confirmClear, setConfirmClear] = useState(false)
   const [restoreStatus, setRestoreStatus] = useState<"idle" | "loading" | "done" | "error">("idle")
+  const deliveryFee = itemCount > 0 ? 35 : 0
 
   // Restaura el carrito desde el enlace "restore=<order_id>" del email de
   // carrito abandonado. Solo funciona si el usuario tiene sesión (RLS exige
@@ -266,10 +270,10 @@ export default function CartPage() {
               <span className="tabular-nums">-${discount.toFixed(2)}</span>
             </div>
           )}
-          {itemCount >= 10 && (
-            <div className="flex justify-between text-[#108910]">
+          {itemCount > 0 && (
+            <div className="flex justify-between text-[#72767E]">
               <span>Envío</span>
-              <span>Gratis</span>
+              <span className="tabular-nums">${deliveryFee.toFixed(2)}</span>
             </div>
           )}
         </div>
@@ -277,12 +281,16 @@ export default function CartPage() {
         <div className="flex justify-between items-center pt-4 border-t border-[#e0dbd2]">
           <span className="text-base font-bold text-[#242529]">Total</span>
           <span className="text-xl font-bold text-[#1a1a1a] tabular-nums">
-            ${Math.max(0, subtotal - discount).toFixed(2)}
+            ${Math.max(0, subtotal - discount + deliveryFee).toFixed(2)}
           </span>
         </div>
 
+        <div className="mt-4">
+          <CouponInput />
+        </div>
+
         <p className="text-xs text-[#B0B3B8] mt-2">
-          Envío gratis en pedidos de 10+ productos. Aplican restricciones por zona.
+          Envío de $35.00 en pedidos de entrega. Aplican restricciones por zona.
         </p>
       </div>
 
@@ -297,7 +305,7 @@ export default function CartPage() {
                     `${i + 1}. ${item.quantity}× ${item.name} — $${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}`
                 )
                 .join("\n") +
-              `\n\n*Total: $${Math.max(0, subtotal - discount).toFixed(2)} MXN*\n\n¿Me confirman disponibilidad y tiempo de entrega?`
+              `\n\n*Total: $${Math.max(0, subtotal - discount + deliveryFee).toFixed(2)} MXN*\n\n¿Me confirman disponibilidad y tiempo de entrega?`
           )}`}
           target="_blank"
           rel="noopener noreferrer"
@@ -307,7 +315,7 @@ export default function CartPage() {
           Pedir por WhatsApp
         </a>
         <Link
-          href="/resurte/checkout"
+          href={`/${city?.slug ?? "chihuahua"}/checkout`}
           className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-[#108910] text-white font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
         >
           Ir a checkout
@@ -330,7 +338,7 @@ export default function CartPage() {
 
 const trustSignals = [
   { icon: "🔒", label: "Pago Seguro", desc: "Stripe y Conekta" },
-  { icon: "🚚", label: "Envío Gratis", desc: "En pedidos de 10+ prod." },
+  { icon: "🚚", label: "Envío Rápido", desc: "Tarifa fija de $35" },
   { icon: "📄", label: "Factura (CFDI)", desc: "Para tu negocio" },
   { icon: "⭐", label: "Calidad Garantizada", desc: "O te devolvemos tu dinero" },
 ]

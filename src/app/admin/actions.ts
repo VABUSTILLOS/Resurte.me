@@ -20,11 +20,23 @@ export interface AdminOrder {
   status: string
   subtotal: number
   delivery_fee: number
+  discount?: number
+  coupon_code?: string | null
   total: number
   payment_method: string | null
   payment_status: string
   source: string
   created_at: string
+  address: {
+    street: string
+    number: string
+    interior: string | null
+    neighborhood: string
+    city: string
+    state: string
+    zip_code: string
+    references: string | null
+  } | null
   items: AdminOrderItem[]
 }
 
@@ -43,7 +55,7 @@ export async function getAdminOrders(limit = 100): Promise<AdminOrder[]> {
 
   const { data: orders, error } = await supabase
     .from("orders")
-    .select("*, profiles(full_name)")
+    .select("*, profiles(full_name), addresses(*)")
     .order("created_at", { ascending: false })
     .limit(limit)
 
@@ -91,11 +103,25 @@ export async function getAdminOrders(limit = 100): Promise<AdminOrder[]> {
     status: o.status,
     subtotal: Number(o.subtotal),
     delivery_fee: Number(o.delivery_fee),
+    discount: o.discount != null ? Number(o.discount) : undefined,
+    coupon_code: o.coupon_code ?? null,
     total: Number(o.total),
     payment_method: o.payment_method,
     payment_status: o.payment_status,
     source: o.source,
     created_at: o.created_at,
+    address: o.addresses
+      ? {
+          street: o.addresses.street,
+          number: o.addresses.number,
+          interior: o.addresses.interior ?? null,
+          neighborhood: o.addresses.neighborhood,
+          city: o.addresses.city,
+          state: o.addresses.state,
+          zip_code: o.addresses.zip_code,
+          references: o.addresses.references ?? null,
+        }
+      : null,
     items: itemsByOrder.get(o.id) ?? [],
   }))
 }

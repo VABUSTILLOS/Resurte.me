@@ -117,6 +117,7 @@ export type PaymentStatus =
   | 'paid'
   | 'failed'
   | 'refunded'
+  | 'amount_mismatch'
 
 export interface Order {
   id: number
@@ -126,6 +127,8 @@ export interface Order {
   status: OrderStatus
   subtotal: number
   delivery_fee: number
+  discount?: number
+  coupon_code?: string | null
   total: number
   payment_method: PaymentMethod
   payment_status: PaymentStatus
@@ -275,6 +278,8 @@ export interface OrderWithCashback {
   status: OrderStatus
   subtotal: number
   delivery_fee: number
+  discount?: number
+  coupon_code?: string | null
   total: number
   payment_method: PaymentMethod | null
   payment_status: PaymentStatus

@@ -11,8 +11,20 @@ import {
   PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_LABEL,
 } from "@/lib/mock-orders"
-import { Search, RefreshCw } from "lucide-react"
+import { Search, RefreshCw, X } from "lucide-react"
 import type { OrderStatus } from "@/types"
+
+function formatAdminAddress(a: NonNullable<AdminOrder["address"]>): string {
+  const parts = [
+    `${a.street} ${a.number}`,
+    a.interior ? `Int. ${a.interior}` : null,
+    a.neighborhood ? `Col. ${a.neighborhood}` : null,
+    a.zip_code ? `CP ${a.zip_code}` : null,
+    a.city,
+    a.state,
+  ].filter(Boolean)
+  return parts.join(", ")
+}
 
 const STATUS_FILTERS: { label: string; value: OrderStatus | "all" }[] = [
   { label: "Todos", value: "all" },
@@ -32,6 +44,7 @@ export default function AdminOrdersPage() {
   const [search, setSearch] = useState("")
   const [updatingId, setUpdatingId] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -196,6 +209,7 @@ export default function AdminOrdersPage() {
               <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
                 <th className="px-5 py-3">Pedido</th>
                 <th className="px-5 py-3">Cliente</th>
+                <th className="px-5 py-3">Dirección</th>
                 <th className="px-5 py-3">Total</th>
                 <th className="px-5 py-3">Pago</th>
                 <th className="px-5 py-3">Estado</th>
@@ -211,7 +225,24 @@ export default function AdminOrdersPage() {
                   <td className="px-5 py-3 text-xs text-gray-500">
                     {order.customer_name || `Usuario #${order.user_id.slice(0, 8)}`}
                   </td>
-                  <td className="px-5 py-3 font-semibold text-gray-900">${order.total.toFixed(2)}</td>
+                  <td className="px-5 py-3 text-xs text-gray-500 max-w-[180px]">
+                    {order.address ? (
+                      <span className="block truncate" title={formatAdminAddress(order.address)}>
+                        {order.address.street} {order.address.number}
+                        {order.address.neighborhood ? `, ${order.address.neighborhood}` : ""}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3 font-semibold text-gray-900">
+                    ${order.total.toFixed(2)}
+                    {order.discount ? (
+                      <span className="block text-[10px] font-medium text-green-600">
+                        −${order.discount.toFixed(2)} de cupón
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <div>
@@ -264,7 +295,10 @@ export default function AdminOrdersPage() {
                     {new Date(order.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}
                   </td>
                   <td className="px-5 py-3">
-                    <button className="text-brand-600 hover:text-brand-700 text-xs font-medium">
+                    <button
+                      onClick={() => setSelectedOrder(order)}
+                      className="text-brand-600 hover:text-brand-700 text-xs font-medium"
+                    >
                       Ver detalle
                     </button>
                   </td>
@@ -272,7 +306,7 @@ export default function AdminOrdersPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={9} className="px-5 py-12 text-center text-gray-400 text-sm">
                     No hay pedidos que coincidan con el filtro.
                   </td>
                 </tr>
@@ -281,6 +315,112 @@ export default function AdminOrdersPage() {
           </table>
         </div>
       </div>
+
+      {/* Order detail modal */}
+      {selectedOrder && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setSelectedOrder(null)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Pedido #{selectedOrder.id}</h2>
+                <p className="text-xs text-gray-400">
+                  {selectedOrder.customer_name || `Usuario #${selectedOrder.user_id.slice(0, 8)}`} ·{" "}
+                  {new Date(selectedOrder.created_at).toLocaleString("es-MX", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+                aria-label="Cerrar detalle"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              {selectedOrder.address && (
+                <div>
+                  <p className="text-xs font-medium text-gray-400 mb-1">Dirección de entrega</p>
+                  <p className="text-sm text-gray-700">{formatAdminAddress(selectedOrder.address)}</p>
+                  {selectedOrder.address.references ? (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Ref: {selectedOrder.address.references}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs font-medium text-gray-400 mb-1.5">
+                  Productos ({selectedOrder.items.length})
+                </p>
+                <ul className="divide-y divide-gray-100 rounded-xl border border-gray-100">
+                  {selectedOrder.items.map((item) => (
+                    <li key={item.id} className="flex items-center justify-between px-3 py-2">
+                      <span className="text-sm text-gray-700">
+                        {item.quantity}× {item.product_name ?? `Producto #${item.product_id}`}
+                      </span>
+                      <span className="text-sm font-medium text-gray-900">
+                        ${(item.unit_price * item.quantity).toFixed(2)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between text-gray-500">
+                  <span>Subtotal</span>
+                  <span>${selectedOrder.subtotal.toFixed(2)}</span>
+                </div>
+                {selectedOrder.discount ? (
+                  <div className="flex justify-between text-green-600">
+                    <span>
+                      Descuento{selectedOrder.coupon_code ? ` (${selectedOrder.coupon_code})` : ""}
+                    </span>
+                    <span>−${selectedOrder.discount.toFixed(2)}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between text-gray-500">
+                  <span>Envío</span>
+                  <span>${selectedOrder.delivery_fee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-gray-900 pt-1 border-t border-gray-100">
+                  <span>Total</span>
+                  <span>${selectedOrder.total.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 text-xs">
+                <span className={`px-2 py-1 rounded-lg font-medium ${STATUS_COLOR[selectedOrder.status]}`}>
+                  {STATUS_LABEL[selectedOrder.status]}
+                </span>
+                <span className="px-2 py-1 rounded-lg bg-gray-50 text-gray-500 font-medium">
+                  {selectedOrder.payment_method
+                    ? PAYMENT_METHOD_LABEL[selectedOrder.payment_method] ?? selectedOrder.payment_method
+                    : "—"}
+                </span>
+                <span className="px-2 py-1 rounded-lg bg-gray-50 text-gray-500 font-medium">
+                  {PAYMENT_STATUS_LABEL[selectedOrder.payment_status]}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

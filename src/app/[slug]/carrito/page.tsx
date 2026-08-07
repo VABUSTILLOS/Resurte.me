@@ -14,9 +14,10 @@ import {
   Tag,
 } from "lucide-react"
 import Link from "next/link"
+import { CouponInput } from "@/components/cart/coupon-input"
 
 export default function CartPage() {
-  const { cart, itemCount, subtotal, discount, updateQuantity, removeItem, clearCart, coupon, removeCoupon } = useCart()
+  const { cart, itemCount, subtotal, discount, updateQuantity, removeItem, clearCart } = useCart()
   const { city } = useCity()
   const router = useRouter()
 
@@ -212,35 +213,7 @@ export default function CartPage() {
             </div>
 
             {/* Coupon */}
-            {coupon ? (
-              <div className="bg-green-50 rounded-xl border border-green-200 p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-green-700">Cupón: {coupon.code}</p>
-                  <p className="text-xs text-green-500">
-                    {coupon.discount_type === "percentage"
-                      ? `${coupon.discount_value}% descuento`
-                      : `-$${coupon.discount_value} MXN`}
-                  </p>
-                </div>
-                <button onClick={removeCoupon} className="text-xs text-green-600 hover:text-red-500 underline">
-                  Quitar
-                </button>
-              </div>
-            ) : (
-              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-                <p className="text-xs text-gray-500 mb-2">¿Tienes un cupón?</p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Código de cupón"
-                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                  />
-                  <button className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors">
-                    Aplicar
-                  </button>
-                </div>
-              </div>
-            )}
+            <CouponInput />
           </div>
         </div>
       </div>

@@ -25,6 +25,18 @@ const STATUS_ICONS: Record<OrderStatus, React.ReactNode> = {
 }
 
 interface OrderDetail extends OrderWithCashback {
+  address?: {
+    id: number
+    label: string
+    street: string
+    number: string
+    interior: string | null
+    neighborhood: string
+    city: string
+    state: string
+    zip_code: string
+    references: string | null
+  } | null
   items: (OrderItem & {
     product_name: string
     product_image: string
@@ -32,6 +44,19 @@ interface OrderDetail extends OrderWithCashback {
 }
 
 interface OrderRow extends OrderWithCashback {
+  // Supabase devuelve la relación anidada con la clave del nombre de tabla
+  addresses?: {
+    id: number
+    label: string
+    street: string
+    number: string
+    interior: string | null
+    neighborhood: string
+    city: string
+    state: string
+    zip_code: string
+    references: string | null
+  } | null
   order_items: (OrderItem & {
     products: { id: number; name: string; image_url: string | null; slug: string } | null
   })[]
@@ -69,7 +94,7 @@ export default function OrderDetailPage() {
         const { data, error } = await supabase
           .from("orders")
           .select(
-            "*, order_items(*, products(id, name, image_url, slug))"
+            "*, order_items(*, products(id, name, image_url, slug)), addresses(*) "
           )
           .eq("user_id", session.user.id)
           .eq("id", orderId)
@@ -82,7 +107,7 @@ export default function OrderDetailPage() {
 
         if (cancelled) return
 
-        const { order_items, ...row } = data as OrderRow
+        const { order_items, addresses, ...row } = data as OrderRow
         const items = (order_items ?? []).map((item) => ({
           id: item.id,
           order_id: item.order_id,
@@ -92,7 +117,7 @@ export default function OrderDetailPage() {
           product_name: item.products?.name || `Producto #${item.product_id}`,
           product_image: item.products?.image_url || "",
         }))
-        setOrder({ ...row, items })
+        setOrder({ ...row, address: addresses ?? null, items })
       } catch {
         // Keep defaults
       } finally {
@@ -218,7 +243,25 @@ export default function OrderDetailPage() {
           <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
           <div>
             <p className="text-xs text-gray-400">Dirección de entrega</p>
-            <p className="text-sm font-medium text-gray-900">{city.name}, México</p>
+            {order.address ? (
+              <>
+                <p className="text-sm font-medium text-gray-900">
+                  {order.address.street} {order.address.number}
+                  {order.address.interior ? `, Int. ${order.address.interior}` : ""}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {order.address.neighborhood
+                    ? `Col. ${order.address.neighborhood}, `
+                    : ""}
+                  CP {order.address.zip_code}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {order.address.city}, {order.address.state}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm font-medium text-gray-900">{city.name}, México</p>
+            )}
           </div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-3">
@@ -243,7 +286,11 @@ export default function OrderDetailPage() {
           <div>
             <p className="text-xs text-gray-400">Total</p>
             <p className="text-sm font-bold text-brand-600">${order.total.toFixed(2)}</p>
-            <p className="text-xs text-gray-400">Subtotal ${order.subtotal.toFixed(2)} + Envío ${order.delivery_fee.toFixed(2)}</p>
+            <p className="text-xs text-gray-400">
+              Subtotal ${order.subtotal.toFixed(2)}
+              {order.discount ? ` − Descuento $${order.discount.toFixed(2)}` : ""}
+              {" "}+ Envío ${order.delivery_fee.toFixed(2)}
+            </p>
           </div>
         </div>
       </div>

@@ -26,9 +26,11 @@ interface CreateOrderBody {
     time: string
   }
   payment_method: string
+  phone?: string
   subtotal: number
   delivery_fee: number
   total: number
+  coupon_code?: string
   items: OrderItemInput[]
 }
 
@@ -51,9 +53,11 @@ export async function POST(request: NextRequest) {
       address,
       schedule,
       payment_method,
+      phone,
       subtotal,
       delivery_fee,
       total,
+      coupon_code,
       items,
     } = body
 
@@ -67,6 +71,23 @@ export async function POST(request: NextRequest) {
       console.error("Order validation failed - missing:", missing, { city_id, items_count: items?.length, total })
       return NextResponse.json(
         { error: `Faltan campos requeridos: ${missing.join(", ")}` },
+        { status: 400 }
+      )
+    }
+
+    // Whitelist de métodos de pago (evita guardar valores inválidos en la BD)
+    const ALLOWED_PAYMENT_METHODS = [
+      "card",
+      "spei",
+      "oxxo",
+      "cash_on_delivery",
+      "mercado_pago",
+      "codi",
+      "stripe",
+    ]
+    if (!ALLOWED_PAYMENT_METHODS.includes(payment_method)) {
+      return NextResponse.json(
+        { error: "Método de pago inválido" },
         { status: 400 }
       )
     }
@@ -140,10 +161,64 @@ export async function POST(request: NextRequest) {
 
     // Delivery fee: solo 0 (recoger) o 35 MXN (envío), y 0 si no hay items
     const validDeliveryFee = items.length > 0 ? (delivery_fee === 0 || delivery_fee === 35 ? delivery_fee : 35) : 0
-    // El checkout envía total = subtotal - discount + deliveryFee. La UI de
-    // cupones no está activa (applyCoupon nunca se dispara), por lo que el
-    // descuento real es siempre 0. Se exige total = subtotal + envío exacto.
-    const realTotal = realSubtotal + validDeliveryFee
+
+    // ── Validación server-side del cupón (si viene) ──
+    // El descuento se recalcula contra la BD con la misma fórmula del cliente
+    // (calcDiscount en cart-context) para que el total coincida exactamente.
+    let discountAmount = 0
+    let coupon: CouponRow | null = null
+    const code = coupon_code?.trim()
+    if (code) {
+      const { data: found, error: couponErr } = await supabase
+        .from("coupons")
+        .select("id, code, discount_type, discount_value, min_order, max_uses, used_count, expires_at")
+        .ilike("code", code) // case-insensitive: "BIENVENIDO" == "bienvenido"
+        .maybeSingle()
+
+      if (couponErr) {
+        console.error("Coupon fetch error:", couponErr)
+        return NextResponse.json(
+          { error: "Error al validar el cupón" },
+          { status: 500 }
+        )
+      }
+      if (!found) {
+        return NextResponse.json(
+          { error: "El cupón no existe o no es válido" },
+          { status: 400 }
+        )
+      }
+      if (found.expires_at && new Date(found.expires_at) < new Date()) {
+        return NextResponse.json(
+          { error: "El cupón ha expirado" },
+          { status: 400 }
+        )
+      }
+      if (realSubtotal < Number(found.min_order)) {
+        return NextResponse.json(
+          { error: `Este cupón requiere un pedido mínimo de $${Number(found.min_order).toFixed(2)}` },
+          { status: 400 }
+        )
+      }
+      if (found.max_uses > 0 && found.used_count >= found.max_uses) {
+        return NextResponse.json(
+          { error: "El cupón ya fue utilizado el máximo de veces" },
+          { status: 400 }
+        )
+      }
+
+      coupon = found
+      if (found.discount_type === "percentage") {
+        discountAmount = Math.round((realSubtotal * Number(found.discount_value)) / 100 * 100) / 100
+      } else {
+        discountAmount = Math.min(Number(found.discount_value), realSubtotal)
+      }
+    }
+
+    // El checkout envía total = subtotal - descuento + envío. Se exige que
+    // coincida con el monto recalculado server-side (el descuento solo se
+    // otorga si el cupón fue validado arriba).
+    const realTotal = Math.max(0, realSubtotal - discountAmount + validDeliveryFee)
     const totalDiff = Math.abs(realTotal - (total ?? 0))
     if (totalDiff > 0.01) {
       console.error("Total mismatch", { client: total, server: realTotal, diff: totalDiff })
@@ -163,36 +238,103 @@ export async function POST(request: NextRequest) {
       .single()
     const storeId = store?.id ?? null
 
-    // 1. Create address (or use existing)
-    const { data: addr, error: addrError } = await supabase
-      .from("addresses")
-      .insert({
-        user_id: userId, // vinculada al usuario logueado (null si checkout anónimo)
-        label: address.label,
-        street: address.street,
-        number: address.number,
-        interior: address.interior || null,
-        neighborhood: address.neighborhood,
-        city: address.neighborhood, // using neighborhood as city name proxy
-        state: address.neighborhood, // will be overwritten by actual city
-        zip_code: address.zip_code,
-        references: address.references || null,
-      })
-      .select("id")
-      .single()
-
-    if (addrError) {
-      console.error("Address creation error:", addrError)
+    // ── Resolver ciudad/estado reales (addresses.city/state guardan el nombre
+    //    real, no la colonia como antes) ──
+    const { data: cityRow } = await supabase
+      .from("cities")
+      .select("name, state")
+      .eq("id", city_id)
+      .maybeSingle()
+    if (!cityRow) {
       return NextResponse.json(
-        { error: "Error al guardar la dirección", detail: addrError.message, code: addrError.code },
-        { status: 500 }
+        { error: "La ciudad seleccionada no existe" },
+        { status: 400 }
       )
+    }
+    const cityName = cityRow.name
+    const cityState = cityRow.state
+
+    // ── Reutilizar dirección existente del usuario (evita duplicados en cada
+    //    compra) o insertar una nueva. Los usuarios anónimos siempre insertan. ──
+    let addressId: number | null = null
+    if (userId) {
+      let query = supabase
+        .from("addresses")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("street", address.street)
+        .eq("number", address.number)
+        .eq("neighborhood", address.neighborhood)
+        .eq("zip_code", address.zip_code)
+        .eq("city", cityName)
+        .eq("state", cityState)
+      if (address.interior) query = query.eq("interior", address.interior)
+      if (address.references) query = query.eq("references", address.references)
+      const { data: existing } = await query.maybeSingle()
+      if (existing) addressId = existing.id
+    }
+
+    if (addressId === null) {
+      // 1. Create address (or use existing)
+      const { data: addr, error: addrError } = await supabase
+        .from("addresses")
+        .insert({
+          user_id: userId, // vinculada al usuario logueado (null si checkout anónimo)
+          label: address.label,
+          street: address.street,
+          number: address.number,
+          interior: address.interior || null,
+          neighborhood: address.neighborhood,
+          city: cityName, // nombre real de la ciudad
+          state: cityState, // estado real de la ciudad
+          zip_code: address.zip_code,
+          references: address.references || null,
+        })
+        .select("id")
+        .single()
+
+      if (addrError) {
+        console.error("Address creation error:", addrError)
+        return NextResponse.json(
+          { error: "Error al guardar la dirección", detail: addrError.message, code: addrError.code },
+          { status: 500 }
+        )
+      }
+      addressId = addr.id
     }
 
     // 2. Build scheduled_for timestamp
     const scheduledFor = schedule.date
       ? new Date(`${schedule.date}T${extractTime(schedule.time)}:00-06:00`)
       : new Date()
+
+    // ── Reservar el uso del cupón (optimistic concurrency) ──
+    // Si el UPDATE condicional no afecta filas, otro pedido consumió el último
+    // uso entre nuestra lectura y este momento → el cupón ya está agotado.
+    let couponReserved = false
+    if (coupon) {
+      const { data: reserved, error: reserveErr } = await supabase
+        .from("coupons")
+        .update({ used_count: coupon.used_count + 1 })
+        .eq("id", coupon.id)
+        .eq("used_count", coupon.used_count)
+        .select("id")
+
+      if (reserveErr) {
+        console.error("Coupon reserve error:", reserveErr)
+        return NextResponse.json(
+          { error: "Error al aplicar el cupón" },
+          { status: 500 }
+        )
+      }
+      if (!reserved || reserved.length === 0) {
+        return NextResponse.json(
+          { error: "El cupón ya fue utilizado el máximo de veces" },
+          { status: 400 }
+        )
+      }
+      couponReserved = true
+    }
 
     // 3. Create the order
     //    El trigger process_cashback_for_order() calcula el cashback al insertar.
@@ -201,7 +343,7 @@ export async function POST(request: NextRequest) {
     const insertOrder: Record<string, unknown> = {
       user_id: userId, // ← vincula el pedido al usuario logueado
       city_id,
-      address_id: addr.id,
+      address_id: addressId,
       status: "pending",
       subtotal: realSubtotal,
       delivery_fee: validDeliveryFee,
@@ -210,6 +352,12 @@ export async function POST(request: NextRequest) {
       payment_status: "pending",
       scheduled_for: scheduledFor.toISOString(),
       source: "web",
+      // Teléfono de contacto: habilita la confirmación por WhatsApp (workflows.ts)
+      customer_phone: phone?.trim() || null,
+    }
+    if (coupon) {
+      insertOrder.discount = discountAmount
+      insertOrder.coupon_code = coupon.code
     }
     if (storeId !== null) {
       insertOrder.store_id = storeId
@@ -222,6 +370,7 @@ export async function POST(request: NextRequest) {
 
     if (orderError) {
       console.error("Order creation error:", orderError)
+      await releaseCoupon(coupon, couponReserved, supabase)
       return NextResponse.json(
         { error: "Error al crear el pedido", detail: orderError.message, code: orderError.code },
         { status: 500 }
@@ -247,6 +396,7 @@ export async function POST(request: NextRequest) {
       console.error("Order items creation error:", itemsError)
       // Order exists but items failed — clean up
       await supabase.from("orders").delete().eq("id", order.id)
+      await releaseCoupon(coupon, couponReserved, supabase)
       return NextResponse.json(
         { error: "Error al guardar los productos del pedido" },
         { status: 500 }
@@ -261,7 +411,7 @@ export async function POST(request: NextRequest) {
       try {
         const stripe = getStripe()
         const paymentIntent = await stripe.paymentIntents.create({
-          amount: Math.round(total * 100), // MXN cents
+          amount: Math.round(realTotal * 100), // MXN cents — monto server-side, no el del cliente
           currency: "mxn",
           automatic_payment_methods: { enabled: true },
           metadata: {
@@ -285,6 +435,7 @@ export async function POST(request: NextRequest) {
         // Order is created but payment failed — clean up
         await supabase.from("order_items").delete().eq("order_id", order.id)
         await supabase.from("orders").delete().eq("id", order.id)
+        await releaseCoupon(coupon, couponReserved, supabase)
         return NextResponse.json(
           { error: "Error al inicializar el pago con Stripe", detail: stripeMsg },
           { status: 500 }
@@ -320,4 +471,33 @@ function extractTime(timeRange: string): string {
   // Convert 12 AM to 0
   if (timeRange.includes("AM") && hour === 12) hour = 0
   return `${String(hour).padStart(2, "0")}:${minute}`
+}
+
+interface CouponRow {
+  id: number
+  code: string
+  discount_type: "percentage" | "fixed_amount"
+  discount_value: number
+  min_order: number
+  max_uses: number
+  used_count: number
+  expires_at: string | null
+}
+
+/**
+ * Revierte la reserva de un cupón si el pedido no llegó a completarse.
+ * El UPDATE es condicional (used_count = lo que este pedido puso) para no
+ * pisar una reserva concurrente de otro pedido en vuelo.
+ */
+async function releaseCoupon(
+  coupon: CouponRow | null,
+  reserved: boolean,
+  supabase: Awaited<ReturnType<typeof createServiceClient>>
+) {
+  if (!coupon || !reserved) return
+  await supabase
+    .from("coupons")
+    .update({ used_count: coupon.used_count })
+    .eq("id", coupon.id)
+    .eq("used_count", coupon.used_count + 1)
 }
