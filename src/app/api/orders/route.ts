@@ -121,22 +121,27 @@ export async function POST(request: NextRequest) {
 
     // 3. Create the order
     //    El trigger process_cashback_for_order() calcula el cashback al insertar.
+    //    Nota: si no hay tienda activa se OMITE store_id para que aplique el
+    //    DEFAULT de la migración 00026 (insertar NULL explícito lo anularía).
+    const insertOrder: Record<string, unknown> = {
+      user_id: userId, // ← vincula el pedido al usuario logueado
+      city_id,
+      address_id: addr.id,
+      status: "pending",
+      subtotal,
+      delivery_fee,
+      total,
+      payment_method,
+      payment_status: "pending",
+      scheduled_for: scheduledFor.toISOString(),
+      source: "web",
+    }
+    if (storeId !== null) {
+      insertOrder.store_id = storeId
+    }
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .insert({
-        user_id: userId, // ← vincula el pedido al usuario logueado
-        store_id: storeId,
-        city_id,
-        address_id: addr.id,
-        status: "pending",
-        subtotal,
-        delivery_fee,
-        total,
-        payment_method,
-        payment_status: "pending",
-        scheduled_for: scheduledFor.toISOString(),
-        source: "web",
-      })
+      .insert(insertOrder)
       .select("id, cashback_credits, cashback_tier, total")
       .single()
 

@@ -170,8 +170,12 @@ BEGIN
   VALUES (p_user_id, 0)
   ON CONFLICT (user_id) DO NOTHING;
 
+  -- FOR UPDATE: bloquea la fila para evitar dobles débitos concurrentes.
+  -- Sin el lock, dos canjes simultáneos pueden pasar el check de saldo y el
+  -- segundo UPDATE violaría el CHECK (balance_credits >= 0).
   SELECT id, balance_credits INTO v_wallet_id, v_balance
-  FROM public.wallets WHERE user_id = p_user_id;
+  FROM public.wallets WHERE user_id = p_user_id
+  FOR UPDATE;
 
   -- Validar saldo suficiente
   IF v_balance IS NULL OR v_balance < p_cost THEN
@@ -203,3 +207,21 @@ $$;
 
 COMMENT ON FUNCTION redeem_service(UUID, TEXT, TEXT, DECIMAL)
   IS 'Canjea créditos Resurte por un servicio de la Tienda de Crecimiento. Debita el monedero, registra la transacción y crea el registro en redemptions. Retorna el nuevo saldo.';
+
+-- ============================================================
+-- 5. SEGURIDAD: restringir ejecución SOLO al service_role
+-- ============================================================
+-- Por defecto, PostgREST expone las funciones a los roles anon/authenticated.
+-- redeem_service() es SECURITY DEFINER y NO valida auth.uid() = p_user_id,
+-- así que cualquier usuario autenticado podría debitar el monedero de OTRO
+-- usuario (IDOR) llamando select redeem_service('<user_id_ajeno>', ...).
+-- Al revocar EXECUTE de anon/authenticated/public, la función solo queda
+-- disponible para el service_role (el que usa /api/redeem), que ya valida
+-- la sesión real del usuario antes de invocarla.
+REVOKE EXECUTE ON FUNCTION public.redeem_service(UUID, TEXT, TEXT, DECIMAL)
+  FROM anon, authenticated, public;
+
+-- Asegurar explícitamente que el service_role (cliente de /api/redeem)
+-- conserva el permiso de ejecución.
+GRANT EXECUTE ON FUNCTION public.redeem_service(UUID, TEXT, TEXT, DECIMAL)
+  TO service_role;
