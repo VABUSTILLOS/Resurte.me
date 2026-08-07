@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
+import { createClient } from "@/lib/supabase/client"
 import {
   ShoppingBag,
   ArrowLeft,
@@ -110,21 +111,39 @@ export default function CheckoutPage() {
   })
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
+
+  // Detecta si el usuario tiene sesión para sugerirle iniciarla (historial +
+  // créditos de recompensa). null = aún verificando / sin Supabase configurado.
+  useEffect(() => {
+    let cancelled = false
+    const supabase = createClient()
+    if (!supabase) return
+    supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled) setIsLoggedIn(!!data.user)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Stripe integration state
   const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null)
   const [showStripeForm, setShowStripeForm] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  // ID real del pedido en la BD (para la página de confirmación)
+  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
 
   const deliveryFee = itemCount > 0 ? 35 : 0
   const total = subtotal - discount + deliveryFee
 
   // Persist the order summary so the confirmation page can fire a complete
   // `purchase` event after the cart is cleared.
-  const saveLastOrder = () => {
+  const saveLastOrder = (orderId?: number) => {
     sessionStorage.setItem(
       "last_order",
       JSON.stringify({
+        orderId: orderId ?? null,
         total,
         items: cart.items.map((i) => ({
           id: String(i.product_id),
@@ -221,6 +240,7 @@ export default function CheckoutPage() {
 
       // Card payment → show Stripe form
       if (paymentMethod === "card" && data.clientSecret) {
+        setCreatedOrderId(data.orderId ?? null)
         setStripeClientSecret(data.clientSecret)
         setShowStripeForm(true)
         setIsProcessing(false)
@@ -228,7 +248,7 @@ export default function CheckoutPage() {
       }
 
       // Non-card payment → redirect to confirmation
-      saveLastOrder()
+      saveLastOrder(data.orderId)
       clearCart()
       router.push(`/${city.slug}/pedido-confirmado`)
     } catch (err) {
@@ -240,7 +260,7 @@ export default function CheckoutPage() {
   }
 
   const handleStripeSuccess = (_paymentIntentId: string) => {
-    saveLastOrder()
+    saveLastOrder(createdOrderId ?? undefined)
     clearCart()
     router.push(`/${city.slug}/pedido-confirmado`)
   }
@@ -260,6 +280,30 @@ export default function CheckoutPage() {
         <span>/</span>
         <span className="text-gray-600 font-medium">Checkout</span>
       </div>
+
+      {/* Login nudge: sin sesión no hay historial ni créditos de recompensa */}
+      {isLoggedIn === false && (
+        <div className="bg-brand-50 border border-brand-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-brand-100 flex items-center justify-center shrink-0">
+            <Store className="w-5 h-5 text-brand-700" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-brand-800 mb-0.5">
+              Inicia sesión para ganar créditos
+            </p>
+            <p className="text-xs text-brand-600 mb-2">
+              Tus pedidos quedarán en tu historial y acumularás créditos de
+              recompensa en todas tus compras.
+            </p>
+            <Link
+              href="/auth/login"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800"
+            >
+              Iniciar sesión <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* WhatsApp ordering alternative */}
       <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-start gap-3">

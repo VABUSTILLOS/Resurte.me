@@ -1,13 +1,86 @@
 "use client"
 
-import { ArrowLeft, ShoppingCart, Trash2, Minus, Plus, Package } from "lucide-react"
+import { ArrowLeft, ShoppingCart, Trash2, Minus, Plus, Package, RefreshCw } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
+import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 export default function CartPage() {
-  const { cart, itemCount, subtotal, discount, coupon, removeItem, updateQuantity, clearCart } = useCart()
+  const { cart, itemCount, subtotal, discount, coupon, removeItem, updateQuantity, clearCart, addItem } = useCart()
   const [confirmClear, setConfirmClear] = useState(false)
+  const [restoreStatus, setRestoreStatus] = useState<"idle" | "loading" | "done" | "error">("idle")
+
+  // Restaura el carrito desde el enlace "restore=<order_id>" del email de
+  // carrito abandonado. Solo funciona si el usuario tiene sesión (RLS exige
+  // ser dueño de la orden); si no, se ignora sin romper la página.
+  useEffect(() => {
+    let cancelled = false
+    const params = new URLSearchParams(window.location.search)
+    const orderId = params.get("restore")
+    if (!orderId || isNaN(Number(orderId))) return
+
+    const supabase = createClient()
+    if (!supabase) return
+
+    ;(async () => {
+      setRestoreStatus("loading")
+      try {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("id, order_items(*, products(id, name, image_url, slug))")
+          .eq("id", Number(orderId))
+          .maybeSingle()
+
+        if (cancelled) return
+        if (error || !data) {
+          setRestoreStatus("error")
+          return
+        }
+
+        const items: Array<{
+          product_id: number
+          quantity: number
+          unit_price: number
+          products: { id: number; name: string; image_url: string; slug: string } | null
+        }> = ((data as { order_items?: unknown }).order_items ?? []) as Array<{
+          product_id: number
+          quantity: number
+          unit_price: number
+          products: { id: number; name: string; image_url: string; slug: string } | null
+        }>
+        if (items.length === 0) {
+          setRestoreStatus("error")
+          return
+        }
+
+        items.forEach((item) => {
+          addItem({
+            product_id: item.product_id,
+            name: item.products?.name || `Producto #${item.product_id}`,
+            slug: item.products?.slug || `producto-${item.product_id}`,
+            image_url: item.products?.image_url || "",
+            brand: "",
+            price: Number(item.unit_price),
+            sale_price: null,
+            quantity: item.quantity,
+            stock_status: "in_stock",
+          })
+        })
+
+        setRestoreStatus("done")
+        // Limpia el query param sin recargar la página
+        window.history.replaceState({}, "", window.location.pathname)
+      } catch {
+        if (!cancelled) setRestoreStatus("error")
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleClear = () => {
     if (confirmClear) {
@@ -67,6 +140,26 @@ export default function CartPage() {
           {confirmClear ? "¿Confirmar?" : "Vaciar"}
         </button>
       </div>
+
+      {/* Restore status (desde el email de carrito abandonado) */}
+      {restoreStatus === "loading" && (
+        <div className="flex items-center gap-2 text-sm text-[#72767E] bg-[#F7F5F0] rounded-xl px-4 py-3 mb-4">
+          <RefreshCw className="w-4 h-4 animate-spin text-[#108910]" />
+          Restaurando tu pedido anterior…
+        </div>
+      )}
+      {restoreStatus === "done" && (
+        <div className="flex items-center gap-2 text-sm text-[#0D720D] bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4">
+          <Package className="w-4 h-4 text-[#108910]" />
+          Restauramos los productos de tu último pedido. ¡Continúa tu compra!
+        </div>
+      )}
+      {restoreStatus === "error" && (
+        <div className="flex items-center gap-2 text-sm text-[#b3261e] bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
+          <Package className="w-4 h-4 text-[#de3534]" />
+          No pudimos restaurar tu pedido anterior.
+        </div>
+      )}
 
       {/* Cart items */}
       <div className="space-y-3 mb-8">

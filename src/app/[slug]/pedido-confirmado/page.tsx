@@ -15,7 +15,20 @@ function generateOrderId(): string {
 
 export default function OrderConfirmedPage() {
   const { city } = useCity()
-  const [orderId] = useState(() => generateOrderId())
+  // Prefer the real DB order id saved by the checkout page; fall back to a
+  // generated reference if it's not available (e.g. direct visit).
+  const [orderId] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem("last_order")
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed?.orderId) return `#${parsed.orderId}`
+      }
+    } catch {
+      // Ignore malformed session data
+    }
+    return generateOrderId()
+  })
 
   // Track purchase on page mount (total/items come from sessionStorage,
   // set right before the cart was cleared on the checkout page)

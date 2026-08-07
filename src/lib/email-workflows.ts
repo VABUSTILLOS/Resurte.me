@@ -39,6 +39,10 @@ export async function checkAbandonedCarts(): Promise<CronResult> {
     .select("id, user_id, total, created_at")
     .eq("status", "pending")
     .eq("payment_status", "pending")
+    // Los pedidos en efectivo (cash_on_delivery) quedan "pending" hasta que la
+    // tienda los confirma, pero NO son carritos abandonados: ya son pedidos
+    // reales en espera. Solo los métodos con pago anticipado pueden abandonarse.
+    .not("payment_method", "eq", "cash_on_delivery")
     .gte("created_at", twentyFourHoursAgo)
     .lte("created_at", twoHoursAgo)
     .order("created_at", { ascending: false })
