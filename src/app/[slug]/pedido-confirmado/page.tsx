@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useCity } from "@/contexts/city-context"
-import { CheckCircle2, ArrowRight, Package, Clock, MapPin, Store, Share2 } from "lucide-react"
+import { CheckCircle2, ArrowRight, Package, Clock, MapPin, Store, Share2, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { trackEvent } from "@/lib/analytics"
 
@@ -28,6 +28,25 @@ export default function OrderConfirmedPage() {
       // Ignore malformed session data
     }
     return generateOrderId()
+  })
+
+  // Cashback estimado devuelto por POST /api/orders y guardado en last_order
+  const [cashback] = useState<{ credits: number; tier: string | null } | null>(() => {
+    try {
+      const raw = sessionStorage.getItem("last_order")
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed?.cashbackCredits && parsed.cashbackCredits > 0) {
+          return {
+            credits: parsed.cashbackCredits,
+            tier: parsed.cashbackTier ?? null,
+          }
+        }
+      }
+    } catch {
+      // Ignore malformed session data
+    }
+    return null
   })
 
   // Track purchase on page mount (total/items come from sessionStorage,
@@ -123,6 +142,20 @@ export default function OrderConfirmedPage() {
             </p>
           </div>
         </div>
+
+        {cashback && cashback.credits > 0 && (
+          <div className="bg-gradient-to-br from-brand-600 to-brand-700 rounded-xl p-4 flex items-start gap-4 shadow-sm">
+            <div className="w-10 h-10 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <p className="font-semibold text-white text-sm">¡Ganaste {cashback.credits} Créditos Resurte!</p>
+              <p className="text-sm text-brand-50 mt-0.5">
+                {cashback.tier ? `Nivel ${cashback.tier}` : "Recompensa"} — se abonan a tu wallet cuando la tienda confirme el pago de este pedido.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* CTA buttons */}

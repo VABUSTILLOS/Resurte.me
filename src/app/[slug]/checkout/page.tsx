@@ -133,18 +133,22 @@ export default function CheckoutPage() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   // ID real del pedido en la BD (para la página de confirmación)
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
+  // Cashback estimado devuelto por POST /api/orders (se muestra tras pagar)
+  const [earnedCashback, setEarnedCashback] = useState<{ credits: number; tier: string | null } | null>(null)
 
   const deliveryFee = itemCount > 0 ? 35 : 0
   const total = subtotal - discount + deliveryFee
 
   // Persist the order summary so the confirmation page can fire a complete
   // `purchase` event after the cart is cleared.
-  const saveLastOrder = (orderId?: number) => {
+  const saveLastOrder = (orderId?: number, cashbackCredits?: number, cashbackTier?: string | null) => {
     sessionStorage.setItem(
       "last_order",
       JSON.stringify({
         orderId: orderId ?? null,
         total,
+        cashbackCredits: cashbackCredits ?? 0,
+        cashbackTier: cashbackTier ?? null,
         items: cart.items.map((i) => ({
           id: String(i.product_id),
           name: i.name,
@@ -241,6 +245,10 @@ export default function CheckoutPage() {
       // Card payment → show Stripe form
       if (paymentMethod === "card" && data.clientSecret) {
         setCreatedOrderId(data.orderId ?? null)
+        setEarnedCashback({
+          credits: data.cashbackCredits ?? 0,
+          tier: data.cashbackTier ?? null,
+        })
         setStripeClientSecret(data.clientSecret)
         setShowStripeForm(true)
         setIsProcessing(false)
@@ -248,7 +256,7 @@ export default function CheckoutPage() {
       }
 
       // Non-card payment → redirect to confirmation
-      saveLastOrder(data.orderId)
+      saveLastOrder(data.orderId, data.cashbackCredits, data.cashbackTier)
       clearCart()
       router.push(`/${city.slug}/pedido-confirmado`)
     } catch (err) {
@@ -260,10 +268,9 @@ export default function CheckoutPage() {
   }
 
   const handleStripeSuccess = (_paymentIntentId: string) => {
-    saveLastOrder(createdOrderId ?? undefined)
+    saveLastOrder(createdOrderId ?? undefined, earnedCashback?.credits, earnedCashback?.tier)
     clearCart()
-    router.push(`/${city.slug}/pedido-confirmado`)
-  }
+    router.push(`/${city.slug}/pedido-confirmado`)  }
 
   const handleStripeBack = () => {
     setShowStripeForm(false)
