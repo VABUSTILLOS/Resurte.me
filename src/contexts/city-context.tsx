@@ -55,14 +55,18 @@ function setCityLocalStorage(slug: string) {
   }
 }
 
-const DEFAULT_CITY_SLUG = "chihuahua"
+export const DEFAULT_CITY_SLUG = "chihuahua"
 
 export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
   const [city, setCityState] = useState<City | null>(() => {
-    // Server receives the cookie value from the layout via initialCitySlug,
-    // so the first client render matches the server-rendered HTML (no hydration mismatch).
-    if (typeof window === "undefined" && !initialCitySlug) return null
-    const slug = initialCitySlug || getCityFromCookie() || getCityFromLocalStorage() || DEFAULT_CITY_SLUG
+    // The layout resolves a concrete city slug from the request cookie (falling
+    // back to DEFAULT_CITY_SLUG) so server and client render the same city —
+    // eliminating the "Seleccionar ciudad" hydration mismatch.
+    const slug =
+      initialCitySlug ||
+      getCityFromCookie() ||
+      getCityFromLocalStorage() ||
+      DEFAULT_CITY_SLUG
     const found = MEXICO_CITIES.find((c) => c.slug === slug)
     return (found as City) || null
   })

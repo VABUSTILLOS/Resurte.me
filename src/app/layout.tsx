@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { cookies } from "next/headers"
 import { Geist, Geist_Mono } from "next/font/google"
-import { CityProvider } from "@/contexts/city-context"
+import { CityProvider, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { CartProvider } from "@/contexts/cart-context"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
@@ -113,7 +113,7 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies()
   const initialCitySlug =
-    cookieStore.get("city-slug")?.value ?? null
+    cookieStore.get("city-slug")?.value ?? DEFAULT_CITY_SLUG
   return (
     <html
       lang="es-MX"
