@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Star, Award, Zap } from "lucide-react"
 import { TIER_CONFIGS } from "./types"
 import type { Tier } from "./types"
+import { isoWeek, localMonthYear } from "@/lib/utils"
 
 const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "diamante"]
 
@@ -57,13 +58,7 @@ const TIER_PROGRESS_COLOR: Record<Tier, string> = {
 }
 
 /** Semana ISO de una fecha (1-53), igual que EXTRACT(WEEK ...) en Postgres */
-function isoWeek(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
-}
+// (utilidad compartida en src/lib/utils.ts)
 
 /** Mínimo acumulado por semana para que cuente como "semana calificada" */
 export const QUALIFYING_WEEK_MIN = 2500
@@ -98,7 +93,7 @@ export function useLoyaltyTier() {
           return
         }
 
-        const monthYear = new Date().toISOString().slice(0, 7)
+        const monthYear = localMonthYear()
 
         const { data: orders, error } = await supabase!
           .from("orders")

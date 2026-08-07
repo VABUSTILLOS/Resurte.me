@@ -9,13 +9,15 @@ import { createClient } from "@/lib/supabase/client";
 interface CheckoutFlowScreenProps {
   service: ServiceItem;
   onBack: () => void;
-  onComplete: () => void;
+  onComplete: (newBalance?: number) => void;
   balance?: number;
 }
 
 export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }: CheckoutFlowScreenProps) {
   const [step, setStep] = useState(1);
   const [restaurantName, setRestaurantName] = useState("");
+  const [redeemError, setRedeemError] = useState("");
+  const [isRedeeming, setIsRedeeming] = useState(false);
   const totalSteps = 3;
 
   const remainingAfter = balance - service.cost;
@@ -46,11 +48,34 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
     loadName();
   }, [supabase]);
 
-  const handleSubmit = () => {
-    setStep(3);
-    setTimeout(() => {
-      onComplete();
-    }, 2500);
+  const handleSubmit = async () => {
+    if (isRedeeming) return;
+    setIsRedeeming(true);
+    setRedeemError("");
+
+    try {
+      const response = await fetch("/api/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service_id: service.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setRedeemError(data.error || "No se pudo completar el canje");
+        setIsRedeeming(false);
+        return;
+      }
+
+      setStep(3);
+      setTimeout(() => {
+        onComplete(data.newBalance);
+      }, 2500);
+    } catch {
+      setRedeemError("Error de conexión. Intenta de nuevo.");
+      setIsRedeeming(false);
+    }
   };
 
   return (
@@ -116,9 +141,10 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
           {step === 2 && (
             <Step2Context
               key="s2"
-              service={service}
               restaurantName={restaurantName}
               onNext={handleSubmit}
+              isRedeeming={isRedeeming}
+              redeemError={redeemError}
             />
           )}
           {step === 3 && (
@@ -216,10 +242,13 @@ function Step1Confirm({
 function Step2Context({
   onNext,
   restaurantName,
+  isRedeeming,
+  redeemError,
 }: {
-  service: ServiceItem;
   restaurantName: string;
   onNext: () => void;
+  isRedeeming?: boolean;
+  redeemError?: string;
 }) {
   return (
     <motion.div
@@ -284,13 +313,20 @@ function Step2Context({
 
       <button
         onClick={onNext}
+        disabled={isRedeeming}
         className="mt-5 w-full rounded-2xl bg-emerald-600 py-4 text-base font-bold text-white 
-          shadow-lg shadow-emerald-900/40 transition-all active:scale-[0.98] flex items-center justify-center gap-2
-          hover:bg-emerald-500"
+          shadow-lg shadow-emerald-900/40 transition-all active:scale-[0.98] 
+          hover:bg-emerald-500 disabled:opacity-60 disabled:active:scale-100 flex items-center justify-center gap-2"
       >
         <Sparkles className="h-4 w-4" />
-        Solicitar Servicio
+        {isRedeeming ? "Canjeando..." : "Solicitar Servicio"}
       </button>
+
+      {redeemError && (
+        <p className="mt-3 text-center text-sm font-semibold text-red-400">
+          {redeemError}
+        </p>
+      )}
     </motion.div>
   );
 }

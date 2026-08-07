@@ -5,6 +5,33 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Retorna "YYYY-MM" en la zona horaria de México (-06:00), sin DST,
+ * para coincidir con el `month_year` que puebla el trigger de cashback
+ * (TO_CHAR(NEW.created_at, 'YYYY-MM') en la zona del servidor).
+ */
+export function localMonthYear(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(date)
+  const year = parts.find((p) => p.type === "year")?.value ?? String(date.getFullYear())
+  const month = parts.find((p) => p.type === "month")?.value ?? String(date.getMonth() + 1).padStart(2, "0")
+  return `${year}-${month}`
+}
+
+/**
+ * Semana ISO de una fecha (1-53), igual que EXTRACT(WEEK ...) en Postgres.
+ */
+export function isoWeek(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+}
+
 // Maps legacy text-based icon identifiers to emoji icons
 const CATEGORY_ICON_MAP: Record<string, string> = {
   apple: "🥬",

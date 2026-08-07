@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { isoWeek } from "@/lib/utils"
 import type {
   OrderWithCashback,
   OrderItem,
@@ -198,11 +199,7 @@ export async function getMonthlyCashbackProgress(): Promise<{
   const spendByWeek = new Map<string, number>()
   for (const o of orders) {
     const d = new Date(o.created_at)
-    // ISO week number
-    const jan4 = new Date(d.getFullYear(), 0, 4)
-    const weekNum = Math.ceil(
-      ((d.getTime() - jan4.getTime()) / 86400000 + jan4.getDay() + 1) / 7
-    )
+    const weekNum = isoWeek(d)
     const key = `${d.getFullYear()}-W${weekNum}`
     spendByWeek.set(key, (spendByWeek.get(key) ?? 0) + Number(o.total ?? 0))
   }

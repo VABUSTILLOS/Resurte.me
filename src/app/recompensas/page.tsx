@@ -86,8 +86,9 @@ export default function CashbackPage() {
     setActiveTab("wallet");
   }, []);
 
-  const handleCheckoutComplete = useCallback(() => {
+  const handleCheckoutComplete = useCallback((newBalance?: number) => {
     setShowCheckout(false);
+    if (typeof newBalance === "number") setBalance(newBalance);
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 4000);
   }, []);

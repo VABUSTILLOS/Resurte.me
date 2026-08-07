@@ -70,8 +70,10 @@ function extractTime(timeRange: string): string {
  *
  * Flujo automático del trigger:
  *   1. BEFORE INSERT en `orders` dispara `process_cashback_for_order()`
- *   2. Si total >= $2,500 MXN y hay user_id → calcula nivel, crea wallet si no
- *      existe, inserta transacción y actualiza saldo
+ *   2. Si hay user_id → calcula el nivel del usuario (# semanas ISO calificadas
+ *      en el mes con gasto >= $2,500), crea wallet si no existe, inserta
+ *      transacción y actualiza saldo. TODAS las compras generan cashback a la
+ *      tasa del nivel (5% Verde / 10% Plata / 15% Oro / 20% Diamante)
  *   3. Si es checkout anónimo (sin sesión) → no se genera cashback
  *
  * @returns Order ID + cashback metadata + Stripe client_secret si aplica

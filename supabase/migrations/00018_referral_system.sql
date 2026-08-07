@@ -2,7 +2,7 @@
 -- Resurte.me — Sistema de Referidos
 -- Cada usuario obtiene un código único de referido.
 -- Al registrarse con un código, se vincula al referidor.
--- Cuando el referido hace su primera compra ≥ $2,500 MXN,
+-- Cuando el referido hace su primera compra confirmada (sin mínimo de monto),
 -- el referidor recibe $100 créditos Resurte.
 -- ============================================================
 

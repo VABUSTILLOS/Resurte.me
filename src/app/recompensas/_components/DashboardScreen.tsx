@@ -13,6 +13,7 @@ import { TIER_CONFIGS } from "./types";
 import { LoyaltyTierBanner, useLoyaltyTier, TIER_ORDER } from "./LoyaltyTierCard";
 import { ReferralDashboard } from "@/components/referral-dashboard";
 import { createClient } from "@/lib/supabase/client";
+import { localMonthYear } from "@/lib/utils";
 import type { Tier } from "./types";
 import type { ServiceItem } from "./types";
 import type { WalletTransaction } from "@/types";
@@ -380,7 +381,7 @@ function ProfileView() {
           }
         }
 
-        const monthYear = new Date().toISOString().slice(0, 7)
+        const monthYear = localMonthYear()
         const { count: monthCount } = await supabase!
           .from("orders")
           .select("id", { count: "exact", head: true })
