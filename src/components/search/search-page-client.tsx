@@ -11,7 +11,7 @@ import { getCategoryIcon } from "@/lib/utils"
 import { loadMoreProducts } from "@/app/[slug]/buscar/actions"
 import Link from "next/link"
 
-type SortOption = "name" | "price-asc" | "price-desc"
+type SortOption = "categoria" | "name" | "price-asc" | "price-desc"
 
 interface SearchPageClientProps {
   citySlug: string
@@ -33,7 +33,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
   const [loadingMore, setLoadingMore] = useState(false)
 
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
-  const [sortBy, setSortBy] = useState<SortOption>("name")
+  const [sortBy, setSortBy] = useState<SortOption>("categoria")
   const filterBarRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -45,6 +45,21 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
     })
     return map
   }, [allProducts])
+
+  // Priority map: Frutas y Verduras (0), Carnes (1), resto (2)
+  const categoryPriority = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const cat of categories) {
+      const slug = (cat.slug ?? "").toLowerCase()
+      const name = (cat.name ?? "").toLowerCase()
+      if (slug.includes("frut") || slug.includes("verdura") || name.includes("frutas y verduras")) {
+        map.set(cat.id, 0)
+      } else if (slug.includes("carne") || name.includes("carne")) {
+        map.set(cat.id, 1)
+      }
+    }
+    return map
+  }, [categories])
 
   // Compute filtered + searched results (derived state, no effect needed)
   const results = useMemo(() => {
@@ -72,10 +87,18 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
         return copy.sort((a, b) => a.price - b.price)
       case "price-desc":
         return copy.sort((a, b) => b.price - a.price)
+      case "categoria":
+        return copy.sort((a, b) => {
+          const diff =
+            (categoryPriority.get(a.category_id) ?? 2) -
+            (categoryPriority.get(b.category_id) ?? 2)
+          if (diff !== 0) return diff
+          return a.name.localeCompare(b.name)
+        })
       default:
         return copy.sort((a, b) => a.name.localeCompare(b.name))
     }
-  }, [results, sortBy])
+  }, [results, sortBy, categoryPriority])
 
   // Infinite scroll: observe sentinel element
   useEffect(() => {
@@ -106,6 +129,16 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
   const handleCategoryToggle = (catId: number) => {
     setSelectedCategory(prev => prev === catId ? null : catId)
   }
+
+  // Order category chips by priority (Frutas y Verduras → Carnes → resto)
+  const orderedCategories = useMemo(
+    () =>
+      [...categories].sort(
+        (a, b) =>
+          (categoryPriority.get(a.id) ?? 2) - (categoryPriority.get(b.id) ?? 2),
+      ),
+    [categories, categoryPriority],
+  )
 
   const hasResults = sortedResults.length > 0
   const isShowingAll = !query
@@ -183,7 +216,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
                 Todo
                 <span className="text-xs opacity-70 ml-0.5">{allCount}</span>
               </button>
-              {categories.map((cat) => {
+              {orderedCategories.map((cat) => {
                 const count = categoryCounts.get(cat.id) ?? 0
                 if (count === 0) return null
                 return (
@@ -222,6 +255,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
                   onChange={(e) => setSortBy(e.target.value as SortOption)}
                   className="text-xs font-medium text-[#1a1a1a] bg-transparent outline-none cursor-pointer appearance-none pr-1"
                 >
+                  <option value="categoria">Recomendados</option>
                   <option value="name">Nombre A-Z</option>
                   <option value="price-asc">Menor precio</option>
                   <option value="price-desc">Mayor precio</option>
