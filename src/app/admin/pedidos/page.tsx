@@ -94,16 +94,43 @@ export default function AdminOrdersPage() {
                   <td className="px-5 py-3 text-xs text-gray-500">Usuario #{order.id * 7}</td>
                   <td className="px-5 py-3 font-semibold text-gray-900">${order.total.toFixed(2)}</td>
                   <td className="px-5 py-3">
-                    <div>
-                      <span className="text-xs text-gray-600">{PAYMENT_METHOD_LABEL[order.payment_method]}</span>
-                      <span
-                        className={`ml-2 text-[10px] font-medium ${
-                          order.payment_status === "paid" ? "text-green-600" :
-                          order.payment_status === "failed" ? "text-red-600" : "text-amber-600"
-                        }`}
-                      >
-                        {PAYMENT_STATUS_LABEL[order.payment_status]}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <span className="text-xs text-gray-600">{PAYMENT_METHOD_LABEL[order.payment_method]}</span>
+                        <span
+                          className={`ml-2 text-[10px] font-medium ${
+                            order.payment_status === "paid" ? "text-green-600" :
+                            order.payment_status === "failed" ? "text-red-600" : "text-amber-600"
+                          }`}
+                        >
+                          {PAYMENT_STATUS_LABEL[order.payment_status]}
+                        </span>
+                      </div>
+                      {order.payment_status === "pending" && order.payment_method !== "card" && (
+                        <button
+                          type="button"
+                          className="ml-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors"
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/orders/${order.id}/status`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ payment_status: "paid" }),
+                              })
+                              if (res.ok) {
+                                alert(`Pago del pedido #${order.id} confirmado. El cashback se abonó a la wallet del cliente.`)
+                              } else {
+                                const data = await res.json()
+                                alert(data.error || "Error al confirmar el pago")
+                              }
+                            } catch {
+                              alert("Error de conexión")
+                            }
+                          }}
+                        >
+                          Confirmar pago
+                        </button>
+                      )}
                     </div>
                   </td>
                   <td className="px-5 py-3">

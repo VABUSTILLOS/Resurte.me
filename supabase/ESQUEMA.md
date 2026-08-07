@@ -52,3 +52,46 @@ los datos ya existentes.
    stock tardan hasta 5 minutos en reflejarse en la tienda.
 4. `stock_status` es un ENUM `in_stock | low_stock | out_of_stock`. No hay
    inventario numérico.
+
+## Flujo de cashback (Créditos Resurte)
+
+> Regla de negocio: **todas** las compras generan cashback a la tasa del nivel
+> actual. El mínimo de **$2,500 MXN semanales** no genera puntos por sí solo:
+> sirve para **subir de nivel** y ganar mayor porcentaje.
+
+### Niveles (semanas calificadas del mes, `America/Mexico_City`)
+
+Una semana ISO del mes **califica** si el gasto acumulado en compras **pagadas**
+de esa semana es ≥ $2,500 MXN. El nivel se calcula sobre el total de semanas
+calificadas en el mes:
+
+| Semanas calificadas | Nivel | Cashback |
+|---|---|---|
+| 0–1 | Verde | 5% |
+| 2 | Plata | 10% |
+| 3 | Oro | 15% |
+| 4+ | Diamante | 20% |
+
+### Cuándo se abona
+
+**El cashback se abona SOLO cuando el pago se confirma** (`payment_status = 'paid'`):
+
+- **Tarjeta (Stripe):** el webhook `payment_intent.succeeded` marca `paid` →
+  el trigger `trg_credit_cashback_on_payment` abona la wallet.
+- **COD / SPEI / OXXO / Mercado Pago:** el admin confirma el pago manualmente
+  (`PATCH /api/orders/[id]/status` con `payment_status: "paid"`).
+
+Al crear la orden (`BEFORE INSERT`, `trg_cashback_on_order`) **solo** se guarda
+la metadata estimada (`week_of_month`, `month_year`, `cashback_credits`,
+`cashback_tier`) para mostrarla en la confirmación del pedido. El valor REAL
+(con nivel final) se fija en el momento del abono.
+
+### Guardas de integridad
+
+- **Anti-doble-abono:** `credit_cashback_on_payment()` no abona si ya existe
+  una transacción positiva de cashback para esa orden.
+- **Anti-abuso de nivel:** las semanas calificadas solo cuentan órdenes con
+  `payment_status = 'paid' AND status <> 'cancelled'` → crear órdenes sin pagar
+  NO sube el nivel.
+- **Reversión:** al cancelar o fallar el pago, `trg_reverse_cashback` revierte
+  los créditos (solo si el cashback fue realmente abonado).

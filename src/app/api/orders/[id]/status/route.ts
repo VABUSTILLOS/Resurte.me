@@ -4,14 +4,19 @@
  * Updates an order's status and triggers WhatsApp workflow notifications.
  * Used by the admin panel when changing order status.
  * 
- * Body: { status: OrderStatus }
+ * Body: { status?: OrderStatus, payment_status?: PaymentStatus }
+ *   - status: nuevo estado del pedido (opcional).
+ *   - payment_status: confirmación manual de pago para métodos sin cobro
+ *     en línea (COD, SPEI, OXXO, Mercado Pago). El único valor permitido
+ *     aquí es "paid"; al aplicarlo, el trigger trg_credit_cashback_on_payment
+ *     abona el cashback a la wallet del usuario.
  * Authentication: Requires service role (admin only)
  */
 
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { onOrderStatusChange } from "@/lib/workflows"
-import type { OrderStatus } from "@/types"
+import type { OrderStatus, PaymentStatus } from "@/types"
 
 const VALID_STATUSES: OrderStatus[] = [
   "pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled",
@@ -30,11 +35,30 @@ export async function PATCH(
     }
 
     const body = await req.json()
-    const { status } = body
+    const { status, payment_status } = body
 
-    if (!status || !VALID_STATUSES.includes(status)) {
+    // Se requiere al menos uno de los dos campos
+    if (!status && !payment_status) {
+      return NextResponse.json(
+        { error: "Se requiere status o payment_status" },
+        { status: 400 }
+      )
+    }
+
+    if (status && !VALID_STATUSES.includes(status)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` },
+        { status: 400 }
+      )
+    }
+
+    // Confirmación manual de pago: solo se permite marcar como "paid".
+    // Cualquier otro valor no se acepta por este endpoint (el flujo de
+    // tarjeta lo controla el webhook de Stripe).
+    const VALID_PAYMENT_STATUSES: PaymentStatus[] = ["paid"]
+    if (payment_status && !VALID_PAYMENT_STATUSES.includes(payment_status)) {
+      return NextResponse.json(
+        { error: "payment_status solo puede ser 'paid' (confirmación manual de pago)" },
         { status: 400 }
       )
     }
@@ -53,27 +77,41 @@ export async function PATCH(
     }
 
     const oldStatus = currentOrder.status as OrderStatus
+    const oldPaymentStatus = currentOrder.payment_status as PaymentStatus
 
-    // Don't update if status hasn't changed
-    if (oldStatus === status) {
+    // Don't update if nothing changed
+    if ((!status || oldStatus === status) && (!payment_status || oldPaymentStatus === payment_status)) {
       return NextResponse.json({
         success: true,
-        order: { id: orderId, status },
+        order: {
+          id: orderId,
+          ...(status ? { status } : {}),
+          ...(payment_status ? { payment_status } : {}),
+        },
         message: "Status unchanged",
       })
     }
 
-    // Update the order status
+    const updatePayload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (status) {
+      updatePayload.status = status
+      // If cancelling, set payment to failed if pending
+      if (status === "cancelled" && currentOrder.payment_status === "pending") {
+        updatePayload.payment_status = "failed"
+      }
+    }
+
+    if (payment_status === "paid") {
+      updatePayload.payment_status = "paid"
+    }
+
+    // Update the order
     const { data: updatedOrder, error: updateError } = await supabase
       .from("orders")
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
-        // If cancelling, set payment to failed if pending
-        ...(status === "cancelled" && currentOrder.payment_status === "pending"
-          ? { payment_status: "failed" }
-          : {}),
-      })
+      .update(updatePayload)
       .eq("id", orderId)
       .select("*")
       .single()
@@ -85,12 +123,14 @@ export async function PATCH(
       )
     }
 
-    // Trigger WhatsApp workflow notifications
+    // Trigger WhatsApp workflow notifications (solo si cambió el status)
     let workflowResults: unknown[] = []
-    try {
-      workflowResults = await onOrderStatusChange(orderId, oldStatus, status as OrderStatus)
-    } catch (workflowErr) {
-      console.error("[API] Workflow error (non-blocking):", workflowErr)
+    if (status && oldStatus !== status) {
+      try {
+        workflowResults = await onOrderStatusChange(orderId, oldStatus, status as OrderStatus)
+      } catch (workflowErr) {
+        console.error("[API] Workflow error (non-blocking):", workflowErr)
+      }
     }
 
     return NextResponse.json({
