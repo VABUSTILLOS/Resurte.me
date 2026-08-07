@@ -89,6 +89,20 @@ export default function PedidosPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Comanda en vivo: refresco automático cada 30s sin bloquear la UI
+  useEffect(() => {
+    const id = setInterval(async () => {
+      if (!restaurant) return
+      try {
+        const os = await listOrders(restaurant.id)
+        setOrders(os)
+      } catch {
+        // silencioso: el siguiente ciclo reintenta
+      }
+    }, 30_000)
+    return () => clearInterval(id)
+  }, [restaurant])
+
   const branchName = useMemo(() => {
     const map = new Map(branches.map((b) => [b.id, b.name]))
     return (id: string | null) => (id ? map.get(id) ?? "—" : "—")

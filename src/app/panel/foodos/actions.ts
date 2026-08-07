@@ -526,18 +526,42 @@ export async function insertCampaign(input: {
   scheduled_for?: string | null
   status?: string
   channel?: string
-}): Promise<void> {
+}): Promise<{ data: FoodosCampaign }> {
   const { supabase } = await requireAuth()
-  const { error } = await supabase.from("foodos_campaigns").insert({
-    restaurant_id: input.restaurant_id,
-    automation_id: input.automation_id ?? null,
-    customer_id: input.customer_id ?? null,
-    scheduled_for: input.scheduled_for ?? null,
-    status: input.status ?? "scheduled",
-    channel: input.channel ?? "whatsapp",
-  })
+  const { data, error } = await supabase
+    .from("foodos_campaigns")
+    .insert({
+      restaurant_id: input.restaurant_id,
+      automation_id: input.automation_id ?? null,
+      customer_id: input.customer_id ?? null,
+      scheduled_for: input.scheduled_for ?? null,
+      status: input.status ?? "scheduled",
+      channel: input.channel ?? "whatsapp",
+    })
+    .select("*")
+    .single()
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/clientes")
+  return { data: data as FoodosCampaign }
+}
+
+export async function runCampaignNow(
+  campaignId: string
+): Promise<{ sent: number; failed: number; skipped: number }> {
+  // Verifica sesión y propiedad antes de delegar al motor (service client)
+  const { supabase, user } = await requireAuth()
+  const { data: campaign } = await supabase
+    .from("foodos_campaigns")
+    .select("id, foodos_restaurants!inner(user_id)")
+    .eq("id", campaignId)
+    .eq("foodos_restaurants.user_id", user.id)
+    .maybeSingle()
+  if (!campaign) throw new Error("Campaña no encontrada")
+
+  const { runFoodosCampaign } = await import("@/lib/foodos-campaigns")
+  const result = await runFoodosCampaign(campaignId)
+  revalidatePath("/panel/foodos/clientes")
+  return result
 }
 
 export async function deleteCampaign(id: string): Promise<void> {

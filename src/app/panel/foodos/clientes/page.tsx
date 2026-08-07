@@ -14,6 +14,7 @@ import {
   upsertAutomation,
   listCampaigns,
   insertCampaign,
+  runCampaignNow,
   deleteCampaign,
 } from "../actions"
 import { formatMoney, SEGMENT_META, segmentCustomer } from "@/lib/foodos"
@@ -177,18 +178,26 @@ export default function ClientesPage() {
 
   async function runCampaign(auto: FoodosAutomation) {
     if (!restaurant) return
-    if (!confirm(`¿Ejecutar "${auto.name}" ahora? Se registrará una campaña para los clientes objetivo.`)) return
+    if (!confirm(`¿Ejecutar "${auto.name}" ahora? Se enviará un WhatsApp a cada cliente objetivo.`)) return
     setSendingCampaign(auto.id)
+    setError(null)
     try {
-      await insertCampaign({
+      const { data: campaign } = await insertCampaign({
         restaurant_id: restaurant.id,
         automation_id: auto.id,
         status: "scheduled",
         channel: "whatsapp",
       })
+      const result = await runCampaignNow(campaign.id)
+      if (result.failed > 0) {
+        setError(
+          `Campaña enviada: ${result.sent} mensajes OK, ${result.failed} fallidos` +
+            (result.skipped ? `, ${result.skipped} sin teléfono válido` : "")
+        )
+      }
       setCampaigns(await listCampaigns(restaurant.id))
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al crear campaña")
+      setError(e instanceof Error ? e.message : "Error al ejecutar campaña")
     } finally {
       setSendingCampaign(null)
     }
@@ -368,7 +377,12 @@ export default function ClientesPage() {
                       <p className="text-xs font-semibold text-stone-700">
                         {new Date(c.created_at).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}
                       </p>
-                      <p className="text-xs text-stone-500 capitalize">{c.status} · {c.channel}</p>
+                      <p className="text-xs text-stone-500 capitalize">
+                        {c.status === "sent" ? "enviada" : c.status === "failed" ? "fallida" : c.status === "scheduled" ? "programada" : c.status} · {c.channel}
+                      </p>
+                      {c.error && (
+                        <p className="text-[11px] text-red-600 mt-0.5">{c.error}</p>
+                      )}
                     </div>
                     <button
                       onClick={() => removeCampaign(c.id)}

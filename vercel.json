@@ -45,6 +45,10 @@
     {
       "path": "/api/workflows/trigger?job=reactivation",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/foodos/campaigns/run",
+      "schedule": "0 18 * * *"
     }
   ]
 }

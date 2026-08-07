@@ -181,5 +181,7 @@ export interface FoodosCampaign {
   scheduled_for: string | null
   status: FoodosCampaignStatus
   channel: string
+  error: string | null
+  sent_at: string | null
   created_at: string
 }
