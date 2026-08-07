@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import {
   ShoppingBag,
   Plus,
@@ -15,6 +16,7 @@ import {
   CheckCircle2,
   Sparkles,
   Trash2,
+  Compass,
 } from "lucide-react"
 import {
   computeOrderTotals,
@@ -100,10 +102,16 @@ export function FoodosStorefront({
   }
 
   const addCombo = (combo: FoodosCombo) => {
-    setCart((prev) => [
-      ...prev,
-      { item_id: combo.id, name: combo.name, price: combo.price, qty: 1, combo_id: combo.id },
-    ])
+    setCart((prev) => {
+      const existing = prev.find((i) => i.combo_id === combo.id)
+      if (existing) {
+        return prev.map((i) => (i.combo_id === combo.id ? { ...i, qty: i.qty + 1 } : i))
+      }
+      return [
+        ...prev,
+        { item_id: combo.id, name: combo.name, price: combo.price, qty: 1, combo_id: combo.id },
+      ]
+    })
   }
 
   const addRecommendation = (rec: (typeof recommendations)[number]) => {
@@ -206,6 +214,12 @@ export function FoodosStorefront({
             <div>
               <h1 className="font-black text-stone-900 leading-tight">{restaurant.name}</h1>
               <p className="text-xs text-stone-500">{restaurant.description ?? "Pide en línea"}</p>
+              <Link
+                href="/comer"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-600 mt-0.5"
+              >
+                <Compass className="w-3 h-3" /> hoyquecomemos.mx
+              </Link>
             </div>
           </div>
           <button

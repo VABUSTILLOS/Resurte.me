@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
-import { createClientOrNotFound } from "@/lib/supabase/server"
+import {
+  getCachedCollectionBySlug,
+  getCachedVisibleProducts,
+} from "@/lib/catalog-cache"
 import { Metadata } from "next"
 import { CollectionPageClient } from "./collection-page-client"
 import type { Product } from "@/types"
@@ -13,13 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, collectionSlug } = await params
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
 
-  const supabase = await createClientOrNotFound()
-  const { data: collection } = await supabase
-    .from("restaurant_collections")
-    .select("name")
-    .eq("slug", collectionSlug)
-    .eq("is_active", true)
-    .single()
+  const collection = await getCachedCollectionBySlug(collectionSlug)
 
   if (!city || !collection) {
     return { title: "Colección no encontrada — Resurte.me" }
@@ -41,19 +38,12 @@ export default async function CollectionPage({ params }: Props) {
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   if (!city) notFound()
 
-  const supabase = await createClientOrNotFound()
-
-  // Fetch collection metadata
-  const { data: collection } = await supabase
-    .from("restaurant_collections")
-    .select("*")
-    .eq("slug", collectionSlug)
-    .eq("is_active", true)
-    .single()
+  // Fetch collection metadata (cached)
+  const collection = await getCachedCollectionBySlug(collectionSlug)
 
   if (!collection) notFound()
 
-  // Fetch products matching this collection's tags
+  // Fetch products matching this collection's tags (cached full catalog)
   const tags = (collection as { tags: string[] }).tags || []
 
   let products: Record<string, unknown>[] = []
@@ -61,26 +51,12 @@ export default async function CollectionPage({ params }: Props) {
   // Ingredients like "Sal", "Aceite vegetal" or "Pan brioche" may not be tagged
   // with this collection, so we match against the whole store, not just the
   // collection-filtered grid.
-  let allProducts: Record<string, unknown>[] = []
+  const allProducts = (await getCachedVisibleProducts()) as unknown as Record<string, unknown>[]
   if (tags.length > 0) {
-    const { data } = await supabase
-      .from("products")
-      .select("*")
-      .eq("is_visible", true)
-      .order("name")
-
-    allProducts = (data ?? []) as Record<string, unknown>[]
     products = allProducts.filter((p) => {
       const productTags: string[] = Array.isArray(p.tags) ? (p.tags as string[]) : []
       return productTags.some((t: string) => tags.includes(t))
     })
-  } else {
-    const { data } = await supabase
-      .from("products")
-      .select("*")
-      .eq("is_visible", true)
-      .order("name")
-    allProducts = (data ?? []) as Record<string, unknown>[]
   }
 
   return (

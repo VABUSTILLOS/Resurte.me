@@ -17,6 +17,7 @@ const FOOTER_LINKS = {
     { label: "Línea de crédito", href: "/negocio/credito" },
     { label: "Facturación electrónica", href: "/negocio/facturacion" },
     { label: "Cotizaciones por volumen", href: "/negocio/cotizaciones" },
+    { label: "Marketplace hoyquecomemos", href: "/comer" },
   ],
   Recursos: [
     { label: "Blog", href: "/blog" },

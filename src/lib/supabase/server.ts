@@ -39,6 +39,16 @@ export async function createClient() {
 }
 
 /**
+ * Detecta si el request trae una sesión de Supabase SIN hacer una llamada de
+ * red. Los cookies de sesión de Supabase usan el prefijo `sb-`. Cuando no hay
+ * cookie (visitante anónimo), evitar getUser() ahorra un roundtrip a la red.
+ */
+export async function hasSessionCookie(): Promise<boolean> {
+  const cookieStore = await cookies()
+  return cookieStore.getAll().some((c) => c.name.startsWith("sb-"))
+}
+
+/**
  * Igual que createClient pero degrada a 404 cuando Supabase no está
  * configurado en el entorno (dev local o preview sin secrets). Ideal para
  * páginas de catálogo que no tienen datos que mostrar sin backend.

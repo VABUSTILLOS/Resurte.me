@@ -24,6 +24,7 @@ export interface FoodosBranch {
   id: string
   restaurant_id: string
   name: string
+  city: string | null
   address: string | null
   lat: number | null
   lng: number | null

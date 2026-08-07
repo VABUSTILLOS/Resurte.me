@@ -41,10 +41,12 @@ export default function TableroPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState(30)
+  const [now, setNow] = useState(() => Date.now())
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setNow(Date.now())
     try {
       const r = await getMyRestaurant()
       setRestaurant(r)
@@ -68,7 +70,7 @@ export default function TableroPage() {
   useEffect(() => { load() }, [load])
 
   const metrics = useMemo(() => {
-    const cutoff = Date.now() - days * DAY_MS
+    const cutoff = now - days * DAY_MS
     const recent = orders.filter((o) => {
       const t = new Date(o.created_at).getTime()
       return t >= cutoff && o.status !== "cancelled"
@@ -83,7 +85,7 @@ export default function TableroPage() {
     // por día (últimos 7 días)
     const byDay: { label: string; count: number }[] = []
     for (let i = days - 1; i >= 0; i--) {
-      const start = Date.now() - i * DAY_MS
+      const start = now - i * DAY_MS
       const end = start + DAY_MS
       const count = recent.filter((o) => {
         const t = new Date(o.created_at).getTime()
@@ -142,7 +144,7 @@ export default function TableroPage() {
       repeatRate,
       customers: customers.length,
     }
-  }, [orders, customers, days])
+  }, [orders, customers, days, now])
 
   const maxDay = useMemo(
     () => Math.max(...metrics.byDay.map((d) => d.count), 1),

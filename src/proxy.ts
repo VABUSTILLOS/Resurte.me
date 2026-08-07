@@ -117,27 +117,36 @@ export async function proxy(request: NextRequest) {
   // Sin Supabase configurado (dev local o preview sin secrets) el sitio
   // público renderiza igual: no hay sesión que refrescar ni cookies que copiar.
   if (isSupabaseConfigured()) {
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll()
-          },
-          setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-            supabaseResponse = NextResponse.next({ request })
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, options)
-            )
-          },
-        },
-      }
-    )
+    // Solo hay sesión que refrescar si el request trae cookies `sb-` (visitante
+    // autenticado). Saltarnos getUser() para visitantes anónimos ahorra un
+    // roundtrip a la red en CADA request del sitio.
+    const hasSessionCookie = request.cookies
+      .getAll()
+      .some((c) => c.name.startsWith("sb-"))
 
-    // Refresca la sesión (renueva token si expiró, setea cookies)
-    await supabase.auth.getUser()
+    if (hasSessionCookie) {
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            getAll() {
+              return request.cookies.getAll()
+            },
+            setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+              cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+              supabaseResponse = NextResponse.next({ request })
+              cookiesToSet.forEach(({ name, value, options }) =>
+                supabaseResponse.cookies.set(name, value, options)
+              )
+            },
+          },
+        }
+      )
+
+      // Refresca la sesión (renueva token si expiró, setea cookies)
+      await supabase.auth.getUser()
+    }
   }
 
   // ── City detection & routing ──

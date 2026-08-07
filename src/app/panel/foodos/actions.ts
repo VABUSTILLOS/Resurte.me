@@ -134,6 +134,7 @@ export async function upsertBranch(input: {
   id?: string
   restaurant_id: string
   name: string
+  city?: string | null
   address?: string | null
   phone?: string | null
   pickup_active: boolean
@@ -155,6 +156,7 @@ export async function upsertBranch(input: {
   const payload = {
     restaurant_id: input.restaurant_id,
     name: input.name,
+    city: input.city || null,
     address: input.address || null,
     phone: input.phone || null,
     pickup_active: input.pickup_active,

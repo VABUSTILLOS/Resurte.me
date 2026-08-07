@@ -38,6 +38,7 @@ export default function RestaurantePage() {
 
   // Nueva sucursal
   const [branchName, setBranchName] = useState("")
+  const [branchCity, setBranchCity] = useState("")
   const [branchAddress, setBranchAddress] = useState("")
   const [branchPhone, setBranchPhone] = useState("")
 
@@ -110,6 +111,7 @@ export default function RestaurantePage() {
     await upsertBranch({
       restaurant_id: restaurant.id,
       name: branchName,
+      city: branchCity || null,
       address: branchAddress || null,
       phone: branchPhone || null,
       pickup_active: true,
@@ -118,6 +120,7 @@ export default function RestaurantePage() {
       min_order: 0,
     })
     setBranchName("")
+    setBranchCity("")
     setBranchAddress("")
     setBranchPhone("")
     setBranches(await listBranches(restaurant.id))
@@ -321,7 +324,8 @@ export default function RestaurantePage() {
                   <div key={b.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3">
                     <div>
                       <p className="text-sm font-medium text-gray-800">{b.name}</p>
-                      {b.address && <p className="text-xs text-gray-500 mt-0.5">{b.address}</p>}
+                      {b.city && <p className="text-xs text-gray-500 mt-0.5">📍 {b.city}</p>}
+                      {b.address && <p className="text-xs text-gray-500">{b.address}</p>}
                       <div className="flex gap-3 mt-1.5">
                         {b.pickup_active && (
                           <span className="text-[10px] font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Para llevar</span>
@@ -347,6 +351,12 @@ export default function RestaurantePage() {
                 value={branchName}
                 onChange={(e) => setBranchName(e.target.value)}
                 placeholder="Sucursal Centro"
+                className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+              />
+              <input
+                value={branchCity}
+                onChange={(e) => setBranchCity(e.target.value)}
+                placeholder="Ciudad (ej. Guadalajara)"
                 className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
               />
               <input

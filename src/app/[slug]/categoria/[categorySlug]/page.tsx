@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
-import { createClientOrNotFound } from "@/lib/supabase/server"
+import {
+  getCachedCategoryBySlug,
+  getCachedProductsByCategory,
+} from "@/lib/catalog-cache"
 import { Metadata } from "next"
 import { CategoryPageClient } from "./category-page-client"
 
@@ -12,12 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug, categorySlug } = await params
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
 
-  const supabase = await createClientOrNotFound()
-  const { data: category } = await supabase
-    .from("categories")
-    .select("name")
-    .eq("slug", categorySlug)
-    .single()
+  const category = await getCachedCategoryBySlug(categorySlug)
 
   if (!city || !category) {
     return { title: "Categoría no encontrada — Resurte.me" }
@@ -39,31 +37,20 @@ export default async function CategoryPage({ params }: Props) {
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   if (!city) notFound()
 
-  const supabase = await createClientOrNotFound()
-
-  // Fetch category
-  const { data: category } = await supabase
-    .from("categories")
-    .select("id, name, slug, icon, parent_id")
-    .eq("slug", categorySlug)
-    .single()
+  // Fetch category (cached)
+  const category = await getCachedCategoryBySlug(categorySlug)
 
   if (!category) notFound()
 
-  // Fetch products in this category
-  const { data: products } = await supabase
-    .from("products")
-    .select("*")
-    .eq("category_id", category.id)
-    .eq("is_visible", true)
-    .order("name")
+  // Fetch products in this category (cached)
+  const products = await getCachedProductsByCategory(category.id)
 
   return (
     <CategoryPageClient
       citySlug={slug}
       cityName={city.name}
       category={category}
-      products={products ?? []}
+      products={products}
     />
   )
 }

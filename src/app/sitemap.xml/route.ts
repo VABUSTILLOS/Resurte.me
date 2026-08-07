@@ -72,6 +72,9 @@ export async function GET() {
     })
   }
 
+  // Marketplace hoyquecomemos
+  entries.push({ url: `${BASE_URL}/comer`, changeFrequency: "daily", priority: 0.9 })
+
   const xml = generateSitemapXml(entries)
 
   return new Response(xml, {

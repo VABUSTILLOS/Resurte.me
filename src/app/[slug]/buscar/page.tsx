@@ -3,8 +3,10 @@ import { MEXICO_CITIES } from "@/lib/cities"
 import { Metadata } from "next"
 import { SearchPageClient } from "@/components/search/search-page-client"
 import { Suspense } from "react"
-import { createClientOrNotFound } from "@/lib/supabase/server"
-import { getProductsPaginated } from "@/lib/data"
+import {
+  getCachedCategories,
+  getCachedProductsPaginated,
+} from "@/lib/catalog-cache"
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -44,16 +46,11 @@ export default async function SearchPage({ params }: Props) {
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   if (!city) notFound()
 
-  const supabase = await createClientOrNotFound()
+  const categoriesPromise = getCachedCategories()
 
-  const categoriesPromise = supabase
-    .from("categories")
-    .select("id, name, slug, icon, parent_id")
-    .order("id")
+  const productsPromise = getCachedProductsPaginated(0, INITIAL_PAGE_SIZE)
 
-  const productsPromise = getProductsPaginated(0, INITIAL_PAGE_SIZE)
-
-  const [{ data: categories }, { products, total }] = await Promise.all([
+  const [categories, { products, total }] = await Promise.all([
     categoriesPromise,
     productsPromise,
   ])
@@ -64,7 +61,7 @@ export default async function SearchPage({ params }: Props) {
         citySlug={slug}
         cityName={city.name}
         products={products}
-        categories={categories ?? []}
+        categories={categories}
         totalProducts={total}
         pageSize={INITIAL_PAGE_SIZE}
       />

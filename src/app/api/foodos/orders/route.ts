@@ -4,6 +4,33 @@ import { getStripe } from "@/lib/stripe"
 import { computeOrderTotals } from "@/lib/foodos"
 import type { FoodosOrderItem } from "@/types/foodos"
 
+// Rate limiting básico en memoria (sliding window por IP).
+// Suficiente para mitigar abuso; para multi-instancia usar Upstash/Redis.
+const RATE_LIMIT_MAX = 20
+const RATE_LIMIT_WINDOW_MS = 60_000
+const rateBuckets = new Map<string, number[]>()
+
+function rateLimited(ip: string): boolean {
+  const now = Date.now()
+  const cutoff = now - RATE_LIMIT_WINDOW_MS
+  const hits = (rateBuckets.get(ip) ?? []).filter((t) => t > cutoff)
+  if (hits.length >= RATE_LIMIT_MAX) {
+    rateBuckets.set(ip, hits)
+    return true
+  }
+  hits.push(now)
+  rateBuckets.set(ip, hits)
+  return false
+}
+
+function clientIp(request: NextRequest): string {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  )
+}
+
 interface FoodosOrderBody {
   restaurant_id: string
   branch_id?: string | null
@@ -30,13 +57,18 @@ interface FoodosOrderBody {
  */
 export async function POST(request: NextRequest) {
   try {
+    if (rateLimited(clientIp(request))) {
+      return NextResponse.json(
+        { error: "Demasiadas peticiones. Intenta en un minuto." },
+        { status: 429 }
+      )
+    }
+
     const body: FoodosOrderBody = await request.json()
     const {
       restaurant_id,
       branch_id,
       items,
-      delivery_fee = 0,
-      discount = 0,
       channel = "web",
       fulfillment = "pickup",
       payment_method,
@@ -56,21 +88,107 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validar montos: no confiar en el cliente
-    const cleanItems: FoodosOrderItem[] = items.map((i) => ({
-      item_id: i.item_id,
-      name: i.name ?? "Producto",
-      price: Math.max(Number(i.price) || 0, 0),
-      qty: Math.max(Number(i.qty) || 0, 1),
-      combo_id: i.combo_id ?? null,
-    }))
+    // Validar montos: NO confiar en el cliente. Cargar el menú real del
+    // restaurante y recalcular precios server-side.
+    const supabase = await createServiceClient()
+
+    const { data: restaurant } = await supabase
+      .from("foodos_restaurants")
+      .select("id")
+      .eq("id", restaurant_id)
+      .eq("status", "active")
+      .maybeSingle()
+    if (!restaurant) {
+      return NextResponse.json({ error: "Restaurante no encontrado o inactivo" }, { status: 404 })
+    }
+
+    let serverDeliveryFee = 0
+    if (branch_id) {
+      const { data: branch } = await supabase
+        .from("foodos_branches")
+        .select("id, pickup_active, delivery_active, delivery_fee")
+        .eq("id", branch_id)
+        .eq("restaurant_id", restaurant_id)
+        .maybeSingle()
+      if (!branch) {
+        return NextResponse.json(
+          { error: "Sucursal no válida para este restaurante" },
+          { status: 400 }
+        )
+      }
+      if (fulfillment === "delivery" && !branch.delivery_active) {
+        return NextResponse.json({ error: "Esta sucursal no ofrece entrega" }, { status: 400 })
+      }
+      if (fulfillment === "pickup" && !branch.pickup_active) {
+        return NextResponse.json({ error: "Esta sucursal no ofrece recolección" }, { status: 400 })
+      }
+      serverDeliveryFee = fulfillment === "delivery" ? Number(branch.delivery_fee) || 0 : 0
+    }
+
+    const MAX_LINES = 20
+    const MAX_QTY_PER_LINE = 50
+    if (items.length > MAX_LINES) {
+      return NextResponse.json(
+        { error: `Máximo ${MAX_LINES} líneas por pedido` },
+        { status: 400 }
+      )
+    }
+
+    const comboIds = [...new Set(items.filter((i) => i.combo_id).map((i) => i.combo_id as string))]
+    const itemIds = [...new Set(items.filter((i) => !i.combo_id).map((i) => i.item_id))]
+
+    const [combosRes, itemsRes] = await Promise.all([
+      comboIds.length
+        ? supabase.from("foodos_combos").select("id, price").in("id", comboIds)
+        : Promise.resolve({ data: [] as { id: string; price: number }[], error: null }),
+      itemIds.length
+        ? supabase.from("foodos_menu_items").select("id, price").in("id", itemIds)
+        : Promise.resolve({ data: [] as { id: string; price: number }[], error: null }),
+    ])
+
+    const comboPrice = new Map((combosRes.data ?? []).map((c) => [c.id, Number(c.price)]))
+    const itemPrice = new Map((itemsRes.data ?? []).map((i) => [i.id, Number(i.price)]))
+
+    const cleanItems: FoodosOrderItem[] = []
+    for (const raw of items) {
+      const qty = Math.min(Math.max(Math.round(Number(raw.qty)) || 1, 1), MAX_QTY_PER_LINE)
+      if (raw.combo_id) {
+        const price = comboPrice.get(raw.combo_id)
+        if (price === undefined) {
+          return NextResponse.json(
+            { error: "Combo no válido en el pedido" },
+            { status: 400 }
+          )
+        }
+        cleanItems.push({
+          item_id: raw.item_id,
+          name: raw.name ?? "Combo",
+          price,
+          qty,
+          combo_id: raw.combo_id,
+        })
+      } else {
+        const price = itemPrice.get(raw.item_id)
+        if (price === undefined) {
+          return NextResponse.json(
+            { error: "Platillo no válido en el pedido" },
+            { status: 400 }
+          )
+        }
+        cleanItems.push({
+          item_id: raw.item_id,
+          name: raw.name ?? "Producto",
+          price,
+          qty,
+        })
+      }
+    }
+
     const { subtotal, discount: cappedDiscount, total } = computeOrderTotals(
       cleanItems,
-      Math.max(Number(delivery_fee) || 0, 0),
-      Math.max(Number(discount) || 0, 0)
+      serverDeliveryFee,
+      0 // descuentos se calculan server-side (v1: el descuento de combos ya está en su precio)
     )
-
-    const supabase = await createServiceClient()
 
     const payload = {
       restaurant_id,
@@ -78,7 +196,7 @@ export async function POST(request: NextRequest) {
       items: cleanItems,
       subtotal,
       discount: cappedDiscount,
-      delivery_fee: Math.max(Number(delivery_fee) || 0, 0),
+      delivery_fee: serverDeliveryFee,
       total,
       channel,
       fulfillment,

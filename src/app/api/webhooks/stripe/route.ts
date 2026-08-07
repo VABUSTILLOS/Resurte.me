@@ -33,8 +33,13 @@ export async function POST(request: NextRequest) {
   try {
     switch (event.type) {
       case "payment_intent.succeeded": {
-        const paymentIntent = event.data.object as { id: string; metadata?: Record<string, string> }
-        console.log("✅ Payment succeeded:", paymentIntent.id)
+        const paymentIntent = event.data.object as {
+          id: string
+          amount_received: number
+          currency?: string
+          metadata?: Record<string, string>
+        }
+        console.log("✅ Payment succeeded:", paymentIntent.id, "amount:", paymentIntent.amount_received)
 
         const supabase = await createServiceClient()
 
@@ -50,21 +55,36 @@ export async function POST(request: NextRequest) {
           .select("id, user_id")
           .single()
 
-        // Actualiza pedidos FoodOS (micrositio /r/[slug]) del mismo intent
+        // Actualiza pedidos FoodOS (micrositio /r/[slug]) del mismo intent,
+        // solo si el monto recibido coincide con el total del pedido.
         const { data: foodosOrder, error: foodosError } = await supabase
           .from("foodos_orders")
-          .update({
-            payment_status: "paid",
-            updated_at: new Date().toISOString(),
-          })
+          .select("id, total")
           .eq("stripe_payment_intent_id", paymentIntent.id)
-          .select("id")
           .maybeSingle()
 
         if (foodosError) {
-          console.error("Failed to update foodos order payment:", foodosError.message)
+          console.error("Failed to fetch foodos order payment:", foodosError.message)
         } else if (foodosOrder) {
-          console.log("✅ FoodOS payment succeeded for order:", foodosOrder.id)
+          const expectedCents = Math.round(Number(foodosOrder.total) * 100)
+          if (paymentIntent.amount_received >= expectedCents) {
+            await supabase
+              .from("foodos_orders")
+              .update({ payment_status: "paid", updated_at: new Date().toISOString() })
+              .eq("id", foodosOrder.id)
+            console.log("✅ FoodOS payment succeeded for order:", foodosOrder.id)
+          } else {
+            await supabase
+              .from("foodos_orders")
+              .update({
+                payment_status: "amount_mismatch",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", foodosOrder.id)
+            console.error(
+              `⚠️ FoodOS amount mismatch: order ${foodosOrder.id} expected ${expectedCents}, received ${paymentIntent.amount_received}`
+            )
+          }
         }
 
         if (error) {

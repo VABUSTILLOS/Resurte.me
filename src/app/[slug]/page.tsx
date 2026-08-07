@@ -2,8 +2,13 @@ import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { Metadata } from "next"
 import { CityLanding } from "@/components/city/city-landing"
+import {
+  getCachedActiveCollections,
+  getCachedCategories,
+  getCachedVisibleProducts,
+} from "@/lib/catalog-cache"
 import { getCityLandingSchema } from "@/lib/structured-data"
-import { createClient } from "@/lib/supabase/server"
+import { createClient, hasSessionCookie } from "@/lib/supabase/server"
 import type { Category, Product, RestaurantCollection } from "@/types"
 
 // ISR: revalidate every hour so new collections/products appear without manual deploy
@@ -67,29 +72,22 @@ export default async function CityPage({ params }: Props) {
   let collections: RestaurantCollection[] = []
 
   try {
-    const supabase = await createClient()
-    const { data: { user: currentUser } } = await supabase.auth.getUser()
-    user = currentUser
+    // Solo consultamos la sesión si el request trae cookie de Supabase.
+    // Visitantes anónimos ahorran un roundtrip de red a getUser().
+    if (await hasSessionCookie()) {
+      const supabase = await createClient()
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      user = currentUser
+    }
 
     const [cats, prods, colls] = await Promise.all([
-      supabase
-        .from("categories")
-        .select("id, name, slug, icon, parent_id")
-        .order("id"),
-      supabase
-        .from("products")
-        .select("*")
-        .eq("is_visible", true)
-        .order("name"),
-      supabase
-        .from("restaurant_collections")
-        .select("*")
-        .eq("is_active", true)
-        .order("display_order"),
+      getCachedCategories(),
+      getCachedVisibleProducts(),
+      getCachedActiveCollections(),
     ])
-    categories = (cats.data as Category[]) ?? []
-    products = (prods.data as Product[]) ?? []
-    collections = (colls.data as RestaurantCollection[]) ?? []
+    categories = cats
+    products = prods
+    collections = colls
   } catch (error) {
     if (error instanceof Error && error.message.includes("Supabase no está configurado")) {
       console.warn(`CityPage(${slug}) renderizó sin Supabase (env no configurado).`)

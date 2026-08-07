@@ -14,7 +14,7 @@ import {
   Calendar, ClipboardCheck, ArrowRight, ChefHat, Store,
   PieChart, DollarSign, BarChart3, Zap, Clock, Percent, Package, Receipt, Copy,
   AlertTriangle, Bell, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Search, Flame, Target, Gift,
-  UtensilsCrossed, QrCode, Megaphone,
+  UtensilsCrossed, QrCode, Megaphone, Compass,
 } from "lucide-react"
 import { GlobalSearch } from "@/components/global-search"
 
@@ -209,6 +209,15 @@ const TOOLS: Tool[] = [
     href: "/panel/foodos/tablero",
     color: "text-blue-600",
     bgColor: "bg-blue-50",
+    standalone: true,
+  },
+  {
+    title: "Marketplace hoyquecomemos",
+    description: "Tu menú aparece en el directorio público de hoyquecomemos.mx: los comensales te encuentran por ciudad y platillo y piden directo en tu micrositio, sin comisiones.",
+    icon: Compass,
+    href: "/comer",
+    color: "text-teal-600",
+    bgColor: "bg-teal-50",
     standalone: true,
   },
 ]

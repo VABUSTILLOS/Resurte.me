@@ -1,5 +1,9 @@
 import { CityLanding } from "@/components/city/city-landing"
-import { createClient } from "@/lib/supabase/server"
+import {
+  getCachedCategories,
+  getCachedVisibleProducts,
+} from "@/lib/catalog-cache"
+import { createClient, hasSessionCookie } from "@/lib/supabase/server"
 import type { Category, Product } from "@/types"
 import type { Metadata } from "next"
 
@@ -18,22 +22,17 @@ export default async function Home() {
   let products: Product[] = []
 
   try {
-    const supabase = await createClient()
-    const { data: { user: currentUser } } = await supabase.auth.getUser()
-    user = currentUser
+    // Solo consultamos la sesión si el request trae cookie de Supabase.
+    // Visitantes anónimos ahorran un roundtrip de red a getUser().
+    if (await hasSessionCookie()) {
+      const supabase = await createClient()
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      user = currentUser
+    }
 
     const [cats, prods] = await Promise.all([
-      supabase
-        .from("categories")
-        .select("id, name, slug, icon, parent_id")
-        .order("id")
-        .then(({ data }) => data ?? []),
-      supabase
-        .from("products")
-        .select("*")
-        .eq("is_visible", true)
-        .order("name")
-        .then(({ data }) => data ?? []),
+      getCachedCategories(),
+      getCachedVisibleProducts(),
     ])
     categories = cats
     products = prods

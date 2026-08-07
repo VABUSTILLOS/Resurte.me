@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { Metadata } from "next"
-import { createClientOrNotFound } from "@/lib/supabase/server"
+import {
+  getCachedCategoryById,
+  getCachedProductBySlug,
+  getCachedProductsByCategory,
+  getCachedVisibleProducts,
+} from "@/lib/catalog-cache"
 import { ProductDetailClient } from "./product-detail-client"
 
 // ISR: revalidate product pages every hour for fresh pricing
@@ -16,12 +21,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   if (!city) return { title: "Producto no encontrado — Resurte.me" }
 
-  const supabase = await createClientOrNotFound()
-  const { data: product } = await supabase
-    .from("products")
-    .select("name, description, image_url")
-    .eq("slug", productSlug)
-    .single()
+  const product = await getCachedProductBySlug(productSlug)
 
   if (!product) return { title: "Producto no encontrado — Resurte.me" }
 
@@ -54,48 +54,29 @@ export default async function ProductPage({ params }: Props) {
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   if (!city) notFound()
 
-  const supabase = await createClientOrNotFound()
-
-  // Fetch product with category
-  const { data: product } = await supabase
-    .from("products")
-    .select("*")
-    .eq("slug", productSlug)
-    .single()
+  // Fetch product with category (cached)
+  const product = await getCachedProductBySlug(productSlug)
 
   if (!product) notFound()
 
-  // Fetch category info
-  const { data: category } = await supabase
-    .from("categories")
-    .select("id, name, slug, icon, parent_id")
-    .eq("id", product.category_id)
-    .single()
+  // Fetch category info (cached)
+  const category = await getCachedCategoryById(product.category_id)
 
   // Fetch related products (same category, excluding current)
-  const { data: relatedSameCategory } = await supabase
-    .from("products")
-    .select("*")
-    .eq("category_id", product.category_id)
-    .eq("is_visible", true)
-    .neq("id", product.id)
-    .limit(4)
-    .order("name")
+  const relatedSameCategory = (await getCachedProductsByCategory(product.category_id)).filter(
+    (p) => p.id !== product.id
+  )
 
-  const related = relatedSameCategory ?? []
+  const related = relatedSameCategory.slice(0, 4)
 
   // If fewer than 4 from same category, fill with products from other categories
   if (related.length < 4) {
-    const existingIds = [product.id, ...related.map((p) => p.id)]
-    const { data: otherProducts } = await supabase
-      .from("products")
-      .select("*")
-      .eq("is_visible", true)
-      .not("id", "in", `(${existingIds.join(",")})`)
-      .limit(4 - related.length)
-      .order("name")
+    const existingIds = new Set([product.id, ...related.map((p) => p.id)])
+    const otherProducts = (await getCachedVisibleProducts()).filter(
+      (p) => p.id !== product.id && !existingIds.has(p.id)
+    )
 
-    if (otherProducts) related.push(...otherProducts)
+    if (otherProducts.length) related.push(...otherProducts.slice(0, 4 - related.length))
   }
 
   return (
