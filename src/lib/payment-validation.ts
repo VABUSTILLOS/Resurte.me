@@ -29,7 +29,7 @@ export function isAmountSufficient(
   return amountReceivedCents >= expectedCents
 }
 
-export interface CashbackTierResult {
+interface CashbackTierResult {
   name: CashbackTier
   /** Porcentaje como fracción (0.05 = 5%). */
   pct: number

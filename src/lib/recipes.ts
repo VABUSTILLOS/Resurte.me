@@ -9,11 +9,6 @@ import type { CollectionRecipe } from "@/types"
 
 type RecipeInput = Omit<CollectionRecipe, "id" | "collection_id" | "is_active">
 
-export interface RecipeGroup {
-  collectionSlug: string
-  recipes: RecipeInput[]
-}
-
 const RECIPES: Record<string, RecipeInput[]> = {
   // ── 1. Hamburguesas y Hot Dogs ──────────────────────────
   "hamburguesas-hot-dogs": [

@@ -54,14 +54,6 @@ export interface ActivityItem {
   status: "completed" | "pending";
 }
 
-export interface WalletState {
-  balance: number;
-  monthlyCashback: number;
-  monthlySpend: number;
-  cashbackRate: number;
-  pendingBalance: number;
-}
-
 export interface Notification {
   id: string;
   type: "cashback_earned" | "milestone" | "service_ready" | "service_update" | "new_feature";
@@ -83,13 +75,6 @@ export interface ImpactStory {
   quote: string;
   photoUrl: string;
   months: number;
-}
-
-export interface OnboardingStep {
-  id: string;
-  title: string;
-  subtitle: string;
-  illustration: string;
 }
 
 export interface InvoiceScanState {

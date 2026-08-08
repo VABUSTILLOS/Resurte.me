@@ -53,28 +53,3 @@ export function DashboardSkeleton() {
     </div>
   );
 }
-
-export function StoreSkeleton() {
-  return (
-    <div className="px-4 pt-6 pb-6 space-y-4">
-      <Skeleton className="h-6 w-48" />
-      <Skeleton className="h-4 w-64" delay={0.1} />
-
-      {/* Filter chips */}
-      <div className="flex gap-2">
-        <Skeleton className="h-9 w-20 rounded-full" delay={0.15} />
-        <Skeleton className="h-9 w-28 rounded-full" delay={0.2} />
-        <Skeleton className="h-9 w-24 rounded-full" delay={0.25} />
-        <Skeleton className="h-9 w-20 rounded-full" delay={0.3} />
-      </div>
-
-      {/* Service Cards */}
-      <div className="space-y-3">
-        <Skeleton className="h-36 w-full rounded-2xl" delay={0.35} />
-        <Skeleton className="h-36 w-full rounded-2xl" delay={0.4} />
-        <Skeleton className="h-36 w-full rounded-2xl" delay={0.45} />
-        <Skeleton className="h-36 w-full rounded-2xl" delay={0.5} />
-      </div>
-    </div>
-  );
-}

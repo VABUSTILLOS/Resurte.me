@@ -31,17 +31,6 @@ import type {
 // Restaurante
 // ------------------------------------------------------------
 
-export async function getMyRestaurant(): Promise<FoodosRestaurant | null> {
-  const { supabase, user } = await requireAuth()
-  const { data, error } = await supabase
-    .from("foodos_restaurants")
-    .select("*")
-    .eq("user_id", user.id)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-  return (data as FoodosRestaurant) ?? null
-}
-
 /**
  * Carga el restaurante del usuario y TODAS sus listas dependientes en una
  * sola llamada de server action (una sola round-trip HTTP). Las queries se
@@ -575,18 +564,6 @@ export async function toggleAutomation(
 // ------------------------------------------------------------
 // Clientes (CRM)
 // ------------------------------------------------------------
-
-export async function listCustomers(restaurantId: string) {
-  const { supabase } = await requireAuth()
-  const { data, error } = await supabase
-    .from("foodos_customers")
-    .select("*")
-    .eq("restaurant_id", restaurantId)
-    .order("total_spend", { ascending: false })
-    .limit(500)
-  if (error) throw new Error(error.message)
-  return (data as FoodosCustomer[]) ?? []
-}
 
 export async function listCampaigns(restaurantId: string) {
   const { supabase } = await requireAuth()

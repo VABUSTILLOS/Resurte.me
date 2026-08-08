@@ -60,16 +60,6 @@ export interface CollectionRecipe {
   is_active: boolean
 }
 
-export interface Profile {
-  id: string
-  full_name: string
-  phone: string
-  birthday: string | null
-  avatar_url: string
-  default_city_id: number | null
-  marketing_consent: boolean
-}
-
 export interface Address {
   id: number
   user_id: string | null
@@ -120,40 +110,12 @@ export type PaymentStatus =
   | 'refunded'
   | 'amount_mismatch'
 
-export interface Order {
-  id: number
-  user_id: string
-  city_id: number
-  address_id: number
-  status: OrderStatus
-  subtotal: number
-  delivery_fee: number
-  discount?: number
-  coupon_code?: string | null
-  total: number
-  payment_method: PaymentMethod
-  payment_status: PaymentStatus
-  stripe_payment_intent_id: string | null
-  stripe_checkout_session_id: string | null
-  scheduled_for: string
-  source: 'web' | 'whatsapp'
-  created_at: string
-}
-
 export interface OrderItem {
   id: number
   order_id: number
   product_id: number
   quantity: number
   unit_price: number
-}
-
-export interface DeliveryZone {
-  id: number
-  city_id: number
-  name: string
-  polygon_coords: number[][] | null
-  is_active: boolean
 }
 
 // --- WhatsApp Types ---
@@ -169,7 +131,7 @@ export interface WhatsAppMessage {
   created_at: string
 }
 
-export type WhatsAppTemplateType =
+type WhatsAppTemplateType =
   | 'broadcast'
   | 'payment_reminder'
   | 'birthday'
