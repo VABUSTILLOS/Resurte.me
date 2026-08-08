@@ -7,43 +7,21 @@ import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { uid } from "@/lib/ids"
 import { convertQty, ManualQty, readManualQtys } from "@/lib/panel-units"
-import { t } from "@/lib/i18n/es"
-import {
-  Package, Plus, Edit3, Trash2, ShoppingCart,
-  ArrowDownToLine, Copy, AlertTriangle, CheckCircle2,
-  Clock, Download, ChevronDown, ChevronUp, BarChart3, X,
-  Truck, MessageCircle, Users, Layers,
-} from "lucide-react"
-
-// ── Types ──────────────────────────────────────────────
-interface InventoryItem {
-  id: string
-  name: string
-  stock: number
-  minStock: number
-  unit: string
-  pricePerUnit: number
-  category?: string
-  proveedorId?: string
-}
-
-interface Proveedor {
-  id: string
-  nombre: string
-  contacto?: string
-  telefono?: string
-}
-
-interface StockMovement {
-  fecha: string
-  itemId: string
-  itemName: string
-  tipo: "entrada" | "salida" | "ajuste"
-  delta: number
-  motivo: string
-}
-
-type SortField = "name" | "stock" | "pricePerUnit" | "status"
+import { Package } from "lucide-react"
+import type { InventoryItem, Proveedor, StockMovement, SortField } from "@/components/panel/inventario/inventario-shared"
+import InventarioHeader from "@/components/panel/inventario/InventarioHeader"
+import StatsRow from "@/components/panel/inventario/StatsRow"
+import ValueCards from "@/components/panel/inventario/ValueCards"
+import SuppliersCatalog from "@/components/panel/inventario/SuppliersCatalog"
+import ImportPlanificador from "@/components/panel/inventario/ImportPlanificador"
+import StockProjection from "@/components/panel/inventario/StockProjection"
+import SortControls from "@/components/panel/inventario/SortControls"
+import ItemsTable from "@/components/panel/inventario/ItemsTable"
+import PurchaseOrder from "@/components/panel/inventario/PurchaseOrder"
+import MovementHistory from "@/components/panel/inventario/MovementHistory"
+import InventarioTips from "@/components/panel/inventario/InventarioTips"
+import AddEditModal from "@/components/panel/inventario/AddEditModal"
+import DeleteConfirm from "@/components/panel/inventario/DeleteConfirm"
 
 export default function InventarioPage() {
   const { selectedCollection } = useRestaurant()
@@ -537,655 +515,128 @@ export default function InventarioPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 pb-20">
-      {/* ── Header ─────────────────────────────────────── */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 mb-1">📦 Mi inventario</h1>
-          <p className="text-sm text-gray-400">
-            {selectedCollection.name} — {items.length} productos registrados
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {items.length > 0 && (
-            <button
-              onClick={exportCSV}
-              className="p-2 text-gray-400 hover:text-[#108910] hover:bg-green-50 rounded-xl transition-colors"
-              title="Exportar CSV"
-              aria-label="Exportar inventario a CSV"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-          )}
-          <button
-            onClick={openAddForm}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Agregar producto
-          </button>
-        </div>
-      </div>
+    <InventarioHeader
+      restaurantName={selectedCollection.name}
+      itemCount={items.length}
+      onExportCsv={exportCSV}
+      onAddProduct={openAddForm}
+    />
 
-      {/* ── Stats row ──────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
-        <div className="bg-white rounded-xl border border-gray-100 p-3 text-center">
-          <p className="text-2xl font-extrabold text-gray-800">{items.length}</p>
-          <p className="text-[10px] text-gray-400">Productos</p>
-        </div>
-        <div className="bg-green-50 rounded-xl border border-green-100 p-3 text-center">
-          <p className="text-2xl font-extrabold text-green-700">{okStock.length}</p>
-          <p className="text-[10px] text-green-600">🟢 Suficiente</p>
-        </div>
-        <div className="bg-amber-50 rounded-xl border border-amber-100 p-3 text-center">
-          <p className="text-2xl font-extrabold text-amber-700">{lowStock.length}</p>
-          <p className="text-[10px] text-amber-600">🟡 Bajo</p>
-        </div>
-        <div className="bg-red-50 rounded-xl border border-red-100 p-3 text-center">
-          <p className="text-2xl font-extrabold text-red-700">{outOfStock.length}</p>
-          <p className="text-[10px] text-red-600">🔴 Agotado</p>
-        </div>
-      </div>
+    <StatsRow
+      itemCount={items.length}
+      okCount={okStock.length}
+      lowCount={lowStock.length}
+      outCount={outOfStock.length}
+    />
 
-      {/* ── Value cards ────────────────────────────────── */}
-      <div className="grid sm:grid-cols-2 gap-3 mb-3">
-        <div className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3">
-          <BarChart3 className="w-5 h-5 text-[#108910] shrink-0" />
-          <div>
-            <p className="text-[10px] text-gray-400">Valor total del inventario</p>
-            <p className="font-bold text-lg text-gray-900">${totalValue.toFixed(0)}</p>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3">
-          <Clock className="w-5 h-5 text-indigo-600 shrink-0" />
-          <div>
-            <p className="text-[10px] text-gray-400">Costo semanal estimado</p>
-            <p className="font-bold text-lg text-indigo-700">${weeklyCost.toFixed(0)}</p>
-          </div>
-        </div>
-      </div>
-      {items.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 p-4 mb-6">
-          <p className="text-[10px] text-gray-400 mb-2">Valor por estado</p>
-          <div className="grid grid-cols-3 gap-3 text-center text-xs">
-            <div className="bg-green-50 rounded-lg py-2">
-              <p className="text-gray-500">🟢 Suficiente</p>
-              <p className="font-bold text-green-700">${okStock.reduce((s, i) => s + i.stock * i.pricePerUnit, 0).toFixed(0)}</p>
-            </div>
-            <div className="bg-amber-50 rounded-lg py-2">
-              <p className="text-gray-500">🟡 Bajo</p>
-              <p className="font-bold text-amber-700">${lowStock.reduce((s, i) => s + i.stock * i.pricePerUnit, 0).toFixed(0)}</p>
-            </div>
-            <div className="bg-red-50 rounded-lg py-2">
-              <p className="text-gray-500">🔴 Agotado</p>
-              <p className="font-bold text-red-700">${outOfStock.reduce((s, i) => s + i.stock * i.pricePerUnit, 0).toFixed(0)}</p>
-            </div>
-          </div>
-        </div>
-      )}
+    <ValueCards
+      totalValue={totalValue}
+      weeklyCost={weeklyCost}
+      okStock={okStock}
+      lowStock={lowStock}
+      outOfStock={outOfStock}
+    />
 
-      {/* ── Suppliers catalog ──────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-        <button onClick={() => setShowSuppliers(!showSuppliers)} className="flex items-center justify-between w-full text-left">
-          <div className="flex items-center gap-2">
-            <Truck className="w-5 h-5 text-[#108910]" />
-            <h3 className="font-bold text-gray-900 text-sm">Proveedores ({proveedores.length})</h3>
-            <p className="text-[10px] text-gray-400 hidden sm:block">Asigna un proveedor a cada producto para agrupar tus órdenes</p>
-          </div>
-          {showSuppliers ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-        </button>
-        {showSuppliers && (
-          <div className="mt-4">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-2">
-              <input
-                type="text"
-                value={supplierForm.nombre}
-                onChange={(e) => setSupplierForm({ ...supplierForm, nombre: e.target.value })}
-                placeholder="Nombre del proveedor"
-                className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]"
-                aria-label="Nombre del proveedor"
-              />
-              <input
-                type="text"
-                value={supplierForm.contacto}
-                onChange={(e) => setSupplierForm({ ...supplierForm, contacto: e.target.value })}
-                placeholder="Contacto (opcional)"
-                className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]"
-                aria-label="Contacto del proveedor"
-              />
-              <input
-                type="text"
-                value={supplierForm.telefono}
-                onChange={(e) => setSupplierForm({ ...supplierForm, telefono: e.target.value })}
-                placeholder="Teléfono (opcional)"
-                className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]"
-                aria-label="Teléfono del proveedor"
-              />
-              <button
-                onClick={addSupplier}
-                disabled={!supplierForm.nombre.trim()}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Agregar
-              </button>
-            </div>
-            {proveedores.length === 0 && (
-              <p className="text-[10px] text-gray-400">
-                Agrega tus proveedores (p. ej. “Distribuidora Lácteos” o “Carnicería El Norte”) para después asignarlos a cada producto.
-              </p>
-            )}
-            {proveedores.length > 0 && (
-              <div className="space-y-1.5 mt-3">
-                {proveedores.map((p) => {
-                  const assigned = items.filter((i) => i.proveedorId === p.id).length
-                  return (
-                    <div key={p.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2 text-xs">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-700 truncate">{p.nombre}</p>
-                        <p className="text-[10px] text-gray-400">
-                          {[p.contacto, p.telefono].filter(Boolean).join(" · ") || "Sin contacto"}
-                          {assigned > 0 && ` · ${assigned} producto${assigned > 1 ? "s" : ""}`}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => deleteSupplier(p.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Eliminar proveedor"
-                        aria-label={`Eliminar proveedor ${p.nombre}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+    <SuppliersCatalog
+      proveedores={proveedores}
+      items={items}
+      showSuppliers={showSuppliers}
+      onToggle={() => setShowSuppliers(!showSuppliers)}
+      supplierForm={supplierForm}
+      onFormChange={(field, value) => setSupplierForm({ ...supplierForm, [field]: value })}
+      onAdd={addSupplier}
+      onDelete={deleteSupplier}
+    />
 
-      {/* ── Import from planificador ───────────────────── */}
-      {Object.values(manualQtys).some((m) => m.qty > 0) && (
-        <div className="bg-gradient-to-r from-indigo-50 to-white rounded-xl border border-indigo-100 p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ArrowDownToLine className="w-4 h-4 text-indigo-600" />
-              <p className="text-xs font-semibold text-indigo-700">
-                Importar productos desde el Planificador
-              </p>
-            </div>
-            <button
-              onClick={importFromPlanificador}
-              className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
-            >
-              Importar ahora
-            </button>
-          </div>
-          <p className="text-[10px] text-indigo-400 mt-2">
-            Los productos con cantidades manuales del planificador se agregarán al inventario.
-            Los que ya existen se actualizarán con stock adicional.
-          </p>
-        </div>
-      )}
+    <ImportPlanificador
+      hasPlanQtys={Object.values(manualQtys).some((m) => m.qty > 0)}
+      onImport={importFromPlanificador}
+    />
 
-      {/* ── Recipe-aware stock projection ──────────────── */}
-      {projection.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-[#108910]" />
-              <h3 className="font-bold text-gray-900 text-sm">Tu menú planeado para {covers} comensales</h3>
-            </div>
-            {missingCount > 0 && (
-              <button
-                onClick={() => {
-                  setProjectionIncluded(!projectionIncluded)
-                  toast(
-                    projectionIncluded
-                      ? "Se quitó la proyección de la orden de compra"
-                      : `Se agregaron ${missingCount} faltantes del menú a la orden de compra`,
-                    "success"
-                  )
-                }}
-                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
-                  projectionIncluded ? "bg-[#108910] text-white" : "bg-cyan-50 text-cyan-700 hover:bg-cyan-100"
-                }`}
-                title="Agregar los faltantes calculados a la orden de compra"
-              >
-                <ShoppingCart className="w-3.5 h-3.5" />
-                {projectionIncluded ? "En la orden de compra ✓" : "Agregar faltantes a la orden"}
-              </button>
-            )}
-          </div>
-          <div className="space-y-1.5 mb-2">
-            {projection.map((p) => (
-              <div key={p.key} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 text-xs">
-                <span className="shrink-0 text-sm">{p.icon}</span>
-                <span className="font-semibold text-gray-700 truncate">{p.name}</span>
-                <span className={`ml-auto shrink-0 font-medium ${
-                  p.status === "ok" ? "text-green-600" : p.status === "justo" ? "text-amber-600" : "text-red-600"
-                }`}>
-                  {p.label}
-                </span>
-                <span className="text-gray-400 shrink-0">
-                  {p.stockQty === null ? "—" : `${p.stockQty} ${p.stockUnit}`} / {p.neededQty.toFixed(1)} {p.neededUnit}
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="text-[10px] text-gray-400">
-            Proyección = ingredientes de tus {sharedDishes.length} platillos costeados × {covers} comensales (con su unidad).
-            Compara contra tu inventario actual para no quedarte corto en el servicio.
-          </p>
-        </div>
-      )}
+    <StockProjection
+      projection={projection}
+      covers={covers}
+      missingCount={missingCount}
+      projectionIncluded={projectionIncluded}
+      onToggleProjection={() => {
+        setProjectionIncluded(!projectionIncluded)
+        toast(
+          projectionIncluded
+            ? "Se quitó la proyección de la orden de compra"
+            : `Se agregaron ${missingCount} faltantes del menú a la orden de compra`,
+          "success"
+        )
+      }}
+      dishCount={sharedDishes.length}
+    />
 
-      {/* ── Sort ───────────────────────────────────────── */}
-      {items.length > 0 && (
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-xs text-gray-400">Ordenar:</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortField)}
-            className="text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg px-2 py-1"
-          >
-            <option value="name">Nombre</option>
-            <option value="stock">Stock</option>
-            <option value="pricePerUnit">Precio</option>
-            <option value="status">Estado</option>
-          </select>
-        </div>
-      )}
+    <SortControls itemCount={items.length} sortBy={sortBy} onSortChange={setSortBy} />
 
-      {/* ── Items table ────────────────────────────────── */}
-      {items.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-          <Package className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-          <p className="text-gray-400 font-medium mb-1">{t("inventario.emptyTitle")}</p>
-          <p className="text-xs text-gray-300 mb-4">
-            Agrega productos manualmente o impórtalos desde el planificador
-          </p>
-          <button
-            onClick={openAddForm}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Agregar primer producto
-          </button>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs" aria-label={t("inventario.title")}>
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/50">
-                  <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Estado</th>
-                  <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Producto</th>
-                  <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Stock</th>
-                  <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Mínimo</th>
-                  <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Unidad</th>
-                  <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Precio/Unid</th>
-                  <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Valor</th>
-                  <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Ajuste</th>
-                  <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedItems.map((item) => {
-                  const status = getStatus(item)
-                  return (
-                    <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-3 text-center">
-                        <span title={status.label} className="text-lg">{status.icon}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-gray-800">{item.name}</p>
-                        {item.category && <p className="text-[10px] text-gray-400">{item.category}</p>}
-                        {item.proveedorId && (
-                          <p className="text-[10px] text-emerald-600 font-medium truncate max-w-[160px]">
-                            🚚 {proveedorName(item.proveedorId)}
-                          </p>
-                        )}
-                      </td>
-                      <td className={`px-4 py-3 text-right font-bold ${
-                        item.stock === 0 ? "text-red-600" : item.stock <= item.minStock ? "text-amber-600" : "text-green-700"
-                      }`}>
-                        {item.stock}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-500">{item.minStock}</td>
-                      <td className="px-4 py-3 text-center text-gray-500">{item.unit}</td>
-                      <td className="px-4 py-3 text-right text-gray-700 font-medium">${item.pricePerUnit}</td>
-                      <td className="px-4 py-3 text-right text-gray-700 font-medium">
-                        ${(item.stock * item.pricePerUnit).toFixed(0)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => adjustStock(item.id, -1)}
-                            className="w-6 h-6 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 text-xs font-bold transition-colors"
-                            disabled={item.stock <= 0}
-                            aria-label={`Disminuir stock de ${item.name}`}
-                          >−</button>
-                          <button
-                            onClick={() => adjustStock(item.id, 1)}
-                            className="w-6 h-6 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 text-xs font-bold transition-colors"
-                            aria-label={`Aumentar stock de ${item.name}`}
-                          >+</button>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => openEditForm(item)} className="p-1.5 text-gray-400 hover:text-[#108910] hover:bg-green-50 rounded-lg transition-colors" title="Editar" aria-label={`Editar ${item.name}`}>
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => setDeleteConfirm(item.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar" aria-label={`Eliminar ${item.name}`}>
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+    <ItemsTable
+      items={items}
+      sortedItems={sortedItems}
+      getStatus={getStatus}
+      proveedorName={proveedorName}
+      onAddFirst={openAddForm}
+      onEdit={openEditForm}
+      onDelete={(id) => setDeleteConfirm(id)}
+      onAdjustStock={adjustStock}
+    />
 
-      {/* ── Purchase order section ─────────────────────── */}
-      {(projectedOrder.length > 0) && (
-        <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
-          <button onClick={() => setOrderExpanded(!orderExpanded)} className="flex items-center justify-between w-full text-left">
-            <div className="flex items-center gap-2">
-              <ShoppingCart className="w-5 h-5 text-[#108910]" />
-              <h3 className="font-bold text-gray-900 text-sm">Orden de compra sugerida ({projectedOrder.length} productos)</h3>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-[#108910]">${projectedOrder.reduce((s, i) => s + i.cost, 0).toFixed(0)}</span>
-              {orderExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-            </div>
-          </button>
-          {orderExpanded && (
-            <div className="mt-4">
-              {proveedores.length > 0 && groupedOrder.length > 1 && (
-                <div className="flex items-center gap-2 mb-4">
-                  <label className="flex items-center gap-2 text-[11px] text-gray-500 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={groupBySupplier}
-                      onChange={(e) => setGroupBySupplier(e.target.checked)}
-                      className="accent-[#108910]"
-                    />
-                    <span className="font-semibold text-gray-700">Agrupar por proveedor</span>
-                  </label>
-                  <Layers className="w-3.5 h-3.5 text-gray-400" />
-                </div>
-              )}
+    <PurchaseOrder
+      orderExpanded={orderExpanded}
+      onToggleExpanded={() => setOrderExpanded(!orderExpanded)}
+      groupBySupplier={groupBySupplier}
+      onToggleGroupBy={() => setGroupBySupplier(!groupBySupplier)}
+      projectedOrder={projectedOrder}
+      proveedoresCount={proveedores.length}
+      groupedOrder={groupedOrder}
+      getStatus={getStatus}
+      proveedorName={proveedorName}
+      onCopyOrder={copyOrder}
+      onCopyGroup={(g) => navigator.clipboard.writeText(orderTextFor(g.items))}
+      onSendWhatsApp={sendWhatsApp}
+      onToast={toast}
+    />
 
-              {groupBySupplier && proveedores.length > 0 ? (
-                <div className="space-y-4 mb-4">
-                  {groupedOrder.map((group) => (
-                    <div key={group.proveedorId || "sin"} className="rounded-xl border border-gray-100 overflow-hidden">
-                      <div className="flex items-center justify-between bg-gray-50 px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <Users className="w-3.5 h-3.5 text-[#108910]" />
-                          <span className="text-xs font-bold text-gray-700">{group.nombre}</span>
-                          <span className="text-[9px] text-gray-400">{group.items.length} producto{group.items.length > 1 ? "s" : ""}</span>
-                        </div>
-                        <span className="text-xs font-bold text-[#108910]">
-                          ${group.items.reduce((s, i) => s + i.cost, 0).toFixed(0)}
-                        </span>
-                      </div>
-                      <div className="divide-y divide-gray-50">
-                        {group.items.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between px-3 py-2 text-xs">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span>{item.id.startsWith("proj-") ? "🔍" : getStatus(item).icon}</span>
-                              <span className="font-semibold text-gray-700 truncate">{item.name}</span>
-                              {item.id.startsWith("proj-") && (
-                                <span className="text-[9px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded-full font-medium">Proyección</span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                              <span className="text-gray-500">Comprar {item.toBuy} {item.unit}</span>
-                              <span className="font-bold text-[#108910]">${item.cost.toFixed(0)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-2 border-t border-gray-100">
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(orderTextFor(group.items))
-                            toast(`Orden de ${group.nombre} copiada`, "success")
-                          }}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 text-gray-700 text-[10px] font-semibold rounded-lg hover:bg-gray-200 transition-colors"
-                          aria-label={`Copiar orden de ${group.nombre}`}
-                        >
-                          <Copy className="w-3 h-3" /> Copiar
-                        </button>
-                        <button
-                          onClick={() => sendWhatsApp(group.items, group.nombre)}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 text-green-700 text-[10px] font-semibold rounded-lg hover:bg-green-100 transition-colors"
-                          aria-label={`Enviar orden de ${group.nombre} por WhatsApp`}
-                        >
-                          <MessageCircle className="w-3 h-3" /> WhatsApp
-                        </button>
-                        <span className="ml-auto text-[10px] text-gray-400">{group.nombre}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-2 mb-4">
-                  {projectedOrder.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2 text-xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span>{item.id.startsWith("proj-") ? "🔍" : getStatus(item).icon}</span>
-                        <span className="font-semibold text-gray-700 truncate">{item.name}</span>
-                        {item.id.startsWith("proj-") && (
-                          <span className="text-[9px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded-full font-medium">Proyección</span>
-                        )}
-                        {item.proveedorId && (
-                          <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-full font-medium hidden sm:inline">
-                            {proveedorName(item.proveedorId)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-gray-500">Comprar {item.toBuy} {item.unit}</span>
-                        <span className="font-bold text-[#108910]">${item.cost.toFixed(0)}</span>
-                        <a href="https://resurte.me" target="_blank" rel="noopener noreferrer"
-                          className="text-[10px] bg-[#108910] text-white px-2 py-0.5 rounded-full font-medium hover:bg-green-800 transition-colors">
-                          Comprar
-                        </a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="flex items-center gap-2 pt-3 border-t border-gray-100 flex-wrap">
-                <button onClick={copyOrder}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-200 transition-colors">
-                  <Copy className="w-3.5 h-3.5" /> Copiar lista
-                </button>
-                <button
-                  onClick={() => sendWhatsApp(projectedOrder, "general")}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 text-xs font-semibold rounded-xl hover:bg-green-100 transition-colors"
-                  aria-label="Enviar orden de compra por WhatsApp"
-                >
-                  <MessageCircle className="w-3.5 h-3.5" /> Enviar por WhatsApp
-                </button>
-                <p className="text-[10px] text-gray-400">Pega en WhatsApp o notas</p>
-                <span className="ml-auto text-xs font-bold text-gray-700">Total: ${projectedOrder.reduce((s, i) => s + i.cost, 0).toFixed(0)}</span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+    <MovementHistory
+      movements={movements}
+      showMovements={showMovements}
+      onToggle={() => setShowMovements(!showMovements)}
+    />
 
-      {/* ── Movement history ───────────────────────────── */}
-      {movements.length > 0 && (
-        <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
-          <button onClick={() => setShowMovements(!showMovements)} className="flex items-center justify-between w-full text-left">
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-indigo-600" />
-              <h3 className="font-bold text-gray-900 text-sm">Historial de movimientos ({movements.length})</h3>
-            </div>
-            {showMovements ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-          </button>
-          {showMovements && (
-            <div className="mt-4 space-y-1.5 max-h-64 overflow-y-auto">
-              {movements.slice(0, 20).map((m, i) => (
-                <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5 text-xs">
-                  <span className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                    m.tipo === "entrada" ? "bg-green-100 text-green-700" : m.tipo === "salida" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
-                  }`}>
-                    {m.tipo === "entrada" ? "+" : m.tipo === "salida" ? "−" : "±"}
-                  </span>
-                  <span className="font-semibold text-gray-700 truncate">{m.itemName}</span>
-                  <span className="text-gray-400 shrink-0">{m.motivo}</span>
-                  <span className={`ml-auto shrink-0 font-bold ${m.delta >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    {m.delta > 0 ? "+" : ""}{m.delta}
-                  </span>
-                  <span className="text-[10px] text-gray-300 shrink-0 w-24 text-right">
-                    {new Date(m.fecha).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })} {new Date(m.fecha).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+    <InventarioTips />
 
-      {/* ── Tips ───────────────────────────────────────── */}
-      <div className="mt-6 bg-gradient-to-r from-[#F0FDF4] to-white rounded-2xl border border-[#108910]/10 p-5">
-        <div className="flex items-start gap-3">
-          <Package className="w-5 h-5 text-[#108910] mt-0.5 shrink-0" />
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-1 text-sm">Consejos de inventario</h4>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              Mantén al menos 2× el stock mínimo de cada producto. Revisa el inventario semanalmente.
-              Los productos importados del planificador se actualizan al reimportar.
-              Usa la orden de compra sugerida para pedir todo lo que necesitas en resurte.me.
-            </p>
-          </div>
-        </div>
-      </div>
+    <AddEditModal
+      showForm={showForm}
+      editingId={editingId}
+      formName={formName}
+      setFormName={setFormName}
+      formStock={formStock}
+      setFormStock={setFormStock}
+      formMinStock={formMinStock}
+      setFormMinStock={setFormMinStock}
+      formUnit={formUnit}
+      setFormUnit={setFormUnit}
+      formPrice={formPrice}
+      setFormPrice={setFormPrice}
+      formCategory={formCategory}
+      setFormCategory={setFormCategory}
+      formProveedorId={formProveedorId}
+      setFormProveedorId={setFormProveedorId}
+      proveedores={proveedores}
+      onCancel={() => {
+        setShowForm(false)
+        setEditingId(null)
+      }}
+      onSave={saveItem}
+    />
 
-      {/* ── Add/Edit Modal ─────────────────────────────── */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-900">{editingId ? "Editar producto" : "Agregar producto"}</h3>
-              <button onClick={() => { setShowForm(false); setEditingId(null) }} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Nombre</label>
-                <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)}
-                  placeholder="Ej: Harina de trigo"
-                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]" autoFocus />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Stock actual</label>
-                  <input type="number" value={formStock} onChange={(e) => setFormStock(e.target.value)} min="0"
-                    className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Stock mínimo</label>
-                  <input type="number" value={formMinStock} onChange={(e) => setFormMinStock(e.target.value)} min="1"
-                    className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Unidad</label>
-                  <select value={formUnit} onChange={(e) => setFormUnit(e.target.value)}
-                    className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]">
-                    <option value="kg">kg</option>
-                    <option value="g">g</option>
-                    <option value="L">L</option>
-                    <option value="ml">ml</option>
-                    <option value="pieza">pieza</option>
-                    <option value="caja">caja</option>
-                    <option value="paquete">paquete</option>
-                    <option value="litro">litro</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Precio por unidad</label>
-                  <input type="number" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} min="0" step="0.01"
-                    className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">
-                  Categoría <span className="text-gray-300">(opcional)</span>
-                </label>
-                <input type="text" value={formCategory} onChange={(e) => setFormCategory(e.target.value)}
-                  placeholder="Ej: Lácteos"
-                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">
-                  Proveedor <span className="text-gray-300">(opcional)</span>
-                </label>
-                <select value={formProveedorId} onChange={(e) => setFormProveedorId(e.target.value)}
-                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910] bg-white"
-                  aria-label="Proveedor del producto">
-                  <option value="">Sin proveedor</option>
-                  {proveedores.map((p) => (
-                    <option key={p.id} value={p.id}>{p.nombre}</option>
-                  ))}
-                </select>
-                {proveedores.length === 0 && (
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    Agrega proveedores en la sección “Proveedores” de esta página para agrupar tus órdenes de compra.
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button onClick={() => { setShowForm(false); setEditingId(null) }}
-                  className="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors font-medium">
-                  Cancelar
-                </button>
-                <button onClick={saveItem} disabled={!formName.trim()}
-                  className="flex-1 px-4 py-2 text-sm text-white bg-[#108910] rounded-xl hover:bg-green-800 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                  {editingId ? "Guardar cambios" : "Agregar"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Delete Confirm Modal ───────────────────────── */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setDeleteConfirm(null)}>
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-4">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <h3 className="font-bold text-gray-900">¿Eliminar producto?</h3>
-            </div>
-            <p className="text-sm text-gray-500 mb-4">Esta acción no se puede deshacer.</p>
-            <div className="flex gap-2">
-              <button onClick={() => setDeleteConfirm(null)}
-                className="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors font-medium">
-                Cancelar
-              </button>
-              <button onClick={() => deleteItem(deleteConfirm)}
-                className="flex-1 px-4 py-2 text-sm text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors font-semibold">
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    <DeleteConfirm
+      deleteConfirm={deleteConfirm}
+      onCancel={() => setDeleteConfirm(null)}
+      onConfirm={deleteItem}
+    />
     </div>
   )
 }
