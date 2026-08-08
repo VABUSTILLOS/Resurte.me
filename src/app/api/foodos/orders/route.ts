@@ -3,46 +3,11 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { computeOrderTotals } from "@/lib/foodos"
 import type { FoodosOrderItem } from "@/types/foodos"
 import { logger } from "@/lib/logger"
+import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 
-// Rate limiting: fixed-window counter durable en Supabase
-// (RPC consume_rate_limit, tabla rate_limits). Compartido entre
-// instancias serverless; no se reinicia en deploys.
+// Rate limiting durable (helper compartido en src/lib/rate-limit.ts).
 const RATE_LIMIT_MAX = 20
 const RATE_LIMIT_WINDOW_SECONDS = 60
-
-interface RateLimitResult {
-  allowed: boolean
-  remaining: number
-  retry_after_seconds: number
-}
-
-async function rateLimited(
-  supabase: Awaited<ReturnType<typeof createServiceClient>>,
-  ip: string
-): Promise<RateLimitResult> {
-  const { data, error } = await supabase.rpc("consume_rate_limit", {
-    p_key: `foodos_orders:${ip}`,
-    p_limit: RATE_LIMIT_MAX,
-    p_window_seconds: RATE_LIMIT_WINDOW_SECONDS,
-  })
-
-  if (error || !data || data.length === 0) {
-    // Fail-open en caso de error de BD: no bloquear pedidos legítimos
-    // por una falla del rate limiter.
-    return { allowed: true, remaining: RATE_LIMIT_MAX, retry_after_seconds: 0 }
-  }
-
-  const row = data[0] as RateLimitResult
-  return row
-}
-
-function clientIp(request: NextRequest): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-  )
-}
 
 interface FoodosOrderBody {
   restaurant_id: string
@@ -72,12 +37,9 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createServiceClient()
 
-    const rate = await rateLimited(supabase, clientIp(request))
+    const rate = await rateLimited(supabase, `foodos_orders:${clientIp(request)}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_SECONDS)
     if (!rate.allowed) {
-      return NextResponse.json(
-        { error: "Demasiadas peticiones. Intenta en un minuto." },
-        { status: 429, headers: { "Retry-After": String(rate.retry_after_seconds) } }
-      )
+      return rateLimitResponse(rate)
     }
 
     const body: FoodosOrderBody = await request.json()
