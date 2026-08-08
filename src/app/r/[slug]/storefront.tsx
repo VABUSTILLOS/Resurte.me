@@ -246,7 +246,7 @@ export function FoodosStorefront({
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {restaurant.logo_url ? (
-              <img src={restaurant.logo_url} alt={restaurant.name} className="w-11 h-11 rounded-full object-cover" />
+              <img src={restaurant.logo_url} alt={restaurant.name} width={44} height={44} className="w-11 h-11 rounded-full object-cover" />
             ) : (
               <div className="w-11 h-11 rounded-full bg-amber-500 text-white flex items-center justify-center font-black text-lg">
                 {restaurant.name.charAt(0).toUpperCase()}
@@ -491,7 +491,7 @@ function ItemCard({ item, onAdd }: { item: FoodosMenuItem; onAdd: () => void }) 
       </div>
       {item.image_url ? (
         <div className="relative shrink-0">
-          <img src={item.image_url} alt={item.name} className="w-20 h-20 rounded-xl object-cover" />
+          <img src={item.image_url} alt={item.name} width={80} height={80} className="w-20 h-20 rounded-xl object-cover" />
           <button
             onClick={onAdd}
             className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 shadow"

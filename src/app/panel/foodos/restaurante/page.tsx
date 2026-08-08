@@ -265,7 +265,7 @@ export default function RestaurantePage() {
             <>
               <div className="bg-white rounded-2xl border border-gray-200 p-3 shadow-sm">
                 {qrUrl ? (
-                  <img src={qrUrl} alt={`QR de ${restaurant.name}`} className="w-52 h-52" />
+                  <img src={qrUrl} alt={`QR de ${restaurant.name}`} width={208} height={208} className="w-52 h-52" />
                 ) : (
                   <div className="w-52 h-52 flex items-center justify-center text-gray-300">
                     <Loader2 className="w-6 h-6 animate-spin" />
