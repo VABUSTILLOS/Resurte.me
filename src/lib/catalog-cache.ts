@@ -1,9 +1,10 @@
 import { revalidateTag, unstable_cache } from "next/cache"
-import type { Category, Product, RestaurantCollection } from "@/types"
+import type { Category, City, Product, RestaurantCollection } from "@/types"
 import {
   getCategories,
   getCategoryById,
   getCategoryBySlug,
+  getCities,
   getProductBySlug,
   getProducts,
   getProductsByCollection,
@@ -43,6 +44,14 @@ export const getCachedActiveCollections = unstable_cache(
   async (): Promise<RestaurantCollection[]> => getRestaurantCollections(),
   ["catalog-collections"],
   { revalidate: 3600, tags: ["catalog", "collections"] }
+)
+
+// Ciudades activas: cambian rara vez (nuevo marketplace), TTL 24h.
+// Se usa en sitemap.xml y robots; el tag "cities" permite invalidar manual.
+export const getCachedActiveCities = unstable_cache(
+  async (): Promise<City[]> => getCities(),
+  ["catalog-cities"],
+  { revalidate: 86400, tags: ["cities"] }
 )
 
 export const getCachedCategoryBySlug = unstable_cache(

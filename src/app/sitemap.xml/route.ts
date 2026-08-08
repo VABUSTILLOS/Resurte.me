@@ -1,16 +1,15 @@
 import type { SitemapEntry } from "@/lib/structured-data"
+import { getCachedActiveCities } from "@/lib/catalog-cache"
 
 const BASE_URL = "https://resurte.me"
 
 export async function GET() {
   // Dynamic imports to avoid build-time evaluation when DB isn't ready
-  const [{ createClient }, { MEXICO_CITIES }, { getAllPosts }, { generateSitemapXml }, { getCities }] =
+  const [{ MEXICO_CITIES }, { getAllPosts }, { generateSitemapXml }] =
     await Promise.all([
-      import("@/lib/supabase/server"),
       import("@/lib/cities"),
       import("@/lib/blog"),
       import("@/lib/structured-data"),
-      import("@/lib/data"),
     ])
 
   const entries: SitemapEntry[] = [
@@ -23,10 +22,12 @@ export async function GET() {
   let categorySlugs: string[] = []
   let collectionSlugs: string[] = []
   try {
-    const supabase = await createClient()
+    const { getCachedCategories, getCachedActiveCollections } = await import(
+      "@/lib/catalog-cache"
+    )
     const [cats, colls] = await Promise.all([
-      supabase.from("categories").select("slug").then(({ data }) => data ?? []),
-      supabase.from("restaurant_collections").select("slug").eq("is_active", true).then(({ data }) => data ?? []),
+      getCachedCategories(),
+      getCachedActiveCollections(),
     ])
     categorySlugs = cats.map((c: { slug: string }) => c.slug)
     collectionSlugs = colls.map((c: { slug: string }) => c.slug)
@@ -38,7 +39,7 @@ export async function GET() {
   // no devuelve nada (DB vacía o sin configurar), se usan todas las estáticas.
   let activeCitySlugs: string[] = []
   try {
-    const cities = await getCities()
+    const cities = await getCachedActiveCities()
     if (cities.length > 0) activeCitySlugs = cities.map((c) => c.slug)
   } catch {
     // Supabase not configured — fallback to all static cities
