@@ -99,6 +99,46 @@ describe("migración v1→v2", () => {
     expect(readStored("test-migrable", [], null, s)).toEqual([1, 2, 3])
   })
 
+  it("ciclo completo de evolución: migra, persiste con versión nueva y no re-migra", () => {
+    // Formato v1: string con lista separada por comas. v2: array.
+    registerStorageSchema({
+      key: "test-evolucion",
+      version: 2,
+      default: () => ([] as string[]),
+      validate: (data: unknown) =>
+        Array.isArray(data) ? data.filter((x) => typeof x === "string") : [],
+      migrate: (data: unknown) =>
+        typeof data === "string" && data.length > 0 ? data.split(",") : [],
+    })
+    const s = fakeStorage({
+      "resurte-test-evolucion": JSON.stringify("tomate,cebolla"),
+      "resurte-test-evolucion@v": "1",
+    })
+
+    // 1. Lectura: migra v1 → v2 en memoria.
+    expect(readStored("test-evolucion", [], null, s)).toEqual(["tomate", "cebolla"])
+
+    // 2. Escritura del valor migrado: persiste como v2.
+    writeStored("test-evolucion", ["tomate", "cebolla"], null, s)
+    expect(s.store.get("resurte-test-evolucion@v")).toBe("2")
+
+    // 3. Re-lectura: versión ya es la actual, migrate no se vuelve a invocar.
+    let migrateCalls = 0
+    registerStorageSchema({
+      key: "test-evolucion",
+      version: 2,
+      default: () => ([] as string[]),
+      validate: (data: unknown) =>
+        Array.isArray(data) ? data.filter((x) => typeof x === "string") : [],
+      migrate: (data: unknown) => {
+        migrateCalls += 1
+        return typeof data === "string" ? data.split(",") : []
+      },
+    })
+    expect(readStored("test-evolucion", [], null, s)).toEqual(["tomate", "cebolla"])
+    expect(migrateCalls).toBe(0)
+  })
+
   it("no migra si la versión ya es la actual", () => {
     registerStorageSchema({
       key: "test-migrable-2",
