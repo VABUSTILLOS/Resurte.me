@@ -2,59 +2,46 @@
 
 import { Check, Clock, Copy, Settings2, Trash2 } from "lucide-react"
 import { dateLabel } from "@/lib/panel-utils"
+import type { EmpleadosCrud } from "@/hooks/use-ventas-crud"
 import type { EmpleadoHoy, FichajesHoy } from "./ventas-shared"
 
 interface RelojChecadorProps {
-  showReloj: boolean
+  crud: EmpleadosCrud
   empleadoCount: number
   empleadosHoy: EmpleadoHoy[]
   fichajesHoy: FichajesHoy
-  empNombre: string
-  empRol: string
-  empTarifa: string
-  empEditId: string | null
-  empDeleteId: string | null
   selectedDate: string
-  onToggle: () => void
-  onNombreChange: (v: string) => void
-  onRolChange: (v: string) => void
-  onTarifaChange: (v: string) => void
-  onSave: () => void
-  onCancel: () => void
-  onFicharEntrada: (id: string) => void
-  onFicharSalida: (id: string) => void
-  onEdit: (e: EmpleadoHoy) => void
-  onDeleteClick: (id: string) => void
-  onCancelDelete: () => void
-  onConfirmDelete: () => void
   onCopyHoras: () => void
 }
 
 export default function RelojChecador({
-  showReloj,
+  crud,
   empleadoCount,
   empleadosHoy,
   fichajesHoy,
-  empNombre,
-  empRol,
-  empTarifa,
-  empEditId,
-  empDeleteId,
   selectedDate,
-  onToggle,
-  onNombreChange,
-  onRolChange,
-  onTarifaChange,
-  onSave,
-  onCancel,
-  onFicharEntrada,
-  onFicharSalida,
-  onEdit,
-  onDeleteClick,
-  onCancelDelete,
-  onConfirmDelete,
   onCopyHoras,
 }: RelojChecadorProps) {
+  const {
+    showReloj,
+    empNombre,
+    empRol,
+    empTarifa,
+    empEditId,
+    empDeleteId,
+    onToggle,
+    onNombreChange,
+    onRolChange,
+    onTarifaChange,
+    onSave,
+    onCancel,
+    onFicharEntrada,
+    onFicharSalida,
+    onEdit,
+    onDeleteClick,
+    onCancelDelete,
+    onConfirmDelete,
+  } = crud
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <div className="flex items-center gap-2 mb-4">

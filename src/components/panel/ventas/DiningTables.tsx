@@ -1,51 +1,34 @@
 "use client"
 
 import { Check, Settings2, Trash2, UtensilsCrossed } from "lucide-react"
-import type { Mesa } from "./ventas-shared"
+import type { MesasCrud } from "@/hooks/use-ventas-crud"
 
 interface DiningTablesProps {
-  mesas: Mesa[]
-  showMesas: boolean
+  crud: MesasCrud
   mesasOcupadasHoy: Map<string, number>
   now: number
-  mesaName: string
-  mesaCapacidad: string
-  mesaZona: string
-  mesaEditId: string | null
-  mesaDeleteId: string | null
-  onToggle: () => void
-  onNameChange: (v: string) => void
-  onCapacidadChange: (v: string) => void
-  onZonaChange: (v: string) => void
-  onSave: () => void
-  onCancel: () => void
-  onEdit: (m: Mesa) => void
-  onDeleteClick: (id: string) => void
-  onCancelDelete: () => void
-  onConfirmDelete: () => void
 }
 
-export default function DiningTables({
-  mesas,
-  showMesas,
-  mesasOcupadasHoy,
-  now,
-  mesaName,
-  mesaCapacidad,
-  mesaZona,
-  mesaEditId,
-  mesaDeleteId,
-  onToggle,
-  onNameChange,
-  onCapacidadChange,
-  onZonaChange,
-  onSave,
-  onCancel,
-  onEdit,
-  onDeleteClick,
-  onCancelDelete,
-  onConfirmDelete,
-}: DiningTablesProps) {
+export default function DiningTables({ crud, mesasOcupadasHoy, now }: DiningTablesProps) {
+  const {
+    mesas,
+    showMesas,
+    mesaName,
+    mesaCapacidad,
+    mesaZona,
+    mesaEditId,
+    mesaDeleteId,
+    onToggle,
+    onNameChange,
+    onCapacidadChange,
+    onZonaChange,
+    onSave,
+    onCancel,
+    onEdit,
+    onDeleteClick,
+    onCancelDelete,
+    onConfirmDelete,
+  } = crud
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <div className="flex items-center gap-2 mb-4">

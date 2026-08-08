@@ -1,61 +1,48 @@
 "use client"
 
 import { Check, Copy, Gift, Settings2, Trash2, Users } from "lucide-react"
-import type { Cliente } from "./ventas-shared"
+import type { ClientesCrud } from "@/hooks/use-ventas-crud"
 
 interface FrequentCustomersProps {
-  clientes: Cliente[]
-  showClientes: boolean
-  clienteName: string
-  clientePhone: string
-  clientePts: string
-  clienteEditId: string | null
-  clienteDeleteId: string | null
+  crud: ClientesCrud
   puntosTasa: number
   puntosCanje: number
   tipoCambio: number
   onCopy: () => void
-  onToggle: () => void
-  onNameChange: (v: string) => void
-  onPhoneChange: (v: string) => void
-  onPtsChange: (v: string) => void
-  onSave: () => void
-  onCancel: () => void
-  onEdit: (c: Cliente) => void
-  onDeleteClick: (id: string) => void
-  onCancelDelete: () => void
-  onConfirmDelete: () => void
   onPuntosTasaChange: (v: number) => void
   onPuntosCanjeChange: (v: number) => void
   onTipoCambioChange: (v: number) => void
 }
 
 export default function FrequentCustomers({
-  clientes,
-  showClientes,
-  clienteName,
-  clientePhone,
-  clientePts,
-  clienteEditId,
-  clienteDeleteId,
+  crud,
   puntosTasa,
   puntosCanje,
   tipoCambio,
   onCopy,
-  onToggle,
-  onNameChange,
-  onPhoneChange,
-  onPtsChange,
-  onSave,
-  onCancel,
-  onEdit,
-  onDeleteClick,
-  onCancelDelete,
-  onConfirmDelete,
   onPuntosTasaChange,
   onPuntosCanjeChange,
   onTipoCambioChange,
 }: FrequentCustomersProps) {
+  const {
+    clientes,
+    showClientes,
+    clienteName,
+    clientePhone,
+    clientePts,
+    clienteEditId,
+    clienteDeleteId,
+    onToggle,
+    onNameChange,
+    onPhoneChange,
+    onPtsChange,
+    onSave,
+    onCancel,
+    onEdit,
+    onDeleteClick,
+    onCancelDelete,
+    onConfirmDelete,
+  } = crud
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <div className="flex items-center gap-2 mb-4">

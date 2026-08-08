@@ -12,15 +12,8 @@ import { todayStr, dateLabel } from "@/lib/panel-utils"
 import { t } from "@/lib/i18n/es"
 import Link from "next/link"
 import { ArrowLeft, Copy, Flame, AlertCircle, Receipt } from "lucide-react"
-import {
-  SaleEntry,
-  Cliente,
-  Mesa,
-  Empleado,
-  Fichaje,
-  TarjetaRegalo,
-  entryTotal,
-} from "@/components/panel/ventas/ventas-shared"
+import { SaleEntry, entryTotal } from "@/components/panel/ventas/ventas-shared"
+import { useClientesCrud, useMesasCrud, useEmpleadosCrud, useTarjetasCrud } from "@/hooks/use-ventas-crud"
 import {
   buildClientesLines,
   buildCorteLines,
@@ -78,14 +71,13 @@ export default function VentasPage() {
   const [dailyGoal, setDailyGoal] = useLocalStorage<number>("ventas-meta-dia", 0, slug)
   const [monthlyGoal, setMonthlyGoal] = useLocalStorage<number>("ventas-meta-mes", 0, slug)
   const [ticketThreshold, setTicketThreshold] = useLocalStorage<number>("ventas-umbral-ticket", 3000, slug)
-  const [clientes, setClientes] = useLocalStorage<Cliente[]>("clientes", [], slug)
   const [puntosTasa, setPuntosTasa] = useLocalStorage<number>("ventas-puntos-tasa", 100, slug)
   const [puntosCanje, setPuntosCanje] = useLocalStorage<number>("ventas-puntos-canje", 1, slug)
   const [tipoCambio, setTipoCambio] = useLocalStorage<number>("ventas-tipo-cambio", 1, slug)
-  const [mesas, setMesas] = useLocalStorage<Mesa[]>("mesas", [], slug)
-  const [empleados, setEmpleados] = useLocalStorage<Empleado[]>("reloj-empleados", [], slug)
-  const [fichajes, setFichajes] = useLocalStorage<Fichaje[]>("reloj-fichajes", [], slug)
-  const [tarjetas, setTarjetas] = useLocalStorage<TarjetaRegalo[]>("tarjetas-regalo", [], slug)
+  const clientesCrud = useClientesCrud(slug)
+  const mesasCrud = useMesasCrud(slug)
+  const empleadosCrud = useEmpleadosCrud(slug)
+  const tarjetasCrud = useTarjetasCrud(slug)
   const [comisiones, setComisiones] = useLocalStorage<Record<string, number>>("ventas-comisiones", {}, slug)
   // Keep comanda statuses in sync: deleting a sale must remove its comanda status
   const [, setComandaStatuses] = useLocalStorage<Record<string, unknown>>("comanda-statuses", {}, slug)
@@ -96,26 +88,6 @@ export default function VentasPage() {
     return () => clearInterval(t)
   }, [])
   const [showGoals, setShowGoals] = useState(false)
-  const [showClientes, setShowClientes] = useState(false)
-  const [showMesas, setShowMesas] = useState(false)
-  const [showReloj, setShowReloj] = useState(false)
-  const [showTarjetas, setShowTarjetas] = useState(false)
-  const [mesaName, setMesaName] = useState("")
-  const [mesaCapacidad, setMesaCapacidad] = useState("")
-  const [mesaZona, setMesaZona] = useState("")
-  const [mesaEditId, setMesaEditId] = useState<string | null>(null)
-  const [mesaDeleteId, setMesaDeleteId] = useState<string | null>(null)
-  const [empNombre, setEmpNombre] = useState("")
-  const [empRol, setEmpRol] = useState("")
-  const [empTarifa, setEmpTarifa] = useState("")
-  const [empEditId, setEmpEditId] = useState<string | null>(null)
-  const [empDeleteId, setEmpDeleteId] = useState<string | null>(null)
-  const [tarjetaMonto, setTarjetaMonto] = useState("")
-  const [clienteName, setClienteName] = useState("")
-  const [clientePhone, setClientePhone] = useState("")
-  const [clientePts, setClientePts] = useState("")
-  const [clienteEditId, setClienteEditId] = useState<string | null>(null)
-  const [clienteDeleteId, setClienteDeleteId] = useState<string | null>(null)
   const [goalFormDia, setGoalFormDia] = useState("")
   const [goalFormMes, setGoalFormMes] = useState("")
   const [selectedDate, setSelectedDate] = useState(todayStr())
@@ -165,8 +137,8 @@ export default function VentasPage() {
     ticketThreshold,
     reportPeriod,
     comisiones,
-    empleados,
-    fichajes,
+    empleados: empleadosCrud.empleados,
+    fichajes: empleadosCrud.fichajes,
   })
 
   // ── Sales goals (daily / monthly) ─────────────────────
@@ -179,46 +151,6 @@ export default function VentasPage() {
     toast("Metas de venta guardadas", "success")
   }
 
-  const ficharEntrada = (empleadoId: string) => {
-    const open = fichajes.find((f) => f.empleadoId === empleadoId && !f.salida)
-    if (open) {
-      toast("Ya tiene un fichaje de entrada abierto", "warning")
-      return
-    }
-    setFichajes((prev) => [...prev, { id: uid("fichaje"), empleadoId, entrada: new Date().toISOString() }])
-    toast("Entrada registrada", "success")
-  }
-
-  const ficharSalida = (empleadoId: string) => {
-    const open = fichajes.find((f) => f.empleadoId === empleadoId && !f.salida)
-    if (!open) {
-      toast("No hay fichaje de entrada abierto", "warning")
-      return
-    }
-    setFichajes((prev) => prev.map((f) => (f.id === open.id ? { ...f, salida: new Date().toISOString() } : f)))
-    toast("Salida registrada", "success")
-  }
-
-  const saveEmpleado = () => {
-    const nombre = empNombre.trim()
-    const tarifa = parseFloat(empTarifa)
-    if (!nombre || Number.isNaN(tarifa) || tarifa < 0) {
-      toast("Completa nombre y tarifa válida", "warning")
-      return
-    }
-    setEmpleados((prev) => {
-      const id = empEditId || uid("empleado")
-      const exists = prev.some((e) => e.id === id)
-      const nuevo: Empleado = { id, nombre, rol: empRol.trim() || undefined, tarifa }
-      return exists ? prev.map((e) => (e.id === id ? nuevo : e)) : [...prev, nuevo]
-    })
-    setEmpNombre("")
-    setEmpRol("")
-    setEmpTarifa("")
-    setEmpEditId(null)
-    toast(empEditId ? "Empleado actualizado" : "Empleado agregado", "success")
-  }
-
   const copyHoras = () => {
     if (fichajesHoy.rows.length === 0) {
       toast("No hay fichajes para ese día", "warning")
@@ -227,24 +159,6 @@ export default function VentasPage() {
     const lines = buildHorasLines({ collectionName: selectedCollection?.name, dateLabel: dateLabel(selectedDate), fichajesHoy })
     navigator.clipboard.writeText(lines.join("\n"))
     toast("Reporte de horas copiado", "success")
-  }
-
-  // ── Tarjetas de regalo ────────────────────────────────
-  const emitirTarjeta = () => {
-    const monto = parseFloat(tarjetaMonto)
-    if (Number.isNaN(monto) || monto <= 0) {
-      toast("Ingresa un monto válido", "warning")
-      return
-    }
-    const code = `RT-${Math.random().toString(36).slice(2, 6).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
-    setTarjetas((prev) => [...prev, { id: uid("tarjeta"), codigo: code, monto, saldo: monto, estado: "activa", creada: new Date().toISOString() }])
-    setTarjetaMonto("")
-    toast(`Tarjeta ${code} emitida con $${monto.toFixed(0)}`, "success")
-  }
-
-  const copyCodigoTarjeta = (codigo: string) => {
-    navigator.clipboard.writeText(codigo)
-    toast("Código copiado", "success")
   }
 
   // ── Comparativa contra período anterior ──────────────
@@ -312,7 +226,7 @@ export default function VentasPage() {
     // Gift card payment: validate the code covers the total and reduce its balance
     if (data.payment === "regalo") {
       const code = (data.giftCode || "").trim().toUpperCase()
-      const card = tarjetas.find((t) => t.codigo === code && t.estado === "activa" && t.saldo > 0)
+      const card = tarjetasCrud.tarjetas.find((t) => t.codigo === code && t.estado === "activa" && t.saldo > 0)
       if (!card) {
         toast("Código de tarjeta de regalo no válido o sin saldo", "warning")
         return
@@ -321,7 +235,7 @@ export default function VentasPage() {
         toast(`El saldo de la tarjeta ($${card.saldo.toFixed(0)}) no cubre el total ($${total.toFixed(0)})`, "warning")
         return
       }
-      setTarjetas((prev) =>
+      tarjetasCrud.setTarjetas((prev) =>
         prev.map((t) => {
           if (t.id !== card.id) return t
           const saldo = Math.max(0, t.saldo - total)
@@ -337,7 +251,7 @@ export default function VentasPage() {
     if (data.clienteId) {
       const total = entryTotal(entry)
       const earned = Math.floor(total / (puntosTasa > 0 ? puntosTasa : 100))
-      setClientes((prev) =>
+      clientesCrud.setClientes((prev) =>
         prev.map((c) =>
           c.id === data.clienteId
             ? {
@@ -421,100 +335,12 @@ export default function VentasPage() {
     toast("Venta eliminada", "warning")
   }
 
-  // ── Clientes frecuentes ────────────────────────────────
-  const saveCliente = () => {
-    const name = clienteName.trim()
-    if (!name) {
-      toast("Escribe el nombre del cliente", "warning")
-      return
-    }
-    const pts = Math.max(0, clientePts ? parseInt(clientePts) || 0 : 0)
-    if (clienteEditId) {
-      setClientes((prev) =>
-        prev.map((c) =>
-          c.id === clienteEditId
-            ? { ...c, nombre: name, telefono: clientePhone.trim() || undefined, puntos: pts }
-            : c,
-        ),
-      )
-      toast("Cliente actualizado", "success")
-    } else {
-      setClientes((prev) => [
-        ...prev,
-        { id: uid("cliente"), nombre: name, telefono: clientePhone.trim() || undefined, puntos: pts, visitas: 0, totalGastado: 0, createdAt: new Date().toISOString() },
-      ])
-      toast("Cliente agregado", "success")
-    }
-    setClienteName("")
-    setClientePhone("")
-    setClientePts("")
-    setClienteEditId(null)
-  }
-
-  const startEditCliente = (c: Cliente) => {
-    setClienteEditId(c.id)
-    setClienteName(c.nombre)
-    setClientePhone(c.telefono || "")
-    setClientePts(String(c.puntos))
-  }
-
-  const confirmDeleteCliente = () => {
-    if (!clienteDeleteId) return
-    setClientes((prev) => prev.filter((c) => c.id !== clienteDeleteId))
-    setClienteDeleteId(null)
-    toast("Cliente eliminado", "warning")
-  }
-
-  // ── Mesas CRUD ──────────────────────────────────────────
-  const saveMesa = () => {
-    const nombre = mesaName.trim()
-    if (!nombre) {
-      toast("Escribe el nombre de la mesa", "warning")
-      return
-    }
-    const capacidad = Math.max(1, mesaCapacidad ? parseInt(mesaCapacidad) || 1 : 1)
-    if (mesaEditId) {
-      setMesas((prev) =>
-        prev.map((m) => (m.id === mesaEditId ? { ...m, nombre, capacidad, zona: mesaZona.trim() || undefined } : m)),
-      )
-      toast("Mesa actualizada", "success")
-    } else {
-      setMesas((prev) => [...prev, { id: uid("mesa"), nombre, capacidad, zona: mesaZona.trim() || undefined }])
-      toast("Mesa agregada", "success")
-    }
-    setMesaName("")
-    setMesaCapacidad("")
-    setMesaZona("")
-    setMesaEditId(null)
-  }
-
-  const startEditMesa = (m: Mesa) => {
-    setMesaEditId(m.id)
-    setMesaName(m.nombre)
-    setMesaCapacidad(String(m.capacidad))
-    setMesaZona(m.zona || "")
-  }
-
-  const confirmDeleteMesa = () => {
-    if (!mesaDeleteId) return
-    setMesas((prev) => prev.filter((m) => m.id !== mesaDeleteId))
-    setMesaDeleteId(null)
-    toast("Mesa eliminada", "warning")
-  }
-
-  const confirmDeleteEmpleado = () => {
-    if (!empDeleteId) return
-    setEmpleados((prev) => prev.filter((e) => e.id !== empDeleteId))
-    setEmpDeleteId(null)
-    toast("Empleado eliminado", "warning")
-  }
-
   const copyClientes = () => {
-    if (clientes.length === 0) {
+    if (clientesCrud.clientes.length === 0) {
       toast("No hay clientes registrados", "warning")
       return
     }
-    const lines = buildClientesLines({ collectionName: selectedCollection?.name, clientes })
+    const lines = buildClientesLines({ collectionName: selectedCollection?.name, clientes: clientesCrud.clientes })
     navigator.clipboard.writeText(lines.join("\n"))
     toast("Clientes copiados", "success")
   }
@@ -528,8 +354,8 @@ export default function VentasPage() {
       channels: channelBreakdown,
       top: topSellers,
       tipoCambio,
-      clientes,
-      mesas,
+      clientes: clientesCrud.clientes,
+      mesas: mesasCrud.mesas,
       entries: dayEntries,
     })
     navigator.clipboard.writeText(lines.join("\n"))
@@ -619,8 +445,8 @@ export default function VentasPage() {
       <SaleForm
         sharedDishes={sharedDishes}
         entries={entries}
-        clientes={clientes}
-        mesas={mesas}
+        clientes={clientesCrud.clientes}
+        mesas={mesasCrud.mesas}
         puntosTasa={puntosTasa}
         puntosCanje={puntosCanje}
         deductStock={deductStock}
@@ -663,112 +489,31 @@ export default function VentasPage() {
 
       {/* ── Clientes frecuentes ──────────────────────────── */}
       <FrequentCustomers
-        clientes={clientes}
-        showClientes={showClientes}
-        clienteName={clienteName}
-        clientePhone={clientePhone}
-        clientePts={clientePts}
-        clienteEditId={clienteEditId}
-        clienteDeleteId={clienteDeleteId}
+        crud={clientesCrud}
         puntosTasa={puntosTasa}
         puntosCanje={puntosCanje}
         tipoCambio={tipoCambio}
         onCopy={copyClientes}
-        onToggle={() => setShowClientes(!showClientes)}
-        onNameChange={setClienteName}
-        onPhoneChange={setClientePhone}
-        onPtsChange={setClientePts}
-        onSave={saveCliente}
-        onCancel={() => {
-          setClienteEditId(null)
-          setClienteName("")
-          setClientePhone("")
-          setClientePts("")
-        }}
-        onEdit={startEditCliente}
-        onDeleteClick={(id) => setClienteDeleteId(id)}
-        onCancelDelete={() => setClienteDeleteId(null)}
-        onConfirmDelete={confirmDeleteCliente}
         onPuntosTasaChange={setPuntosTasa}
         onPuntosCanjeChange={setPuntosCanje}
         onTipoCambioChange={setTipoCambio}
       />
 
       {/* ── Mesas del salón ──────────────────────────────── */}
-      <DiningTables
-        mesas={mesas}
-        showMesas={showMesas}
-        mesasOcupadasHoy={mesasOcupadasHoy}
-        now={now}
-        mesaName={mesaName}
-        mesaCapacidad={mesaCapacidad}
-        mesaZona={mesaZona}
-        mesaEditId={mesaEditId}
-        mesaDeleteId={mesaDeleteId}
-        onToggle={() => setShowMesas(!showMesas)}
-        onNameChange={setMesaName}
-        onCapacidadChange={setMesaCapacidad}
-        onZonaChange={setMesaZona}
-        onSave={saveMesa}
-        onCancel={() => {
-          setMesaEditId(null)
-          setMesaName("")
-          setMesaCapacidad("")
-          setMesaZona("")
-        }}
-        onEdit={startEditMesa}
-        onDeleteClick={(id) => setMesaDeleteId(id)}
-        onCancelDelete={() => setMesaDeleteId(null)}
-        onConfirmDelete={confirmDeleteMesa}
-      />
+      <DiningTables crud={mesasCrud} mesasOcupadasHoy={mesasOcupadasHoy} now={now} />
 
       {/* ── Reloj checador ───────────────────────────────── */}
       <RelojChecador
-        showReloj={showReloj}
-        empleadoCount={empleados.length}
+        crud={empleadosCrud}
+        empleadoCount={empleadosCrud.empleados.length}
         empleadosHoy={empleadosHoy}
         fichajesHoy={fichajesHoy}
-        empNombre={empNombre}
-        empRol={empRol}
-        empTarifa={empTarifa}
-        empEditId={empEditId}
-        empDeleteId={empDeleteId}
         selectedDate={selectedDate}
-        onToggle={() => setShowReloj(!showReloj)}
-        onNombreChange={setEmpNombre}
-        onRolChange={setEmpRol}
-        onTarifaChange={setEmpTarifa}
-        onSave={saveEmpleado}
-        onCancel={() => {
-          setEmpEditId(null)
-          setEmpNombre("")
-          setEmpRol("")
-          setEmpTarifa("")
-        }}
-        onFicharEntrada={ficharEntrada}
-        onFicharSalida={ficharSalida}
-        onEdit={(e) => {
-          setEmpEditId(e.id)
-          setEmpNombre(e.nombre)
-          setEmpRol(e.rol || "")
-          setEmpTarifa(String(e.tarifa))
-        }}
-        onDeleteClick={(id) => setEmpDeleteId(id)}
-        onCancelDelete={() => setEmpDeleteId(null)}
-        onConfirmDelete={confirmDeleteEmpleado}
         onCopyHoras={copyHoras}
       />
 
       {/* ── Tarjetas de regalo ───────────────────────────── */}
-      <GiftCards
-        tarjetas={tarjetas}
-        showTarjetas={showTarjetas}
-        tarjetaMonto={tarjetaMonto}
-        onToggle={() => setShowTarjetas(!showTarjetas)}
-        onMontoChange={setTarjetaMonto}
-        onEmitir={emitirTarjeta}
-        onCopyCodigo={copyCodigoTarjeta}
-      />
+      <GiftCards crud={tarjetasCrud} />
 
       {/* ── Antifraud alerts ─────────────────────────────── */}
       <AntifraudAlerts
@@ -835,7 +580,7 @@ export default function VentasPage() {
             units={dayStats.units}
             selectedDateLabel={dateLabel(selectedDate)}
             visibleEntries={visibleEntries}
-            clientes={clientes}
+            clientes={clientesCrud.clientes}
             dishCost={dishCost}
             onAdjustQty={adjustQty}
             onDeleteClick={(id) => setDeleteConfirm(id)}

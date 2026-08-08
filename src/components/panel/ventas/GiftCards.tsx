@@ -1,19 +1,14 @@
 "use client"
 
 import { Copy, CreditCard, Gift, Settings2 } from "lucide-react"
-import type { TarjetaRegalo } from "./ventas-shared"
+import type { TarjetasCrud } from "@/hooks/use-ventas-crud"
 
 interface GiftCardsProps {
-  tarjetas: TarjetaRegalo[]
-  showTarjetas: boolean
-  tarjetaMonto: string
-  onToggle: () => void
-  onMontoChange: (v: string) => void
-  onEmitir: () => void
-  onCopyCodigo: (codigo: string) => void
+  crud: TarjetasCrud
 }
 
-export default function GiftCards({ tarjetas, showTarjetas, tarjetaMonto, onToggle, onMontoChange, onEmitir, onCopyCodigo }: GiftCardsProps) {
+export default function GiftCards({ crud }: GiftCardsProps) {
+  const { tarjetas, showTarjetas, tarjetaMonto, onToggle, onMontoChange, onEmitir, onCopyCodigo } = crud
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <div className="flex items-center gap-2 mb-4">
