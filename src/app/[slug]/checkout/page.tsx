@@ -9,21 +9,12 @@ import {
   ShoppingBag,
   ArrowLeft,
   ArrowRight,
-  MapPin,
-  Clock,
-  CreditCard,
   CheckCircle2,
-  Building2,
-  Smartphone,
-  Banknote,
-  QrCode,
   Store,
   MessageCircle,
 } from "lucide-react"
 import Link from "next/link"
-import { PAYMENT_METHODS, type PaymentMethod, type Address } from "@/types"
-import { StripeProvider } from "@/components/stripe/stripe-provider"
-import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
+import type { PaymentMethod, Address } from "@/types"
 import {
   getGuestToken,
   saveGuestToken,
@@ -31,67 +22,18 @@ import {
   saveLastAddress,
   claimGuestAddresses,
 } from "@/lib/guest-address"
-
-// ============================================================
-// Types
-// ============================================================
-
-type Step = "address" | "schedule" | "review" | "payment"
-
-interface AddressForm {
-  label: string
-  street: string
-  number: string
-  interior: string
-  neighborhood: string
-  zip_code: string
-  references: string
-}
-
-interface ScheduleForm {
-  date: string
-  time: string
-}
-
-// ============================================================
-// Helpers
-// ============================================================
-
-const DELIVERY_TIMES = [
-  "8:00 AM — 10:00 AM",
-  "10:00 AM — 12:00 PM",
-  "12:00 PM — 2:00 PM",
-  "2:00 PM — 4:00 PM",
-  "4:00 PM — 6:00 PM",
-  "6:00 PM — 8:00 PM",
-]
-
-// Generate next 7 days for Mexico
-function getNextDays(): { value: string; label: string }[] {
-  const days: { value: string; label: string }[] = []
-  const today = new Date()
-  const formatter = new Intl.DateTimeFormat("es-MX", { weekday: "long", month: "long", day: "numeric" })
-
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(today)
-    date.setDate(date.getDate() + i)
-    const iso = date.toISOString().split("T")[0] ?? ""
-    const label = i === 0 ? `Hoy — ${formatter.format(date)}` : i === 1 ? `Mañana — ${formatter.format(date)}` : formatter.format(date).replace(/^\w/, (c) => c.toUpperCase())
-    days.push({ value: iso, label })
-  }
-
-  return days
-}
-
-const PAYMENT_ICONS: Record<PaymentMethod, React.ReactNode> = {
-  card: <CreditCard className="w-5 h-5" />,
-  spei: <Building2 className="w-5 h-5" />,
-  oxxo: <Store className="w-5 h-5" />,
-  mercado_pago: <Smartphone className="w-5 h-5" />,
-  cash_on_delivery: <Banknote className="w-5 h-5" />,
-  codi: <QrCode className="w-5 h-5" />,
-  stripe: <CreditCard className="w-5 h-5" />,
-}
+import {
+  DEFAULT_ADDRESS_FORM,
+  DELIVERY_TIMES,
+  getNextDays,
+  type AddressForm,
+  type ScheduleForm,
+  type Step,
+} from "@/components/checkout/checkout-shared"
+import { AddressStep } from "@/components/checkout/AddressStep"
+import { ScheduleStep } from "@/components/checkout/ScheduleStep"
+import { ReviewStep } from "@/components/checkout/ReviewStep"
+import { PaymentStep } from "@/components/checkout/PaymentStep"
 
 // ============================================================
 // Page
@@ -103,15 +45,7 @@ export default function CheckoutPage() {
   const router = useRouter()
 
   const [step, setStep] = useState<Step>("address")
-  const [address, setAddress] = useState<AddressForm>({
-    label: "Casa",
-    street: "",
-    number: "",
-    interior: "",
-    neighborhood: "",
-    zip_code: "",
-    references: "",
-  })
+  const [address, setAddress] = useState<AddressForm>(DEFAULT_ADDRESS_FORM)
   const [schedule, setSchedule] = useState<ScheduleForm>({
     date: getNextDays()[0]?.value ?? "",
     time: DELIVERY_TIMES[2] ?? "12:00 PM — 2:00 PM",
@@ -538,563 +472,71 @@ export default function CheckoutPage() {
 
       {/* ============ STEP 1: ADDRESS ============ */}
       {step === "address" && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-1">
-            <MapPin className="w-5 h-5 inline mr-2 text-brand-600" />
-            Dirección de entrega
-          </h2>
-          <p className="text-gray-500 text-sm mb-6">
-            Selecciona o agrega una dirección en {city.name}, {city.state}.
-          </p>
-
-          {/* Direcciones guardadas (solo usuarios con sesión) */}
-          {isLoggedIn && savedAddresses.length > 0 && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Mis direcciones
-                </label>
-                <Link
-                  href={`/${city.slug}/mis-direcciones`}
-                  className="text-xs font-medium text-brand-600 hover:text-brand-700"
-                >
-                  Gestionar direcciones
-                </Link>
-              </div>
-              <div className="space-y-2">
-                <button
-                  onClick={() => {
-                    setSelectedAddressId(null)
-                    setAddress({
-                      label: "Casa",
-                      street: "",
-                      number: "",
-                      interior: "",
-                      neighborhood: "",
-                      zip_code: "",
-                      references: "",
-                    })
-                  }}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
-                    selectedAddressId === null
-                      ? "border-brand-500 bg-brand-50"
-                      : "border-gray-200 bg-white hover:border-gray-300"
-                  }`}
-                >
-                  <span className="w-4 h-4 rounded-full border-2 border-brand-500 flex items-center justify-center shrink-0">
-                    {selectedAddressId === null && <span className="w-2 h-2 rounded-full bg-brand-600" />}
-                  </span>
-                  <span className="text-sm font-medium text-gray-700">+ Nueva dirección</span>
-                </button>
-                {savedAddresses.map((addr) => (
-                  <button
-                    key={addr.id}
-                    onClick={() => handleSelectSavedAddress(addr)}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
-                      selectedAddressId === addr.id
-                        ? "border-brand-500 bg-brand-50"
-                        : "border-gray-200 bg-white hover:border-gray-300"
-                    }`}
-                  >
-                    <span className="w-4 h-4 rounded-full border-2 border-brand-500 flex items-center justify-center shrink-0">
-                      {selectedAddressId === addr.id && <span className="w-2 h-2 rounded-full bg-brand-600" />}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-gray-900">{addr.label}</span>
-                      <span className="block text-xs text-gray-500 truncate">
-                        {addr.street} {addr.number}
-                        {addr.neighborhood ? `, ${addr.neighborhood}` : ""}, CP {addr.zip_code}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Address label */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Etiqueta
-            </label>
-            <div className="flex gap-2">
-              {["Casa", "Oficina", "Otro"].map((l) => (
-                <button
-                  key={l}
-                  onClick={() => updateAddress("label", l)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    address.label === l
-                      ? "bg-brand-600 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Street + Number */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Calle *
-              </label>
-              <input
-                type="text"
-                value={address.street}
-                onChange={(e) => updateAddress("street", e.target.value)}
-                placeholder="Av. Insurgentes Sur"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Número *
-              </label>
-              <input
-                type="text"
-                value={address.number}
-                onChange={(e) => updateAddress("number", e.target.value)}
-                placeholder="1234"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-              />
-            </div>
-          </div>
-
-          {/* Interior + Neighborhood */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Interior (opcional)
-              </label>
-              <input
-                type="text"
-                value={address.interior}
-                onChange={(e) => updateAddress("interior", e.target.value)}
-                placeholder="Depto 4B"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Colonia *
-              </label>
-              <input
-                type="text"
-                value={address.neighborhood}
-                onChange={(e) => updateAddress("neighborhood", e.target.value)}
-                placeholder="Roma Norte"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-              />
-            </div>
-          </div>
-
-          {/* ZIP code */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Código Postal *
-            </label>
-            <input
-              type="text"
-              value={address.zip_code}
-              onChange={(e) => updateAddress("zip_code", e.target.value.replace(/\D/g, "").slice(0, 5))}
-              placeholder="06700"
-              maxLength={5}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-            />
-          </div>
-
-          {/* References */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Referencias (opcional)
-            </label>
-            <textarea
-              value={address.references}
-              onChange={(e) => updateAddress("references", e.target.value)}
-              placeholder="Entre calles, color de fachada, etc."
-              rows={2}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 resize-none"
-            />
-          </div>
-
-          {/* Phone — se guarda en orders.customer_phone para la confirmación por WhatsApp */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Teléfono de contacto *
-            </label>
-            <input
-              type="tel"
-              inputMode="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-              placeholder="55 1234 5678"
-              maxLength={10}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-            />
-            <p className="mt-1 text-xs text-gray-400">
-              Lo usamos para enviarte la confirmación de tu pedido por WhatsApp.
-            </p>
-          </div>
-
-          <button
-            onClick={() => setStep("schedule")}
-            disabled={!isAddressValid || phone.trim().length < 10}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Continuar
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
+        <AddressStep
+          address={address}
+          phone={phone}
+          savedAddresses={savedAddresses}
+          selectedAddressId={selectedAddressId}
+          isLoggedIn={isLoggedIn}
+          city={city}
+          isAddressValid={Boolean(isAddressValid)}
+          onUpdateAddress={updateAddress}
+          onSelectSavedAddress={handleSelectSavedAddress}
+          onNewAddress={() => {
+            setSelectedAddressId(null)
+            setAddress(DEFAULT_ADDRESS_FORM)
+          }}
+          onPhoneChange={setPhone}
+          onContinue={() => setStep("schedule")}
+        />
       )}
 
       {/* ============ STEP 2: SCHEDULE ============ */}
       {step === "schedule" && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-1">
-            <Clock className="w-5 h-5 inline mr-2 text-brand-600" />
-            ¿Cuándo entregamos?
-          </h2>
-          <p className="text-gray-500 text-sm mb-6">
-            Elige la fecha y horario de entrega. Entrega estimada: 30–60 min.
-          </p>
-
-          {/* Date selection */}
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Fecha</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6">
-            {getNextDays().map((day) => (
-              <button
-                key={day.value}
-                onClick={() => setSchedule((s) => ({ ...s, date: day.value }))}
-                className={`p-3 rounded-xl text-sm font-medium text-left transition-colors ${
-                  schedule.date === day.value
-                    ? "bg-brand-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {day.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Time selection */}
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Horario</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
-            {DELIVERY_TIMES.map((time) => (
-              <button
-                key={time}
-                onClick={() => setSchedule((s) => ({ ...s, time }))}
-                className={`p-3 rounded-xl text-sm font-medium text-left transition-colors ${
-                  schedule.time === time
-                    ? "bg-brand-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {time}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={() => setStep("address")}
-              className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Atrás
-            </button>
-            <button
-              onClick={() => setStep("review")}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 transition-colors"
-            >
-              Continuar
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <ScheduleStep
+          schedule={schedule}
+          onDateChange={(value) => setSchedule((s) => ({ ...s, date: value }))}
+          onTimeChange={(value) => setSchedule((s) => ({ ...s, time: value }))}
+          onBack={() => setStep("address")}
+          onContinue={() => setStep("review")}
+        />
       )}
 
       {/* ============ STEP 3: REVIEW ============ */}
       {step === "review" && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-1">
-            Revisa tu pedido
-          </h2>
-          <p className="text-gray-500 text-sm mb-6">
-            Confirma que todo esté correcto antes de pagar.
-          </p>
-
-          {/* Address summary */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-brand-600" />
-                Dirección
-              </h3>
-              <button
-                onClick={() => setStep("address")}
-                className="text-xs text-brand-600 hover:text-brand-700 font-medium"
-              >
-                Editar
-              </button>
-            </div>
-            <p className="text-sm text-gray-600">
-              {address.street} {address.number}
-              {address.interior ? `, ${address.interior}` : ""}
-              <br />
-              {address.neighborhood}, CP {address.zip_code}
-              <br />
-              {city.name}, {city.state}
-              {address.references && (
-                <>
-                  <br />
-                  <span className="text-gray-400 text-xs">Ref: {address.references}</span>
-                </>
-              )}
-            </p>
-          </div>
-
-          {/* Schedule summary */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-brand-600" />
-                Entrega
-              </h3>
-              <button
-                onClick={() => setStep("schedule")}
-                className="text-xs text-brand-600 hover:text-brand-700 font-medium"
-              >
-                Editar
-              </button>
-            </div>
-            <p className="text-sm text-gray-600">
-              {schedule.date === getNextDays()[0]?.value ? "Hoy" : schedule.date} — {schedule.time}
-            </p>
-          </div>
-
-          {/* Items summary */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">
-              Productos ({itemCount})
-            </h3>
-            <ul className="space-y-2">
-              {cart.items.map((item) => (
-                <li key={item.product_id} className="flex justify-between text-sm">
-                  <span className="text-gray-600 truncate mr-4">
-                    {item.quantity}× {item.name}
-                  </span>
-                  <span className="font-medium text-gray-900 shrink-0">
-                    ${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Total */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Subtotal</span>
-              <span className="text-gray-900">${subtotal.toFixed(2)}</span>
-            </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-green-600">Descuento</span>
-                <span className="text-green-600">-${discount.toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Envío</span>
-              <span className="text-gray-900">${deliveryFee.toFixed(2)}</span>
-            </div>
-            <hr className="border-gray-100" />
-            <div className="flex justify-between">
-              <span className="text-lg font-bold text-gray-900">Total</span>
-              <span className="text-lg font-bold text-brand-600">${total.toFixed(2)}</span>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={() => setStep("schedule")}
-              className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Atrás
-            </button>
-            <button
-              onClick={() => setStep("payment")}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 transition-colors"
-            >
-              Continuar al pago
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <ReviewStep
+          address={address}
+          schedule={schedule}
+          city={city}
+          cartItems={cart.items}
+          itemCount={itemCount}
+          subtotal={subtotal}
+          discount={discount}
+          deliveryFee={deliveryFee}
+          total={total}
+          onEditAddress={() => setStep("address")}
+          onEditSchedule={() => setStep("schedule")}
+          onBack={() => setStep("schedule")}
+          onContinue={() => setStep("payment")}
+        />
       )}
 
       {/* ============ STEP 4: PAYMENT ============ */}
       {step === "payment" && (
-        <div>
-          {/* Stripe Card Form */}
-          {showStripeForm && stripeClientSecret ? (
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-1">
-                <CreditCard className="w-5 h-5 inline mr-2 text-brand-600" />
-                Pago con tarjeta
-              </h2>
-              <p className="text-gray-500 text-sm mb-6">
-                Ingresa los datos de tu tarjeta. Pago seguro con Stripe.
-              </p>
-
-              <StripeProvider clientSecret={stripeClientSecret}>
-                <StripePaymentForm
-                  amount={total}
-                  onSuccess={handleStripeSuccess}
-                  onBack={handleStripeBack}
-                />
-              </StripeProvider>
-            </div>
-          ) : (
-            <>
-              <h2 className="text-xl font-bold text-gray-900 mb-1">
-                <CreditCard className="w-5 h-5 inline mr-2 text-brand-600" />
-                Método de pago
-              </h2>
-              <p className="text-gray-500 text-sm mb-6">
-                Elige cómo quieres pagar. Procesamiento seguro.
-              </p>
-
-              {/* Payment methods */}
-              <div className="space-y-3 mb-6">
-                {PAYMENT_METHODS.filter((m) => m.value !== "codi").map((method) => (
-                  <button
-                    key={method.value}
-                    onClick={() => setPaymentMethod(method.value)}
-                    className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-colors text-left ${
-                      paymentMethod === method.value
-                        ? "border-brand-600 bg-brand-50"
-                        : "border-gray-200 bg-white hover:border-gray-300"
-                    }`}
-                  >
-                    <div
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        paymentMethod === method.value
-                          ? "bg-brand-600 text-white"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
-                    >
-                      {PAYMENT_ICONS[method.value]}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900 text-sm">{method.label}</p>
-                      <p className="text-xs text-gray-500">{method.description}</p>
-                    </div>
-                    <div
-                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        paymentMethod === method.value
-                          ? "border-brand-600"
-                          : "border-gray-300"
-                      }`}
-                    >
-                      {paymentMethod === method.value && (
-                        <div className="w-3 h-3 rounded-full bg-brand-600" />
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Trust badges — payment security assurance */}
-              <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 space-y-3">
-                <div className="flex items-center gap-2 text-xs text-[#6b6b6b]">
-                  <CheckCircle2 className="w-4 h-4 text-[#108910]" />
-                  <span>Pago seguro con encriptación SSL</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-[#6b6b6b]">
-                  <CheckCircle2 className="w-4 h-4 text-[#108910]" />
-                  <span>Factura electrónica (CFDI 4.0) incluida</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-[#6b6b6b]">
-                  <CheckCircle2 className="w-4 h-4 text-[#108910]" />
-                  <span>Soporte vía WhatsApp antes, durante y después del pedido</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-[#6b6b6b]">
-                  <CheckCircle2 className="w-4 h-4 text-[#108910]" />
-                  <span>Garantía de frescura: si algo no llega bien, te lo reponemos</span>
-                </div>
-              </div>
-
-              {/* Total reminder */}
-              <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-                <div className="flex justify-between">
-                  <span className="font-bold text-gray-900">Total a pagar</span>
-                  <span className="font-bold text-brand-600 text-lg">${total.toFixed(2)}</span>
-                </div>
-                <p className="text-xs text-gray-400 mt-1">Incluye ${deliveryFee.toFixed(2)} de envío</p>
-              </div>
-
-              {/* Payment method instructions */}
-              {paymentMethod === "spei" && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm">
-                  <p className="text-blue-800 font-semibold mb-1">Pago vía SPEI</p>
-                  <p className="text-blue-600 text-xs">
-                    Al confirmar tu pedido recibirás la CLABE interbancaria para realizar la transferencia. Tu pedido se procesará cuando el pago sea confirmado (típicamente 5–30 minutos).
-                  </p>
-                </div>
-              )}
-
-              {paymentMethod === "oxxo" && (
-                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 text-sm">
-                  <p className="text-orange-800 font-semibold mb-1">Pago en OXXO</p>
-                  <p className="text-orange-600 text-xs">
-                    Recibirás un código de barras para pagar en cualquier tienda OXXO. Tienes 24 horas para realizar el pago. Tu pedido se prepara al confirmar el pago.
-                  </p>
-                </div>
-              )}
-
-              {/* Error display */}
-              {checkoutError && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-sm text-red-700">
-                  {checkoutError}
-                </div>
-              )}
-
-              {/* Action buttons */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setStep("review")}
-                  className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Atrás
-                </button>
-                <button
-                  onClick={handlePlaceOrder}
-                  disabled={isProcessing}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 disabled:opacity-70 transition-colors"
-                >
-                  {isProcessing ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Procesando...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-5 h-5" />
-                      Confirmar pedido — ${total.toFixed(2)}
-                    </>
-                  )}
-                </button>
-              </div>
-              <p className="text-center text-xs text-gray-400 mt-4">
-                Al confirmar aceptas nuestros Términos y Política de Privacidad.
-              </p>
-            </>
-          )}
-        </div>
+        <PaymentStep
+          paymentMethod={paymentMethod}
+          total={total}
+          deliveryFee={deliveryFee}
+          checkoutError={checkoutError}
+          isProcessing={isProcessing}
+          showStripeForm={showStripeForm}
+          stripeClientSecret={stripeClientSecret}
+          onSelectMethod={setPaymentMethod}
+          onPlaceOrder={handlePlaceOrder}
+          onBack={() => setStep("review")}
+          onStripeSuccess={handleStripeSuccess}
+          onStripeBack={handleStripeBack}
+        />
       )}
     </div>
   )
