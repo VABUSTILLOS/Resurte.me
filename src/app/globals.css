@@ -466,3 +466,17 @@ img, video, iframe, canvas, svg {
   max-width: 100%;
   height: auto;
 }
+
+/* ============================================
+   Print rules (apertura kit) — moved from inline
+   <style> so CSP style-src 'self' allows them
+   without a nonce.
+   ============================================ */
+@media print {
+  .print-hidden {
+    display: none !important;
+  }
+  .print-avoid-break {
+    break-inside: avoid;
+  }
+}
