@@ -261,7 +261,6 @@ export default function PlanificadorPage() {
           sharedDishes={sharedDishes}
           covers={covers}
           avgWastePct={avgWastePct}
-          manualQtys={manualQtys}
           isImported={(dish) => dish.ingredients.every((i) => findManualQtyKey(manualQtys, normalizeName(i.ingredientName)))}
           onToggleImport={toggleImportDish}
         />
