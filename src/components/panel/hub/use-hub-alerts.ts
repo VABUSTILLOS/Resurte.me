@@ -6,54 +6,11 @@ import {
 } from "lucide-react"
 import { foodCostStatus, type PanelConfig } from "@/lib/panel-config"
 import { hubEntryTotal, type HubAlert, type HubCollection, type HubComandas, type HubMesasInfo, type HubTodaySales, type HubVenta } from "./hub-data"
-
-interface DishIngredient {
-  ingredientName: string
-  quantity: number
-  unitPrice: number
-  unit?: string
-}
-
-interface Dish {
-  name: string
-  sellingPrice: number
-  ingredients: DishIngredient[]
-}
-
-interface MermaEntry {
-  id: string
-  amountKg: number
-  costPerKg: number
-  date: string
-  category: string
-}
-
-interface InventoryItem {
-  id: string
-  name: string
-  stock: number
-  minStock: number
-  unit: string
-  pricePerUnit: number
-  category?: string
-}
-
-interface ShoppingItem {
-  key: string
-  name: string
-  pricePerKg: number
-  quantityKg: number
-}
-
-interface HubCliente {
-  id: string
-  nombre: string
-  telefono?: string
-  puntos: number
-  visitas: number
-  totalGastado: number
-  createdAt: string
-}
+import type { SharedDish } from "@/hooks/use-local-storage"
+import type { WasteEntry } from "@/components/panel/mermas/mermas-shared"
+import type { InventoryItem } from "@/components/panel/inventario/inventario-shared"
+import type { ShoppingItem } from "@/components/panel/temporada/temporada-shared"
+import type { Cliente } from "@/components/panel/ventas/ventas-shared"
 
 interface UseHubAlertsArgs {
   selectedCollection: HubCollection | null
@@ -64,14 +21,14 @@ interface UseHubAlertsArgs {
   ventasUmbralTicket: number
   ventasMetaDia: number
   inventarioItems: InventoryItem[]
-  sharedDishes: Dish[]
-  mermaEntries: MermaEntry[]
+  sharedDishes: SharedDish[]
+  mermaEntries: WasteEntry[]
   monthlyGoal: number
   shoppingList: ShoppingItem[]
   aperturaChecked: string[]
   projectionShortfall: number
   covers: number
-  clientes: HubCliente[]
+  clientes: Cliente[]
   panelCfg: PanelConfig
 }
 
