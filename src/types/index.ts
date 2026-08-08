@@ -72,7 +72,8 @@ export interface Profile {
 
 export interface Address {
   id: number
-  user_id: string
+  user_id: string | null
+  guest_token: string | null
   label: string
   street: string
   number: string

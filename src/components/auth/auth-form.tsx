@@ -5,6 +5,7 @@ import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useSearchParams } from "next/navigation"
 import { trackEvent } from "@/lib/analytics"
+import { claimGuestAddresses } from "@/lib/guest-address"
 
 interface AuthFormProps {
   mode: "login" | "register"
@@ -37,6 +38,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
+        // Vincula las direcciones de compras anónimas hechas en este navegador
+        await claimGuestAddresses()
         router.refresh()
         router.push("/")
       } else {
@@ -87,6 +90,8 @@ export function AuthForm({ mode }: AuthFormProps) {
 
         // If session exists, user is auto-confirmed — redirect to home
         if (data.session) {
+          // Vincula las direcciones de compras anónimas hechas en este navegador
+          await claimGuestAddresses()
           router.refresh()
           router.push("/")
         } else {

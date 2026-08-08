@@ -24,6 +24,13 @@ import Link from "next/link"
 import { PAYMENT_METHODS, type PaymentMethod, type Address } from "@/types"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
+import {
+  getGuestToken,
+  saveGuestToken,
+  getLastAddress,
+  saveLastAddress,
+  claimGuestAddresses,
+} from "@/lib/guest-address"
 
 // ============================================================
 // Types
@@ -122,12 +129,32 @@ export default function CheckoutPage() {
 
   // Detecta si el usuario tiene sesión para sugerirle iniciarla (historial +
   // créditos de recompensa). null = aún verificando / sin Supabase configurado.
+  // Para anónimos además precarga la dirección y el teléfono de la última
+  // compra (localStorage) para no tener que escribirlos de nuevo.
   useEffect(() => {
     let cancelled = false
     const supabase = createClient()
     if (!supabase) return
     supabase.auth.getUser().then(({ data }) => {
-      if (!cancelled) setIsLoggedIn(!!data.user)
+      if (cancelled) return
+      const loggedIn = !!data.user
+      setIsLoggedIn(loggedIn)
+      if (!loggedIn) {
+        const last = getLastAddress()
+        if (last) {
+          setAddress((prev) => ({
+            ...prev,
+            label: last.label ?? prev.label,
+            street: last.street ?? prev.street,
+            number: last.number ?? prev.number,
+            interior: last.interior ?? prev.interior,
+            neighborhood: last.neighborhood ?? prev.neighborhood,
+            zip_code: last.zip_code ?? prev.zip_code,
+            references: last.references ?? prev.references,
+          }))
+          setPhone((prev) => last.phone ?? prev)
+        }
+      }
     })
     return () => {
       cancelled = true
@@ -135,11 +162,23 @@ export default function CheckoutPage() {
   }, [])
 
   // Carga las direcciones guardadas cuando hay sesión activa
+  const loadSavedAddresses = async (supabase: ReturnType<typeof createClient>) => {
+    if (!supabase) return
+    const { data, error } = await supabase
+      .from("addresses")
+      .select("*")
+      .order("created_at", { ascending: false })
+    if (!error && data) setSavedAddresses(data as Address[])
+  }
+
   useEffect(() => {
     if (isLoggedIn !== true) return
     let cancelled = false
     const supabase = createClient()
     if (!supabase) return
+    // Vincula las direcciones de compras anónimas hechas en este navegador
+    // (no-op si no hay guest_token en localStorage).
+    claimGuestAddresses()
     supabase
       .from("addresses")
       .select("*")
@@ -243,11 +282,30 @@ export default function CheckoutPage() {
     setCheckoutError(null)
 
     try {
+      // Solo se envía address_id si la dirección seleccionada NO fue editada;
+      // si el usuario modificó un campo, se crea/actualiza una nueva.
+      const selectedAddress = savedAddresses.find((a) => a.id === selectedAddressId)
+      const selectedAddressUnedited =
+        selectedAddress !== undefined &&
+        selectedAddress.street === address.street &&
+        selectedAddress.number === address.number &&
+        (selectedAddress.interior ?? "") === address.interior &&
+        selectedAddress.neighborhood === address.neighborhood &&
+        selectedAddress.zip_code === address.zip_code &&
+        (selectedAddress.references ?? "") === address.references
+
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           city_id: city.id,
+          // Checkout anónimo: reutiliza el token del navegador para que la
+          // dirección se vincule a la misma "sesión" y se pueda reclamar al
+          // iniciar sesión (el servidor genera uno si aún no existe).
+          ...(isLoggedIn === false ? { guest_token: getGuestToken() ?? undefined } : {}),
+          ...(selectedAddressUnedited && selectedAddressId
+            ? { address_id: selectedAddressId }
+            : {}),
           address: {
             label: address.label,
             street: address.street,
@@ -283,6 +341,17 @@ export default function CheckoutPage() {
         setIsProcessing(false)
         return
       }
+
+      // Autoguardado (checkout anónimo): persiste el guest_token del servidor
+      // y la última dirección+teléfono para reutilizarlos en la próxima compra.
+      if (isLoggedIn === false) {
+        if (data.guestToken) saveGuestToken(data.guestToken)
+        saveLastAddress({ ...address, phone })
+      }
+
+      // Refresca "Mis direcciones" si el usuario vuelve sin recargar la página.
+      const supabase = createClient()
+      if (supabase) loadSavedAddresses(supabase)
 
       // Card payment → show Stripe form
       if (paymentMethod === "card" && data.clientSecret) {
@@ -428,9 +497,17 @@ export default function CheckoutPage() {
           {/* Direcciones guardadas (solo usuarios con sesión) */}
           {isLoggedIn && savedAddresses.length > 0 && (
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Mis direcciones
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Mis direcciones
+                </label>
+                <Link
+                  href={`/${city.slug}/mis-direcciones`}
+                  className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                >
+                  Gestionar direcciones
+                </Link>
+              </div>
               <div className="space-y-2">
                 <button
                   onClick={() => {

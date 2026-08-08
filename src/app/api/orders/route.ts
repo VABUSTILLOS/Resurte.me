@@ -21,6 +21,12 @@ interface CreateOrderBody {
     zip_code: string
     references: string
   }
+  // Dirección guardada reutilizada tal cual (logged-in). Si la dirección del
+  // formulario fue editada, el frontend NO la envía y se crea una nueva.
+  address_id?: number
+  // Token de checkout anónimo: permite reutilizar la dirección del mismo
+  // navegador y reclamarla al iniciar sesión.
+  guest_token?: string
   schedule: {
     date: string
     time: string
@@ -51,6 +57,8 @@ export async function POST(request: NextRequest) {
     const {
       city_id,
       address,
+      address_id,
+      guest_token,
       schedule,
       payment_method,
       phone,
@@ -83,7 +91,6 @@ export async function POST(request: NextRequest) {
       "cash_on_delivery",
       "mercado_pago",
       "codi",
-      "stripe",
     ]
     if (!ALLOWED_PAYMENT_METHODS.includes(payment_method)) {
       return NextResponse.json(
@@ -254,20 +261,42 @@ export async function POST(request: NextRequest) {
     const cityName = cityRow.name
     const cityState = cityRow.state
 
-    // ── Reutilizar dirección existente del usuario (evita duplicados en cada
-    //    compra) o insertar una nueva. Los usuarios anónimos siempre insertan. ──
+    // ── Resolver la dirección del pedido ──
+    // Logged-in:
+    //   · si viene address_id → validar que pertenece al usuario y reutilizarla
+    //     (el frontend solo la envía cuando la dirección NO fue editada);
+    //   · si no → buscar por coincidencia exacta para evitar duplicados.
+    // Anónimo: se genera/persiste un guest_token y se reutiliza la dirección
+    // del mismo navegador por token + coincidencia de campos. El token permite
+    // reclamar la dirección al iniciar sesión (POST /api/addresses/claim).
     let addressId: number | null = null
-    if (userId) {
+    const guestToken = guest_token?.trim() || (userId ? null : crypto.randomUUID())
+
+    if (userId && address_id) {
+      const { data: owned } = await supabase
+        .from("addresses")
+        .select("id")
+        .eq("id", address_id)
+        .eq("user_id", userId)
+        .maybeSingle()
+      if (owned) addressId = owned.id
+    }
+
+    if (addressId === null) {
       let query = supabase
         .from("addresses")
         .select("id")
-        .eq("user_id", userId)
         .eq("street", address.street)
         .eq("number", address.number)
         .eq("neighborhood", address.neighborhood)
         .eq("zip_code", address.zip_code)
         .eq("city", cityName)
         .eq("state", cityState)
+      if (userId) {
+        query = query.eq("user_id", userId)
+      } else {
+        query = query.is("user_id", null).eq("guest_token", guestToken)
+      }
       if (address.interior) query = query.eq("interior", address.interior)
       if (address.references) query = query.eq("references", address.references)
       const { data: existing } = await query.maybeSingle()
@@ -280,6 +309,7 @@ export async function POST(request: NextRequest) {
         .from("addresses")
         .insert({
           user_id: userId, // vinculada al usuario logueado (null si checkout anónimo)
+          guest_token: userId ? null : guestToken,
           label: address.label,
           street: address.street,
           number: address.number,
@@ -450,6 +480,9 @@ export async function POST(request: NextRequest) {
       clientSecret,
       paymentIntentId,
       total: realTotal,
+      // Solo para checkout anónimo: el frontend lo persiste en localStorage
+      // para reutilizar la dirección en la próxima compra y reclamarla al login.
+      guestToken,
     })
   } catch (error) {
     console.error("Create order error:", error)
