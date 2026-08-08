@@ -45,4 +45,16 @@ describe("buildCspHeader", () => {
     expect(frameSrc).toContain("https://js.stripe.com")
     expect(csp).toContain("https://api.stripe.com")
   })
+
+  it("incluye upgrade-insecure-requests en enforce pero no en report-only", () => {
+    // Enforce (default): sí lo incluye.
+    expect(buildCspHeader("abc123")).toContain("upgrade-insecure-requests")
+    // Report-only: lo omite (el navegador lo ignora y emite un aviso benigno).
+    expect(buildCspHeader("abc123", { reportOnly: true })).not.toContain(
+      "upgrade-insecure-requests"
+    )
+    expect(buildCspHeader("abc123", { hardened: true, reportOnly: true })).not.toContain(
+      "upgrade-insecure-requests"
+    )
+  })
 })

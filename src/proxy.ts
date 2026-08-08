@@ -145,7 +145,7 @@ export async function proxy(request: NextRequest) {
     // endurecer. Los reportes de navegadores legacy indican dependencia del
     // fallback CSP2 (ver src/lib/csp.ts y /api/csp-report).
     if (reportOnlyEnabled) {
-      cspReportOnlyHeader = buildCspHeader(nonce, { hardened: true })
+      cspReportOnlyHeader = buildCspHeader(nonce, { hardened: true, reportOnly: true })
       request.headers.set("Content-Security-Policy-Report-Only", cspReportOnlyHeader)
     }
     request.headers.set("x-nonce", nonce)

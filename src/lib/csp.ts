@@ -30,6 +30,9 @@ const SUPABASE_HOST = "isogthougrpctnfzcdes.supabase.co"
 type CspOptions = {
   /** Elimina los hosts de terceros de script-src (solo 'self'+nonce+strict-dynamic). */
   hardened?: boolean
+  /** Policy report-only: omite upgrade-insecure-requests (el navegador lo ignora
+   *  en report-only y emite un aviso benigno en consola). */
+  reportOnly?: boolean
 }
 
 export function buildCspHeader(nonce: string, options: CspOptions = {}): string {
@@ -49,7 +52,7 @@ export function buildCspHeader(nonce: string, options: CspOptions = {}): string 
     object-src 'none';
     base-uri 'self';
     form-action 'self';
-    frame-ancestors 'none';${isDev ? "" : "\n    upgrade-insecure-requests;"}
+    frame-ancestors 'none';${!isDev && !options.reportOnly ? "\n    upgrade-insecure-requests;" : ""}
     report-uri /api/csp-report;
   `
     .replace(/\s{2,}/g, " ")
