@@ -153,7 +153,7 @@ export default async function RootLayout({
           <CartProvider>
             <OnboardingWizardGate />
             <Header />
-            <main id="main-content" className="flex-1"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
+            <main id="main-content" tabIndex={-1} className="flex-1 outline-none"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
             <Footer />
             <CityDetector />
             <CartDrawer />
