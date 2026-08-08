@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { runNewOrderWorkflows } from "@/lib/workflows"
 import type { Coupon } from "@/types"
 import { logger } from "@/lib/logger"
+import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 
 interface OrderItemInput {
   product_id: number
@@ -107,6 +108,14 @@ export async function POST(request: NextRequest) {
     const userId = user?.id ?? null
 
     const supabase = await createServiceClient()
+
+    // ── Rate limit: checkout anónimo o logueado (dinero real) ──
+    // Logueado → key por usuario; guest → key por IP.
+    const rateKey = userId ? `orders:${userId}` : `orders:${clientIp(request)}`
+    const rate = await rateLimited(supabase, rateKey, 15, 60)
+    if (!rate.allowed) {
+      return rateLimitResponse(rate)
+    }
 
     // ── Validación server-side de precios y stock ──
     // El subtotal/total/unit_price del body provienen del cliente y NO son de

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import type { AppliedCoupon } from "@/types"
 import { logger } from "@/lib/logger"
+import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 
 /**
  * POST /api/coupons/validate
@@ -14,6 +15,14 @@ import { logger } from "@/lib/logger"
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createServiceClient()
+
+    // ── Rate limit público por IP (evita enumeración de códigos) ──
+    const rate = await rateLimited(supabase, `coupons:${clientIp(request)}`, 30, 60)
+    if (!rate.allowed) {
+      return rateLimitResponse(rate)
+    }
+
     const body = (await request.json()) as { code?: string; subtotal?: number }
     const code = body.code?.trim()
     const subtotal = Number(body.subtotal ?? 0)
@@ -24,8 +33,6 @@ export async function POST(request: NextRequest) {
     if (!Number.isFinite(subtotal) || subtotal < 0) {
       return NextResponse.json({ error: "Subtotal inválido" }, { status: 400 })
     }
-
-    const supabase = await createServiceClient()
 
     const { data: coupon, error } = await supabase
       .from("coupons")

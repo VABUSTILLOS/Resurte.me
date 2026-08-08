@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { redeemCredits } from "@/lib/wallet-actions"
 import { SERVICES } from "@/app/recompensas/_components/services-data"
 import { logger } from "@/lib/logger"
+import { rateLimited, rateLimitResponse } from "@/lib/rate-limit"
 
 /**
  * POST /api/redeem
@@ -38,6 +39,12 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createServiceClient()
+
+    // ── Rate limit por usuario (canje de dinero real) ──
+    const rate = await rateLimited(supabase, `redeem:${user.id}`, 10, 60)
+    if (!rate.allowed) {
+      return rateLimitResponse(rate)
+    }
 
     // ── Idempotencia: evitar doble-débito por doble-click/retry ──
     // Si el usuario ya canjeó este mismo servicio en los últimos 5 minutos,
