@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { ArrowLeft, Plus, Minus, Check, ShoppingCart, Package } from "lucide-react"
+import Image from "next/image"
 import { useCart } from "@/contexts/cart-context"
 import { ProductCard } from "@/components/product/product-card"
 import { WhatsAppBadge, OrderByWhatsAppButton } from "@/components/whatsapp/whatsapp-button"
@@ -112,11 +113,14 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
           <div className="w-full lg:w-[55%]">
             <div className="aspect-[4/3] sm:aspect-square bg-[#f7f4ef] rounded-xl sm:rounded-2xl overflow-hidden relative border border-[#ede8df]">
               {allImages[selectedImage] ? (
-                <img
+                <Image
                   src={allImages[selectedImage]}
                   alt={product.name}
                   width={640}
                   height={480}
+                  priority
+                  fetchPriority="high"
+                  sizes="(max-width: 1024px) 100vw, 55vw"
                   className="w-full h-full object-contain p-8"
                 />
               ) : (

@@ -1,8 +1,6 @@
-"use client"
-
 import Link from "next/link"
 import { ArrowRight, BookOpen, Package, Sparkles, Wrench } from "lucide-react"
-import { useCity } from "@/contexts/city-context"
+import { cookies } from "next/headers"
 import type { ResolvedPostCta } from "@/lib/blog"
 
 const ICONS = {
@@ -19,7 +17,7 @@ const ICONS = {
  * frontmatter) y se pasa como prop; la ciudad se lee del contexto del usuario
  * para las colecciones.
  */
-export function PostCTA({
+export async function PostCTA({
   config,
   heading = "¿Listo para llevar tu restaurante al siguiente nivel?",
   secondaryHref = "/blog",
@@ -30,12 +28,12 @@ export function PostCTA({
   secondaryHref?: string
   secondaryLabel?: string
 }) {
-  const { city } = useCity()
+  const cookieStore = await cookies()
+  const citySlug = cookieStore.get("city-slug")?.value ?? "chihuahua"
   const Icon = ICONS[config.variant]
 
   let href = config.href
   if (config.variant === "coleccion") {
-    const citySlug = city?.slug ?? "chihuahua"
     href = `/${citySlug}/coleccion/${config.collectionSlug ?? ""}`
   }
 

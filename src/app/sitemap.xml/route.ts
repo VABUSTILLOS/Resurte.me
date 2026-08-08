@@ -70,10 +70,6 @@ export async function GET() {
     }
   }
 
-  entries.push({ url: `${BASE_URL}/admin`, changeFrequency: "weekly", priority: 0.4 })
-  entries.push({ url: `${BASE_URL}/admin/pedidos`, changeFrequency: "weekly", priority: 0.4 })
-  entries.push({ url: `${BASE_URL}/admin/whatsapp`, changeFrequency: "weekly", priority: 0.5 })
-
   // Blog
   entries.push({ url: `${BASE_URL}/blog`, changeFrequency: "weekly", priority: 0.8 })
   for (const post of getAllPosts()) {

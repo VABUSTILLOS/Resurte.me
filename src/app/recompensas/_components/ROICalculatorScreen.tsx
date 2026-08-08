@@ -51,10 +51,11 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
       <div className="flex-1 overflow-y-auto px-4 pt-5 pb-6 space-y-5">
         {/* Service Goal Picker */}
         <div>
-          <label className="text-gray-400 text-xs uppercase tracking-wider font-semibold">
+          <label htmlFor="roi-service" className="text-gray-400 text-xs uppercase tracking-wider font-semibold">
             ¿Qué servicio quieres desbloquear?
           </label>
           <select
+            id="roi-service"
             value={targetServiceId}
             onChange={(e) => setTargetServiceId(e.target.value)}
             className="mt-2 w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white text-sm 

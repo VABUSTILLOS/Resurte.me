@@ -1,5 +1,4 @@
 import { test, expect, type Page } from "@playwright/test"
-import path from "node:path"
 
 // Inyecta axe-core y ejecuta el scan de la página actual.
 async function runAxe(page: Page): Promise<AxeResults> {
@@ -47,6 +46,10 @@ test.describe("accesibilidad WCAG (axe-core)", () => {
     ["marketplace", "/comer"],
     ["blog", "/blog"],
     ["ciudad", "/cdmx"],
+    ["carrito", "/cdmx/carrito"],
+    ["busqueda", "/cdmx/buscar"],
+    ["recompensas", "/recompensas"],
+    ["404", "/ruta-inexistente-xyz"],
   ]
 
   for (const [label, url] of pages) {

@@ -307,6 +307,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  aria-label="Ordenar resultados"
                   className="text-xs font-medium text-[#1a1a1a] bg-transparent outline-none cursor-pointer appearance-none pr-1"
                 >
                   <option value="categoria">Recomendados</option>

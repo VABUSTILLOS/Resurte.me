@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, MotionConfig } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BottomTabBar } from "./_components/BottomTabBar";
@@ -107,6 +107,7 @@ export default function CashbackPage() {
   const showShell = !isFullScreen;
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="relative mx-auto flex min-h-screen max-w-md flex-col bg-gray-950 md:max-w-none md:flex-row">
       {/* Sidebar Navigation (Tablet/Desktop) */}
       {showShell && (
@@ -189,5 +190,6 @@ export default function CashbackPage() {
         {showConfetti && <ConfettiOverlay />}
       </div>
     </div>
+    </MotionConfig>
   );
 }
