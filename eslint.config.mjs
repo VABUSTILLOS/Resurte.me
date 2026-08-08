@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build output local de Vercel (`vercel build`/`vercel dev` genera CJS
+    // launchers que no se lintan). Ignorado en git pero no en eslint.
+    ".vercel/**",
   ]),
   {
     // Standalone Node scripts are CommonJS — require() is intentional there.
