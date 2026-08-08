@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import { logger } from "@/lib/logger"
 
 /**
  * POST /api/addresses/claim
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
       .select("id")
 
     if (error) {
-      console.error("Address claim error:", error)
+      logger.error("Address claim error:", error)
       return NextResponse.json(
         { error: "Error al vincular las direcciones", detail: error.message },
         { status: 500 }
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ claimed: data?.length ?? 0 })
   } catch (err) {
-    console.error("Claim address error:", err)
+    logger.error("Claim address error:", err)
     return NextResponse.json(
       { error: "Error interno al vincular las direcciones" },
       { status: 500 }

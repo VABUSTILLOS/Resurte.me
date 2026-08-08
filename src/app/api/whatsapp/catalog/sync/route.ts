@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 /**
  * WhatsApp Catalog Sync API
  * POST /api/whatsapp/catalog/sync
@@ -50,10 +51,10 @@ export async function POST(req: NextRequest) {
         direction: "outbound",
       })
       if (logError) {
-        console.error("WhatsApp catalog sync log error:", logError)
+        logger.error("WhatsApp catalog sync log error:", logError)
       }
     } catch (logErr) {
-      console.error("WhatsApp catalog sync log unexpected error:", logErr)
+      logger.error("WhatsApp catalog sync log unexpected error:", logErr)
     }
 
     return NextResponse.json({
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
       total_in_catalog: products.length,
     })
   } catch (err) {
-    console.error("WhatsApp catalog sync error:", err)
+    logger.error("WhatsApp catalog sync error:", err)
     return NextResponse.json(
       {
         error: "Failed to sync catalog",

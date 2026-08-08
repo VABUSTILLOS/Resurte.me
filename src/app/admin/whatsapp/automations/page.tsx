@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { logger } from "@/lib/logger"
 import {
   MessageCircle,
   Clock,
@@ -141,7 +142,7 @@ export default function AdminAutomationsPage() {
         }
       })
       .catch((err) => {
-        if (!cancelled) console.error("Failed to load automations:", err)
+        if (!cancelled) logger.error("Failed to load automations:", err)
       })
     return () => {
       cancelled = true
@@ -173,7 +174,7 @@ export default function AdminAutomationsPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setSavedMsg({ type, ok: true })
     } catch (err) {
-      console.error("Failed to save automation:", err)
+      logger.error("Failed to save automation:", err)
       setSavedMsg({ type, ok: false })
     } finally {
       setSavingType(null)

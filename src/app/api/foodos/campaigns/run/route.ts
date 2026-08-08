@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 /**
  * GET /api/foodos/campaigns/run
  *
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     const result = await runDueFoodosCampaigns()
     return NextResponse.json({ success: true, ...result })
   } catch (err) {
-    console.error("[FOODOS-CAMPAIGNS] Fatal error:", err)
+    logger.error("[FOODOS-CAMPAIGNS] Fatal error:", err)
     return NextResponse.json(
       {
         success: false,

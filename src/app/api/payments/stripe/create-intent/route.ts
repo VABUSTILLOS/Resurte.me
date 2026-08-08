@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
 import {
   createPaymentIntentForOrder,
   PaymentIntentError,
@@ -47,11 +48,11 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     if (error instanceof PaymentIntentError) {
-      console.error("create-intent error:", error.message)
+      logger.error("create-intent error:", error.message)
       return NextResponse.json({ error: error.message }, { status: error.status })
     }
 
-    console.error("Stripe create-intent error:", error)
+    logger.error("Stripe create-intent error:", error)
     const message =
       error instanceof Error ? error.message : "Error al crear PaymentIntent"
     return NextResponse.json({ error: message }, { status: 500 })

@@ -1,5 +1,6 @@
 import { createPublicClient } from "@/lib/supabase/public"
 import type { City, Category, Product, RestaurantCollection } from "@/types"
+import { logger } from "@/lib/logger"
 
 type SupabasePublicClient = NonNullable<ReturnType<typeof createPublicClient>>
 
@@ -250,7 +251,7 @@ export async function getProductsByCollection(
   })
 
   if (error) {
-    console.error("getProductsByCollection error:", error.message)
+    logger.error("getProductsByCollection error:", error.message)
     return []
   }
 

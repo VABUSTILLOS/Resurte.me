@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 /**
  * WhatsApp Send Template API
  * POST /api/whatsapp/send-template
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle<Pick<WhatsAppTemplate, "template_name" | "status">>()
 
     if (templateError) {
-      console.error("WhatsApp template lookup error:", templateError)
+      logger.error("WhatsApp template lookup error:", templateError)
       return NextResponse.json(
         { error: "Failed to verify template" },
         { status: 500 }
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
       await supabase.from("whatsapp_messages").insert(messageLog)
     } catch (logErr) {
       // El log no debe romper el envío ya realizado.
-      console.error("Failed to log whatsapp template message:", logErr)
+      logger.error("Failed to log whatsapp template message:", logErr)
     }
 
     return NextResponse.json({
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest) {
       message_id: result.messages[0]?.id,
     })
   } catch (err) {
-    console.error("WhatsApp send template error:", err)
+    logger.error("WhatsApp send template error:", err)
     return NextResponse.json(
       {
         error: "Failed to send template",

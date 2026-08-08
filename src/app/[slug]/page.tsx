@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { Metadata } from "next"
 import { CityLanding } from "@/components/city/city-landing"
+import { logger } from "@/lib/logger"
 import {
   getCachedActiveCollections,
   getCachedCategories,
@@ -106,7 +107,7 @@ export default async function CityPage({ params }: Props) {
     collections = colls
   } catch (error) {
     if (error instanceof Error && error.message.includes("Supabase no está configurado")) {
-      console.warn(`CityPage(${slug}) renderizó sin Supabase (env no configurado).`)
+      logger.warn(`CityPage(${slug}) renderizó sin Supabase (env no configurado).`)
     } else {
       throw error
     }

@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 /**
  * GET /api/workflows/payment-reminders
  * 
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
       ...result,
     })
   } catch (err) {
-    console.error("[CRON] Payment reminder error:", err)
+    logger.error("[CRON] Payment reminder error:", err)
     return NextResponse.json(
       {
         success: false,

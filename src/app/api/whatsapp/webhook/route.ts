@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     // Fail-closed: sin app secret configurado no se aceptan eventos.
     const appSecret = process.env.WHATSAPP_APP_SECRET
     if (!appSecret) {
-      console.error("WhatsApp webhook: WHATSAPP_APP_SECRET no configurado")
+      logger.error("WhatsApp webhook: WHATSAPP_APP_SECRET no configurado")
       return NextResponse.json({ error: "Not configured" }, { status: 503 })
     }
     if (!verifySignature(req, rawBody, appSecret)) {
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     // Always return 200 to acknowledge receipt
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (err) {
-    console.error("WhatsApp webhook error:", err)
+    logger.error("WhatsApp webhook error:", err)
     // Always return 200 to Meta — otherwise they'll retry
     return NextResponse.json({ success: false, error: "Internal error" }, { status: 200 })
   }
@@ -194,10 +194,10 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
       message_id: messageId,
     })
     if (error) {
-      console.error("WhatsApp webhook: failed to persist incoming message:", error)
+      logger.error("WhatsApp webhook: failed to persist incoming message:", error)
     }
   } catch (err) {
-    console.error("WhatsApp webhook: unexpected error persisting message:", err)
+    logger.error("WhatsApp webhook: unexpected error persisting message:", err)
   }
 
   logger.info("whatsapp.incoming", {
@@ -233,7 +233,7 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
         "📦 *Tu pedido* — escríbeme \"mi pedido\" para ver el estado.\n" +
         "🛍️ *Catálogo* — escríbeme \"catálogo\" y te envío el link.\n" +
         "❓ *Ayuda* — escríbeme \"ayuda\" para hablar con soporte.",
-    }).catch((err) => console.error("WhatsApp webhook: fallback reply failed:", err))
+    }).catch((err) => logger.error("WhatsApp webhook: fallback reply failed:", err))
   }
 }
 
@@ -262,7 +262,7 @@ async function handleOrderLookup(from: string) {
     .limit(1)
 
   if (profileError) {
-    console.error("WhatsApp webhook: profile lookup failed:", profileError)
+    logger.error("WhatsApp webhook: profile lookup failed:", profileError)
     return
   }
 
@@ -290,7 +290,7 @@ async function handleOrderLookup(from: string) {
     .limit(1)
 
   if (orderError) {
-    console.error("WhatsApp webhook: order lookup failed:", orderError)
+    logger.error("WhatsApp webhook: order lookup failed:", orderError)
     return
   }
 
@@ -317,7 +317,7 @@ async function handleOrderLookup(from: string) {
   await sendTextMessage({
     to: from,
     text: `Hola ${profile.full_name || ""} 👋\n\nTu pedido *#${order.id}* (${city}) está: *${statusLabel[order.status as string] || order.status}*\n\nTotal: $${total} MXN\n\n¿Necesitas algo más? Escríbeme \"ayuda\" o \"catálogo\".`,
-  }).catch((err) => console.error("WhatsApp webhook: order status reply failed:", err))
+  }).catch((err) => logger.error("WhatsApp webhook: order status reply failed:", err))
 }
 
 async function sendCatalogLink(from: string) {
@@ -333,14 +333,14 @@ async function sendCatalogLink(from: string) {
     to: from,
     text: `${siteUrl}/comer`,
     preview_url: true,
-  }).catch((err) => console.error("WhatsApp webhook: catalog link reply failed:", err))
+  }).catch((err) => logger.error("WhatsApp webhook: catalog link reply failed:", err))
 }
 
 async function sendSupportInfo(from: string) {
   await sendTextMessage({
     to: from,
     text: "¿Necesitas ayuda? 🙋\n\n📞 Escríbenos a *hola@resurte.me* o responde con tu duda y un agente te atenderá en horario de 9:00 a 21:00.\n\nTambién puedes consultar el estado de tu pedido escribiendo \"mi pedido\".",
-  }).catch((err) => console.error("WhatsApp webhook: support reply failed:", err))
+  }).catch((err) => logger.error("WhatsApp webhook: support reply failed:", err))
 }
 
 async function handleMessageStatus(status: WhatsAppStatus, _value: WhatsAppValue) {
@@ -364,9 +364,9 @@ async function handleMessageStatus(status: WhatsAppStatus, _value: WhatsAppValue
       .update({ status: statusValue })
       .eq("message_id", messageId)
     if (error) {
-      console.error("WhatsApp webhook: status update failed:", error)
+      logger.error("WhatsApp webhook: status update failed:", error)
     }
   } catch (err) {
-    console.error("WhatsApp webhook: unexpected error on status update:", err)
+    logger.error("WhatsApp webhook: unexpected error on status update:", err)
   }
 }

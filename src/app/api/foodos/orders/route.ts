@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { computeOrderTotals } from "@/lib/foodos"
 import type { FoodosOrderItem } from "@/types/foodos"
+import { logger } from "@/lib/logger"
 
 // Rate limiting: fixed-window counter durable en Supabase
 // (RPC consume_rate_limit, tabla rate_limits). Compartido entre
@@ -228,7 +229,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (orderError) {
-      console.error("FoodOS order error:", orderError)
+      logger.error("FoodOS order error:", orderError)
       return NextResponse.json(
         { error: "Error al crear el pedido", detail: orderError.message, code: orderError.code },
         { status: 500 }
@@ -244,7 +245,7 @@ export async function POST(request: NextRequest) {
       total,
     })
   } catch (error) {
-    console.error("FoodOS create order error:", error)
+    logger.error("FoodOS create order error:", error)
     return NextResponse.json(
       { error: "Error interno al crear el pedido" },
       { status: 500 }

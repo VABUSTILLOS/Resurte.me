@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 /**
  * WhatsApp Automations API
  * GET  /api/whatsapp/automations — List all automations
@@ -87,7 +88,7 @@ export async function GET() {
     .select("id", { count: "exact", head: true })
 
   if (countError) {
-    console.error("WhatsApp automations count error:", countError)
+    logger.error("WhatsApp automations count error:", countError)
     return NextResponse.json(
       { error: "Failed to load automations" },
       { status: 500 }
@@ -99,7 +100,7 @@ export async function GET() {
       .from("whatsapp_automations")
       .insert(DEFAULT_AUTOMATIONS)
     if (seedError) {
-      console.error("WhatsApp automations seed error:", seedError)
+      logger.error("WhatsApp automations seed error:", seedError)
       return NextResponse.json(
         { error: "Failed to initialize automations" },
         { status: 500 }
@@ -113,7 +114,7 @@ export async function GET() {
     .order("id", { ascending: true })
 
   if (error) {
-    console.error("WhatsApp automations load error:", error)
+    logger.error("WhatsApp automations load error:", error)
     return NextResponse.json(
       { error: "Failed to load automations" },
       { status: 500 }
@@ -191,7 +192,7 @@ export async function POST(req: NextRequest) {
         .update(upsertPayload)
         .eq("id", existing.id as number)
       if (updateError) {
-        console.error("WhatsApp automations update error:", updateError)
+        logger.error("WhatsApp automations update error:", updateError)
         return NextResponse.json(
           { error: "Failed to update automation" },
           { status: 500 }
@@ -205,7 +206,7 @@ export async function POST(req: NextRequest) {
         .select("id")
         .single()
       if (insertError) {
-        console.error("WhatsApp automations insert error:", insertError)
+        logger.error("WhatsApp automations insert error:", insertError)
         return NextResponse.json(
           { error: "Failed to create automation" },
           { status: 500 }

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import type { AppliedCoupon } from "@/types"
+import { logger } from "@/lib/logger"
 
 /**
  * POST /api/coupons/validate
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (error) {
-      console.error("Coupon validation error:", error)
+      logger.error("Coupon validation error:", error)
       return NextResponse.json({ error: "Error al validar el cupón" }, { status: 500 })
     }
 
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(appliedCoupon)
   } catch (error) {
-    console.error("Coupon validate error:", error)
+    logger.error("Coupon validate error:", error)
     return NextResponse.json({ error: "Error interno al validar el cupón" }, { status: 500 })
   }
 }

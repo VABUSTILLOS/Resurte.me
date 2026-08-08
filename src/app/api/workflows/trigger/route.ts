@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 /**
  * POST /api/workflows/trigger
  * GET  /api/workflows/trigger?job=abandoned-cart|reactivation
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
       { status: 400 }
     )
   } catch (err) {
-    console.error("[CRON-EMAIL] Fatal error:", err)
+    logger.error("[CRON-EMAIL] Fatal error:", err)
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : "Internal error" },
       { status: 500 }
@@ -165,7 +166,7 @@ export async function POST(req: NextRequest) {
       result,
     })
   } catch (err) {
-    console.error("[API] Error triggering workflow:", err)
+    logger.error("[API] Error triggering workflow:", err)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -226,7 +227,7 @@ async function handleOnboarding(
       message_sent: !!profile?.phone,
     })
   } catch (err) {
-    console.error("[API] Onboarding workflow error:", err)
+    logger.error("[API] Onboarding workflow error:", err)
     // Don't block registration on workflow failure
     return NextResponse.json({
       success: true,
@@ -326,7 +327,7 @@ async function handleReferral(
       referrer_id: referrer.id,
     })
   } catch (err) {
-    console.error("[API] Referral error:", err)
+    logger.error("[API] Referral error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

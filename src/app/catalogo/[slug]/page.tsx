@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import { Metadata } from "next"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { CityPageClient } from "@/components/city/city-page-client"
+import { logger } from "@/lib/logger"
 import {
   getCachedCategories,
   getCachedVisibleProducts,
@@ -74,7 +75,7 @@ export default async function CatalogPage({ params }: Props) {
     products = prods
   } catch (error) {
     if (error instanceof Error && error.message.includes("Supabase no está configurado")) {
-      console.warn(`CatalogPage(${slug}) renderizó sin Supabase (env no configurado).`)
+      logger.warn(`CatalogPage(${slug}) renderizó sin Supabase (env no configurado).`)
     } else {
       throw error
     }

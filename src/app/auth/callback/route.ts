@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
       // Log técnico para debugging interno; el usuario solo ve un mensaje amigable.
-      console.error("Auth callback error:", error.message)
+      logger.error("Auth callback error:", error.message)
       const friendlyMessage = mapAuthError(error)
       return NextResponse.redirect(`${origin}/auth/login?error=${encodeURIComponent(friendlyMessage)}`)
     }

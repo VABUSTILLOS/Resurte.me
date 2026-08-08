@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     )
   } catch (err) {
     const message = err instanceof Error ? err.message : "Invalid signature"
-    console.error("Stripe webhook signature error:", message)
+    logger.error("Stripe webhook signature error:", message)
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
@@ -72,10 +72,10 @@ export async function POST(request: NextRequest) {
             // no se cancelan al resolver el response.
             after(() => {
               confirmPaymentToCustomer(order.id).catch((e) =>
-                console.error("Workflow: payment_confirmed failed:", e)
+                logger.error("Workflow: payment_confirmed failed:", e)
               )
               notifyCustomerStatusUpdate(order.id, "confirmed").catch((e) =>
-                console.error("Workflow: status_update failed:", e)
+                logger.error("Workflow: status_update failed:", e)
               )
             })
           } else {
@@ -86,12 +86,12 @@ export async function POST(request: NextRequest) {
                 updated_at: new Date().toISOString(),
               })
               .eq("id", order.id)
-            console.error(
+            logger.error(
               `⚠️ Amount mismatch: order ${order.id} expected ${toCents(order.total)}, received ${paymentIntent.amount_received}`
             )
           }
         } else if (error) {
-          console.error("Failed to fetch order payment:", error.message)
+          logger.error("Failed to fetch order payment:", error.message)
         }
 
         // Actualiza pedidos FoodOS (micrositio /r/[slug]) del mismo intent,
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
           .maybeSingle()
 
         if (foodosError) {
-          console.error("Failed to fetch foodos order payment:", foodosError.message)
+          logger.error("Failed to fetch foodos order payment:", foodosError.message)
         } else if (foodosOrder) {
           if (isAmountSufficient(paymentIntent.amount_received, foodosOrder.total)) {
             await supabase
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
                 updated_at: new Date().toISOString(),
               })
               .eq("id", foodosOrder.id)
-            console.error(
+            logger.error(
               `⚠️ FoodOS amount mismatch: order ${foodosOrder.id} expected ${toCents(foodosOrder.total)}, received ${paymentIntent.amount_received}`
             )
           }
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true })
   } catch (error) {
-    console.error("Stripe webhook handler error:", error)
+    logger.error("Stripe webhook handler error:", error)
     return NextResponse.json(
       { error: "Webhook handler failed" },
       { status: 500 }

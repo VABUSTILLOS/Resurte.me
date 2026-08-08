@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 /**
  * GET /api/workflows/logs
  * 
@@ -77,7 +78,7 @@ interface ParsedContent {
       logs,
     })
   } catch (err) {
-    console.error("[API] Error fetching workflow logs:", err)
+    logger.error("[API] Error fetching workflow logs:", err)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

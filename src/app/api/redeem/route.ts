@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { redeemCredits } from "@/lib/wallet-actions"
 import { SERVICES } from "@/app/recompensas/_components/services-data"
+import { logger } from "@/lib/logger"
 
 /**
  * POST /api/redeem
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!result.success) {
-      console.error("[API redeem] rpc error:", result.error)
+      logger.error("[API redeem] rpc error:", result.error)
       return NextResponse.json(
         { error: result.error ?? "No se pudo completar el canje" },
         { status: 400 }
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (err) {
-    console.error("[API redeem] error:", err)
+    logger.error("[API redeem] error:", err)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Error interno" },
       { status: 500 }

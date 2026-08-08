@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 /**
  * POST /api/admin/update-images
  *
@@ -370,7 +371,7 @@ export async function POST(req: NextRequest) {
       errors,
     })
   } catch (err) {
-    console.error("[Admin] Image update error:", err)
+    logger.error("[Admin] Image update error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 /**
  * Email Workflow Engine — Resurte.me
  * ===================================
@@ -48,7 +49,7 @@ export async function checkAbandonedCarts(): Promise<CronResult> {
     .order("created_at", { ascending: false })
 
   if (orderErr) {
-    console.error("[ABANDONED-CART] Query error:", orderErr)
+    logger.error("[ABANDONED-CART] Query error:", orderErr)
     return { success: false, sent: 0, failed: 0, total: 0, message: orderErr.message }
   }
 
@@ -122,7 +123,7 @@ export async function checkAbandonedCarts(): Promise<CronResult> {
       if (result.ok) sent++
       else failed++
     } catch (err) {
-      console.error(`[ABANDONED-CART] Error processing order ${order.id}:`, err)
+      logger.error(`[ABANDONED-CART] Error processing order ${order.id}:`, err)
       failed++
     }
   }
@@ -153,7 +154,7 @@ export async function checkInactiveUsers(): Promise<CronResult> {
     })
 
     if (userErr) {
-      console.error(`[REACTIVATION-${window.days}] Error listing users:`, userErr)
+      logger.error(`[REACTIVATION-${window.days}] Error listing users:`, userErr)
       totalFailed++
       continue
     }
@@ -235,7 +236,7 @@ export async function checkInactiveUsers(): Promise<CronResult> {
         if (result.ok) totalSent++
         else totalFailed++
       } catch (err) {
-        console.error(`[REACTIVATION-${window.days}] Error for user ${user.id}:`, err)
+        logger.error(`[REACTIVATION-${window.days}] Error for user ${user.id}:`, err)
         totalFailed++
       }
     }

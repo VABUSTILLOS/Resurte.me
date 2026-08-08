@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { runNewOrderWorkflows } from "@/lib/workflows"
 import type { Coupon } from "@/types"
+import { logger } from "@/lib/logger"
 
 interface OrderItemInput {
   product_id: number
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
     if (!total) missing.push("total")
 
     if (missing.length) {
-      console.error("Order validation failed - missing:", missing, { city_id, items_count: items?.length, total })
+      logger.error("Order validation failed - missing:", missing, { city_id, items_count: items?.length, total })
       return NextResponse.json(
         { error: `Faltan campos requeridos: ${missing.join(", ")}` },
         { status: 400 }
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
       .in("id", productIds)
 
     if (productsErr) {
-      console.error("Products fetch error:", productsErr)
+      logger.error("Products fetch error:", productsErr)
       return NextResponse.json(
         { error: "Error al validar los productos del pedido" },
         { status: 500 }
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
 
     const subtotalDiff = Math.abs(realSubtotal - (subtotal ?? 0))
     if (subtotalDiff > 0.01) {
-      console.error("Subtotal mismatch", { client: subtotal, server: realSubtotal, diff: subtotalDiff })
+      logger.error("Subtotal mismatch", { client: subtotal, server: realSubtotal, diff: subtotalDiff })
       return NextResponse.json(
         { error: "El subtotal no coincide con los precios del catálogo" },
         { status: 400 }
@@ -184,7 +185,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle()
 
       if (couponErr) {
-        console.error("Coupon fetch error:", couponErr)
+        logger.error("Coupon fetch error:", couponErr)
         return NextResponse.json(
           { error: "Error al validar el cupón" },
           { status: 500 }
@@ -229,7 +230,7 @@ export async function POST(request: NextRequest) {
     const realTotal = Math.max(0, realSubtotal - discountAmount + validDeliveryFee)
     const totalDiff = Math.abs(realTotal - (total ?? 0))
     if (totalDiff > 0.01) {
-      console.error("Total mismatch", { client: total, server: realTotal, diff: totalDiff })
+      logger.error("Total mismatch", { client: total, server: realTotal, diff: totalDiff })
       return NextResponse.json(
         { error: "El total no coincide con los precios del catálogo" },
         { status: 400 }
@@ -325,7 +326,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (addrError) {
-        console.error("Address creation error:", addrError)
+        logger.error("Address creation error:", addrError)
         return NextResponse.json(
           { error: "Error al guardar la dirección", detail: addrError.message, code: addrError.code },
           { status: 500 }
@@ -352,7 +353,7 @@ export async function POST(request: NextRequest) {
         .select("id")
 
       if (reserveErr) {
-        console.error("Coupon reserve error:", reserveErr)
+        logger.error("Coupon reserve error:", reserveErr)
         return NextResponse.json(
           { error: "Error al aplicar el cupón" },
           { status: 500 }
@@ -400,7 +401,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (orderError) {
-      console.error("Order creation error:", orderError)
+      logger.error("Order creation error:", orderError)
       await releaseCoupon(coupon, couponReserved, supabase)
       return NextResponse.json(
         { error: "Error al crear el pedido", detail: orderError.message, code: orderError.code },
@@ -424,7 +425,7 @@ export async function POST(request: NextRequest) {
       .insert(orderItems)
 
     if (itemsError) {
-      console.error("Order items creation error:", itemsError)
+      logger.error("Order items creation error:", itemsError)
       // Order exists but items failed — clean up
       await supabase.from("orders").delete().eq("id", order.id)
       await releaseCoupon(coupon, couponReserved, supabase)
@@ -455,7 +456,7 @@ export async function POST(request: NextRequest) {
       guestToken,
     })
   } catch (error) {
-    console.error("Create order error:", error)
+    logger.error("Create order error:", error)
     return NextResponse.json(
       { error: "Error interno al crear el pedido" },
       { status: 500 }

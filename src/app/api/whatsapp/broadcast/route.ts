@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 /**
  * WhatsApp Broadcast API
  * POST /api/whatsapp/broadcast
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     if (templateError) {
-      console.error("WhatsApp broadcast template lookup error:", templateError)
+      logger.error("WhatsApp broadcast template lookup error:", templateError)
       return NextResponse.json(
         { error: "Failed to verify template" },
         { status: 500 }
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
           .not("phone", "is", null)
 
         if (profilesError) {
-          console.error("WhatsApp broadcast recipients lookup error:", profilesError)
+          logger.error("WhatsApp broadcast recipients lookup error:", profilesError)
           return NextResponse.json(
             { error: "Failed to load recipients" },
             { status: 500 }
@@ -141,10 +142,10 @@ export async function POST(req: NextRequest) {
         direction: "outbound",
       })
       if (logError) {
-        console.error("WhatsApp broadcast log error:", logError)
+        logger.error("WhatsApp broadcast log error:", logError)
       }
     } catch (logErr) {
-      console.error("WhatsApp broadcast log unexpected error:", logErr)
+      logger.error("WhatsApp broadcast log unexpected error:", logErr)
     }
 
     return NextResponse.json({
@@ -156,7 +157,7 @@ export async function POST(req: NextRequest) {
       errors: result.errors,
     })
   } catch (err) {
-    console.error("WhatsApp broadcast error:", err)
+    logger.error("WhatsApp broadcast error:", err)
     return NextResponse.json(
       {
         error: "Failed to send broadcast",

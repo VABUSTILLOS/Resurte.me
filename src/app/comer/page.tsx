@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { getPublicMarketplace } from "@/lib/foodos-public"
 import { MarketplaceDirectory } from "@/components/marketplace/marketplace-directory"
+import { logger } from "@/lib/logger"
 
 export const metadata: Metadata = {
   title: "Hoy qué comemos · Pide directo a tu restaurante favorito",
@@ -20,7 +21,7 @@ export default async function ComerPage() {
     entries = await getPublicMarketplace()
   } catch (error) {
     if (error instanceof Error && error.message.includes("Supabase no está configurado")) {
-      console.warn("Marketplace renderizó sin Supabase (env no configurado).")
+      logger.warn("Marketplace renderizó sin Supabase (env no configurado).")
     } else {
       throw error
     }

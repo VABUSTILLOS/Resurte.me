@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 /**
  * PATCH /api/orders/[id]/status
  * 
@@ -129,7 +130,7 @@ export async function PATCH(
       try {
         workflowResults = await onOrderStatusChange(orderId, oldStatus, status as OrderStatus)
       } catch (workflowErr) {
-        console.error("[API] Workflow error (non-blocking):", workflowErr)
+        logger.error("[API] Workflow error (non-blocking):", workflowErr)
       }
     }
 
@@ -158,7 +159,7 @@ export async function PATCH(
       workflow: workflowResults,
     })
   } catch (err) {
-    console.error("[API] Error updating order status:", err)
+    logger.error("[API] Error updating order status:", err)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -1,4 +1,5 @@
 import { CityLanding } from "@/components/city/city-landing"
+import { logger } from "@/lib/logger"
 import {
   getCachedCategories,
   getCachedVisibleProducts,
@@ -40,7 +41,7 @@ export default async function Home() {
     // renderiza vacía en lugar de fallar. Los errores reales de la DB no se
     // silencian: `createClient` solo lanza cuando faltan las env vars.
     if (error instanceof Error && error.message.includes("Supabase no está configurado")) {
-      console.warn("Home renderizó sin Supabase (env no configurado).")
+      logger.warn("Home renderizó sin Supabase (env no configurado).")
     } else {
       throw error
     }

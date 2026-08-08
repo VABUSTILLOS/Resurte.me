@@ -1,6 +1,7 @@
 "use server"
 
 import { createServiceClient } from "@/lib/supabase/service"
+import { logger } from "@/lib/logger"
 import { requireAdmin } from "@/lib/admin-auth"
 
 interface AdminOrderItem {
@@ -75,7 +76,7 @@ export async function getAdminOrders(
   const { data: orders, error } = await query.limit(limit + 1)
 
   if (error) {
-    console.error("[ADMIN-ORDERS] Error fetching orders:", error)
+    logger.error("[ADMIN-ORDERS] Error fetching orders:", error)
     throw new Error("Error al cargar los pedidos")
   }
 
@@ -161,7 +162,7 @@ export async function getActiveStoresCount(): Promise<number> {
     .eq("is_active", true)
 
   if (error) {
-    console.error("[ADMIN-DASHBOARD] Error fetching stores:", error)
+    logger.error("[ADMIN-DASHBOARD] Error fetching stores:", error)
     throw new Error("Error al cargar las tiendas")
   }
   return count ?? 0
@@ -214,11 +215,11 @@ export async function getAdminWhatsappCatalog(): Promise<{
   ])
 
   if (productsRes.error) {
-    console.error("[ADMIN-WHATSAPP] Error fetching products:", productsRes.error)
+    logger.error("[ADMIN-WHATSAPP] Error fetching products:", productsRes.error)
     throw new Error("Error al cargar los productos")
   }
   if (categoriesRes.error) {
-    console.error("[ADMIN-WHATSAPP] Error fetching categories:", categoriesRes.error)
+    logger.error("[ADMIN-WHATSAPP] Error fetching categories:", categoriesRes.error)
     throw new Error("Error al cargar las categorías")
   }
 
@@ -261,7 +262,7 @@ export async function setProductWhatsappVisibility(
     .eq("id", productId)
 
   if (error) {
-    console.error("[ADMIN-WHATSAPP] Error updating product:", error)
+    logger.error("[ADMIN-WHATSAPP] Error updating product:", error)
     throw new Error("Error al actualizar el producto")
   }
 }

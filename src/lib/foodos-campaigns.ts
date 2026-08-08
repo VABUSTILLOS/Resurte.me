@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 // ============================================================
 // Motor de ejecución de campañas FoodOS (solo servidor).
 //
@@ -327,7 +328,7 @@ export async function runDueFoodosCampaigns(
         failed: 0,
         skipped: 1,
       })
-      console.error(
+      logger.error(
         `[FOODOS-CAMPAIGN] ${row.id}:`,
         err instanceof Error ? err.message : err
       )

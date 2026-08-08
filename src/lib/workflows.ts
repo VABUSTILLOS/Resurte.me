@@ -111,7 +111,7 @@ async function logWorkflow(
       direction: "outbound",
     })
   } catch (err) {
-    console.error(`[Workflow] Failed to log ${workflowType}:`, err)
+    logger.error(`[Workflow] Failed to log ${workflowType}:`, err)
   }
 }
 
@@ -132,7 +132,7 @@ async function getOrderDetails(orderId: number): Promise<OrderWithDetails | null
     .single()
 
   if (error || !order) {
-    console.error(`[Workflow] Order ${orderId} not found:`, error)
+    logger.error(`[Workflow] Order ${orderId} not found:`, error)
     return null
   }
 
@@ -351,7 +351,7 @@ export async function notifyStaffNewOrder(orderId: number): Promise<WorkflowLog[
       })
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Unknown error"
-      console.error(`[Workflow] Failed to notify staff ${phone}:`, errorMsg)
+      logger.error(`[Workflow] Failed to notify staff ${phone}:`, errorMsg)
       await logWorkflow("new_order_staff", orderId, phone, null, "failed", errorMsg)
       results.push({
         workflow_type: "new_order_staff",
@@ -389,7 +389,7 @@ export async function confirmOrderToCustomer(orderId: number): Promise<WorkflowL
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "Unknown error"
-    console.error(`[Workflow] Failed to confirm order to customer:`, errorMsg)
+    logger.error(`[Workflow] Failed to confirm order to customer:`, errorMsg)
     await logWorkflow("new_order_customer", orderId, order.customer_phone || "unknown", null, "failed", errorMsg)
     return {
       workflow_type: "new_order_customer",
@@ -427,7 +427,7 @@ export async function notifyCustomerStatusUpdate(orderId: number, newStatus: Ord
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "Unknown error"
-    console.error(`[Workflow] Failed to send status update:`, errorMsg)
+    logger.error(`[Workflow] Failed to send status update:`, errorMsg)
     await logWorkflow("status_update", orderId, order.customer_phone || "unknown", null, "failed", errorMsg)
     return {
       workflow_type: "status_update",
@@ -470,7 +470,7 @@ export async function sendPaymentReminder(orderId: number): Promise<WorkflowLog 
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "Unknown error"
-    console.error(`[Workflow] Failed to send payment reminder:`, errorMsg)
+    logger.error(`[Workflow] Failed to send payment reminder:`, errorMsg)
     await logWorkflow("payment_reminder", orderId, order.customer_phone || "unknown", null, "failed", errorMsg)
     return {
       workflow_type: "payment_reminder",
@@ -505,7 +505,7 @@ export async function confirmPaymentToCustomer(orderId: number): Promise<Workflo
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "Unknown error"
-    console.error(`[Workflow] Failed to confirm payment:`, errorMsg)
+    logger.error(`[Workflow] Failed to confirm payment:`, errorMsg)
     await logWorkflow("payment_confirmed", orderId, order.customer_phone || "unknown", null, "failed", errorMsg)
     return {
       workflow_type: "payment_confirmed",
@@ -543,7 +543,7 @@ export async function notifyFulfillmentUpdate(
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "Unknown error"
-    console.error(`[Workflow] Failed to send fulfillment update:`, errorMsg)
+    logger.error(`[Workflow] Failed to send fulfillment update:`, errorMsg)
     await logWorkflow("fulfillment_update", orderId, order.customer_phone || "unknown", null, "failed", errorMsg)
     return {
       workflow_type: "fulfillment_update",
@@ -584,7 +584,7 @@ export async function checkAndSendPaymentReminders(): Promise<{
     .neq("status", "cancelled")
 
   if (error) {
-    console.error("[Workflow] Failed to fetch pending orders:", error)
+    logger.error("[Workflow] Failed to fetch pending orders:", error)
     return { checked: 0, reminded: 0, cancelled: 0, errors: [error.message] }
   }
 

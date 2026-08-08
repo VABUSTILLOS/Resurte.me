@@ -73,7 +73,7 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
 
   const data = await res.json()
   if (!res.ok) {
-    console.error("[EMAIL ERROR]", data)
+    logger.error("[EMAIL ERROR]", data)
     return { ok: false, error: (data as { message?: string }).message ?? String(res.status) }
   }
   return { ok: true, id: (data as { id?: string }).id }
