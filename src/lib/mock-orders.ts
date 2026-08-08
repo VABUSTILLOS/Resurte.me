@@ -1,6 +1,6 @@
 import type { Order, OrderItem } from "@/types"
 
-export interface MockOrder extends Order {
+interface MockOrder extends Order {
   items: (OrderItem & {
     product_name: string
     product_image: string

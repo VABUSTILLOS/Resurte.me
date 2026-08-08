@@ -1,14 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Plus, Minus, Check, MessageCircle, ShoppingCart, Package } from "lucide-react"
+import { ArrowLeft, Plus, Minus, Check, ShoppingCart, Package } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
 import { ProductCard } from "@/components/product/product-card"
+import { WhatsAppBadge, OrderByWhatsAppButton } from "@/components/whatsapp/whatsapp-button"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import Link from "next/link"
 import type { Category, Product } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
-import { trackEvent } from "@/lib/analytics"
+import { AnalyticsEvents } from "@/lib/analytics"
 
 interface ProductDetailClientProps {
   product: Product
@@ -35,14 +36,11 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
 
   // Track product view on page load
   useEffect(() => {
-    trackEvent("view_item", {
-      currency: "MXN",
-      value: displayPrice,
-      items: [{
-        item_id: String(product.id),
-        item_name: product.name,
-        item_category: category?.name,
-      }],
+    AnalyticsEvents.viewItem({
+      id: product.id,
+      name: product.name,
+      price: displayPrice,
+      category: category?.name,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -61,14 +59,11 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
         stock_status: (product.stock_status ?? "in_stock") as "in_stock" | "low_stock" | "out_of_stock",
       })
     }
-    trackEvent("add_to_cart", {
-      currency: "MXN",
-      value: displayPrice * quantity,
-      items: [{
-        item_id: String(product.id),
-        item_name: product.name,
-        quantity,
-      }],
+    AnalyticsEvents.addToCart({
+      id: product.id,
+      name: product.name,
+      price: displayPrice,
+      quantity,
     })
     setAdded(true)
     setQuantity(1)
@@ -198,6 +193,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                   {product.brand}
                 </span>
               )}
+              <WhatsAppBadge />
             </div>
 
             {/* Stock status */}
@@ -295,17 +291,13 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                 )}
               </button>
 
-              <a
-                href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}?text=${encodeURIComponent(
-                  `Hola, me interesa: ${product.name}${quantity > 1 ? ` x${quantity}` : ""} - $${displayPrice.toFixed(2)} c/u`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <OrderByWhatsAppButton
+                phoneNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}
+                productName={product.name}
+                productPrice={displayPrice}
+                quantity={quantity}
                 className="flex-1 h-12 flex items-center justify-center gap-2 text-sm font-semibold rounded-xl border-2 border-[#25D366] text-[#25D366] hover:bg-[#25D366] hover:text-white transition-all duration-200"
-              >
-                <MessageCircle className="w-5 h-5" />
-                Pedir por WhatsApp
-              </a>
+              />
             </div>
 
             {/* Description — Erewhon-style accordion */}

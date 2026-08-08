@@ -10,7 +10,8 @@ import {
   Check,
 } from "lucide-react"
 import type { BlogPostMeta } from "@/lib/blog"
-import { BLOG_CATEGORIES, BLOG_CONTENT_TYPES } from "@/lib/blog-categories"
+import { searchPosts } from "@/lib/blog-search"
+import { BLOG_CATEGORIES, BLOG_CONTENT_TYPES, getContentType } from "@/lib/blog-categories"
 import { BlogCard } from "@/components/blog/blog-card"
 import { FeaturedBlogCard } from "@/components/blog/featured-blog-card"
 
@@ -130,22 +131,18 @@ export function BlogIndexClient({
   }
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const matches = posts.filter((post) => {
+    const matches = searchPosts(posts, query).filter((post) => {
       const matchesCategory =
         activeCategory === "all" || post.category === activeCategory
       if (!matchesCategory) return false
       const matchesContentType =
         activeContentType === "all" || post.contentType === activeContentType
-      if (!matchesContentType) return false
-      if (!q) return true
-      return [post.title, post.description, ...post.tags]
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
+      return matchesContentType
     })
     return sortPosts(matches, sortBy)
   }, [posts, query, activeCategory, activeContentType, sortBy])
+
+  const activeContentTypeInfo = getContentType(activeContentType)
 
   // Artículos destacados (featured: true) — se muestran en la vista general.
   const featured = useMemo(
@@ -377,7 +374,9 @@ export function BlogIndexClient({
             Sin resultados para &quot;{query}&quot;
           </h2>
           <p className="mt-1 text-sm text-warm-500">
-            Prueba con otra palabra o explora todas las categorías.
+            {activeContentTypeInfo
+              ? `No hay artículos de tipo «${activeContentTypeInfo.label}». Prueba con otra palabra o explora todas las categorías.`
+              : "Prueba con otra palabra o explora todas las categorías."}
           </p>
         </div>
       )}

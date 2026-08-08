@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 
-export function Skeleton({
+function Skeleton({
   className = "",
   delay = 0,
 }: {

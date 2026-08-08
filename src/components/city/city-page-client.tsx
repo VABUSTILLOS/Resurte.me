@@ -5,7 +5,7 @@ import { useCity } from "@/contexts/city-context"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { MapPin, Search } from "lucide-react"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
-import { ProductCard } from "@/components/product/product-card"
+import { ProductCardGrid } from "@/components/product/product-card"
 import { getCategoryIcon } from "@/lib/utils"
 import type { Category, Product } from "@/types"
 
@@ -120,11 +120,9 @@ export function CityPageClient({ slug, categories, products }: Props) {
 
       {/* Products */}
       {activeCategory ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} citySlug={slug} />
-          ))}
-        </div>
+        filteredProducts.length > 0 && (
+          <ProductCardGrid products={filteredProducts} citySlug={slug} />
+        )
       ) : (
         productsByCategory?.map(({ category, products }) => (
           <section key={category.id} className="mb-10">
@@ -132,11 +130,7 @@ export function CityPageClient({ slug, categories, products }: Props) {
               <span>{getCategoryIcon(category.icon, category.slug)}</span>
               {category.name}
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {products.map((product) => (
-                <ProductCard key={product.id} product={product} citySlug={slug} />
-              ))}
-            </div>
+            <ProductCardGrid products={products} citySlug={slug} />
           </section>
         ))
       )}

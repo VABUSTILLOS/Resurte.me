@@ -105,7 +105,7 @@ export function useLoyaltyTier() {
   return { ...data, loading }
 }
 
-export function LoyaltyTierCard({
+function LoyaltyTierCard({
   tier,
   weekCount,
   monthlySpend,

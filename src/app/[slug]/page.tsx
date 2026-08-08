@@ -8,7 +8,8 @@ import {
   getCachedVisibleProducts,
 } from "@/lib/catalog-cache"
 import { getCityLandingSchema } from "@/lib/structured-data"
-import { createClient, hasSessionCookie } from "@/lib/supabase/server"
+import { hasSessionCookie } from "@/lib/supabase/server"
+import { getCurrentUser } from "@/lib/auth"
 import { getCityBySlug } from "@/lib/data"
 import type { Category, Product, RestaurantCollection, City } from "@/types"
 
@@ -92,9 +93,7 @@ export default async function CityPage({ params }: Props) {
     // Solo consultamos la sesión si el request trae cookie de Supabase.
     // Visitantes anónimos ahorran un roundtrip de red a getUser().
     if (await hasSessionCookie()) {
-      const supabase = await createClient()
-      const { data: { user: currentUser } } = await supabase.auth.getUser()
-      user = currentUser
+      user = await getCurrentUser()
     }
 
     const [cats, prods, colls] = await Promise.all([

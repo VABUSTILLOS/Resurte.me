@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useSearchParams } from "next/navigation"
-import { trackEvent } from "@/lib/analytics"
+import { AnalyticsEvents } from "@/lib/analytics"
 import { claimGuestAddresses } from "@/lib/guest-address"
 
 interface AuthFormProps {
@@ -55,7 +55,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
         // Trigger onboarding WhatsApp coupon via API
         if (data.user) {
-          trackEvent("sign_up", { method: "email" })
+          AnalyticsEvents.signUp("email")
           try {
             // Trigger onboarding workflow
             await fetch("/api/workflows/trigger", {

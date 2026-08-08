@@ -40,12 +40,12 @@ export interface SendTemplateParams {
   components?: TemplateComponent[] // Header/body/button parameters
 }
 
-export interface TemplateComponent {
+interface TemplateComponent {
   type: "header" | "body" | "button"
   parameters: TemplateParameter[]
 }
 
-export interface TemplateParameter {
+interface TemplateParameter {
   type: "text" | "currency" | "date_time" | "image" | "document" | "video"
   text?: string
   currency?: { fallback_value: string; code: string; amount_1000: number }
@@ -125,7 +125,7 @@ async function waFetch(
  * Create or update a product in the WhatsApp Commerce catalog.
  * Uses the WABA-level catalog API.
  */
-export async function upsertCatalogProduct(
+async function upsertCatalogProduct(
   product: WhatsAppProduct,
   config?: WhatsAppConfig
 ): Promise<{ id: string }> {
@@ -157,7 +157,7 @@ export async function upsertCatalogProduct(
  * Set the price for a product in the WhatsApp catalog.
  * Price API is separate from product creation in WhatsApp Commerce.
  */
-export async function setProductPrice(
+async function setProductPrice(
   productId: string,
   price: number,
   currency: string = "MXN",
@@ -189,7 +189,7 @@ export async function setProductPrice(
 /**
  * Delete a product from the WhatsApp Commerce catalog.
  */
-export async function deleteCatalogProduct(
+async function deleteCatalogProduct(
   productId: string,
   config?: WhatsAppConfig
 ): Promise<void> {
@@ -200,7 +200,7 @@ export async function deleteCatalogProduct(
 /**
  * Get all products currently in the WhatsApp catalog.
  */
-export async function getCatalogProducts(config?: WhatsAppConfig): Promise<{
+async function getCatalogProducts(config?: WhatsAppConfig): Promise<{
   data: { id: string; name: string; retailer_id: string }[]
 }> {
   const cfg = config || getConfig()

@@ -45,7 +45,7 @@ export interface WorkflowLog {
   created_at?: string
 }
 
-export interface OrderWithDetails {
+interface OrderWithDetails {
   id: number
   user_id: string
   status: OrderStatus

@@ -12,6 +12,7 @@ import { SERVICES } from "./StoreScreen";
 import { TIER_CONFIGS } from "./types";
 import { LoyaltyTierBanner, useLoyaltyTier, TIER_ORDER } from "./LoyaltyTierCard";
 import { ReferralDashboard } from "@/components/referral-dashboard";
+import { useOnboardingCompleted } from "@/components/onboarding-wizard";
 import { createClient } from "@/lib/supabase/client";
 import {
   getWalletBalance,
@@ -44,6 +45,8 @@ export function DashboardScreen({
   referralView,
   balance = 0,
 }: DashboardScreenProps) {
+  const onboardingCompleted = useOnboardingCompleted()
+
   if (walletView) {
     return <WalletView />;
   }
@@ -69,6 +72,20 @@ export function DashboardScreen({
         </div>
         <NotificationBell />
       </div>
+
+      {/* Welcome banner — visible after completing el onboarding */}
+      {onboardingCompleted && (
+        <div className="px-4 mb-3 md:px-6 lg:px-8">
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 flex items-start gap-3">
+            <CheckCircle className="h-4 w-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <p className="text-white text-xs leading-relaxed">
+              <span className="font-semibold">¡Bienvenido a Resurte!</span> Ya completaste tu
+              onboarding. Explora tus recompensas y el catálogo de servicios para hacer crecer tu
+              negocio.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Main Dashboard Grid */}
       <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:px-8">

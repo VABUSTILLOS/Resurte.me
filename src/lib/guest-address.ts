@@ -44,7 +44,7 @@ export function saveGuestToken(token: string): void {
   }
 }
 
-export function clearGuestToken(): void {
+function clearGuestToken(): void {
   if (typeof window === "undefined") return
   try {
     window.localStorage.removeItem(TOKEN_KEY)

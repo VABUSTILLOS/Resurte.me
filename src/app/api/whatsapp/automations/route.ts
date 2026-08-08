@@ -14,16 +14,16 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { AUTOMATION_TEMPLATE_MAP } from "@/lib/whatsapp"
-import type { AutomationType } from "@/types"
+import type { WhatsAppAutomation } from "@/types"
 
 // ============================================================
 // Mock automations store (TODO: Supabase)
 // ============================================================
 
-const MOCK_AUTOMATIONS = [
+const MOCK_AUTOMATIONS: WhatsAppAutomation[] = [
   {
     id: 1,
-    automation_type: "payment_recovery" as AutomationType,
+    automation_type: "payment_recovery",
     trigger_delay_hours: 1,
     template_id: 1,
     is_active: true,
@@ -31,7 +31,7 @@ const MOCK_AUTOMATIONS = [
   },
   {
     id: 2,
-    automation_type: "cart_abandonment" as AutomationType,
+    automation_type: "cart_abandonment",
     trigger_delay_hours: 2,
     template_id: 2,
     is_active: true,
@@ -39,7 +39,7 @@ const MOCK_AUTOMATIONS = [
   },
   {
     id: 3,
-    automation_type: "birthday" as AutomationType,
+    automation_type: "birthday",
     trigger_delay_hours: 0,
     template_id: 3,
     is_active: false,
@@ -47,7 +47,7 @@ const MOCK_AUTOMATIONS = [
   },
   {
     id: 4,
-    automation_type: "reactivation" as AutomationType,
+    automation_type: "reactivation",
     trigger_delay_hours: 720,
     template_id: 4,
     is_active: false,
@@ -55,7 +55,7 @@ const MOCK_AUTOMATIONS = [
   },
   {
     id: 5,
-    automation_type: "post_delivery_rating" as AutomationType,
+    automation_type: "post_delivery_rating",
     trigger_delay_hours: 24,
     template_id: 5,
     is_active: true,
@@ -63,7 +63,7 @@ const MOCK_AUTOMATIONS = [
   },
   {
     id: 6,
-    automation_type: "onboarding" as AutomationType,
+    automation_type: "onboarding",
     trigger_delay_hours: 0,
     template_id: 6,
     is_active: true,

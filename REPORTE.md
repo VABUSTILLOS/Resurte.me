@@ -104,3 +104,64 @@ Verificación: `npx tsc --noEmit` ✅ · `npx next build` ✅ · `npx vitest run
 - `mock-orders.ts` / `mock-products.ts` — usados en páginas de producción (admin/mis-pedidos); deuda técnica a resolver cuando existan datos reales completos.
 - ~132 imágenes de producto sin referencia directa en código — candidatas a verificar contra `products.image_url` en Supabase (si están en DB, están en uso).
 - Knip sigue reportando módulos fuera de alcance de esta tarea (`lib/images.ts`, `lib/blog.ts`, `lib/recipes.ts`, `lib/whatsapp.ts`, tipos de `foodos.ts`/`index.ts`, `Skeleton.tsx` en recompensas, `sharp`/`vercel` devDeps) — candidatos a una siguiente iteración.
+
+---
+
+# Segunda auditoría — knip (wave 2)
+
+Escaneo `npx knip` sobre la base de la primera ola. Resultados: 25 archivos sin uso (23 `scripts/*` + `Skeleton.tsx`), 2 devDeps sin uso (`sharp`, `vercel`), 1 dep no listada (`unified`), 58 exports sin uso y 26 tipos sin uso. Misma filosofía: **revivir/integrar, no borrar**.
+
+## Verificación final
+
+- `npx knip` → solo queda el Grupo D documentado (0 en A/B/C). ✅
+- `npx tsc --noEmit` ✅ · `npm run lint` sin errores nuevos ✅ · `npx vitest run` ✅ · `npx next build` ✅
+
+## Grupo A — Sobre-exportados (se quita `export`; viven dentro del módulo)
+
+Símbolos usados solo internamente que ya no se exportan: `ProgressRing`, `LoyaltyTierCard`, `comboValue`, `normalizeCategory`, `BLOG_DIR`, `DEFAULT_PANEL_CONFIG`, `toBaseQty`, `getABVariant`, `COLLECTION_COVERS`, `clearGuestToken`, `es` (i18n), `upsertCatalogProduct`, `setProductPrice`, `deleteCatalogProduct`, `getCatalogProducts` (whatsapp), y los tipos `AdminOrderItem`, `BlogFAQ`, `BlogCTAVariant`, `BlogCTAConfig`, `MockOrder`, `TemplateComponent`, `TemplateParameter`, `OrderWithDetails`. `Skeleton` en recompensas deja de exportarse (solo `DashboardSkeleton` es la API pública).
+
+## Grupo B — Revividos cableando en flujos vivos
+
+| # | Ítem | Integración | Riesgo |
+| --- | --- | --- | --- |
+| B1 | `getProductSchema`/`getBreadcrumbSchema` | JSON-LD `Product` + `BreadcrumbList` en `/producto/[productSlug]`; breadcrumbs en `/catalogo`, `/coleccion`, `/categoria` | Bajo |
+| B2 | `runNewOrderWorkflows` | `POST /api/orders` → tras registrar la orden: notificar staff + confirmar al cliente | Medio (WhatsApp) |
+| B3 | `resetCatalogCache` | Admin routes `update`, `toggle-visibility`, `seed-products`, `update-images` (junto a `revalidateCatalogCache`) | Bajo |
+| B4 | `DashboardSkeleton` | `loading.tsx` en `/recompensas` | Bajo |
+| B5 | `ProductCardGrid` | Grids de `/catalogo/[slug]`, `/categoria/[categorySlug]`, `/coleccion/[collectionSlug]` | Bajo |
+| B6 | `WhatsAppBadge`/`OrderByWhatsAppButton` | CTA "ordenar por WhatsApp" en `/producto/[productSlug]` | Bajo |
+| B7 | `searchPosts` + `getContentType` | Filtro búsqueda/categoría en `blog-index-client`. `searchPosts` se extrae a `lib/blog-search.ts` (función pura client-safe, sin `fs`) y `lib/blog.ts` la envuelve para uso server-side; `blog/page.tsx` pre-filtra con `?q=` (SEO) | Bajo |
+| B8 | `generateMockOrders` | Reemplaza el generador local duplicado en `dashboard-sidebar` | Bajo |
+| B9 | `getAllRecipes` | Índice/base de recetas del panel planificador | Medio |
+| B10 | `createClientOrNotFound` | **Decisión**: no encaja hoy — home/city degradan a render vacío por diseño y las API routes necesitan errores JSON. Se documenta como utilidad para futuras server pages | — |
+| B11 | `getCurrentUser` | Centraliza `createClient()+auth.getUser()` en `page.tsx` y `[slug]/page.tsx` | Medio |
+| B12 | `AnalyticsEvents` | Refactor de llamadas gtag inline → constantes: viewItem, addToCart, beginCheckout(items), purchase(value?, items?), repeatOrder, search, lead, signUp (8 call sites) | Bajo |
+| B13 | `CASHBACK_TIERS` | `TIER_CONFIGS` deriva `name`/`pct` de `CASHBACK_TIERS` vía `TIER_INDEX` (fuente única de % por tier) | Bajo |
+| B14 | `useOnboardingCompleted` | Banner de bienvenida post-onboarding en `DashboardScreen` de recompensas | Bajo |
+
+## Grupo C — Tipos de features vivas (cablear el tipo donde la feature ya existe)
+
+- **Coupon**: `Coupon.expires_at` → `string | null` (alineado con migración 00001). `api/orders` tipa `CouponRow extends Pick<Coupon, ...>`; `api/coupons/validate` devuelve `AppliedCoupon`; `cart/coupon-input.tsx` tipa el fetch con `AppliedCoupon` y el error con `{ error?: string }`.
+- **WhatsApp**: `WhatsAppTemplateStatus` usado en `send-template` (check de aprobación); `WhatsAppMessage` (Pick) tipa el insert del log en `whatsapp_messages`; `WhatsAppTemplate` tipa la consulta `.maybeSingle<Pick<...>>()`; `WhatsAppAutomation` tipa `MOCK_AUTOMATIONS` en `api/whatsapp/automations`. La página admin `automations` sigue con `AutomationUI` local (UI mock) — `AUTOMATION_TEMPLATE_MAP` es la fuente de los `templateName`.
+- **Foodos**: las unions `FoodosRestaurantStatus`, `FoodosRuleTriggerType`, `FoodosOrderChannel`, `FoodosFulfillment`, `FoodosPaymentStatus` y `FoodosCampaignStatus` ahora se importan y usan directamente en `panel/foodos/actions.ts` y `panel/foodos/pedidos/page.tsx` (en vez de acceso indexado `T["status"]`): `FULFILLMENT_LABEL: Record<FoodosFulfillment, string>`, `CHANNEL_OPTIONS` tipado, `PAID: FoodosPaymentStatus`, `"failed" satisfies FoodosCampaignStatus`.
+- **CashbackTier**: queda vivo al consolidar `CASHBACK_TIERS`/`TIER_CONFIGS` (B13).
+
+## Grupo D — Documentado (deuda técnica, no se toca)
+
+- `scripts/*` (24): migraciones/seeders one-off y herramientas dev manuales (`test-workflows.ts`, `validate-whatsapp.ts`, generadores de imágenes, fetch de covers/recetas). No se borran.
+- devDeps `sharp` (usado por scripts de imágenes) y `vercel` (CLI deploy manual): se conservan como tooling.
+- `unified`: **agregada a `dependencies`** en `package.json` (dep real de `lib/blog-rss-html.ts` que faltaba en el manifest).
+- **Constantes mock** `COLLECTION_*` (12) y `IMG_*` (13) en `lib/images.ts`: candidatas a purga cuando se elimine el mock de producción.
+- `StoreSkeleton` (recompensas): skeleton del tab Store sin consumidor — queda para un futuro lazy-load de `StoreScreen`.
+- **Contract types sin feature consumidora** (decisión: no borrar, documentar):
+  - `Profile`, `DeliveryZone` (types/index.ts) — contrato de tablas/datos no implementadas.
+  - `WalletState`, `OnboardingStep` (recompensas) — el estado/onboarding actuales usan estructuras locales distintas.
+  - `RecipeGroup` (lib/recipes) — `getAllRecipes` devuelve un shape plano; el grupo tipado espera la futura agrupación.
+  - `WhatsAppTemplateType` — la union de tipos de template que requiere el flujo de sync con Meta (hoy solo se usa el `status`).
+- `createClientOrNotFound` (supabase/server): ver decisión B10.
+
+## Observaciones nuevas
+
+- **Bloqueador de build resuelto**: `blog-index-client.tsx` (componente `"use client"`) importaba `searchPosts` desde `lib/blog.ts`, que usa `node:fs` → Turbopack fallaba ("chunking context does not support external modules: node:fs"). Se extrajo el filtro a `lib/blog-search.ts` (puro, sin `fs`); el cliente lo usa sobre los posts que recibe por props y el server pre-filtra con `?q=`. `next build` ✅.
+- `AutomationUI` en `admin/whatsapp/automations` y `MOCK_AUTOMATIONS` en `api/whatsapp/automations` son mocks — el POST queda con `TODO: Upsert en Supabase whatsapp_automations` (la tabla requiere `store_id`, esquema B2B pendiente).
+- `handleIncomingMessage` (webhook whatsapp) solo loggea a console — no inserta en `whatsapp_messages` (modelo de tenant pendiente). `WhatsAppMessage` queda listo para ese insert.

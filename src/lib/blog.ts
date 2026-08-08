@@ -1,24 +1,25 @@
 import fs from "node:fs"
 import path from "node:path"
 import matter from "gray-matter"
+import { searchPosts as filterPostsByQuery } from "./blog-search"
 
 // ============================================================
 // BLOG DE RESURTE.ME — lectura de posts MDX locales
 // Los posts viven en src/content/blog/*.mdx (estáticos, mejor SEO).
 // ============================================================
 
-export const BLOG_DIR = path.join(process.cwd(), "src", "content", "blog")
+const BLOG_DIR = path.join(process.cwd(), "src", "content", "blog")
 
-export interface BlogFAQ {
+interface BlogFAQ {
   question: string
   answer: string
 }
 
 /** Activos de Resurte.me a los que puede llevar un CTA. */
-export type BlogCTAVariant = "coleccion" | "herramienta" | "crecimiento"
+type BlogCTAVariant = "coleccion" | "herramienta" | "crecimiento"
 
 /** Configuración del CTA de cierre de un post (override por frontmatter). */
-export interface BlogCTAConfig {
+interface BlogCTAConfig {
   variant: BlogCTAVariant
   title?: string
   cta?: string
@@ -155,7 +156,7 @@ export function getPostSlugs(): string[] {
 
 /** Posts de la misma categoría, excluyendo el post actual. */
 /** Normaliza una categoría a su slug canónico (sinónimos → canónico). */
-export function normalizeCategory(slug: string): string {
+function normalizeCategory(slug: string): string {
   const s = slug.trim().toLowerCase()
   return CATEGORY_SYNONYMS[s] ?? s
 }
@@ -342,16 +343,9 @@ export function getBlogIndexCta(): ResolvedPostCta {
   }
 }
 
-/** Filtro simple por texto (título, descripción y tags). */
+/** Filtro por texto (título, descripción y tags). Server-side: usa la lista completa de posts. */
 export function searchPosts(query: string): BlogPostMeta[] {
-  const q = query.trim().toLowerCase()
-  if (!q) return getAllPosts()
-  return getAllPosts().filter((p) => {
-    const haystack = [p.title, p.description, p.category, ...p.tags]
-      .join(" ")
-      .toLowerCase()
-    return haystack.includes(q)
-  })
+  return filterPostsByQuery(getAllPosts(), query)
 }
 
 /** URL canónica de un post. */

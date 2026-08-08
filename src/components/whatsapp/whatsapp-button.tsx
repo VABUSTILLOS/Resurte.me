@@ -2,7 +2,7 @@
 
 import { MessageCircle } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
-import { trackEvent } from "@/lib/analytics"
+import { AnalyticsEvents } from "@/lib/analytics"
 
 interface WhatsAppButtonProps {
   phoneNumber: string
@@ -23,7 +23,7 @@ export function WhatsAppButton({
   const waLink = `https://wa.me/${cleanNumber}?text=${encodedMessage}`
 
   const handleWhatsAppClick = () => {
-    trackEvent("lead")
+    AnalyticsEvents.lead()
   }
 
   const positionClass = position === "bottom-right" ? "right-4 sm:right-6" : "left-4 sm:left-6"
@@ -69,11 +69,13 @@ export function OrderByWhatsAppButton({
   productName,
   productPrice,
   quantity = 1,
+  className,
 }: {
   phoneNumber: string
   productName: string
   productPrice: number
   quantity?: number
+  className?: string
 }) {
   const cleanNumber = phoneNumber.replace(/\D/g, "")
   const total = (productPrice * quantity).toFixed(2)
@@ -92,7 +94,10 @@ export function OrderByWhatsAppButton({
       href={waLink}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors"
+      className={
+        className ??
+        "flex items-center justify-center gap-2 w-full px-4 py-3 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors"
+      }
     >
       <MessageCircle className="w-5 h-5" />
       Pedir por WhatsApp

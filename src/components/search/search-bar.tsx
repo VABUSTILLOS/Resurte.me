@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react"
 import { Search, X } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { trackEvent } from "@/lib/analytics"
+import { AnalyticsEvents } from "@/lib/analytics"
 
 interface SearchBarProps {
   citySlug: string
@@ -28,7 +28,7 @@ export function SearchBar({
       e.preventDefault()
       const trimmed = query.trim()
       if (trimmed.length < 2) return
-      trackEvent("search", { search_string: trimmed })
+      AnalyticsEvents.search(trimmed)
       router.push(`/${citySlug}/buscar?q=${encodeURIComponent(trimmed)}`)
       setFocused(false)
       inputRef.current?.blur()

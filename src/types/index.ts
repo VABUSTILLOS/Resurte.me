@@ -213,7 +213,7 @@ export interface Coupon {
   min_order: number
   max_uses: number
   used_count: number
-  expires_at: string
+  expires_at: string | null
   created_at: string
 }
 

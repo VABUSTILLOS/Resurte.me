@@ -7,7 +7,7 @@ import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/mock-ord
 import { getUserPurchaseHistory } from "@/lib/wallet-actions"
 import type { OrderWithCashback, OrderItem } from "@/types"
 import { Package, Clock, ChevronRight, ArrowLeft, RotateCcw, ShoppingCart } from "lucide-react"
-import { trackEvent } from "@/lib/analytics"
+import { AnalyticsEvents } from "@/lib/analytics"
 import Link from "next/link"
 
 interface OrderWithItems extends OrderWithCashback {
@@ -72,7 +72,7 @@ export default function OrderHistoryPage() {
       })
     })
 
-    trackEvent("repeat_order", { order_id: order.id, item_count: order.items.length })
+    AnalyticsEvents.repeatOrder(order.id, order.items.length)
 
     setTimeout(() => setReorderingId(null), 1500)
   }

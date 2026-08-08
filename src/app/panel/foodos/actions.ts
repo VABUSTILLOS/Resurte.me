@@ -12,15 +12,18 @@ import { slugify } from "@/lib/foodos"
 import { revalidatePath } from "next/cache"
 import type {
   FoodosRestaurant,
+  FoodosRestaurantStatus,
   FoodosBranch,
   FoodosMenuCategory,
   FoodosMenuItem,
   FoodosCombo,
   FoodosUpsellRule,
+  FoodosRuleTriggerType,
   FoodosAutomation,
   FoodosOrderStatus,
   FoodosCustomer,
   FoodosCampaign,
+  FoodosCampaignStatus,
 } from "@/types/foodos"
 
 // ------------------------------------------------------------
@@ -44,7 +47,7 @@ export async function upsertRestaurant(input: {
   slug: string
   logo_url?: string | null
   description?: string | null
-  status?: FoodosRestaurant["status"]
+  status?: FoodosRestaurantStatus
   currency?: string
   collection_id?: number | null
 }): Promise<FoodosRestaurant> {
@@ -100,7 +103,7 @@ export async function upsertRestaurant(input: {
 
 export async function setRestaurantStatus(
   id: string,
-  status: FoodosRestaurant["status"]
+  status: FoodosRestaurantStatus
 ): Promise<void> {
   const { supabase, user } = await requireAuth()
   const { error } = await supabase
@@ -383,7 +386,7 @@ export async function upsertUpsellRule(input: {
   id?: string
   restaurant_id: string
   name: string
-  trigger_type: FoodosUpsellRule["trigger_type"]
+  trigger_type: FoodosRuleTriggerType
   trigger_value: FoodosUpsellRule["trigger_value"]
   suggested_items: string[]
   offer_text?: string | null
@@ -592,7 +595,7 @@ export async function runCampaignNow(
     await service
       .from("foodos_campaigns")
       .update({
-        status: "failed",
+        status: "failed" satisfies FoodosCampaignStatus,
         error: err instanceof Error ? err.message : "Error al ejecutar",
       })
       .eq("id", campaignId)

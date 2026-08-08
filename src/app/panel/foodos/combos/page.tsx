@@ -25,6 +25,7 @@ import type {
   FoodosMenuCategory,
   FoodosCombo,
   FoodosUpsellRule,
+  FoodosRuleTriggerType,
 } from "@/types/foodos"
 import {
   Sparkles, Plus, Trash2, Percent, Trophy, Loader2, Check, Wand2,
@@ -44,7 +45,7 @@ const EMPTY_COMBO: ComboForm = { name: "", price: "", discount_pct: "", item_ids
 interface RuleForm {
   id?: string
   name: string
-  trigger_type: FoodosUpsellRule["trigger_type"]
+  trigger_type: FoodosRuleTriggerType
   trigger_item_id: string
   trigger_category_id: string
   min_ticket: string

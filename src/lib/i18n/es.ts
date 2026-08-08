@@ -7,7 +7,7 @@
  * Usage: `t("costeo.newDish")` — fallback returns the key if a string is missing.
  */
 
-export const es = {
+const es = {
   common: {
     save: "Guardar",
     cancel: "Cancelar",

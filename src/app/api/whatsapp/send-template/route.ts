@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { sendTemplate } from "@/lib/whatsapp"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import type { WhatsAppMessage, WhatsAppTemplate, WhatsAppTemplateStatus } from "@/types"
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
       .from("whatsapp_templates")
       .select("template_name, status")
       .eq("template_name", template_name)
-      .maybeSingle()
+      .maybeSingle<Pick<WhatsAppTemplate, "template_name" | "status">>()
 
     if (templateError) {
       console.error("WhatsApp template lookup error:", templateError)
@@ -55,9 +56,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (template.status !== "approved") {
+    const status: WhatsAppTemplateStatus = template.status
+    if (status !== "approved") {
       return NextResponse.json(
-        { error: `Template "${template_name}" is not approved (status: ${template.status})` },
+        { error: `Template "${template.template_name}" is not approved (status: ${status})` },
         { status: 400 }
       )
     }
@@ -70,18 +72,22 @@ export async function POST(req: NextRequest) {
     })
 
     // Registrar el envío en whatsapp_messages (log de auditoría).
+    const messageLog: Pick<
+      WhatsAppMessage,
+      "from_number" | "message_type" | "content" | "direction"
+    > = {
+      from_number: to,
+      message_type: `template:${template_name}`,
+      content: JSON.stringify({
+        template_name,
+        language_code: language_code || "es_MX",
+        message_id: result.messages[0]?.id || null,
+        components: components || [],
+      }),
+      direction: "outbound",
+    }
     try {
-      await supabase.from("whatsapp_messages").insert({
-        from_number: to,
-        message_type: `template:${template_name}`,
-        content: JSON.stringify({
-          template_name,
-          language_code: language_code || "es_MX",
-          message_id: result.messages[0]?.id || null,
-          components: components || [],
-        }),
-        direction: "outbound",
-      })
+      await supabase.from("whatsapp_messages").insert(messageLog)
     } catch (logErr) {
       // El log no debe romper el envío ya realizado.
       console.error("Failed to log whatsapp template message:", logErr)

@@ -3,7 +3,8 @@ import {
   getCachedCategories,
   getCachedVisibleProducts,
 } from "@/lib/catalog-cache"
-import { createClient, hasSessionCookie } from "@/lib/supabase/server"
+import { hasSessionCookie } from "@/lib/supabase/server"
+import { getCurrentUser } from "@/lib/auth"
 import type { Category, Product } from "@/types"
 import type { Metadata } from "next"
 
@@ -25,9 +26,7 @@ export default async function Home() {
     // Solo consultamos la sesión si el request trae cookie de Supabase.
     // Visitantes anónimos ahorran un roundtrip de red a getUser().
     if (await hasSessionCookie()) {
-      const supabase = await createClient()
-      const { data: { user: currentUser } } = await supabase.auth.getUser()
-      user = currentUser
+      user = await getCurrentUser()
     }
 
     const [cats, prods] = await Promise.all([

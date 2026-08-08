@@ -50,7 +50,7 @@ export function computeOrderTotals(
   }
 }
 
-export function comboValue(combo: FoodosCombo): number {
+function comboValue(combo: FoodosCombo): number {
   return combo.discount_pct > 0
     ? (combo.price * combo.discount_pct) / 100
     : 0

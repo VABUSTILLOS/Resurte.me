@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useCity } from "@/contexts/city-context"
 import { CheckCircle2, ArrowRight, Package, Clock, MapPin, Store, Share2, Sparkles } from "lucide-react"
 import Link from "next/link"
-import { trackEvent } from "@/lib/analytics"
+import { AnalyticsEvents } from "@/lib/analytics"
 
 function generateOrderId(): string {
   const prefix = "RT"
@@ -69,12 +69,17 @@ export default function OrderConfirmedPage() {
       // Ignore malformed session data
     }
 
-    trackEvent("purchase", {
-      transaction_id: orderId,
-      currency: "MXN",
+    AnalyticsEvents.purchase(
+      orderId,
       value,
-      items,
-    })
+      undefined,
+      items?.map((i) => ({
+        item_id: i.id,
+        item_name: i.name,
+        quantity: i.quantity,
+        price: i.price,
+      }))
+    )
   }, [orderId])
 
   if (!city) {
@@ -175,7 +180,7 @@ export default function OrderConfirmedPage() {
           )}`}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => trackEvent("share", { method: "whatsapp", content_type: "referral" })}
+          onClick={() => AnalyticsEvents.shareReferral()}
           className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-[#25D366] text-white font-semibold rounded-xl hover:bg-[#20BD5A] transition-colors"
         >
           <Share2 className="w-4 h-4" />

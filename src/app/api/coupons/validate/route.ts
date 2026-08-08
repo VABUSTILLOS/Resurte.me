@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import type { AppliedCoupon } from "@/types"
 
 /**
  * POST /api/coupons/validate
@@ -52,12 +53,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "El cupón ya fue utilizado el máximo de veces" }, { status: 400 })
     }
 
-    return NextResponse.json({
+    const appliedCoupon: AppliedCoupon = {
       code: coupon.code,
       discount_type: coupon.discount_type,
       discount_value: Number(coupon.discount_value),
       min_order: Number(coupon.min_order),
-    })
+    }
+
+    return NextResponse.json(appliedCoupon)
   } catch (error) {
     console.error("Coupon validate error:", error)
     return NextResponse.json({ error: "Error interno al validar el cupón" }, { status: 500 })

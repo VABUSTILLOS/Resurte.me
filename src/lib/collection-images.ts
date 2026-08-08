@@ -5,7 +5,7 @@
  * locales comprimidas para carga rápida y consistencia visual.
  */
 
-export const COLLECTION_COVERS: Record<string, string> = {
+const COLLECTION_COVERS: Record<string, string> = {
   "hamburguesas-hot-dogs": "/images/collections/burger.webp",
   "taquerias-antojitos": "/images/collections/taqueria.webp",
   "sushi-comida-asiatica": "/images/collections/sushi.webp",

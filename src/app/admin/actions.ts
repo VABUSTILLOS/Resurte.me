@@ -3,7 +3,7 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 
-export interface AdminOrderItem {
+interface AdminOrderItem {
   id: number
   order_id: number
   product_id: number

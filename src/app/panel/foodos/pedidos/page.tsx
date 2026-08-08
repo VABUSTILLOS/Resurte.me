@@ -19,6 +19,9 @@ import type {
   FoodosBranch,
   FoodosOrder,
   FoodosOrderStatus,
+  FoodosOrderChannel,
+  FoodosFulfillment,
+  FoodosPaymentStatus,
 } from "@/types/foodos"
 import {
   Loader2,
@@ -53,11 +56,20 @@ const STATUS_META: Record<
   cancelled: { label: "Cancelado", badge: "bg-red-100 text-red-700", icon: <XCircle className="w-3.5 h-3.5" /> },
 }
 
-const FULFILLMENT_LABEL: Record<string, string> = {
+const FULFILLMENT_LABEL: Record<FoodosFulfillment, string> = {
   delivery: "A domicilio",
   pickup: "Para llevar",
   dine_in: "En sucursal",
 }
+
+const PAID: FoodosPaymentStatus = "paid"
+
+const CHANNEL_OPTIONS: { id: FoodosOrderChannel | "all"; label: string }[] = [
+  { id: "all", label: "Todos los canales" },
+  { id: "web", label: "Web" },
+  { id: "qr", label: "QR" },
+  { id: "whatsapp", label: "WhatsApp" },
+]
 
 export default function PedidosPage() {
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
@@ -66,7 +78,7 @@ export default function PedidosPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FoodosOrderStatus | "all">("all")
-  const [channelFilter, setChannelFilter] = useState<string>("all")
+  const [channelFilter, setChannelFilter] = useState<FoodosOrderChannel | "all">("all")
   const [saving, setSaving] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -211,12 +223,7 @@ export default function PedidosPage() {
 
       {/* Filtro por canal */}
       <div className="flex gap-2 mb-6">
-        {[
-          { id: "all", label: "Todos los canales" },
-          { id: "web", label: "Web" },
-          { id: "qr", label: "QR" },
-          { id: "whatsapp", label: "WhatsApp" },
-        ].map((c) => (
+        {CHANNEL_OPTIONS.map((c) => (
           <button
             key={c.id}
             onClick={() => setChannelFilter(c.id)}
@@ -270,7 +277,7 @@ export default function PedidosPage() {
                     ) : (
                       <><Banknote className="w-3 h-3" /> En sucursal</>
                     )}
-                    {order.payment_status === "paid" && (
+                    {order.payment_status === PAID && (
                       <span className="ml-1 text-emerald-600 font-bold">· Pagado</span>
                     )}
                   </p>

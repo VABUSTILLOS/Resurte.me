@@ -56,7 +56,7 @@ export function unitDimension(unit: string): UnitDimension {
 }
 
 /** Convierte una cantidad a su unidad base de dimensión: kg / L / cantidad. */
-export function toBaseQty(qty: number, unit: string): number {
+function toBaseQty(qty: number, unit: string): number {
   const u = (unit ?? "").trim().toLowerCase();
   if (u === "g" || u === "gr" || u === "gramo" || u === "gramos") return qty / 1000;
   if (u === "ml" || u === "cl") return u === "ml" ? qty / 1000 : qty / 100;

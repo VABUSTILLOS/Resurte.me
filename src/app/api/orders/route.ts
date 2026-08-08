@@ -1,6 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server"
+import { after, NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import { runNewOrderWorkflows } from "@/lib/workflows"
+import type { Coupon } from "@/types"
 
 interface OrderItemInput {
   product_id: number
@@ -436,6 +438,13 @@ export async function POST(request: NextRequest) {
     //    POST /api/payments/stripe/create-intent con el order_id devuelto aquí
     //    (separación de responsabilidades: esta ruta solo registra la orden).
 
+    // 6. Workflows post-registro (staff + confirmación WhatsApp al cliente).
+    //    Se ejecutan después de responder para no bloquear el checkout.
+    //    Internamente son no-op si no hay teléfono / config WhatsApp.
+    after(() => {
+      void runNewOrderWorkflows(order.id)
+    })
+
     return NextResponse.json({
       orderId: order.id,
       cashbackCredits: order.cashback_credits ?? 0,
@@ -467,16 +476,7 @@ function extractTime(timeRange: string): string {
   return `${String(hour).padStart(2, "0")}:${minute}`
 }
 
-interface CouponRow {
-  id: number
-  code: string
-  discount_type: "percentage" | "fixed_amount"
-  discount_value: number
-  min_order: number
-  max_uses: number
-  used_count: number
-  expires_at: string | null
-}
+type CouponRow = Pick<Coupon, "id" | "code" | "discount_type" | "discount_value" | "min_order" | "max_uses" | "used_count" | "expires_at">
 
 /**
  * Revierte la reserva de un cupón si el pedido no llegó a completarse.

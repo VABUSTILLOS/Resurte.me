@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
+import { resetCatalogCache } from "@/lib/catalog"
 
 const ADMIN_SECRET = process.env.ADMIN_API_SECRET || "resurte-me-migrate-2024"
 
@@ -346,6 +347,7 @@ export async function POST(req: NextRequest) {
 
     // Reflejar las imágenes actualizadas en la tienda sin esperar el TTL.
     revalidateCatalogCache()
+    resetCatalogCache()
 
     return NextResponse.json({
       success: errors.length === 0,

@@ -168,6 +168,15 @@ export function trackEvent(eventName: string, params?: EventParams) {
 // Ecommerce event helpers — call these on key user actions
 // ============================================================
 
+/** A line item in an ecommerce event payload */
+type AnalyticsItem = {
+  item_id: string | number
+  item_name: string
+  item_category?: string
+  price?: number
+  quantity?: number
+}
+
 // Pre-built ecommerce events
 export const AnalyticsEvents = {
   /** Product viewed */
@@ -202,16 +211,22 @@ export const AnalyticsEvents = {
     trackEvent("add_payment_info", { currency: "MXN", value, item_count: itemCount }),
 
   /** Checkout started */
-  beginCheckout: (value: number, itemCount: number) =>
-    trackEvent("begin_checkout", { currency: "MXN", value, item_count: itemCount }),
-
-  /** Order completed */
-  purchase: (orderId: string, value: number, eventId?: string) =>
-    trackEvent("purchase", {
+  beginCheckout: (value: number, itemCount: number, items?: AnalyticsItem[]) =>
+    trackEvent("begin_checkout", {
       currency: "MXN",
       value,
+      item_count: itemCount,
+      ...(items ? { items } : {}),
+    }),
+
+  /** Order completed */
+  purchase: (orderId: string, value?: number, eventId?: string, items?: AnalyticsItem[]) =>
+    trackEvent("purchase", {
+      currency: "MXN",
+      ...(value != null ? { value } : {}),
       transaction_id: orderId,
-      event_id: eventId,
+      ...(items ? { items } : {}),
+      ...(eventId ? { event_id: eventId } : {}),
     }),
 
   /** Registration completed */
@@ -227,8 +242,11 @@ export const AnalyticsEvents = {
     trackEvent("lead", value != null ? { currency: "MXN", value } : undefined),
 
   /** Repeat order clicked */
-  repeatOrder: (orderId: number) =>
-    trackEvent("repeat_order", { order_id: orderId }),
+  repeatOrder: (orderId: number, itemCount?: number) =>
+    trackEvent(
+      "repeat_order",
+      itemCount != null ? { order_id: orderId, item_count: itemCount } : { order_id: orderId }
+    ),
 
   /** WhatsApp share tapped */
   shareReferral: () =>

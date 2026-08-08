@@ -14,7 +14,7 @@ import {
   ArrowRight,
 } from "lucide-react"
 import Link from "next/link"
-import { trackEvent } from "@/lib/analytics"
+import { AnalyticsEvents } from "@/lib/analytics"
 
 // Global event bus to control drawer from header
 export const CART_DRAWER_EVENT = "resurte:toggle-cart-drawer"
@@ -39,16 +39,16 @@ export function CartDrawer() {
   }, [isOpen])
 
   const handleCheckout = () => {
-    trackEvent("begin_checkout", {
-      currency: "MXN",
-      value: subtotal,
-      items: cart.items.map((i) => ({
+    AnalyticsEvents.beginCheckout(
+      subtotal,
+      cart.items.length,
+      cart.items.map((i) => ({
         item_id: String(i.product_id),
         item_name: i.name,
         price: i.price,
         quantity: i.quantity,
-      })),
-    })
+      }))
+    )
     setIsOpen(false)
     if (city) router.push(`/${city.slug}/checkout`)
   }

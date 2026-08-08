@@ -164,7 +164,7 @@ function AnimatedBalance({ target, isNearUnlock }: { target: number; isNearUnloc
   );
 }
 
-export function ProgressRing({
+function ProgressRing({
   percent,
   size = 64,
   isNearUnlock = false,

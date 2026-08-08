@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useCart } from "@/contexts/cart-context"
+import type { AppliedCoupon } from "@/types"
 import { Tag, X, Loader2, Check } from "lucide-react"
 
 /**
@@ -53,10 +54,10 @@ export function CouponInput() {
       })
       const data = await response.json()
       if (!response.ok) {
-        setError(data.error || "El cupón no es válido")
+        setError((data as { error?: string }).error || "El cupón no es válido")
         return
       }
-      applyCoupon(data)
+      applyCoupon(data as AppliedCoupon)
       setCode("")
     } catch {
       setError("Error de conexión. Intenta de nuevo.")

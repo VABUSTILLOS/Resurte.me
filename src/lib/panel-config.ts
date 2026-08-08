@@ -22,7 +22,7 @@ export interface PanelConfig {
   alertCap: number
 }
 
-export const DEFAULT_PANEL_CONFIG: PanelConfig = {
+const DEFAULT_PANEL_CONFIG: PanelConfig = {
   foodCostGreenMax: 30,
   foodCostRedAbove: 38,
   costeoTargetFcMin: 20,

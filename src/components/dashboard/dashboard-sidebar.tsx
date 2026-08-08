@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
+import { generateMockOrders, STATUS_LABEL, STATUS_COLOR } from "@/lib/mock-orders"
 
 interface OrderSummary {
   id: number
@@ -28,40 +29,6 @@ interface OrderSummary {
   status: string
   itemCount: number
   created_at: string
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: "Pendiente",
-  confirmed: "Confirmado",
-  preparing: "Preparando",
-  out_for_delivery: "En camino",
-  delivered: "Entregado",
-  cancelled: "Cancelado",
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  pending: "bg-amber-50 text-amber-700 border-amber-200",
-  confirmed: "bg-blue-50 text-blue-700 border-blue-200",
-  preparing: "bg-purple-50 text-purple-700 border-purple-200",
-  out_for_delivery: "bg-orange-50 text-orange-700 border-orange-200",
-  delivered: "bg-green-50 text-green-700 border-green-200",
-  cancelled: "bg-red-50 text-red-700 border-red-200",
-}
-
-function generateMockOrders(count: number): OrderSummary[] {
-  const statuses = ["pending", "confirmed", "preparing", "out_for_delivery", "delivered"]
-  return Array.from({ length: count }, (_, i) => {
-    const daysAgo = i * 3 + 1
-    const d = new Date()
-    d.setDate(d.getDate() - daysAgo)
-    return {
-      id: count - i,
-      total: Math.round((250 + Math.random() * 1800) * 100) / 100,
-      status: statuses[i % statuses.length],
-      itemCount: 2 + Math.floor(Math.random() * 6),
-      created_at: d.toISOString(),
-    }
-  })
 }
 
 export function DashboardSidebar() {
@@ -72,7 +39,15 @@ export function DashboardSidebar() {
   // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
   const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
   const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [orders] = useState<OrderSummary[]>(() => generateMockOrders(5))
+  const [orders] = useState<OrderSummary[]>(() =>
+    generateMockOrders(5).map((o) => ({
+      id: o.id,
+      total: o.total,
+      status: o.status,
+      itemCount: o.items.length,
+      created_at: o.created_at,
+    }))
+  )
   const [cashback] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => {

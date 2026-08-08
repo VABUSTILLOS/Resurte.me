@@ -8,6 +8,7 @@ import {
   getCachedVisibleProducts,
 } from "@/lib/catalog-cache"
 import { ProductDetailClient } from "./product-detail-client"
+import { getBreadcrumbSchema, getProductSchema } from "@/lib/structured-data"
 
 // ISR: revalidate product pages every hour for fresh pricing
 export const revalidate = 3600
@@ -79,13 +80,35 @@ export default async function ProductPage({ params }: Props) {
     if (otherProducts.length) related.push(...otherProducts.slice(0, 4 - related.length))
   }
 
+  const url = `https://resurte.me/${slug}/producto/${productSlug}`
+  const jsonLd = [
+    getProductSchema(
+      product.name,
+      product.description?.slice(0, 300) ?? `${product.name} por mayoreo en ${city.name}.`,
+      product.brand || "Resurte.me",
+      product.sale_price ?? product.price,
+      product.stock_status
+    ),
+    getBreadcrumbSchema([
+      { name: city.name, url: `https://resurte.me/${slug}` },
+      { name: category?.name ?? "Catálogo", url: category ? `https://resurte.me/${slug}/categoria/${category.slug}` : `https://resurte.me/${slug}/catalogo` },
+      { name: product.name, url },
+    ]),
+  ]
+
   return (
-    <ProductDetailClient
-      product={product}
-      category={category ?? undefined}
-      relatedProducts={related}
-      citySlug={slug}
-      cityName={city.name}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <ProductDetailClient
+        product={product}
+        category={category ?? undefined}
+        relatedProducts={related}
+        citySlug={slug}
+        cityName={city.name}
+      />
+    </>
   )
 }

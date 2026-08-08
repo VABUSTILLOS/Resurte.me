@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
+import { resetCatalogCache } from "@/lib/catalog"
 import { NextResponse } from "next/server"
 
 /**
@@ -52,6 +53,7 @@ export async function PATCH(request: Request) {
 
     // Los cambios deben reflejarse en la tienda sin esperar el TTL de la caché.
     revalidateCatalogCache()
+    resetCatalogCache()
 
     return NextResponse.json({ success: true, productId, ...updates })
   } catch (error) {

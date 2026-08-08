@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { getAllPosts, getBlogIndexCta } from "@/lib/blog"
+import { getAllPosts, searchPosts, getBlogIndexCta } from "@/lib/blog"
 import { getBlogIndexSchema, getBlogBreadcrumbSchema } from "@/lib/blog-schema"
 import { BlogHero } from "@/components/blog/blog-hero"
 import { PostCTA } from "@/components/blog/post-cta"
@@ -33,7 +33,8 @@ export default async function BlogIndexPage({
   searchParams: Promise<{ q?: string; categoria?: string; tipo?: string }>
 }) {
   const { q, categoria, tipo } = await searchParams
-  const posts = getAllPosts()
+  // Pre-filtro server-side: con ?q= el HTML inicial ya llega filtrado (mejor SEO).
+  const posts = q ? searchPosts(q) : getAllPosts()
   const jsonLd = [
     getBlogIndexSchema(posts),
     getBlogBreadcrumbSchema("blog"),

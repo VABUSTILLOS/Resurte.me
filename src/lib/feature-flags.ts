@@ -83,7 +83,7 @@ function getABUserId(): string {
  * @param variants - Array of variants with weights (must sum to 1)
  * @returns The assigned variant key
  */
-export function getABVariant(testId: string, variants: ABVariant[]): string {
+function getABVariant(testId: string, variants: ABVariant[]): string {
   if (typeof window === "undefined") return variants[0]?.key ?? "control"
 
   const userId = getABUserId()
