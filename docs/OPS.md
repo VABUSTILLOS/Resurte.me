@@ -15,7 +15,7 @@ Todos los endpoints cron están **protegidos con `CRON_SECRET`** (patrón fail-c
 
 > Los schedules están en **UTC**. Las horas MX mostradas asumen CST (UTC−6); ajustar en verano (CDT, UTC−5) según la zona del negocio.
 
-> ⚠️ **Además** hay 1 job de mantenimiento en **pg_cron (Supabase)**, no en Vercel: `cleanup-guest-addresses` (domingos 04:00 UTC, retención 30 días — ver §2). La tabla anterior solo lista los crons de Vercel.
+> ⚠️ **Además** hay 2 jobs de mantenimiento en **pg_cron (Supabase)**, no en Vercel: `cleanup-guest-addresses` (domingos 04:00 UTC, retención 30 días — ver §2) y `purge-rate-limits` (diario 04:17 UTC, retención 24h — ver §4). La tabla anterior solo lista los crons de Vercel.
 
 ### Implementación (referencia)
 - `src/app/api/workflows/payment-reminders/route.ts` — GET, `checkAndSendPaymentReminders()`
@@ -102,7 +102,24 @@ Si el proyecto Vercel está en plan **Hobby**, el límite es **2 crons** — añ
 | --- | --- | --- |
 | `cleanup_orphan_guest_addresses(days)` | `00042_cleanup_guest_addresses.sql` | Direcciones guest huérfanas (`guest_token` sin `user_id`) más viejas que `days` |
 
-> **Backlog**: la tabla `rate_limits` (migración `00039`) no tiene purga. Si se escala el uso de `/api/foodos/orders`, añadir un cron de limpieza de filas viejas.
+> **pg_cron `purge-rate-limits`** (migración `00044`, Fase 11): la tabla `rate_limits` (migración `00039`) acumulaba filas huérfanas porque `consume_rate_limit` solo hace limpieza perezosa de keys re-consultadas. Ahora un job diario (04:17 UTC) borra ventanas vencidas hace más de 24h:
+>
+> ```sql
+> SELECT cron.schedule(
+>   'purge-rate-limits',
+>   '17 4 * * *',
+>   $$DELETE FROM public.rate_limits WHERE window_start < now() - interval '1 day'$$
+> );
+> ```
+>
+> Verificación del job:
+> ```sql
+> SELECT jobid, jobname, schedule, command
+> FROM cron.job
+> WHERE jobname = 'purge-rate-limits';
+> ```
+>
+> El DELETE corre como superuser de pg_cron dentro de la BD; la tabla sigue con RLS on y revocada a `anon`/`authenticated`, así que el camino público no expone datos.
 
 ---
 
@@ -128,22 +145,23 @@ curl -s -H "Authorization: Bearer $CRON_SECRET" \
 
 ---
 
-## 6. Endpoints de dinero sin rate limit (backlog — no priorizado)
+## 6. Rate limiting de endpoints de dinero (resuelto en Fase 9)
 
-La infraestructura durable de rate limiting existe (tabla `rate_limits` + RPC `consume_rate_limit`, migración `00039`) y **solo** `/api/foodos/orders` la usa. Estos endpoints públicos/autenticados de dinero **NO** tienen rate limit (sí tienen auth/`requireAuth`):
+La infraestructura durable de rate limiting existe (tabla `rate_limits` + RPC `consume_rate_limit`, migración `00039`) y se aplica a los **4 endpoints de dinero** vía `src/lib/rate-limit.ts` (helper compartido, fail-open, 429 con `Retry-After`):
 
-| Endpoint | Riesgo |
-| --- | --- |
-| `POST /api/redeem` | Canje de créditos — abuso = deuda de wallet (mitigado por advisory lock, pero sin límite de peticiones) |
-| `POST /api/orders` | Creación de órdenes de compra |
-| `POST /api/coupons/validate` | Validación de cupones — enumeración/abuso |
+| Endpoint | Key | Límite |
+| --- | --- | --- |
+| `POST /api/foodos/orders` | `orders:{ip}` | 15/min (guest) |
+| `POST /api/redeem` | `redeem:{user.id}` | 10/min |
+| `POST /api/orders` | `orders:{user.id}` o `orders:{ip}` | 15/min |
+| `POST /api/coupons/validate` | `coupons:{ip}` | 30/min (anti-enumeración) |
 
-**Decisión pendiente**: añadir `consume_rate_limit` a estos 3 endpoints en una fase futura.
+> La tabla crece con keys de ventanas activas; la migración `00044` programa la purga diaria vía pg_cron (§4).
 
 ---
 
 ## Referencias
 
 - `vercel.json` (crons + headers de seguridad), `src/app/api/cron/*`, `src/app/api/workflows/*`, `src/app/api/foodos/campaigns/run`.
-- Migraciones: `supabase/migrations/00039_rate_limits.sql`, `00042_cleanup_guest_addresses.sql`.
+- Migraciones: `supabase/migrations/00039_rate_limits.sql`, `00042_cleanup_guest_addresses.sql`, `00043_pg_cron_cleanup_guest_addresses.sql`, `00044_pg_cron_purge_rate_limits.sql`.
 - Relacionado: `docs/MOCKS.md` (contrato de fallback), `REPORTE.md`, `supabase/ESQUEMA.md`.
