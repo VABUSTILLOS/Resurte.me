@@ -16,7 +16,7 @@ import {
   TopSeller,
 } from "@/components/panel/ventas/ventas-shared"
 
-interface ChannelRow {
+export interface ChannelRow {
   key: SaleChannel
   label: string
   icon: string
