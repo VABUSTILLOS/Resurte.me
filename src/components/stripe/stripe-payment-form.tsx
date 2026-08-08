@@ -7,6 +7,7 @@ import {
 } from "@stripe/react-stripe-js"
 import { useState, type FormEvent } from "react"
 import { CreditCard, Lock, AlertCircle } from "lucide-react"
+import { stripeErrorMessage } from "@/lib/stripe-errors"
 
 interface StripePaymentFormProps {
   /** Total amount being charged (for display only) */
@@ -44,7 +45,7 @@ export function StripePaymentForm({ amount, onSuccess, onBack }: StripePaymentFo
     try {
       const { error: submitError } = await elements.submit()
       if (submitError) {
-        setError(submitError.message ?? "Error al validar los datos de la tarjeta.")
+        setError(stripeErrorMessage(submitError))
         setIsLoading(false)
         return
       }
@@ -58,7 +59,7 @@ export function StripePaymentForm({ amount, onSuccess, onBack }: StripePaymentFo
       })
 
       if (confirmError) {
-        setError(confirmError.message ?? "El pago fue rechazado. Verifica tus datos.")
+        setError(stripeErrorMessage(confirmError))
         setIsLoading(false)
         return
       }
