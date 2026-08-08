@@ -15,6 +15,8 @@ Todos los endpoints cron están **protegidos con `CRON_SECRET`** (patrón fail-c
 
 > Los schedules están en **UTC**. Las horas MX mostradas asumen CST (UTC−6); ajustar en verano (CDT, UTC−5) según la zona del negocio.
 
+> ⚠️ **Además** hay 1 job de mantenimiento en **pg_cron (Supabase)**, no en Vercel: `cleanup-guest-addresses` (domingos 04:00 UTC, retención 30 días — ver §2). La tabla anterior solo lista los crons de Vercel.
+
 ### Implementación (referencia)
 - `src/app/api/workflows/payment-reminders/route.ts` — GET, `checkAndSendPaymentReminders()`
 - `src/app/api/workflows/trigger/route.ts` — GET con `?job=abandoned-cart|reactivation` (imports dinámicos de `@/lib/email-workflows`); POST manual (admin/autenticado)
@@ -22,48 +24,43 @@ Todos los endpoints cron están **protegidos con `CRON_SECRET`** (patrón fail-c
 
 ---
 
-## 2. 🔴 GAP: `cleanup-guest-addresses` NO está programado
+## 2. ✅ RESUELTO: `cleanup-guest-addresses` programado con `pg_cron`
 
-El endpoint **existe y está listo**, pero **no está en `vercel.json`** (decisión deliberada para no consumir el plan gratuito de Vercel, documentada en el propio archivo):
+> **Actualizado en Fase 10**: la migración `supabase/migrations/00043_pg_cron_cleanup_guest_addresses.sql` habilita `pg_cron` y programa el job **`cleanup-guest-addresses`** (domingos 04:00 UTC, retención 30 días) con llamada **directa al RPC** — sin HTTP, sin `CRON_SECRET` y sin consumir el plan de Vercel. Solo se necesita **aplicar la migración** en Supabase (el job queda activo).
+
+El endpoint HTTP **existe como fallback manual** (no está en `vercel.json`, decisión deliberada para no consumir el plan gratuito):
 
 - **Ruta**: `src/app/api/cron/cleanup-guest-addresses/route.ts`
 - **Qué hace**: borra direcciones anónimas huérfanas (`guest_token` sin `user_id`) más viejas que `days` (default 30) vía el RPC `cleanup_orphan_guest_addresses(days)` (migración `supabase/migrations/00042_cleanup_guest_addresses.sql`).
-- **Riesgo de no ejecutarlo**: las direcciones guest (checkout anónimo) **se acumulan sin límite** en la tabla `addresses`. No compromete la integridad (no se usan para pagos), pero crece la tabla y expone PII huérfana innecesaria.
+- **Riesgo cubierto**: las direcciones guest (checkout anónimo) se **limpian semanalmente**; sin esto se acumularían sin límite en la tabla `addresses`. No compromete la integridad (no se usan para pagos), pero crece la tabla y expone PII huérfana innecesaria.
 - **Protección**: `CRON_SECRET` fail-closed; valida `days` entre 1 y 3650.
 
-### Opción A — Programar en Supabase con `pg_cron` (recomendado, plan gratuito)
-El plan de Vercel no se toca y corre en la misma infraestructura de la BD:
+### Verificación del job (después de aplicar la migración)
+```sql
+SELECT jobid, jobname, schedule, command
+FROM cron.job
+WHERE jobname = 'cleanup-guest-addresses';
+```
+
+### Opción A (implementada) — Programar en Supabase con `pg_cron`
+El plan de Vercel no se toca y corre en la misma infraestructura de la BD. La migración `00043` hace exactamente esto (idempotente — puede re-aplicarse):
 
 ```sql
--- Habilitar pg_cron (solo primera vez)
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
--- Programa semanal: domingos 4:00 a.m. UTC, retención de 30 días
+SELECT cron.unschedule('cleanup-guest-addresses')
+WHERE EXISTS (
+  SELECT 1 FROM cron.job WHERE jobname = 'cleanup-guest-addresses'
+);
+
 SELECT cron.schedule(
   'cleanup-guest-addresses',
   '0 4 * * 0',
-  $$SELECT net.http_post(
-    url := 'https://resurte.me/api/cron/cleanup-guest-addresses?days=30',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || current_setting('app.cron_secret')
-    )
-  )$$
+  $$SELECT public.cleanup_orphan_guest_addresses(30)$$
 );
 ```
 
-> Requiere la extensión `pg_net`/`net.http_post` o un helper de HTTP desde Supabase. Alternativa más simple si no se quiere HTTP:
-
-```sql
--- Ejecución directa del RPC (sin HTTP, sin CRON_SECRET) — recomendada
-SELECT cron.schedule(
-  'cleanup-guest-addresses-direct',
-  '0 4 * * 0',
-  $$SELECT cleanup_orphan_guest_addresses(30)$$
-);
-```
-
-Esta segunda opción **no consume el plan de Vercel y no depende del endpoint HTTP** — llama el RPC directamente en la BD.
+> Este enfoque **no consume el plan de Vercel y no depende del endpoint HTTP** — llama el RPC directamente en la BD. (La variante con `net.http_post` requiere la extensión `pg_net`; se descartó por añadir una dependencia innecesaria.)
 
 ### Opción B — Añadir a `vercel.json`
 ```json
