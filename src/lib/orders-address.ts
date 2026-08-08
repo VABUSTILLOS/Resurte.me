@@ -54,6 +54,27 @@ function isMissingCityIdColumn(error: PostgrestError | null): boolean {
 }
 
 /**
+ * Construye el payload base de `public.addresses` (sin `city_id`, que se añade
+ * solo cuando el esquema lo soporta). Expuesto para poder testear el payload
+ * contra el esquema real de las migraciones.
+ */
+export function buildAddressInsertPayload(input: AddressInsertInput): Record<string, unknown> {
+  return {
+    user_id: input.user_id,
+    guest_token: input.guest_token,
+    label: input.label ?? "Casa",
+    street: input.street,
+    number: input.number,
+    interior: input.interior ?? null,
+    neighborhood: input.neighborhood,
+    city: input.city,
+    state: input.state,
+    zip_code: input.zip_code,
+    references: input.references ?? null,
+  }
+}
+
+/**
  * Inserta una dirección en `public.addresses` tolerando esquemas sin la
  * columna `city_id` (migración 00050 no aplicada en el entorno objetivo).
  *
@@ -69,19 +90,7 @@ export async function insertAddressResilient(
   supabase: ServiceClient,
   input: AddressInsertInput
 ): Promise<AddressInsertOutcome> {
-  const base = {
-    user_id: input.user_id,
-    guest_token: input.guest_token,
-    label: input.label ?? "Casa",
-    street: input.street,
-    number: input.number,
-    interior: input.interior ?? null,
-    neighborhood: input.neighborhood,
-    city: input.city,
-    state: input.state,
-    zip_code: input.zip_code,
-    references: input.references ?? null,
-  }
+  const base = buildAddressInsertPayload(input)
 
   const attempt = async (withCityId: boolean) => {
     const payload = withCityId && input.city_id != null ? { ...base, city_id: input.city_id } : base
