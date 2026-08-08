@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
 import {
@@ -15,6 +14,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { AnalyticsEvents } from "@/lib/analytics"
+import { CHECKOUT_DRAWER_EVENT } from "@/components/checkout/CheckoutDrawer"
 
 // Global event bus to control drawer from header
 export const CART_DRAWER_EVENT = "resurte:toggle-cart-drawer"
@@ -23,7 +23,6 @@ export function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false)
   const { cart, itemCount, subtotal, removeItem, updateQuantity, clearCart } = useCart()
   const { city } = useCity()
-  const router = useRouter()
 
   // Listen for toggle events from header
   useEffect(() => {
@@ -50,7 +49,9 @@ export function CartDrawer() {
       }))
     )
     setIsOpen(false)
-    if (city) router.push(`/${city.slug}/checkout`)
+    // Abrir el checkout completo dentro del drawer (mecánica SamCart) en vez
+    // de navegar a /{city}/checkout. La ruta sigue funcionando como fallback.
+    window.dispatchEvent(new Event(CHECKOUT_DRAWER_EVENT))
   }
 
   if (!isOpen) return null
@@ -331,13 +332,13 @@ export function MobileCartBar() {
           >
             Ver más productos
           </Link>
-          <Link
-            href={city ? `/${city.slug}/checkout` : "#"}
+          <button
+            onClick={() => window.dispatchEvent(new Event(CHECKOUT_DRAWER_EVENT))}
             className="flex items-center gap-1.5 px-3 sm:px-5 py-2.5 text-sm font-semibold text-white bg-[#0E7A0E] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap touch-target"
           >
             Hacer Checkout
             <ArrowRight className="w-4 h-4" />
-          </Link>
+          </button>
         </div>
       </div>
     </div>

@@ -33,3 +33,40 @@ export function validDeliveryFee(
     ? deliveryFeeInput
     : DELIVERY_FEE_FLAT
 }
+
+/**
+ * Descuento de cupón sobre un subtotal dado. Misma fórmula que POST /api/orders
+ * (server-side), de modo que el total del cliente coincida exactamente con el
+ * total recalculado en la BD — incluye order bumps en `subtotal`.
+ */
+export function calcCouponDiscount(subtotal: number, coupon: { discount_type: string; discount_value: number; min_order: number } | null): number {
+  if (!coupon) return 0
+  if (subtotal < coupon.min_order) return 0
+  if (coupon.discount_type === "percentage") {
+    return Math.round((subtotal * coupon.discount_value) / 100 * 100) / 100
+  }
+  return Math.min(coupon.discount_value, subtotal)
+}
+
+/**
+ * Estado de la barra de envío gratis para un subtotal pagable.
+ * Devuelve el texto exacto y el porcentaje de progreso (0–100).
+ */
+export function freeShippingProgress(payableSubtotal: number): {
+  remaining: number
+  percent: number
+  isFree: boolean
+  message: string
+} {
+  const remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - payableSubtotal)
+  const percent = Math.min(100, (payableSubtotal / FREE_SHIPPING_THRESHOLD) * 100)
+  const isFree = remaining <= 0
+  return {
+    remaining,
+    percent,
+    isFree,
+    message: isFree
+      ? "🎉 Tienes envío gratis"
+      : `Agrega $${remaining.toFixed(2)} más para envío gratis`,
+  }
+}

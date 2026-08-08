@@ -24,6 +24,328 @@ export interface PaymentIntentResult {
   saveCardEnabled: boolean
 }
 
+export type ProcessUpsellResult =
+  | {
+      status: "succeeded"
+      paymentIntentId: string
+      orderUpsellId: number
+      amount: number
+    }
+  | {
+      status: "requires_action"
+      clientSecret: string
+      paymentIntentId: string
+      orderUpsellId: number
+    }
+
+export interface ProcessUpsellParams {
+  orderId: number
+  productId: number
+  quantity: number
+  /** Llave de idempotencia generada por el cliente (una por visita). */
+  idempotencyKey: string
+  userId?: string | null
+  guestToken?: string | null
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
+/**
+ * Cobra un 1-click upsell off-session sobre una orden YA pagada, reutilizando
+ * el método de pago guardado (stripe_payment_method_id) del cargo base.
+ *
+ * Contratos de la mecánica SamCart:
+ *  · El cliente solo envía product_id + quantity + idempotency_key. El precio
+ *    y el descuento se derivan server-side de `products` y `bump_rules`.
+ *  · Si el pago base no guardó método (wallet/Link sin setup_future_usage), se
+ *    rechaza con 409 — la orden base permanece intacta y el modal cae al
+ *    downsell o confirmación final.
+ *  · Idempotencia: un `order_upsells` pagado con la misma idempotency_key
+ *    devuelve el resultado original sin cobrar dos veces (200).
+ *  · Nunca muta orders.total ni payment_status de la orden base.
+ *
+ * Lanza PaymentIntentError si el pedido no admite upsell (404/403/409) o si
+ * el banco rechaza el cargo (402).
+ */
+export async function processUpsellForOrder(
+  params: ProcessUpsellParams
+): Promise<ProcessUpsellResult> {
+  const supabase = await createServiceClient()
+  const stripe = getStripe()
+
+  const qty = Math.floor(Number(params.quantity))
+  if (!Number.isInteger(qty) || qty < 1 || qty > 99) {
+    throw new PaymentIntentError("Cantidad de upsell inválida", 400)
+  }
+  const key = params.idempotencyKey?.trim()
+  if (!key) {
+    throw new PaymentIntentError("idempotency_key es requerida", 400)
+  }
+
+  const { data: order, error } = await supabase
+    .from("orders")
+    .select("id, user_id, payment_status, status, stripe_payment_method_id, stripe_customer_id, address_id, store_id")
+    .eq("id", params.orderId)
+    .maybeSingle()
+
+  if (error || !order) {
+    throw new PaymentIntentError("Pedido no encontrado", 404)
+  }
+  if (order.payment_status !== "paid" || order.status !== "confirmed") {
+    throw new PaymentIntentError("El pedido aún no está confirmado", 409)
+  }
+  if (!order.stripe_payment_method_id) {
+    throw new PaymentIntentError(
+      "No hay método de pago guardado para este pedido",
+      409
+    )
+  }
+
+  // Propiedad del pedido (misma regla que createPaymentIntentForOrder).
+  if (order.user_id && params.userId && order.user_id !== params.userId) {
+    throw new PaymentIntentError("No autorizado para este pedido", 403)
+  }
+  if (!order.user_id && params.userId) {
+    throw new PaymentIntentError("No autorizado para este pedido", 403)
+  }
+  if (!order.user_id && params.guestToken && order.address_id) {
+    const { data: addr } = await supabase
+      .from("addresses")
+      .select("guest_token")
+      .eq("id", order.address_id)
+      .maybeSingle()
+    if (addr && addr.guest_token && addr.guest_token !== params.guestToken) {
+      throw new PaymentIntentError("No autorizado para este pedido", 403)
+    }
+  }
+
+  // Idempotencia: un upsell ya registrado para esta llave. Si está pagado,
+  // devolvemos el resultado original sin volver a cobrar. Si quedó en
+  // requires_action (3DS/SCA), consultamos el PaymentIntent real en Stripe
+  // para reconciliar: si el cliente terminó la autenticación, se marca pagado
+  // y se insertan sus items (sin crear un cargo nuevo).
+  const { data: existingUpsell } = await supabase
+    .from("order_upsells")
+    .select("id, status, stripe_payment_intent_id, amount")
+    .eq("order_id", order.id)
+    .eq("idempotency_key", key)
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (existingUpsell?.status === "paid") {
+    return {
+      status: "succeeded",
+      paymentIntentId: existingUpsell.stripe_payment_intent_id!,
+      orderUpsellId: existingUpsell.id,
+      amount: Number(existingUpsell.amount),
+    }
+  }
+
+  // Reconciliación de 3DS: el cargo pudo completarse en Stripe tras la
+  // verificación bancaria pero antes de que el webhook actualice la fila.
+  if (
+    existingUpsell &&
+    existingUpsell.status === "requires_action" &&
+    existingUpsell.stripe_payment_intent_id
+  ) {
+    let pi
+    try {
+      pi = await stripe.paymentIntents.retrieve(existingUpsell.stripe_payment_intent_id)
+    } catch {
+      pi = null
+    }
+    if (pi?.status === "succeeded") {
+      await supabase
+        .from("order_upsells")
+        .update({
+          status: "paid",
+          paid_at: new Date().toISOString(),
+        })
+        .eq("id", existingUpsell.id)
+      await supabase.from("order_items").insert({
+        order_id: order.id,
+        product_id: params.productId,
+        quantity: qty,
+        unit_price: Number(existingUpsell.amount) / qty,
+        item_type: "upsell",
+      })
+      return {
+        status: "succeeded",
+        paymentIntentId: existingUpsell.stripe_payment_intent_id,
+        orderUpsellId: existingUpsell.id,
+        amount: Number(existingUpsell.amount),
+      }
+    }
+    if (pi?.status === "requires_action" && pi.client_secret) {
+      return {
+        status: "requires_action",
+        clientSecret: pi.client_secret,
+        paymentIntentId: pi.id,
+        orderUpsellId: existingUpsell.id,
+      }
+    }
+    // El intent ya no es recuperable (canceled/failed): marcarlo y continuar
+    // con un cargo nuevo en el siguiente intento.
+    await supabase
+      .from("order_upsells")
+      .update({ status: pi?.status ?? "failed" })
+      .eq("id", existingUpsell.id)
+  }
+
+  // Producto + descuento del upsell (derivados del server, nunca del cliente).
+  const { data: product, error: productError } = await supabase
+    .from("products")
+    .select("id, name, price, sale_price, stock_status")
+    .eq("id", params.productId)
+    .maybeSingle()
+
+  if (productError || !product) {
+    throw new PaymentIntentError("Producto de upsell no encontrado", 404)
+  }
+  if (product.stock_status === "out_of_stock") {
+    throw new PaymentIntentError("Producto agotado", 409)
+  }
+
+  // Si el producto tiene una bump_rule activa, se reutiliza su descuento
+  // (el admin define el descuento del upsell ahí); si no, precio completo.
+  const { data: bumpRule } = await supabase
+    .from("bump_rules")
+    .select("discount_pct")
+    .eq("product_id", product.id)
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle()
+
+  const effectivePrice = product.sale_price ?? product.price
+  const unitPrice = round2(effectivePrice * (1 - (Number(bumpRule?.discount_pct) || 0)))
+  const amount = round2(unitPrice * qty)
+  if (amount <= 0) {
+    throw new PaymentIntentError("Monto de upsell inválido", 400)
+  }
+
+  // Registra el cargo (pending) con la idempotency_key del cliente.
+  const { data: upsellRow, error: upsellErr } = await supabase
+    .from("order_upsells")
+    .insert({
+      order_id: order.id,
+      product_id: product.id,
+      quantity: qty,
+      unit_price: unitPrice,
+      amount,
+      status: "pending",
+      idempotency_key: key,
+    })
+    .select("id")
+    .single()
+
+  if (upsellErr || !upsellRow) {
+    logger.warn("order_upsells insert failed", {
+      error: upsellErr?.message ?? "no row",
+    })
+    throw new PaymentIntentError("Error al registrar el upsell", 500)
+  }
+
+  // Cargo off-session con idempotencia de Stripe por order_upsells.id.
+  let paymentIntent
+  try {
+    paymentIntent = await stripe.paymentIntents.create(
+      {
+        amount: toCents(amount),
+        currency: "mxn",
+        payment_method: order.stripe_payment_method_id,
+        customer: order.stripe_customer_id ?? undefined,
+        off_session: true,
+        confirm: true,
+        metadata: {
+          order_id: String(order.id),
+          order_upsell_id: String(upsellRow.id),
+          source: "resurte.me-upsell",
+        },
+      },
+      { idempotencyKey: `upsell-${upsellRow.id}` }
+    )
+  } catch (err) {
+    const isAuthRequired =
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code?: string }).code === "authentication_required"
+    if (isAuthRequired && "payment_intent" in err) {
+      const pi = (err as { payment_intent?: { id: string; client_secret?: string | null } }).payment_intent
+      await supabase
+        .from("order_upsells")
+        .update({ status: "requires_action", stripe_payment_intent_id: pi?.id ?? null })
+        .eq("id", upsellRow.id)
+      if (!pi?.client_secret) {
+        throw new PaymentIntentError("Error al procesar la verificación bancaria", 402)
+      }
+      return {
+        status: "requires_action",
+        clientSecret: pi.client_secret,
+        paymentIntentId: pi.id,
+        orderUpsellId: upsellRow.id,
+      }
+    }
+    // Declinado / fondos insuficientes / error: la orden base permanece intacta.
+    await supabase
+      .from("order_upsells")
+      .update({ status: "failed", stripe_payment_intent_id: null })
+      .eq("id", upsellRow.id)
+    throw new PaymentIntentError("No se pudo cobrar el upsell", 402)
+  }
+
+  if (paymentIntent.status === "succeeded") {
+    await supabase
+      .from("order_upsells")
+      .update({
+        status: "paid",
+        stripe_payment_intent_id: paymentIntent.id,
+        paid_at: new Date().toISOString(),
+      })
+      .eq("id", upsellRow.id)
+
+    // Items del upsell (item_type='upsell'); NO toca orders.total ni los
+    // items standard de la orden base.
+    await supabase.from("order_items").insert({
+      order_id: order.id,
+      product_id: product.id,
+      quantity: qty,
+      unit_price: unitPrice,
+      item_type: "upsell",
+    })
+
+    return {
+      status: "succeeded",
+      paymentIntentId: paymentIntent.id,
+      orderUpsellId: upsellRow.id,
+      amount,
+    }
+  }
+
+  if (paymentIntent.status === "requires_action" && paymentIntent.client_secret) {
+    await supabase
+      .from("order_upsells")
+      .update({ status: "requires_action", stripe_payment_intent_id: paymentIntent.id })
+      .eq("id", upsellRow.id)
+    return {
+      status: "requires_action",
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      orderUpsellId: upsellRow.id,
+    }
+  }
+
+  // Cualquier otro estado (processing, canceled, etc.) → failed, orden intacta.
+  await supabase
+    .from("order_upsells")
+    .update({ status: "failed", stripe_payment_intent_id: paymentIntent.id })
+    .eq("id", upsellRow.id)
+  throw new PaymentIntentError("No se pudo completar el cobro del upsell", 402)
+}
+
 /**
  * Busca o crea el Stripe Customer del cliente para poder reutilizar su método
  * de pago off-session (1-click upsells).

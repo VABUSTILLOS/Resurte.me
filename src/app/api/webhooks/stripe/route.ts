@@ -104,6 +104,52 @@ export async function POST(request: NextRequest) {
           logger.error("Failed to fetch order payment:", error.message)
         }
 
+        // Upsells 1-click: si este intent corresponde a un order_upsells, se
+        // marca como pagado y se insertan sus items (item_type='upsell').
+        // NUNCA se toca orders.total ni el payment_status de la orden base:
+        // el cargo base ya fue validado y el cashback se calculó con él.
+        const { data: upsellRow, error: upsellError } = await supabase
+          .from("order_upsells")
+          .select("id, order_id, product_id, quantity, unit_price, status")
+          .eq("stripe_payment_intent_id", paymentIntent.id)
+          .maybeSingle()
+
+        if (upsellError) {
+          logger.error("Failed to fetch order_upsells:", upsellError.message)
+        } else if (upsellRow) {
+          if (upsellRow.status !== "paid") {
+            await supabase
+              .from("order_upsells")
+              .update({
+                status: "paid",
+                paid_at: new Date().toISOString(),
+              })
+              .eq("id", upsellRow.id)
+
+            // Idempotente: Stripe puede re-entregar el webhook; no duplicar items.
+            const { data: existingUpsellItem } = await supabase
+              .from("order_items")
+              .select("id")
+              .eq("order_id", upsellRow.order_id)
+              .eq("product_id", upsellRow.product_id)
+              .eq("quantity", upsellRow.quantity)
+              .eq("unit_price", upsellRow.unit_price)
+              .eq("item_type", "upsell")
+              .maybeSingle()
+
+            if (!existingUpsellItem) {
+              await supabase.from("order_items").insert({
+                order_id: upsellRow.order_id,
+                product_id: upsellRow.product_id,
+                quantity: upsellRow.quantity,
+                unit_price: upsellRow.unit_price,
+                item_type: "upsell",
+              })
+            }
+          }
+          logger.info("stripe.upsell.payment.succeeded", { order_upsell: upsellRow.id })
+        }
+
         // Actualiza pedidos FoodOS (micrositio /r/[slug]) del mismo intent,
         // solo si el monto recibido coincide con el total del pedido.
         const { data: foodosOrder, error: foodosError } = await supabase
@@ -166,6 +212,10 @@ export async function POST(request: NextRequest) {
           .from("foodos_orders")
           .update({ payment_status: "failed", updated_at: new Date().toISOString() })
           .eq("stripe_payment_intent_id", paymentIntent.id)
+        await supabase
+          .from("order_upsells")
+          .update({ status: "failed" })
+          .eq("stripe_payment_intent_id", paymentIntent.id)
         break
       }
 
@@ -186,6 +236,10 @@ export async function POST(request: NextRequest) {
             .update({ payment_status: "failed", updated_at: new Date().toISOString() })
             .eq("stripe_payment_intent_id", paymentIntent.id)
         }
+        await supabase
+          .from("order_upsells")
+          .update({ status: "canceled" })
+          .eq("stripe_payment_intent_id", paymentIntent.id)
         break
       }
 

@@ -9,6 +9,7 @@ vi.mock("@/lib/supabase/service", () => ({
 import {
   evaluateTriggerTypes,
   resolveBumps,
+  resolveBumpPricing,
   type BumpProduct,
   type BumpRuleRow,
   type BumpTriggerType,
@@ -86,6 +87,59 @@ describe("evaluateTriggerTypes", () => {
     expect(matched).toHaveLength(3)
     expect(new Set(matched).size).toBe(3)
     expect(matched[0]).toBe("perishables")
+  })
+})
+
+describe("resolveBumpPricing", () => {
+  it("calcula el precio con descuento a partir del precio base y la regla", () => {
+    const result = resolveBumpPricing({
+      bumpItems: [{ product_id: 100, quantity: 1 }],
+      basePriceByProduct: new Map([[100, 25]]),
+      discountPctByProduct: new Map([[100, 0.1]]),
+    })
+    expect(result).toEqual({ ok: true, pricesByProduct: new Map([[100, 22.5]]) })
+  })
+
+  it("usa sale_price como base si existe", () => {
+    const result = resolveBumpPricing({
+      bumpItems: [{ product_id: 100, quantity: 2 }],
+      basePriceByProduct: new Map([[100, 30]]), // sale_price gana
+      discountPctByProduct: new Map([[100, 0.25]]),
+    })
+    expect(result).toEqual({ ok: true, pricesByProduct: new Map([[100, 22.5]]) })
+  })
+
+  it("redondea a 2 decimales", () => {
+    const result = resolveBumpPricing({
+      bumpItems: [{ product_id: 100, quantity: 1 }],
+      basePriceByProduct: new Map([[100, 33.33]]),
+      discountPctByProduct: new Map([[100, 0.1]]),
+    })
+    expect(result).toEqual({ ok: true, pricesByProduct: new Map([[100, 30]]) })
+  })
+
+  it("rechaza un bump sin regla activa (no se puede inventar el descuento)", () => {
+    const result = resolveBumpPricing({
+      bumpItems: [
+        { product_id: 100, quantity: 1 },
+        { product_id: 999, quantity: 1 },
+      ],
+      basePriceByProduct: new Map([
+        [100, 25],
+        [999, 40],
+      ]),
+      discountPctByProduct: new Map([[100, 0.1]]),
+    })
+    expect(result).toEqual({ ok: false, missingProductId: 999 })
+  })
+
+  it("devuelve ok con map vacío si no hay bumps", () => {
+    const result = resolveBumpPricing({
+      bumpItems: [],
+      basePriceByProduct: new Map(),
+      discountPctByProduct: new Map(),
+    })
+    expect(result).toEqual({ ok: true, pricesByProduct: new Map() })
   })
 })
 

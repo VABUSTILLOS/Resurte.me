@@ -6,12 +6,15 @@ import type { Coupon } from "@/types"
 import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { validDeliveryFee } from "@/lib/checkout-config"
+import { resolveBumpPricing } from "@/lib/order-bumps"
 
 interface OrderItemInput {
   product_id: number
   quantity: number
   unit_price: number
   name: string
+  /** 'standard' (carrito) o 'bump' (order bump del drawer, con descuento). */
+  item_type?: "standard" | "bump"
 }
 
 interface CreateOrderBody {
@@ -166,10 +169,63 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Recalcular subtotal con precios reales (sale_price gana si existe)
+    // ── Precios de order bumps (server-side, nunca del cliente) ──
+    // Los items tipo "bump" se validan contra bump_rules activos: el precio
+    // con descuento lo calcula el servidor. Si no hay regla activa para el
+    // producto, el bump se rechaza (no se puede inventar un descuento).
+    const bumpItems = items.filter((i) => i.item_type === "bump")
+    const bumpPriceByProduct = new Map<number, number>()
+    if (bumpItems.length > 0) {
+      const bumpProductIds = [...new Set(bumpItems.map((i) => i.product_id))]
+      const { data: bumpRules, error: bumpErr } = await supabase
+        .from("bump_rules")
+        .select("product_id, discount_pct")
+        .eq("is_active", true)
+        .in("product_id", bumpProductIds)
+
+      if (bumpErr) {
+        logger.error("Bump rules fetch error:", bumpErr)
+        return NextResponse.json(
+          { error: "Error al validar los artículos especiales del pedido" },
+          { status: 500 }
+        )
+      }
+
+      const discountPctByProduct = new Map<number, number>()
+      for (const r of bumpRules ?? []) {
+        discountPctByProduct.set(r.product_id, Number(r.discount_pct))
+      }
+
+      const basePriceByProduct = new Map<number, number>()
+      for (const item of bumpItems) {
+        const db = priceByProduct.get(item.product_id)!
+        basePriceByProduct.set(item.product_id, db.sale_price ?? db.price)
+      }
+
+      const pricing = resolveBumpPricing({
+        bumpItems,
+        basePriceByProduct,
+        discountPctByProduct,
+      })
+      if (!pricing.ok) {
+        return NextResponse.json(
+          { error: `El artículo especial ${pricing.missingProductId} no está disponible` },
+          { status: 400 }
+        )
+      }
+      for (const [productId, price] of pricing.pricesByProduct) {
+        bumpPriceByProduct.set(productId, price)
+      }
+    }
+
+    // Recalcular subtotal con precios reales (sale_price gana si existe;
+    // bump usa el precio con descuento de bump_rules)
     const realSubtotal = items.reduce((sum, item) => {
       const db = priceByProduct.get(item.product_id)!
-      const unitPrice = db.sale_price ?? db.price
+      const unitPrice =
+        item.item_type === "bump"
+          ? (bumpPriceByProduct.get(item.product_id) ?? db.sale_price ?? db.price)
+          : (db.sale_price ?? db.price)
       return sum + unitPrice * item.quantity
     }, 0)
 
@@ -433,7 +489,11 @@ export async function POST(request: NextRequest) {
         order_id: order.id,
         product_id: item.product_id,
         quantity: item.quantity,
-        unit_price: db.sale_price ?? db.price,
+        unit_price:
+          item.item_type === "bump"
+            ? (bumpPriceByProduct.get(item.product_id) ?? db.sale_price ?? db.price)
+            : (db.sale_price ?? db.price),
+        item_type: item.item_type === "bump" ? "bump" : "standard",
       }
     })
 

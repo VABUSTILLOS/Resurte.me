@@ -18,6 +18,10 @@ interface AddressStepProps {
   onNewAddress: () => void
   onPhoneChange: (value: string) => void
   onContinue: () => void
+  /** Email opcional (captura de lead onBlur). Prop retrocompatible. */
+  email?: string
+  onEmailChange?: (value: string) => void
+  onEmailBlur?: (value: string) => void
 }
 
 export function AddressStep({
@@ -33,6 +37,9 @@ export function AddressStep({
   onNewAddress,
   onPhoneChange,
   onContinue,
+  email,
+  onEmailChange,
+  onEmailBlur,
 }: AddressStepProps) {
   return (
     <div>
@@ -229,6 +236,28 @@ export function AddressStep({
           Lo usamos para enviarte la confirmación de tu pedido por WhatsApp.
         </p>
       </div>
+
+      {/* Email — captura de lead al salir del campo (onBlur) */}
+      {email !== undefined && onEmailChange && (
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Correo electrónico
+          </label>
+          <input
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => onEmailChange(e.target.value.trim())}
+            onBlur={(e) => onEmailBlur?.(e.target.value.trim())}
+            placeholder="tucorreo@ejemplo.com"
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            Para enviarte tu recibo y cupones de bienvenida.
+          </p>
+        </div>
+      )}
 
       <button
         type="button"

@@ -34,6 +34,7 @@ import { AddressStep } from "@/components/checkout/AddressStep"
 import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { ReviewStep } from "@/components/checkout/ReviewStep"
 import { PaymentStep } from "@/components/checkout/PaymentStep"
+import { validDeliveryFee } from "@/lib/checkout-config"
 
 // ============================================================
 // Page
@@ -135,7 +136,8 @@ export default function CheckoutPage() {
   // Cashback estimado devuelto por POST /api/orders (se muestra tras pagar)
   const [earnedCashback, setEarnedCashback] = useState<{ credits: number; tier: string | null } | null>(null)
 
-  const deliveryFee = itemCount > 0 ? 35 : 0
+  // Envío gratis desde $500 MXN (misma regla que el servidor en POST /api/orders)
+  const deliveryFee = validDeliveryFee(itemCount, subtotal - discount, 35)
   const total = subtotal - discount + deliveryFee
 
   // Persist the order summary so the confirmation page can fire a complete

@@ -88,6 +88,42 @@ function discountPrice(product: BumpProduct, discountPct: number): number {
   return round2(effectivePrice(product) * (1 - discountPct))
 }
 
+/** Precio de bump a partir de un precio base y el % de descuento. */
+export function bumpUnitPrice(basePrice: number, discountPct: number): number {
+  return round2(basePrice * (1 - discountPct))
+}
+
+export interface BumpPricingInput {
+  /** Items del pedido con item_type "bump". */
+  bumpItems: { product_id: number; quantity: number }[]
+  /** Precio base por producto (sale_price ?? price) desde la BD. */
+  basePriceByProduct: Map<number, number>
+  /** Descuentos activos por producto desde `bump_rules`. */
+  discountPctByProduct: Map<number, number>
+}
+
+export type BumpPricingResult =
+  | { ok: true; pricesByProduct: Map<number, number> }
+  | { ok: false; missingProductId: number }
+
+/**
+ * Valida que cada bump item tenga una regla activa y calcula su precio con
+ * descuento. Si algún producto no tiene regla activa, el bump se rechaza
+ * (no se puede inventar un descuento). Misma fórmula que POST /api/orders.
+ */
+export function resolveBumpPricing(input: BumpPricingInput): BumpPricingResult {
+  const pricesByProduct = new Map<number, number>()
+  for (const item of input.bumpItems) {
+    const base = input.basePriceByProduct.get(item.product_id)
+    const discountPct = input.discountPctByProduct.get(item.product_id)
+    if (base === undefined || discountPct === undefined) {
+      return { ok: false, missingProductId: item.product_id }
+    }
+    pricesByProduct.set(item.product_id, bumpUnitPrice(base, discountPct))
+  }
+  return { ok: true, pricesByProduct }
+}
+
 /**
  * Evalúa qué reglas de bump aplican al carrito según la lógica de categorías.
  * Devuelve los trigger_types ordenados por display_order.
