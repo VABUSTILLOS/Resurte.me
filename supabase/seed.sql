@@ -677,9 +677,64 @@ INSERT INTO restaurant_collections (name, slug, description, image_url, tags, di
    '["bebidas","bar","botanas","licor"]', 14);
 
 -- ============================================================
--- TAGS: Los productos ya se taggearon vía script Node.js.
--- Las 14 colecciones filtran por intersección de tags
--- (product.tags ∩ collection.tags) en el servidor.
+-- TAGS DE PRODUCTOS PARA DETECCIÓN DE RECETAS/COLECCIONES
 -- ============================================================
+-- Las 14 colecciones filtran por intersección de tags
+-- (product.tags ∩ collection.tags) en el servidor. En el reset local las
+-- migraciones corren ANTES que los productos, así que aquí etiquetamos los
+-- ingredientes clave del catálogo para que el motor de order bumps por
+-- receta/colección funcione en desarrollo (en producción los tags ya existen
+-- vía script Node.js; este bloque solo aplica al seed local).
+-- Idempotente: sobrescribe tags en el reset local (catálogo determinista).
+UPDATE products SET tags = '["taqueria","tacos","mexicana","antojitos"]'::jsonb
+WHERE slug IN ('tortillas-maiz', 'tortillas-de-harina', 'harina-de-maiz-1kg', 'cilantro', 'cebolla-en-polvo', 'aguacate-hass');
+
+UPDATE products SET tags = '["cortes","asador","parrilla","carne-res","taqueria"]'::jsonb
+WHERE slug IN ('arrachera', 'chorizo', 'tortillas-de-harina');
+
+UPDATE products SET tags = '["pollo","alitas","boneless","fritura"]'::jsonb
+WHERE slug IN ('pollo-entero', 'salsa-buffalo');
+
+UPDATE products SET tags = '["bebidas","bar","botanas","licor"]'::jsonb
+WHERE slug IN ('cerveza-corona-355ml', 'cerveza-modelo-355ml', 'cerveza-victoria-355ml', 'limon-agrio', 'cacahuate-salado-200g');
+
+UPDATE products SET tags = '["sushi","japonesa","asiatica"]'::jsonb
+WHERE slug IN ('salsa-de-anguila', 'arroz-grano-corto', 'alga-nori');
+
+UPDATE products SET tags = '["hamburgueseria","burger","hotdog"]'::jsonb
+WHERE slug IN ('pan-brioche', 'tocino', 'papas-congeladas');
+
+UPDATE products SET tags = '["marisqueria","mariscos","pescados"]'::jsonb
+WHERE slug IN ('tostadas', 'aguacate-hass', 'limon-agrio', 'camaron', 'pulpo', 'filete-de-pescado');
+
+UPDATE products SET tags = '["arabe","griega","trompo","kebab"]'::jsonb
+WHERE slug IN ('pan-pita', 'jocoque', 'tahini');
+
+UPDATE products SET tags = '["venezolana","colombiana","latina","arepas"]'::jsonb
+WHERE slug IN ('harina-pan', 'platano-macho', 'yuca');
+
+UPDATE products SET tags = '["fonda","cocina-economica","mexicana","guisados"]'::jsonb
+WHERE slug IN ('frijoles-refritos', 'chorizo', 'huevo-blanco-caja-30pz', 'cilantro');
+
+UPDATE products SET tags = '["postres","panaderia","helados","reposteria"]'::jsonb
+WHERE slug IN ('chispas-de-chocolate', 'mantequilla', 'fresa');
+
+UPDATE products SET tags = '["saludable","ensaladas","poke","organico"]'::jsonb
+WHERE slug IN ('tortilla-integral', 'aguacate-hass', 'lechuga-gourmet', 'kale');
+
+UPDATE products SET tags = '["cafeteria","cafe","desayunos","crepas"]'::jsonb
+WHERE slug IN ('huevo-blanco-caja-30pz', 'huevo-blanco-18pz', 'leche-entera', 'cafe-en-grano');
+
+UPDATE products SET tags = '["pizzeria","italiana","pasta"]'::jsonb
+WHERE slug IN ('pepperoni', 'mozzarella', 'harina-de-trigo', 'pure-de-tomate');
+
+-- ============================================================
+-- ORDER BUMPS: sembrar reglas de venta cruzada (idempotente).
+-- Las migraciones corren antes que los productos en el reset local, por lo
+-- que la función de 00051 se vuelve a invocar aquí para que las reglas
+-- apunten a productos reales ya insertados. En producción es un no-op.
+-- ============================================================
+SELECT public.seed_bump_rules();
+
 -- FIN COLECCIONES
 -- ============================================================

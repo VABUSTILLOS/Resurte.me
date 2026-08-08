@@ -10,6 +10,7 @@ import {
   evaluateTriggerTypes,
   resolveBumps,
   resolveBumpPricing,
+  detectCollectionsInCart,
   type BumpProduct,
   type BumpRuleRow,
   type BumpTriggerType,
@@ -31,6 +32,7 @@ function rule(
     discount_pct: 0.1,
     is_active: true,
     display_order: 1,
+    collection_slug: null,
     ...overrides,
   }
 }
@@ -46,6 +48,19 @@ function product(overrides: Partial<BumpProduct> = {}): BumpProduct {
     sale_price: null,
     stock_status: "in_stock",
     category_id: 10,
+    tags: [],
+    is_visible: true,
+    ...overrides,
+  }
+}
+
+function collection(overrides: Partial<{ id: number; slug: string; name: string; tags: string[]; is_active: boolean }> = {}) {
+  return {
+    id: 1,
+    slug: "taquerias-antojitos",
+    name: "Taquerías y Antojitos",
+    tags: ["taqueria", "tacos"],
+    is_active: true,
     ...overrides,
   }
 }
@@ -87,6 +102,38 @@ describe("evaluateTriggerTypes", () => {
     expect(matched).toHaveLength(3)
     expect(new Set(matched).size).toBe(3)
     expect(matched[0]).toBe("perishables")
+  })
+
+  it("nuevos triggers meat_bbq y drinks_sides disparan por categoría", () => {
+    const meatRule = rule("meat_bbq", { id: 4, display_order: 4 })
+    const drinksRule = rule("drinks_sides", { id: 5, display_order: 5 })
+    expect(evaluateTriggerTypes(new Set(["carnes-aves-pescados"]), 100, [meatRule])).toContain("meat_bbq")
+    expect(evaluateTriggerTypes(new Set(["bebidas"]), 100, [drinksRule])).toContain("drinks_sides")
+    // botanas-dulces dispara snacks_drinks, NO drinks_sides (bebidas es el disparador).
+    expect(evaluateTriggerTypes(new Set(["botanas-dulces"]), 100, [drinksRule])).not.toContain("drinks_sides")
+    expect(evaluateTriggerTypes(new Set(["botanas-dulces"]), 100, [snacksRule])).toContain("snacks_drinks")
+  })
+
+  it("recipe_collection dispara cuando la colección está en el carrito", () => {
+    const recipeRule = rule("recipe_collection", { id: 6, collection_slug: "taquerias-antojitos", display_order: 6 })
+    const slugs = new Set(["taquerias-antojitos"])
+    expect(evaluateTriggerTypes(new Set(), 100, [recipeRule], slugs)).toContain("recipe_collection")
+    expect(evaluateTriggerTypes(new Set(), 100, [recipeRule], new Set(["otra"]))).toEqual([])
+  })
+})
+
+describe("detectCollectionsInCart", () => {
+  it("detecta colección por intersección de tags", () => {
+    const cartProducts = [{ tags: ["taqueria", "mexicana"] }]
+    const collections = [collection(), collection({ slug: "postres", name: "Postres", tags: ["postres"] })]
+    const detected = detectCollectionsInCart(cartProducts, collections as never)
+    expect(detected.has("taquerias-antojitos")).toBe(true)
+    expect(detected.has("postres")).toBe(false)
+  })
+
+  it("carrito sin tags no detecta nada (fail-open)", () => {
+    const cartProducts = [{ tags: [] }]
+    expect(detectCollectionsInCart(cartProducts, [collection()] as never).size).toBe(0)
   })
 })
 
@@ -148,31 +195,61 @@ describe("resolveBumps", () => {
     vi.clearAllMocks()
   })
 
-  /** Construye el mock de Supabase con respuestas por tabla/query. */
+  /**
+   * Construye el mock de Supabase con respuestas por tabla/query.
+   * - bump_rules: select("*") → reglas; insert → regla insertada (fallback dinámico)
+   * - products: in() → productos del carrito; eq(id) → bumpProduct por producto
+   * - categories: in() → categorías
+   * - restaurant_collections: eq(is_active) → colecciones
+   * - rpc get_products_by_collection: productos de la colección (fallback dinámico)
+   */
   function makeSupabase(opts: {
     rules?: BumpRuleRow[]
     cartProducts?: BumpProduct[]
-    cartCategoryIds?: { id: number; category_id: number }[]
     categories?: { id: number; slug: string }[]
-    bumpProduct?: BumpProduct
+    bumpProducts?: Record<number, BumpProduct>
+    collections?: { id: number; slug: string; name: string; tags: string[]; is_active: boolean }[]
+    rpcProducts?: Record<string, Record<string, unknown>[]>
+    insertedRule?: BumpRuleRow | null
   }) {
     const {
       rules = [perishableRule],
       cartProducts = [product({ id: 1, name: "Manzana", category_id: 20 })],
-      cartCategoryIds = [{ id: 1, category_id: 20 }],
       categories = [{ id: 20, slug: "frutas-verduras" }],
-      bumpProduct = product(),
+      bumpProducts = { 100: product() },
+      collections = [],
+      rpcProducts = {},
+      insertedRule = null,
     } = opts
 
-    return {
+    // Espía accesible para verificar que el fallback dinámico registró la regla.
+    const insertBumpRules = vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue({ data: insertedRule ?? null, error: null }),
+      }),
+    })
+
+    const supabase = {
+      __insertBumpRules: insertBumpRules,
       from: vi.fn().mockImplementation((table: string) => {
         if (table === "bump_rules") {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: rules, error: null }),
-              }),
+          const selectStar = vi.fn().mockReturnValue({
+            eq: vi.fn().mockImplementation((col: string) => {
+              if (col === "is_active") {
+                return {
+                  order: vi.fn().mockResolvedValue({ data: rules, error: null }),
+                }
+              }
+              // Recuperación de carrera: eq(trigger_type) → eq(collection_slug)
+              return {
+                eq: vi.fn().mockResolvedValue({ data: insertedRule ?? null, error: null }),
+              }
             }),
+            maybeSingle: vi.fn().mockResolvedValue({ data: insertedRule ?? null, error: null }),
+          })
+          return {
+            select: selectStar,
+            insert: insertBumpRules,
           }
         }
         if (table === "products") {
@@ -180,15 +257,21 @@ describe("resolveBumps", () => {
             select: vi.fn().mockImplementation((cols: string) => {
               if (cols === "id, category_id") {
                 return {
-                  in: vi.fn().mockResolvedValue({ data: cartCategoryIds, error: null }),
+                  in: vi.fn().mockResolvedValue({
+                    data: cartProducts.map((p) => ({ id: p.id, category_id: p.category_id })),
+                    error: null,
+                  }),
                 }
               }
-              // Cols completas de producto.
               return {
                 in: vi.fn().mockResolvedValue({ data: cartProducts, error: null }),
-                eq: vi.fn().mockReturnValue({
-                  maybeSingle: vi.fn().mockResolvedValue({ data: bumpProduct, error: null }),
-                }),
+                eq: vi.fn().mockImplementation((_col: string, value?: number) => ({
+                  maybeSingle: vi.fn().mockResolvedValue({
+                    data:
+                      value !== undefined ? (bumpProducts[value] ?? null) : (bumpProducts[100] ?? null),
+                    error: null,
+                  }),
+                })),
               }
             }),
           }
@@ -200,9 +283,23 @@ describe("resolveBumps", () => {
             }),
           }
         }
+        if (table === "restaurant_collections") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: collections, error: null }),
+            }),
+          }
+        }
         return { select: vi.fn().mockResolvedValue({ data: null, error: null }) }
       }),
+      rpc: vi.fn().mockImplementation((name: string, args: { p_slug?: string }) => {
+        if (name === "get_products_by_collection") {
+          return Promise.resolve({ data: rpcProducts[args?.p_slug ?? ""] ?? [], error: null })
+        }
+        return Promise.resolve({ data: null, error: null })
+      }),
     }
+    return supabase
   }
 
   it("carrito vacío devuelve []", async () => {
@@ -228,17 +325,20 @@ describe("resolveBumps", () => {
             }),
           }
         }
-        return { select: vi.fn().mockResolvedValue({ data: null, error: null }) }
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }
       }),
+      rpc: vi.fn(),
     }
     vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
     expect(await resolveBumps({ items: [{ product_id: 1, quantity: 2 }] })).toEqual([])
   })
 
   it("devuelve bumps con precio descontado y excluye productos del carrito", async () => {
-    vi.mocked(createServiceClient).mockResolvedValue(
-      makeSupabase({}) as never
-    )
+    vi.mocked(createServiceClient).mockResolvedValue(makeSupabase({}) as never)
     const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 2 }] })
     expect(bumps).toHaveLength(1)
     expect(bumps[0]?.trigger_type).toBe("perishables")
@@ -248,7 +348,6 @@ describe("resolveBumps", () => {
   })
 
   it("omite el bump si su producto ya está en el carrito", async () => {
-    // El producto del bump (id 100) ya está en el carrito → se excluye.
     const supabase = makeSupabase({})
     vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
     const bumps = await resolveBumps({ items: [{ product_id: 100, quantity: 1 }] })
@@ -257,7 +356,7 @@ describe("resolveBumps", () => {
 
   it("usa sale_price cuando existe para el precio original y descontado", async () => {
     const supabase = makeSupabase({
-      bumpProduct: product({ id: 100, sale_price: 20 }),
+      bumpProducts: { 100: product({ id: 100, sale_price: 20 }) },
     })
     vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
     const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
@@ -267,7 +366,15 @@ describe("resolveBumps", () => {
 
   it("omite bumps cuyo producto está agotado", async () => {
     const supabase = makeSupabase({
-      bumpProduct: product({ id: 100, stock_status: "out_of_stock" }),
+      bumpProducts: { 100: product({ id: 100, stock_status: "out_of_stock" }) },
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    expect(await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })).toEqual([])
+  })
+
+  it("omite bumps cuyo producto no es visible (is_visible = false)", async () => {
+    const supabase = makeSupabase({
+      bumpProducts: { 100: product({ id: 100, is_visible: false }) },
     })
     vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
     expect(await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })).toEqual([])
@@ -280,5 +387,144 @@ describe("resolveBumps", () => {
     })
     vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
     expect(await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })).toEqual([])
+  })
+
+  // ── Cross-sell por receta/colección (motor de recomendación) ──
+
+  it("detecta colección por tags y ofrece el bump de receta con badge", async () => {
+    const recipeRule = rule("recipe_collection", {
+      id: 6,
+      product_id: 600,
+      collection_slug: "taquerias-antojitos",
+      display_order: 6,
+    })
+    const supabase = makeSupabase({
+      rules: [perishableRule, recipeRule],
+      cartProducts: [
+        product({ id: 1, name: "Tortillas", category_id: 20, tags: ["taqueria"] }),
+      ],
+      categories: [{ id: 20, slug: "frutas-verduras" }],
+      bumpProducts: {
+        100: product({ id: 100, name: "Empaque térmico", price: 40 }),
+        600: product({ id: 600, name: "Guacamole preparado", price: 35 }),
+      },
+      collections: [collection()],
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+    // La receta/colección gana el ranking aunque ambas reglas apliquen.
+    expect(bumps).toHaveLength(2)
+    expect(bumps[0]?.trigger_type).toBe("recipe_collection")
+    expect(bumps[0]?.product.id).toBe(600)
+    expect(bumps[0]?.isRecipeMatch).toBe(true)
+    expect(bumps[0]?.badgeLabel).toBe("Sugerido para tu receta / pedido")
+    expect(bumps[0]?.collection_slug).toBe("taquerias-antojitos")
+    expect(bumps[0]?.price).toBeCloseTo(31.5, 2) // 35 * 0.9
+  })
+
+  it("omite el bump de colección si su producto ya está en el carrito", async () => {
+    const recipeRule = rule("recipe_collection", {
+      id: 6,
+      product_id: 600,
+      collection_slug: "taquerias-antojitos",
+      display_order: 6,
+    })
+    const supabase = makeSupabase({
+      rules: [recipeRule],
+      cartProducts: [
+        product({ id: 600, name: "Guacamole", category_id: 20, tags: ["taqueria"] }),
+      ],
+      categories: [{ id: 20, slug: "frutas-verduras" }],
+      bumpProducts: { 600: product({ id: 600 }) },
+      collections: [collection()],
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    expect(await resolveBumps({ items: [{ product_id: 600, quantity: 1 }] })).toEqual([])
+  })
+
+  it("fallback dinámico: colección detectada sin regla admin genera bump propio", async () => {
+    const supabase = makeSupabase({
+      rules: [],
+      cartProducts: [
+        product({ id: 1, name: "Tortillas", category_id: 20, tags: ["taqueria"] }),
+      ],
+      categories: [{ id: 20, slug: "frutas-verduras" }],
+      collections: [collection()],
+      rpcProducts: {
+        "taquerias-antojitos": [
+          { id: 900, name: "Guacamole preparado", slug: "guacamole", price: 30, sale_price: null, stock_status: "in_stock", is_visible: true, category_id: 1 },
+        ],
+      },
+      insertedRule: rule("recipe_collection", {
+        id: 60,
+        product_id: 900,
+        collection_slug: "taquerias-antojitos",
+        display_order: 0,
+      }),
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+    expect(bumps).toHaveLength(1)
+    expect(bumps[0]?.product.id).toBe(900)
+    expect(bumps[0]?.isRecipeMatch).toBe(true)
+    expect(bumps[0]?.collection_slug).toBe("taquerias-antojitos")
+    expect(bumps[0]?.price).toBeCloseTo(27, 2) // 30 * 0.9 (descuento dinámico 10%)
+    // Verifica que el motor registró la regla para que POST /api/orders valide.
+    expect((supabase as unknown as { __insertBumpRules: ReturnType<typeof vi.fn> }).__insertBumpRules).toHaveBeenCalled()
+  })
+
+  it("máximo 3 bumps simultáneos con prioridad de recetas", async () => {
+    const meatRule = rule("meat_bbq", { id: 4, product_id: 400, display_order: 4 })
+    const drinksRule = rule("drinks_sides", { id: 5, product_id: 500, display_order: 5 })
+    const recipeRule = rule("recipe_collection", {
+      id: 6,
+      product_id: 600,
+      collection_slug: "taquerias-antojitos",
+      display_order: 6,
+    })
+    const supabase = makeSupabase({
+      rules: [meatRule, drinksRule, recipeRule],
+      cartProducts: [
+        product({ id: 1, name: "Arrachera", category_id: 4, tags: ["taqueria"] }),
+        product({ id: 2, name: "Cerveza", category_id: 6, tags: ["bar"] }),
+      ],
+      categories: [
+        { id: 4, slug: "carnes-aves-pescados" },
+        { id: 6, slug: "bebidas" },
+      ],
+      bumpProducts: {
+        400: product({ id: 400, name: "Sazonador", price: 15 }),
+        500: product({ id: 500, name: "Botana", price: 20 }),
+        600: product({ id: 600, name: "Guacamole", price: 35 }),
+      },
+      collections: [collection()],
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+    expect(bumps).toHaveLength(3)
+    // Ranking: receta primero, luego categorías.
+    expect(bumps[0]?.trigger_type).toBe("recipe_collection")
+    expect(new Set(bumps.map((b) => b.product.id)).size).toBe(3)
+  })
+
+  it("fail-open: error en rpc de colección no rompe el flujo", async () => {
+    const recipeRule = rule("recipe_collection", {
+      id: 6,
+      product_id: 600,
+      collection_slug: "taquerias-antojitos",
+      display_order: 6,
+    })
+    const supabase = makeSupabase({
+      rules: [recipeRule],
+      cartProducts: [product({ id: 1, tags: ["taqueria"] })],
+      collections: [collection()],
+      bumpProducts: { 600: product({ id: 600 }) },
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    supabase.rpc = vi.fn().mockResolvedValue({ data: null, error: new Error("rpc boom") })
+    // La regla admin de la colección existe y es usable → el bump sale igual.
+    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+    expect(Array.isArray(bumps)).toBe(true)
+    expect(bumps.some((b) => b.product.id === 600)).toBe(true)
   })
 })

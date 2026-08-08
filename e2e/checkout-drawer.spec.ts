@@ -15,6 +15,7 @@ import { test, expect, type Page } from "@playwright/test"
 
 const CART_STORAGE_KEY = "resurte_cart"
 const CHECKOUT_DRAWER_EVENT = "resurte:toggle-checkout-drawer"
+const CART_DRAWER_EVENT = "resurte:toggle-cart-drawer"
 
 interface SeedItem {
   product_id: number
@@ -155,5 +156,99 @@ test.describe("checkout drawer (alta conversión)", () => {
     // tras crear el PaymentIntent).
     await expect(page.getByRole("button", { name: /Confirmar pedido/ })).toBeVisible()
     await expect(page.getByText(/Pago seguro|Guardar mi tarjeta/i).first()).toBeVisible()
+  })
+
+  test("cart drawer muestra los order bumps y los transfiere al checkout", async ({ page }) => {
+    // Respuesta determinística del API para no depender del seed de bump_rules.
+    const stubBumps = {
+      bumps: [
+        {
+          ruleId: 6001,
+          trigger_type: "recipe_collection",
+          title: "Guacamole preparado",
+          description: "El complemento perfecto para tu taquería",
+          discount_pct: 0.1,
+          product: {
+            id: 900,
+            name: "Guacamole preparado",
+            slug: "guacamole",
+            description: "",
+            image_url: "",
+            price: 35,
+            sale_price: null,
+            stock_status: "in_stock",
+            category_id: 1,
+          },
+          price: 31.5,
+          original_price: 35,
+          isRecipeMatch: true,
+          badgeLabel: "Sugerido para tu receta / pedido",
+          collection_slug: "taquerias-antojitos",
+        },
+        {
+          ruleId: 6002,
+          trigger_type: "meat_bbq",
+          title: "Sazonador para carne asada",
+          description: "Lleva tu carne asada a otro nivel",
+          discount_pct: 0.15,
+          product: {
+            id: 901,
+            name: "Sazonador",
+            slug: "sazonador",
+            description: "",
+            image_url: "",
+            price: 20,
+            sale_price: null,
+            stock_status: "in_stock",
+            category_id: 4,
+          },
+          price: 17,
+          original_price: 20,
+        },
+      ],
+    }
+    await page.route("**/api/cart/bumps", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(stubBumps),
+      })
+    )
+
+    seedCart(page, [aguacate])
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
+
+    // Abre el cart drawer (toggle del mismo evento que usa MobileCartBar).
+    const restaurantsHint = page.getByText("🔥 Restaurantes también compran")
+    let cartDrawerOpen = false
+    for (let i = 0; i < 6 && !cartDrawerOpen; i++) {
+      await page.evaluate((evt) => window.dispatchEvent(new Event(evt)), CART_DRAWER_EVENT)
+      try {
+        await expect(restaurantsHint).toBeVisible({ timeout: 1000 })
+        cartDrawerOpen = true
+      } catch {
+        // reintenta hasta que el listener de React esté registrado
+      }
+    }
+    if (!cartDrawerOpen) throw new Error("No se pudo abrir el cart drawer")
+
+    // BumpCards montado en el cross-sell del drawer: 2 tarjetas simultáneas.
+    const guacamoleCard = page.getByRole("button", { name: /Guacamole preparado/ })
+    await expect(guacamoleCard).toBeVisible()
+    await expect(page.getByText("Sugerido para tu receta / pedido")).toBeVisible()
+    await expect(page.getByText("Sazonador para carne asada")).toBeVisible()
+    await expect(page.getByText(/Hasta 3 artículos especiales por pedido/)).toBeVisible()
+
+    // Selecciona un bump → el subtotal del bump se marca en el drawer.
+    await guacamoleCard.click()
+    await expect(guacamoleCard).toHaveAttribute("aria-pressed", "true")
+
+    // "Ir a Checkout" transfiere los bumps vía detail.bumps al CheckoutDrawer.
+    await page.getByRole("button", { name: /Ir a Checkout/ }).click()
+
+    await expect(page.getByRole("button", { name: "Continuar al envío" })).toBeVisible()
+    // El review del checkout incluye el bump: subtotal $850 + bump $31.50.
+    await expect(page.getByText("Artículos especiales")).toBeVisible()
+    await expect(page.getByText("+$31.50")).toBeVisible()
   })
 })

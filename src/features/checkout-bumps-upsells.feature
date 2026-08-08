@@ -72,6 +72,36 @@ Característica: Checkout drawer con order bumps y upsells 1-click
     Entonces ese bump se excluye de las ofertas
 
   # -----------------------------------------------------------
+  # Cross-sell inteligente por recetas/colecciones (motor híbrido)
+  # -----------------------------------------------------------
+
+  Escenario: Bump sugerido por colección/receta con badge
+    Dado un carrito con ingredientes etiquetados de la colección "taquerias-antojitos"
+    Cuando se consulta POST /api/cart/bumps
+    Entonces se ofrece el bump de la colección con badge "Sugerido para tu receta / pedido"
+    Y su precio incluye el descuento de la bump_rule
+    Y los bumps de colección/receta se listan antes que los de categoría
+
+  Escenario: Exclusión estricta en el motor de recomendación
+    Dado que el producto candidato está agotado, oculto (is_visible = false) o ya está en el carrito
+    Cuando se consulta POST /api/cart/bumps
+    Entonces ese bump NO se ofrece
+    Y los bumps devueltos están en stock, visibles y fuera del carrito
+
+  Escenario: Máximo 3 bumps con prioridad de recetas
+    Dado un carrito que dispara varias reglas de categoría y de colección a la vez
+    Cuando se consulta POST /api/cart/bumps
+    Entonces se devuelven hasta 3 bumps simultáneos
+    Y cada bump corresponde a un producto distinto
+
+  Escenario: Fallback dinámico para colección sin regla admin
+    Dado un carrito con una colección detectada sin regla en bump_rules
+    Cuando se consulta POST /api/cart/bumps
+    Entonces el motor elige un producto complementario de la colección
+    Y lo registra como bump_rule de tipo recipe_collection
+    Y el bump resultante pasa la validación de POST /api/orders
+
+  # -----------------------------------------------------------
   # Upsell 1-click (lógica SamCart)
   # -----------------------------------------------------------
 

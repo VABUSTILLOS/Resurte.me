@@ -142,6 +142,7 @@ export async function resolveUpsellOffers(
           discount_pct: row.discount_pct,
           is_active: row.is_active,
           display_order: row.display_order,
+          collection_slug: row.collection_slug ?? null,
         },
         product
       )

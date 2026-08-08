@@ -34,6 +34,7 @@ function rule(overrides: Partial<BumpRuleRow> = {}): BumpRuleRow {
     discount_pct: 0.05,
     is_active: true,
     display_order: 1,
+    collection_slug: null,
     ...overrides,
   }
 }
@@ -142,5 +143,59 @@ describe("BDD — invariantes del upsell 1-click", () => {
     // Upsell y downsell usan claves distintas para que la reconciliación no
     // confunda ofertas (decisión de diseño documentada en el modal).
     expect(`${key}`).not.toBe(`${key}-ds`)
+  })
+})
+
+// -----------------------------------------------------------
+// BDD: "Bump sugerido por colección/receta" + "Exclusión estricta"
+// -----------------------------------------------------------
+describe("BDD — cross-sell por colección/receta", () => {
+  it("recipe_collection dispara SOLO si la colección está en el carrito", () => {
+    const recipeRule = rule({
+      id: 6,
+      trigger_type: "recipe_collection",
+      collection_slug: "taquerias-antojitos",
+      subtotal_min: null,
+    })
+    const withCollection = evaluateTriggerTypes(
+      new Set(["carnes-aves-pescados"]),
+      300,
+      [recipeRule],
+      new Set(["taquerias-antojitos"])
+    )
+    expect(withCollection).toContain("recipe_collection")
+
+    const withoutCollection = evaluateTriggerTypes(
+      new Set(["carnes-aves-pescados"]),
+      300,
+      [recipeRule],
+      new Set()
+    )
+    expect(withoutCollection).toEqual([])
+  })
+
+  it("la regla de receta nunca excluye una categoría válida (compatibilidad)", () => {
+    const rules = [
+      rule({
+        id: 1,
+        trigger_type: "perishables",
+        category_slugs: ["frutas-verduras"],
+      }),
+      rule({
+        id: 6,
+        trigger_type: "recipe_collection",
+        collection_slug: "taquerias-antojitos",
+        subtotal_min: null,
+      }),
+    ]
+    const matched = evaluateTriggerTypes(
+      new Set(["frutas-verduras"]),
+      300,
+      rules,
+      new Set(["taquerias-antojitos"])
+    )
+    expect(matched).toContain("perishables")
+    expect(matched).toContain("recipe_collection")
+    expect(matched).toHaveLength(2)
   })
 })

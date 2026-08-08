@@ -92,7 +92,22 @@ export function CheckoutDrawer() {
 
   // ── Apertura / cierre del drawer ──
   useEffect(() => {
-    const handler = () => {
+    const handler = (event: Event) => {
+      // Los bumps seleccionados en el cross-sell del CartDrawer viajan en
+      // detail.bumps; sin detail se conserva el comportamiento retrocompatible
+      // (se inician vacíos). Se valida la forma para no aceptar basura.
+      const detail = (event as CustomEvent<{ bumps?: unknown }>).detail
+      const incomingBumps = Array.isArray(detail?.bumps)
+        ? (detail.bumps as SelectedBump[]).filter(
+            (b) =>
+              b &&
+              typeof b.ruleId === "number" &&
+              typeof b.productId === "number" &&
+              typeof b.quantity === "number" &&
+              b.quantity > 0 &&
+              typeof b.unitPrice === "number"
+          )
+        : []
       setIsOpen((prev) => {
         const next = !prev
         if (next) {
@@ -100,7 +115,7 @@ export function CheckoutDrawer() {
           setCheckoutError(null)
           setShowStripeForm(false)
           setStripeClientSecret(null)
-          setSelectedBumps([])
+          setSelectedBumps(incomingBumps)
           setSaveAsDefault(false)
         }
         return next
@@ -502,6 +517,12 @@ export function CheckoutDrawer() {
                   <span className="text-[var(--text-secondary)]">Subtotal</span>
                   <span className="font-semibold text-[#242529]">${subtotal.toFixed(2)}</span>
                 </div>
+                {selectedBumps.length > 0 && (
+                  <div className="flex justify-between text-brand-700">
+                    <span>Artículos especiales</span>
+                    <span className="font-semibold">+${bumpsSubtotal.toFixed(2)}</span>
+                  </div>
+                )}
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-green-700">
                     <span>Descuento ({coupon?.code ?? "cupón"})</span>

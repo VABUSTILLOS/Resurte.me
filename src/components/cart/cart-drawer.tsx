@@ -15,6 +15,7 @@ import {
 import Link from "next/link"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { CHECKOUT_DRAWER_EVENT } from "@/components/checkout/CheckoutDrawer"
+import { BumpCards, type SelectedBump } from "@/components/checkout/BumpCards"
 
 // Global event bus to control drawer from header
 export const CART_DRAWER_EVENT = "resurte:toggle-cart-drawer"
@@ -23,6 +24,9 @@ export function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false)
   const { cart, itemCount, subtotal, removeItem, updateQuantity, clearCart } = useCart()
   const { city } = useCity()
+  // Order bumps seleccionados en el cross-sell del carrito; se transfieren al
+  // CheckoutDrawer vía detail.bumps al presionar "Ir a Checkout".
+  const [selectedBumps, setSelectedBumps] = useState<SelectedBump[]>([])
 
   // Listen for toggle events from header
   useEffect(() => {
@@ -51,7 +55,11 @@ export function CartDrawer() {
     setIsOpen(false)
     // Abrir el checkout completo dentro del drawer (mecánica SamCart) en vez
     // de navegar a /{city}/checkout. La ruta sigue funcionando como fallback.
-    window.dispatchEvent(new Event(CHECKOUT_DRAWER_EVENT))
+    // Los bumps seleccionados en el cross-sell viajan en detail.bumps para que
+    // CheckoutDrawer los inicialice (retrocompatible: si no llegan, se vacían).
+    window.dispatchEvent(
+      new CustomEvent(CHECKOUT_DRAWER_EVENT, { detail: { bumps: selectedBumps } })
+    )
   }
 
   if (!isOpen) return null
@@ -208,6 +216,16 @@ export function CartDrawer() {
               <span className="text-[var(--text-secondary)]">Subtotal</span>
               <span className="font-semibold text-[#242529]">${subtotal.toFixed(2)}</span>
             </div>
+
+            {/* Cross-sell: order bumps inteligentes (2-3 tarjetas simultáneas) */}
+            <BumpCards
+              cartItems={cart.items.map((i) => ({
+                product_id: i.product_id,
+                quantity: i.quantity,
+              }))}
+              selected={selectedBumps}
+              onChange={setSelectedBumps}
+            />
 
             {/* Cross-sell: "Restaurantes también compran" hints */}
             <div className="bg-[#FDF8F3] rounded-xl border border-[#F0E5D8] p-3">

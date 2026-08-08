@@ -144,7 +144,20 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 leading-tight">
+                <div className="flex items-start gap-1.5">
+                  {bump.badgeLabel ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">
+                      <Sparkles className="w-3 h-3" />
+                      {bump.badgeLabel}
+                    </span>
+                  ) : bump.discount_pct > 0 ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-full px-2 py-0.5 shrink-0">
+                      <Check className="w-3 h-3" />
+                      Ahorra {Math.round(bump.discount_pct * 100)}% al agregar ahora
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-sm font-semibold text-gray-900 leading-tight mt-1">
                   {bump.title}
                 </p>
                 <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">
