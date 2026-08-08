@@ -25,6 +25,13 @@ import {
   SaleChannel,
   entryTotal,
 } from "@/components/panel/ventas/ventas-shared"
+import {
+  buildClientesLines,
+  buildCorteLines,
+  buildGerencialLines,
+  buildHorasLines,
+  buildResumenLines,
+} from "@/lib/ventas/reportes"
 import SalesGoals from "@/components/panel/ventas/SalesGoals"
 import SaleForm, { SaleFormData } from "@/components/panel/ventas/SaleForm"
 import FrequentCustomers from "@/components/panel/ventas/FrequentCustomers"
@@ -414,15 +421,7 @@ export default function VentasPage() {
       toast("No hay fichajes para ese día", "warning")
       return
     }
-    const lines = [
-      `⏰ Reporte de horas — ${dateLabel(selectedDate)} (${selectedCollection?.name || ""})`,
-      ...fichajesHoy.rows.map(
-        (r) => `${r.nombre}${r.rol ? ` (${r.rol})` : ""}: ${Math.floor(r.minutos / 60)}h ${Math.round(r.minutos % 60)}min — $${((r.minutos / 60) * r.tarifa).toFixed(0)}${r.abierto ? " (en curso)" : ""}`,
-      ),
-      `Total: ${Math.floor(fichajesHoy.totalMin / 60)}h ${Math.round(fichajesHoy.totalMin % 60)}min — $${fichajesHoy.totalCosto.toFixed(0)}`,
-      "",
-      "📈 Registrado en resurte.me",
-    ]
+    const lines = buildHorasLines({ collectionName: selectedCollection?.name, dateLabel: dateLabel(selectedDate), fichajesHoy })
     navigator.clipboard.writeText(lines.join("\n"))
     toast("Reporte de horas copiado", "success")
   }
@@ -476,28 +475,17 @@ export default function VentasPage() {
 
   const copyGerencial = () => {
     const label = reportPeriod === "hoy" ? "Hoy" : reportPeriod === "7d" ? "Últimos 7 días" : "Últimos 30 días"
-    const lines = [
-      `📊 Reporte gerencial — ${label} (${selectedCollection?.name || ""})`,
-      `Ingresos: $${reportStats.revenue.toFixed(0)}`,
-      `Costo de venta: $${reportStats.cost.toFixed(0)}`,
-      `Margen bruto: $${reportStats.margin.toFixed(0)}`,
-      `Food cost: ${reportStats.foodCost.toFixed(1)}%`,
-      `Tickets: ${reportStats.orders} · Ticket promedio: $${reportStats.avgTicket.toFixed(0)}`,
-      `Platillos vendidos: ${reportStats.units}`,
-    ]
-    if (reportStats.discount > 0) lines.push(`Descuentos otorgados: -$${reportStats.discount.toFixed(0)}`)
-    if (comisionesReporte > 0) lines.push(`Comisiones por canal: -$${comisionesReporte.toFixed(0)}`)
-    if (tipoCambio !== 1) lines.push(`Aprox. USD: $${(reportStats.revenue / tipoCambio).toFixed(2)}`)
-    if (reportMethods.length > 0) lines.push("", "Por método de pago:", ...reportMethods.map((m) => `${m.icon} ${m.label}: $${m.revenue.toFixed(0)}`))
-    if (reportChannels.length > 1) lines.push("", "Por canal:", ...reportChannels.map((c) => `${c.icon} ${c.label}: $${c.revenue.toFixed(0)}`))
-    if (reportTop.length > 0) lines.push("", "Top productos:", ...reportTop.map((t, i) => `${i + 1}. ${t.name} — ${t.qty} pz ($${t.revenue.toFixed(0)})`))
-    if (comparison.prev.orders > 0 || comparison.prev.revenue > 0) {
-      lines.push(
-        "",
-        `vs período anterior: ingresos ${comparison.revenueDelta >= 0 ? "+" : ""}${comparison.revenueDelta.toFixed(0)}% · tickets ${comparison.ordersDelta >= 0 ? "+" : ""}${comparison.ordersDelta.toFixed(0)}% · ticket prom. ${comparison.avgDelta >= 0 ? "+" : ""}${comparison.avgDelta.toFixed(0)}%`,
-      )
-    }
-    lines.push("", "📈 Registrado en resurte.me")
+    const lines = buildGerencialLines({
+      collectionName: selectedCollection?.name,
+      periodLabel: label,
+      stats: reportStats,
+      comisionesReporte,
+      tipoCambio,
+      methods: reportMethods,
+      channels: reportChannels,
+      top: reportTop,
+      comparison,
+    })
     navigator.clipboard.writeText(lines.join("\n"))
     toast("Reporte gerencial copiado", "success")
   }
@@ -751,68 +739,40 @@ export default function VentasPage() {
       toast("No hay clientes registrados", "warning")
       return
     }
-    const header = `👥 Clientes frecuentes — ${selectedCollection?.name || ""}`
-    const lines = clientes.map((c) => `${c.nombre}${c.telefono ? ` · ${c.telefono}` : ""} · ${c.puntos} pts · ${c.visitas} visitas · $${c.totalGastado.toFixed(0)}`)
-    navigator.clipboard.writeText([header, ...lines].join("\n"))
+    const lines = buildClientesLines({ collectionName: selectedCollection?.name, clientes })
+    navigator.clipboard.writeText(lines.join("\n"))
     toast("Clientes copiados", "success")
   }
 
   const copySummary = () => {
-    const header = `💰 Resumen de ventas — ${dateLabel(selectedDate)} (${selectedCollection?.name || ""})`
-    const lines = [
-      `Ingresos: $${dayStats.revenue.toFixed(0)}`,
-      `Costo de venta: $${dayStats.cost.toFixed(0)}`,
-      `Margen bruto: $${dayStats.margin.toFixed(0)}`,
-      `Food cost real: ${dayStats.foodCost.toFixed(1)}%`,
-      `Platillos vendidos: ${dayStats.units}`,
-    ]
-    if (dayStats.discount > 0) lines.push(`Descuentos otorgados: -$${dayStats.discount.toFixed(0)}`)
-    const methods = methodBreakdown.filter((m) => m.count > 0)
-    const methodLines = methods.length > 0
-      ? ["", "Por método de pago:", ...methods.map((m) => `${m.icon} ${m.label}: $${m.revenue.toFixed(0)} (${m.count} venta${m.count > 1 ? "s" : ""})`)]
-      : []
-    const channels = channelBreakdown.filter((c) => c.count > 0)
-    const channelLines = channels.length > 1
-      ? ["", "Por canal:", ...channels.map((c) => `${c.icon} ${c.label}: $${c.revenue.toFixed(0)} (${c.count} venta${c.count > 1 ? "s" : ""})`)]
-      : []
-    const top = topSellers.length > 0
-      ? ["", "Top ventas:", ...topSellers.map((t, i) => `${i + 1}. ${t.name} — ${t.qty} pz ($${t.revenue.toFixed(0)})`)]
-      : []
-    if (tipoCambio !== 1) lines.push(`Aprox. USD: $${(dayStats.revenue / tipoCambio).toFixed(2)}`)
-    const clienteName = (id?: string) => clientes.find((c) => c.id === id)?.nombre || ""
-    const mesaLabel = (id?: string) => mesas.find((m) => m.id === id)?.nombre || ""
-    const entries = dayEntries.length > 0
-      ? ["", "Ventas del día:", ...dayEntries.map((e, i) => {
-          const mods = e.modificadores && e.modificadores.length > 0 ? ` [+${e.modificadores.map((m) => m.nombre).join(", ")}]` : ""
-          const cli = e.clienteId ? ` · ${clienteName(e.clienteId)}` : ""
-          const mesaTxt = e.mesaId && mesaLabel(e.mesaId) ? ` · 🪑 ${mesaLabel(e.mesaId)}` : ""
-          return `${i + 1}. ${e.dishName}${mods} ×${e.quantity}${cli}${mesaTxt} — $${(e.unitPrice * e.quantity).toFixed(0)}`
-        })]
-      : []
-    navigator.clipboard.writeText([header, ...lines, ...entries, ...methodLines, ...channelLines, ...top, "", "📈 Registrado en resurte.me"].join("\n"))
+    const lines = buildResumenLines({
+      collectionName: selectedCollection?.name,
+      dateLabel: dateLabel(selectedDate),
+      stats: dayStats,
+      methods: methodBreakdown,
+      channels: channelBreakdown,
+      top: topSellers,
+      tipoCambio,
+      clientes,
+      mesas,
+      entries: dayEntries,
+    })
+    navigator.clipboard.writeText(lines.join("\n"))
     toast("Resumen del día copiado", "success")
   }
 
   const copyCorte = () => {
-    const lines = [
-      `🧾 Corte de caja — ${dateLabel(selectedDate)} (${selectedCollection?.name || ""})`,
-      "",
-      ...methodBreakdown.filter((m) => m.count > 0)
-        .map((m) => `${m.icon} ${m.label}: $${m.revenue.toFixed(0)} (${m.count} venta${m.count > 1 ? "s" : ""})`),
-      ...(channelBreakdown.filter((c) => c.count > 0).length > 1
-        ? ["", ...channelBreakdown.filter((c) => c.count > 0)
-            .map((c) => `${c.icon} ${c.label}: $${c.revenue.toFixed(0)} (${c.count} venta${c.count > 1 ? "s" : ""})`)]
-        : []),
-      ...(dayStats.discount > 0 ? [`Descuentos otorgados: -$${dayStats.discount.toFixed(0)}`] : []),
-      ...(comisionesHoy > 0 ? [`Comisiones por canal: -$${comisionesHoy.toFixed(0)}`] : []),
-      ...(mesasOcupadasHoy.size > 0 ? [`Mesas ocupadas: ${mesasOcupadasHoy.size}`] : []),
-      ...(tipoCambio !== 1 ? [`Aprox. USD: $${(dayStats.revenue / tipoCambio).toFixed(2)}`] : []),
-      ...(dayEntries.some((e) => e.modificadores?.length) ? ["", "Con modificadores:", ...dayEntries.filter((e) => e.modificadores?.length).map((e) => `${e.dishName} [+${e.modificadores!.map((m) => m.nombre).join(", ")}] ×${e.quantity}`)] : []),
-      "",
-      `Total: $${dayStats.revenue.toFixed(0)} · ${dayStats.units} platillos`,
-      "",
-      "📈 Registrado en resurte.me",
-    ]
+    const lines = buildCorteLines({
+      collectionName: selectedCollection?.name,
+      dateLabel: dateLabel(selectedDate),
+      stats: dayStats,
+      methods: methodBreakdown,
+      channels: channelBreakdown,
+      comisionesHoy,
+      mesasOcupadas: mesasOcupadasHoy.size,
+      tipoCambio,
+      entries: dayEntries,
+    })
     navigator.clipboard.writeText(lines.join("\n"))
     toast("Corte de caja copiado", "success")
   }
