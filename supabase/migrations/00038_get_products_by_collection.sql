@@ -37,18 +37,22 @@ STABLE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+  WITH collection_tags AS (
+    SELECT COALESCE(
+      ARRAY(SELECT jsonb_array_elements_text(rc.tags)),
+      ARRAY[]::text[]
+    ) AS tags
+    FROM public.restaurant_collections rc
+    WHERE rc.slug = p_slug
+      AND rc.is_active = true
+    LIMIT 1
+  )
   SELECT p.id, p.name, p.slug, p.description, p.image_url, p.brand,
          p.price, p.sale_price, p.images, p.category_id, p.tags,
          p.stock_status, p.is_visible, p.created_at
-  FROM public.products p
+  FROM public.products p, collection_tags ct
   WHERE p.is_visible = true
-    AND p.tags ?| (
-      SELECT COALESCE(rc.tags, '[]'::jsonb)
-      FROM public.restaurant_collections rc
-      WHERE rc.slug = p_slug
-        AND rc.is_active = true
-      LIMIT 1
-    )
+    AND p.tags ?| ct.tags
   ORDER BY p.name ASC;
 $$;
 
