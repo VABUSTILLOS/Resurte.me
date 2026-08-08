@@ -169,12 +169,22 @@ export function CheckoutDrawer() {
     const supabase = createClient()
     if (!supabase) return
     claimGuestAddresses()
-    supabase
-      .from("addresses")
-      .select("*")
-      .order("is_default", { ascending: false })
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
+    const fetchSavedAddresses = async () => {
+      // Orden preferido: predeterminada primero. Si el esquema desplegado aún
+      // no tiene `is_default` (migración 00050), PostgREST devuelve error y se
+      // reintenta con el orden clásico — el drawer sigue funcionando.
+      const preferred = await supabase
+        .from("addresses")
+        .select("*")
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: false })
+      if (preferred.data && !preferred.error) return preferred
+      return supabase
+        .from("addresses")
+        .select("*")
+        .order("created_at", { ascending: false })
+    }
+    fetchSavedAddresses().then(({ data, error }) => {
         if (cancelled) return
         if (!error && data) {
           const rows = data as Address[]
@@ -352,7 +362,13 @@ export function CheckoutDrawer() {
 
       const data = await response.json()
       if (!response.ok) {
-        setCheckoutError(data.error || "Error al crear el pedido")
+        // `detail` es el mensaje real del fallo (p. ej. columna faltante en la
+        // BD): se muestra junto al error genérico para poder diagnosticarlo.
+        setCheckoutError(
+          data.detail
+            ? `${data.error || "Error al crear el pedido"} — ${data.detail}`
+            : data.error || "Error al crear el pedido"
+        )
         setIsProcessing(false)
         return
       }

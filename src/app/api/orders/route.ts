@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { validDeliveryFee } from "@/lib/checkout-config"
 import { resolveBumpPricing } from "@/lib/order-bumps"
+import { insertAddressResilient } from "@/lib/orders-address"
 
 interface OrderItemInput {
   product_id: number
@@ -382,29 +383,35 @@ export async function POST(request: NextRequest) {
 
     if (addressId === null) {
       // 1. Create address (or use existing)
-      const { data: addr, error: addrError } = await supabase
-        .from("addresses")
-        .insert({
-          user_id: userId, // vinculada al usuario logueado (null si checkout anónimo)
-          guest_token: userId ? null : guestToken,
-          label: address.label,
-          street: address.street,
-          number: address.number,
-          interior: address.interior || null,
-          neighborhood: address.neighborhood,
-          city: cityName, // nombre real de la ciudad
-          state: cityState, // estado real de la ciudad
-          zip_code: address.zip_code,
-          references: address.references || null,
-          city_id: userId ? city_id : null, // referencia fuerte a cities (logged-in)
-        })
-        .select("id")
-        .single()
+      // Retrocompatible: si el esquema desplegado aún no tiene `city_id`
+      // (migración 00050 no aplicada), el helper reintenta sin esa columna en
+      // lugar de fallar el checkout.
+      const { data: addr, error: addrError } = await insertAddressResilient(supabase, {
+        user_id: userId, // vinculada al usuario logueado (null si checkout anónimo)
+        guest_token: userId ? null : guestToken,
+        label: address.label,
+        street: address.street,
+        number: address.number,
+        interior: address.interior || null,
+        neighborhood: address.neighborhood,
+        city: cityName, // nombre real de la ciudad
+        state: cityState, // estado real de la ciudad
+        zip_code: address.zip_code,
+        references: address.references || null,
+        city_id: userId ? city_id : null, // referencia fuerte a cities (logged-in)
+      })
 
-      if (addrError) {
-        logger.error("Address creation error:", addrError)
+      if (addrError || !addr) {
+        logger.error(
+          "Address creation error:",
+          addrError ?? new Error("No address row returned by insertAddressResilient")
+        )
         return NextResponse.json(
-          { error: "Error al guardar la dirección", detail: addrError.message, code: addrError.code },
+          {
+            error: "Error al guardar la dirección",
+            detail: addrError?.message ?? "No se obtuvo el id de la dirección creada",
+            code: addrError?.code ?? "EMPTY_RESULT",
+          },
           { status: 500 }
         )
       }
