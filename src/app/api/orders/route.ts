@@ -5,6 +5,7 @@ import { runNewOrderWorkflows } from "@/lib/workflows"
 import type { Coupon } from "@/types"
 import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
+import { validDeliveryFee } from "@/lib/checkout-config"
 
 interface OrderItemInput {
   product_id: number
@@ -36,6 +37,9 @@ interface CreateOrderBody {
   }
   payment_method: string
   phone?: string
+  // Email del cliente (drawer checkout): se persiste para notificaciones y
+  // reutilización del método de pago en upsells 1-click.
+  email?: string
   subtotal: number
   delivery_fee: number
   total: number
@@ -65,6 +69,7 @@ export async function POST(request: NextRequest) {
       schedule,
       payment_method,
       phone,
+      email,
       subtotal,
       delivery_fee,
       total,
@@ -177,9 +182,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Delivery fee: solo 0 (recoger) o 35 MXN (envío), y 0 si no hay items
-    const validDeliveryFee = items.length > 0 ? (delivery_fee === 0 || delivery_fee === 35 ? delivery_fee : 35) : 0
-
     // ── Validación server-side del cupón (si viene) ──
     // El descuento se recalcula contra la BD con la misma fórmula del cliente
     // (calcDiscount en cart-context) para que el total coincida exactamente.
@@ -233,10 +235,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Delivery fee: 0 si hay envío gratis (subtotal con descuento >= umbral) o
+    // no hay items; si no, solo 0 (recoger) o 35 MXN (envío), whitelist.
+    const computedDeliveryFee = validDeliveryFee(items.length, realSubtotal - discountAmount, delivery_fee)
+
     // El checkout envía total = subtotal - descuento + envío. Se exige que
     // coincida con el monto recalculado server-side (el descuento solo se
     // otorga si el cupón fue validado arriba).
-    const realTotal = Math.max(0, realSubtotal - discountAmount + validDeliveryFee)
+    const realTotal = Math.max(0, realSubtotal - discountAmount + computedDeliveryFee)
     const totalDiff = Math.abs(realTotal - (total ?? 0))
     if (totalDiff > 0.01) {
       logger.error("Total mismatch", { client: total, server: realTotal, diff: totalDiff })
@@ -387,7 +393,7 @@ export async function POST(request: NextRequest) {
       address_id: addressId,
       status: "pending",
       subtotal: realSubtotal,
-      delivery_fee: validDeliveryFee,
+      delivery_fee: computedDeliveryFee,
       total: realTotal,
       payment_method,
       payment_status: "pending",
@@ -395,6 +401,8 @@ export async function POST(request: NextRequest) {
       source: "web",
       // Teléfono de contacto: habilita la confirmación por WhatsApp (workflows.ts)
       customer_phone: phone?.trim() || null,
+      // Email del cliente (drawer checkout): notificaciones + upsell off-session.
+      customer_email: email?.trim() || null,
     }
     if (coupon) {
       insertOrder.discount = discountAmount

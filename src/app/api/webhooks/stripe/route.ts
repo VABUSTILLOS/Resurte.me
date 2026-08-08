@@ -40,6 +40,9 @@ export async function POST(request: NextRequest) {
           amount_received: number
           currency?: string
           metadata?: Record<string, string>
+          payment_method?: string | null
+          customer?: string | null
+          receipt_email?: string | null
         }
         logger.info("stripe.payment.succeeded", { paymentIntent: paymentIntent.id, amount: paymentIntent.amount_received })
 
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
         // (p.ej. cliente manipuló el total del body al crear el intent).
         const { data: order, error } = await supabase
           .from("orders")
-          .select("id, user_id, total")
+          .select("id, user_id, total, customer_email")
           .eq("stripe_payment_intent_id", paymentIntent.id)
           .maybeSingle()
 
@@ -61,6 +64,13 @@ export async function POST(request: NextRequest) {
               .update({
                 payment_status: "paid",
                 status: "confirmed",
+                // Persiste el método de pago + customer de Stripe para poder
+                // cobrar 1-click upsells off-session después.
+                stripe_payment_method_id: paymentIntent.payment_method ?? null,
+                stripe_customer_id: paymentIntent.customer ?? null,
+                // El email capturado en el drawer llega por esta vía al pedido
+                // aunque la sesión del cliente ya no exista.
+                customer_email: order.customer_email ?? paymentIntent.receipt_email ?? null,
                 updated_at: new Date().toISOString(),
               })
               .eq("id", order.id)

@@ -11,7 +11,8 @@ import {
  *
  * Crea un PaymentIntent de Stripe para un pedido PENDIENTE con pago por tarjeta
  * y lo liga al pedido (orders o foodos_orders).
- * Body: { order_id: number|string, type?: "main" | "foodos", guest_token?: string }
+ * Body: { order_id: number|string, type?: "main" | "foodos", guest_token?: string,
+ *         save_card?: boolean, customer_email?: string }
  *
  * El monto se deriva SIEMPRE del total del pedido en la BD (nunca del body),
  * por lo que no se acepta `amount` del cliente.
@@ -24,7 +25,7 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { order_id, type = "main", guest_token } = body
+    const { order_id, type = "main", guest_token, save_card, customer_email } = body
 
     if (order_id === undefined || order_id === null) {
       return NextResponse.json({ error: "order_id es requerido" }, { status: 400 })
@@ -40,11 +41,14 @@ export async function POST(request: NextRequest) {
       orderId: order_id,
       userId: user?.id ?? null,
       guestToken: typeof guest_token === "string" && guest_token ? guest_token : null,
+      saveCardConsent: save_card === true,
+      customerEmail: typeof customer_email === "string" && customer_email ? customer_email : null,
     })
 
     return NextResponse.json({
       clientSecret: result.clientSecret,
       paymentIntentId: result.paymentIntentId,
+      saveCardEnabled: result.saveCardEnabled,
     })
   } catch (error) {
     if (error instanceof PaymentIntentError) {
