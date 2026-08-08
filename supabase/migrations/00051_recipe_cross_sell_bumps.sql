@@ -119,11 +119,11 @@ BEGIN
     SELECT 'subtotal_threshold',
            ARRAY[]::TEXT[],
            500,
-           p.id, 'Salsa Valentina 370 ml',
+           p.id, 'Salsa Picante',
            'Tu pedido superó el umbral de envío gratis. Llévala a un precio especial.',
            0.20, true, 3
     FROM public.products p
-    WHERE p.slug = 'salsa-valentina-370ml'
+    WHERE p.slug = 'salsa-picante'
       AND p.is_visible = true
       AND p.stock_status <> 'out_of_stock'
     LIMIT 1;
