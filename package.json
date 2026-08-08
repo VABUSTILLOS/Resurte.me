@@ -62,6 +62,13 @@
       ],
       "src/lib/foodos-campaigns.ts": [
         "exports"
+      ],
+      "src/lib/storage/index.ts": [
+        "exports",
+        "types"
+      ],
+      "src/lib/storage/storage-schemas.ts": [
+        "exports"
       ]
     }
   }

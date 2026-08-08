@@ -3,11 +3,12 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Search, X, ArrowRight } from "lucide-react"
+import { readStored } from "@/lib/storage"
 
 interface InventarioItem {
   name: string
   stock: number
-  stockMin: number
+  minStock: number
   unit: string
   pricePerUnit: number
 }
@@ -46,14 +47,6 @@ interface ShoppingItem {
   quantityKg?: number
 }
 
-function readJSON<T>(key: string): T[] {
-  if (typeof window === "undefined") return []
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : []
-  } catch { return [] }
-}
-
 export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: () => void; slug?: string | null }) {
   const router = useRouter()
   const [query, setQuery] = useState("")
@@ -73,14 +66,13 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
   const results = useMemo((): SearchResult[] => {
     if (!query.trim()) return []
     const q = query.toLowerCase()
-    // Claves reales scoped por colección (mismo formato que useLocalStorage).
-    const storageKey = (key: string) => (slug ? `resurte-${key}-${slug}` : `resurte-${key}`)
+    // Misma validación que useLocalStorage: readStored aplica el schema registrado.
     const items: SearchResult[] = []
 
     // Index dishes from costeo (datos reales de shared-dishes)
     try {
-      const dishes: Dish[] = readJSON(storageKey("costeo-dishes"))
-      const shared: Dish[] = readJSON(storageKey("shared-dishes"))
+      const dishes: Dish[] = readStored("costeo-dishes", [], slug)
+      const shared: Dish[] = readStored("shared-dishes", [], slug)
       const allDishes = [...dishes, ...shared]
       const seenDishes = new Set<string>()
       allDishes.forEach((d) => {
@@ -105,10 +97,10 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
 
     // Index inventario
     try {
-      const inv: InventarioItem[] = readJSON(storageKey("inventario-items"))
+      const inv: InventarioItem[] = readStored("inventario-items", [], slug)
       inv.forEach((i) => {
         if (i.name.toLowerCase().includes(q)) {
-          const status = i.stock <= 0 ? "Agotado" : i.stock <= i.stockMin ? "Bajo" : "OK"
+          const status = i.stock <= 0 ? "Agotado" : i.stock <= i.minStock ? "Bajo" : "OK"
           items.push({
             id: `inv-${i.name}`,
             label: i.name,
@@ -122,49 +114,41 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
       })
     } catch {}
 
-    // Index planificador: cantidades manuales reales (productos del pedido)
+    // Index planificador: cantidades manuales reales (productos del pedido).
+    // readStored aplica readManualQtys: los números legacy ya vienen como {qty, unit}.
     try {
-      const raw = localStorage.getItem(storageKey("planner-manual-qtys"))
-      if (raw) {
-        const qtys: Record<string, unknown> = JSON.parse(raw)
-        Object.entries(qtys).forEach(([name, value]) => {
-          if (!name.toLowerCase().includes(q)) return
-          if (value && typeof value === "object" && typeof (value as { qty?: unknown }).qty === "number") {
-            const v = value as { qty: number; unit?: string }
-            items.push({ id: `prod-${name}`, label: name, subtitle: `Cantidad: ${v.qty} ${v.unit || "kg"} (pedido actual)`, tool: "planificador", toolLabel: "Planificador", url: "/panel/planificador", emoji: "📋" })
-          } else if (typeof value === "number") {
-            items.push({ id: `prod-${name}`, label: name, subtitle: `Cantidad: ${value} (pedido actual)`, tool: "planificador", toolLabel: "Planificador", url: "/panel/planificador", emoji: "📋" })
-          }
-        })
-      }
+      const qtys: Record<string, { qty: number; unit?: string }> = readStored("planner-manual-qtys", {}, slug)
+      Object.entries(qtys).forEach(([name, v]) => {
+        if (!name.toLowerCase().includes(q)) return
+        if (v && typeof v === "object" && typeof v.qty === "number") {
+          items.push({ id: `prod-${name}`, label: name, subtitle: `Cantidad: ${v.qty} ${v.unit || "kg"} (pedido actual)`, tool: "planificador", toolLabel: "Planificador", url: "/panel/planificador", emoji: "📋" })
+        }
+      })
     } catch {}
 
     // Index ventas entries
     try {
-      const raw = localStorage.getItem(storageKey("ventas-entries"))
-      if (raw) {
-        const sales: { dishName: string; quantity: number; date: string; unitPrice: number }[] = JSON.parse(raw)
-        const seen = new Set<string>()
-        sales.forEach((s) => {
-          if (s.dishName && s.dishName.toLowerCase().includes(q) && !seen.has(s.dishName)) {
-            seen.add(s.dishName)
-            items.push({
-              id: `venta-${s.dishName}`,
-              label: s.dishName,
-              subtitle: `${s.quantity} vendidos · $${s.unitPrice} · ${s.date || "fecha pendiente"}`,
-              tool: "ventas",
-              toolLabel: "Ventas del día",
-              url: "/panel/ventas",
-              emoji: "💰",
-            })
-          }
-        })
-      }
+      const sales: { dishName: string; quantity: number; date: string; unitPrice: number }[] = readStored("ventas-entries", [], slug)
+      const seen = new Set<string>()
+      sales.forEach((s) => {
+        if (s.dishName && s.dishName.toLowerCase().includes(q) && !seen.has(s.dishName)) {
+          seen.add(s.dishName)
+          items.push({
+            id: `venta-${s.dishName}`,
+            label: s.dishName,
+            subtitle: `${s.quantity} vendidos · $${s.unitPrice} · ${s.date || "fecha pendiente"}`,
+            tool: "ventas",
+            toolLabel: "Ventas del día",
+            url: "/panel/ventas",
+            emoji: "💰",
+          })
+        }
+      })
     } catch {}
 
     // Index mermas entries
     try {
-      const wastes: WasteEntry[] = readJSON(storageKey("mermas-entries"))
+      const wastes: WasteEntry[] = readStored("mermas-entries", [], slug)
       wastes.forEach((w) => {
         const haystack = `${w.category} ${w.cause || ""} ${w.note || ""}`
         if (haystack.toLowerCase().includes(q)) {
@@ -183,7 +167,7 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
 
     // Index temporada: lista de compras estacional
     try {
-      const list: ShoppingItem[] = readJSON(storageKey("temporada-shopping-list"))
+      const list: ShoppingItem[] = readStored("temporada-shopping-list", [], slug)
       list.forEach((s) => {
         if (s.name.toLowerCase().includes(q)) {
           items.push({
