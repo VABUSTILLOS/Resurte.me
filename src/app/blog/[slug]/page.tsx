@@ -164,6 +164,7 @@ export default async function BlogPostPage({
             alt={post.data.coverAlt ?? post.data.title}
             width={1200}
             height={675}
+            sizes="(max-width: 768px) 100vw, 896px"
             className="aspect-[16/9] h-auto w-full rounded-2xl border border-warm-200 object-cover"
             priority
           />

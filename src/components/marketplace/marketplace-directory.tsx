@@ -196,6 +196,8 @@ function RestaurantCard({ entry }: { entry: PublicMarketplaceEntry }) {
           <img
             src={restaurant.logo_url}
             alt={restaurant.name}
+            width={256}
+            height={128}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
           />
         ) : (
