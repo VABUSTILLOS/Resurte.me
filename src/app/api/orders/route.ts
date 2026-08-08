@@ -31,6 +31,9 @@ interface CreateOrderBody {
   // Dirección guardada reutilizada tal cual (logged-in). Si la dirección del
   // formulario fue editada, el frontend NO la envía y se crea una nueva.
   address_id?: number
+  // Guardar la dirección como predeterminada del usuario (solo logged-in).
+  // Se aplica tanto si se crea como si se reutiliza address_id.
+  save_default?: boolean
   // Token de checkout anónimo: permite reutilizar la dirección del mismo
   // navegador y reclamarla al iniciar sesión.
   guest_token?: string
@@ -78,6 +81,7 @@ export async function POST(request: NextRequest) {
       total,
       coupon_code,
       items,
+      save_default,
     } = body
 
     // Validate required fields
@@ -392,6 +396,7 @@ export async function POST(request: NextRequest) {
           state: cityState, // estado real de la ciudad
           zip_code: address.zip_code,
           references: address.references || null,
+          city_id: userId ? city_id : null, // referencia fuerte a cities (logged-in)
         })
         .select("id")
         .single()
@@ -404,6 +409,20 @@ export async function POST(request: NextRequest) {
         )
       }
       addressId = addr.id
+    }
+
+    // ── Guardar como dirección predeterminada (atómico, solo logged-in) ──
+    // Se aplica después de resolver addressId (creada o reutilizada) para que
+    // el UPDATE condicional desmarque las demás y marque la elegida. Si falla,
+    // la orden NO se bloquea: el predeterminado es best-effort.
+    if (save_default === true && userId && addressId !== null) {
+      const { error: defaultErr } = await supabase.rpc("set_default_address", {
+        p_user_id: userId,
+        p_address_id: addressId,
+      })
+      if (defaultErr) {
+        logger.error("set_default_address error (best-effort):", defaultErr)
+      }
     }
 
     // 2. Build scheduled_for timestamp

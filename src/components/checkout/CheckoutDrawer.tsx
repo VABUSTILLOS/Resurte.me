@@ -87,6 +87,8 @@ export function CheckoutDrawer() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
+  // Guardar la dirección como predeterminada (checkbox en AddressStep, logged-in)
+  const [saveAsDefault, setSaveAsDefault] = useState(false)
 
   // ── Apertura / cierre del drawer ──
   useEffect(() => {
@@ -99,6 +101,7 @@ export function CheckoutDrawer() {
           setShowStripeForm(false)
           setStripeClientSecret(null)
           setSelectedBumps([])
+          setSaveAsDefault(false)
         }
         return next
       })
@@ -154,10 +157,29 @@ export function CheckoutDrawer() {
     supabase
       .from("addresses")
       .select("*")
+      .order("is_default", { ascending: false })
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (cancelled) return
-        if (!error && data) setSavedAddresses(data as Address[])
+        if (!error && data) {
+          const rows = data as Address[]
+          setSavedAddresses(rows)
+          // Auto-selección: predeterminada o la más reciente; autocompleta el
+          // formulario para que "Continuar al envío" pueda saltar al horario.
+          const preferred = rows.find((a) => a.is_default) ?? rows[0]
+          setSelectedAddressId(preferred?.id ?? null)
+          if (preferred) {
+            setAddress({
+              label: preferred.label,
+              street: preferred.street,
+              number: preferred.number,
+              interior: preferred.interior ?? "",
+              neighborhood: preferred.neighborhood,
+              zip_code: preferred.zip_code,
+              references: preferred.references ?? "",
+            })
+          }
+        }
       })
     return () => {
       cancelled = true
@@ -181,6 +203,22 @@ export function CheckoutDrawer() {
       address.neighborhood.trim() &&
       address.zip_code.trim().length >= 5
   )
+
+  // Dirección guardada actualmente seleccionada (para el badge de ScheduleStep
+  // y para decidir si el formulario no fue editado → reutilizar address_id).
+  const selectedSavedAddress =
+    savedAddresses.find((a) => a.id === selectedAddressId) ?? null
+
+  // El formulario coincide exactamente con la dirección guardada seleccionada:
+  // solo entonces se reutiliza address_id (en lugar de crear/editar una nueva).
+  const selectedAddressUnedited =
+    selectedSavedAddress !== null &&
+    selectedSavedAddress.street === address.street &&
+    selectedSavedAddress.number === address.number &&
+    (selectedSavedAddress.interior ?? "") === address.interior &&
+    selectedSavedAddress.neighborhood === address.neighborhood &&
+    selectedSavedAddress.zip_code === address.zip_code &&
+    (selectedSavedAddress.references ?? "") === address.references
 
   // ── Captura de lead onBlur (fire-and-forget, fail-open) ──
   const captureLead = useCallback((value: string) => {
@@ -252,16 +290,6 @@ export function CheckoutDrawer() {
         return
       }
 
-      const selectedAddress = savedAddresses.find((a) => a.id === selectedAddressId)
-      const selectedAddressUnedited =
-        selectedAddress !== undefined &&
-        selectedAddress.street === address.street &&
-        selectedAddress.number === address.number &&
-        (selectedAddress.interior ?? "") === address.interior &&
-        selectedAddress.neighborhood === address.neighborhood &&
-        selectedAddress.zip_code === address.zip_code &&
-        (selectedAddress.references ?? "") === address.references
-
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -271,6 +299,7 @@ export function CheckoutDrawer() {
           ...(selectedAddressUnedited && selectedAddressId
             ? { address_id: selectedAddressId }
             : {}),
+          ...(isLoggedIn === true ? { save_default: saveAsDefault } : {}),
           address: {
             label: address.label,
             street: address.street,
@@ -492,7 +521,15 @@ export function CheckoutDrawer() {
               </div>
 
               <button
-                onClick={() => setStep("address")}
+                onClick={() => {
+                  // Usuario logueado con dirección guardada válida → salta el
+                  // paso de dirección y avanza directo al horario.
+                  if (isLoggedIn === true && selectedAddressId !== null && isAddressValid) {
+                    setStep("schedule")
+                  } else {
+                    setStep("address")
+                  }
+                }}
                 disabled={itemCount === 0}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
@@ -538,6 +575,8 @@ export function CheckoutDrawer() {
               }}
               onPhoneChange={setPhone}
               onContinue={() => setStep("schedule")}
+              saveAsDefault={saveAsDefault}
+              onSaveAsDefaultChange={setSaveAsDefault}
             />
           )}
 
@@ -548,6 +587,12 @@ export function CheckoutDrawer() {
               onTimeChange={(value) => setSchedule((s) => ({ ...s, time: value }))}
               onBack={() => setStep("address")}
               onContinue={() => setStep("bumps")}
+              savedAddressLabel={
+                isLoggedIn === true && selectedSavedAddress && selectedAddressUnedited
+                  ? selectedSavedAddress.label
+                  : null
+              }
+              onEditAddress={() => setStep("address")}
             />
           )}
 

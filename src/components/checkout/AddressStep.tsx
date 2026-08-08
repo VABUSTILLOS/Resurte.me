@@ -22,6 +22,9 @@ interface AddressStepProps {
   email?: string
   onEmailChange?: (value: string) => void
   onEmailBlur?: (value: string) => void
+  /** Guardar la dirección editada como predeterminada (solo logged-in). */
+  saveAsDefault?: boolean
+  onSaveAsDefaultChange?: (value: boolean) => void
 }
 
 export function AddressStep({
@@ -40,6 +43,8 @@ export function AddressStep({
   email,
   onEmailChange,
   onEmailBlur,
+  saveAsDefault = false,
+  onSaveAsDefaultChange,
 }: AddressStepProps) {
   return (
     <div>
@@ -97,7 +102,14 @@ export function AddressStep({
                   {selectedAddressId === addr.id && <span className="w-2 h-2 rounded-full bg-brand-600" />}
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-gray-900">{addr.label}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="block text-sm font-semibold text-gray-900 truncate">{addr.label}</span>
+                    {addr.is_default && (
+                      <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-700 text-[10px] font-bold uppercase tracking-wide">
+                        Predeterminada
+                      </span>
+                    )}
+                  </span>
                   <span className="block text-xs text-gray-500 truncate">
                     {addr.street} {addr.number}
                     {addr.neighborhood ? `, ${addr.neighborhood}` : ""}, CP {addr.zip_code}
@@ -217,6 +229,21 @@ export function AddressStep({
           className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 resize-none"
         />
       </div>
+
+      {/* Guardar como predeterminada (solo usuarios con sesión) */}
+      {isLoggedIn && onSaveAsDefaultChange && (
+        <label className="flex items-start gap-2.5 mb-6 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={saveAsDefault}
+            onChange={(e) => onSaveAsDefaultChange(e.target.checked)}
+            className="mt-0.5 w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+          />
+          <span className="text-sm text-gray-700">
+            Guardar como mi dirección predeterminada
+          </span>
+        </label>
+      )}
 
       {/* Phone — se guarda en orders.customer_phone para la confirmación por WhatsApp */}
       <div className="mb-6">

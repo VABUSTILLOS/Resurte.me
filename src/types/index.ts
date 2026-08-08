@@ -73,6 +73,10 @@ export interface Address {
   state: string
   zip_code: string
   references: string
+  /** Dirección predeterminada del usuario (máx. una por user_id). */
+  is_default: boolean
+  /** Ciudad de entrega (cities.id); opcional en direcciones históricas. */
+  city_id: number | null
   lat: number
   lng: number
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { motion } from "framer-motion"
 import { Sparkles, Check } from "lucide-react"
 import { MAX_BUMPS } from "@/lib/checkout-config"
 import type { OrderBump } from "@/lib/order-bumps"
@@ -109,62 +110,71 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
       {bumps.map((bump) => {
         const isSelected = selected.some((s) => s.ruleId === bump.ruleId)
         return (
-          <button
+          <motion.div
             key={bump.ruleId}
-            type="button"
-            onClick={() => toggle(bump)}
-            aria-pressed={isSelected}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-colors ${
-              isSelected
-                ? "border-brand-500 bg-brand-50"
-                : "border-gray-200 bg-white hover:border-brand-200"
-            }`}
+            layout
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            whileTap={{ scale: 0.99 }}
+            className="w-full"
           >
-            <div className="w-14 h-14 rounded-lg bg-[#F7F5F0] flex items-center justify-center shrink-0 overflow-hidden">
-              {bump.product.image_url ? (
-                <img
-                  src={bump.product.image_url}
-                  alt={bump.product.name}
-                  loading="lazy"
-                  width={56}
-                  height={56}
-                  className="w-full h-full object-contain p-1"
-                />
-              ) : (
-                <Sparkles className="w-5 h-5 text-[#C7C8CD]" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 leading-tight">
-                {bump.title}
-              </p>
-              <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">
-                {bump.description}
-              </p>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-sm font-bold text-brand-700">
-                  ${bump.price.toFixed(2)}
-                </span>
-                {bump.original_price > bump.price && (
-                  <span className="text-xs text-gray-400 line-through">
-                    ${bump.original_price.toFixed(2)}
-                  </span>
-                )}
-                {bump.discount_pct > 0 && (
-                  <span className="text-[10px] font-semibold text-white bg-brand-600 px-1.5 py-0.5 rounded">
-                    -{Math.round(bump.discount_pct * 100)}%
-                  </span>
-                )}
-              </div>
-            </div>
-            <div
-              className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                isSelected ? "border-brand-600 bg-brand-600" : "border-gray-300"
+            <button
+              type="button"
+              onClick={() => toggle(bump)}
+              aria-pressed={isSelected}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-colors ${
+                isSelected
+                  ? "border-brand-500 bg-brand-50"
+                  : "border-gray-200 bg-white hover:border-brand-200"
               }`}
             >
-              {isSelected && <Check className="w-4 h-4 text-white" />}
-            </div>
-          </button>
+              <div className="w-14 h-14 rounded-lg bg-[#F7F5F0] flex items-center justify-center shrink-0 overflow-hidden">
+                {bump.product.image_url ? (
+                  <img
+                    src={bump.product.image_url}
+                    alt={bump.product.name}
+                    loading="lazy"
+                    width={56}
+                    height={56}
+                    className="w-full h-full object-contain p-1"
+                  />
+                ) : (
+                  <Sparkles className="w-5 h-5 text-[#C7C8CD]" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 leading-tight">
+                  {bump.title}
+                </p>
+                <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">
+                  {bump.description}
+                </p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="text-sm font-bold text-brand-700">
+                    ${bump.price.toFixed(2)}
+                  </span>
+                  {bump.original_price > bump.price && (
+                    <span className="text-xs text-gray-400 line-through">
+                      ${bump.original_price.toFixed(2)}
+                    </span>
+                  )}
+                  {bump.discount_pct > 0 && (
+                    <span className="text-[10px] font-semibold text-white bg-brand-600 px-1.5 py-0.5 rounded">
+                      -{Math.round(bump.discount_pct * 100)}%
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div
+                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                  isSelected ? "border-brand-600 bg-brand-600" : "border-gray-300"
+                }`}
+              >
+                {isSelected && <Check className="w-4 h-4 text-white" />}
+              </div>
+            </button>
+          </motion.div>
         )
       })}
       <p className="text-[11px] text-gray-400">

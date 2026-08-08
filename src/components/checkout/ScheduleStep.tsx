@@ -1,6 +1,6 @@
 "use client"
 
-import { Clock, ArrowLeft, ArrowRight } from "lucide-react"
+import { Clock, ArrowLeft, ArrowRight, MapPin } from "lucide-react"
 import { DELIVERY_TIMES, getNextDays, type ScheduleForm } from "./checkout-shared"
 
 interface ScheduleStepProps {
@@ -9,6 +9,10 @@ interface ScheduleStepProps {
   onTimeChange: (value: string) => void
   onBack: () => void
   onContinue: () => void
+  /** Etiqueta de la dirección guardada seleccionada (opcional, retrocompatible). */
+  savedAddressLabel?: string | null
+  /** Regresa al paso de dirección para editarla. */
+  onEditAddress?: () => void
 }
 
 export function ScheduleStep({
@@ -17,6 +21,8 @@ export function ScheduleStep({
   onTimeChange,
   onBack,
   onContinue,
+  savedAddressLabel,
+  onEditAddress,
 }: ScheduleStepProps) {
   return (
     <div>
@@ -27,6 +33,25 @@ export function ScheduleStep({
       <p className="text-gray-500 text-sm mb-6">
         Elige la fecha y horario de entrega. Entrega estimada: 30–60 min.
       </p>
+
+      {/* Badge de dirección guardada seleccionada */}
+      {savedAddressLabel && onEditAddress && (
+        <div className="flex items-center justify-between gap-3 p-3 mb-6 rounded-xl border border-brand-200 bg-brand-50">
+          <span className="flex items-center gap-2 min-w-0">
+            <MapPin className="w-4 h-4 text-brand-600 shrink-0" />
+            <span className="text-sm text-gray-800 truncate">
+              Dirección guardada seleccionada: <span className="font-semibold">{savedAddressLabel}</span>
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={onEditAddress}
+            className="shrink-0 text-xs font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2"
+          >
+            Editar
+          </button>
+        </div>
+      )}
 
       {/* Date selection */}
       <h3 className="text-sm font-semibold text-gray-700 mb-3">Fecha</h3>
