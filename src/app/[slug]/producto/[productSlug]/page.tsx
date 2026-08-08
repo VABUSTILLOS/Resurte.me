@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { Metadata } from "next"
+import { headers } from "next/headers"
 import {
   getCachedCategoryById,
   getCachedProductBySlug,
@@ -9,9 +10,6 @@ import {
 } from "@/lib/catalog-cache"
 import { ProductDetailClient } from "./product-detail-client"
 import { getBreadcrumbSchema, getProductSchema } from "@/lib/structured-data"
-
-// ISR: revalidate product pages every hour for fresh pricing
-export const revalidate = 3600
 
 interface Props {
   params: Promise<{ slug: string; productSlug: string }>
@@ -54,6 +52,7 @@ export default async function ProductPage({ params }: Props) {
   const { slug, productSlug } = await params
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   if (!city) notFound()
+  const nonce = (await headers()).get("x-nonce")
 
   // Fetch product with category (cached)
   const product = await getCachedProductBySlug(productSlug)
@@ -100,6 +99,7 @@ export default async function ProductPage({ params }: Props) {
     <>
       <script
         type="application/ld+json"
+        nonce={nonce ?? undefined}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <ProductDetailClient

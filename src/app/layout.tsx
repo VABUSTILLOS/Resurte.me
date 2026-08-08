@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { Geist, Geist_Mono } from "next/font/google"
 import { CityProvider, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { CartProvider } from "@/contexts/cart-context"
@@ -114,6 +114,7 @@ export default async function RootLayout({
   const cookieStore = await cookies()
   const initialCitySlug =
     cookieStore.get("city-slug")?.value ?? DEFAULT_CITY_SLUG
+  const nonce = (await headers()).get("x-nonce")
   return (
     <html
       lang="es-MX"
@@ -123,6 +124,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col bg-[#faf8f5] text-[#343538] antialiased max-w-full overflow-x-clip">
         {/* Apply stored theme before hydration to avoid flash of wrong theme */}
         <script
+          nonce={nonce ?? undefined}
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("resurte-theme");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-theme",t)}}catch(e){}})();`,
           }}
@@ -142,11 +144,12 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Resurte.me" />
         <script
           type="application/ld+json"
+          nonce={nonce ?? undefined}
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(getOrganizationSchema()),
           }}
         />
-        <Analytics />
+        <Analytics nonce={nonce} />
         <CityProvider initialCitySlug={initialCitySlug}>
           <CartProvider>
             <OnboardingWizard />

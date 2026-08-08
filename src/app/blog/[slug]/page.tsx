@@ -3,6 +3,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ChevronRight } from "lucide-react"
 import type { Metadata } from "next"
+import { headers } from "next/headers"
 import { compileMDX } from "next-mdx-remote/rsc"
 import remarkGfm from "remark-gfm"
 import { getPostBySlug, getPostSlugs, getPostUrl, getPostCta } from "@/lib/blog"
@@ -77,6 +78,7 @@ export default async function BlogPostPage({
   const { slug } = await params
   const post = getPostBySlug(slug)
   if (!post) notFound()
+  const nonce = (await headers()).get("x-nonce")
 
   const { content } = await compileMDX({
     source: post.content,
@@ -98,6 +100,7 @@ export default async function BlogPostPage({
       <BlogShareRail title={post.data.title} url={getPostUrl(slug)} />
       <script
         type="application/ld+json"
+        nonce={nonce ?? undefined}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 

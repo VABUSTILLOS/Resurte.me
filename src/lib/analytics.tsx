@@ -24,7 +24,7 @@ declare global {
   }
 }
 
-export function Analytics() {
+export function Analytics({ nonce }: { nonce?: string | null }) {
   return (
     <>
       {/* Google Analytics 4 */}
@@ -33,8 +33,9 @@ export function Analytics() {
           <Script
             src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
             strategy="afterInteractive"
+            nonce={nonce ?? undefined}
           />
-          <Script id="ga4-init" strategy="afterInteractive">
+          <Script id="ga4-init" strategy="afterInteractive" nonce={nonce ?? undefined}>
             {`
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
@@ -51,7 +52,7 @@ export function Analytics() {
       {/* Meta Pixel */}
       {PIXEL_ID && (
         <>
-          <Script id="meta-pixel-init" strategy="afterInteractive">
+          <Script id="meta-pixel-init" strategy="afterInteractive" nonce={nonce ?? undefined}>
             {`
               !function(f,b,e,v,n,t,s)
               {if(f.fbq)return;n=f.fbq=function(){n.callMethod?

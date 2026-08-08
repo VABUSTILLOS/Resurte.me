@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { headers } from "next/headers"
 import { getAllPosts, searchPosts, getBlogIndexCta } from "@/lib/blog"
 import { getBlogIndexSchema, getBlogBreadcrumbSchema } from "@/lib/blog-schema"
 import { BlogHero } from "@/components/blog/blog-hero"
@@ -33,6 +34,7 @@ export default async function BlogIndexPage({
   searchParams: Promise<{ q?: string; categoria?: string; tipo?: string }>
 }) {
   const { q, categoria, tipo } = await searchParams
+  const nonce = (await headers()).get("x-nonce")
   // Pre-filtro server-side: con ?q= el HTML inicial ya llega filtrado (mejor SEO).
   const posts = q ? searchPosts(q) : getAllPosts()
   const jsonLd = [
@@ -55,6 +57,7 @@ export default async function BlogIndexPage({
     <>
       <script
         type="application/ld+json"
+        nonce={nonce ?? undefined}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <BlogHero

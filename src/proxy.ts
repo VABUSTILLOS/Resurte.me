@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { MEXICO_CITIES } from "@/lib/cities"
+import { buildCspHeader } from "@/lib/csp"
 import { updateSession } from "@/lib/supabase/middleware"
 
 const VALID_SLUGS = MEXICO_CITIES.map((c) => c.slug)
@@ -106,15 +107,45 @@ function copyAuthCookies(source: NextResponse, target: NextResponse) {
   })
 }
 
+// Paths que no renderizan HTML (no necesitan CSP): assets, API, estáticos.
+const ASSET_PATHS = ["/_next", "/api", "/favicon.ico", "/static"]
+
 /**
- * Proxy: refresca sesión Supabase + detección de ciudad + ruteo.
+ * Proxy: refresca sesión Supabase + CSP con nonces + detección de ciudad.
+ *
+ * CSP: se genera un nonce por request y se inyecta en `request.headers`
+ * (x-nonce + Content-Security-Policy) ANTES de llamar a updateSession. Como
+ * updateSession construye `NextResponse.next({ request })` con el MISMO objeto
+ * request, las mutaciones de headers se propagan al render y Next.js aplica el
+ * nonce a scripts/estilos que genera. El header CSP también se setea en la
+ * response para que el navegador lo aplique.
  */
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Prefetch (next/link) y assets no renderizan HTML: se omite CSP para evitar
+  // nonces cacheados. updateSession igual refresca la sesión en /api.
+  const isPrefetch =
+    request.headers.has("next-router-prefetch") ||
+    request.headers.get("purpose") === "prefetch"
+  const isAsset = ASSET_PATHS.some((p) => pathname.startsWith(p))
+
+  let cspHeader: string | null = null
+  if (!isPrefetch && !isAsset) {
+    const nonce = Buffer.from(crypto.randomUUID()).toString("base64")
+    cspHeader = buildCspHeader(nonce)
+    request.headers.set("x-nonce", nonce)
+    request.headers.set("Content-Security-Policy", cspHeader)
+  }
+
   // ── Supabase session refresh (delegado a updateSession) ──
   const { supabaseResponse } = await updateSession(request)
 
+  if (cspHeader) {
+    supabaseResponse.headers.set("Content-Security-Policy", cspHeader)
+  }
+
   // ── City detection & routing ──
-  const { pathname } = request.nextUrl
 
   // Skip public paths — still return supabaseResponse with auth cookies
   if (isPublicPath(pathname)) {

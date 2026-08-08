@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { headers } from "next/headers"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { Metadata } from "next"
 import { CityLanding } from "@/components/city/city-landing"
@@ -80,6 +81,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CityPage({ params }: Props) {
   const { slug } = await params
   const city = await resolveCity(slug)
+  const nonce = (await headers()).get("x-nonce")
 
   if (!city) notFound()
 
@@ -117,6 +119,7 @@ export default async function CityPage({ params }: Props) {
     <>
       <script
         type="application/ld+json"
+        nonce={nonce ?? undefined}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(getCityLandingSchema(city.name, city.state, city.lat, city.lng)),
         }}
