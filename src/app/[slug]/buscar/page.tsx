@@ -12,8 +12,6 @@ interface Props {
   params: Promise<{ slug: string }>
 }
 
-export const revalidate = 300 // ISR: revalidate every 5 minutes
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const city = MEXICO_CITIES.find((c) => c.slug === slug)

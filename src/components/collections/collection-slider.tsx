@@ -220,12 +220,6 @@ export function CollectionSlider({ collections, citySlug }: CollectionSliderProp
         </div>
       </div>
 
-      {/* Hide scrollbar via injected style (Next.js compatible) */}
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
     </section>
   )
 }

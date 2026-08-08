@@ -15,8 +15,12 @@ import { getCurrentUser } from "@/lib/auth"
 import { getCityBySlug } from "@/lib/data"
 import type { Category, Product, RestaurantCollection, City } from "@/types"
 
-// ISR: revalidate every hour so new collections/products appear without manual deploy
-export const revalidate = 3600
+// NOTA (Fase 22): esta página es deliberadamente dinámica. Lee `headers()` para
+// el nonce CSP por-request (generado en src/proxy.ts), lo que descarta ISR.
+// Además, ISR real + nonce por-request son incompatibles: el HTML cacheado
+// llevaría un nonce viejo que no coincide con el header CSP del request
+// siguiente → scripts bloqueados. El rendimiento se mantiene vía
+// `getCached*` (unstable_cache + revalidateTag) con LCP 60-80ms en móvil.
 
 interface Props {
   params: Promise<{ slug: string }>

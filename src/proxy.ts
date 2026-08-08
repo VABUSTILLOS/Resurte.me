@@ -137,7 +137,12 @@ export async function proxy(request: NextRequest) {
   )
   if (!isPrefetch && !isAsset) {
     const nonce = Buffer.from(crypto.randomUUID()).toString("base64")
-    cspHeader = buildCspHeader(nonce)
+    // Policy endurecida como enforce: strict-dynamic permite que GA4/Meta Pixel
+    // carguen vía scripts con nonce en navegadores modernos, por lo que los
+    // hosts de terceros en script-src ya no son necesarios (eran fallback CSP2).
+    // Validado con probe en prod: gtag/js y fbevents responden 200 con esta
+    // policy activa (ver fase 22, f22-endurecer-csp).
+    cspHeader = buildCspHeader(nonce, { hardened: true })
     // En modo report-only se observa el endurecimiento sin romper nada: se
     // envían ambas policies con el mismo nonce. La report-only quita los hosts
     // de terceros de script-src; si GA4/Meta Pixel cargan vía strict-dynamic

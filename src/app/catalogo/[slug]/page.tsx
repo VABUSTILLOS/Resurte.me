@@ -14,8 +14,6 @@ interface Props {
   params: Promise<{ slug: string }>
 }
 
-export const revalidate = 3600 // ISR: revalidate every hour like the landing
-
 /**
  * Resuelve la ciudad con datos de la tabla `cities` de Supabase cuando está
  * disponible, degradando al catálogo estático cuando no hay Supabase.

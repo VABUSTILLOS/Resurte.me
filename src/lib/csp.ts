@@ -14,21 +14,21 @@
  * - `frame-ancestors 'none'` + `object-src 'none'`: anti-clickjacking y sin
  *   plugins; el proyecto ya envía `X-Frame-Options: DENY`.
  *
- * Modo report-only (endurecimiento): con `{ hardened: true }` se eliminan los
- * hosts de terceros de `script-src`, dejando solo `'self'` + nonce +
- * `'strict-dynamic'`. En navegadores modernos `strict-dynamic` ya permite los
- * scripts cargados dinámicamente por un script con nonce (GA4/Meta), así que
- * la política endurecida no cambia el comportamiento real; los hosts solo son
- * un fallback para navegadores sin soporte. El proxy puede enviar esta versión
- * como `Content-Security-Policy-Report-Only` (ver `src/proxy.ts`) para
- * observar qué violaciones generarían los navegadores legacy antes de
- * endurecer definitivamente.
+ * Modo endurecido (único desde F22): `script-src` solo permite `'self'` +
+ * nonce + `'strict-dynamic'` + Stripe. En navegadores modernos `strict-dynamic`
+ * ya permite los scripts cargados dinámicamente por un script con nonce
+ * (GA4/Meta Pixel), así que la política endurecida no cambia el comportamiento
+ * real; los hosts de terceros solo serían un fallback para navegadores sin
+ * soporte. El proxy envía esta política como `Content-Security-Policy` y, en
+ * modo observación, también una copia como `Content-Security-Policy-Report-Only`
+ * (ver `src/proxy.ts`).
  */
 
 const SUPABASE_HOST = "isogthougrpctnfzcdes.supabase.co"
 
 type CspOptions = {
-  /** Elimina los hosts de terceros de script-src (solo 'self'+nonce+strict-dynamic). */
+  /** DEPRECADO (F22): la policy endurecida es ahora la única. Se mantiene la
+   *  opción como no-op de compatibilidad; GA4/Meta cargan vía strict-dynamic. */
   hardened?: boolean
   /** Policy report-only: omite upgrade-insecure-requests (el navegador lo ignora
    *  en report-only y emite un aviso benigno en consola). */
@@ -37,9 +37,11 @@ type CspOptions = {
 
 export function buildCspHeader(nonce: string, options: CspOptions = {}): string {
   const isDev = process.env.NODE_ENV === "development"
-  const thirdPartyScripts = options.hardened
-    ? " https://js.stripe.com"
-    : " https://www.googletagmanager.com https://connect.facebook.net https://js.stripe.com"
+  // Desde F22 la policy endurecida es la única: con strict-dynamic, GA4/Meta
+  // Pixel cargan vía scripts con nonce en navegadores modernos, así que los
+  // hosts de terceros en script-src son un fallback CSP2 innecesario. Se
+  // mantiene Stripe (dependencia funcional del checkout embebido).
+  const thirdPartyScripts = " https://js.stripe.com"
   return `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}${thirdPartyScripts};

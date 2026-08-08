@@ -2,16 +2,19 @@ import { describe, expect, it } from "vitest"
 import { buildCspHeader } from "./csp"
 
 describe("buildCspHeader", () => {
-  it("incluye nonce, strict-dynamic y hosts de terceros en modo enforce", () => {
+  it("enforce (default) es la policy endurecida: sin hosts de terceros en script-src", () => {
     const csp = buildCspHeader("abc123")
+    const scriptSrc = csp.match(/script-src ([^;]+);/)?.[1] ?? ""
     expect(csp).toContain("'nonce-abc123'")
     expect(csp).toContain("'strict-dynamic'")
-    expect(csp).toContain("https://www.googletagmanager.com")
-    expect(csp).toContain("https://connect.facebook.net")
+    // GA4/Meta cargan vía strict-dynamic (script con nonce); los hosts ya no
+    // se listan en script-src (validado en prod en fase 22).
+    expect(scriptSrc).not.toContain("googletagmanager.com")
+    expect(scriptSrc).not.toContain("connect.facebook.net")
     expect(csp).toContain("report-uri /api/csp-report")
   })
 
-  it("quita hosts de terceros de script-src en modo hardened", () => {
+  it("quita hosts de terceros de script-src en modo hardened (equivalente a enforce)", () => {
     const csp = buildCspHeader("abc123", { hardened: true })
     const scriptSrc = csp.match(/script-src ([^;]+);/)?.[1] ?? ""
     expect(scriptSrc).not.toContain("googletagmanager.com")
