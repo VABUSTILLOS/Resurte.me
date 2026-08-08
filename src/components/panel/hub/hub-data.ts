@@ -1,8 +1,78 @@
+import type { LucideIcon } from "lucide-react"
+import type { RestaurantCollection } from "@/types"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp, Calendar, ClipboardCheck,
   Package, Receipt, Flame, QrCode, UtensilsCrossed, Gift, Megaphone,
   BarChart3, Compass,
 } from "lucide-react"
+
+export type HubCollection = RestaurantCollection
+
+export interface HubAlert {
+  id: string
+  type: "danger" | "warning" | "info" | "success"
+  icon: LucideIcon
+  title: string
+  detail: string
+  href: string
+}
+
+export interface HubStats {
+  totalCosteo: number
+  totalMerma: number
+  green: number
+  red: number
+  dishesCount: number
+  mermaCount: number
+  aperturaCount: number
+  avgFoodCost: number
+  avgMargin: number
+  monthLoss: number
+  mermaVsGoal: number
+  seasonalSavings: number
+  totalPrice: number
+  monthlyGoal: number
+}
+
+export interface HubMethodStats {
+  key: string
+  label: string
+  icon: string
+  revenue: number
+  count: number
+}
+
+export interface HubTodaySales {
+  revenue: number
+  margin: number
+  marginPct: number
+  foodCost: number
+  units: number
+  count: number
+  avgTicket: number
+  methods: HubMethodStats[]
+  todayMerma: number
+}
+
+export interface HubComandas {
+  active: number
+  pendiente: number
+  enCocina: number
+  readyToday: number
+}
+
+export interface HubMesasInfo {
+  occupied: number
+  total: number
+  longCount: number
+  longNames: string[]
+}
+
+export interface HubGoalProgress {
+  pct: number
+  projected: number
+  goal: number
+}
 
 export type HubVenta = {
   id: string
