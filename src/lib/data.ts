@@ -239,6 +239,11 @@ export async function getRestaurantCollectionBySlug(
  * El filtrado se hace en PostgreSQL (RPC get_products_by_collection) usando el
  * operador JSONB `?|` sobre el índice GIN de products.tags, en lugar de traer
  * todos los productos y filtrar en memoria.
+ *
+ * Fallback: si el RPC no está disponible (p. ej. schema cache de PostgREST sin
+ * la función, o migraciones no aplicadas), se replica la misma lógica en
+ * memoria — colección por slug + productos visibles + intersección de tags —
+ * para que la página nunca se degrade a un carrito/colección vacía.
  */
 export async function getProductsByCollection(
   collectionSlug: string
@@ -250,10 +255,25 @@ export async function getProductsByCollection(
     p_slug: collectionSlug,
   })
 
-  if (error) {
-    logger.error("getProductsByCollection error:", error.message)
-    return []
+  if (!error) {
+    return (data ?? []) as Product[]
   }
 
-  return (data ?? []) as Product[]
+  logger.warn(
+    "getProductsByCollection: RPC no disponible, usando fallback en memoria",
+    { message: error.message }
+  )
+
+  const [collection, products] = await Promise.all([
+    getRestaurantCollectionBySlug(collectionSlug),
+    getProducts(),
+  ])
+
+  if (!collection || !collection.tags?.length) return []
+
+  const tagSet = new Set(collection.tags)
+  const matched = products.filter(
+    (p) => p.is_visible !== false && p.tags?.some((t) => tagSet.has(t))
+  )
+  return matched.sort((a, b) => a.name.localeCompare(b.name))
 }
