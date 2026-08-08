@@ -12,6 +12,7 @@ import {
   TrendingUp, ArrowLeft, Circle, AlertTriangle, CheckCircle2,
   DollarSign, Download, Trash2,
 } from "lucide-react"
+import type { WasteEntry } from "@/components/panel/mermas/mermas-shared"
 
 interface DishData { name: string; cost: number; price: number; category: string; alert?: string }
 
@@ -148,7 +149,7 @@ export default function RentabilidadPage() {
   const slug = selectedCollection?.slug || null
   const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
-  const [mermaEntries] = useLocalStorage<{ amountKg: number; costPerKg: number; id: string; date: string }[]>("mermas-entries", [], slug)
+  const [mermaEntries] = useLocalStorage<WasteEntry[]>("mermas-entries", [], slug)
   const panelCfg = usePanelConfig(slug)
   const [monthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
   const [priceOverrides, setPriceOverrides] = useLocalStorage<Record<string, number>>("rentabilidad-prices", {}, slug)

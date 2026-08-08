@@ -20,6 +20,7 @@ import {
   type ComboItem,
 } from "@/components/panel/costeo/costeo-shared"
 import CosteoHeader from "@/components/panel/costeo/CosteoHeader"
+import type { InventoryItem } from "@/components/panel/inventario/inventario-shared"
 import FoodCostTarget from "@/components/panel/costeo/FoodCostTarget"
 import CategoryTabs from "@/components/panel/costeo/CategoryTabs"
 import SearchBar from "@/components/panel/costeo/SearchBar"
@@ -86,7 +87,7 @@ export default function CosteoPage() {
   const [newDishModifiers, setNewDishModifiers] = useState<{ id: string; nombre: string; precio: number }[]>([])
   const [modName, setModName] = useState("")
   const [modPrice, setModPrice] = useState("")
-  const [inventarioItems] = useLocalStorage<{ name: string; stock: number; minStock: number; unit: string; pricePerUnit: number }[]>("inventario-items", [], slug)
+  const [inventarioItems] = useLocalStorage<InventoryItem[]>("inventario-items", [], slug)
   const panelCfg = usePanelConfig(slug)
   const [undoStack, setUndoStack] = useState<Dish[][]>([])
   const [undoIndex, setUndoIndex] = useState(-1)

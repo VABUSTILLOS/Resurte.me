@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
+import type { ShoppingItem, TransferItem } from "@/components/panel/temporada/temporada-shared"
 import Link from "next/link"
 import {
   Calendar, ArrowLeft, Sun, Leaf, DollarSign, TrendingDown,
@@ -100,13 +101,7 @@ export default function TemporadaPage() {
   const { toast } = useToast()
   const today = new Date()
   const [viewMonth, setViewMonth] = useLocalStorage<number>("temporada-month", today.getMonth() + 1, slug)
-  
-  interface ShoppingItem { key: string; name: string; icon: string; pricePerKg: number; quantityKg: number }
   const [shoppingList, setShoppingList] = useLocalStorage<ShoppingItem[]>("temporada-shopping-list", [], slug)
-  // Transfer items carry clean names (no emoji) + real unit so the planificador
-  // matches them against inventory. `qtyKg` is kept for legacy data written
-  // before the unit unification.
-  interface TransferItem { name: string; unit: string; price: number; qty: number; icon?: string; qtyKg?: number }
   const [, setTransfers] = useLocalStorage<TransferItem[]>("temporada-transfer", [], slug)
 
   const tips = selectedCollection

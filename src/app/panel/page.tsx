@@ -14,6 +14,10 @@ import {
   PAYMENT_METHODS, TOOLS, hubEntryTotal,
   type HubVenta, type HubMesa,
 } from "@/components/panel/hub/hub-data"
+import type { WasteEntry } from "@/components/panel/mermas/mermas-shared"
+import type { ShoppingItem } from "@/components/panel/temporada/temporada-shared"
+import type { InventoryItem } from "@/components/panel/inventario/inventario-shared"
+import type { Cliente } from "@/components/panel/ventas/ventas-shared"
 import { useHubAlerts } from "@/components/panel/hub/use-hub-alerts"
 import HeroSection from "@/components/panel/hub/HeroSection"
 import LiveStats from "@/components/panel/hub/LiveStats"
@@ -31,16 +35,16 @@ export default function PanelPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
-  const [mermaEntries] = useLocalStorage<{ amountKg: number; costPerKg: number; category: string; id: string; date: string }[]>("mermas-entries", [], slug)
+  const [mermaEntries] = useLocalStorage<WasteEntry[]>("mermas-entries", [], slug)
   const [aperturaChecked] = useLocalStorage<string[]>("apertura-checked", [], slug)
   const [monthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
-  const [shoppingList] = useLocalStorage<{ key: string; name: string; pricePerKg: number; quantityKg: number }[]>("temporada-shopping-list", [], slug)
-  const [inventarioItems] = useLocalStorage<{ id: string; name: string; stock: number; minStock: number; unit: string; pricePerUnit: number; category?: string }[]>("inventario-items", [], slug)
+  const [shoppingList] = useLocalStorage<ShoppingItem[]>("temporada-shopping-list", [], slug)
+  const [inventarioItems] = useLocalStorage<InventoryItem[]>("inventario-items", [], slug)
   const [ventasEntries] = useLocalStorage<HubVenta[]>("ventas-entries", [], slug)
   const [mesas] = useLocalStorage<HubMesa[]>("mesas", [], slug)
   const [ventasMetaDia] = useLocalStorage<number>("ventas-meta-dia", 0, slug)
   const [ventasUmbralTicket] = useLocalStorage<number>("ventas-umbral-ticket", 3000, slug)
-  const [clientes] = useLocalStorage<{ id: string; nombre: string; telefono?: string; puntos: number; visitas: number; totalGastado: number; createdAt: string }[]>("clientes", [], slug)
+  const [clientes] = useLocalStorage<Cliente[]>("clientes", [], slug)
   const [puntosTasa] = useLocalStorage<number>("ventas-puntos-tasa", 100, slug)
   const [comandaStatuses] = useLocalStorage<Record<string, { status: "pendiente" | "en-cocina" | "listo"; startedAt?: number; readyAt?: number }>>("comanda-statuses", {}, slug)
   const [covers] = useLocalStorage<number>("planner-covers", 0, slug)

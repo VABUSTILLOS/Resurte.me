@@ -18,6 +18,8 @@ import ShoppingList from "@/components/panel/planificador/shopping-list"
 import ConfirmImportModal from "@/components/panel/planificador/confirm-import-modal"
 import { ShoppingCart } from "lucide-react"
 import type { PlannerProduct } from "@/components/panel/planificador/planificador-shared"
+import type { SaleEntry } from "@/components/panel/ventas/ventas-shared"
+import type { TransferItem } from "@/components/panel/temporada/temporada-shared"
 
 export default function PlanificadorPage() {
   const { selectedCollection } = useRestaurant()
@@ -26,12 +28,12 @@ export default function PlanificadorPage() {
   const [sharedDishes] = useSharedDishes(slug)
 
   const [covers, setCovers] = useLocalStorage<number>("planner-covers", 50, slug)
-  const [ventasEntries] = useLocalStorage<{ id: string; dishId: string; dishName: string; quantity: number; date: string; unitPrice: number; unitCost: number }[]>("ventas-entries", [], slug)
+  const [ventasEntries] = useLocalStorage<SaleEntry[]>("ventas-entries", [], slug)
   const [wastePcts, setWastePcts] = useLocalStorage<Record<string, number>>("planner-waste-pcts", {}, slug)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
   const [showOrder, setShowOrder] = useState(false)
   const [manualQtysRaw, setManualQtysRaw] = useLocalStorage<Record<string, number | ManualQty>>("planner-manual-qtys", {}, slug)
-  const [transfers, setTransfers] = useLocalStorage<{ name: string; unit: string; price: number; qty: number; icon?: string; qtyKg?: number }[]>("temporada-transfer", [], slug)
+  const [transfers, setTransfers] = useLocalStorage<TransferItem[]>("temporada-transfer", [], slug)
 
   // Real catalog prices (Supabase): refresh price/unit of matching products.
   const [catalogPrices, setCatalogPrices] = useState<Record<string, { price: number; unit?: string }>>({})
