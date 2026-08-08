@@ -66,7 +66,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: "website",
       images: [
         {
-          url: "https://resurte.me/og-image.png",
+          url: "https://resurte.me/opengraph-image",
           width: 1200,
           height: 630,
           alt: `Resurte.me en ${city.name}`,
@@ -77,7 +77,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       card: "summary_large_image",
       title,
       description,
-      images: ["https://resurte.me/og-image.png"],
+      images: ["https://resurte.me/opengraph-image"],
     },
   }
 }

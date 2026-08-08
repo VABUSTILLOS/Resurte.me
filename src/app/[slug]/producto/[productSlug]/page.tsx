@@ -86,7 +86,8 @@ export default async function ProductPage({ params }: Props) {
       product.description?.slice(0, 300) ?? `${product.name} por mayoreo en ${city.name}.`,
       product.brand || "Resurte.me",
       product.sale_price ?? product.price,
-      product.stock_status
+      product.stock_status,
+      product.image_url || undefined
     ),
     getBreadcrumbSchema([
       { name: city.name, url: `https://resurte.me/${slug}` },

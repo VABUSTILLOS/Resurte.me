@@ -67,7 +67,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "https://resurte.me/og-image.png",
+        url: "https://resurte.me/opengraph-image",
         width: 1200,
         height: 630,
         alt: "Resurte.me — Central de Abastos Digital",
@@ -79,7 +79,7 @@ export const metadata: Metadata = {
     title: "Resurte.me — Central de Abastos Digital",
     description:
       "Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Envío gratis desde $2,500 MXN.",
-    images: ["https://resurte.me/og-image.png"],
+    images: ["https://resurte.me/opengraph-image"],
   },
   icons: {
     icon: [

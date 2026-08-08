@@ -32,7 +32,7 @@ export function getOrganizationSchema(): OrganizationSchema {
     "@type": "Organization",
     name: "Resurte.me",
     url: "https://resurte.me",
-    logo: "https://resurte.me/logo.png",
+    logo: "https://resurte.me/images/store/logo.webp",
     description:
       "Central de abastos digital para restaurantes y negocios en México. Abarrotes, frutas, verduras y carnes por mayoreo — entregados a tu puerta.",
     sameAs: [
@@ -80,7 +80,7 @@ export function getCityLandingSchema(cityName: string, state: string, lat: numbe
     name: `Resurte.me — ${cityName}`,
     description: `Central de abastos digital en ${cityName}, ${state}. Abarrotes, frutas, verduras y carnes por mayoreo para restaurantes y negocios.`,
 
-    image: "https://resurte.me/og-image.png",
+    image: "https://resurte.me/opengraph-image",
 
     address: {
       "@type": "PostalAddress",
@@ -138,14 +138,15 @@ export function getProductSchema(
   description: string,
   brand: string,
   price: number,
-  availability: string
+  availability: string,
+  image?: string
 ): ProductSchema {
   return {
     "@context": "https://schema.org",
     "@type": "Product",
     name,
     description,
-    image: "https://resurte.me/placeholder-product.png",
+    image: image || "https://resurte.me/images/store/logo.webp",
     brand: { "@type": "Brand", name: brand },
     offers: {
       "@type": "Offer",
