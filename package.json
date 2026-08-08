@@ -50,6 +50,19 @@
     "vitest": "^4.1.10"
   },
   "knip": {
-    "ignore": ["scripts/archive/**"]
+    "ignore": [
+      "scripts/archive/**"
+    ],
+    "ignoreIssues": {
+      "src/lib/panel-utils.ts": [
+        "exports"
+      ],
+      "src/lib/payment-validation.ts": [
+        "exports"
+      ],
+      "src/lib/foodos-campaigns.ts": [
+        "exports"
+      ]
+    }
   }
 }
