@@ -28,4 +28,21 @@ describe("buildCspHeader", () => {
     expect(csp).toContain("https://storage.googleapis.com")
     expect(csp).toContain("frame-ancestors 'none'")
   })
+
+  it("permite el iframe y API de Stripe (checkout embebido)", () => {
+    const csp = buildCspHeader("abc123")
+    const frameSrc = csp.match(/frame-src ([^;]+);/)?.[1] ?? ""
+    expect(frameSrc).toContain("https://js.stripe.com")
+    expect(frameSrc).toContain("https://hooks.stripe.com")
+    expect(csp).toContain("https://api.stripe.com")
+    expect(csp).toContain("https://m.stripe.network")
+    expect(csp).toContain("https://js.stripe.com")
+  })
+
+  it("mantiene Stripe en modo hardened (dependencia funcional)", () => {
+    const csp = buildCspHeader("abc123", { hardened: true })
+    const frameSrc = csp.match(/frame-src ([^;]+);/)?.[1] ?? ""
+    expect(frameSrc).toContain("https://js.stripe.com")
+    expect(csp).toContain("https://api.stripe.com")
+  })
 })

@@ -18,10 +18,6 @@
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=(self)"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://connect.facebook.net https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://resurte.me https://*.supabase.co https://storage.googleapis.com https://www.facebook.com https://connect.facebook.net; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://www.google-analytics.com https://*.google-analytics.com https://api.stripe.com https://m.stripe.network https://js.stripe.com https://connect.facebook.net https://www.facebook.com; frame-src https://js.stripe.com https://m.stripe.network https://checkout.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         }
       ]
     },

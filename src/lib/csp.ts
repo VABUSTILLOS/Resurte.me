@@ -35,16 +35,17 @@ type CspOptions = {
 export function buildCspHeader(nonce: string, options: CspOptions = {}): string {
   const isDev = process.env.NODE_ENV === "development"
   const thirdPartyScripts = options.hardened
-    ? ""
-    : " https://www.googletagmanager.com https://connect.facebook.net"
+    ? " https://js.stripe.com"
+    : " https://www.googletagmanager.com https://connect.facebook.net https://js.stripe.com"
   return `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}${thirdPartyScripts};
     style-src 'self' 'nonce-${nonce}';
     style-src-attr 'unsafe-inline';
-    img-src 'self' blob: data: https://${SUPABASE_HOST} https://storage.googleapis.com https://www.facebook.com;
+    img-src 'self' blob: data: https://${SUPABASE_HOST} https://storage.googleapis.com https://www.facebook.com https://js.stripe.com https://q.stripe.com;
     font-src 'self' data:;
-    connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST} https://www.google-analytics.com https://www.googletagmanager.com https://www.facebook.com https://graph.facebook.com https://connect.facebook.net;
+    connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST} https://www.google-analytics.com https://www.googletagmanager.com https://www.facebook.com https://graph.facebook.com https://connect.facebook.net https://api.stripe.com https://m.stripe.network https://js.stripe.com;
+    frame-src https://js.stripe.com https://m.stripe.network https://hooks.stripe.com https://checkout.stripe.com;
     object-src 'none';
     base-uri 'self';
     form-action 'self';
