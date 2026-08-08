@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
-import { foodCostStatus, usePanelConfig } from "@/lib/panel-config"
+import { usePanelConfig } from "@/lib/panel-config"
 import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { uid } from "@/lib/ids"
@@ -11,87 +11,34 @@ import { convertQty } from "@/lib/panel-units"
 import { todayStr, dateLabel } from "@/lib/panel-utils"
 import { t } from "@/lib/i18n/es"
 import Link from "next/link"
+import { ArrowLeft, Plus, Copy, Flame, AlertCircle, Receipt } from "lucide-react"
 import {
-  ArrowLeft, Plus, Trash2, DollarSign, TrendingUp, Receipt,
-  Copy, BarChart3, Target, AlertCircle, Flame, Landmark, ShieldAlert,
-  AlertTriangle, Settings2, Check, Users, Gift,
-  Clock, CreditCard, HandCoins, UtensilsCrossed,
-} from "lucide-react"
-
-interface SaleEntry {
-  id: string
-  dishId: string
-  dishName: string
-  quantity: number
-  date: string // YYYY-MM-DD
-  unitPrice: number
-  unitCost: number
-  paymentMethod?: PaymentMethod
-  channel?: SaleChannel
-  discount?: { type: "monto" | "porcentaje"; value: number }
-  clienteId?: string
-  mesaId?: string
-  modificadores?: { nombre: string; precio: number }[]
-  createdAt?: string // ISO timestamp, set on addEntry
-}
-
-interface Cliente {
-  id: string
-  nombre: string
-  telefono?: string
-  puntos: number
-  visitas: number
-  totalGastado: number
-  createdAt: string
-}
-
-interface Mesa {
-  id: string
-  nombre: string
-  capacidad: number
-  zona?: string
-}
-
-interface Empleado {
-  id: string
-  nombre: string
-  rol?: string
-  tarifa: number
-}
-
-interface Fichaje {
-  id: string
-  empleadoId: string
-  entrada: string // ISO timestamp
-  salida?: string // ISO timestamp
-}
-
-interface TarjetaRegalo {
-  id: string
-  codigo: string
-  monto: number
-  saldo: number
-  estado: "activa" | "agotada"
-  creada: string
-}
-
-const PAYMENT_METHODS = [
-  { key: "efectivo", label: "Efectivo", icon: "💵" },
-  { key: "tarjeta", label: "Tarjeta", icon: "💳" },
-  { key: "transferencia", label: "Transferencia", icon: "🏦" },
-  { key: "regalo", label: "Regalo", icon: "🎁" },
-] as const
-
-type PaymentMethod = (typeof PAYMENT_METHODS)[number]["key"]
-
-const SALE_CHANNELS = [
-  { key: "comedor", label: "Comedor", icon: "🍽️" },
-  { key: "rapido", label: "Rápido", icon: "⚡" },
-  { key: "para-llevar", label: "Para llevar", icon: "🥡" },
-  { key: "domicilio", label: "Domicilio", icon: "🛵" },
-] as const
-
-type SaleChannel = (typeof SALE_CHANNELS)[number]["key"]
+  SaleEntry,
+  Cliente,
+  Mesa,
+  Empleado,
+  Fichaje,
+  TarjetaRegalo,
+  PAYMENT_METHODS,
+  PaymentMethod,
+  SALE_CHANNELS,
+  SaleChannel,
+  entryTotal,
+} from "@/components/panel/ventas/ventas-shared"
+import SalesGoals from "@/components/panel/ventas/SalesGoals"
+import FrequentCustomers from "@/components/panel/ventas/FrequentCustomers"
+import DiningTables from "@/components/panel/ventas/DiningTables"
+import RelojChecador from "@/components/panel/ventas/RelojChecador"
+import GiftCards from "@/components/panel/ventas/GiftCards"
+import AntifraudAlerts from "@/components/panel/ventas/AntifraudAlerts"
+import DayStats from "@/components/panel/ventas/DayStats"
+import CorteCaja from "@/components/panel/ventas/CorteCaja"
+import ManagementReport from "@/components/panel/ventas/ManagementReport"
+import WeekTrend from "@/components/panel/ventas/WeekTrend"
+import TopSellers from "@/components/panel/ventas/TopSellers"
+import EntriesList from "@/components/panel/ventas/EntriesList"
+import AllTimeTip from "@/components/panel/ventas/AllTimeTip"
+import DeleteConfirmModal from "@/components/panel/ventas/DeleteConfirmModal"
 
 interface InventoryItemLike {
   id: string
@@ -110,14 +57,6 @@ interface StockMovementLike {
   tipo: "entrada" | "salida" | "ajuste"
   delta: number
   motivo: string
-}
-
-function entryTotal(e: SaleEntry) {
-  let total = e.quantity * e.unitPrice
-  if (e.discount) {
-    total -= e.discount.type === "porcentaje" ? (total * e.discount.value) / 100 : e.discount.value
-  }
-  return Math.max(0, total)
 }
 
 export default function VentasPage() {
@@ -1214,1259 +1153,230 @@ export default function VentasPage() {
       </div>
 
       {/* ── Sales goals ──────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Target className="w-4 h-4 text-[#108910]" />
-          <h3 className="text-sm font-semibold text-gray-900">Metas de venta</h3>
-          <button
-            onClick={() => {
-              if (!showGoals) {
-                setGoalFormDia(String(dailyGoal || ""))
-                setGoalFormMes(String(monthlyGoal || ""))
-              }
-              setShowGoals(!showGoals)
-            }}
-            className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
-            title={showGoals ? "Cerrar edición" : "Editar metas diaria y mensual"}
-            aria-label="Editar metas de venta"
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-            {showGoals ? "Cerrar" : "Editar metas"}
-          </button>
-        </div>
-
-        {showGoals ? (
-          <>
-          <div className="grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-            <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Meta diaria ($)</label>
-              <input
-                type="number"
-                value={goalFormDia}
-                onChange={(e) => setGoalFormDia(e.target.value)}
-                min="0"
-                placeholder="Ej. 12000"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
-                aria-label="Meta de venta diaria"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Meta mensual ($)</label>
-              <input
-                type="number"
-                value={goalFormMes}
-                onChange={(e) => setGoalFormMes(e.target.value)}
-                min="0"
-                placeholder="Ej. 360000"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
-                aria-label="Meta de venta mensual"
-              />
-            </div>
-            <button
-              onClick={saveGoals}
-              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
-            >
-              <Check className="w-3.5 h-3.5" />
-              Guardar
-            </button>
-          </div>
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">Comisiones por canal (%)</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {SALE_CHANNELS.map((c) => (
-                <label key={c.key} className="block">
-                  <span className="block text-[10px] text-gray-500 mb-1">{c.icon} {c.label}</span>
-                  <input
-                    type="number"
-                    value={comisiones[c.key] || 0}
-                    onChange={(e) => setComisiones((prev) => ({ ...prev, [c.key]: Math.max(0, parseFloat(e.target.value) || 0) }))}
-                    min="0"
-                    step="0.5"
-                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#108910]"
-                    aria-label={`Comisión por canal ${c.label}`}
-                  />
-                </label>
-              ))}
-            </div>
-            <p className="text-[10px] text-gray-400 mt-1.5">
-              <HandCoins className="w-3 h-3 inline-block mr-1 text-[#108910]" />
-              Se calcula sobre los ingresos del día/período según el canal de cada venta.
-            </p>
-          </div>
-          </>
-        ) : (
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-baseline justify-between mb-1.5">
-                <span className="text-xs font-medium text-gray-500">Meta diaria</span>
-                <span className="text-xs text-gray-400">
-                  {dailyGoal > 0 ? `$${dayStats.revenue.toFixed(0)} / $${dailyGoal.toFixed(0)}` : "Sin meta"}
-                </span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    dailyGoalPct >= 100 ? "bg-green-500" : dailyGoalPct >= 50 ? "bg-amber-500" : "bg-[#108910]"
-                  }`}
-                  style={{ width: `${Math.min(dailyGoalPct, 100)}%` }}
-                />
-              </div>
-              <p className="text-[10px] text-gray-400 mt-1.5">
-                {dailyGoal > 0
-                  ? `${dailyGoalPct.toFixed(0)}% · Proyección a cierre: $${projectedRevenue.toFixed(0)} ${
-                      onPace ? "✅ En ritmo" : "⚠️ Atrasado"
-                    }`
-                  : "Define una meta para ver tu progreso del día."}
-              </p>
-            </div>
-            <div>
-              <div className="flex items-baseline justify-between mb-1.5">
-                <span className="text-xs font-medium text-gray-500">Meta mensual</span>
-                <span className="text-xs text-gray-400">
-                  {monthlyGoal > 0 ? `$${monthRevenue.toFixed(0)} / $${monthlyGoal.toFixed(0)}` : "Sin meta"}
-                </span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    monthlyGoalPct >= 100 ? "bg-green-500" : monthlyGoalPct >= 50 ? "bg-amber-500" : "bg-[#108910]"
-                  }`}
-                  style={{ width: `${Math.min(monthlyGoalPct, 100)}%` }}
-                />
-              </div>
-              <p className="text-[10px] text-gray-400 mt-1.5">
-                {monthlyGoal > 0
-                  ? `${monthlyGoalPct.toFixed(0)}% del mes · te faltan $${Math.max(0, monthlyGoal - monthRevenue).toFixed(0)}`
-                  : "Define una meta para seguir tu avance mensual."}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      <SalesGoals
+        showGoals={showGoals}
+        goalFormDia={goalFormDia}
+        goalFormMes={goalFormMes}
+        dailyGoal={dailyGoal}
+        monthlyGoal={monthlyGoal}
+        dayStats={dayStats}
+        dailyGoalPct={dailyGoalPct}
+        monthlyGoalPct={monthlyGoalPct}
+        monthRevenue={monthRevenue}
+        projectedRevenue={projectedRevenue}
+        onPace={onPace}
+        comisiones={comisiones}
+        onToggle={() => {
+          if (!showGoals) {
+            setGoalFormDia(String(dailyGoal || ""))
+            setGoalFormMes(String(monthlyGoal || ""))
+          }
+          setShowGoals(!showGoals)
+        }}
+        onGoalFormDiaChange={setGoalFormDia}
+        onGoalFormMesChange={setGoalFormMes}
+        onSave={saveGoals}
+        onComisionChange={(key, value) =>
+          setComisiones((prev) => ({ ...prev, [key]: Math.max(0, parseFloat(value) || 0) }))
+        }
+      />
 
       {/* ── Clientes frecuentes ──────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Users className="w-4 h-4 text-[#108910]" />
-          <h3 className="text-sm font-semibold text-gray-900">Clientes frecuentes</h3>
-          {clientes.length > 0 && (
-            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
-              {clientes.length} cliente{clientes.length !== 1 ? "s" : ""}
-            </span>
-          )}
-          <button
-            onClick={copyClientes}
-            className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
-            title="Copiar lista de clientes"
-            aria-label="Copiar clientes frecuentes"
-          >
-            <Copy className="w-3.5 h-3.5" />
-            Copiar clientes
-          </button>
-          <button
-            onClick={() => setShowClientes(!showClientes)}
-            className="flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
-            aria-expanded={showClientes}
-            aria-label="Mostrar u ocultar clientes frecuentes"
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-            {showClientes ? "Cerrar" : "Gestionar"}
-          </button>
-        </div>
-
-        {showClientes && (
-          <div className="space-y-4">
-            <div className="grid sm:grid-cols-3 gap-3 items-end">
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Nombre</label>
-                <input
-                  type="text"
-                  value={clienteName}
-                  onChange={(e) => setClienteName(e.target.value)}
-                  placeholder={clienteEditId ? "Editar nombre…" : "Ej. María López"}
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
-                  aria-label="Nombre del cliente"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Teléfono</label>
-                <input
-                  type="text"
-                  value={clientePhone}
-                  onChange={(e) => setClientePhone(e.target.value)}
-                  placeholder="Opcional"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
-                  aria-label="Teléfono del cliente"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Puntos iniciales</label>
-                <input
-                  type="number"
-                  value={clientePts}
-                  onChange={(e) => setClientePts(e.target.value)}
-                  min="0"
-                  placeholder="0"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
-                  aria-label="Puntos iniciales del cliente"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={saveCliente}
-                className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
-              >
-                <Check className="w-3.5 h-3.5" />
-                {clienteEditId ? "Guardar cambios" : "Agregar cliente"}
-              </button>
-              {clienteEditId && (
-                <button
-                  onClick={() => { setClienteEditId(null); setClienteName(""); setClientePhone(""); setClientePts("") }}
-                  className="text-xs font-semibold text-gray-500 hover:text-gray-700"
-                >
-                  Cancelar
-                </button>
-              )}
-              <div className="ml-auto flex flex-wrap gap-3 items-end">
-                <label className="block">
-                  <span className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">$ por punto (tasa)</span>
-                  <input
-                    type="number"
-                    value={puntosTasa}
-                    onChange={(e) => setPuntosTasa(Math.max(1, parseFloat(e.target.value) || 0))}
-                    min="1"
-                    className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#108910]"
-                    aria-label="Pesos por punto al ganar"
-                  />
-                </label>
-                <label className="block">
-                  <span className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Valor por punto (canje)</span>
-                  <input
-                    type="number"
-                    value={puntosCanje}
-                    onChange={(e) => setPuntosCanje(Math.max(0, parseFloat(e.target.value) || 0))}
-                    min="0"
-                    step="0.5"
-                    className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#108910]"
-                    aria-label="Pesos por punto al canjear"
-                  />
-                </label>
-                <label className="block">
-                  <span className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Tipo de cambio MXN/USD</span>
-                  <input
-                    type="number"
-                    value={tipoCambio}
-                    onChange={(e) => setTipoCambio(Math.max(0, parseFloat(e.target.value) || 0))}
-                    min="0"
-                    step="0.01"
-                    className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#108910]"
-                    aria-label="Tipo de cambio MXN a USD"
-                  />
-                </label>
-              </div>
-            </div>
-            {clientes.length === 0 ? (
-              <p className="text-[11px] text-gray-400">Aún no registras clientes frecuentes. Agrega el primero para empezar a acumular puntos por compra.</p>
-            ) : (
-              <div className="border-t border-gray-100 pt-3">
-                <ul className="divide-y divide-gray-50">
-                  {clientes.map((c) => (
-                    <li key={c.id} className="flex items-center gap-3 py-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-gray-800 truncate">{c.nombre}</p>
-                        <p className="text-[10px] text-gray-400">
-                          {c.telefono ? `${c.telefono} · ` : ""}{c.visitas} visita{c.visitas !== 1 ? "s" : ""} · ${c.totalGastado.toFixed(0)} gastados
-                        </p>
-                      </div>
-                      <span className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${c.puntos >= 500 ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
-                        <Gift className="w-3.5 h-3.5" />
-                        {c.puntos} pts
-                      </span>
-                      <button
-                        onClick={() => startEditCliente(c)}
-                        className="p-1.5 text-gray-400 hover:text-[#108910] rounded-lg hover:bg-emerald-50 transition-colors"
-                        title="Editar cliente"
-                        aria-label={`Editar a ${c.nombre}`}
-                      >
-                        <Settings2 className="w-4 h-4" />
-                      </button>
-                      {clienteDeleteId === c.id ? (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={confirmDeleteCliente}
-                            className="px-2 py-1 text-[10px] font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600"
-                          >
-                            Sí
-                          </button>
-                          <button
-                            onClick={() => setClienteDeleteId(null)}
-                            className="px-2 py-1 text-[10px] font-semibold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200"
-                          >
-                            No
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setClienteDeleteId(c.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
-                          title="Eliminar cliente"
-                          aria-label={`Eliminar a ${c.nombre}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <FrequentCustomers
+        clientes={clientes}
+        showClientes={showClientes}
+        clienteName={clienteName}
+        clientePhone={clientePhone}
+        clientePts={clientePts}
+        clienteEditId={clienteEditId}
+        clienteDeleteId={clienteDeleteId}
+        puntosTasa={puntosTasa}
+        puntosCanje={puntosCanje}
+        tipoCambio={tipoCambio}
+        onCopy={copyClientes}
+        onToggle={() => setShowClientes(!showClientes)}
+        onNameChange={setClienteName}
+        onPhoneChange={setClientePhone}
+        onPtsChange={setClientePts}
+        onSave={saveCliente}
+        onCancel={() => {
+          setClienteEditId(null)
+          setClienteName("")
+          setClientePhone("")
+          setClientePts("")
+        }}
+        onEdit={startEditCliente}
+        onDeleteClick={(id) => setClienteDeleteId(id)}
+        onCancelDelete={() => setClienteDeleteId(null)}
+        onConfirmDelete={confirmDeleteCliente}
+        onPuntosTasaChange={setPuntosTasa}
+        onPuntosCanjeChange={setPuntosCanje}
+        onTipoCambioChange={setTipoCambio}
+      />
 
       {/* ── Mesas del salón ──────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <UtensilsCrossed className="w-4 h-4 text-[#108910]" />
-          <h3 className="text-sm font-semibold text-gray-900">Mesas del salón</h3>
-          {mesas.length > 0 && (
-            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
-              {mesasOcupadasHoy.size} ocupada{mesasOcupadasHoy.size !== 1 ? "s" : ""} de {mesas.length}
-            </span>
-          )}
-          <button
-            onClick={() => setShowMesas(!showMesas)}
-            className="ml-auto flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
-            aria-expanded={showMesas}
-            aria-label="Mostrar u ocultar mesas del salón"
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-            {showMesas ? "Cerrar" : "Gestionar"}
-          </button>
-        </div>
-
-        {showMesas && (
-          <div className="space-y-4">
-            <div className="grid sm:grid-cols-3 gap-3 items-end">
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Nombre</label>
-                <input
-                  type="text"
-                  value={mesaName}
-                  onChange={(e) => setMesaName(e.target.value)}
-                  placeholder={mesaEditId ? "Editar nombre…" : "Ej. Mesa 3"}
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
-                  aria-label="Nombre de la mesa"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Capacidad</label>
-                <input
-                  type="number"
-                  value={mesaCapacidad}
-                  onChange={(e) => setMesaCapacidad(e.target.value)}
-                  min="1"
-                  placeholder="4"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
-                  aria-label="Capacidad de la mesa"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Zona</label>
-                <input
-                  type="text"
-                  value={mesaZona}
-                  onChange={(e) => setMesaZona(e.target.value)}
-                  placeholder="Opcional · Ej. Terraza"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
-                  aria-label="Zona de la mesa"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={saveMesa}
-                className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
-              >
-                <Check className="w-3.5 h-3.5" />
-                {mesaEditId ? "Guardar cambios" : "Agregar mesa"}
-              </button>
-              {mesaEditId && (
-                <button
-                  onClick={() => { setMesaEditId(null); setMesaName(""); setMesaCapacidad(""); setMesaZona("") }}
-                  className="text-xs font-semibold text-gray-500 hover:text-gray-700"
-                >
-                  Cancelar
-                </button>
-              )}
-            </div>
-            {mesas.length === 0 ? (
-              <p className="text-[11px] text-gray-400">Aún no registras mesas. Agrégalas para asignarlas a tus ventas y ver la ocupación del día.</p>
-            ) : (
-              <div className="border-t border-gray-100 pt-3">
-                <ul className="divide-y divide-gray-50">
-                  {mesas.map((m) => {
-                    const firstTs = mesasOcupadasHoy.get(m.id)
-                    const ocupada = firstTs != null
-                    const mins = ocupada ? Math.max(1, Math.round((now - firstTs) / 60000)) : 0
-                    return (
-                      <li key={m.id} className="flex items-center gap-3 py-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-800 truncate">🪑 {m.nombre}</p>
-                          <p className="text-[10px] text-gray-400">
-                            {m.zona ? `${m.zona} · ` : ""}Cap. {m.capacidad}
-                          </p>
-                        </div>
-                        {ocupada ? (
-                          <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full shrink-0">
-                            Ocupada · {Math.floor(mins / 60)}h {mins % 60}min
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full shrink-0">
-                            Libre
-                          </span>
-                        )}
-                        <button
-                          onClick={() => startEditMesa(m)}
-                          className="p-1.5 text-gray-400 hover:text-[#108910] rounded-lg hover:bg-emerald-50 transition-colors"
-                          title="Editar mesa"
-                          aria-label={`Editar mesa ${m.nombre}`}
-                        >
-                          <Settings2 className="w-4 h-4" />
-                        </button>
-                        {mesaDeleteId === m.id ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={confirmDeleteMesa}
-                              className="px-2 py-1 text-[10px] font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600"
-                            >
-                              Sí
-                            </button>
-                            <button
-                              onClick={() => setMesaDeleteId(null)}
-                              className="px-2 py-1 text-[10px] font-semibold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200"
-                            >
-                              No
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setMesaDeleteId(m.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
-                            title="Eliminar mesa"
-                            aria-label={`Eliminar mesa ${m.nombre}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <DiningTables
+        mesas={mesas}
+        showMesas={showMesas}
+        mesasOcupadasHoy={mesasOcupadasHoy}
+        now={now}
+        mesaName={mesaName}
+        mesaCapacidad={mesaCapacidad}
+        mesaZona={mesaZona}
+        mesaEditId={mesaEditId}
+        mesaDeleteId={mesaDeleteId}
+        onToggle={() => setShowMesas(!showMesas)}
+        onNameChange={setMesaName}
+        onCapacidadChange={setMesaCapacidad}
+        onZonaChange={setMesaZona}
+        onSave={saveMesa}
+        onCancel={() => {
+          setMesaEditId(null)
+          setMesaName("")
+          setMesaCapacidad("")
+          setMesaZona("")
+        }}
+        onEdit={startEditMesa}
+        onDeleteClick={(id) => setMesaDeleteId(id)}
+        onCancelDelete={() => setMesaDeleteId(null)}
+        onConfirmDelete={confirmDeleteMesa}
+      />
 
       {/* ── Reloj checador ───────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Clock className="w-4 h-4 text-[#108910]" />
-          <h3 className="text-sm font-semibold text-gray-900">Reloj checador</h3>
-          {empleados.length > 0 && (
-            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
-              {empleados.length} empleado{empleados.length !== 1 ? "s" : ""}
-            </span>
-          )}
-          <button
-            onClick={() => setShowReloj(!showReloj)}
-            className="ml-auto flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
-            aria-expanded={showReloj}
-            aria-label="Mostrar u ocultar reloj checador"
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-            {showReloj ? "Cerrar" : "Gestionar"}
-          </button>
-        </div>
-
-        {showReloj && (
-          <div className="space-y-4">
-            <div className="grid sm:grid-cols-3 gap-3 items-end">
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Nombre</label>
-                <input
-                  type="text"
-                  value={empNombre}
-                  onChange={(e) => setEmpNombre(e.target.value)}
-                  placeholder={empEditId ? "Editar nombre…" : "Ej. Juan Pérez"}
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
-                  aria-label="Nombre del empleado"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Rol</label>
-                <input
-                  type="text"
-                  value={empRol}
-                  onChange={(e) => setEmpRol(e.target.value)}
-                  placeholder="Opcional · Ej. Mesero"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
-                  aria-label="Rol del empleado"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Tarifa por hora ($)</label>
-                <input
-                  type="number"
-                  value={empTarifa}
-                  onChange={(e) => setEmpTarifa(e.target.value)}
-                  min="0"
-                  placeholder="Ej. 60"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
-                  aria-label="Tarifa por hora del empleado"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={saveEmpleado}
-                className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
-              >
-                <Check className="w-3.5 h-3.5" />
-                {empEditId ? "Guardar cambios" : "Agregar empleado"}
-              </button>
-              {empEditId && (
-                <button
-                  onClick={() => { setEmpEditId(null); setEmpNombre(""); setEmpRol(""); setEmpTarifa("") }}
-                  className="text-xs font-semibold text-gray-500 hover:text-gray-700"
-                >
-                  Cancelar
-                </button>
-              )}
-            </div>
-            {empleados.length === 0 ? (
-              <p className="text-[11px] text-gray-400">Aún no registras empleados. Agrégalos para fichar entradas y salidas.</p>
-            ) : (
-              <div className="border-t border-gray-100 pt-3">
-                <ul className="divide-y divide-gray-50">
-                  {empleadosHoy.map((e) => (
-                    <li key={e.id} className="flex items-center gap-3 py-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-gray-800 truncate">
-                          {e.nombre}
-                          {e.abierto && <span className="ml-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">en turno</span>}
-                        </p>
-                        <p className="text-[10px] text-gray-400">
-                          {e.rol ? `${e.rol} · ` : ""}hoy {Math.floor(e.minutos / 60)}h {Math.round(e.minutos % 60)}min · ${((e.minutos / 60) * e.tarifa).toFixed(0)}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => ficharEntrada(e.id)}
-                        className="px-2.5 py-1.5 text-[10px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
-                        aria-label={`Fichar entrada de ${e.nombre}`}
-                      >
-                        ⏱ Entrada
-                      </button>
-                      <button
-                        onClick={() => ficharSalida(e.id)}
-                        disabled={!e.abierto}
-                        className="px-2.5 py-1.5 text-[10px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        aria-label={`Fichar salida de ${e.nombre}`}
-                      >
-                        Salida
-                      </button>
-                      <button
-                        onClick={() => { setEmpEditId(e.id); setEmpNombre(e.nombre); setEmpRol(e.rol || ""); setEmpTarifa(String(e.tarifa)) }}
-                        className="p-1.5 text-gray-400 hover:text-[#108910] rounded-lg hover:bg-emerald-50 transition-colors"
-                        title="Editar empleado"
-                        aria-label={`Editar a ${e.nombre}`}
-                      >
-                        <Settings2 className="w-4 h-4" />
-                      </button>
-                      {empDeleteId === e.id ? (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={confirmDeleteEmpleado}
-                            className="px-2 py-1 text-[10px] font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600"
-                          >
-                            Sí
-                          </button>
-                          <button
-                            onClick={() => setEmpDeleteId(null)}
-                            className="px-2 py-1 text-[10px] font-semibold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200"
-                          >
-                            No
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setEmpDeleteId(e.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
-                          title="Eliminar empleado"
-                          aria-label={`Eliminar a ${e.nombre}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {fichajesHoy.rows.length > 0 && (
-              <div className="border-t border-gray-100 pt-3">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase">Resumen de {dateLabel(selectedDate)}</p>
-                  <button
-                    onClick={copyHoras}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    Copiar reporte de horas
-                  </button>
-                </div>
-                <ul className="space-y-1.5">
-                  {fichajesHoy.rows.map((r) => (
-                    <li key={r.nombre} className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">{r.nombre}{r.rol ? ` · ${r.rol}` : ""}</span>
-                      <span className="text-gray-500">
-                        {Math.floor(r.minutos / 60)}h {Math.round(r.minutos % 60)}min · ${((r.minutos / 60) * r.tarifa).toFixed(0)}{r.abierto ? " (en curso)" : ""}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                  <span className="text-xs font-semibold text-gray-500">Total</span>
-                  <span className="text-xs font-bold text-gray-800">
-                    {Math.floor(fichajesHoy.totalMin / 60)}h {Math.round(fichajesHoy.totalMin % 60)}min · ${fichajesHoy.totalCosto.toFixed(0)}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <RelojChecador
+        showReloj={showReloj}
+        empleadoCount={empleados.length}
+        empleadosHoy={empleadosHoy}
+        fichajesHoy={fichajesHoy}
+        empNombre={empNombre}
+        empRol={empRol}
+        empTarifa={empTarifa}
+        empEditId={empEditId}
+        empDeleteId={empDeleteId}
+        selectedDate={selectedDate}
+        onToggle={() => setShowReloj(!showReloj)}
+        onNombreChange={setEmpNombre}
+        onRolChange={setEmpRol}
+        onTarifaChange={setEmpTarifa}
+        onSave={saveEmpleado}
+        onCancel={() => {
+          setEmpEditId(null)
+          setEmpNombre("")
+          setEmpRol("")
+          setEmpTarifa("")
+        }}
+        onFicharEntrada={ficharEntrada}
+        onFicharSalida={ficharSalida}
+        onEdit={(e) => {
+          setEmpEditId(e.id)
+          setEmpNombre(e.nombre)
+          setEmpRol(e.rol || "")
+          setEmpTarifa(String(e.tarifa))
+        }}
+        onDeleteClick={(id) => setEmpDeleteId(id)}
+        onCancelDelete={() => setEmpDeleteId(null)}
+        onConfirmDelete={confirmDeleteEmpleado}
+        onCopyHoras={copyHoras}
+      />
 
       {/* ── Tarjetas de regalo ───────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <CreditCard className="w-4 h-4 text-[#108910]" />
-          <h3 className="text-sm font-semibold text-gray-900">Tarjetas de regalo</h3>
-          {tarjetas.length > 0 && (
-            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
-              {tarjetas.length} tarjeta{tarjetas.length !== 1 ? "s" : ""}
-            </span>
-          )}
-          <button
-            onClick={() => setShowTarjetas(!showTarjetas)}
-            className="ml-auto flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 px-2.5 py-1 rounded-lg transition-colors"
-            aria-expanded={showTarjetas}
-            aria-label="Mostrar u ocultar tarjetas de regalo"
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-            {showTarjetas ? "Cerrar" : "Gestionar"}
-          </button>
-        </div>
-
-        {showTarjetas && (
-          <div className="space-y-4">
-            <div className="flex items-end gap-3">
-              <div className="w-40">
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Monto ($)</label>
-                <input
-                  type="number"
-                  value={tarjetaMonto}
-                  onChange={(e) => setTarjetaMonto(e.target.value)}
-                  min="1"
-                  placeholder="Ej. 500"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
-                  aria-label="Monto de la tarjeta de regalo"
-                />
-              </div>
-              <button
-                onClick={emitirTarjeta}
-                className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
-              >
-                <Gift className="w-3.5 h-3.5" />
-                Emitir tarjeta
-              </button>
-            </div>
-            {tarjetas.length === 0 ? (
-              <p className="text-[11px] text-gray-400">Aún no emites tarjetas de regalo. Al emitir una, podrás usarla como método de pago “Regalo” en tus ventas.</p>
-            ) : (
-              <div className="border-t border-gray-100 pt-3">
-                <ul className="divide-y divide-gray-50">
-                  {tarjetas.map((t) => (
-                    <li key={t.id} className="flex items-center gap-3 py-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-gray-800 font-mono truncate">{t.codigo}</p>
-                        <p className="text-[10px] text-gray-400">Emitida el {new Date(t.creada).toLocaleDateString("es-MX")}</p>
-                      </div>
-                      <span className={`text-xs font-bold shrink-0 ${t.estado === "activa" ? "text-emerald-700" : "text-gray-400"}`}>
-                        ${t.saldo.toFixed(0)} / ${t.monto.toFixed(0)}
-                      </span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${t.estado === "activa" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                        {t.estado === "activa" ? "Activa" : "Agotada"}
-                      </span>
-                      <button
-                        onClick={() => copyCodigoTarjeta(t.codigo)}
-                        className="p-1.5 text-gray-400 hover:text-[#108910] rounded-lg hover:bg-emerald-50 transition-colors shrink-0"
-                        title="Copiar código"
-                        aria-label={`Copiar código de ${t.codigo}`}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <GiftCards
+        tarjetas={tarjetas}
+        showTarjetas={showTarjetas}
+        tarjetaMonto={tarjetaMonto}
+        onToggle={() => setShowTarjetas(!showTarjetas)}
+        onMontoChange={setTarjetaMonto}
+        onEmitir={emitirTarjeta}
+        onCopyCodigo={copyCodigoTarjeta}
+      />
 
       {/* ── Antifraud alerts ─────────────────────────────── */}
-      {fraudAlerts.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <ShieldAlert className="w-4 h-4 text-red-600" />
-            <h3 className="text-sm font-semibold text-red-800">
-              Posibles ventas irregulares ({fraudAlerts.length})
-            </h3>
-            <div className="ml-auto flex items-center gap-3">
-              <label className="flex items-center gap-1.5 text-[10px] font-semibold text-red-400 uppercase">
-                Umbral ticket $
-                <input
-                  id="ventas-umbral"
-                  type="number"
-                  value={ticketThreshold}
-                  onChange={(e) => setTicketThreshold(Math.max(0, parseFloat(e.target.value) || 0))}
-                  min="0"
-                  className="w-20 px-2 py-1 rounded-lg border border-red-200 text-xs bg-white focus:outline-none focus:border-red-400"
-                  aria-label="Umbral de ticket para alerta antifraude"
-                />
-              </label>
-              <label className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 uppercase" title="Tipo de cambio MXN → USD (solo presentación)">
-                Tipo cambio MXN/USD
-                <input
-                  id="ventas-tipo-cambio"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={tipoCambio}
-                  onChange={(e) => setTipoCambio(Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-16 px-2 py-1 rounded-lg border border-emerald-200 text-xs bg-white focus:outline-none focus:border-emerald-400"
-                  aria-label="Tipo de cambio MXN a USD"
-                />
-              </label>
-            </div>
-          </div>
-          <ul className="space-y-1.5">
-            {fraudAlerts.map((a, i) => (
-              <li key={`${a.entryId}-${i}`} className="flex items-center gap-2 text-xs text-red-700">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                <span className="font-medium">{a.dishName}</span>
-                <span className="text-red-500">— {a.reason}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="text-[10px] text-red-400 mt-3">Revisa estos registros antes de cerrar tu corte de caja.</p>
-        </div>
-      )}
+      <AntifraudAlerts
+        fraudAlerts={fraudAlerts}
+        ticketThreshold={ticketThreshold}
+        tipoCambio={tipoCambio}
+        onTicketThresholdChange={setTicketThreshold}
+        onTipoCambioChange={setTipoCambio}
+      />
 
       {/* ── Day stats ────────────────────────────────────── */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 px-3 py-2">
-          <span className="text-xs text-gray-400 shrink-0">Día:</span>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => { setSelectedDate(e.target.value || todayStr()); setShowAll(false) }}
-            className="text-xs font-semibold text-gray-700 bg-transparent focus:outline-none"
-            aria-label="Seleccionar día a consultar"
-          />
-        </div>
-        <button
-          onClick={() => setShowAll(!showAll)}
-          className={`text-xs font-semibold px-3 py-2 rounded-xl transition-colors ${
-            showAll ? "bg-[#108910] text-white" : "bg-white text-gray-600 border border-gray-100 hover:bg-gray-50"
-          }`}
-        >
-          {showAll ? "Ver solo este día" : "Ver todo el historial"}
-        </button>
-      </div>
+      <DayStats
+        hasEntries={entries.length > 0}
+        dayStats={dayStats}
+        selectedDate={selectedDate}
+        showAll={showAll}
+        tipoCambio={tipoCambio}
+        panelCfg={panelCfg}
+        onDateChange={(v) => {
+          setSelectedDate(v || todayStr())
+          setShowAll(false)
+        }}
+        onToggleShowAll={() => setShowAll(!showAll)}
+        onFocusFirstDish={() => document.getElementById("venta-dish")?.focus()}
+      />
 
-      {entries.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-          <Receipt className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-          <p className="text-gray-400 font-medium mb-1">{t("ventas.emptyTitle")}</p>
-          <p className="text-xs text-gray-300 mb-4">Registra tu primera venta del día para ver tu margen real</p>
-          <button
-            onClick={() => document.getElementById("venta-dish")?.focus()}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Registrar primera venta
-          </button>
-        </div>
-      ) : (
+      {entries.length > 0 && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-              <DollarSign className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
-              <p className="text-lg font-extrabold text-emerald-700">${dayStats.revenue.toFixed(0)}</p>
-              <p className="text-[10px] text-gray-400">Ingresos · {dateLabel(selectedDate)}</p>
-              {tipoCambio !== 1 && <p className="text-[10px] text-gray-300 font-semibold mt-0.5">≈ ${(dayStats.revenue / tipoCambio).toFixed(2)} USD</p>}
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-              <Receipt className="w-5 h-5 text-blue-600 mx-auto mb-1" />
-              <p className="text-lg font-extrabold text-blue-700">${dayStats.cost.toFixed(0)}</p>
-              <p className="text-[10px] text-gray-400">Costo de venta (COGS)</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-              <TrendingUp className="w-5 h-5 text-[#108910] mx-auto mb-1" />
-              <p className={`text-lg font-extrabold ${dayStats.margin >= 0 ? "text-[#108910]" : "text-red-600"}`}>
-                ${dayStats.margin.toFixed(0)}
-              </p>
-              <p className="text-[10px] text-gray-400">Margen bruto</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-              <Target className="w-5 h-5 text-amber-600 mx-auto mb-1" />
-              <p className={`text-lg font-extrabold ${
-                foodCostStatus(dayStats.foodCost, panelCfg) === "red" ? "text-red-600" :
-                foodCostStatus(dayStats.foodCost, panelCfg) === "amber" ? "text-amber-600" : "text-green-700"
-              }`}>
-                {dayStats.foodCost.toFixed(1)}%
-              </p>
-              <p className="text-[10px] text-gray-400">Food cost real del día</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-              <BarChart3 className="w-5 h-5 text-purple-600 mx-auto mb-1" />
-              <p className="text-lg font-extrabold text-purple-700">${dayStats.avgTicket.toFixed(0)}</p>
-              <p className="text-[10px] text-gray-400">Ticket promedio ({dayStats.orders} registros)</p>
-            </div>
-          </div>
+          <CorteCaja
+            methodBreakdown={methodBreakdown}
+            revenue={dayStats.revenue}
+            dayEntryCount={dayEntries.length}
+            selectedDateLabel={dateLabel(selectedDate)}
+            tipoCambio={tipoCambio}
+            onCopy={copyCorte}
+          />
 
-          {/* Corte de caja */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Landmark className="w-4 h-4 text-[#108910]" />
-              <h3 className="text-sm font-semibold text-gray-900">Corte de caja · {dateLabel(selectedDate)}</h3>
-              <button
-                onClick={copyCorte}
-                disabled={dayEntries.length === 0}
-                className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Copiar corte de caja del día seleccionado"
-                aria-label="Copiar corte de caja"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                Copiar corte
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {methodBreakdown.map((m) => (
-                <div key={m.key} className="bg-gray-50 rounded-xl p-3 text-center">
-                  <p className="text-[10px] text-gray-500 mb-1">{m.icon} {m.label}</p>
-                  <p className="text-lg font-extrabold text-gray-800">${m.revenue.toFixed(0)}</p>
-                  <p className="text-[10px] text-gray-400">{m.count} venta{m.count !== 1 ? "s" : ""}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-              <span className="text-xs text-gray-500">Total del día</span>
-              <span className="flex flex-col items-end">
-                <span className="text-lg font-extrabold text-[#108910]">${dayStats.revenue.toFixed(0)}</span>
-                {tipoCambio !== 1 && <span className="text-[10px] text-gray-400">≈ ${(dayStats.revenue / tipoCambio).toFixed(2)} USD</span>}
-              </span>
-            </div>
-          </div>
-
-          {/* ── Management report (period) ─────────────── */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-            <div className="flex items-center gap-2 mb-4 flex-wrap">
-              <BarChart3 className="w-4 h-4 text-purple-600" />
-              <h3 className="text-sm font-semibold text-gray-900">Reporte gerencial</h3>
-              <div className="flex items-center gap-1 ml-auto">
-                {(["hoy", "7d", "30d"] as const).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setReportPeriod(p)}
-                    className={`px-3 py-1 text-[10px] font-semibold rounded-lg transition-colors ${
-                      reportPeriod === p ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                    }`}
-                  >
-                    {p === "hoy" ? "Hoy" : p === "7d" ? "7 días" : "30 días"}
-                  </button>
-                ))}
-                <button
-                  onClick={copyGerencial}
-                  disabled={reportEntries.length === 0}
-                  title="Copiar reporte gerencial del período"
-                  aria-label="Copiar reporte gerencial"
-                  className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  Copiar reporte
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-gray-500 mb-1">Ingresos</p>
-                <p className="text-lg font-extrabold text-[#108910]">${reportStats.revenue.toFixed(0)}</p>
-                <p className="text-[10px] text-gray-400">{reportStats.orders} ticket{reportStats.orders !== 1 ? "s" : ""}</p>
-                {tipoCambio !== 1 && <p className="text-[10px] text-gray-300 font-semibold">≈ ${(reportStats.revenue / tipoCambio).toFixed(2)} USD</p>}
-              </div>
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-gray-500 mb-1">Costo de venta</p>
-                <p className="text-lg font-extrabold text-gray-800">${reportStats.cost.toFixed(0)}</p>
-                <p className="text-[10px] text-gray-400">{reportStats.units} platillos</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-gray-500 mb-1">Margen bruto</p>
-                <p className="text-lg font-extrabold text-gray-800">${reportStats.margin.toFixed(0)}</p>
-                <p className="text-[10px] text-gray-400">ingresos − costo</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-gray-500 mb-1">Food cost</p>
-                <p className="text-lg font-extrabold text-gray-800">{reportStats.foodCost.toFixed(1)}%</p>
-                <p className="text-[10px] text-gray-400">costo / ingresos</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-gray-500 mb-1">Ticket promedio</p>
-                <p className="text-lg font-extrabold text-gray-800">${reportStats.avgTicket.toFixed(0)}</p>
-                <p className="text-[10px] text-gray-400">{reportStats.orders > 0 ? "por ticket" : "sin ventas"}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-gray-500 mb-1">Descuentos</p>
-                <p className="text-lg font-extrabold text-red-600">-${reportStats.discount.toFixed(0)}</p>
-                <p className="text-[10px] text-gray-400">otorgados</p>
-              </div>
-            </div>
-
-            {(reportEntries.length > 0 || comparison.prev.orders > 0) && (
-              <div className="grid sm:grid-cols-3 gap-3 mb-4">
-                {[
-                  { label: "Ingresos", cur: comparison.cur.revenue, prev: comparison.prev.revenue, delta: comparison.revenueDelta },
-                  { label: "Tickets", cur: comparison.cur.orders, prev: comparison.prev.orders, delta: comparison.ordersDelta },
-                  { label: "Ticket promedio", cur: comparison.cur.avgTicket, prev: comparison.prev.avgTicket, delta: comparison.avgDelta },
-                ].map((x) => (
-                  <div key={x.label} className="bg-gray-50 rounded-xl p-3 text-center border border-dashed border-gray-200">
-                    <p className="text-[10px] text-gray-500 mb-1">vs período anterior — {x.label}</p>
-                    <p className="text-sm font-extrabold text-gray-800">{x.label === "Tickets" ? x.cur : `$${x.cur.toFixed(0)}`}</p>
-                    <p className={`text-[10px] font-bold ${x.delta >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {x.delta >= 0 ? "↑" : "↓"} {Math.abs(x.delta).toFixed(0)}%
-                      <span className="text-gray-400 font-medium"> · prev {x.label === "Tickets" ? x.prev : `$${x.prev.toFixed(0)}`}</span>
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {reportEntries.length === 0 ? (
-              <p className="text-xs text-gray-400">Sin ventas en este período.</p>
-            ) : (
-              <div className="grid sm:grid-cols-3 gap-4 text-xs">
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500 font-semibold mb-2">Por método de pago</p>
-                  <div className="space-y-1.5">
-                    {reportMethods.length === 0 ? (
-                      <p className="text-gray-400">—</p>
-                    ) : reportMethods.map((m) => (
-                      <div key={m.key} className="flex items-center justify-between gap-2">
-                        <span className="text-gray-600">{m.icon} {m.label}</span>
-                        <span className="font-semibold text-gray-800">${m.revenue.toFixed(0)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500 font-semibold mb-2">Por canal</p>
-                  <div className="space-y-1.5">
-                    {reportChannels.length === 0 ? (
-                      <p className="text-gray-400">—</p>
-                    ) : reportChannels.map((c) => (
-                      <div key={c.key} className="flex items-center justify-between gap-2">
-                        <span className="text-gray-600">{c.icon} {c.label}</span>
-                        <span className="font-semibold text-gray-800">${c.revenue.toFixed(0)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-500 font-semibold mb-2">Top productos</p>
-                  <div className="space-y-1.5">
-                    {reportTop.length === 0 ? (
-                      <p className="text-gray-400">—</p>
-                    ) : reportTop.map((t, i) => (
-                      <div key={t.name} className="flex items-center justify-between gap-2">
-                        <span className="text-gray-600 truncate">{i + 1}. {t.name}</span>
-                        <span className="font-semibold text-gray-800 shrink-0">{t.qty} pz</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <ManagementReport
+            reportPeriod={reportPeriod}
+            reportStats={reportStats}
+            reportEntries={reportEntries}
+            reportMethods={reportMethods}
+            reportChannels={reportChannels}
+            reportTop={reportTop}
+            comparison={comparison}
+            tipoCambio={tipoCambio}
+            onPeriodChange={setReportPeriod}
+            onCopy={copyGerencial}
+          />
 
           <div className="grid lg:grid-cols-2 gap-6 mb-6">
-            {/* 7-day trend */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart3 className="w-4 h-4 text-emerald-600" />
-                <h3 className="text-sm font-semibold text-gray-900">Ingresos últimos 7 días</h3>
-              </div>
-              <div className="flex items-end gap-2 h-32">
-                {weekTrend.days.map((d, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
-                    <span className="text-[9px] text-gray-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                      ${d.revenue.toFixed(0)}
-                    </span>
-                    <div
-                      className={`w-full rounded-t-lg transition-all ${
-                        d.revenue > 0 ? "bg-emerald-500 group-hover:bg-emerald-600" : "bg-gray-100"
-                      }`}
-                      style={{ height: `${Math.max(d.revenue > 0 ? (d.revenue / weekTrend.max) * 100 : 3, 3)}%` }}
-                      title={`${d.label}: $${d.revenue.toFixed(0)} (costo $${d.cost.toFixed(0)})`}
-                    />
-                    <span className={`text-[10px] ${d.revenue > 0 ? "text-gray-600 font-medium" : "text-gray-300"}`}>
-                      {d.label.length > 5 ? d.label.slice(0, 3) : d.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[10px] text-gray-400 mt-3">Pasa el cursor sobre cada barra para ver el detalle.</p>
-            </div>
-
-            {/* Top sellers */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="w-4 h-4 text-[#108910]" />
-                <h3 className="text-sm font-semibold text-gray-900">Top ventas · {dateLabel(selectedDate)}</h3>
-              </div>
-              {topSellers.length === 0 ? (
-                <p className="text-xs text-gray-400">Sin ventas este día.</p>
-              ) : (
-                <div className="space-y-2">
-                  {topSellers.map((t, i) => {
-                    const pct = dayStats.units > 0 ? (t.qty / dayStats.units) * 100 : 0
-                    return (
-                      <div key={t.name} className="flex items-center gap-2 text-xs">
-                        <span className="w-5 text-gray-400 font-bold">{i + 1}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between mb-0.5">
-                            <span className="font-medium text-gray-700 truncate">{t.name}</span>
-                            <span className="text-gray-400 shrink-0 ml-2">{t.qty} pz · ${t.revenue.toFixed(0)}</span>
-                          </div>
-                          <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                            <div className="h-full bg-[#108910] rounded-full" style={{ width: `${pct}%` }} />
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+            <WeekTrend weekTrend={weekTrend} />
+            <TopSellers
+              topSellers={topSellers}
+              totalUnits={dayStats.units}
+              selectedDateLabel={dateLabel(selectedDate)}
+            />
           </div>
 
-          {/* Entries list */}
-          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-900">
-                {showAll ? `Historial completo (${entries.length})` : `Ventas de ${dateLabel(selectedDate)} (${dayEntries.length})`}
-              </h3>
-              {!showAll && dayStats.units > 0 && (
-                <span className="text-xs text-gray-400">{dayStats.units} platillos vendidos</span>
-              )}
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs" aria-label={t("ventas.title")}>
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Platillo</th>
-                    <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Cant.</th>
-                    <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Precio</th>
-                    <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Costo</th>
-                    <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Total</th>
-                    <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Margen</th>
-                    <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Fecha</th>
-                    <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Pago</th>
-                    <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Canal</th>
-                    <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleEntries
-                    .slice()
-                    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
-                    .map((e) => {
-                      const subtotal = e.quantity * e.unitPrice
-                      const total = entryTotal(e)
-                      const cost = e.quantity * e.unitCost
-                      const margin = total - cost
-                      const currentCost = dishCost(e.dishId)
-                      const costStale = e.dishId && currentCost > 0 && Math.abs(currentCost - e.unitCost) > 0.01
-                      return (
-                        <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1.5">
-                              <p className="font-semibold text-gray-800">{e.dishName}</p>
-                              {e.clienteId && (() => {
-                                const c = clientes.find((x) => x.id === e.clienteId)
-                                return c ? <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full font-medium">👤 {c.nombre}</span> : null
-                              })()}
-                            </div>
-                            <p className="text-[10px] text-gray-400">${e.unitPrice.toFixed(0)} / ${e.unitCost.toFixed(2)}</p>
-                            {e.modificadores && e.modificadores.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {e.modificadores.map((m) => (
-                                  <span key={m.nombre} className="text-[9px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium">
-                                    +{m.nombre}{m.precio > 0 ? ` $${m.precio.toFixed(0)}` : ""}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => adjustQty(e.id, -1)}
-                                disabled={e.quantity <= 1}
-                                className="w-5 h-5 rounded bg-red-50 text-red-500 hover:bg-red-100 text-xs font-bold transition-colors disabled:opacity-40"
-                                aria-label={`Reducir cantidad de ${e.dishName}`}
-                              >−</button>
-                              <span className="w-6 text-center font-bold text-gray-800">{e.quantity}</span>
-                              <button
-                                onClick={() => adjustQty(e.id, 1)}
-                                className="w-5 h-5 rounded bg-green-50 text-green-600 hover:bg-green-100 text-xs font-bold transition-colors"
-                                aria-label={`Aumentar cantidad de ${e.dishName}`}
-                              >+</button>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-right text-gray-700 font-medium">${e.unitPrice.toFixed(0)}</td>
-                          <td className="px-4 py-3 text-right text-gray-500">${cost.toFixed(0)}
-                            {costStale && (
-                              <span
-                                className="block text-[9px] text-amber-600 font-semibold mt-0.5 cursor-help"
-                                title={`El costo registrado fue $${e.unitCost.toFixed(2)}/u; hoy el platillo cuesta $${currentCost.toFixed(2)}/u. El margen usa el costo congelado de la venta.`}
-                              >
-                                ⚠ costo actualizado
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {e.discount ? (
-                              <>
-                                <p className="text-[10px] text-gray-400 line-through">${subtotal.toFixed(0)}</p>
-                                <p className="font-bold text-red-600">${total.toFixed(0)}</p>
-                                <p className="text-[9px] text-red-400 font-semibold">
-                                  {e.discount.type === "porcentaje" ? `${e.discount.value}%` : `-$${e.discount.value.toFixed(0)}`} desc.
-                                </p>
-                              </>
-                            ) : (
-                              <p className="font-bold text-gray-900">${total.toFixed(0)}</p>
-                            )}
-                          </td>
-                          <td className={`px-4 py-3 text-right font-bold ${margin >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            ${margin.toFixed(0)}
-                          </td>
-                          <td className="px-4 py-3 text-center text-gray-500 whitespace-nowrap">{dateLabel(e.date)}</td>
-                          <td className="px-4 py-3 text-center whitespace-nowrap">
-                            {(() => {
-                              const m = PAYMENT_METHODS.find((p) => p.key === (e.paymentMethod || "efectivo"))
-                              return (
-                                <span className="text-[10px] text-gray-500" title={m?.label}>
-                                  {m?.icon} {m?.label}
-                                </span>
-                              )
-                            })()}
-                          </td>
-                          <td className="px-4 py-3 text-center whitespace-nowrap">
-                            {(() => {
-                              const c = SALE_CHANNELS.find((ch) => ch.key === (e.channel || "comedor"))
-                              return (
-                                <span className="text-[10px] text-gray-500" title={c?.label}>
-                                  {c?.icon} {c?.label}
-                                </span>
-                              )
-                            })()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-center">
-                              <button
-                                onClick={() => setDeleteConfirm(e.id)}
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Eliminar venta"
-                                aria-label={`Eliminar venta de ${e.dishName}`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                </tbody>
-              </table>
-            </div>
-            {visibleEntries.length === 0 && (
-              <div className="text-center py-10">
-                <p className="text-xs text-gray-400">No hay ventas para mostrar.</p>
-              </div>
-            )}
-          </div>
+          <EntriesList
+            showAll={showAll}
+            entriesCount={entries.length}
+            dayEntriesCount={dayEntries.length}
+            units={dayStats.units}
+            selectedDateLabel={dateLabel(selectedDate)}
+            visibleEntries={visibleEntries}
+            clientes={clientes}
+            dishCost={dishCost}
+            onAdjustQty={adjustQty}
+            onDeleteClick={(id) => setDeleteConfirm(id)}
+          />
         </>
       )}
 
       {/* All-time tip */}
-      {entries.length > 0 && (
-        <div className="mt-6 bg-gradient-to-r from-[#F0FDF4] to-white rounded-2xl border border-[#108910]/10 p-5">
-          <div className="flex items-start gap-3">
-            <Receipt className="w-5 h-5 text-[#108910] mt-0.5 shrink-0" />
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-1 text-sm">Tu historial en total</h4>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                {allTimeStats.count} registros · ${allTimeStats.revenue.toFixed(0)} ingresos · ${allTimeStats.margin.toFixed(0)} margen bruto
-                {allTimeStats.foodCost > 0 && ` · food cost promedio ${allTimeStats.foodCost.toFixed(1)}%`}.
-                Un food cost arriba de {panelCfg.foodCostRedAbove}% significa que estás regalando margen: ajusta precios desde el Costeador.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <AllTimeTip
+        hasEntries={entries.length > 0}
+        allTimeStats={allTimeStats}
+        foodCostRedAbove={panelCfg.foodCostRedAbove}
+      />
 
       {/* Delete confirm */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setDeleteConfirm(null)}>
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-4">
-              <AlertCircle className="w-5 h-5 text-red-500" />
-              <h3 className="font-bold text-gray-900">¿Eliminar esta venta?</h3>
-            </div>
-            <p className="text-sm text-gray-500 mb-4">Esta acción no se puede deshacer.</p>
-            {deductStock && (
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
-                El stock que se descontó al registrar esta venta no se repondrá automáticamente.
-              </p>
-            )}
-            <div className="flex gap-2">
-              <button onClick={() => setDeleteConfirm(null)}
-                className="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors font-medium">
-                Cancelar
-              </button>
-              <button onClick={() => deleteEntry(deleteConfirm)}
-                className="flex-1 px-4 py-2 text-sm text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors font-semibold">
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal
+        entryId={deleteConfirm}
+        deductStock={deductStock}
+        onCancel={() => setDeleteConfirm(null)}
+        onConfirm={deleteEntry}
+      />
     </div>
   )
 }
