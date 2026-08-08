@@ -131,9 +131,23 @@ export async function proxy(request: NextRequest) {
   const isAsset = ASSET_PATHS.some((p) => pathname.startsWith(p))
 
   let cspHeader: string | null = null
+  let cspReportOnlyHeader: string | null = null
+  const reportOnlyEnabled = ["true", "1"].includes(
+    (process.env.CSP_REPORT_ONLY ?? "").toLowerCase()
+  )
   if (!isPrefetch && !isAsset) {
     const nonce = Buffer.from(crypto.randomUUID()).toString("base64")
     cspHeader = buildCspHeader(nonce)
+    // En modo report-only se observa el endurecimiento sin romper nada: se
+    // envían ambas policies con el mismo nonce. La report-only quita los hosts
+    // de terceros de script-src; si GA4/Meta Pixel cargan vía strict-dynamic
+    // (navegadores modernos) no generarán reportes, lo que valida que se puede
+    // endurecer. Los reportes de navegadores legacy indican dependencia del
+    // fallback CSP2 (ver src/lib/csp.ts y /api/csp-report).
+    if (reportOnlyEnabled) {
+      cspReportOnlyHeader = buildCspHeader(nonce, { hardened: true })
+      request.headers.set("Content-Security-Policy-Report-Only", cspReportOnlyHeader)
+    }
     request.headers.set("x-nonce", nonce)
     request.headers.set("Content-Security-Policy", cspHeader)
   }
@@ -143,6 +157,9 @@ export async function proxy(request: NextRequest) {
 
   if (cspHeader) {
     supabaseResponse.headers.set("Content-Security-Policy", cspHeader)
+  }
+  if (cspReportOnlyHeader) {
+    supabaseResponse.headers.set("Content-Security-Policy-Report-Only", cspReportOnlyHeader)
   }
 
   // ── City detection & routing ──

@@ -13,15 +13,33 @@
  *   sin abrir `<style>`/CSS externo (que requieren nonce/'self').
  * - `frame-ancestors 'none'` + `object-src 'none'`: anti-clickjacking y sin
  *   plugins; el proyecto ya envía `X-Frame-Options: DENY`.
+ *
+ * Modo report-only (endurecimiento): con `{ hardened: true }` se eliminan los
+ * hosts de terceros de `script-src`, dejando solo `'self'` + nonce +
+ * `'strict-dynamic'`. En navegadores modernos `strict-dynamic` ya permite los
+ * scripts cargados dinámicamente por un script con nonce (GA4/Meta), así que
+ * la política endurecida no cambia el comportamiento real; los hosts solo son
+ * un fallback para navegadores sin soporte. El proxy puede enviar esta versión
+ * como `Content-Security-Policy-Report-Only` (ver `src/proxy.ts`) para
+ * observar qué violaciones generarían los navegadores legacy antes de
+ * endurecer definitivamente.
  */
 
 const SUPABASE_HOST = "isogthougrpctnfzcdes.supabase.co"
 
-export function buildCspHeader(nonce: string): string {
+type CspOptions = {
+  /** Elimina los hosts de terceros de script-src (solo 'self'+nonce+strict-dynamic). */
+  hardened?: boolean
+}
+
+export function buildCspHeader(nonce: string, options: CspOptions = {}): string {
   const isDev = process.env.NODE_ENV === "development"
+  const thirdPartyScripts = options.hardened
+    ? ""
+    : " https://www.googletagmanager.com https://connect.facebook.net"
   return `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""} https://www.googletagmanager.com https://connect.facebook.net;
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}${thirdPartyScripts};
     style-src 'self' 'nonce-${nonce}';
     style-src-attr 'unsafe-inline';
     img-src 'self' blob: data: https://${SUPABASE_HOST} https://storage.googleapis.com https://www.facebook.com;
