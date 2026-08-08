@@ -50,3 +50,6 @@ AGENTS.md
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Verificación de entornos Vercel (secrets redactados)
+.env.*.tmp
