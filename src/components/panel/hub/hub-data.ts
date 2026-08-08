@@ -34,7 +34,7 @@ export interface HubStats {
   monthlyGoal: number
 }
 
-export interface HubMethodStats {
+interface HubMethodStats {
   key: string
   label: string
   icon: string
