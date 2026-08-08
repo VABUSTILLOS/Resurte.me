@@ -11,7 +11,7 @@ import { CartDrawer, MobileCartBar } from "@/components/cart/cart-drawer"
 import { WhatsAppButton } from "@/components/whatsapp/whatsapp-button"
 import { Analytics } from "@/lib/analytics"
 import { CookieConsent } from "@/components/ui/cookie-consent"
-import { OnboardingWizard } from "@/components/onboarding-wizard"
+import { OnboardingWizardGate } from "@/components/onboarding-wizard-gate"
 import { getOrganizationSchema } from "@/lib/structured-data"
 import "./globals.css"
 
@@ -151,7 +151,7 @@ export default async function RootLayout({
         <Analytics nonce={nonce} />
         <CityProvider initialCitySlug={initialCitySlug}>
           <CartProvider>
-            <OnboardingWizard />
+            <OnboardingWizardGate />
             <Header />
             <main id="main-content" className="flex-1"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
             <Footer />

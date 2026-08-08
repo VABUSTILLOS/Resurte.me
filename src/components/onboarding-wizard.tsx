@@ -69,12 +69,18 @@ const STEPS = [
   { id: "done", title: "¡Todo listo!", subtitle: "Estamos listos para ayudarte a crecer" },
 ]
 
-export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
+export function OnboardingWizard({
+  onComplete,
+  startVisible = false,
+}: {
+  onComplete?: () => void
+  startVisible?: boolean
+}) {
   const [supabase] = useState(() =>
     typeof window === "undefined" ? null : createClient()
   )
   const [step, setStep] = useState(0)
-  const [visible, setVisible] = useState(false)
+  const [visible, setVisible] = useState(startVisible)
   const [data, setData] = useState<OnboardingData>({
     businessType: null,
     monthlyBudget: 15000,
@@ -86,6 +92,12 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
   // Check if onboarding is needed
   useEffect(() => {
     if (!supabase) return
+
+    // El gate ya verificó sesión+localStorage; solo falta el trackEvent.
+    if (startVisible) {
+      trackEvent("onboarding_wizard_start", { step: 0 })
+      return
+    }
 
     async function check() {
       // Check localStorage first
@@ -110,7 +122,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
     // Small delay so page renders first
     const timer = setTimeout(check, 800)
     return () => clearTimeout(timer)
-  }, [supabase])
+  }, [supabase, startVisible])
 
   const currentStep = STEPS[step] ?? STEPS[0]!
   const isLast = step === STEPS.length - 1
