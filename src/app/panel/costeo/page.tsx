@@ -8,559 +8,30 @@ import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { uid } from "@/lib/ids"
-import Link from "next/link"
+import { Calculator } from "lucide-react"
 import {
-  Calculator, Plus, Trash2, PieChart, ArrowLeft, Gift, Tag,
-  Percent, TrendingDown, AlertCircle, Edit3, Download,
-  Copy, Printer, BookOpen, Save,
-} from "lucide-react"
-import EmptyState from "@/components/panel/EmptyState"
-import ConfirmDialog from "@/components/panel/ConfirmDialog"
-import NumberInput from "@/components/panel/NumberInput"
-import { t } from "@/lib/i18n/es"
-
-// Mock ingredients per collection type — in production this comes from Resurte.me catalog
-const MOCK_INGREDIENTS: Record<string, { name: string; unit: string; price: number }[]> = {
-  "hamburguesas-hot-dogs": [
-    { name: "Carne molida sirloin 80/20", unit: "kg", price: 189 },
-    { name: "Pan brioche para hamburguesa", unit: "pza", price: 8.5 },
-    { name: "Queso cheddar rebanado", unit: "rebanada", price: 6 },
-    { name: "Tocino ahumado", unit: "kg", price: 210 },
-    { name: "Papas congeladas", unit: "kg", price: 52 },
-    { name: "Lechuga iceberg", unit: "pza", price: 18 },
-    { name: "Jitomate bola", unit: "kg", price: 35 },
-    { name: "Cebolla blanca", unit: "kg", price: 28 },
-  ],
-  "taquerias-antojitos": [
-    { name: "Bistec de res para asada", unit: "kg", price: 220 },
-    { name: "Carne de cerdo para pastor", unit: "kg", price: 165 },
-    { name: "Tortilla de maíz taquera", unit: "kg", price: 32 },
-    { name: "Cilantro fresco", unit: "manojo", price: 8 },
-    { name: "Cebolla blanca", unit: "kg", price: 28 },
-    { name: "Limón", unit: "kg", price: 30 },
-    { name: "Queso asadero", unit: "kg", price: 145 },
-    { name: "Salsa verde preparada", unit: "L", price: 48 },
-  ],
-  "pizzas-comida-italiana": [
-    { name: "Harina de fuerza 00", unit: "kg", price: 42 },
-    { name: "Queso mozzarella rallado", unit: "kg", price: 160 },
-    { name: "Pepperoni rebanado", unit: "kg", price: 195 },
-    { name: "Puré de tomate enlatado", unit: "lata 2.5kg", price: 65 },
-    { name: "Aceite de oliva extra virgen", unit: "L", price: 180 },
-    { name: "Albahaca fresca", unit: "manojo", price: 15 },
-  ],
-  "comida-mexicana-corrida": [
-    { name: "Pechuga de pollo", unit: "kg", price: 120 },
-    { name: "Arroz grano largo", unit: "kg", price: 28 },
-    { name: "Frijol negro", unit: "kg", price: 35 },
-    { name: "Jitomate bola", unit: "kg", price: 35 },
-    { name: "Chile serrano", unit: "kg", price: 40 },
-    { name: "Tortilla de maíz", unit: "kg", price: 28 },
-    { name: "Aceite vegetal", unit: "L", price: 45 },
-  ],
-  "mariscos-pescados": [
-    { name: "Camarón mediano crudo", unit: "kg", price: 320 },
-    { name: "Filete de pescado blanco", unit: "kg", price: 180 },
-    { name: "Pulpo cocido", unit: "kg", price: 380 },
-    { name: "Tostadas de maíz", unit: "paquete 20pz", price: 22 },
-    { name: "Aguacate hass", unit: "kg", price: 65 },
-    { name: "Limón", unit: "kg", price: 30 },
-  ],
-  "pollo-alitas": [
-    { name: "Alitas de pollo", unit: "kg", price: 95 },
-    { name: "Boneless de pollo", unit: "kg", price: 130 },
-    { name: "Salsa Buffalo", unit: "L", price: 85 },
-    { name: "Salsa BBQ", unit: "L", price: 78 },
-    { name: "Aceite por bidón", unit: "L", price: 42 },
-    { name: "Aderezo blue cheese", unit: "L", price: 95 },
-  ],
-  "sushi-comida-asiatica": [
-    { name: "Salmón grado sushi", unit: "kg", price: 480 },
-    { name: "Arroz para sushi", unit: "kg", price: 55 },
-    { name: "Alga nori", unit: "paquete 50h", price: 120 },
-    { name: "Aguacate hass", unit: "kg", price: 65 },
-    { name: "Queso crema Philadelphia", unit: "kg", price: 150 },
-    { name: "Salsa de soya", unit: "L", price: 72 },
-  ],
-  "cortes-carne-asaderos": [
-    { name: "Ribeye importado", unit: "kg", price: 580 },
-    { name: "Arrachera marinada", unit: "kg", price: 320 },
-    { name: "Chorizo argentino", unit: "kg", price: 185 },
-    { name: "Papa para asar", unit: "kg", price: 35 },
-    { name: "Chile morrón", unit: "kg", price: 45 },
-    { name: "Sal de grano", unit: "kg", price: 28 },
-  ],
-  "cafeterias-crepas-desayunos": [
-    { name: "Huevo fresco", unit: "docena", price: 48 },
-    { name: "Harina para hot cakes", unit: "kg", price: 38 },
-    { name: "Café en grano", unit: "kg", price: 220 },
-    { name: "Leche entera", unit: "L", price: 28 },
-    { name: "Jarabe de maple", unit: "L", price: 130 },
-    { name: "Nutella", unit: "kg", price: 180 },
-  ],
-  "saludable-ensaladas-pokes": [
-    { name: "Salmón fresco", unit: "kg", price: 450 },
-    { name: "Atún fresco", unit: "kg", price: 380 },
-    { name: "Quinoa", unit: "kg", price: 85 },
-    { name: "Mix de lechugas baby", unit: "kg", price: 72 },
-    { name: "Edamame", unit: "kg", price: 65 },
-    { name: "Aderezo de jengibre", unit: "L", price: 95 },
-  ],
-  "postres-panaderia-helados": [
-    { name: "Harina de trigo", unit: "kg", price: 32 },
-    { name: "Mantequilla sin sal", unit: "kg", price: 160 },
-    { name: "Chocolate belga", unit: "kg", price: 280 },
-    { name: "Crema para batir", unit: "L", price: 75 },
-    { name: "Azúcar glass", unit: "kg", price: 35 },
-    { name: "Vainilla natural", unit: "L", price: 350 },
-  ],
-  "comida-arabe-griega": [
-    { name: "Carne de cordero", unit: "kg", price: 340 },
-    { name: "Pechuga de pollo", unit: "kg", price: 120 },
-    { name: "Garbanzo seco", unit: "kg", price: 42 },
-    { name: "Tahini", unit: "kg", price: 160 },
-    { name: "Pan pita", unit: "paquete 10pz", price: 38 },
-    { name: "Yogur griego natural", unit: "L", price: 65 },
-  ],
-  "comida-venezolana-latina": [
-    { name: "Harina P.A.N.", unit: "kg", price: 45 },
-    { name: "Carne mechada", unit: "kg", price: 195 },
-    { name: "Plátano macho", unit: "kg", price: 30 },
-    { name: "Queso blanco duro", unit: "kg", price: 140 },
-    { name: "Frijol negro", unit: "kg", price: 35 },
-    { name: "Aguacate hass", unit: "kg", price: 65 },
-  ],
-  "bebidas-bares-botanas": [
-    { name: "Cacahuate japonés", unit: "kg", price: 72 },
-    { name: "Cueritos encurtidos", unit: "kg", price: 55 },
-    { name: "Alitas de pollo", unit: "kg", price: 95 },
-    { name: "Limón", unit: "kg", price: 30 },
-    { name: "Sal de grano", unit: "kg", price: 28 },
-    { name: "Chile en polvo", unit: "kg", price: 85 },
-  ],
-}
-
-// Recetas pregrabadas por tipo de colección — para costear platillos típicos al instante
-interface RecipeIngredient {
-  name: string
-  quantity: number
-  unit: string
-}
-
-interface Recipe {
-  id: string
-  name: string
-  category: string
-  portions: number
-  ingredients: RecipeIngredient[]
-}
-
-const PRESET_RECIPES: Record<string, Recipe[]> = {
-  "hamburguesas-hot-dogs": [
-    {
-      id: "rec-hamburguesa-clasica", name: "Hamburguesa clásica", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Pan brioche para hamburguesa", quantity: 1, unit: "pza" },
-        { name: "Carne molida sirloin 80/20", quantity: 0.16, unit: "kg" },
-        { name: "Queso cheddar rebanado", quantity: 1, unit: "rebanada" },
-        { name: "Lechuga iceberg", quantity: 0.03, unit: "pza" },
-        { name: "Jitomate bola", quantity: 0.04, unit: "kg" },
-      ],
-    },
-    {
-      id: "rec-hamburguesa-bacon", name: "Hamburguesa con tocino", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Pan brioche para hamburguesa", quantity: 1, unit: "pza" },
-        { name: "Carne molida sirloin 80/20", quantity: 0.18, unit: "kg" },
-        { name: "Tocino ahumado", quantity: 0.05, unit: "kg" },
-        { name: "Queso cheddar rebanado", quantity: 1, unit: "rebanada" },
-        { name: "Cebolla blanca", quantity: 0.02, unit: "kg" },
-      ],
-    },
-    {
-      id: "rec-papas-francesa", name: "Papas a la francesa", category: "acompanamiento", portions: 4,
-      ingredients: [
-        { name: "Papas congeladas", quantity: 1, unit: "kg" },
-      ],
-    },
-  ],
-  "taquerias-antojitos": [
-    {
-      id: "rec-tacos-pastor", name: "Tacos al pastor", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Carne de cerdo para pastor", quantity: 0.12, unit: "kg" },
-        { name: "Tortilla de maíz taquera", quantity: 0.12, unit: "kg" },
-        { name: "Cilantro fresco", quantity: 0.02, unit: "manojo" },
-        { name: "Cebolla blanca", quantity: 0.02, unit: "kg" },
-        { name: "Salsa verde preparada", quantity: 0.03, unit: "L" },
-      ],
-    },
-    {
-      id: "rec-tacos-bistec", name: "Tacos de bistec", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Bistec de res para asada", quantity: 0.14, unit: "kg" },
-        { name: "Tortilla de maíz taquera", quantity: 0.12, unit: "kg" },
-        { name: "Cilantro fresco", quantity: 0.02, unit: "manojo" },
-        { name: "Cebolla blanca", quantity: 0.02, unit: "kg" },
-      ],
-    },
-    {
-      id: "rec-quesadilla-asadero", name: "Quesadilla de asadero", category: "entrada", portions: 1,
-      ingredients: [
-        { name: "Tortilla de maíz taquera", quantity: 0.06, unit: "kg" },
-        { name: "Queso asadero", quantity: 0.06, unit: "kg" },
-      ],
-    },
-  ],
-  "pizzas-comida-italiana": [
-    {
-      id: "rec-pizza-margarita", name: "Pizza margarita", category: "plato-fuerte", portions: 2,
-      ingredients: [
-        { name: "Harina de fuerza 00", quantity: 0.28, unit: "kg" },
-        { name: "Puré de tomate enlatado", quantity: 0.15, unit: "lata 2.5kg" },
-        { name: "Queso mozzarella rallado", quantity: 0.2, unit: "kg" },
-        { name: "Aceite de oliva extra virgen", quantity: 0.02, unit: "L" },
-        { name: "Albahaca fresca", quantity: 0.02, unit: "manojo" },
-      ],
-    },
-    {
-      id: "rec-pizza-pepperoni", name: "Pizza de pepperoni", category: "plato-fuerte", portions: 2,
-      ingredients: [
-        { name: "Harina de fuerza 00", quantity: 0.28, unit: "kg" },
-        { name: "Puré de tomate enlatado", quantity: 0.15, unit: "lata 2.5kg" },
-        { name: "Queso mozzarella rallado", quantity: 0.2, unit: "kg" },
-        { name: "Pepperoni rebanado", quantity: 0.15, unit: "kg" },
-      ],
-    },
-  ],
-  "comida-mexicana-corrida": [
-    {
-      id: "rec-pollo-arroz", name: "Pollo con arroz", category: "plato-fuerte", portions: 4,
-      ingredients: [
-        { name: "Pechuga de pollo", quantity: 1, unit: "kg" },
-        { name: "Arroz grano largo", quantity: 0.5, unit: "kg" },
-        { name: "Aceite vegetal", quantity: 0.08, unit: "L" },
-        { name: "Jitomate bola", quantity: 0.2, unit: "kg" },
-      ],
-    },
-    {
-      id: "rec-arroz-mexicana", name: "Arroz a la mexicana", category: "acompanamiento", portions: 4,
-      ingredients: [
-        { name: "Arroz grano largo", quantity: 0.5, unit: "kg" },
-        { name: "Jitomate bola", quantity: 0.3, unit: "kg" },
-        { name: "Aceite vegetal", quantity: 0.06, unit: "L" },
-      ],
-    },
-    {
-      id: "rec-frijoles-charros", name: "Frijoles charros", category: "acompanamiento", portions: 6,
-      ingredients: [
-        { name: "Frijol negro", quantity: 0.6, unit: "kg" },
-        { name: "Tortilla de maíz", quantity: 0.1, unit: "kg" },
-        { name: "Chile serrano", quantity: 0.05, unit: "kg" },
-      ],
-    },
-  ],
-  "mariscos-pescados": [
-    {
-      id: "rec-ceviche-camaron", name: "Ceviche de camarón", category: "entrada", portions: 4,
-      ingredients: [
-        { name: "Camarón mediano crudo", quantity: 0.8, unit: "kg" },
-        { name: "Limón", quantity: 0.3, unit: "kg" },
-        { name: "Tostadas de maíz", quantity: 1, unit: "paquete 20pz" },
-        { name: "Aguacate hass", quantity: 0.2, unit: "kg" },
-      ],
-    },
-    {
-      id: "rec-filete-plancha", name: "Filete de pescado a la plancha", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Filete de pescado blanco", quantity: 0.2, unit: "kg" },
-        { name: "Limón", quantity: 0.03, unit: "kg" },
-      ],
-    },
-    {
-      id: "rec-tostadas-pulpo", name: "Tostadas de pulpo", category: "entrada", portions: 4,
-      ingredients: [
-        { name: "Pulpo cocido", quantity: 0.6, unit: "kg" },
-        { name: "Tostadas de maíz", quantity: 1, unit: "paquete 20pz" },
-        { name: "Aguacate hass", quantity: 0.3, unit: "kg" },
-      ],
-    },
-  ],
-  "pollo-alitas": [
-    {
-      id: "rec-alitas-bbq", name: "Alitas BBQ", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Alitas de pollo", quantity: 0.3, unit: "kg" },
-        { name: "Salsa BBQ", quantity: 0.04, unit: "L" },
-        { name: "Aceite por bidón", quantity: 0.03, unit: "L" },
-      ],
-    },
-    {
-      id: "rec-boneless-buffalo", name: "Boneless Buffalo", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Boneless de pollo", quantity: 0.25, unit: "kg" },
-        { name: "Salsa Buffalo", quantity: 0.05, unit: "L" },
-        { name: "Aderezo blue cheese", quantity: 0.03, unit: "L" },
-      ],
-    },
-  ],
-  "sushi-comida-asiatica": [
-    {
-      id: "rec-roll-philadelphia", name: "Roll de salmón Philadelphia", category: "plato-fuerte", portions: 2,
-      ingredients: [
-        { name: "Salmón grado sushi", quantity: 0.2, unit: "kg" },
-        { name: "Arroz para sushi", quantity: 0.3, unit: "kg" },
-        { name: "Alga nori", quantity: 0.5, unit: "paquete 50h" },
-        { name: "Aguacate hass", quantity: 0.1, unit: "kg" },
-        { name: "Queso crema Philadelphia", quantity: 0.1, unit: "kg" },
-      ],
-    },
-    {
-      id: "rec-nigiri-salmon", name: "Nigiri de salmón", category: "plato-fuerte", portions: 4,
-      ingredients: [
-        { name: "Salmón grado sushi", quantity: 0.15, unit: "kg" },
-        { name: "Arroz para sushi", quantity: 0.2, unit: "kg" },
-        { name: "Alga nori", quantity: 0.25, unit: "paquete 50h" },
-      ],
-    },
-  ],
-  "cortes-carne-asaderos": [
-    {
-      id: "rec-ribeye", name: "Ribeye a la parrilla", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Ribeye importado", quantity: 0.35, unit: "kg" },
-        { name: "Sal de grano", quantity: 0.01, unit: "kg" },
-      ],
-    },
-    {
-      id: "rec-arrachera-papas", name: "Arrachera con papas", category: "plato-fuerte", portions: 2,
-      ingredients: [
-        { name: "Arrachera marinada", quantity: 0.6, unit: "kg" },
-        { name: "Papa para asar", quantity: 0.6, unit: "kg" },
-        { name: "Sal de grano", quantity: 0.01, unit: "kg" },
-      ],
-    },
-  ],
-  "cafeterias-crepas-desayunos": [
-    {
-      id: "rec-hotcakes-maple", name: "Hot cakes con maple", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Harina para hot cakes", quantity: 0.2, unit: "kg" },
-        { name: "Huevo fresco", quantity: 0.25, unit: "docena" },
-        { name: "Leche entera", quantity: 0.15, unit: "L" },
-        { name: "Jarabe de maple", quantity: 0.05, unit: "L" },
-      ],
-    },
-    {
-      id: "rec-crepa-nutella", name: "Crepa de Nutella", category: "postre", portions: 1,
-      ingredients: [
-        { name: "Harina para hot cakes", quantity: 0.06, unit: "kg" },
-        { name: "Leche entera", quantity: 0.1, unit: "L" },
-        { name: "Huevo fresco", quantity: 0.08, unit: "docena" },
-        { name: "Nutella", quantity: 0.05, unit: "kg" },
-      ],
-    },
-  ],
-  "saludable-ensaladas-pokes": [
-    {
-      id: "rec-poke-salmon", name: "Poke de salmón", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Salmón fresco", quantity: 0.15, unit: "kg" },
-        { name: "Quinoa", quantity: 0.08, unit: "kg" },
-        { name: "Mix de lechugas baby", quantity: 0.05, unit: "kg" },
-        { name: "Edamame", quantity: 0.05, unit: "kg" },
-        { name: "Aderezo de jengibre", quantity: 0.03, unit: "L" },
-      ],
-    },
-    {
-      id: "rec-ensalada-atun", name: "Ensalada de atún", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Atún fresco", quantity: 0.15, unit: "kg" },
-        { name: "Mix de lechugas baby", quantity: 0.1, unit: "kg" },
-        { name: "Edamame", quantity: 0.05, unit: "kg" },
-        { name: "Aderezo de jengibre", quantity: 0.03, unit: "L" },
-      ],
-    },
-  ],
-  "postres-panaderia-helados": [
-    {
-      id: "rec-brownie", name: "Brownie de chocolate", category: "postre", portions: 8,
-      ingredients: [
-        { name: "Harina de trigo", quantity: 0.3, unit: "kg" },
-        { name: "Chocolate belga", quantity: 0.3, unit: "kg" },
-        { name: "Mantequilla sin sal", quantity: 0.2, unit: "kg" },
-        { name: "Azúcar glass", quantity: 0.15, unit: "kg" },
-      ],
-    },
-    {
-      id: "rec-pay-manzana", name: "Pay de manzana", category: "postre", portions: 8,
-      ingredients: [
-        { name: "Harina de trigo", quantity: 0.4, unit: "kg" },
-        { name: "Mantequilla sin sal", quantity: 0.25, unit: "kg" },
-        { name: "Azúcar glass", quantity: 0.2, unit: "kg" },
-        { name: "Crema para batir", quantity: 0.3, unit: "L" },
-      ],
-    },
-  ],
-  "comida-arabe-griega": [
-    {
-      id: "rec-shawarma-pollo", name: "Shawarma de pollo", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Pechuga de pollo", quantity: 0.15, unit: "kg" },
-        { name: "Pan pita", quantity: 0.1, unit: "paquete 10pz" },
-        { name: "Tahini", quantity: 0.02, unit: "kg" },
-        { name: "Yogur griego natural", quantity: 0.03, unit: "L" },
-      ],
-    },
-    {
-      id: "rec-hummus-pita", name: "Hummus con pita", category: "entrada", portions: 4,
-      ingredients: [
-        { name: "Garbanzo seco", quantity: 0.3, unit: "kg" },
-        { name: "Tahini", quantity: 0.1, unit: "kg" },
-        { name: "Pan pita", quantity: 1, unit: "paquete 10pz" },
-      ],
-    },
-  ],
-  "comida-venezolana-latina": [
-    {
-      id: "rec-arepa-reina", name: "Arepa reina pepiada", category: "plato-fuerte", portions: 1,
-      ingredients: [
-        { name: "Harina P.A.N.", quantity: 0.1, unit: "kg" },
-        { name: "Pechuga de pollo", quantity: 0.12, unit: "kg" },
-        { name: "Aguacate hass", quantity: 0.1, unit: "kg" },
-      ],
-    },
-    {
-      id: "rec-pabellon", name: "Pabellón criollo", category: "plato-fuerte", portions: 2,
-      ingredients: [
-        { name: "Carne mechada", quantity: 0.4, unit: "kg" },
-        { name: "Frijol negro", quantity: 0.3, unit: "kg" },
-        { name: "Plátano macho", quantity: 0.3, unit: "kg" },
-        { name: "Queso blanco duro", quantity: 0.1, unit: "kg" },
-      ],
-    },
-  ],
-  "bebidas-bares-botanas": [
-    {
-      id: "rec-alitas-chile", name: "Alitas con chile y limón", category: "acompanamiento", portions: 4,
-      ingredients: [
-        { name: "Alitas de pollo", quantity: 1, unit: "kg" },
-        { name: "Chile en polvo", quantity: 0.05, unit: "kg" },
-        { name: "Limón", quantity: 0.2, unit: "kg" },
-        { name: "Sal de grano", quantity: 0.02, unit: "kg" },
-      ],
-    },
-    {
-      id: "rec-cacahuates", name: "Cacahuates japoneses", category: "acompanamiento", portions: 4,
-      ingredients: [
-        { name: "Cacahuate japonés", quantity: 0.5, unit: "kg" },
-        { name: "Sal de grano", quantity: 0.02, unit: "kg" },
-      ],
-    },
-  ],
-}
-
-const DEFAULT_INGREDIENTS = [
-  { name: "Ingrediente 1", unit: "kg", price: 0 },
-  { name: "Ingrediente 2", unit: "kg", price: 0 },
-]
-
-interface DishIngredient {
-  ingredientName: string
-  quantity: number
-  unit: string
-  unitPrice: number
-}
-
-interface Dish {
-  id: string
-  name: string
-  ingredients: DishIngredient[]
-  foodCostPercent: number
-  sellingPrice: number
-  category: string
-  portions: number
-  modificadores?: { id: string; nombre: string; precio: number }[]
-}
-
-const DISH_CATEGORIES = [
-  { key: "todas", label: "Todas", color: "bg-gray-100 text-gray-700" },
-  { key: "entrada", label: "Entrada", color: "bg-amber-100 text-amber-700" },
-  { key: "plato-fuerte", label: "Plato fuerte", color: "bg-red-100 text-red-700" },
-  { key: "postre", label: "Postre", color: "bg-pink-100 text-pink-700" },
-  { key: "bebida", label: "Bebida", color: "bg-blue-100 text-blue-700" },
-  { key: "acompanamiento", label: "Acompañamiento", color: "bg-green-100 text-green-700" },
-]
-
-const CATEGORY_EMOJI: Record<string, string> = {
-  entrada: "🥗",
-  "plato-fuerte": "🍽️",
-  postre: "🍰",
-  bebida: "🥤",
-  acompanamiento: "🍟",
-  todas: "📋",
-}
-
-function RecipeCard({ recipe, cost, onUse, onDelete, saved }: {
-  recipe: Recipe
-  cost: number
-  onUse: () => void
-  onDelete?: () => void
-  saved?: boolean
-}) {
-  const catLabel = DISH_CATEGORIES.find((c) => c.key === recipe.category)?.label || recipe.category
-  const catEmoji = CATEGORY_EMOJI[recipe.category] || "🍽️"
-  return (
-    <div className="border border-gray-100 rounded-xl p-3 flex flex-col gap-2 hover:border-purple-300 transition-colors">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">{catEmoji} {recipe.name}</p>
-          <p className="text-[10px] text-gray-400 mt-0.5">
-            {catLabel} · {recipe.portions} porción(es) · {recipe.ingredients.length} ingredientes
-          </p>
-        </div>
-        {onDelete && (
-          <button
-            onClick={onDelete}
-            className="text-gray-300 hover:text-red-500 transition-colors p-1 shrink-0"
-            aria-label={`Eliminar receta ${recipe.name}`}
-            title="Eliminar receta guardada"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-gray-700">
-          Costo est. <span className="text-[#108910]">${cost.toFixed(2)}</span>
-        </span>
-        <button
-          onClick={onUse}
-          className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors ${
-            saved
-              ? "bg-purple-600 text-white hover:bg-purple-700"
-              : "bg-[#108910] text-white hover:bg-[#0D720D]"
-          }`}
-        >
-          Usar
-        </button>
-      </div>
-    </div>
-  )
-}
-
-interface ComboItem {
-  dishId: string
-  dishName: string
-  qty: number
-}
-
-interface Combo {
-  id: string
-  name: string
-  items: ComboItem[]
-  price: number
-}
+  MOCK_INGREDIENTS,
+  DEFAULT_INGREDIENTS,
+  DISH_CATEGORIES,
+  type Recipe,
+  type Dish,
+  type DishIngredient,
+  type Combo,
+  type ComboItem,
+} from "@/components/panel/costeo/costeo-shared"
+import CosteoHeader from "@/components/panel/costeo/CosteoHeader"
+import FoodCostTarget from "@/components/panel/costeo/FoodCostTarget"
+import CategoryTabs from "@/components/panel/costeo/CategoryTabs"
+import SearchBar from "@/components/panel/costeo/SearchBar"
+import BatchToolbar from "@/components/panel/costeo/BatchToolbar"
+import MenuDigitalView from "@/components/panel/costeo/MenuDigitalView"
+import DishesList from "@/components/panel/costeo/DishesList"
+import AddDishForm from "@/components/panel/costeo/AddDishForm"
+import CombosSection from "@/components/panel/costeo/CombosSection"
+import CosteoSummary from "@/components/panel/costeo/CosteoSummary"
+import RecipePickerModal from "@/components/panel/costeo/RecipePickerModal"
+import DeleteModals from "@/components/panel/costeo/DeleteModals"
+import ShortcutsOverlay from "@/components/panel/costeo/ShortcutsOverlay"
 
 let dishCounter = 0
 function nextId() { dishCounter++; return `dish-${Date.now()}-${dishCounter}` }
@@ -1065,1006 +536,155 @@ export default function CosteoPage() {
 
   return (
     <div>
-      {/* Back link and title */}
-      <div className="flex items-center gap-4 mb-6">
-        <Link href="/panel" className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
-          <ArrowLeft className="w-5 h-5 text-gray-400" />
-        </Link>
-        <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-gray-900">{t("costeo.title")}</h2>
-            <button
-              onClick={() => setShowShortcuts(true)}
-              className="w-6 h-6 rounded-full border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 text-xs font-bold transition-colors"
-              title="Atajos de teclado (?)"
-              aria-label="Ver atajos de teclado"
-            >
-              ?
-            </button>
-            {dishes.length > 0 && (
-              <button
-                onClick={exportCSV}
-                className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
-                title="Exportar platillos del filtro activo a CSV"
-              >
-                <Download className="w-3.5 h-3.5" />
-                {t("costeo.exportCsv")}
-              </button>
-            )}
-            <button
-              onClick={() => setShowRecipes(true)}
-              className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg transition-colors"
-              title="Recetas pregrabadas y guardadas para costear platillos"
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              Recetas
-            </button>
-            {dishes.length > 0 && (
-              <button
-                onClick={() => setViewMode(viewMode === "lista" ? "menu" : "lista")}
-                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors ${
-                  viewMode === "menu"
-                    ? "bg-[#108910] text-white"
-                    : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                }`}
-                title="Alternar entre lista de costeo y vista de menú digital"
-              >
-                {viewMode === "menu" ? "📋 Ver costeo" : "🥘 Menú digital"}
-              </button>
-            )}
-          </div>
-          <p className="text-sm text-gray-400">{selectedCollection.name}</p>
-        </div>
-      </div>
+    <CosteoHeader
+      restaurantName={selectedCollection.name}
+      dishCount={dishes.length}
+      viewMode={viewMode}
+      onToggleView={() => setViewMode(viewMode === "lista" ? "menu" : "lista")}
+      onOpenShortcuts={() => setShowShortcuts(true)}
+      onExportCsv={exportCSV}
+      onOpenRecipes={() => setShowRecipes(true)}
+    />
 
-      {/* Food cost target */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Percent className="w-5 h-5 text-blue-600" />
-            <h3 className="font-semibold text-gray-900">{t("costeo.foodCostTarget")}</h3>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setTargetFoodCost(Math.max(panelCfg.costeoTargetFcMin, targetFoodCost - 5))}
-              className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 transition-colors"
-            >
-              −
-            </button>
-            <span className="text-2xl font-bold text-[#108910]">{targetFoodCost}%</span>
-            <button
-              onClick={() => setTargetFoodCost(Math.min(panelCfg.costeoTargetFcMax, targetFoodCost + 5))}
-              className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 transition-colors"
-            >
-              +
-            </button>
-          </div>
-        </div>
-        <p className="text-xs text-gray-400">
-          Tus platillos se preciarán para alcanzar este % de costo sobre el precio de venta.
-          Lo ideal en México está entre 28% y 35%.
-        </p>
-      </div>
+    <FoodCostTarget
+      targetFoodCost={targetFoodCost}
+      onDecrease={() => setTargetFoodCost(Math.max(panelCfg.costeoTargetFcMin, targetFoodCost - 5))}
+      onIncrease={() => setTargetFoodCost(Math.min(panelCfg.costeoTargetFcMax, targetFoodCost + 5))}
+    />
 
-      {/* Category filter tabs */}
-      {dishes.length === 0 && viewMode === "lista" && (
-        <div className="mb-6">
-          <EmptyState
-            icon={Calculator}
-            title={t("costeo.emptyTitle")}
-            description={t("costeo.emptyDescription")}
-            action={
-              <button
-                onClick={() => setShowForm(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                {t("costeo.createFirst")}
-              </button>
-            }
-          />
-        </div>
-      )}
-      {dishes.length > 0 && (
-        <div className="flex gap-1.5 mb-3 flex-wrap">
-          {DISH_CATEGORIES.map((cat) => (
-            <button
-              key={cat.key}
-              onClick={() => setCategoryFilter(cat.key)}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                categoryFilter === cat.key
-                  ? cat.color
-                  : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-      )}
+    <CategoryTabs
+      dishCount={dishes.length}
+      viewMode={viewMode}
+      categoryFilter={categoryFilter}
+      onSelectCategory={setCategoryFilter}
+      onCreateFirst={() => setShowForm(true)}
+    />
 
-      {/* Search bar */}
-      {dishes.length > 0 && (
-        <div className="mb-4">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar platillo o ingrediente..."
-            className="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#108910]/20 focus:border-[#108910] placeholder-gray-400"
-          />
-          {searchQuery.trim() && (
-            <p className="text-xs text-gray-400 mt-1.5">
-              {filteredDishes.length} de {dishes.length} platillos
-            </p>
-          )}
-        </div>
-      )}
+    <SearchBar
+      dishCount={dishes.length}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      filteredCount={filteredDishes.length}
+    />
 
-      {/* Batch selection toolbar */}
-      {filteredDishes.length > 0 && (
-        <div className="flex items-center gap-2 mb-3">
-          <button
-            onClick={selectedDishes.size > 0 ? deselectAll : selectAllFiltered}
-            className="text-xs font-semibold text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            {selectedDishes.size > 0 ? `Deseleccionar (${selectedDishes.size})` : "Seleccionar todos"}
-          </button>
-          {selectedDishes.size > 0 && (
-            <button
-              onClick={() => setBatchDeleteConfirm(true)}
-              className="text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
-            >
-              <Trash2 className="w-3 h-3" />
-              Eliminar {selectedDishes.size} seleccionado{selectedDishes.size > 1 ? "s" : ""}
-            </button>
-          )}
-        </div>
-      )}
+    <BatchToolbar
+      filteredCount={filteredDishes.length}
+      selectedCount={selectedDishes.size}
+      onToggleAll={selectedDishes.size > 0 ? deselectAll : selectAllFiltered}
+      onDeleteSelected={() => setBatchDeleteConfirm(true)}
+    />
 
-      {/* Menu digital view */}
-      {viewMode === "menu" && filteredDishes.length > 0 && (
-        <div className="mb-6">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-4 print:hidden">
-            <p className="text-xs text-gray-400">
-              Vista previa de tu carta — {filteredDishes.length} platillo{filteredDishes.length !== 1 ? "s" : ""}
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={copyCarta}
-                className="flex items-center gap-1.5 text-xs font-semibold text-[#108910] bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                Copiar carta
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
-                aria-label="Imprimir menú digital"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                Imprimir
-              </button>
-            </div>
-          </div>
-          <div className="max-w-md mx-auto bg-white rounded-3xl border border-gray-100 shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-br from-[#108910] to-green-800 px-6 py-5 text-center">
-              <p className="text-[10px] tracking-widest uppercase text-green-100">Bienvenido a</p>
-              <h3 className="text-lg font-extrabold text-white">{selectedCollection?.name || "Mi menú"}</h3>
-              <p className="text-[10px] text-green-200 mt-0.5">Hecho con Resurte.me</p>
-            </div>
-            <div className="p-5">
-              {DISH_CATEGORIES.filter((c) => c.key !== "todas").map((cat) => {
-                const inCat = filteredDishes.filter((d) => (d.category || "plato-fuerte") === cat.key)
-                if (inCat.length === 0) return null
-                return (
-                  <div key={cat.key} className="mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-lg">{CATEGORY_EMOJI[cat.key] || "🍽️"}</span>
-                      <h4 className="font-bold text-gray-900 text-sm uppercase tracking-wide">{cat.label}</h4>
-                      <div className="flex-1 border-t border-dashed border-gray-200 mx-1" />
-                    </div>
-                    <div className="space-y-2.5">
-                      {inCat.map((dish) => {
-                        const suggested = dish.sellingPrice
-                        const portions = dish.portions || 4
-                        return (
-                          <div key={dish.id} className="flex items-center gap-3">
-                            <div className="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-br from-green-50 to-gray-50 border border-gray-100 flex items-center justify-center text-xl">
-                              {CATEGORY_EMOJI[dish.category] || "🍽️"}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-baseline justify-between gap-2">
-                                <p className="font-semibold text-gray-800 text-sm truncate">{dish.name}</p>
-                                <p className="font-bold text-[#108910] text-sm shrink-0">${suggested.toFixed(0)}</p>
-                              </div>
-                              <p className="text-[10px] text-gray-400 truncate">
-                                {dish.ingredients.slice(0, 3).map((i) => i.ingredientName).join(" · ")}
-                                {dish.ingredients.length > 3 && " · …"}
-                                {portions > 1 && ` · ${portions} porc.`}
-                              </p>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Dishes list */}
-      {viewMode === "lista" && filteredDishes.length > 0 && (
-        <div className="space-y-3 mb-6">
-          {filteredDishes.map((dish) => {
-            const totalCost = dish.ingredients.reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0)
-            const margin = dish.sellingPrice - totalCost
-            const actualFoodCost = dish.sellingPrice > 0 ? (totalCost / dish.sellingPrice) * 100 : 0
-            const isGood = actualFoodCost <= 32
-            const isOk = actualFoodCost <= 38
-
-            return (
-              <div key={dish.id} className="bg-white rounded-2xl border border-gray-100 p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <input
-                      type="checkbox"
-                      checked={selectedDishes.has(dish.id)}
-                      onChange={() => toggleSelect(dish.id)}
-                      className="w-4 h-4 rounded accent-[#108910] cursor-pointer shrink-0"
-                    />
-                    <h4 className="font-bold text-gray-900 truncate">{dish.name}</h4>
-                    {(() => {
-                      const cat = DISH_CATEGORIES.find((c) => c.key === dish.category)
-                      return cat && cat.key !== "todas" ? (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${cat.color}`}>
-                          {cat.label}
-                        </span>
-                      ) : null
-                    })()}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => duplicateDish(dish)} className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-500 transition-colors" title="Duplicar platillo" aria-label={`Duplicar ${dish.name}`}>
-                      <Plus className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => startEditDish(dish)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title={t("costeo.editDish")} aria-label={`Editar ${dish.name}`}>
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => removeDish(dish.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar platillo" aria-label={`Eliminar ${dish.name}`}>
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-1.5 mb-3">
-                  {dish.ingredients.map((ing, i) => (
-                    <div key={i} className="flex justify-between text-sm text-gray-500">
-                      <span>{ing.ingredientName} ({ing.quantity} {ing.unit})</span>
-                      <span className="font-mono">${(ing.quantity * ing.unitPrice).toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="border-t border-gray-100 pt-3 grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-xs text-gray-400">Costo total</p>
-                    <p className="font-bold text-gray-900">${totalCost.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400">Precio venta</p>
-                    <p className="font-bold text-[#108910]">${dish.sellingPrice.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400">Margen</p>
-                    <p className={`font-bold ${margin > 0 ? "text-green-600" : "text-red-600"}`}>
-                      ${margin.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-                {(dish.portions || 4) > 0 && (
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-center text-[10px] bg-gray-50 rounded-xl px-3 py-2">
-                    <div>
-                      <span className="text-gray-400">Costo por porción</span>
-                      <p className="font-semibold text-gray-700">${(totalCost / (dish.portions || 4)).toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Precio por porción</span>
-                      <p className="font-semibold text-[#108910]">${(dish.sellingPrice / (dish.portions || 4)).toFixed(2)}</p>
-                    </div>
-                  </div>
-                )}
-                <div className={`mt-2 flex items-center gap-2 text-xs font-medium rounded-lg px-3 py-1.5 ${
-                  isGood ? "bg-green-50 text-green-700" : isOk ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"
-                }`}>
-                  {isGood ? <TrendingDown className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-                  Food cost real: {actualFoodCost.toFixed(1)}%
-                  {isGood ? " — ¡Excelente!" : isOk ? " — Aceptable" : " — ¡Revisa tus precios!"}
-                </div>
-                {dish.modificadores && dish.modificadores.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {dish.modificadores.map((m) => (
-                      <span key={m.id} className="text-[9px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full font-medium">
-                        +{m.nombre}{m.precio > 0 ? ` $${m.precio.toFixed(0)}` : ""}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Add dish form */}
-      {showForm ? (
-        <div className="bg-white rounded-2xl border border-[#108910]/30 p-5 mb-6">
-          <h4 className="font-semibold text-gray-900 mb-4">
-            {editingDishId ? t("costeo.editDish") : t("costeo.newDish")}
-          </h4>
-          <input
-            type="text"
-            value={newDishName}
-            onChange={(e) => setNewDishName(e.target.value)}
-            placeholder="Nombre del platillo"
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm mb-3 focus:outline-none focus:border-[#108910]"
-          />
-
-          {/* Category selector */}
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-xs text-gray-400">Categoría:</span>
-            <div className="flex flex-wrap gap-1.5">
-              {DISH_CATEGORIES.filter((c) => c.key !== "todas").map((cat) => (
-                <button
-                  key={cat.key}
-                  onClick={() => setNewDishCategory(cat.key)}
-                  className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${
-                    newDishCategory === cat.key
-                      ? cat.color
-                      : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Portions input */}
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-xs text-gray-400">Rinde:</span>
-            <NumberInput
-              value={newDishPortions}
-              onChange={(v) => setNewDishPortions(Math.max(1, v))}
-              min={1}
-              ariaLabel="Porciones"
-              className="w-20 text-center"
-            />
-            <span className="text-xs text-gray-400">porciones</span>
-          </div>
-
-          <div className="space-y-3 mb-4">
-            {newDishIngredients.map((ing, idx) => {
-              const invMatch = inventarioItems.find((i) => normalizeName(i.name) === normalizeName(ing.ingredientName))
-              return (
-              <>
-              <div key={idx} className="flex items-center gap-2">
-                <select
-                  value={ing.ingredientName}
-                  onChange={(e) => updateIngredient(idx, "ingredientName", e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#108910] bg-white"
-                >
-                  <option value="">Seleccionar ingrediente</option>
-                  {ingredients.map((opt) => (
-                    <option key={opt.name} value={opt.name}>
-                      {opt.name} — ${opt.price}/{opt.unit}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  value={ing.quantity || ""}
-                  onChange={(e) => updateIngredient(idx, "quantity", parseFloat(e.target.value) || 0)}
-                  placeholder="Cant."
-                  className="w-20 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
-                  min="0"
-                  step="0.01"
-                />
-                <span className="text-xs text-gray-400 w-10 text-center">{ing.unit}</span>
-                <button
-                  onClick={() => removeIngredient(idx)}
-                  className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"
-                  disabled={newDishIngredients.length === 1}
-                  aria-label="Quitar ingrediente"
-                  title="Quitar ingrediente"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              {invMatch && (
-                <div className="flex items-center gap-1 ml-0.5 -mt-1 mb-1">
-                  <button
-                    type="button"
-                    onClick={() => updateIngredient(idx, "unitPrice", invMatch.pricePerUnit)}
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors ${
-                      ing.unitPrice === invMatch.pricePerUnit
-                        ? "bg-cyan-100 text-cyan-700 border border-cyan-300"
-                        : "bg-cyan-50 text-cyan-600 border border-cyan-200 hover:bg-cyan-100"
-                    }`}
-                    title="Click para usar el precio de tu inventario"
-                  >
-                    📦 Inv: ${invMatch.pricePerUnit}/{invMatch.unit}
-                    {ing.unitPrice === invMatch.pricePerUnit && " ✓"}
-                  </button>
-                  {ing.unitPrice !== invMatch.pricePerUnit && (
-                    <span className="text-[10px] text-amber-600">⚠ precio desactualizado — click para usar ${invMatch.pricePerUnit}</span>
-                  )}
-                </div>
-              )}
-              </>
-              )
-            })}
-          </div>
-
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <button
-              onClick={addIngredient}
-              className="text-sm text-[#108910] font-semibold hover:underline"
-            >
-              + Agregar ingrediente del catálogo
-            </button>
-            <button
-              onClick={() => setShowCustom(!showCustom)}
-              className="text-sm text-blue-600 font-semibold hover:underline"
-            >
-              + Ingrediente personalizado
-            </button>
-          </div>
-
-          {/* Custom ingredient mini-form */}
-          {showCustom && (
-            <div className="bg-blue-50 rounded-xl p-3 mb-4 space-y-2">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  placeholder="Nombre del ingrediente"
-                  className="flex-1 px-3 py-2 rounded-lg border border-blue-200 text-sm focus:outline-none focus:border-blue-400 bg-white"
-                />
-                <select
-                  value={customUnit}
-                  onChange={(e) => setCustomUnit(e.target.value)}
-                  className="w-24 px-2 py-2 rounded-lg border border-blue-200 text-sm bg-white"
-                >
-                  <option value="kg">kg</option>
-                  <option value="g">g</option>
-                  <option value="L">L</option>
-                  <option value="mL">mL</option>
-                  <option value="pza">pza</option>
-                  <option value="docena">docena</option>
-                  <option value="manojo">manojo</option>
-                  <option value="rebanada">rebanada</option>
-                </select>
-                <input
-                  type="number"
-                  value={customPrice}
-                  onChange={(e) => setCustomPrice(e.target.value)}
-                  placeholder="$ precio"
-                  className="w-24 px-3 py-2 rounded-lg border border-blue-200 text-sm focus:outline-none focus:border-blue-400 bg-white"
-                  min="0"
-                  step="0.5"
-                />
-                <button
-                  onClick={addCustomIngredient}
-                  className="px-3 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Modificadores del platillo (sin cebolla, extra queso, etc.) */}
-          <div className="mb-4">
-            <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">
-              Modificadores opcionales
-              <span className="ml-1 normal-case font-normal text-gray-300">(se suman al precio en Ventas y aparecen en Comanda)</span>
-            </label>
-            <div className="space-y-2">
-              {newDishModifiers.map((m) => (
-                <div key={m.id} className="flex items-center gap-2">
-                  <span className="flex-1 px-3 py-2 rounded-lg bg-amber-50 text-sm text-amber-800 font-medium">
-                    {m.nombre}
-                    <span className="text-amber-600 font-semibold ml-1">{m.precio > 0 ? `+$${m.precio.toFixed(0)}` : "(sin costo)"}</span>
-                  </span>
-                  <button
-                    onClick={() => removeModifier(m.id)}
-                    className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500"
-                    aria-label={`Quitar modificador ${m.nombre}`}
-                    title="Quitar modificador"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2 mt-2">
-              <input
-                type="text"
-                value={modName}
-                onChange={(e) => setModName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addModifier() } }}
-                placeholder="Ej. Sin cebolla, extra queso, término medio"
-                className="flex-1 px-3 py-2 rounded-lg border border-amber-200 text-sm focus:outline-none focus:border-amber-400"
-                aria-label="Nombre del modificador"
-              />
-              <input
-                type="number"
-                value={modPrice}
-                onChange={(e) => setModPrice(e.target.value)}
-                placeholder="$"
-                min="0"
-                step="0.5"
-                className="w-20 px-2 py-2 rounded-lg border border-amber-200 text-sm text-center focus:outline-none focus:border-amber-400"
-                aria-label="Precio del modificador"
-              />
-              <button
-                onClick={addModifier}
-                disabled={!modName.trim()}
-                className="px-3 py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-40 transition-colors"
-                title="Agregar modificador"
-                aria-label="Agregar modificador"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <button onClick={saveDish} className="flex-1 bg-[#108910] text-white font-semibold py-2.5 rounded-xl hover:bg-[#0D720D] transition-colors">
-              {editingDishId ? "Guardar cambios" : "Guardar platillo"}
-            </button>
-            <button
-              onClick={saveCurrentAsRecipe}
-              disabled={!newDishName.trim() || newDishIngredients.length === 0}
-              className="flex items-center gap-1.5 px-4 py-2.5 border border-purple-200 text-purple-700 rounded-xl text-sm font-semibold hover:bg-purple-50 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
-              title="Guardar el platillo actual como receta reutilizable"
-            >
-              <Save className="w-4 h-4" />
-              Guardar como receta
-            </button>
-            <button onClick={resetForm} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50">
-              Cancelar
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => setShowForm(true)}
-          className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-[#108910] hover:text-[#108910] transition-colors font-medium"
-        >
-          <Plus className="w-5 h-5" />
-          Agregar platillo
-        </button>
-      )}
-
-      {/* Combos y promociones */}
-      <div className="mt-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Gift className="w-5 h-5 text-amber-600" />
-            <h3 className="font-semibold text-gray-900">Combos y promociones</h3>
-            {combos.length > 0 && (
-              <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium">{combos.length}</span>
-            )}
-          </div>
-          {!showComboForm && (
-            <button
-              onClick={() => setShowComboForm(true)}
-              className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Nuevo combo
-            </button>
-          )}
-        </div>
-
-        {combos.length === 0 && !showComboForm && (
-          <p className="text-xs text-gray-400 mb-4">
-            Arma combos con 2+ platillos de tu menú para aumentar el ticket promedio. Sugerimos el precio según tu food cost objetivo.
-          </p>
-        )}
-
-        {/* Combo list */}
-        {combos.length > 0 && (
-          <div className="space-y-3 mb-4">
-            {combos.map((combo) => {
-              const cost = comboCost(combo.items)
-              const margin = combo.price - cost
-              const fc = combo.price > 0 ? (cost / combo.price) * 100 : 0
-              const isGood = fc <= 32
-              const isOk = fc <= 38
-              return (
-                <div key={combo.id} className="bg-white rounded-2xl border border-gray-100 p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Tag className="w-4 h-4 text-amber-500" />
-                      <h4 className="font-bold text-gray-900">{combo.name}</h4>
-                    </div>
-                    <button
-                      onClick={() => removeCombo(combo.id)}
-                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
-                      title="Eliminar combo"
-                      aria-label={`Eliminar combo ${combo.name}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {combo.items.map((it) => (
-                      <span key={it.dishId} className="text-[10px] bg-amber-50 text-amber-700 px-2 py-1 rounded-lg font-medium">
-                        {it.qty} × {it.dishName}
-                      </span>
-                    ))}
-                  </div>
-                  {comboMissingDishes(combo.items).length > 0 && (
-                    <div className="mb-3 flex items-center gap-2 text-[11px] font-medium text-red-600 bg-red-50 rounded-lg px-3 py-2">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      {comboMissingDishes(combo.items).length === 1
-                        ? `El platillo "${comboMissingDishes(combo.items)[0]!.dishName}" ya no existe — su costo cuenta como $0.`
-                        : `${comboMissingDishes(combo.items).length} platillos de este combo ya no existen — su costo cuenta como $0.`}
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                    <div className="bg-gray-50 rounded-xl p-2.5">
-                      <p className="text-[10px] text-gray-400">Costo combo</p>
-                      <p className="font-bold text-gray-900">${cost.toFixed(2)}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-xl p-2.5">
-                      <p className="text-[10px] text-gray-400">Precio venta</p>
-                      <p className="font-bold text-[#108910]">${combo.price.toFixed(2)}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-xl p-2.5">
-                      <p className="text-[10px] text-gray-400">Margen</p>
-                      <p className={`font-bold ${margin > 0 ? "text-green-600" : "text-red-600"}`}>${margin.toFixed(2)}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-xl p-2.5">
-                      <p className="text-[10px] text-gray-400">Food cost</p>
-                      <p className={`font-bold ${isGood ? "text-green-600" : isOk ? "text-amber-600" : "text-red-600"}`}>
-                        {fc.toFixed(1)}%
-                      </p>
-                    </div>
-                  </div>
-                  <div className={`mt-2 flex items-center gap-2 text-xs font-medium rounded-lg px-3 py-1.5 ${
-                    isGood ? "bg-green-50 text-green-700" : isOk ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"
-                  }`}>
-                    {isGood ? <TrendingDown className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-                    {isGood
-                      ? "¡Combo rentable! Aumenta tu ticket promedio."
-                      : isOk
-                        ? "Combo aceptable, revisa el precio."
-                        : `Estás regalando margen. Precio sugerido: $${suggestedComboPrice(combo.items).toFixed(2)}`}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* New combo form */}
-        {showComboForm && (
-          <div className="bg-white rounded-2xl border border-amber-200 p-5 mb-4">
-            <h4 className="font-semibold text-gray-900 mb-4">Nuevo combo</h4>
-            <input
-              type="text"
-              value={newComboName}
-              onChange={(e) => setNewComboName(e.target.value)}
-              placeholder="Nombre del combo (ej. Combo familiar)"
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm mb-3 focus:outline-none focus:border-amber-500"
-            />
-            <div className="mb-3">
-              <p className="text-xs text-gray-400 mb-2">Selecciona los platillos del menú (mínimo 2):</p>
-              {dishes.length === 0 ? (
-                <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2">
-                  Primero costea tu menú para poder armar combos.
-                </p>
-              ) : (
-                <div className="max-h-44 overflow-y-auto space-y-1.5 border border-gray-100 rounded-xl p-2">
-                  {dishes.map((dish) => {
-                    const selected = newComboItems.find((it) => it.dishId === dish.id)
-                    return (
-                      <div key={dish.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                        selected ? "bg-amber-50 border border-amber-200" : "hover:bg-gray-50"
-                      }`}>
-                        <input
-                          type="checkbox"
-                          checked={!!selected}
-                          onChange={() => toggleComboDish(dish.id, dish.name)}
-                          className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
-                        />
-                        <span className="flex-1 text-sm text-gray-700 truncate">{dish.name}</span>
-                        {selected && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => setComboQty(dish.id, selected.qty - 1)}
-                              className="w-6 h-6 rounded bg-amber-100 text-amber-700 font-bold hover:bg-amber-200 transition-colors"
-                              aria-label={`Reducir cantidad de ${dish.name}`}
-                            >−</button>
-                            <span className="w-6 text-center text-xs font-bold text-gray-800">{selected.qty}</span>
-                            <button
-                              onClick={() => setComboQty(dish.id, selected.qty + 1)}
-                              className="w-6 h-6 rounded bg-amber-100 text-amber-700 font-bold hover:bg-amber-200 transition-colors"
-                              aria-label={`Aumentar cantidad de ${dish.name}`}
-                            >+</button>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {newComboItems.length >= 2 && (
-              <div className="mb-3 bg-amber-50 rounded-xl px-3 py-2.5 grid grid-cols-3 gap-2 text-center text-xs">
-                <div>
-                  <p className="text-amber-700/70">Costo combo</p>
-                  <p className="font-bold text-gray-900">${comboCost(newComboItems).toFixed(2)}</p>
-                </div>
-                <div>
-                  <p className="text-amber-700/70">Precio sugerido ({targetFoodCost}%)</p>
-                  <p className="font-bold text-amber-700">${suggestedComboPrice(newComboItems).toFixed(2)}</p>
-                </div>
-                <div>
-                  <p className="text-amber-700/70">Precio del combo</p>
-                  <input
-                    type="number"
-                    value={newComboPrice}
-                    onChange={(e) => setNewComboPrice(e.target.value)}
-                    placeholder="$$$"
-                    min="0"
-                    step="0.5"
-                    className="w-full px-2 py-1.5 rounded-lg border border-amber-300 text-sm text-center font-bold focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button onClick={addCombo} className="flex-1 bg-amber-500 text-white font-semibold py-2.5 rounded-xl hover:bg-amber-600 transition-colors">
-                Guardar combo
-              </button>
-              <button
-                onClick={() => { setShowComboForm(false); setNewComboName(""); setNewComboItems([]); setNewComboPrice("") }}
-                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500 hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Summary */}
-      {dishes.length > 0 && (
-        <div className="mt-6 bg-gradient-to-r from-[#F0FDF4] to-white rounded-2xl border border-[#108910]/10 p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <PieChart className="w-5 h-5 text-[#108910]" />
-            <h3 className="font-semibold text-gray-900">Resumen de menú</h3>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-            <div className="bg-white rounded-xl p-3">
-              <p className="text-xs text-gray-400">Platillos</p>
-              <p className="text-xl font-bold text-gray-900">{dishes.length}</p>
-            </div>
-            <div className="bg-white rounded-xl p-3">
-              <p className="text-xs text-gray-400">Costo total menú</p>
-              <p className="text-xl font-bold text-gray-900">
-                ${dishes.reduce((s, d) => s + d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0), 0).toFixed(0)}
-              </p>
-            </div>
-            <div className="bg-white rounded-xl p-3">
-              <p className="text-xs text-gray-400">Ingreso potencial</p>
-              <p className="text-xl font-bold text-[#108910]">
-                ${dishes.reduce((s, d) => s + d.sellingPrice, 0).toFixed(0)}
-              </p>
-            </div>
-            <div className="bg-white rounded-xl p-3">
-              <p className="text-xs text-gray-400">Food cost promedio</p>
-              <p className="text-xl font-bold text-gray-900">
-                {(() => {
-                  const totalCost = dishes.reduce((s, d) => s + d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0), 0)
-                  const totalPrice = dishes.reduce((s, d) => s + d.sellingPrice, 0)
-                  return totalPrice > 0 ? `${((totalCost / totalPrice) * 100).toFixed(1)}%` : "—"
-                })()}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tip */}
-      <div className="mt-4 bg-blue-50 rounded-xl p-4 border border-blue-100">
-        <p className="text-xs text-blue-700">
-          <strong>💡 Tip:</strong> Los precios de ingredientes vienen del catálogo real de Resurte.me cuando está disponible (los locales usan precios de referencia). 
-          Si los precios cambian en la plataforma, agrega el ingrediente de nuevo para usar el precio actual.
-        </p>
-      </div>
-
-      {/* Recipe picker modal */}
-      {showRecipes && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowRecipes(false)}>
-          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4 shrink-0">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-purple-600" />
-                <h4 className="font-bold text-gray-900">Recetas para costear</h4>
-                <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-                  {savedRecipes.length} guardadas
-                </span>
-              </div>
-              <button onClick={() => setShowRecipes(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Cerrar recetas">×</button>
-            </div>
-
-            <input
-              type="text"
-              value={recipeSearch}
-              onChange={(e) => setRecipeSearch(e.target.value)}
-              placeholder="Buscar receta por nombre…"
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm mb-4 shrink-0 focus:outline-none focus:border-purple-400"
-            />
-
-            <div className="overflow-y-auto flex-1 space-y-5">
-              {/* Pregrabadas */}
-              <div>
-                <h5 className="text-[10px] font-semibold text-gray-400 uppercase mb-2 tracking-wide">
-                  📖 Pregrabadas · {selectedCollection.name}
-                </h5>
-                {(PRESET_RECIPES[slug || ""] || []).filter((r) => normalizeName(r.name).includes(normalizeName(recipeSearch.trim()))).length === 0 ? (
-                  <p className="text-sm text-gray-400">No hay recetas pregrabadas que coincidan con tu búsqueda para este tipo de cocina.</p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {(PRESET_RECIPES[slug || ""] || [])
-                      .filter((r) => normalizeName(r.name).includes(normalizeName(recipeSearch.trim())))
-                      .map((r) => (
-                        <RecipeCard key={r.id} recipe={r} cost={estimateRecipeCost(r)} onUse={() => loadRecipe(r)} />
-                      ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Guardadas */}
-              <div>
-                <h5 className="text-[10px] font-semibold text-gray-400 uppercase mb-2 tracking-wide">
-                  🔖 Mis recetas guardadas
-                </h5>
-                {savedRecipes.length === 0 ? (
-                  <p className="text-sm text-gray-400">
-                    Aún no guardas recetas. Llena el formulario de un platillo y usa <strong>Guardar como receta</strong> para tenerla a mano.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {savedRecipes
-                      .filter((r) => normalizeName(r.name).includes(normalizeName(recipeSearch.trim())))
-                      .map((r) => (
-                        <RecipeCard
-                          key={r.id}
-                          recipe={r}
-                          cost={estimateRecipeCost(r)}
-                          saved
-                          onUse={() => loadRecipe(r)}
-                          onDelete={() => setRecipeConfirmDelete(r.id)}
-                        />
-                      ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete saved recipe confirmation modal */}
-      {recipeConfirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
-            <h4 className="font-bold text-gray-900 mb-2">¿Eliminar esta receta guardada?</h4>
-            <p className="text-sm text-gray-500 mb-4">Esta acción no se puede deshacer. La receta se quitará de tus guardadas.</p>
-            <div className="flex gap-3">
-              <button onClick={() => removeSavedRecipe(recipeConfirmDelete)} className="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-xl hover:bg-red-700 text-sm">
-                Sí, eliminar
-              </button>
-              <button onClick={() => setRecipeConfirmDelete(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-50 text-sm">
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirmation modal */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
-            <h4 className="font-bold text-gray-900 mb-2">¿Eliminar este platillo?</h4>
-            <p className="text-sm text-gray-500 mb-4">Esta acción no se puede deshacer. Perderás todos los ingredientes y precios de este platillo.</p>
-            <div className="flex gap-3">
-              <button onClick={confirmDeleteDish} className="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-xl hover:bg-red-700 text-sm">
-                Sí, eliminar
-              </button>
-              <button onClick={() => setDeleteConfirmId(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-50 text-sm">
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Combo delete confirmation modal */}
-      {comboDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
-            <h4 className="font-bold text-gray-900 mb-2">¿Eliminar este combo?</h4>
-            <p className="text-sm text-gray-500 mb-4">
-              Esta acción no se puede deshacer. Se eliminará el combo de tus promociones.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={confirmDeleteCombo} className="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-xl hover:bg-red-700 text-sm">
-                Sí, eliminar
-              </button>
-              <button onClick={() => setComboDeleteConfirm(null)} className="flex-1 border border-gray-200 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-50 text-sm">
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Batch delete confirmation modal */}
-      <ConfirmDialog
-        open={batchDeleteConfirm}
-        danger
-        title={`¿Eliminar ${selectedDishes.size} platillo${selectedDishes.size > 1 ? "s" : ""}?`}
-        message="Esta acción no se puede deshacer. Perderás todos los ingredientes y precios de los platillos seleccionados. Puedes deshacer con Ctrl+Z después de eliminar."
-        confirmLabel="Sí, eliminar"
-        onConfirm={batchDelete}
-        onCancel={() => setBatchDeleteConfirm(false)}
+    {viewMode === "menu" && (
+      <MenuDigitalView
+        dishes={filteredDishes}
+        restaurantName={selectedCollection.name}
+        onCopyCarta={copyCarta}
       />
+    )}
 
-      {/* Shortcuts overlay */}
-      {showShortcuts && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowShortcuts(false)}>
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="font-bold text-gray-900">Atajos de teclado</h4>
-              <button onClick={() => setShowShortcuts(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Cerrar atajos">×</button>
-            </div>
-            <ul className="space-y-3 text-sm">
-              <li className="flex justify-between items-center">
-                <span className="text-gray-600">Nuevo platillo / combo</span>
-                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-xs font-mono">Ctrl+N</kbd>
-              </li>
-              <li className="flex justify-between items-center">
-                <span className="text-gray-600">Deshacer</span>
-                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-xs font-mono">Ctrl+Z</kbd>
-              </li>
-              <li className="flex justify-between items-center">
-                <span className="text-gray-600">Rehacer</span>
-                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-xs font-mono">Ctrl+Y</kbd>
-              </li>
-              <li className="flex justify-between items-center">
-                <span className="text-gray-600">Cerrar formularios / ventanas</span>
-                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-xs font-mono">Esc</kbd>
-              </li>
-              <li className="flex justify-between items-center">
-                <span className="text-gray-600">Mostrar/ocultar esta ayuda</span>
-                <kbd className="px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-xs font-mono">?</kbd>
-              </li>
-            </ul>
-          </div>
-        </div>
-      )}
+    {viewMode === "lista" && (
+      <DishesList
+        dishes={filteredDishes}
+        selectedIds={selectedDishes}
+        onToggleSelect={toggleSelect}
+        onDuplicate={duplicateDish}
+        onEdit={startEditDish}
+        onRemove={removeDish}
+      />
+    )}
+
+    <AddDishForm
+      showForm={showForm}
+      editingDishId={editingDishId}
+      newDishName={newDishName}
+      setNewDishName={setNewDishName}
+      newDishCategory={newDishCategory}
+      setNewDishCategory={setNewDishCategory}
+      newDishPortions={newDishPortions}
+      setNewDishPortions={setNewDishPortions}
+      newDishIngredients={newDishIngredients}
+      updateIngredient={updateIngredient}
+      removeIngredient={removeIngredient}
+      addIngredient={addIngredient}
+      showCustom={showCustom}
+      setShowCustom={setShowCustom}
+      customName={customName}
+      setCustomName={setCustomName}
+      customUnit={customUnit}
+      setCustomUnit={setCustomUnit}
+      customPrice={customPrice}
+      setCustomPrice={setCustomPrice}
+      addCustomIngredient={addCustomIngredient}
+      newDishModifiers={newDishModifiers}
+      removeModifier={removeModifier}
+      modName={modName}
+      setModName={setModName}
+      modPrice={modPrice}
+      setModPrice={setModPrice}
+      addModifier={addModifier}
+      saveDish={saveDish}
+      saveCurrentAsRecipe={saveCurrentAsRecipe}
+      resetForm={resetForm}
+      setShowForm={setShowForm}
+      ingredients={ingredients}
+      inventarioItems={inventarioItems}
+      normalizeName={normalizeName}
+    />
+
+    <CombosSection
+      combos={combos}
+      showComboForm={showComboForm}
+      setShowComboForm={setShowComboForm}
+      comboCost={comboCost}
+      comboMissingDishes={comboMissingDishes}
+      suggestedComboPrice={suggestedComboPrice}
+      onRemoveCombo={removeCombo}
+      dishes={dishes}
+      newComboName={newComboName}
+      setNewComboName={setNewComboName}
+      newComboItems={newComboItems}
+      setNewComboItems={setNewComboItems}
+      toggleComboDish={toggleComboDish}
+      setComboQty={setComboQty}
+      newComboPrice={newComboPrice}
+      setNewComboPrice={setNewComboPrice}
+      addCombo={addCombo}
+      targetFoodCost={targetFoodCost}
+    />
+
+    <CosteoSummary dishes={dishes} />
+
+    <RecipePickerModal
+      open={showRecipes}
+      collectionName={selectedCollection.name}
+      slug={slug}
+      savedRecipes={savedRecipes}
+      recipeSearch={recipeSearch}
+      onSearchChange={setRecipeSearch}
+      estimateRecipeCost={estimateRecipeCost}
+      onUseRecipe={loadRecipe}
+      onDeleteSaved={setRecipeConfirmDelete}
+      onClose={() => setShowRecipes(false)}
+      normalizeName={normalizeName}
+    />
+
+    <DeleteModals
+      recipeConfirmDelete={recipeConfirmDelete}
+      onConfirmDeleteRecipe={removeSavedRecipe}
+      onCancelDeleteRecipe={() => setRecipeConfirmDelete(null)}
+      deleteConfirmId={deleteConfirmId}
+      onConfirmDeleteDish={confirmDeleteDish}
+      onCancelDeleteDish={() => setDeleteConfirmId(null)}
+      comboDeleteConfirm={comboDeleteConfirm}
+      onConfirmDeleteCombo={confirmDeleteCombo}
+      onCancelDeleteCombo={() => setComboDeleteConfirm(null)}
+      batchDeleteConfirm={batchDeleteConfirm}
+      selectedCount={selectedDishes.size}
+      onConfirmBatchDelete={batchDelete}
+      onCancelBatchDelete={() => setBatchDeleteConfirm(false)}
+    />
+
+    <ShortcutsOverlay open={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </div>
   )
 }
