@@ -244,7 +244,11 @@ export default function MenuPage() {
               placeholder="Nueva categoría"
               className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
             />
-            <button type="submit" className="p-2 rounded-lg bg-[#108910] text-white hover:bg-[#0e7a0e]">
+            <button
+              type="submit"
+              className="p-2 rounded-lg bg-[#108910] text-white hover:bg-[#0e7a0e]"
+              aria-label="Agregar categoría"
+            >
               <Plus className="w-4 h-4" />
             </button>
           </form>
@@ -264,8 +268,20 @@ export default function MenuPage() {
                       onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
                       className="flex-1 rounded-lg border border-[#108910] px-2 py-1.5 text-sm"
                     />
-                    <button onClick={handleRenameCategory} className="p-1 text-[#108910]"><Check className="w-3.5 h-3.5" /></button>
-                    <button onClick={() => setEditingCategory(null)} className="p-1 text-gray-400"><X className="w-3.5 h-3.5" /></button>
+                    <button
+                      onClick={handleRenameCategory}
+                      className="p-1 text-[#108910]"
+                      aria-label="Guardar nombre de categoría"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setEditingCategory(null)}
+                      className="p-1 text-gray-400"
+                      aria-label="Cancelar edición de categoría"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-50 group">

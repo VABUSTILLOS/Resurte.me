@@ -248,6 +248,7 @@ export default function AddDishForm({
             <button
               onClick={addCustomIngredient}
               className="px-3 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700"
+              aria-label="Agregar ingrediente"
             >
               <Plus className="w-4 h-4" />
             </button>

@@ -50,7 +50,11 @@ export default function AddEditModal({
       <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-gray-900">{editingId ? "Editar producto" : "Agregar producto"}</h3>
-          <button onClick={onCancel} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
+          <button
+            onClick={onCancel}
+            className="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
+            aria-label="Cerrar formulario"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
