@@ -44,7 +44,7 @@ export default function ChannelFilters({
         <select
           value={mesaFilter}
           onChange={(e) => onMesaFilterChange(e.target.value)}
-          className="ml-2 text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-600 focus:outline-none focus:border-[#108910]"
+          className="ml-2 text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-600 focus:outline-none focus:border-[#0E7A0E]"
           aria-label="Filtrar por mesa"
         >
           <option value="todas">🪑 Todas las mesas</option>

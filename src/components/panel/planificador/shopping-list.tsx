@@ -45,7 +45,7 @@ export default function ShoppingList({
             Para {covers} comensales
           </span>
         </div>
-        <p className="text-4xl font-extrabold text-[#108910] mb-2">
+        <p className="text-4xl font-extrabold text-[#0E7A0E] mb-2">
           ${totalCost.toFixed(0)} <span className="text-lg font-medium text-gray-400">MXN</span>
         </p>
         <div className="flex flex-wrap gap-3 text-xs text-gray-500">
@@ -92,7 +92,7 @@ export default function ShoppingList({
       <div className="mt-4 space-y-3">
         <button
           onClick={onToggleOrder}
-          className="w-full flex items-center justify-center gap-2 bg-[#108910] hover:bg-green-800 text-white font-bold py-3 rounded-2xl transition-colors"
+          className="w-full flex items-center justify-center gap-2 bg-[#0E7A0E] hover:bg-green-800 text-white font-bold py-3 rounded-2xl transition-colors"
         >
           <ShoppingCart className="w-5 h-5" />
           {showOrder ? "Ocultar lista de pedido" : "Generar lista de pedido"}
@@ -100,19 +100,19 @@ export default function ShoppingList({
 
         {/* Order summary */}
         {showOrder && (
-          <div className="bg-white rounded-2xl border-2 border-[#108910]/20 p-5">
+          <div className="bg-white rounded-2xl border-2 border-[#0E7A0E]/20 p-5">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-bold text-gray-900">📋 Lista de pedido — {collectionName}</h4>
               <div className="flex items-center gap-2">
                 <button
                   onClick={onCopy}
-                  className="text-xs font-semibold text-[#108910] hover:text-green-800 transition-colors"
+                  className="text-xs font-semibold text-[#0E7A0E] hover:text-green-800 transition-colors"
                 >
                   📋 Copiar
                 </button>
                 <Link
                   href="/panel/inventario"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#108910] text-white px-3 py-1.5 rounded-lg hover:bg-[#0D720D] transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#0E7A0E] text-white px-3 py-1.5 rounded-lg hover:bg-[#0D720D] transition-colors"
                   title="Importa estas cantidades como stock en tu inventario"
                 >
                   <Package className="w-3.5 h-3.5" />
@@ -139,7 +139,7 @@ export default function ShoppingList({
             </div>
             <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between">
               <span className="font-bold text-gray-900">Total estimado</span>
-              <span className="font-extrabold text-[#108910] text-lg">${totalCost.toFixed(0)} MXN</span>
+              <span className="font-extrabold text-[#0E7A0E] text-lg">${totalCost.toFixed(0)} MXN</span>
             </div>
           </div>
         )}

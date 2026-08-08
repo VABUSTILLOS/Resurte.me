@@ -248,7 +248,7 @@ export function FoodosStorefront({
             {restaurant.logo_url ? (
               <img src={restaurant.logo_url} alt={restaurant.name} width={44} height={44} className="w-11 h-11 rounded-full object-cover" />
             ) : (
-              <div className="w-11 h-11 rounded-full bg-amber-500 text-white flex items-center justify-center font-black text-lg">
+              <div className="w-11 h-11 rounded-full bg-amber-500 text-amber-950 flex items-center justify-center font-black text-lg">
                 {restaurant.name.charAt(0).toUpperCase()}
               </div>
             )}
@@ -273,7 +273,7 @@ export function FoodosStorefront({
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 pb-32">
+      <div className="max-w-4xl mx-auto px-4 py-6 pb-32">
         {view === "menu" && (
           <MenuView
             categories={categories}
@@ -325,7 +325,7 @@ export function FoodosStorefront({
             onCancel={() => setClientSecret(null)}
           />
         )}
-      </main>
+      </div>
     </div>
   )
 }
@@ -382,7 +382,7 @@ function MenuView({
                   <div className="flex items-center gap-2">
                     <p className="font-bold text-stone-900">{combo.name}</p>
                     {combo.highlight && (
-                      <span className="text-[10px] bg-amber-500 text-white font-bold px-2 py-0.5 rounded-full">+valor</span>
+                      <span className="text-[10px] bg-amber-500 text-amber-950 font-bold px-2 py-0.5 rounded-full">+valor</span>
                     )}
                   </div>
                   <p className="text-sm font-bold text-emerald-600 mt-1">

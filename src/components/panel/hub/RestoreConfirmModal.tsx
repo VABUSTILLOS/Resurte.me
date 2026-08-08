@@ -34,7 +34,7 @@ export default function RestoreConfirmModal({ open, pendingBackup, onCancel, onC
           </button>
           <button
             onClick={onConfirm}
-            className="text-xs font-semibold text-white bg-[#108910] hover:bg-green-800 px-4 py-2 rounded-lg transition-colors"
+            className="text-xs font-semibold text-white bg-[#0E7A0E] hover:bg-green-800 px-4 py-2 rounded-lg transition-colors"
           >
             Restaurar
           </button>

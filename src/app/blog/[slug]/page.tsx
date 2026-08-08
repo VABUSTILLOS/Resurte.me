@@ -109,7 +109,7 @@ export default async function BlogPostPage({
         aria-label="Ruta de navegación"
         className="mx-auto max-w-3xl px-4 pt-8 sm:px-6"
       >
-        <ol className="flex flex-wrap items-center gap-1.5 text-xs text-warm-500">
+        <ol className="flex flex-wrap items-center gap-1.5 text-xs text-[var(--text-secondary)]">
           <li>
             <Link href="/" className="hover:text-brand-600">
               Inicio

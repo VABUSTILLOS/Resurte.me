@@ -9,11 +9,11 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white">
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
-            Política de <span className="text-[#108910]">privacidad</span>
+            Política de <span className="text-[#0E7A0E]">privacidad</span>
           </h1>
           <p className="text-[#5C6068]">
             Última actualización: enero 2026
@@ -31,7 +31,7 @@ export default function PrivacyPage() {
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-[12px] p-5 text-center">
               <div className="w-10 h-10 bg-[#E8F5E8] rounded-xl flex items-center justify-center mx-auto mb-3">
-                <Icon className="w-5 h-5 text-[#108910]" />
+                <Icon className="w-5 h-5 text-[#0E7A0E]" />
               </div>
               <h3 className="text-sm font-semibold text-[#242529] mb-1">{title}</h3>
               <p className="text-xs text-[#5C6068] leading-relaxed">{desc}</p>
@@ -74,7 +74,7 @@ export default function PrivacyPage() {
           <p className="text-[#5C6068] leading-relaxed">
             Tienes derecho a Acceder, Rectificar, Cancelar y Oponerte al
             tratamiento de tus datos personales. Envía tu solicitud a{" "}
-            <a href="mailto:privacidad@resurte.me" className="text-[#108910] hover:underline">
+            <a href="mailto:privacidad@resurte.me" className="text-[#0E7A0E] hover:underline">
               privacidad@resurte.me
             </a>{" "}
             y la atenderemos en un plazo máximo de 20 días hábiles.
@@ -99,6 +99,6 @@ export default function PrivacyPage() {
           </p>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

@@ -79,7 +79,7 @@ export function Header() {
         <div className="flex items-center justify-between h-16 gap-3">
           {/* Logo — Erewhon-style with refined type */}
           <Link href="/" className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[1.35rem] font-bold text-[#108910] tracking-tight">Resurte</span>
+            <span className="text-[1.35rem] font-bold text-[#0E7A0E] tracking-tight">Resurte</span>
             <span className="text-[1.35rem] font-bold text-[#1a1a1a] tracking-tight">.me</span>
           </Link>
 
@@ -87,13 +87,13 @@ export function Header() {
           {cashbackBalance !== null && cashbackBalance > 0 && (
             <Link
               href="/recompensas"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-[#108910]/10 border border-[#108910]/20 hover:bg-[#108910]/15 transition-colors text-sm shrink-0"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-[#0E7A0E]/10 border border-[#0E7A0E]/20 hover:bg-[#0E7A0E]/15 transition-colors text-sm shrink-0"
             >
-              <Coins className="w-4 h-4 text-[#108910]" />
-              <span className="font-semibold text-[#108910]">
+              <Coins className="w-4 h-4 text-[#0E7A0E]" />
+              <span className="font-semibold text-[#0E7A0E]">
                 ${cashbackBalance.toLocaleString("es-MX")}
               </span>
-              <span className="text-xs text-[#108910]/70 hidden lg:inline">recompensas</span>
+              <span className="text-xs text-[#0E7A0E]/70 hidden lg:inline">recompensas</span>
             </Link>
           )}
 
@@ -103,14 +103,14 @@ export function Header() {
             aria-label="Seleccionar ciudad"
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] hover:bg-[#F7F5F0] transition-colors text-sm shrink-0 touch-target"
           >
-            <MapPin className="w-4 h-4 text-[#108910]" aria-hidden="true" />
+            <MapPin className="w-4 h-4 text-[#0E7A0E]" aria-hidden="true" />
             <span
               className="font-medium text-[#343538]"
               suppressHydrationWarning
             >
               {city ? city.name : "Seleccionar ciudad"}
             </span>
-            <ChevronDown className="w-4 h-4 text-[#72767E]" aria-hidden="true" />
+            <ChevronDown className="w-4 h-4 text-[var(--text-secondary)]" aria-hidden="true" />
           </button>
 
           {/* Search Bar — hidden on mobile, shown on md+ */}
@@ -152,7 +152,7 @@ export function Header() {
             >
               <ShoppingCart className="w-5 h-5 text-[#343538]" aria-hidden="true" />
               {itemCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#108910] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5" role="status">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#0E7A0E] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5" role="status">
                   {itemCount > 99 ? "99+" : itemCount}
                 </span>
               )}
@@ -165,7 +165,7 @@ export function Header() {
             >
               <ShoppingCart className="w-5 h-5 text-[#343538]" aria-hidden="true" />
               {itemCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#108910] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5" role="status">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#0E7A0E] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5" role="status">
                   {itemCount > 99 ? "99+" : itemCount}
                 </span>
               )}
@@ -180,7 +180,7 @@ export function Header() {
                   aria-expanded={showUserMenu}
                   className="flex items-center gap-1.5 p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
                 >
-                  <User className="w-5 h-5 text-[#108910]" aria-hidden="true" />
+                  <User className="w-5 h-5 text-[#0E7A0E]" aria-hidden="true" />
                 </button>
 
                 {showUserMenu && (
@@ -189,7 +189,7 @@ export function Header() {
                       <p className="text-sm font-medium text-[#343538] truncate">
                         {user.user_metadata?.full_name || user.email}
                       </p>
-                      <p className="text-xs text-[#72767E] truncate">{user.email}</p>
+                      <p className="text-xs text-[var(--text-secondary)] truncate">{user.email}</p>
                     </div>
                     <Link
                       href={city ? `/${city.slug}/mis-pedidos` : "/auth/login"}

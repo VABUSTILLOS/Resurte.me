@@ -12,10 +12,10 @@ interface HeroSectionProps {
 export default function HeroSection({ collections, selectedCollection, onSelect }: HeroSectionProps) {
   if (selectedCollection) {
     return (
-      <div className="bg-gradient-to-r from-[#F0FDF4] to-[#E8F5E8] rounded-2xl p-6 sm:p-8 border border-[#108910]/10">
+      <div className="bg-gradient-to-r from-[#F0FDF4] to-[#E8F5E8] rounded-2xl p-6 sm:p-8 border border-[#0E7A0E]/10">
         <div className="flex items-start gap-4">
-          <div className="w-14 h-14 bg-[#108910]/10 rounded-2xl flex items-center justify-center shrink-0">
-            <ChefHat className="w-7 h-7 text-[#108910]" />
+          <div className="w-14 h-14 bg-[#0E7A0E]/10 rounded-2xl flex items-center justify-center shrink-0">
+            <ChefHat className="w-7 h-7 text-[#0E7A0E]" />
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
@@ -56,12 +56,12 @@ export default function HeroSection({ collections, selectedCollection, onSelect 
           <button
             key={c.id}
             onClick={() => onSelect(c)}
-            className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-gray-100 hover:border-[#108910]/30 hover:bg-[#F0FDF4] transition-all text-center group"
+            className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-gray-100 hover:border-[#0E7A0E]/30 hover:bg-[#F0FDF4] transition-all text-center group"
           >
             <span className="text-2xl group-hover:scale-110 transition-transform">
               {COLLECTION_ICONS[c.slug] || "🍽️"}
             </span>
-            <span className="text-xs font-medium text-gray-600 group-hover:text-[#108910] leading-tight">
+            <span className="text-xs font-medium text-gray-600 group-hover:text-[#0E7A0E] leading-tight">
               {c.name}
             </span>
           </button>

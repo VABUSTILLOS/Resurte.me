@@ -13,7 +13,7 @@ export default function TopSellers({ topSellers, totalUnits, selectedDateLabel }
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5">
       <div className="flex items-center gap-2 mb-4">
-        <TrendingUp className="w-4 h-4 text-[#108910]" />
+        <TrendingUp className="w-4 h-4 text-[#0E7A0E]" />
         <h3 className="text-sm font-semibold text-gray-900">Top ventas · {selectedDateLabel}</h3>
       </div>
       {topSellers.length === 0 ? (
@@ -31,7 +31,7 @@ export default function TopSellers({ topSellers, totalUnits, selectedDateLabel }
                     <span className="text-gray-400 shrink-0 ml-2">{t.qty} pz · ${t.revenue.toFixed(0)}</span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                    <div className="h-full bg-[#108910] rounded-full" style={{ width: `${pct}%` }} />
+                    <div className="h-full bg-[#0E7A0E] rounded-full" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               </div>

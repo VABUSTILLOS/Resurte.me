@@ -71,12 +71,12 @@ export function CouponInput() {
     return (
       <div className="flex items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
         <div className="flex items-center gap-2 min-w-0">
-          <Check className="w-4 h-4 text-[#108910] shrink-0" />
+          <Check className="w-4 h-4 text-[#0E7A0E] shrink-0" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[#0D720D] truncate">
               Cupón {coupon.code} aplicado
             </p>
-            <p className="text-xs text-[#108910]">
+            <p className="text-xs text-[#0E7A0E]">
               Descuento de ${discount.toFixed(2)}
             </p>
           </div>
@@ -112,13 +112,13 @@ export function CouponInput() {
               }
             }}
             placeholder="Código de descuento"
-            className="w-full pl-9 pr-3 py-2.5 border border-[#e0dbd2] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/20 focus:border-[#108910]"
+            className="w-full pl-9 pr-3 py-2.5 border border-[#e0dbd2] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/20 focus:border-[#0E7A0E]"
           />
         </div>
         <button
           onClick={handleApply}
           disabled={!code.trim() || loading}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#108910] text-white text-sm font-semibold hover:bg-[#0D720D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0D720D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? (
             <>

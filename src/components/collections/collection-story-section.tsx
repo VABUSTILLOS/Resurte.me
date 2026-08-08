@@ -28,7 +28,7 @@ export function CollectionStorySection({
           {/* ── Text column — takes more space ── */}
           <ScrollReveal className="lg:col-span-3 order-2 lg:order-1">
             {/* Label — collection-specific */}
-            <span className="inline-block text-[10px] sm:text-[11px] font-semibold tracking-[0.25em] uppercase text-[#108910]/70 mb-4 sm:mb-6">
+            <span className="inline-block text-[10px] sm:text-[11px] font-semibold tracking-[0.25em] uppercase text-[#0E7A0E]/70 mb-4 sm:mb-6">
               {story.storyLabel || "Nuestra Historia"}
             </span>
 
@@ -37,7 +37,7 @@ export function CollectionStorySection({
             </h2>
 
             {/* Ornamental line */}
-            <div className="w-12 sm:w-16 h-[2px] bg-[#108910]/25 mb-5 sm:mb-8" />
+            <div className="w-12 sm:w-16 h-[2px] bg-[#0E7A0E]/25 mb-5 sm:mb-8" />
 
             {/* Body text — editorial leading */}
             <div className="space-y-4 sm:space-y-5">
@@ -53,8 +53,8 @@ export function CollectionStorySection({
 
             {/* Footer accent */}
             <div className="mt-8 sm:mt-10 flex items-center gap-3">
-              <div className="w-6 sm:w-8 h-[1px] bg-[#108910]/20" />
-              <span className="text-[10px] sm:text-[11px] font-medium tracking-[0.15em] uppercase text-[#999893]">
+              <div className="w-6 sm:w-8 h-[1px] bg-[#0E7A0E]/20" />
+              <span className="text-[10px] sm:text-[11px] font-medium tracking-[0.15em] uppercase text-[var(--text-secondary)]">
                 {collectionName}
               </span>
             </div>
@@ -77,8 +77,8 @@ export function CollectionStorySection({
               /* Elegant decorative placeholder — abstract, editorial */
               <div className="relative aspect-[16/10] sm:aspect-[3/4] lg:aspect-[4/5] rounded-xl sm:rounded-2xl overflow-hidden border border-[#ede8df]/50">
                 <div className="absolute inset-0 bg-gradient-to-br from-[#f7f4ef] via-[#ede8df] to-[#f0ede5]" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 sm:w-32 h-24 sm:h-32 rounded-full bg-[#108910]/[0.04] border border-[#108910]/10" />
-                <div className="absolute top-1/3 right-1/3 w-12 sm:w-16 h-12 sm:h-16 rounded-full bg-[#108910]/[0.03]" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 sm:w-32 h-24 sm:h-32 rounded-full bg-[#0E7A0E]/[0.04] border border-[#0E7A0E]/10" />
+                <div className="absolute top-1/3 right-1/3 w-12 sm:w-16 h-12 sm:h-16 rounded-full bg-[#0E7A0E]/[0.03]" />
               </div>
             )}
           </ScrollReveal>

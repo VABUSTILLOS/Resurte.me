@@ -57,7 +57,7 @@ export function CityPageClient({ slug, categories, products }: Props) {
 
       {/* Hero */}
       <div className="mb-8">
-        <div className="flex items-center gap-2 text-[#72767E] text-sm mb-2">
+        <div className="flex items-center gap-2 text-[var(--text-secondary)] text-sm mb-2">
           <MapPin className="w-4 h-4" />
           <span>
             {city.name}, {city.state}
@@ -66,7 +66,7 @@ export function CityPageClient({ slug, categories, products }: Props) {
         <h1 className="text-3xl font-bold text-[#242529]">
           Central de Abastos Digital en {city.name}
         </h1>
-        <p className="mt-2 text-[#72767E] max-w-2xl">
+        <p className="mt-2 text-[var(--text-secondary)] max-w-2xl">
           Más de 30 productos frescos para tu negocio. Sin membresía, sin mínimo de compra. Pedidos por caja, bulto o pieza.
         </p>
       </div>
@@ -74,7 +74,7 @@ export function CityPageClient({ slug, categories, products }: Props) {
       {/* Search bar */}
       <div className="mb-8">
         <div className="relative max-w-xl">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#72767E]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-secondary)]" />
           <input
             type="text"
             placeholder="Buscar producto..."
@@ -83,7 +83,7 @@ export function CityPageClient({ slug, categories, products }: Props) {
               setSearch(e.target.value)
               setActiveCategory(null)
             }}
-            className="w-full pl-10 pr-4 py-2.5 bg-[#F7F5F0] rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-[#108910] focus:bg-white transition-colors"
+            className="w-full pl-10 pr-4 py-2.5 bg-[#F7F5F0] rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E] focus:bg-white transition-colors"
           />
         </div>
       </div>
@@ -95,8 +95,8 @@ export function CityPageClient({ slug, categories, products }: Props) {
             onClick={() => setActiveCategory(null)}
             className={`shrink-0 px-4 py-2 rounded-[10px] text-sm font-medium transition-colors snap-start ${
               activeCategory === null
-                ? "bg-[#108910] text-white"
-                : "bg-[#F7F5F0] text-[#72767E] hover:bg-[#EDEBE6]"
+                ? "bg-[#0E7A0E] text-white"
+                : "bg-[#F7F5F0] text-[var(--text-secondary)] hover:bg-[#EDEBE6]"
             }`}
           >
             Todos
@@ -107,8 +107,8 @@ export function CityPageClient({ slug, categories, products }: Props) {
               onClick={() => setActiveCategory(cat.id)}
               className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-sm font-medium transition-colors snap-start ${
                 activeCategory === cat.id
-                  ? "bg-[#108910] text-white"
-                  : "bg-[#F7F5F0] text-[#72767E] hover:bg-[#EDEBE6]"
+                  ? "bg-[#0E7A0E] text-white"
+                  : "bg-[#F7F5F0] text-[var(--text-secondary)] hover:bg-[#EDEBE6]"
               }`}
             >
               <span>{getCategoryIcon(cat.icon, cat.slug)}</span>
@@ -138,7 +138,7 @@ export function CityPageClient({ slug, categories, products }: Props) {
       {filteredProducts.length === 0 && (
         <div className="text-center py-16">
           <Search className="w-12 h-12 text-[#D9D7D2] mx-auto mb-4" />
-          <p className="text-[#72767E]">No se encontraron productos.</p>
+          <p className="text-[var(--text-secondary)]">No se encontraron productos.</p>
         </div>
       )}
     </div>

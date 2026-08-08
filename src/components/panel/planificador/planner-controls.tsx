@@ -41,7 +41,7 @@ export default function PlannerControls({
             type="number"
             value={covers}
             onChange={(e) => setCovers(Math.max(1, parseInt(e.target.value) || 0))}
-            className="w-24 text-center text-2xl font-bold text-gray-900 bg-transparent border-b-2 border-gray-200 focus:border-[#108910] focus:outline-none py-1"
+            className="w-24 text-center text-2xl font-bold text-gray-900 bg-transparent border-b-2 border-gray-200 focus:border-[#0E7A0E] focus:outline-none py-1"
           />
           <button
             onClick={() => setCovers(covers + 10)}

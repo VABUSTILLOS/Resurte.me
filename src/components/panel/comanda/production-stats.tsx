@@ -27,8 +27,8 @@ export default function ProductionStats({ activeCount, cookingCount, listoCount,
         <p className="text-[10px] text-gray-400">Listas hoy</p>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-        <Clock className="w-5 h-5 text-[#108910] mx-auto mb-1" />
-        <p className="text-lg font-extrabold text-[#108910]">
+        <Clock className="w-5 h-5 text-[#0E7A0E] mx-auto mb-1" />
+        <p className="text-lg font-extrabold text-[#0E7A0E]">
           {hasProd ? `${avgMin.toFixed(0)} min` : "—"}
         </p>
         <p className="text-[10px] text-gray-400">Tiempo promedio de producción</p>

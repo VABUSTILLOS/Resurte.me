@@ -318,7 +318,7 @@ export default function RentabilidadPage() {
           <p className="text-sm text-gray-400">
             {selectedCollection.name}
             {costeoDishes.length > 0 && (
-              <span className="ml-2 text-[#108910] font-medium">
+              <span className="ml-2 text-[#0E7A0E] font-medium">
                 +{costeoDishes.length} platillos de Costeando mi menú
               </span>
             )}
@@ -353,7 +353,7 @@ export default function RentabilidadPage() {
         <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[#108910]" />
+              <TrendingUp className="w-5 h-5 text-[#0E7A0E]" />
               <h3 className="font-bold text-gray-900 text-sm">Análisis por categoría</h3>
             </div>
             {worstCategory && foodCostStatus(worstCategory.avgFc, panelCfg) === "red" && (
@@ -446,7 +446,7 @@ export default function RentabilidadPage() {
             max="30"
             value={costMultiplier}
             onChange={(e) => setCostMultiplier(parseFloat(e.target.value))}
-            className="flex-1 min-w-0 h-1.5 accent-[#108910]"
+            className="flex-1 min-w-0 h-1.5 accent-[#0E7A0E]"
           />
           <span className={`text-xs font-bold w-14 text-right ${costMultiplier > 0 ? "text-red-600" : costMultiplier < 0 ? "text-emerald-600" : "text-gray-400"}`}>
             {costMultiplier > 0 ? "+" : ""}{costMultiplier}%
@@ -487,7 +487,7 @@ export default function RentabilidadPage() {
           action={
             <Link
               href="/panel/costeo"
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
             >
               <DollarSign className="w-3.5 h-3.5" />
               Ir al Costeador
@@ -556,12 +556,12 @@ export default function RentabilidadPage() {
                         }
                         if (e.key === "Escape") setEditingName(null)
                       }}
-                      className="w-20 text-center font-bold text-sm text-[#108910] border-b-2 border-[#108910] bg-green-50 rounded px-1 py-0.5 outline-none"
+                      className="w-20 text-center font-bold text-sm text-[#0E7A0E] border-b-2 border-[#0E7A0E] bg-green-50 rounded px-1 py-0.5 outline-none"
                     />
                   ) : (
                     <button
                       onClick={() => { setEditingName(dish.name); setEditValue(String(dish.price)) }}
-                      className="font-bold text-sm text-[#108910] hover:text-green-800 hover:underline transition-colors"
+                      className="font-bold text-sm text-[#0E7A0E] hover:text-green-800 hover:underline transition-colors"
                       title="Click para editar precio de venta"
                       aria-label={`Editar precio de ${dish.name}`}
                     >
@@ -598,9 +598,9 @@ export default function RentabilidadPage() {
       )}
 
       {/* Tip */}
-      <div className="mt-6 bg-gradient-to-r from-[#F0FDF4] to-white rounded-2xl border border-[#108910]/10 p-5">
+      <div className="mt-6 bg-gradient-to-r from-[#F0FDF4] to-white rounded-2xl border border-[#0E7A0E]/10 p-5">
         <div className="flex items-start gap-3">
-          <DollarSign className="w-5 h-5 text-[#108910] mt-0.5 shrink-0" />
+          <DollarSign className="w-5 h-5 text-[#0E7A0E] mt-0.5 shrink-0" />
           <div>
             <h4 className="font-semibold text-gray-900 mb-1 text-sm">¿Cómo usarlo?</h4>
             <p className="text-xs text-gray-500 leading-relaxed">

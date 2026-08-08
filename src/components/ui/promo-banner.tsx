@@ -29,7 +29,7 @@ export function PromoBanner() {
   }
 
   return (
-    <div className="bg-[#108910] text-white text-center text-sm py-2 px-4">
+    <div className="bg-[#0E7A0E] text-white text-center text-sm py-2 px-4">
       <Link href="/recompensas" onClick={onCtaClick} className="underline-offset-2 hover:underline">
         {copy}
       </Link>

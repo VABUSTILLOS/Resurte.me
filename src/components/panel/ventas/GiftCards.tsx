@@ -12,7 +12,7 @@ export default function GiftCards({ crud }: GiftCardsProps) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <div className="flex items-center gap-2 mb-4">
-        <CreditCard className="w-4 h-4 text-[#108910]" />
+        <CreditCard className="w-4 h-4 text-[#0E7A0E]" />
         <h3 className="text-sm font-semibold text-gray-900">Tarjetas de regalo</h3>
         {tarjetas.length > 0 && (
           <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
@@ -41,13 +41,13 @@ export default function GiftCards({ crud }: GiftCardsProps) {
                 onChange={(e) => onMontoChange(e.target.value)}
                 min="1"
                 placeholder="Ej. 500"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#0E7A0E]"
                 aria-label="Monto de la tarjeta de regalo"
               />
             </div>
             <button
               onClick={onEmitir}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
             >
               <Gift className="w-3.5 h-3.5" />
               Emitir tarjeta
@@ -72,7 +72,7 @@ export default function GiftCards({ crud }: GiftCardsProps) {
                     </span>
                     <button
                       onClick={() => onCopyCodigo(t.codigo)}
-                      className="p-1.5 text-gray-400 hover:text-[#108910] rounded-lg hover:bg-emerald-50 transition-colors shrink-0"
+                      className="p-1.5 text-gray-400 hover:text-[#0E7A0E] rounded-lg hover:bg-emerald-50 transition-colors shrink-0"
                       title="Copiar código"
                       aria-label={`Copiar código de ${t.codigo}`}
                     >

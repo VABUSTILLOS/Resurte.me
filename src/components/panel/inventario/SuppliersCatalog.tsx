@@ -26,7 +26,7 @@ export default function SuppliersCatalog({
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <button onClick={onToggle} className="flex items-center justify-between w-full text-left">
         <div className="flex items-center gap-2">
-          <Truck className="w-5 h-5 text-[#108910]" />
+          <Truck className="w-5 h-5 text-[#0E7A0E]" />
           <h3 className="font-bold text-gray-900 text-sm">Proveedores ({proveedores.length})</h3>
           <p className="text-[10px] text-gray-400 hidden sm:block">Asigna un proveedor a cada producto para agrupar tus órdenes</p>
         </div>
@@ -40,7 +40,7 @@ export default function SuppliersCatalog({
               value={supplierForm.nombre}
               onChange={(e) => onFormChange("nombre", e.target.value)}
               placeholder="Nombre del proveedor"
-              className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]"
+              className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#0E7A0E]"
               aria-label="Nombre del proveedor"
             />
             <input
@@ -48,7 +48,7 @@ export default function SuppliersCatalog({
               value={supplierForm.contacto}
               onChange={(e) => onFormChange("contacto", e.target.value)}
               placeholder="Contacto (opcional)"
-              className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]"
+              className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#0E7A0E]"
               aria-label="Contacto del proveedor"
             />
             <input
@@ -56,13 +56,13 @@ export default function SuppliersCatalog({
               value={supplierForm.telefono}
               onChange={(e) => onFormChange("telefono", e.target.value)}
               placeholder="Teléfono (opcional)"
-              className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#108910]"
+              className="w-full text-sm px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:border-[#0E7A0E]"
               aria-label="Teléfono del proveedor"
             />
             <button
               onClick={onAdd}
               disabled={!supplierForm.nombre.trim()}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-3.5 h-3.5" />
               Agregar

@@ -25,17 +25,17 @@ export function CategoryPageClient({ citySlug, cityName, category, products }: C
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm text-[#6b6b6b] mb-4">
-            <Link href={`/${citySlug}`} className="hover:text-[#108910] transition-colors">
+            <Link href={`/${citySlug}`} className="hover:text-[#0E7A0E] transition-colors">
               {cityName}
             </Link>
-            <span className="text-[#999893]">/</span>
+            <span className="text-[var(--text-secondary)]">/</span>
             <span className="text-[#1a1a1a] font-medium">{category.name}</span>
           </div>
 
           {/* Category header */}
           <ScrollReveal>
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#108910]/10 flex items-center justify-center text-3xl shadow-sm">
+              <div className="w-14 h-14 rounded-2xl bg-[#0E7A0E]/10 flex items-center justify-center text-3xl shadow-sm">
                 {getCategoryIcon(category.icon, category.slug)}
               </div>
               <div>
@@ -57,7 +57,7 @@ export function CategoryPageClient({ citySlug, cityName, category, products }: C
       {/* Products grid — Erewhon-style */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex items-center gap-2 mb-6">
-          <ShoppingBag className="w-5 h-5 text-[#108910]" />
+          <ShoppingBag className="w-5 h-5 text-[#0E7A0E]" />
           <h2 className="text-lg font-semibold text-[#1a1a1a]">
             {products.length} producto{products.length !== 1 ? "s" : ""}
           </h2>
@@ -65,10 +65,10 @@ export function CategoryPageClient({ citySlug, cityName, category, products }: C
 
         {products.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-[#999893]">No hay productos en esta categoría por el momento.</p>
+            <p className="text-[var(--text-secondary)]">No hay productos en esta categoría por el momento.</p>
             <Link
               href={`/${citySlug}`}
-              className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-[#108910] hover:text-[#0D720D]"
+              className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-[#0E7A0E] hover:text-[#0D720D]"
             >
               <ArrowLeft className="w-4 h-4" />
               Volver al inicio

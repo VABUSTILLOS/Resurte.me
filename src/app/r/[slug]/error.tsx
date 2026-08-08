@@ -26,7 +26,7 @@ export default function StorefrontError({
       </p>
       <button
         onClick={unstable_retry}
-        className="mt-2 px-5 py-2.5 rounded-xl bg-[#108910] text-white text-sm font-semibold hover:bg-[#0d6f0d] transition-colors"
+        className="mt-2 px-5 py-2.5 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0d6f0d] transition-colors"
       >
         Reintentar
       </button>

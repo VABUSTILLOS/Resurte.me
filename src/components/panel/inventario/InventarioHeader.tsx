@@ -20,7 +20,7 @@ export default function InventarioHeader({ restaurantName, itemCount, onExportCs
         {itemCount > 0 && (
           <button
             onClick={onExportCsv}
-            className="p-2 text-gray-400 hover:text-[#108910] hover:bg-green-50 rounded-xl transition-colors"
+            className="p-2 text-gray-400 hover:text-[#0E7A0E] hover:bg-green-50 rounded-xl transition-colors"
             title="Exportar CSV"
             aria-label="Exportar inventario a CSV"
           >
@@ -29,7 +29,7 @@ export default function InventarioHeader({ restaurantName, itemCount, onExportCs
         )}
         <button
           onClick={onAddProduct}
-          className="flex items-center gap-1.5 px-3 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           Agregar producto

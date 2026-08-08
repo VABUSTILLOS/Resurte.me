@@ -34,7 +34,7 @@ export default function MonthlyGoal({
               value={monthlyGoal || ""}
               onChange={(e) => onGoalChange(parseFloat(e.target.value) || 0)}
               placeholder="$5,000"
-              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
             />
             <span className="text-sm text-gray-400">MXN</span>
           </div>

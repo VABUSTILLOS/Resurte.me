@@ -18,7 +18,7 @@ const valueStyles = cva("text-2xl font-bold", {
   variants: {
     tone: {
       default: "text-gray-900",
-      positive: "text-[#108910]",
+      positive: "text-[#0E7A0E]",
       warning: "text-amber-600",
       danger: "text-red-600",
     },
@@ -30,7 +30,7 @@ const iconStyles = cva("w-7 h-7 rounded-lg flex items-center justify-center", {
   variants: {
     tone: {
       default: "bg-gray-50 text-gray-400",
-      positive: "bg-[#F0FDF4] text-[#108910]",
+      positive: "bg-[#F0FDF4] text-[#0E7A0E]",
       warning: "bg-amber-50 text-amber-500",
       danger: "bg-red-50 text-red-500",
     },

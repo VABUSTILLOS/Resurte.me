@@ -16,7 +16,7 @@ export default function CorteCaja({ methodBreakdown, revenue, dayEntryCount, sel
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <div className="flex items-center gap-2 mb-4">
-        <Landmark className="w-4 h-4 text-[#108910]" />
+        <Landmark className="w-4 h-4 text-[#0E7A0E]" />
         <h3 className="text-sm font-semibold text-gray-900">Corte de caja · {selectedDateLabel}</h3>
         <button
           onClick={onCopy}
@@ -41,7 +41,7 @@ export default function CorteCaja({ methodBreakdown, revenue, dayEntryCount, sel
       <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
         <span className="text-xs text-gray-500">Total del día</span>
         <span className="flex flex-col items-end">
-          <span className="text-lg font-extrabold text-[#108910]">${revenue.toFixed(0)}</span>
+          <span className="text-lg font-extrabold text-[#0E7A0E]">${revenue.toFixed(0)}</span>
           {tipoCambio !== 1 && <span className="text-[10px] text-gray-400">≈ ${(revenue / tipoCambio).toFixed(2)} USD</span>}
         </span>
       </div>

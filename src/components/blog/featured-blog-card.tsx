@@ -81,7 +81,7 @@ export function FeaturedBlogCard({
         >
           {post.description}
         </p>
-        <div className="mt-auto flex items-center gap-3 pt-4 text-xs text-warm-400">
+        <div className="mt-auto flex items-center gap-3 pt-4 text-xs text-[var(--text-secondary)]">
           <span>
             {formatPostDate(post.date)}
           </span>

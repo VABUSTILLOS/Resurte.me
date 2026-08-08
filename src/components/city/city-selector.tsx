@@ -55,20 +55,20 @@ export function CitySelector({ onClose }: CitySelectorProps) {
             onClick={onClose}
             className="p-1 rounded-lg hover:bg-[#F7F5F0] transition-colors"
           >
-            <X className="w-5 h-5 text-[#72767E]" />
+            <X className="w-5 h-5 text-[var(--text-secondary)]" />
           </button>
         </div>
 
         {/* Search */}
         <div className="p-4 border-b border-[#E8E9EB]">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8F939B]" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-secondary)]" />
             <input
               type="text"
               placeholder="Busca tu ciudad..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-[#F7F5F0] rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-[#108910] focus:bg-white transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 bg-[#F7F5F0] rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E] focus:bg-white transition-colors"
               autoFocus
             />
           </div>
@@ -77,13 +77,13 @@ export function CitySelector({ onClose }: CitySelectorProps) {
         {/* City list */}
         <div className="overflow-y-auto flex-1 p-4">
           {Object.keys(filtered).length === 0 ? (
-            <p className="text-center text-[#72767E] py-8">
+            <p className="text-center text-[var(--text-secondary)] py-8">
               No se encontraron ciudades.
             </p>
           ) : (
             Object.entries(filtered).map(([state, cities]) => (
               <div key={state} className="mb-6">
-                <h3 className="text-xs font-semibold text-[#8F939B] uppercase tracking-wider mb-2">
+                <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
                   {state}
                 </h3>
                 <div className="space-y-1">
@@ -101,7 +101,7 @@ export function CitySelector({ onClose }: CitySelectorProps) {
                       >
                         <MapPin
                           className={`w-4 h-4 shrink-0 ${
-                            isActive ? "text-[#108910]" : "text-[#8F939B]"
+                            isActive ? "text-[#0E7A0E]" : "text-[var(--text-secondary)]"
                           }`}
                         />
                         {c.name}

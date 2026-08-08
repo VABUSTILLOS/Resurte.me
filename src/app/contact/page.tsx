@@ -51,16 +51,16 @@ export default function ContactPage() {
   const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
 
   return (
-    <main className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white">
       {/* Hero */}
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
-          <span className="inline-block bg-[#E8F5E8] text-[#108910] text-sm font-semibold px-4 py-1.5 rounded-full mb-4">
+          <span className="inline-block bg-[#E8F5E8] text-[#0E7A0E] text-sm font-semibold px-4 py-1.5 rounded-full mb-4">
             Respuesta en menos de 5 minutos
           </span>
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
             Aquí hay personas reales,{" "}
-            <span className="text-[#108910]">no un chat bot</span>
+            <span className="text-[#0E7A0E]">no un chat bot</span>
           </h1>
           <p className="text-lg text-[#5C6068] leading-relaxed max-w-xl mx-auto">
             Del otro lado hay un equipo que conoce tu negocio, tu zona y tus
@@ -79,7 +79,7 @@ export default function ContactPage() {
             { value: "100%", label: "Humanos, cero bots" },
           ].map(({ value, label }) => (
             <div key={label} className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-[12px] p-4">
-              <p className="text-2xl font-extrabold text-[#108910]">{value}</p>
+              <p className="text-2xl font-extrabold text-[#0E7A0E]">{value}</p>
               <p className="text-xs text-[#5C6068] mt-1">{label}</p>
             </div>
           ))}
@@ -97,8 +97,8 @@ export default function ContactPage() {
               href: `https://wa.me/${whatsappNumber}`,
               label: "Abrir WhatsApp",
               bg: "bg-[#E8F5E8]",
-              hoverBg: "hover:bg-[#25D366] hover:text-white",
-              iconColor: "text-[#25D366]",
+              hoverBg: "hover:bg-[#0F7A3D] hover:text-white",
+              iconColor: "text-[#0F7A3D]",
             },
             {
               icon: Mail,
@@ -107,8 +107,8 @@ export default function ContactPage() {
               href: "mailto:hola@resurte.me",
               label: "hola@resurte.me",
               bg: "bg-[#EEF2FF]",
-              hoverBg: "hover:bg-[#108910] hover:text-white",
-              iconColor: "text-[#108910]",
+              hoverBg: "hover:bg-[#0E7A0E] hover:text-white",
+              iconColor: "text-[#0E7A0E]",
             },
             {
               icon: Phone,
@@ -117,8 +117,8 @@ export default function ContactPage() {
               href: "tel:+526145337486",
               label: "614 533 7486",
               bg: "bg-[#FFF7ED]",
-              hoverBg: "hover:bg-[#108910] hover:text-white",
-              iconColor: "text-[#108910]",
+              hoverBg: "hover:bg-[#0E7A0E] hover:text-white",
+              iconColor: "text-[#0E7A0E]",
             },
           ].map(({ icon: Icon, title, desc, href, label, bg, hoverBg, iconColor }) => (
             <a
@@ -137,7 +137,7 @@ export default function ContactPage() {
               <p className="text-sm text-[#5C6068] mb-3 group-hover:text-white/80 transition-colors leading-relaxed">
                 {desc}
               </p>
-              <span className="text-sm font-semibold text-[#108910] group-hover:text-white transition-colors">
+              <span className="text-sm font-semibold text-[#0E7A0E] group-hover:text-white transition-colors">
                 {label} →
               </span>
             </a>
@@ -151,7 +151,7 @@ export default function ContactPage() {
           <div className="text-center mb-10">
             <h2 className="text-2xl sm:text-3xl font-bold text-[#242529] mb-3">
               Dinos qué necesitas y{" "}
-              <span className="text-[#108910]">te llevamos directo</span>
+              <span className="text-[#0E7A0E]">te llevamos directo</span>
             </h2>
             <p className="text-[#5C6068]">
               Cada botón abre WhatsApp con un mensaje listo. Solo pones enviar y
@@ -168,10 +168,10 @@ export default function ContactPage() {
                 className="flex items-center gap-4 bg-white border border-[#E5E7EB] rounded-[12px] p-4 hover:border-[#25D366] hover:shadow-sm transition-all group"
               >
                 <span className="text-2xl flex-shrink-0">{icon}</span>
-                <span className="text-sm font-medium text-[#242529] group-hover:text-[#108910] transition-colors flex-1">
+                <span className="text-sm font-medium text-[#242529] group-hover:text-[#0E7A0E] transition-colors flex-1">
                   {label}
                 </span>
-                <ChevronRight className="w-4 h-4 text-[#C4C7CC] group-hover:text-[#25D366] transition-colors flex-shrink-0" />
+                <ChevronRight className="w-4 h-4 text-[#C4C7CC] group-hover:text-[#0F7A3D] transition-colors flex-shrink-0" />
               </a>
             ))}
           </div>
@@ -184,7 +184,7 @@ export default function ContactPage() {
           <div className="bg-white border border-[#E5E7EB] rounded-[16px] p-8">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-[#E8F5E8] rounded-xl flex items-center justify-center">
-                <Clock className="w-5 h-5 text-[#108910]" />
+                <Clock className="w-5 h-5 text-[#0E7A0E]" />
               </div>
               <h3 className="text-lg font-semibold text-[#242529]">
                 Horario de atención
@@ -208,7 +208,7 @@ export default function ContactPage() {
           <div className="bg-white border border-[#E5E7EB] rounded-[16px] p-8">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-[#E8F5E8] rounded-xl flex items-center justify-center">
-                <MapPin className="w-5 h-5 text-[#108910]" />
+                <MapPin className="w-5 h-5 text-[#0E7A0E]" />
               </div>
               <h3 className="text-lg font-semibold text-[#242529]">
                 Oficina
@@ -241,7 +241,7 @@ export default function ContactPage() {
           </p>
           <Link
             href="/faq"
-            className="inline-flex items-center gap-2 bg-[#108910] text-white font-semibold px-6 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
+            className="inline-flex items-center gap-2 bg-[#0E7A0E] text-white font-semibold px-6 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
           >
             Ver preguntas frecuentes
             <ArrowRight className="w-4 h-4" />
@@ -250,24 +250,24 @@ export default function ContactPage() {
       </section>
 
       {/* Bottom CTA */}
-      <section className="bg-[#108910] py-16 px-4 text-center">
+      <section className="bg-[#0E7A0E] py-16 px-4 text-center">
         <div className="max-w-xl mx-auto">
           <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
             ¿Todavía no tienes cuenta?
           </h2>
-          <p className="text-white/80 mb-6">
+          <p className="text-white/90 mb-6">
             Regístrate gratis en 5 minutos y empieza a pedir hoy. Sin
             compromiso, sin mensualidades.
           </p>
           <Link
             href="/auth/register"
-            className="inline-flex items-center gap-2 bg-white text-[#108910] font-semibold px-8 py-3 rounded-[10px] hover:bg-[#F0F7F0] transition-colors"
+            className="inline-flex items-center gap-2 bg-white text-[#0E7A0E] font-semibold px-8 py-3 rounded-[10px] hover:bg-[#F0F7F0] transition-colors"
           >
             Crear cuenta gratis
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

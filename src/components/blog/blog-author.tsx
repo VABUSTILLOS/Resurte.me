@@ -21,11 +21,11 @@ export function BlogAuthor({ post }: BlogAuthorProps) {
         <div>
           <p className="text-sm font-semibold text-warm-900">{post.author}</p>
           {post.authorRole && (
-            <p className="text-xs text-warm-500">{post.authorRole}</p>
+            <p className="text-xs text-[var(--text-secondary)]">{post.authorRole}</p>
           )}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-warm-500">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-secondary)]">
         <span className="inline-flex items-center gap-1.5">
           <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
           {published}
@@ -36,7 +36,7 @@ export function BlogAuthor({ post }: BlogAuthorProps) {
         </span>
       </div>
       {updated && updated !== published && (
-        <p className="w-full text-xs text-warm-400">
+        <p className="w-full text-xs text-[var(--text-secondary)]">
           Última actualización: {updated}
         </p>
       )}

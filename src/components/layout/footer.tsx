@@ -33,7 +33,7 @@ export function Footer() {
           {/* Brand */}
           <div>
             <Link href="/" className="inline-block mb-4" aria-label="Resurte.me — Ir al inicio">
-              <span className="text-xl font-bold text-[#108910]">Resurte</span>
+              <span className="text-xl font-bold text-[#3CC73C]">Resurte</span>
               <span className="text-xl font-bold text-[#E8E9EB]">.me</span>
             </Link>
             <p className="text-sm text-[#8F939B]">
@@ -44,15 +44,15 @@ export function Footer() {
           {/* Link sections */}
           {Object.entries(FOOTER_LINKS).map(([title, links]) => (
             <nav key={title} aria-label={title}>
-              <h3 className="font-semibold text-[#E8E9EB] mb-3 text-sm uppercase tracking-wider">
+              <h2 className="font-semibold text-[#E8E9EB] mb-3 text-sm uppercase tracking-wider">
                 {title}
-              </h3>
+              </h2>
               <ul className="space-y-2">
                 {links.map((link) => (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-sm text-[#8F939B] hover:text-[#108910] transition-colors"
+                      className="text-sm text-[#8F939B] hover:text-[#0E7A0E] transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -63,7 +63,7 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-10 pt-6 border-t border-[#343538] text-center text-sm text-[#72767E]">
+        <div className="mt-10 pt-6 border-t border-[#343538] text-center text-sm text-[#A0A4AD]">
           <p className="flex items-center justify-center gap-1">
             Hecho con <Heart className="w-3 h-3 text-red-500 fill-red-500" aria-hidden="true" /> en
             México — Resurte.me — Central de Abastos Digital © {new Date().getFullYear()}

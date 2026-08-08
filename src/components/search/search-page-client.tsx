@@ -218,18 +218,18 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
           {/* Breadcrumb */}
           <div className="flex items-center gap-2 text-sm text-[#6b6b6b] mb-4">
-            <Link href={`/${citySlug}`} className="hover:text-[#108910] transition-colors">
+            <Link href={`/${citySlug}`} className="hover:text-[#0E7A0E] transition-colors">
               {cityName}
             </Link>
-            <span className="text-[#999893]">/</span>
+            <span className="text-[var(--text-secondary)]">/</span>
             <span className="text-[#1a1a1a] font-medium">Todos los productos</span>
           </div>
 
           {/* Title */}
           <ScrollReveal>
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#108910]/10 flex items-center justify-center text-3xl shadow-sm">
-                <ShoppingBag className="w-7 h-7 text-[#108910]" />
+              <div className="w-14 h-14 rounded-2xl bg-[#0E7A0E]/10 flex items-center justify-center text-3xl shadow-sm">
+                <ShoppingBag className="w-7 h-7 text-[#0E7A0E]" />
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-[#1a1a1a] tracking-tight">
@@ -262,8 +262,8 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
                 onClick={() => setSelectedCategory(null)}
                 className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 snap-start ${
                   selectedCategory === null
-                    ? "bg-[#108910] text-white shadow-md"
-                    : "bg-white text-[#1a1a1a] border border-[#e0dbd2] hover:border-[#108910]/30 hover:bg-[#f7f5f0]"
+                    ? "bg-[#0E7A0E] text-white shadow-md"
+                    : "bg-white text-[#1a1a1a] border border-[#e0dbd2] hover:border-[#0E7A0E]/30 hover:bg-[#f7f5f0]"
                 }`}
               >
                 <ShoppingBag className="w-3.5 h-3.5" />
@@ -279,8 +279,8 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
                     onClick={() => handleCategoryToggle(cat.id)}
                     className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 snap-start ${
                       selectedCategory === cat.id
-                        ? "bg-[#108910] text-white shadow-md"
-                        : "bg-white text-[#1a1a1a] border border-[#e0dbd2] hover:border-[#108910]/30 hover:bg-[#f7f5f0]"
+                        ? "bg-[#0E7A0E] text-white shadow-md"
+                        : "bg-white text-[#1a1a1a] border border-[#e0dbd2] hover:border-[#0E7A0E]/30 hover:bg-[#f7f5f0]"
                     }`}
                   >
                     <span className="text-base">{getCategoryIcon(cat.icon, cat.slug)}</span>
@@ -296,14 +296,14 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
               {selectedCategory && selectedCat && (
                 <button
                   onClick={() => setSelectedCategory(null)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-[#108910]/10 text-[#108910] hover:bg-[#108910]/20 transition-colors"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-[#0E7A0E]/10 text-[#0E7A0E] hover:bg-[#0E7A0E]/20 transition-colors"
                 >
                   {getCategoryIcon(selectedCat.icon, selectedCat.slug)} {selectedCat.name}
                   <X className="w-3 h-3" />
                 </button>
               )}
               <div className="relative flex items-center gap-1.5 bg-white border border-[#e0dbd2] rounded-full px-3 py-1.5">
-                <ArrowUpDown className="w-3.5 h-3.5 text-[#999893]" />
+                <ArrowUpDown className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortOption)}
@@ -323,7 +323,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
         {query.length > 0 && query.length < 2 && (
           <div className="text-center py-16">
             <Search className="w-16 h-16 text-[#e0dbd2] mx-auto mb-4" />
-            <p className="text-[#999893]">
+            <p className="text-[var(--text-secondary)]">
               Escribe al menos 2 caracteres para buscar.
             </p>
           </div>
@@ -340,7 +340,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
             </p>
             <Link
               href={`/${citySlug}/buscar`}
-              className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-[#108910] hover:text-[#0D720D]"
+              className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-[#0E7A0E] hover:text-[#0D720D]"
             >
               <ArrowLeft className="w-4 h-4" />
               Ver todos los productos
@@ -351,7 +351,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
         {hasResults && (
           <section>
             <div className="flex items-center gap-2 mb-5">
-              <ShoppingBag className="w-5 h-5 text-[#108910]" />
+              <ShoppingBag className="w-5 h-5 text-[#0E7A0E]" />
               <h2 className="text-lg font-semibold text-[#1a1a1a]">
                 {isShowingAll && !selectedCategory
                   ? `${sortedResults.length} producto${sortedResults.length !== 1 ? "s" : ""}`
@@ -359,8 +359,8 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
                 {selectedCat && <span className="text-[#6b6b6b] font-normal"> en {selectedCat.name}</span>}
               </h2>
               {searchingServer && (
-                <span className="text-xs text-[#999893] flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 border-2 border-[#108910] border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 border-2 border-[#0E7A0E] border-t-transparent rounded-full animate-spin" />
                   buscando en todo el catálogo…
                 </span>
               )}
@@ -385,7 +385,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
               </div>
             )}
             {!hasMore && allProducts.length > 0 && sortedResults.length > 0 && (
-              <p className="text-center text-sm text-[#999893] mt-8 py-4 border-t border-[#ede8df]">
+              <p className="text-center text-sm text-[var(--text-secondary)] mt-8 py-4 border-t border-[#ede8df]">
                 {allCount} de {totalProducts} productos mostrados
               </p>
             )}
@@ -403,7 +403,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
             </p>
             <Link
               href={`/${citySlug}`}
-              className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-[#108910] hover:text-[#0D720D]"
+              className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-[#0E7A0E] hover:text-[#0D720D]"
             >
               <ArrowLeft className="w-4 h-4" />
               Volver al inicio

@@ -19,12 +19,12 @@ const CITIES = [
 
 export default function CiudadesPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white">
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
             ¿Entregamos{" "}
-            <span className="text-[#108910]">en tu colonia?</span>
+            <span className="text-[#0E7A0E]">en tu colonia?</span>
           </h1>
           <p className="text-lg text-[#5C6068]">
             Estas son las ciudades y zonas donde ya estamos. Cada mes activamos
@@ -43,8 +43,8 @@ export default function CiudadesPage() {
             { icon: Building2, value: "+30", label: "Colonias con cobertura" },
           ].map(({ icon: Icon, value, label }) => (
             <div key={label} className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-[12px] p-4">
-              <Icon className="w-5 h-5 text-[#108910] mx-auto mb-2" />
-              <p className="text-2xl font-extrabold text-[#108910]">{value}</p>
+              <Icon className="w-5 h-5 text-[#0E7A0E] mx-auto mb-2" />
+              <p className="text-2xl font-extrabold text-[#0E7A0E]">{value}</p>
               <p className="text-xs text-[#5C6068]">{label}</p>
             </div>
           ))}
@@ -57,15 +57,15 @@ export default function CiudadesPage() {
             <Link
               key={city.slug}
               href={`/${city.slug}`}
-              className="block border border-[#E5E7EB] rounded-[12px] p-6 hover:border-[#108910] hover:shadow-md transition-all group"
+              className="block border border-[#E5E7EB] rounded-[12px] p-6 hover:border-[#0E7A0E] hover:shadow-md transition-all group"
             >
-              <h3 className="text-xl font-bold text-[#242529] group-hover:text-[#108910] transition-colors mb-2">
+              <h3 className="text-xl font-bold text-[#242529] group-hover:text-[#0E7A0E] transition-colors mb-2">
                 {city.name}
               </h3>
               <p className="text-sm text-[#5C6068] leading-relaxed mb-2">
                 {city.zonas}
               </p>
-              <p className="text-xs text-[#108910] font-medium">
+              <p className="text-xs text-[#0E7A0E] font-medium">
                 🚚 {city.entrega}
               </p>
             </Link>
@@ -75,13 +75,13 @@ export default function CiudadesPage() {
         <div className="mt-12 text-center p-8 bg-[#F9FAFB] rounded-[12px]">
           <p className="text-[#5C6068]">
             ¿No ves tu ciudad?{" "}
-            <Link href="/contact" className="text-[#108910] font-semibold hover:underline">
+            <Link href="/contact" className="text-[#0E7A0E] font-semibold hover:underline">
               Avísanos
             </Link>{" "}
             y te mandamos un mensaje en cuanto active mos cobertura en tu zona.
           </p>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

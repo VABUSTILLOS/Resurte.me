@@ -63,7 +63,7 @@ export default function ActiveDishes({
         Estimación basada en las cantidades por platillo × {covers} comensales. Agrega ~{avgWastePct}% de merma promedio.
       </p>
       <details className="mt-3">
-        <summary className="text-xs font-semibold text-[#108910] cursor-pointer hover:text-green-800 transition-colors">
+        <summary className="text-xs font-semibold text-[#0E7A0E] cursor-pointer hover:text-green-800 transition-colors">
           + Importar ingredientes de un platillo al planificador
         </summary>
         <div className="mt-2 flex flex-wrap gap-1.5">

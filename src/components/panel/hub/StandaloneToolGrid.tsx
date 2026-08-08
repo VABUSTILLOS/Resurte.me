@@ -29,7 +29,7 @@ export default function StandaloneToolGrid({ tools }: StandaloneToolGridProps) {
             </div>
             <h3 className="text-base font-bold text-gray-900 mb-1.5">{tool.title}</h3>
             <p className="text-sm text-gray-500 leading-relaxed mb-3">{tool.description}</p>
-            <div className="flex items-center gap-1 text-sm font-semibold text-[#108910] group-hover:gap-2 transition-all">
+            <div className="flex items-center gap-1 text-sm font-semibold text-[#0E7A0E] group-hover:gap-2 transition-all">
               Abrir herramienta
               <ArrowRight className="w-4 h-4" />
             </div>

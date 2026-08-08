@@ -46,7 +46,7 @@ export default function MermaForm({
         <select
           value={selectedCategory}
           onChange={(e) => onCategoryChange(e.target.value)}
-          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910] bg-white"
+          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E] bg-white"
         >
           {WASTE_CATEGORIES.map((cat) => (
             <option key={cat.key} value={cat.key}>{cat.icon} {cat.label}</option>
@@ -60,7 +60,7 @@ export default function MermaForm({
               value={amountKg}
               onChange={(e) => onAmountKgChange(e.target.value)}
               placeholder="Ej: 2.5"
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
               min="0"
               step="0.1"
             />
@@ -72,7 +72,7 @@ export default function MermaForm({
               value={costPerKg}
               onChange={(e) => onCostPerKgChange(e.target.value)}
               placeholder="Ej: 85"
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
               min="0"
               step="0.5"
             />
@@ -104,7 +104,7 @@ export default function MermaForm({
             value={note}
             onChange={(e) => onNoteChange(e.target.value)}
             placeholder="Ej: Se echó a perder por cadena de frío..."
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
           />
         </div>
       </div>

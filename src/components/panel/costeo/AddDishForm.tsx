@@ -80,7 +80,7 @@ export default function AddDishForm({
     return (
       <button
         onClick={() => setShowForm(true)}
-        className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-[#108910] hover:text-[#108910] transition-colors font-medium"
+        className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-[#0E7A0E] hover:text-[#0E7A0E] transition-colors font-medium"
       >
         <Plus className="w-5 h-5" />
         Agregar platillo
@@ -88,7 +88,7 @@ export default function AddDishForm({
     )
   }
   return (
-    <div className="bg-white rounded-2xl border border-[#108910]/30 p-5 mb-6">
+    <div className="bg-white rounded-2xl border border-[#0E7A0E]/30 p-5 mb-6">
       <h4 className="font-semibold text-gray-900 mb-4">
         {editingDishId ? t("costeo.editDish") : t("costeo.newDish")}
       </h4>
@@ -97,7 +97,7 @@ export default function AddDishForm({
         value={newDishName}
         onChange={(e) => setNewDishName(e.target.value)}
         placeholder="Nombre del platillo"
-        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm mb-3 focus:outline-none focus:border-[#108910]"
+        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm mb-3 focus:outline-none focus:border-[#0E7A0E]"
       />
 
       {/* Category selector */}
@@ -142,7 +142,7 @@ export default function AddDishForm({
                 <select
                   value={ing.ingredientName}
                   onChange={(e) => updateIngredient(idx, "ingredientName", e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#108910] bg-white"
+                  className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E] bg-white"
                 >
                   <option value="">Seleccionar ingrediente</option>
                   {ingredients.map((opt) => (
@@ -156,7 +156,7 @@ export default function AddDishForm({
                   value={ing.quantity || ""}
                   onChange={(e) => updateIngredient(idx, "quantity", parseFloat(e.target.value) || 0)}
                   placeholder="Cant."
-                  className="w-20 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                  className="w-20 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
                   min="0"
                   step="0.01"
                 />
@@ -199,7 +199,7 @@ export default function AddDishForm({
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <button
           onClick={addIngredient}
-          className="text-sm text-[#108910] font-semibold hover:underline"
+          className="text-sm text-[#0E7A0E] font-semibold hover:underline"
         >
           + Agregar ingrediente del catálogo
         </button>
@@ -303,7 +303,7 @@ export default function AddDishForm({
           <button
             onClick={addModifier}
             disabled={!modName.trim()}
-            className="px-3 py-2 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-40 transition-colors"
+            className="px-3 py-2 bg-amber-500 text-amber-950 text-sm font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-40 transition-colors"
             title="Agregar modificador"
             aria-label="Agregar modificador"
           >
@@ -313,7 +313,7 @@ export default function AddDishForm({
       </div>
 
       <div className="flex gap-3">
-        <button onClick={saveDish} className="flex-1 bg-[#108910] text-white font-semibold py-2.5 rounded-xl hover:bg-[#0D720D] transition-colors">
+        <button onClick={saveDish} className="flex-1 bg-[#0E7A0E] text-white font-semibold py-2.5 rounded-xl hover:bg-[#0D720D] transition-colors">
           {editingDishId ? "Guardar cambios" : "Guardar platillo"}
         </button>
         <button

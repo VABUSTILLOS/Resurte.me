@@ -63,7 +63,7 @@ export default function ManagementReport({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
         <div className="bg-gray-50 rounded-xl p-3 text-center">
           <p className="text-[10px] text-gray-500 mb-1">Ingresos</p>
-          <p className="text-lg font-extrabold text-[#108910]">${reportStats.revenue.toFixed(0)}</p>
+          <p className="text-lg font-extrabold text-[#0E7A0E]">${reportStats.revenue.toFixed(0)}</p>
           <p className="text-[10px] text-gray-400">{reportStats.orders} ticket{reportStats.orders !== 1 ? "s" : ""}</p>
           {tipoCambio !== 1 && <p className="text-[10px] text-gray-300 font-semibold">≈ ${(reportStats.revenue / tipoCambio).toFixed(2)} USD</p>}
         </div>

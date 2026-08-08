@@ -114,7 +114,7 @@ export default function CombosSection({
                   </div>
                   <div className="bg-gray-50 rounded-xl p-2.5">
                     <p className="text-[10px] text-gray-400">Precio venta</p>
-                    <p className="font-bold text-[#108910]">${combo.price.toFixed(2)}</p>
+                    <p className="font-bold text-[#0E7A0E]">${combo.price.toFixed(2)}</p>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-2.5">
                     <p className="text-[10px] text-gray-400">Margen</p>
@@ -223,7 +223,7 @@ export default function CombosSection({
           )}
 
           <div className="flex gap-3">
-            <button onClick={addCombo} className="flex-1 bg-amber-500 text-white font-semibold py-2.5 rounded-xl hover:bg-amber-600 transition-colors">
+            <button onClick={addCombo} className="flex-1 bg-amber-500 text-amber-950 font-semibold py-2.5 rounded-xl hover:bg-amber-600 transition-colors">
               Guardar combo
             </button>
             <button

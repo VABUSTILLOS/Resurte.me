@@ -43,7 +43,7 @@ export default function ProductionInsights({ inProduction, dishAvgTimes }: Produ
       {dishAvgTimes.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <div className="flex items-center gap-2 mb-3">
-            <Clock className="w-4 h-4 text-[#108910]" />
+            <Clock className="w-4 h-4 text-[#0E7A0E]" />
             <h3 className="text-sm font-semibold text-gray-900">Tiempos por platillo (listas)</h3>
             <span className="ml-auto text-[10px] text-gray-400">top 5</span>
           </div>

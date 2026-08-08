@@ -58,7 +58,7 @@ export default function CosteoHeader({
               onClick={onToggleView}
               className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors ${
                 viewMode === "menu"
-                  ? "bg-[#108910] text-white"
+                  ? "bg-[#0E7A0E] text-white"
                   : "bg-amber-50 text-amber-700 hover:bg-amber-100"
               }`}
               title="Alternar entre lista de costeo y vista de menú digital"

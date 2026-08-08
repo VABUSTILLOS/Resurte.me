@@ -46,7 +46,7 @@ export default function DayStats({
         <button
           onClick={onToggleShowAll}
           className={`text-xs font-semibold px-3 py-2 rounded-xl transition-colors ${
-            showAll ? "bg-[#108910] text-white" : "bg-white text-gray-600 border border-gray-100 hover:bg-gray-50"
+            showAll ? "bg-[#0E7A0E] text-white" : "bg-white text-gray-600 border border-gray-100 hover:bg-gray-50"
           }`}
         >
           {showAll ? "Ver solo este día" : "Ver todo el historial"}
@@ -60,7 +60,7 @@ export default function DayStats({
           <p className="text-xs text-gray-300 mb-4">Registra tu primera venta del día para ver tu margen real</p>
           <button
             onClick={onFocusFirstDish}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             Registrar primera venta
@@ -80,8 +80,8 @@ export default function DayStats({
             <p className="text-[10px] text-gray-400">Costo de venta (COGS)</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-100 p-4 text-center">
-            <TrendingUp className="w-5 h-5 text-[#108910] mx-auto mb-1" />
-            <p className={`text-lg font-extrabold ${dayStats.margin >= 0 ? "text-[#108910]" : "text-red-600"}`}>
+            <TrendingUp className="w-5 h-5 text-[#0E7A0E] mx-auto mb-1" />
+            <p className={`text-lg font-extrabold ${dayStats.margin >= 0 ? "text-[#0E7A0E]" : "text-red-600"}`}>
               ${dayStats.margin.toFixed(0)}
             </p>
             <p className="text-[10px] text-gray-400">Margen bruto</p>

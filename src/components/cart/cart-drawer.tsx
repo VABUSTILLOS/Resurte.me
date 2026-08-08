@@ -68,12 +68,12 @@ export function CartDrawer() {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E9EB]">
           <div className="flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-[#108910]" />
+            <ShoppingBag className="w-5 h-5 text-[#0E7A0E]" />
             <h2 className="text-lg font-bold text-[#242529]">
               Mi Carrito
             </h2>
             {itemCount > 0 && (
-              <span className="text-sm text-[#72767E]">
+              <span className="text-sm text-[var(--text-secondary)]">
                 ({itemCount} {itemCount === 1 ? "producto" : "productos"})
               </span>
             )}
@@ -82,7 +82,7 @@ export function CartDrawer() {
             onClick={() => setIsOpen(false)}
             className="p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
           >
-            <X className="w-5 h-5 text-[#72767E]" />
+            <X className="w-5 h-5 text-[var(--text-secondary)]" />
           </button>
         </div>
 
@@ -97,9 +97,9 @@ export function CartDrawer() {
         {/* Items */}
         <div className="flex-1 overflow-y-auto px-5">
           {cart.items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-[#8F939B] gap-3 pb-12">
+            <div className="flex flex-col items-center justify-center h-full text-[var(--text-secondary)] gap-3 pb-12">
             <ShoppingBag className="w-16 h-16 text-[#E8E9EB]" />
-            <p className="text-lg font-medium text-[#72767E]">Tu carrito está vacío</p>
+            <p className="text-lg font-medium text-[var(--text-secondary)]">Tu carrito está vacío</p>
               <p className="text-sm">
                 Agrega productos desde el catálogo de tu ciudad.
               </p>
@@ -139,7 +139,7 @@ export function CartDrawer() {
                           <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-red-400" />
                         </button>
                       </div>
-                      <p className="text-xs text-[#8F939B]">{item.brand}</p>
+                      <p className="text-xs text-[var(--text-secondary)]">{item.brand}</p>
 
                       {item.stock_status === "low_stock" && (
                         <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
@@ -152,10 +152,10 @@ export function CartDrawer() {
                         <div>
                           {item.sale_price ? (
                             <div className="flex items-center gap-1.5">
-                              <span className="text-sm font-bold text-[#108910]">
+                              <span className="text-sm font-bold text-[#0E7A0E]">
                                 ${item.sale_price}
                               </span>
-                              <span className="text-xs text-[#8F939B] line-through">
+                              <span className="text-xs text-[var(--text-secondary)] line-through">
                                 ${item.price}
                               </span>
                             </div>
@@ -175,7 +175,7 @@ export function CartDrawer() {
                             aria-label={`Reducir cantidad de ${item.name}`}
                             className="p-2.5 sm:p-1.5 rounded-md hover:bg-[#F7F5F0] transition-colors touch-target"
                           >
-                            <Minus className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#72767E]" />
+                            <Minus className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[var(--text-secondary)]" />
                           </button>
                           <span className="w-8 text-center text-sm font-medium text-[#242529]">
                             {item.quantity}
@@ -187,7 +187,7 @@ export function CartDrawer() {
                             aria-label={`Aumentar cantidad de ${item.name}`}
                             className="p-2.5 sm:p-1.5 rounded-md hover:bg-[#F7F5F0] transition-colors touch-target"
                           >
-                            <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#72767E]" />
+                            <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[var(--text-secondary)]" />
                           </button>
                         </div>
                       </div>
@@ -204,7 +204,7 @@ export function CartDrawer() {
           <div className="border-t border-[#E8E9EB] bg-white px-5 pt-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))] space-y-3">
             {/* Subtotal */}
             <div className="flex items-center justify-between text-sm">
-              <span className="text-[#72767E]">Subtotal</span>
+              <span className="text-[var(--text-secondary)]">Subtotal</span>
               <span className="font-semibold text-[#242529]">${subtotal.toFixed(2)}</span>
             </div>
 
@@ -213,12 +213,12 @@ export function CartDrawer() {
               <p className="text-[11px] font-semibold text-[#B87A3A] uppercase tracking-wide mb-2">
                 🔥 Restaurantes también compran
               </p>
-              <p className="text-xs text-[#8F939B] leading-relaxed">
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                 Complementa tu pedido con{" "}
                 <Link
                   href={city ? `/${city.slug}/categoria/limpieza-cocina` : "#"}
                   onClick={() => setIsOpen(false)}
-                  className="text-[#108910] font-semibold hover:underline"
+                  className="text-[#0E7A0E] font-semibold hover:underline"
                 >
                   insumos de limpieza
                 </Link>
@@ -226,7 +226,7 @@ export function CartDrawer() {
                 <Link
                   href={city ? `/${city.slug}/categoria/bebidas` : "#"}
                   onClick={() => setIsOpen(false)}
-                  className="text-[#108910] font-semibold hover:underline"
+                  className="text-[#0E7A0E] font-semibold hover:underline"
                 >
                   bebidas
                 </Link>{" "}
@@ -234,7 +234,7 @@ export function CartDrawer() {
                 <Link
                   href={city ? `/${city.slug}/categoria/botanas-dulces` : "#"}
                   onClick={() => setIsOpen(false)}
-                  className="text-[#108910] font-semibold hover:underline"
+                  className="text-[#0E7A0E] font-semibold hover:underline"
                 >
                   botanas
                 </Link>{" "}
@@ -243,7 +243,7 @@ export function CartDrawer() {
             </div>
 
             {/* Delivery fee note (flat $35, server-side) */}
-            <div className="flex items-center gap-1.5 text-xs text-[#72767E]">
+            <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
               <Truck className="w-3.5 h-3.5" />
               <span>
                 Envío a domicilio: <span className="font-semibold text-[#242529]">$35 MXN</span> por pedido
@@ -254,13 +254,13 @@ export function CartDrawer() {
             <div className="flex gap-2 pt-1">
               <button
                 onClick={clearCart}
-                className="px-4 py-2.5 text-sm text-[#72767E] hover:text-red-600 hover:bg-red-50 rounded-[10px] transition-colors shrink-0"
+                className="px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:text-red-600 hover:bg-red-50 rounded-[10px] transition-colors shrink-0"
               >
                 Vaciar
               </button>
               <button
                 onClick={handleCheckout}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-2.5 bg-[#108910] text-white font-semibold rounded-[10px] hover:bg-[#0D720D] transition-colors text-sm"
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-2.5 bg-[#0E7A0E] text-white font-semibold rounded-[10px] hover:bg-[#0D720D] transition-colors text-sm"
               >
                 Ir a Checkout
                 <ArrowRight className="w-4 h-4" />
@@ -273,7 +273,7 @@ export function CartDrawer() {
                 <Link
                   href={`/${city.slug}`}
                   onClick={() => setIsOpen(false)}
-                  className="text-[#108910] hover:text-[#0D720D]"
+                  className="text-[#0E7A0E] hover:text-[#0D720D]"
                 >
                   ← Seguir comprando
                 </Link>
@@ -281,7 +281,7 @@ export function CartDrawer() {
                 <Link
                   href="/cart"
                   onClick={() => setIsOpen(false)}
-                  className="text-[#108910] font-medium hover:text-[#0D720D]"
+                  className="text-[#0E7A0E] font-medium hover:text-[#0D720D]"
                 >
                   Ver carrito completo →
                 </Link>
@@ -314,10 +314,10 @@ export function MobileCartBar() {
           onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
           className="flex items-center gap-2.5 min-w-0"
         >
-          <span className="bg-[#108910] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
+          <span className="bg-[#0E7A0E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
             {itemCount}
           </span>
-          <span className="text-sm text-[#72767E] truncate hidden md:inline">
+          <span className="text-sm text-[var(--text-secondary)] truncate hidden md:inline">
             Ver carrito · ${subtotal.toFixed(2)}
           </span>
           <span className="font-semibold text-sm text-[#242529] md:hidden">Ver carrito</span>
@@ -333,7 +333,7 @@ export function MobileCartBar() {
           </Link>
           <Link
             href={city ? `/${city.slug}/checkout` : "#"}
-            className="flex items-center gap-1.5 px-3 sm:px-5 py-2.5 text-sm font-semibold text-white bg-[#108910] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap touch-target"
+            className="flex items-center gap-1.5 px-3 sm:px-5 py-2.5 text-sm font-semibold text-white bg-[#0E7A0E] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap touch-target"
           >
             Hacer Checkout
             <ArrowRight className="w-4 h-4" />

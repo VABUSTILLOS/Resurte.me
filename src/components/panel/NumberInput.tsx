@@ -3,7 +3,7 @@
 import { cva } from "class-variance-authority"
 
 const inputStyles = cva(
-  "w-full px-2.5 py-2 text-sm text-gray-700 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#108910]/20 focus:border-[#108910]",
+  "w-full px-2.5 py-2 text-sm text-gray-700 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/20 focus:border-[#0E7A0E]",
   {
     variants: {
       disabled: {

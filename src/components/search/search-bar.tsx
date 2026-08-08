@@ -62,12 +62,12 @@ export function SearchBar({
       <div
         className={`flex items-center bg-white border rounded-xl transition-all ${
           focused
-            ? "border-[#108910] ring-2 ring-[#108910]/10 shadow-[0_0_0_3px_rgba(16,137,16,0.06)]"
+            ? "border-[#0E7A0E] ring-2 ring-[#0E7A0E]/10 shadow-[0_0_0_3px_rgba(16,137,16,0.06)]"
             : "border-[#e0dbd2] hover:border-[#c0bab0] shadow-sm"
         } ${compact ? "h-9" : "h-11"}`}
       >
         <Search
-          className={`shrink-0 text-[#999893] ${compact ? "w-4 h-4 ml-3" : "w-5 h-5 ml-4"}`}
+          className={`shrink-0 text-[var(--text-secondary)] ${compact ? "w-4 h-4 ml-3" : "w-5 h-5 ml-4"}`}
         />
         <input
           ref={inputRef}
@@ -77,7 +77,7 @@ export function SearchBar({
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 200)}
           placeholder={placeholder ?? "Buscar productos..."}
-          className="flex-1 bg-transparent px-3 text-[#1a1a1a] placeholder:text-[#999893] focus:outline-none text-sm"
+          className="flex-1 bg-transparent px-3 text-[#1a1a1a] placeholder:text-[var(--text-secondary)] focus:outline-none text-sm"
           minLength={2}
         />
         {query && (
@@ -86,12 +86,12 @@ export function SearchBar({
             onClick={handleClear}
             className="shrink-0 p-1 mr-1 rounded-full hover:bg-[#F7F5F0]"
           >
-            <X className="w-4 h-4 text-[#8F939B]" />
+            <X className="w-4 h-4 text-[var(--text-secondary)]" />
           </button>
         )}
         <button
           type="submit"
-          className={`shrink-0 bg-[#108910] text-white rounded-[10px] hover:bg-[#0D720D] transition-colors font-medium ${
+          className={`shrink-0 bg-[#0E7A0E] text-white rounded-[10px] hover:bg-[#0D720D] transition-colors font-medium ${
             compact ? "text-xs px-3 py-1 mr-1" : "text-sm px-4 py-1.5 mr-1.5"
           }`}
         >
@@ -102,7 +102,7 @@ export function SearchBar({
       {/* Keyboard hint */}
       {!focused && !query && (
         <div className="absolute right-16 top-1/2 -translate-y-1/2 hidden sm:flex items-center pointer-events-none">
-          <kbd className="text-[10px] text-[#8F939B] bg-[#F7F5F0] border border-[#E8E9EB] rounded px-1.5 py-0.5">
+          <kbd className="text-[10px] text-[var(--text-secondary)] bg-[#F7F5F0] border border-[#E8E9EB] rounded px-1.5 py-0.5">
             /
           </kbd>
         </div>

@@ -18,7 +18,7 @@ export default function PlannerHeader({ collectionName, sharedDishesCount }: Pla
         <h2 className="text-xl font-bold text-gray-900">Planificador de pedidos</h2>
         <p className="text-sm text-gray-400">{collectionName}</p>
         {sharedDishesCount > 0 && (
-          <p className="text-xs text-[#108910] font-medium mt-0.5">
+          <p className="text-xs text-[#0E7A0E] font-medium mt-0.5">
             {sharedDishesCount} platillos de Costeando mi menú — revisa cantidades abajo
           </p>
         )}

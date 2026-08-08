@@ -85,17 +85,17 @@ export function CollectionPageClient({ citySlug, cityName, collection, products,
             {/* Value badges — compact on mobile */}
             <div className="flex flex-wrap gap-1.5 sm:gap-2">
               <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-medium text-[#6b6b6b] bg-[#f7f4ef] rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5">
-                <Box className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#108910]" />
+                <Box className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#0E7A0E]" />
                 <span className="hidden sm:inline">Venta por volumen</span>
                 <span className="sm:hidden">Volumen</span>
               </span>
               <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-medium text-[#6b6b6b] bg-[#f7f4ef] rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5">
-                <TrendingUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#108910]" />
+                <TrendingUp className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#0E7A0E]" />
                 <span className="hidden sm:inline">Precio institucional</span>
                 <span className="sm:hidden">Institucional</span>
               </span>
               <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-medium text-[#6b6b6b] bg-[#f7f4ef] rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5">
-                <Truck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#108910]" />
+                <Truck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#0E7A0E]" />
                 <span className="hidden sm:inline">Entrega programada</span>
                 <span className="sm:hidden">Programada</span>
               </span>
@@ -182,7 +182,7 @@ export function CollectionPageClient({ citySlug, cityName, collection, products,
           <p className="text-[#b0b0b0] text-xs sm:text-sm mt-2 sm:mt-3">Vuelve pronto — estamos agregando productos cada semana.</p>
           <Link
             href={`/${citySlug}`}
-            className="inline-flex items-center gap-2 mt-6 sm:mt-8 text-sm font-semibold text-[#108910] hover:text-[#0D720D] btn-pill btn-pill-outline"
+            className="inline-flex items-center gap-2 mt-6 sm:mt-8 text-sm font-semibold text-[#0E7A0E] hover:text-[#0D720D] btn-pill btn-pill-outline"
           >
             <ArrowLeft className="w-4 h-4" />
             Volver al inicio
@@ -232,7 +232,7 @@ function ProductGridSection({
       {!hideHeader && (
         <ScrollReveal>
           <div className="flex items-center gap-2 sm:gap-3 mb-6 sm:mb-8">
-            <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-[#108910]" />
+            <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-[#0E7A0E]" />
             <h2 className="text-sm sm:text-base font-semibold text-[#1a1a1a] tracking-tight">
               {total} producto{total !== 1 ? "s" : ""} en esta colección
             </h2>

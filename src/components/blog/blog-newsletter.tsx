@@ -31,8 +31,8 @@ export function BlogNewsletter() {
   return (
     <div className="rounded-2xl border border-[#ede8df] bg-gradient-to-br from-[#f7f5f0] to-white p-6 sm:p-8">
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl bg-[#108910]/10 flex items-center justify-center shrink-0">
-          <Mail className="w-5 h-5 text-[#108910]" />
+        <div className="w-10 h-10 rounded-xl bg-[#0E7A0E]/10 flex items-center justify-center shrink-0">
+          <Mail className="w-5 h-5 text-[#0E7A0E]" />
         </div>
         <div className="flex-1">
           <h3 className="text-base font-bold text-[#1a1a1a]">
@@ -43,7 +43,7 @@ export function BlogNewsletter() {
           </p>
 
           {submitted ? (
-            <div className="mt-4 flex items-center gap-2 rounded-lg bg-[#E9FBE9] px-4 py-3 text-sm font-semibold text-[#108910]">
+            <div className="mt-4 flex items-center gap-2 rounded-lg bg-[#E9FBE9] px-4 py-3 text-sm font-semibold text-[#0E7A0E]">
               <Check className="w-4 h-4" />
               ¡Listo! Te avisaremos cuando enviemos la primera guía.
             </div>
@@ -55,12 +55,12 @@ export function BlogNewsletter() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tu@correo.com"
                 required
-                className="flex-1 px-4 py-2.5 rounded-xl border border-[#e0dbd2] bg-white text-sm text-[#1a1a1a] placeholder:text-[#999893] focus:outline-none focus:ring-2 focus:ring-[#108910]/20 focus:border-[#108910]"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-[#e0dbd2] bg-white text-sm text-[#1a1a1a] placeholder:text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/20 focus:border-[#0E7A0E]"
               />
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#108910] text-white text-sm font-semibold rounded-xl hover:bg-[#0D720D] disabled:opacity-50 transition-colors shrink-0"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#0E7A0E] text-white text-sm font-semibold rounded-xl hover:bg-[#0D720D] disabled:opacity-50 transition-colors shrink-0"
               >
                 {loading ? "Enviando..." : "Suscribirme"}
                 {!loading && <ArrowRight className="w-4 h-4" />}

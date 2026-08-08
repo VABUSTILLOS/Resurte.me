@@ -171,7 +171,7 @@ export function BlogIndexClient({
       <div className="mx-auto mt-8 max-w-xl">
         <div className="relative">
           <Search
-            className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-warm-400"
+            className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--text-secondary)]"
             aria-hidden="true"
           />
           <input
@@ -187,7 +187,7 @@ export function BlogIndexClient({
               type="button"
               onClick={() => handleQueryChange("")}
               aria-label="Limpiar búsqueda"
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-warm-400 hover:text-warm-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-[var(--text-secondary)] hover:text-warm-600"
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -220,7 +220,7 @@ export function BlogIndexClient({
 
       {/* Chips de tipo de contenido */}
       <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-        <span className="mr-1 text-xs font-bold uppercase tracking-wide text-warm-400">
+        <span className="mr-1 text-xs font-bold uppercase tracking-wide text-[var(--text-secondary)]">
           Tipo de contenido
         </span>
         {[
@@ -237,7 +237,7 @@ export function BlogIndexClient({
               title={chip.description}
               className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                 active
-                  ? "bg-amber-500 text-white"
+                  ? "bg-amber-500 text-amber-950"
                   : "bg-white text-warm-600 shadow-sm ring-1 ring-warm-200 hover:bg-cream-50"
               }`}
             >
@@ -257,7 +257,7 @@ export function BlogIndexClient({
               <h2 className="text-2xl font-extrabold tracking-tight text-warm-900">
                 Artículos destacados
               </h2>
-              <p className="mt-0.5 text-sm text-warm-500">
+              <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
                 Las guías que más ayudan a los dueños de restaurantes.
               </p>
             </div>
@@ -285,7 +285,7 @@ export function BlogIndexClient({
             <h2 className="text-2xl font-extrabold tracking-tight text-warm-900">
               Todos los artículos
             </h2>
-            <p className="mt-0.5 text-sm text-warm-500">
+            <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
               {filtered.length} {filtered.length === 1 ? "artículo" : "artículos"}
             </p>
           </div>
@@ -293,7 +293,7 @@ export function BlogIndexClient({
 
         <div className="flex items-center gap-3">
           {totalPages > 1 && (
-            <p className="hidden text-sm font-medium text-warm-500 sm:block">
+            <p className="hidden text-sm font-medium text-[var(--text-secondary)] sm:block">
               Página {safePage} de {totalPages}
             </p>
           )}
@@ -344,7 +344,7 @@ export function BlogIndexClient({
                           <span className="block text-sm font-semibold">
                             {option.label}
                           </span>
-                          <span className="block text-xs text-warm-500">
+                          <span className="block text-xs text-[var(--text-secondary)]">
                             {option.description}
                           </span>
                         </span>
@@ -373,7 +373,7 @@ export function BlogIndexClient({
           <h2 className="mt-3 text-lg font-bold text-warm-900">
             Sin resultados para &quot;{query}&quot;
           </h2>
-          <p className="mt-1 text-sm text-warm-500">
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
             {activeContentTypeInfo
               ? `No hay artículos de tipo «${activeContentTypeInfo.label}». Prueba con otra palabra o explora todas las categorías.`
               : "Prueba con otra palabra o explora todas las categorías."}
@@ -396,7 +396,7 @@ export function BlogIndexClient({
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
             Anterior
           </button>
-          <span className="text-sm font-medium text-warm-500">
+          <span className="text-sm font-medium text-[var(--text-secondary)]">
             {safePage} / {totalPages}
           </span>
           <button

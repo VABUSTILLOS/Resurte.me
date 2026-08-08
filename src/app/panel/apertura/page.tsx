@@ -392,7 +392,7 @@ export default function AperturaPage() {
         </div>
         <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
           <div
-            className="bg-gradient-to-r from-indigo-500 to-[#108910] h-full rounded-full transition-all duration-500"
+            className="bg-gradient-to-r from-indigo-500 to-[#0E7A0E] h-full rounded-full transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -431,7 +431,7 @@ export default function AperturaPage() {
                   type="date"
                   value={phaseDate}
                   onChange={(e) => setPhaseDate(phase, e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#108910] bg-white"
+                  className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#0E7A0E] bg-white"
                 />
                 <span className="text-xs text-gray-400">Fecha objetivo</span>
               </div>
@@ -509,7 +509,7 @@ export default function AperturaPage() {
                   placeholder="Nombre del rubro"
                   value={newCustomName}
                   onChange={(e) => setNewCustomName(e.target.value)}
-                  className="flex-1 min-w-[120px] px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#108910]"
+                  className="flex-1 min-w-[120px] px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#0E7A0E]"
                 />
                 <input
                   type="number"
@@ -517,7 +517,7 @@ export default function AperturaPage() {
                   placeholder="Min $"
                   value={newCustomLow}
                   onChange={(e) => setNewCustomLow(e.target.value)}
-                  className="w-20 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#108910]"
+                  className="w-20 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#0E7A0E]"
                 />
                 <input
                   type="number"
@@ -525,7 +525,7 @@ export default function AperturaPage() {
                   placeholder="Max $"
                   value={newCustomHigh}
                   onChange={(e) => setNewCustomHigh(e.target.value)}
-                  className="w-20 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#108910]"
+                  className="w-20 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#0E7A0E]"
                 />
                 <button
                   onClick={() => {
@@ -552,7 +552,7 @@ export default function AperturaPage() {
                     setNewCustomName(""); setNewCustomLow(""); setNewCustomHigh("")
                     toast("Rubro de inversión agregado", "success")
                   }}
-                  className="text-xs font-semibold bg-[#108910] text-white px-3 py-1.5 rounded-lg hover:bg-[#0D720D] transition-colors"
+                  className="text-xs font-semibold bg-[#0E7A0E] text-white px-3 py-1.5 rounded-lg hover:bg-[#0D720D] transition-colors"
                 >
                   Agregar
                 </button>
@@ -560,7 +560,7 @@ export default function AperturaPage() {
             </div>
             <div className="border-t border-gray-100 pt-3 flex justify-between">
               <span className="font-bold text-gray-900">Total estimado</span>
-              <span className="font-bold text-[#108910]">
+              <span className="font-bold text-[#0E7A0E]">
                 ${invLow.toLocaleString()} – ${invHigh.toLocaleString()} MXN
               </span>
             </div>
@@ -571,8 +571,8 @@ export default function AperturaPage() {
       {/* First order CTA */}
       <div className="bg-gradient-to-r from-indigo-50 to-[#F0FDF4] rounded-2xl border border-indigo-100 p-5 print-hidden">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 bg-[#108910]/10 rounded-xl flex items-center justify-center shrink-0">
-            <Package className="w-5 h-5 text-[#108910]" />
+          <div className="w-10 h-10 bg-[#0E7A0E]/10 rounded-xl flex items-center justify-center shrink-0">
+            <Package className="w-5 h-5 text-[#0E7A0E]" />
           </div>
           <div>
             <h4 className="font-semibold text-gray-900 mb-1 text-sm">
@@ -585,7 +585,7 @@ export default function AperturaPage() {
             </p>
             <Link
               href="/auth/register"
-              className="inline-flex items-center gap-2 text-sm font-semibold bg-[#108910] text-white px-5 py-2.5 rounded-xl hover:bg-[#0D720D] transition-colors"
+              className="inline-flex items-center gap-2 text-sm font-semibold bg-[#0E7A0E] text-white px-5 py-2.5 rounded-xl hover:bg-[#0D720D] transition-colors"
             >
               <Store className="w-4 h-4" />
               Crear cuenta y empezar

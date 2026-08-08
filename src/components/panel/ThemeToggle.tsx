@@ -80,7 +80,7 @@ export default function ThemeToggle() {
           className={cn(
             "flex items-center justify-center w-8 h-8 rounded-full transition-colors",
             pref === opt.value
-              ? "bg-[#108910] text-white"
+              ? "bg-[#0E7A0E] text-white"
               : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
           )}
         >

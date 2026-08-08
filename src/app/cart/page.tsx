@@ -104,12 +104,12 @@ export default function CartPage() {
           <ShoppingCart className="w-10 h-10 text-[#D9D7D2]" />
         </div>
         <h1 className="text-2xl font-bold text-[#242529] mb-2">Tu carrito está vacío</h1>
-        <p className="text-[#72767E] text-center max-w-sm mb-8">
+        <p className="text-[var(--text-secondary)] text-center max-w-sm mb-8">
           Agrega productos desde el catálogo para comenzar tu pedido.
         </p>
         <Link
           href={`/${city?.slug ?? DEFAULT_CITY_SLUG}`}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-[#108910] text-white font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-[#0E7A0E] text-white font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
         >
           Explorar productos
         </Link>
@@ -124,13 +124,13 @@ export default function CartPage() {
         <div>
           <Link
             href={`/${city?.slug ?? DEFAULT_CITY_SLUG}`}
-            className="inline-flex items-center gap-1.5 text-sm text-[#72767E] hover:text-[#108910] transition-colors mb-2"
+            className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[#0E7A0E] transition-colors mb-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Seguir comprando
           </Link>
           <h1 className="text-2xl font-bold text-[#242529]">Tu carrito</h1>
-          <p className="text-sm text-[#72767E]">{itemCount} {itemCount === 1 ? "producto" : "productos"}</p>
+          <p className="text-sm text-[var(--text-secondary)]">{itemCount} {itemCount === 1 ? "producto" : "productos"}</p>
         </div>
         <button
           onClick={handleClear}
@@ -147,14 +147,14 @@ export default function CartPage() {
 
       {/* Restore status (desde el email de carrito abandonado) */}
       {restoreStatus === "loading" && (
-        <div className="flex items-center gap-2 text-sm text-[#72767E] bg-[#F7F5F0] rounded-xl px-4 py-3 mb-4">
-          <RefreshCw className="w-4 h-4 animate-spin text-[#108910]" />
+        <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] bg-[#F7F5F0] rounded-xl px-4 py-3 mb-4">
+          <RefreshCw className="w-4 h-4 animate-spin text-[#0E7A0E]" />
           Restaurando tu pedido anterior…
         </div>
       )}
       {restoreStatus === "done" && (
         <div className="flex items-center gap-2 text-sm text-[#0D720D] bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4">
-          <Package className="w-4 h-4 text-[#108910]" />
+          <Package className="w-4 h-4 text-[#0E7A0E]" />
           Restauramos los productos de tu último pedido. ¡Continúa tu compra!
         </div>
       )}
@@ -199,7 +199,7 @@ export default function CartPage() {
               <div className="flex-1 min-w-0">
                 <Link
                   href={`/${city?.slug ?? DEFAULT_CITY_SLUG}/producto/${item.slug}`}
-                  className="font-semibold text-[#242529] text-sm line-clamp-2 hover:text-[#108910] transition-colors"
+                  className="font-semibold text-[#242529] text-sm line-clamp-2 hover:text-[#0E7A0E] transition-colors"
                 >
                   {item.name}
                 </Link>
@@ -230,7 +230,7 @@ export default function CartPage() {
                 <div className="flex items-center gap-1.5 bg-[#F7F5F0] rounded-lg p-1">
                   <button
                     onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
-                    className="w-7 h-7 flex items-center justify-center rounded-md text-[#72767E] hover:bg-white hover:text-[#1a1a1a] transition-colors"
+                    className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-white hover:text-[#1a1a1a] transition-colors"
                     aria-label="Reducir cantidad"
                   >
                     <Minus className="w-3.5 h-3.5" />
@@ -240,7 +240,7 @@ export default function CartPage() {
                   </span>
                   <button
                     onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                    className="w-7 h-7 flex items-center justify-center rounded-md text-[#72767E] hover:bg-white hover:text-[#108910] transition-colors"
+                    className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-white hover:text-[#0E7A0E] transition-colors"
                     aria-label="Aumentar cantidad"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -260,18 +260,18 @@ export default function CartPage() {
         <h2 className="font-bold text-[#242529] mb-4">Resumen del pedido</h2>
 
         <div className="space-y-2 text-sm mb-4">
-          <div className="flex justify-between text-[#72767E]">
+          <div className="flex justify-between text-[var(--text-secondary)]">
             <span>Subtotal ({itemCount} productos)</span>
             <span className="tabular-nums">${subtotal.toFixed(2)}</span>
           </div>
           {discount > 0 && (
-            <div className="flex justify-between text-[#108910]">
+            <div className="flex justify-between text-[#0E7A0E]">
               <span>Descuento {coupon ? `(${coupon.code})` : ""}</span>
               <span className="tabular-nums">-${discount.toFixed(2)}</span>
             </div>
           )}
           {itemCount > 0 && (
-            <div className="flex justify-between text-[#72767E]">
+            <div className="flex justify-between text-[var(--text-secondary)]">
               <span>Envío</span>
               <span className="tabular-nums">${deliveryFee.toFixed(2)}</span>
             </div>
@@ -316,7 +316,7 @@ export default function CartPage() {
         </a>
         <Link
           href={`/${city?.slug ?? DEFAULT_CITY_SLUG}/checkout`}
-          className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-[#108910] text-white font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
+          className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-[#0E7A0E] text-white font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
         >
           Ir a checkout
         </Link>

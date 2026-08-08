@@ -15,7 +15,7 @@ export default function ValueCards({ totalValue, weeklyCost, okStock, lowStock, 
     <>
       <div className="grid sm:grid-cols-2 gap-3 mb-3">
         <div className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3">
-          <BarChart3 className="w-5 h-5 text-[#108910] shrink-0" />
+          <BarChart3 className="w-5 h-5 text-[#0E7A0E] shrink-0" />
           <div>
             <p className="text-[10px] text-gray-400">Valor total del inventario</p>
             <p className="font-bold text-lg text-gray-900">${totalValue.toFixed(0)}</p>

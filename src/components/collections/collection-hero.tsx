@@ -57,12 +57,12 @@ export function CollectionHero({
           <div className="flex items-center gap-2 text-xs sm:text-sm tracking-[0.05em]">
             <Link
               href={`/${citySlug}`}
-              className="text-white/50 hover:text-white/80 transition-colors duration-300"
+              className="text-white/70 hover:text-white/90 transition-colors duration-300"
             >
               {cityName}
             </Link>
-            <span className="text-white/20">·</span>
-            <span className="text-white/60 font-medium">{collectionName}</span>
+            <span className="text-white/50">·</span>
+            <span className="text-white/80 font-medium">{collectionName}</span>
           </div>
         </nav>
 

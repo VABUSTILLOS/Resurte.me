@@ -39,11 +39,11 @@ export default function PurchaseOrder({
     <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
       <button onClick={onToggleExpanded} className="flex items-center justify-between w-full text-left">
         <div className="flex items-center gap-2">
-          <ShoppingCart className="w-5 h-5 text-[#108910]" />
+          <ShoppingCart className="w-5 h-5 text-[#0E7A0E]" />
           <h3 className="font-bold text-gray-900 text-sm">Orden de compra sugerida ({projectedOrder.length} productos)</h3>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-bold text-[#108910]">${totalCost.toFixed(0)}</span>
+          <span className="text-sm font-bold text-[#0E7A0E]">${totalCost.toFixed(0)}</span>
           {orderExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
         </div>
       </button>
@@ -56,7 +56,7 @@ export default function PurchaseOrder({
                   type="checkbox"
                   checked={groupBySupplier}
                   onChange={onToggleGroupBy}
-                  className="accent-[#108910]"
+                  className="accent-[#0E7A0E]"
                 />
                 <span className="font-semibold text-gray-700">Agrupar por proveedor</span>
               </label>
@@ -70,11 +70,11 @@ export default function PurchaseOrder({
                 <div key={group.proveedorId || "sin"} className="rounded-xl border border-gray-100 overflow-hidden">
                   <div className="flex items-center justify-between bg-gray-50 px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <Users className="w-3.5 h-3.5 text-[#108910]" />
+                      <Users className="w-3.5 h-3.5 text-[#0E7A0E]" />
                       <span className="text-xs font-bold text-gray-700">{group.nombre}</span>
                       <span className="text-[9px] text-gray-400">{group.items.length} producto{group.items.length > 1 ? "s" : ""}</span>
                     </div>
-                    <span className="text-xs font-bold text-[#108910]">
+                    <span className="text-xs font-bold text-[#0E7A0E]">
                       ${group.items.reduce((s, i) => s + i.cost, 0).toFixed(0)}
                     </span>
                   </div>
@@ -90,7 +90,7 @@ export default function PurchaseOrder({
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
                           <span className="text-gray-500">Comprar {item.toBuy} {item.unit}</span>
-                          <span className="font-bold text-[#108910]">${item.cost.toFixed(0)}</span>
+                          <span className="font-bold text-[#0E7A0E]">${item.cost.toFixed(0)}</span>
                         </div>
                       </div>
                     ))}
@@ -136,9 +136,9 @@ export default function PurchaseOrder({
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="text-gray-500">Comprar {item.toBuy} {item.unit}</span>
-                    <span className="font-bold text-[#108910]">${item.cost.toFixed(0)}</span>
+                    <span className="font-bold text-[#0E7A0E]">${item.cost.toFixed(0)}</span>
                     <a href="https://resurte.me" target="_blank" rel="noopener noreferrer"
-                      className="text-[10px] bg-[#108910] text-white px-2 py-0.5 rounded-full font-medium hover:bg-green-800 transition-colors">
+                      className="text-[10px] bg-[#0E7A0E] text-white px-2 py-0.5 rounded-full font-medium hover:bg-green-800 transition-colors">
                       Comprar
                     </a>
                   </div>

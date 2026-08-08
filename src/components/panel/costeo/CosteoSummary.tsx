@@ -7,9 +7,9 @@ export default function CosteoSummary({ dishes }: { dishes: Dish[] }) {
   return (
     <>
       {dishes.length > 0 && (
-      <div className="mt-6 bg-gradient-to-r from-[#F0FDF4] to-white rounded-2xl border border-[#108910]/10 p-5">
+      <div className="mt-6 bg-gradient-to-r from-[#F0FDF4] to-white rounded-2xl border border-[#0E7A0E]/10 p-5">
         <div className="flex items-center gap-2 mb-3">
-          <PieChart className="w-5 h-5 text-[#108910]" />
+          <PieChart className="w-5 h-5 text-[#0E7A0E]" />
           <h3 className="font-semibold text-gray-900">Resumen de menú</h3>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
@@ -25,7 +25,7 @@ export default function CosteoSummary({ dishes }: { dishes: Dish[] }) {
           </div>
           <div className="bg-white rounded-xl p-3">
             <p className="text-xs text-gray-400">Ingreso potencial</p>
-            <p className="text-xl font-bold text-[#108910]">
+            <p className="text-xl font-bold text-[#0E7A0E]">
               ${totalPrice.toFixed(0)}
             </p>
           </div>

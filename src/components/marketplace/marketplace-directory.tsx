@@ -63,7 +63,7 @@ export function MarketplaceDirectory({ entries }: Props) {
   return (
     <div className="min-h-screen bg-[#F7FAF7]">
       {/* Hero */}
-      <div className="bg-gradient-to-br from-[#0B5D1F] via-[#108910] to-[#16A34A] text-white">
+      <div className="bg-gradient-to-br from-[#0B5D1F] via-[#0E7A0E] to-[#16A34A] text-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
           <div className="flex items-center gap-2 text-emerald-100/90 text-sm font-semibold tracking-wide mb-4">
             <UtensilsCrossed className="w-4 h-4" />
@@ -97,8 +97,8 @@ export function MarketplaceDirectory({ entries }: Props) {
             onClick={() => setCity(null)}
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               city === null
-                ? "bg-[#108910] text-white"
-                : "bg-white text-gray-600 border border-gray-200 hover:border-[#108910]/40"
+                ? "bg-[#0E7A0E] text-white"
+                : "bg-white text-gray-600 border border-gray-200 hover:border-[#0E7A0E]/40"
             }`}
           >
             Todas las ciudades
@@ -109,8 +109,8 @@ export function MarketplaceDirectory({ entries }: Props) {
               onClick={() => setCity(city === c ? null : c)}
               className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                 city === c
-                  ? "bg-[#108910] text-white"
-                  : "bg-white text-gray-600 border border-gray-200 hover:border-[#108910]/40"
+                  ? "bg-[#0E7A0E] text-white"
+                  : "bg-white text-gray-600 border border-gray-200 hover:border-[#0E7A0E]/40"
               }`}
             >
               📍 {c}
@@ -139,7 +139,7 @@ export function MarketplaceDirectory({ entries }: Props) {
       )}
 
       {/* Lista */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 pb-20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 pb-20">
         <div className="flex items-center justify-between mb-6">
           <p className="text-sm text-gray-500">
             {filtered.length}{" "}
@@ -151,14 +151,14 @@ export function MarketplaceDirectory({ entries }: Props) {
           <div className="text-center py-20">
             <UtensilsCrossed className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-500 font-medium">No encontramos restaurantes con esos filtros</p>
-            <p className="text-gray-400 text-sm mt-1">Prueba otra búsqueda o quita los filtros.</p>
+            <p className="text-[var(--text-secondary)] text-sm mt-1">Prueba otra búsqueda o quita los filtros.</p>
             <button
               onClick={() => {
                 setQuery("")
                 setCity(null)
                 setCategory(null)
               }}
-              className="mt-6 rounded-xl bg-[#108910] text-white text-sm font-semibold px-5 py-2.5 hover:bg-[#0e7a0e]"
+              className="mt-6 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold px-5 py-2.5 hover:bg-[#0e7a0e]"
             >
               Limpiar filtros
             </button>
@@ -170,7 +170,7 @@ export function MarketplaceDirectory({ entries }: Props) {
             ))}
           </div>
         )}
-      </main>
+      </div>
     </div>
   )
 }
@@ -188,7 +188,7 @@ function RestaurantCard({ entry }: { entry: PublicMarketplaceEntry }) {
   return (
     <Link
       href={`/r/${restaurant.slug}`}
-      className="group flex flex-col rounded-2xl bg-white border border-gray-200 overflow-hidden shadow-sm hover:shadow-lg hover:border-[#108910]/30 transition-all"
+      className="group flex flex-col rounded-2xl bg-white border border-gray-200 overflow-hidden shadow-sm hover:shadow-lg hover:border-[#0E7A0E]/30 transition-all"
     >
       {/* Cover */}
       <div className="h-32 bg-gradient-to-br from-gray-100 to-gray-200 relative flex items-center justify-center overflow-hidden">
@@ -205,7 +205,7 @@ function RestaurantCard({ entry }: { entry: PublicMarketplaceEntry }) {
       </div>
 
       <div className="p-5 flex flex-col flex-1">
-        <h2 className="text-lg font-bold text-gray-900 group-hover:text-[#108910] transition-colors">
+        <h2 className="text-lg font-bold text-gray-900 group-hover:text-[#0E7A0E] transition-colors">
           {restaurant.name}
         </h2>
         {primary?.city && (
@@ -251,8 +251,8 @@ function RestaurantCard({ entry }: { entry: PublicMarketplaceEntry }) {
         )}
 
         <div className="flex items-center justify-between mt-auto pt-3">
-          <span className="text-sm font-semibold text-[#108910]">Ver menú</span>
-          <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-[#108910] group-hover:translate-x-0.5 transition-all" />
+          <span className="text-sm font-semibold text-[#0E7A0E]">Ver menú</span>
+          <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-[#0E7A0E] group-hover:translate-x-0.5 transition-all" />
         </div>
       </div>
     </Link>

@@ -23,14 +23,14 @@ export default function StockProjection({
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <CheckCircle2 className="w-5 h-5 text-[#108910]" />
+          <CheckCircle2 className="w-5 h-5 text-[#0E7A0E]" />
           <h3 className="font-bold text-gray-900 text-sm">Tu menú planeado para {covers} comensales</h3>
         </div>
         {missingCount > 0 && (
           <button
             onClick={onToggleProjection}
             className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
-              projectionIncluded ? "bg-[#108910] text-white" : "bg-cyan-50 text-cyan-700 hover:bg-cyan-100"
+              projectionIncluded ? "bg-[#0E7A0E] text-white" : "bg-cyan-50 text-cyan-700 hover:bg-cyan-100"
             }`}
             title="Agregar los faltantes calculados a la orden de compra"
           >

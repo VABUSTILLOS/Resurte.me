@@ -190,7 +190,7 @@ export default function MenuPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-6 h-6 animate-spin text-[#108910]" />
+        <Loader2 className="w-6 h-6 animate-spin text-[#0E7A0E]" />
       </div>
     )
   }
@@ -201,7 +201,7 @@ export default function MenuPage() {
         <UtensilsCrossed className="w-12 h-12 text-gray-300 mx-auto mb-3" />
         <h2 className="font-semibold text-gray-900">Primero crea tu restaurante</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Ve a <Link href="/panel/foodos/restaurante" className="text-[#108910] font-semibold hover:underline">Mi restaurante</Link> para configurar tu perfil público.
+          Ve a <Link href="/panel/foodos/restaurante" className="text-[#0E7A0E] font-semibold hover:underline">Mi restaurante</Link> para configurar tu perfil público.
         </p>
       </div>
     )
@@ -219,7 +219,7 @@ export default function MenuPage() {
         <button
           onClick={handleImportFromCosteo}
           disabled={importing || sharedDishes.length === 0}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#108910]/30 text-[#108910] text-sm font-semibold hover:bg-[#F0FDF4] disabled:opacity-40 transition-colors"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#0E7A0E]/30 text-[#0E7A0E] text-sm font-semibold hover:bg-[#F0FDF4] disabled:opacity-40 transition-colors"
           title={sharedDishes.length === 0 ? "No hay platillos en Costeando mi menú" : `Importar ${sharedDishes.length} platillo(s)`}
         >
           {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
@@ -242,11 +242,11 @@ export default function MenuPage() {
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
               placeholder="Nueva categoría"
-              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
             />
             <button
               type="submit"
-              className="p-2 rounded-lg bg-[#108910] text-white hover:bg-[#0e7a0e]"
+              className="p-2 rounded-lg bg-[#0E7A0E] text-white hover:bg-[#0e7a0e]"
               aria-label="Agregar categoría"
             >
               <Plus className="w-4 h-4" />
@@ -266,11 +266,11 @@ export default function MenuPage() {
                     <input
                       value={editingCategory.name}
                       onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
-                      className="flex-1 rounded-lg border border-[#108910] px-2 py-1.5 text-sm"
+                      className="flex-1 rounded-lg border border-[#0E7A0E] px-2 py-1.5 text-sm"
                     />
                     <button
                       onClick={handleRenameCategory}
-                      className="p-1 text-[#108910]"
+                      className="p-1 text-[#0E7A0E]"
                       aria-label="Guardar nombre de categoría"
                     >
                       <Check className="w-3.5 h-3.5" />
@@ -293,7 +293,7 @@ export default function MenuPage() {
                       <span className="text-[10px] text-gray-400">({itemsByCategory.get(c.id)?.length ?? 0})</span>
                     </button>
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => setEditingCategory(c)} className="p-1 text-gray-400 hover:text-[#108910]"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => setEditingCategory(c)} className="p-1 text-gray-400 hover:text-[#0E7A0E]"><Pencil className="w-3.5 h-3.5" /></button>
                       <button onClick={() => handleDeleteCategory(c.id)} className="p-1 text-gray-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
@@ -311,7 +311,7 @@ export default function MenuPage() {
                 {c.name}
                 <button
                   onClick={() => { setEditingItem({ ...EMPTY_ITEM, category_id: c.id }); setShowItemForm(true) }}
-                  className="p-1 rounded-md text-gray-400 hover:text-[#108910] hover:bg-[#F0FDF4]"
+                  className="p-1 rounded-md text-gray-400 hover:text-[#0E7A0E] hover:bg-[#F0FDF4]"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -331,7 +331,7 @@ export default function MenuPage() {
                             description: item.description ?? "", price: String(item.price), cost: String(item.cost),
                             tags: item.tags ?? [], is_featured: item.is_featured, is_available: item.is_available,
                           })}
-                          className="p-1.5 rounded-md text-gray-400 hover:text-[#108910]"
+                          className="p-1.5 rounded-md text-gray-400 hover:text-[#0E7A0E]"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -357,7 +357,7 @@ export default function MenuPage() {
                     {item.tags.length > 0 && (
                       <div className="flex gap-1 mt-2 flex-wrap">
                         {item.tags.map((t) => (
-                          <span key={t} className="text-[10px] bg-[#108910]/10 text-[#108910] px-1.5 py-0.5 rounded-full">{t}</span>
+                          <span key={t} className="text-[10px] bg-[#0E7A0E]/10 text-[#0E7A0E] px-1.5 py-0.5 rounded-full">{t}</span>
                         ))}
                       </div>
                     )}
@@ -389,7 +389,7 @@ export default function MenuPage() {
                             description: item.description ?? "", price: String(item.price), cost: String(item.cost),
                             tags: item.tags ?? [], is_featured: item.is_featured, is_available: item.is_available,
                           })}
-                          className="p-1.5 rounded-md text-gray-400 hover:text-[#108910]"
+                          className="p-1.5 rounded-md text-gray-400 hover:text-[#0E7A0E]"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -424,7 +424,7 @@ export default function MenuPage() {
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setShowItemForm(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <UtensilsCrossed className="w-5 h-5 text-[#108910]" />
+              <UtensilsCrossed className="w-5 h-5 text-[#0E7A0E]" />
               {editingItem.id ? "Editar platillo" : "Nuevo platillo"}
             </h3>
             <form onSubmit={handleSaveItem} className="space-y-4">
@@ -434,7 +434,7 @@ export default function MenuPage() {
                   <input
                     value={editingItem.name}
                     onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
                   />
                 </div>
                 <div>
@@ -443,7 +443,7 @@ export default function MenuPage() {
                     type="number" min="0" step="0.01"
                     value={editingItem.price}
                     onChange={(e) => setEditingItem({ ...editingItem, price: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
                   />
                 </div>
                 <div>
@@ -452,7 +452,7 @@ export default function MenuPage() {
                     type="number" min="0" step="0.01"
                     value={editingItem.cost}
                     onChange={(e) => setEditingItem({ ...editingItem, cost: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
                   />
                 </div>
                 <div className="col-span-2">
@@ -461,7 +461,7 @@ export default function MenuPage() {
                     rows={2}
                     value={editingItem.description}
                     onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
                   />
                 </div>
                 <div className="col-span-2">
@@ -485,7 +485,7 @@ export default function MenuPage() {
                         onClick={() => toggleTag(t)}
                         className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
                           editingItem.tags.includes(t)
-                            ? "bg-[#108910]/10 border-[#108910]/30 text-[#108910]"
+                            ? "bg-[#0E7A0E]/10 border-[#0E7A0E]/30 text-[#0E7A0E]"
                             : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
                         }`}
                       >
@@ -501,7 +501,7 @@ export default function MenuPage() {
                     type="checkbox"
                     checked={editingItem.is_featured}
                     onChange={(e) => setEditingItem({ ...editingItem, is_featured: e.target.checked })}
-                    className="accent-[#108910]"
+                    className="accent-[#0E7A0E]"
                   />
                   Destacado
                 </label>
@@ -510,7 +510,7 @@ export default function MenuPage() {
                     type="checkbox"
                     checked={editingItem.is_available}
                     onChange={(e) => setEditingItem({ ...editingItem, is_available: e.target.checked })}
-                    className="accent-[#108910]"
+                    className="accent-[#0E7A0E]"
                   />
                   Disponible
                 </label>
@@ -526,7 +526,7 @@ export default function MenuPage() {
                 <button
                   type="submit"
                   disabled={!editingItem.name.trim() || !Number(editingItem.price)}
-                  className="px-5 py-2 rounded-xl bg-[#108910] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50"
                 >
                   Guardar
                 </button>

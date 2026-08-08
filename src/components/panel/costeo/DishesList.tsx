@@ -35,7 +35,7 @@ export default function DishesList({
                   type="checkbox"
                   checked={selectedIds.has(dish.id)}
                   onChange={() => onToggleSelect(dish.id)}
-                  className="w-4 h-4 rounded accent-[#108910] cursor-pointer shrink-0"
+                  className="w-4 h-4 rounded accent-[#0E7A0E] cursor-pointer shrink-0"
                 />
                 <h4 className="font-bold text-gray-900 truncate">{dish.name}</h4>
                 {(() => {
@@ -74,7 +74,7 @@ export default function DishesList({
               </div>
               <div>
                 <p className="text-xs text-gray-400">Precio venta</p>
-                <p className="font-bold text-[#108910]">${dish.sellingPrice.toFixed(2)}</p>
+                <p className="font-bold text-[#0E7A0E]">${dish.sellingPrice.toFixed(2)}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-400">Margen</p>
@@ -91,7 +91,7 @@ export default function DishesList({
                 </div>
                 <div>
                   <span className="text-gray-400">Precio por porción</span>
-                  <p className="font-semibold text-[#108910]">${(dish.sellingPrice / (dish.portions || 4)).toFixed(2)}</p>
+                  <p className="font-semibold text-[#0E7A0E]">${(dish.sellingPrice / (dish.portions || 4)).toFixed(2)}</p>
                 </div>
               </div>
             )}

@@ -66,7 +66,7 @@ function PanelContent({ children }: { children: React.ReactNode }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 min-w-0">
-              <Store className="w-5 h-5 text-[#108910] shrink-0" />
+              <Store className="w-5 h-5 text-[#0E7A0E] shrink-0" />
               <h1 className="text-lg font-bold text-gray-900 truncate">
                 {t("panel.title")}
               </h1>
@@ -80,7 +80,7 @@ function PanelContent({ children }: { children: React.ReactNode }) {
                   onClick={() => setShowPicker(!showPicker)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
                   selectedCollection
-                    ? "border-[#108910]/30 bg-[#F0FDF4] text-[#108910]"
+                    ? "border-[#0E7A0E]/30 bg-[#F0FDF4] text-[#0E7A0E]"
                     : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
                 }`}
               >
@@ -113,13 +113,13 @@ function PanelContent({ children }: { children: React.ReactNode }) {
                         key={c.id}
                         onClick={() => { setSelectedCollection(c); setShowPicker(false) }}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-gray-50 transition-colors ${
-                          selectedCollection?.id === c.id ? "bg-[#F0FDF4] text-[#108910] font-semibold" : "text-gray-700"
+                          selectedCollection?.id === c.id ? "bg-[#F0FDF4] text-[#0E7A0E] font-semibold" : "text-gray-700"
                         }`}
                       >
                         <span className="text-lg">{COLLECTION_ICONS[c.slug] || "🍽️"}</span>
                         <span>{c.name}</span>
                         {selectedCollection?.id === c.id && (
-                          <span className="ml-auto text-[10px] bg-[#108910]/10 text-[#108910] px-1.5 py-0.5 rounded-full font-bold">
+                          <span className="ml-auto text-[10px] bg-[#0E7A0E]/10 text-[#0E7A0E] px-1.5 py-0.5 rounded-full font-bold">
                             {t("panel.current")}
                           </span>
                         )}

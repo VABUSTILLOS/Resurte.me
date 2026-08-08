@@ -18,7 +18,7 @@ export default function DaySummary({ todaySales, puntosHoy, goalProgress, onCopy
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
       <div className="flex items-center justify-between p-4 pb-3">
         <div className="flex items-center gap-2">
-          <Receipt className="w-5 h-5 text-[#108910]" />
+          <Receipt className="w-5 h-5 text-[#0E7A0E]" />
           <h3 className="font-semibold text-gray-900 text-sm">Resumen del día</h3>
           {todaySales.count === 0 && (
             <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Sin ventas aún</span>
@@ -35,7 +35,7 @@ export default function DaySummary({ todaySales, puntosHoy, goalProgress, onCopy
             <Copy className="w-3.5 h-3.5" />
             Copiar resumen
           </button>
-          <Link href="/panel/ventas" className="text-xs font-semibold text-[#108910] hover:text-green-800 flex items-center gap-1">
+          <Link href="/panel/ventas" className="text-xs font-semibold text-[#0E7A0E] hover:text-green-800 flex items-center gap-1">
             Registrar ventas
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
@@ -99,13 +99,13 @@ export default function DaySummary({ todaySales, puntosHoy, goalProgress, onCopy
               <Target className="w-3.5 h-3.5 text-purple-600" />
               Meta del día
             </span>
-            <span className={`text-xs font-bold ${goalProgress.pct >= 100 ? "text-green-600" : goalProgress.pct >= 50 ? "text-[#108910]" : "text-amber-600"}`}>
+            <span className={`text-xs font-bold ${goalProgress.pct >= 100 ? "text-green-600" : goalProgress.pct >= 50 ? "text-[#0E7A0E]" : "text-amber-600"}`}>
               ${todaySales.revenue.toFixed(0)} / ${goalProgress.goal.toFixed(0)} ({goalProgress.projected}%)
             </span>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all ${goalProgress.pct >= 100 ? "bg-green-500" : goalProgress.pct >= 50 ? "bg-[#108910]" : "bg-amber-500"}`}
+              className={`h-full rounded-full transition-all ${goalProgress.pct >= 100 ? "bg-green-500" : goalProgress.pct >= 50 ? "bg-[#0E7A0E]" : "bg-amber-500"}`}
               style={{ width: `${Math.min(goalProgress.pct, 100)}%` }}
             />
           </div>

@@ -125,7 +125,7 @@ function RecipeIngredient({
         onClick={() => matched && setOpen(!open)}
         className={`inline-block px-2.5 py-1 text-xs rounded-full font-medium border transition-all duration-150 ${
           matched
-            ? "bg-[#108910]/5 text-[#108910] border-[#108910]/20 hover:bg-[#108910]/10 hover:border-[#108910]/30 cursor-pointer active:scale-95"
+            ? "bg-[#0E7A0E]/5 text-[#0E7A0E] border-[#0E7A0E]/20 hover:bg-[#0E7A0E]/10 hover:border-[#0E7A0E]/30 cursor-pointer active:scale-95"
             : "bg-amber-50 text-amber-800 border-amber-100 cursor-default"
         }`}
       >
@@ -153,8 +153,8 @@ function RecipeIngredient({
                 <p className="text-sm font-semibold text-[#1a1a1a] leading-tight truncate">
                   {matched.name}
                 </p>
-                <p className="text-xs text-[#999893] mt-0.5">{matched.unit || matched.brand}</p>
-                <p className="text-sm font-bold text-[#108910] mt-1">
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">{matched.unit || matched.brand}</p>
+                <p className="text-sm font-bold text-[#0E7A0E] mt-1">
                   ${(matched.sale_price ?? matched.price).toFixed(2)}
                 </p>
               </div>
@@ -164,7 +164,7 @@ function RecipeIngredient({
             <div className="flex border-t border-[#ede8df]">
               <button
                 onClick={handleAddToCart}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold text-white bg-[#108910] hover:bg-[#0D720D] transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold text-white bg-[#0E7A0E] hover:bg-[#0D720D] transition-colors"
               >
                 <ShoppingCart className="w-3.5 h-3.5" />
                 Agregar al carrito
@@ -212,7 +212,7 @@ function RecipeIngredients({
       {hidden > 0 && (
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="inline-block px-2.5 py-1 bg-[#f7f4ef] text-[#999893] text-xs rounded-full font-medium border border-transparent hover:border-[#108910]/20 hover:text-[#108910] cursor-pointer transition-all duration-150 active:scale-95"
+          className="inline-block px-2.5 py-1 bg-[#f7f4ef] text-[var(--text-secondary)] text-xs rounded-full font-medium border border-transparent hover:border-[#0E7A0E]/20 hover:text-[#0E7A0E] cursor-pointer transition-all duration-150 active:scale-95"
         >
           {expanded ? `− mostrar menos` : `+${hidden} más`}
         </button>
@@ -263,7 +263,7 @@ export default function RecipeSlider({ recipes, products, citySlug }: RecipeSlid
       {/* Header — premium editorial */}
       <div className="flex items-end justify-between mb-6">
         <div>
-          <span className="inline-block text-[11px] font-semibold tracking-[0.25em] uppercase text-[#108910]/70 mb-2">
+          <span className="inline-block text-[11px] font-semibold tracking-[0.25em] uppercase text-[#0E7A0E]/70 mb-2">
             Recetario
           </span>
           <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#1a1a1a] tracking-tight leading-[1.12]">
@@ -278,7 +278,7 @@ export default function RecipeSlider({ recipes, products, citySlug }: RecipeSlid
             disabled={!canScrollLeft}
             className={`p-2.5 rounded-full border transition-all duration-200 ${
               canScrollLeft
-                ? "border-[#ede8df] bg-white text-[#1a1a1a] hover:bg-[#f7f4ef] hover:border-[#108910]/20 shadow-sm"
+                ? "border-[#ede8df] bg-white text-[#1a1a1a] hover:bg-[#f7f4ef] hover:border-[#0E7A0E]/20 shadow-sm"
                 : "border-[#ede8df] bg-[#faf8f5] text-[#ccc] cursor-not-allowed"
             }`}
             aria-label="Recetas anteriores"
@@ -290,7 +290,7 @@ export default function RecipeSlider({ recipes, products, citySlug }: RecipeSlid
             disabled={!canScrollRight}
             className={`p-2.5 rounded-full border transition-all duration-200 ${
               canScrollRight
-                ? "border-[#ede8df] bg-white text-[#1a1a1a] hover:bg-[#f7f4ef] hover:border-[#108910]/20 shadow-sm"
+                ? "border-[#ede8df] bg-white text-[#1a1a1a] hover:bg-[#f7f4ef] hover:border-[#0E7A0E]/20 shadow-sm"
                 : "border-[#ede8df] bg-[#faf8f5] text-[#ccc] cursor-not-allowed"
             }`}
             aria-label="Recetas siguientes"
@@ -356,7 +356,7 @@ export default function RecipeSlider({ recipes, products, citySlug }: RecipeSlid
 
                 {/* Tappable ingredients */}
                 <div className="border-t border-[#f7f4ef] pt-3">
-                  <p className="text-[10px] font-semibold text-[#999893] uppercase tracking-widest mb-2.5">
+                  <p className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-widest mb-2.5">
                     Ingredientes
                   </p>
                   <RecipeIngredients
@@ -392,7 +392,7 @@ export default function RecipeSlider({ recipes, products, citySlug }: RecipeSlid
               })
             }}
             className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-              i === activeIndex ? "bg-[#108910] w-4" : "bg-[#ccc]"
+              i === activeIndex ? "bg-[#0E7A0E] w-4" : "bg-[#ccc]"
             }`}
             aria-label={`Receta ${i + 1}`}
           />

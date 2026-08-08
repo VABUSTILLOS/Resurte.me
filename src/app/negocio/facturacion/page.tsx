@@ -10,12 +10,12 @@ export const metadata: Metadata = {
 
 export default function FacturacionPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white">
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
             Facturación{" "}
-            <span className="text-[#108910]">sin mover un dedo</span>
+            <span className="text-[#0E7A0E]">sin mover un dedo</span>
           </h1>
           <p className="text-lg text-[#5C6068]">
             Registras tu RFC una sola vez y olvídate. Cada pedido genera tu CFDI
@@ -26,8 +26,8 @@ export default function FacturacionPage() {
 
       {/* Trust badge */}
       <section className="max-w-xl mx-auto px-4 pb-10">
-        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#108910]/20 rounded-[16px] p-5 flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#108910] rounded-xl flex items-center justify-center flex-shrink-0">
+        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#0E7A0E]/20 rounded-[16px] p-5 flex items-center gap-4">
+          <div className="w-12 h-12 bg-[#0E7A0E] rounded-xl flex items-center justify-center flex-shrink-0">
             <Shield className="w-6 h-6 text-white" />
           </div>
           <div>
@@ -58,7 +58,7 @@ export default function FacturacionPage() {
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="text-center">
               <div className="w-14 h-14 bg-[#E8F5E8] rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Icon className="w-7 h-7 text-[#108910]" />
+                <Icon className="w-7 h-7 text-[#0E7A0E]" />
               </div>
               <h3 className="text-lg font-semibold text-[#242529] mb-2">
                 {title}
@@ -81,7 +81,7 @@ export default function FacturacionPage() {
               "Código postal de tu domicilio fiscal",
             ].map((item) => (
               <li key={item} className="flex items-start gap-2">
-                <span className="text-[#108910] mt-0.5">✓</span>
+                <span className="text-[#0E7A0E] mt-0.5">✓</span>
                 {item}
               </li>
             ))}
@@ -91,13 +91,13 @@ export default function FacturacionPage() {
         <div className="text-center">
           <Link
             href="/auth/register"
-            className="inline-flex items-center gap-2 bg-[#108910] text-white font-semibold px-8 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
+            className="inline-flex items-center gap-2 bg-[#0E7A0E] text-white font-semibold px-8 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
           >
             Crear cuenta y automatizar mi facturación
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

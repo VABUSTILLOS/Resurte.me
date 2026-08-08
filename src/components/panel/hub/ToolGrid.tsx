@@ -32,7 +32,7 @@ export default function ToolGrid({ tools, selectedCollection }: ToolGridProps) {
               ? tool.collectionDesc(selectedCollection.name)
               : tool.description}
           </p>
-          <div className="flex items-center gap-1 text-sm font-semibold text-[#108910] group-hover:gap-2 transition-all">
+          <div className="flex items-center gap-1 text-sm font-semibold text-[#0E7A0E] group-hover:gap-2 transition-all">
             {selectedCollection ? "Abrir herramienta" : "Selecciona tu cocina"}
             <ArrowRight className="w-4 h-4" />
           </div>

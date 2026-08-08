@@ -12,7 +12,7 @@
   --color-brand-200: #B8EDB8;
   --color-brand-300: #7ADE7A;
   --color-brand-400: #3CC73C;
-  --color-brand-500: #108910;
+  --color-brand-500: #0E7A0E; /* 5.2:1 sobre #faf8f5/#ffffff (texto blanco sobre botones) */
   --color-brand-600: #0D720D;
   --color-brand-700: #0A610A;
   --color-brand-800: #084D08;
@@ -58,6 +58,9 @@
 :root {
   --background: #faf8f5;
   --foreground: #1a1a1a;
+  /* Texto secundario/terciario — cumplen WCAG AA (≥4.5:1) sobre sus fondos. */
+  --text-secondary: #5c6069; /* ≥4.5:1 sobre #faf8f5/#ffffff */
+  --text-tertiary: #6e737b;  /* ≥4.5:1 sobre #ffffff (texto pequeño) */
   /* iOS safe areas + header offset (header h-16 = 4rem) */
   --header-inset-top: env(safe-area-inset-top, 0px);
   --header-top-offset: calc(4rem + var(--header-inset-top));
@@ -68,11 +71,15 @@
 [data-theme="light"] {
   --background: #faf8f5;
   --foreground: #1a1a1a;
+  --text-secondary: #5c6069;
+  --text-tertiary: #6e737b;
 }
 
 [data-theme="dark"] {
   --background: #191A1C;
   --foreground: #E8E9EB;
+  --text-secondary: #9aa0a8; /* ≥4.5:1 sobre #191A1C/#242529 */
+  --text-tertiary: #92979f;
   color-scheme: dark;
 }
 
@@ -85,6 +92,8 @@
   :root:not([data-theme="light"]) {
     --background: #191A1C;
     --foreground: #E8E9EB;
+    --text-secondary: #9aa0a8;
+    --text-tertiary: #92979f;
   }
 }
 
@@ -261,7 +270,7 @@ label[for] {
   transition: all 0.2s ease;
 }
 .btn-pill-primary {
-  background: #108910;
+  background: #0E7A0E;
   color: white;
 }
 .btn-pill-primary:hover {
@@ -271,8 +280,8 @@ label[for] {
 }
 .btn-pill-outline {
   background: transparent;
-  color: #108910;
-  border: 1.5px solid #108910;
+  color: #0E7A0E;
+  border: 1.5px solid #0E7A0E;
 }
 .btn-pill-outline:hover {
   background: rgba(16, 137, 16, 0.06);
@@ -357,10 +366,8 @@ label[for] {
 }
 
 /* Performance: skip rendering off-screen layout sections */
-.site-footer {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 200px;
-}
+/* NOTE: content-visibility se elimina del footer porque confunde el cálculo
+   de contraste de axe-core (no resuelve el bg oscuro fuera del viewport). */
 
 /* ============================================
    ACCESSIBILITY — Reduced motion & focus styles
@@ -399,7 +406,7 @@ label[for] {
 
 /* Keyboard focus indicator — visible ring for interactive elements */
 :focus-visible {
-  outline: 2px solid #108910;
+  outline: 2px solid #0E7A0E;
   outline-offset: 2px;
 }
 
@@ -421,7 +428,7 @@ textarea:focus-visible,
   transform: translateX(-50%);
   z-index: 100;
   padding: 0.75rem 1.5rem;
-  background: #108910;
+  background: #0E7A0E;
   color: white;
   font-weight: 600;
   font-size: 0.875rem;

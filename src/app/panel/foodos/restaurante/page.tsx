@@ -139,7 +139,7 @@ export default function RestaurantePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-6 h-6 animate-spin text-[#108910]" />
+        <Loader2 className="w-6 h-6 animate-spin text-[#0E7A0E]" />
       </div>
     )
   }
@@ -159,7 +159,7 @@ export default function RestaurantePage() {
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
               restaurant.status === "active"
                 ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
-                : "bg-[#108910] text-white hover:bg-[#0e7a0e]"
+                : "bg-[#0E7A0E] text-white hover:bg-[#0e7a0e]"
             }`}
           >
             {restaurant.status === "active" ? "Pausar" : "Activar tienda"}
@@ -177,7 +177,7 @@ export default function RestaurantePage() {
         {/* Perfil */}
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-6">
           <div className="flex items-center gap-2 mb-5">
-            <Store className="w-5 h-5 text-[#108910]" />
+            <Store className="w-5 h-5 text-[#0E7A0E]" />
             <h2 className="font-semibold text-gray-900">Perfil público</h2>
           </div>
           <form onSubmit={handleSaveRestaurant} className="space-y-4">
@@ -188,7 +188,7 @@ export default function RestaurantePage() {
                   value={name}
                   onChange={(e) => { setName(e.target.value); if (!restaurant) setSlug(e.target.value) }}
                   placeholder="Taquería El Compa"
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
                 />
               </div>
               <div>
@@ -199,7 +199,7 @@ export default function RestaurantePage() {
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                   placeholder="taqueria-el-compa"
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
                 />
                 <p className="text-[11px] text-gray-400 mt-1">
                   Tu menú quedará en {publicRestaurantUrl(slug || "...")}
@@ -213,7 +213,7 @@ export default function RestaurantePage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Cocina mexicana, hecha en casa, delivery a toda la colonia…"
                 rows={3}
-                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -223,7 +223,7 @@ export default function RestaurantePage() {
                   value={logoUrl}
                   onChange={(e) => setLogoUrl(e.target.value)}
                   placeholder="https://…/logo.png"
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
                 />
               </div>
               <div>
@@ -231,7 +231,7 @@ export default function RestaurantePage() {
                 <select
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
                 >
                   <option value="MXN">MXN — Peso mexicano</option>
                   <option value="USD">USD — Dólar</option>
@@ -242,7 +242,7 @@ export default function RestaurantePage() {
               <button
                 type="submit"
                 disabled={saving || !name.trim()}
-                className="px-5 py-2.5 rounded-xl bg-[#108910] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? "Guardando…" : restaurant ? "Guardar cambios" : "Crear mi tienda"}
               </button>
@@ -258,7 +258,7 @@ export default function RestaurantePage() {
         {/* QR + URL pública */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col items-center">
           <div className="flex items-center gap-2 mb-4 self-start">
-            <QrCode className="w-5 h-5 text-[#108910]" />
+            <QrCode className="w-5 h-5 text-[#0E7A0E]" />
             <h2 className="font-semibold text-gray-900">Tu código QR</h2>
           </div>
           {restaurant ? (
@@ -281,7 +281,7 @@ export default function RestaurantePage() {
                     {publicRestaurantUrl(restaurant.slug)}
                   </span>
                   <button onClick={handleCopyUrl} className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors">
-                    {copied ? <Check className="w-4 h-4 text-[#108910]" /> : <Copy className="w-4 h-4" />}
+                    {copied ? <Check className="w-4 h-4 text-[#0E7A0E]" /> : <Copy className="w-4 h-4" />}
                   </button>
                   <a
                     href={publicRestaurantUrl(restaurant.slug)}
@@ -308,7 +308,7 @@ export default function RestaurantePage() {
       {/* Sucursales */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <div className="flex items-center gap-2 mb-5">
-          <MapPin className="w-5 h-5 text-[#108910]" />
+          <MapPin className="w-5 h-5 text-[#0E7A0E]" />
           <h2 className="font-semibold text-gray-900">Sucursales</h2>
         </div>
 
@@ -349,30 +349,30 @@ export default function RestaurantePage() {
                 value={branchName}
                 onChange={(e) => setBranchName(e.target.value)}
                 placeholder="Sucursal Centro"
-                className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
               />
               <input
                 value={branchCity}
                 onChange={(e) => setBranchCity(e.target.value)}
                 placeholder="Ciudad (ej. Guadalajara)"
-                className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
               />
               <input
                 value={branchAddress}
                 onChange={(e) => setBranchAddress(e.target.value)}
                 placeholder="Dirección"
-                className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
               />
               <input
                 value={branchPhone}
                 onChange={(e) => setBranchPhone(e.target.value)}
                 placeholder="Teléfono WhatsApp"
-                className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]"
+                className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
               />
               <button
                 type="submit"
                 disabled={!branchName.trim()}
-                className="sm:col-span-3 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-[#108910]/40 text-[#108910] text-sm font-semibold hover:bg-[#F0FDF4] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="sm:col-span-3 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-[#0E7A0E]/40 text-[#0E7A0E] text-sm font-semibold hover:bg-[#F0FDF4] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <Plus className="w-4 h-4" /> Agregar sucursal
               </button>

@@ -34,7 +34,7 @@ export function CookieConsent() {
       <div className="bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.15)] border border-[#ede8df] p-5">
         <div className="flex items-start gap-3 mb-4">
           <div className="w-9 h-9 rounded-xl bg-[#F7F5F0] flex items-center justify-center shrink-0">
-            <Cookie className="w-4 h-4 text-[#72767E]" />
+            <Cookie className="w-4 h-4 text-[var(--text-secondary)]" />
           </div>
           <div className="flex-1">
             <p className="text-sm font-semibold text-[#1a1a1a] mb-1">
@@ -47,7 +47,7 @@ export function CookieConsent() {
           <button
             onClick={acceptAll}
             aria-label="Cerrar"
-            className="p-1 rounded-lg hover:bg-[#F7F5F0] text-[#999893] shrink-0"
+            className="p-1 rounded-lg hover:bg-[#F7F5F0] text-[var(--text-secondary)] shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -55,13 +55,13 @@ export function CookieConsent() {
         <div className="flex items-center gap-2">
           <button
             onClick={acceptEssential}
-            className="flex-1 px-4 py-2 text-sm font-medium text-[#72767E] bg-[#F7F5F0] rounded-xl hover:bg-[#EDEAE4] transition-colors"
+            className="flex-1 px-4 py-2 text-sm font-medium text-[var(--text-secondary)] bg-[#F7F5F0] rounded-xl hover:bg-[#EDEAE4] transition-colors"
           >
             Solo necesarias
           </button>
           <button
             onClick={acceptAll}
-            className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-[#108910] rounded-xl hover:bg-[#0D720D] transition-colors"
+            className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-[#0E7A0E] rounded-xl hover:bg-[#0D720D] transition-colors"
           >
             Aceptar todas
           </button>

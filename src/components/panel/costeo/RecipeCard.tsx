@@ -32,14 +32,14 @@ export default function RecipeCard({ recipe, cost, onUse, onDelete, saved }: {
       </div>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-gray-700">
-          Costo est. <span className="text-[#108910]">${cost.toFixed(2)}</span>
+          Costo est. <span className="text-[#0E7A0E]">${cost.toFixed(2)}</span>
         </span>
         <button
           onClick={onUse}
           className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors ${
             saved
               ? "bg-purple-600 text-white hover:bg-purple-700"
-              : "bg-[#108910] text-white hover:bg-[#0D720D]"
+              : "bg-[#0E7A0E] text-white hover:bg-[#0D720D]"
           }`}
         >
           Usar

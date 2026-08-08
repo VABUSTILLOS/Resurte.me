@@ -39,17 +39,19 @@ export function WhatsAppButton({
     : "sm:bottom-[calc(24px+env(safe-area-inset-bottom))]"
 
   return (
-    <a
-      href={waLink}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={handleWhatsAppClick}
-      className={`fixed ${bottomMobile} ${bottomDesktop} ${positionClass} z-50 flex items-center gap-2 px-4 py-3 bg-green-500 text-white font-semibold rounded-full shadow-lg hover:bg-green-600 hover:shadow-xl transition-all group`}
-    >
-      <MessageCircle className="w-5 h-5" />
-      <span className="text-sm hidden sm:inline">{label}</span>
-      <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-300 rounded-full animate-ping" />
-    </a>
+    <div role="complementary" aria-label="Contacto rápido por WhatsApp" className={`fixed ${bottomMobile} ${bottomDesktop} ${positionClass} z-50`}>
+      <a
+        href={waLink}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={handleWhatsAppClick}
+        className="flex items-center gap-2 px-4 py-3 bg-green-700 text-white font-semibold rounded-full shadow-lg hover:bg-green-800 hover:shadow-xl transition-all group"
+      >
+        <MessageCircle className="w-5 h-5" />
+        <span className="text-sm hidden sm:inline">{label}</span>
+        <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-300 rounded-full animate-ping" aria-hidden="true" />
+      </a>
+    </div>
   )
 }
 
@@ -96,7 +98,7 @@ export function OrderByWhatsAppButton({
       rel="noopener noreferrer"
       className={
         className ??
-        "flex items-center justify-center gap-2 w-full px-4 py-3 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors"
+        "flex items-center justify-center gap-2 w-full px-4 py-3 bg-green-700 text-white font-semibold rounded-xl hover:bg-green-800 transition-colors"
       }
     >
       <MessageCircle className="w-5 h-5" />

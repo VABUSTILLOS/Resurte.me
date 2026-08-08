@@ -91,7 +91,7 @@ const TESTIMONIALS: Testimonial[] = [
 function StarRating({ rating, size = "sm" }: { rating: number; size?: "sm" | "md" }) {
   const starSize = size === "md" ? "w-4 h-4" : "w-3.5 h-3.5"
   return (
-    <div className="flex gap-0.5" aria-label={`${rating} de 5 estrellas`}>
+    <div role="img" className="flex gap-0.5" aria-label={`${rating} de 5 estrellas`}>
       {Array.from({ length: 5 }).map((_, i) => (
         <Star
           key={i}
@@ -172,7 +172,7 @@ export function TestimonialCarousel() {
             {/* Quote icon */}
             <div className="flex justify-center mb-5">
               <div className="w-12 h-12 rounded-full bg-[#E9FBE9] flex items-center justify-center">
-                <Quote className="w-5 h-5 text-[#108910]" />
+                <Quote className="w-5 h-5 text-[#0E7A0E]" />
               </div>
             </div>
 
@@ -197,7 +197,7 @@ export function TestimonialCarousel() {
               </div>
               <div>
                 <p className="text-sm font-bold text-[#242529]">{t.author}</p>
-                <p className="text-xs text-[#72767E]">
+                <p className="text-xs text-[var(--text-secondary)]">
                   {t.role} · {t.city}
                 </p>
               </div>
@@ -208,14 +208,14 @@ export function TestimonialCarousel() {
         {/* Navigation arrows */}
         <button
           onClick={prev}
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white border border-[#E8E9EB] shadow-sm flex items-center justify-center text-[#5C6068] hover:text-[#108910] hover:border-[#108910]/30 transition-colors z-10"
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white border border-[#E8E9EB] shadow-sm flex items-center justify-center text-[#5C6068] hover:text-[#0E7A0E] hover:border-[#0E7A0E]/30 transition-colors z-10"
           aria-label="Testimonio anterior"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
         <button
           onClick={next}
-          className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white border border-[#E8E9EB] shadow-sm flex items-center justify-center text-[#5C6068] hover:text-[#108910] hover:border-[#108910]/30 transition-colors z-10"
+          className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white border border-[#E8E9EB] shadow-sm flex items-center justify-center text-[#5C6068] hover:text-[#0E7A0E] hover:border-[#0E7A0E]/30 transition-colors z-10"
           aria-label="Siguiente testimonio"
         >
           <ChevronRight className="w-4 h-4" />
@@ -230,8 +230,8 @@ export function TestimonialCarousel() {
             onClick={() => goTo(i)}
             className={`rounded-full transition-all ${
               i === current
-                ? "w-6 h-2 bg-[#108910]"
-                : "w-2 h-2 bg-[#D1D3D6] hover:bg-[#108910]/40"
+                ? "w-6 h-2 bg-[#0E7A0E]"
+                : "w-2 h-2 bg-[#D1D3D6] hover:bg-[#0E7A0E]/40"
             }`}
             aria-label={`Ir al testimonio ${i + 1}`}
           />

@@ -23,7 +23,7 @@ export default function KitchenMonitor({ comandas }: KitchenMonitorProps) {
             <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Sin comandas activas</span>
           )}
         </div>
-        <Link href="/panel/comanda" className="text-xs font-semibold text-[#108910] hover:text-green-800 flex items-center gap-1">
+        <Link href="/panel/comanda" className="text-xs font-semibold text-[#0E7A0E] hover:text-green-800 flex items-center gap-1">
           Abrir monitor
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>

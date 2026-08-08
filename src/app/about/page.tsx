@@ -17,13 +17,13 @@ const STATS = [
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white">
       {/* Hero */}
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-6">
             La Central de Abastos{" "}
-            <span className="text-[#108910]">que sí entiende tu negocio</span>
+            <span className="text-[#0E7A0E]">que sí entiende tu negocio</span>
           </h1>
           <p className="text-lg text-[#5C6068] leading-relaxed">
             Sabemos lo que es levantarse a las 4 AM para ir a la central. Por eso
@@ -41,7 +41,7 @@ export default function AboutPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {STATS.map(({ value, label }) => (
               <div key={label}>
-                <p className="text-3xl sm:text-4xl font-extrabold text-[#108910] mb-1">
+                <p className="text-3xl sm:text-4xl font-extrabold text-[#0E7A0E] mb-1">
                   {value}
                 </p>
                 <p className="text-sm text-[#5C6068]">{label}</p>
@@ -75,8 +75,8 @@ export default function AboutPage() {
             },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="text-center group">
-              <div className="w-14 h-14 bg-[#E8F5E8] rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:bg-[#108910] transition-colors">
-                <Icon className="w-7 h-7 text-[#108910] group-hover:text-white transition-colors" />
+              <div className="w-14 h-14 bg-[#E8F5E8] rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:bg-[#0E7A0E] transition-colors">
+                <Icon className="w-7 h-7 text-[#0E7A0E] group-hover:text-white transition-colors" />
               </div>
               <h3 className="text-lg font-semibold text-[#242529] mb-2">
                 {title}
@@ -91,11 +91,11 @@ export default function AboutPage() {
       <section className="bg-[#F9FAFB] py-16 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <div className="w-16 h-16 bg-[#E8F5E8] rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <Shield className="w-8 h-8 text-[#108910]" />
+            <Shield className="w-8 h-8 text-[#0E7A0E]" />
           </div>
           <h2 className="text-2xl sm:text-3xl font-bold text-[#242529] mb-4">
             Nuestra garantía,{" "}
-            <span className="text-[#108910]">sin letras chiquitas</span>
+            <span className="text-[#0E7A0E]">sin letras chiquitas</span>
           </h2>
           <div className="grid sm:grid-cols-3 gap-6 text-left mt-8">
             {[
@@ -116,7 +116,7 @@ export default function AboutPage() {
       {/* How we started */}
       <section className="max-w-3xl mx-auto px-4 py-20">
         <div className="flex items-center gap-3 mb-6">
-          <Building2 className="w-6 h-6 text-[#108910]" />
+          <Building2 className="w-6 h-6 text-[#0E7A0E]" />
           <h2 className="text-2xl font-bold text-[#242529]">De la central al celular</h2>
         </div>
         <p className="text-[#5C6068] leading-relaxed mb-4">
@@ -138,24 +138,24 @@ export default function AboutPage() {
       </section>
 
       {/* CTA */}
-      <section className="bg-[#108910] py-16 px-4 text-center">
+      <section className="bg-[#0E7A0E] py-16 px-4 text-center">
         <div className="max-w-xl mx-auto">
           <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
             Deja de madrugar para surtir. Pide en 5 minutos desde tu cel.
           </h2>
-          <p className="text-white/80 mb-6">
+          <p className="text-white/90 mb-6">
             Date de alta gratis. Sin mensualidad, sin compromiso. Tu primer pedido
             con garantía de satisfacción.
           </p>
           <Link
             href="/auth/register"
-            className="inline-flex items-center gap-2 bg-white text-[#108910] font-semibold px-8 py-3 rounded-[10px] hover:bg-[#F0F7F0] transition-colors"
+            className="inline-flex items-center gap-2 bg-white text-[#0E7A0E] font-semibold px-8 py-3 rounded-[10px] hover:bg-[#F0F7F0] transition-colors"
           >
             Quiero empezar
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

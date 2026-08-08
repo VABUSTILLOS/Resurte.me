@@ -9,11 +9,11 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white">
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
-            Términos y <span className="text-[#108910]">condiciones</span>
+            Términos y <span className="text-[#0E7A0E]">condiciones</span>
           </h1>
           <p className="text-[#5C6068]">
             Última actualización: enero 2026
@@ -23,7 +23,7 @@ export default function TermsPage() {
 
       {/* Trust summary */}
       <section className="max-w-3xl mx-auto px-4 pb-12">
-        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#108910]/20 rounded-[16px] p-6">
+        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#0E7A0E]/20 rounded-[16px] p-6">
           <p className="text-sm text-[#242529] font-semibold mb-3">En cristiano, esto significa:</p>
           <div className="grid sm:grid-cols-3 gap-4">
             {[
@@ -32,7 +32,7 @@ export default function TermsPage() {
               { icon: RefreshCw, text: "Si cambiamos algo importante, te avisamos con 15 días de anticipación." },
             ].map(({ icon: Icon, text }) => (
               <div key={text} className="flex items-start gap-2">
-                <Icon className="w-4 h-4 text-[#108910] mt-0.5 flex-shrink-0" />
+                <Icon className="w-4 h-4 text-[#0E7A0E] mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-[#5C6068] leading-relaxed">{text}</p>
               </div>
             ))}
@@ -135,6 +135,6 @@ export default function TermsPage() {
           </p>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

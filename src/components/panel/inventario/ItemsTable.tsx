@@ -33,7 +33,7 @@ export default function ItemsTable({
         </p>
         <button
           onClick={onAddFirst}
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           Agregar primer producto
@@ -104,7 +104,7 @@ export default function ItemsTable({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1">
-                      <button onClick={() => onEdit(item)} className="p-1.5 text-gray-400 hover:text-[#108910] hover:bg-green-50 rounded-lg transition-colors" title="Editar" aria-label={`Editar ${item.name}`}>
+                      <button onClick={() => onEdit(item)} className="p-1.5 text-gray-400 hover:text-[#0E7A0E] hover:bg-green-50 rounded-lg transition-colors" title="Editar" aria-label={`Editar ${item.name}`}>
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button onClick={() => onDelete(item.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar" aria-label={`Eliminar ${item.name}`}>

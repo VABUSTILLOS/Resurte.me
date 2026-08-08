@@ -53,11 +53,11 @@ const FAQS = [
 
 export default function FaqPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white">
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
-            Preguntas <span className="text-[#108910]">frecuentes</span>
+            Preguntas <span className="text-[#0E7A0E]">frecuentes</span>
           </h1>
           <p className="text-lg text-[#5C6068]">
             Lo que todos nos preguntan. Si no encuentras tu respuesta, échanos un mensaje.
@@ -74,7 +74,7 @@ export default function FaqPage() {
             { value: "24h", label: "Garantía de devolución" },
           ].map(({ value, label }) => (
             <div key={label}>
-              <p className="text-2xl font-extrabold text-[#108910]">{value}</p>
+              <p className="text-2xl font-extrabold text-[#0E7A0E]">{value}</p>
               <p className="text-xs text-[#5C6068] mt-1">{label}</p>
             </div>
           ))}
@@ -85,11 +85,11 @@ export default function FaqPage() {
         {FAQS.map(({ q, a }) => (
           <details
             key={q}
-            className="border border-[#E5E7EB] rounded-[12px] p-6 group open:border-[#108910] open:bg-[#F9FAFB] transition-colors cursor-pointer"
+            className="border border-[#E5E7EB] rounded-[12px] p-6 group open:border-[#0E7A0E] open:bg-[#F9FAFB] transition-colors cursor-pointer"
           >
             <summary className="text-lg font-semibold text-[#242529] list-none flex items-center justify-between">
               {q}
-              <span className="text-[#108910] text-xl group-open:rotate-45 transition-transform">
+              <span className="text-[#0E7A0E] text-xl group-open:rotate-45 transition-transform">
                 +
               </span>
             </summary>
@@ -100,8 +100,8 @@ export default function FaqPage() {
 
       {/* Guarantee highlight */}
       <section className="max-w-xl mx-auto px-4 pb-8">
-        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#108910]/20 rounded-[16px] p-6 flex items-start gap-4">
-          <div className="w-10 h-10 bg-[#108910] rounded-xl flex items-center justify-center flex-shrink-0">
+        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#0E7A0E]/20 rounded-[16px] p-6 flex items-start gap-4">
+          <div className="w-10 h-10 bg-[#0E7A0E] rounded-xl flex items-center justify-center flex-shrink-0">
             <Shield className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -119,11 +119,11 @@ export default function FaqPage() {
         <p className="text-[#5C6068] mb-4">¿Faltó algo? Escríbenos sin pena.</p>
         <Link
           href="/contact"
-          className="inline-flex items-center gap-2 bg-[#108910] text-white font-semibold px-6 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
+          className="inline-flex items-center gap-2 bg-[#0E7A0E] text-white font-semibold px-6 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
         >
           Contáctanos
         </Link>
       </section>
-    </main>
+    </div>
   )
 }

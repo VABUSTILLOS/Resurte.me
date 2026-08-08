@@ -45,7 +45,7 @@ export default function RelojChecador({
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <div className="flex items-center gap-2 mb-4">
-        <Clock className="w-4 h-4 text-[#108910]" />
+        <Clock className="w-4 h-4 text-[#0E7A0E]" />
         <h3 className="text-sm font-semibold text-gray-900">Reloj checador</h3>
         {empleadoCount > 0 && (
           <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
@@ -73,7 +73,7 @@ export default function RelojChecador({
                 value={empNombre}
                 onChange={(e) => onNombreChange(e.target.value)}
                 placeholder={empEditId ? "Editar nombre…" : "Ej. Juan Pérez"}
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
                 aria-label="Nombre del empleado"
               />
             </div>
@@ -84,7 +84,7 @@ export default function RelojChecador({
                 value={empRol}
                 onChange={(e) => onRolChange(e.target.value)}
                 placeholder="Opcional · Ej. Mesero"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
                 aria-label="Rol del empleado"
               />
             </div>
@@ -96,7 +96,7 @@ export default function RelojChecador({
                 onChange={(e) => onTarifaChange(e.target.value)}
                 min="0"
                 placeholder="Ej. 60"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#0E7A0E]"
                 aria-label="Tarifa por hora del empleado"
               />
             </div>
@@ -104,7 +104,7 @@ export default function RelojChecador({
           <div className="flex items-center gap-3">
             <button
               onClick={onSave}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
             >
               <Check className="w-3.5 h-3.5" />
               {empEditId ? "Guardar cambios" : "Agregar empleado"}
@@ -148,7 +148,7 @@ export default function RelojChecador({
                     </button>
                     <button
                       onClick={() => onEdit(e)}
-                      className="p-1.5 text-gray-400 hover:text-[#108910] rounded-lg hover:bg-emerald-50 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-[#0E7A0E] rounded-lg hover:bg-emerald-50 transition-colors"
                       title="Editar empleado"
                       aria-label={`Editar a ${e.nombre}`}
                     >

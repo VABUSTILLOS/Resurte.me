@@ -46,7 +46,7 @@ export default function FrequentCustomers({
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <div className="flex items-center gap-2 mb-4">
-        <Users className="w-4 h-4 text-[#108910]" />
+        <Users className="w-4 h-4 text-[#0E7A0E]" />
         <h3 className="text-sm font-semibold text-gray-900">Clientes frecuentes</h3>
         {clientes.length > 0 && (
           <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
@@ -83,7 +83,7 @@ export default function FrequentCustomers({
                 value={clienteName}
                 onChange={(e) => onNameChange(e.target.value)}
                 placeholder={clienteEditId ? "Editar nombre…" : "Ej. María López"}
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
                 aria-label="Nombre del cliente"
               />
             </div>
@@ -94,7 +94,7 @@ export default function FrequentCustomers({
                 value={clientePhone}
                 onChange={(e) => onPhoneChange(e.target.value)}
                 placeholder="Opcional"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
                 aria-label="Teléfono del cliente"
               />
             </div>
@@ -106,7 +106,7 @@ export default function FrequentCustomers({
                 onChange={(e) => onPtsChange(e.target.value)}
                 min="0"
                 placeholder="0"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#0E7A0E]"
                 aria-label="Puntos iniciales del cliente"
               />
             </div>
@@ -114,7 +114,7 @@ export default function FrequentCustomers({
           <div className="flex items-center gap-3">
             <button
               onClick={onSave}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
             >
               <Check className="w-3.5 h-3.5" />
               {clienteEditId ? "Guardar cambios" : "Agregar cliente"}
@@ -132,7 +132,7 @@ export default function FrequentCustomers({
                   value={puntosTasa}
                   onChange={(e) => onPuntosTasaChange(Math.max(1, parseFloat(e.target.value) || 0))}
                   min="1"
-                  className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#108910]"
+                  className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#0E7A0E]"
                   aria-label="Pesos por punto al ganar"
                 />
               </label>
@@ -144,7 +144,7 @@ export default function FrequentCustomers({
                   onChange={(e) => onPuntosCanjeChange(Math.max(0, parseFloat(e.target.value) || 0))}
                   min="0"
                   step="0.5"
-                  className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#108910]"
+                  className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#0E7A0E]"
                   aria-label="Pesos por punto al canjear"
                 />
               </label>
@@ -156,7 +156,7 @@ export default function FrequentCustomers({
                   onChange={(e) => onTipoCambioChange(Math.max(0, parseFloat(e.target.value) || 0))}
                   min="0"
                   step="0.01"
-                  className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#108910]"
+                  className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#0E7A0E]"
                   aria-label="Tipo de cambio MXN a USD"
                 />
               </label>
@@ -181,7 +181,7 @@ export default function FrequentCustomers({
                     </span>
                     <button
                       onClick={() => onEdit(c)}
-                      className="p-1.5 text-gray-400 hover:text-[#108910] rounded-lg hover:bg-emerald-50 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-[#0E7A0E] rounded-lg hover:bg-emerald-50 transition-colors"
                       title="Editar cliente"
                       aria-label={`Editar a ${c.nombre}`}
                     >

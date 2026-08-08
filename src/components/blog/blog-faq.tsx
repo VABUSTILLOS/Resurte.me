@@ -34,7 +34,7 @@ export function BlogFAQ({ items }: { items: FAQItem[] }) {
                   {item.question}
                 </span>
                 <ChevronDown
-                  className={`h-5 w-5 shrink-0 text-warm-400 transition-transform ${
+                  className={`h-5 w-5 shrink-0 text-[var(--text-secondary)] transition-transform ${
                     isOpen ? "rotate-180" : ""
                   }`}
                   aria-hidden="true"

@@ -10,12 +10,12 @@ export const metadata: Metadata = {
 
 export default function CreditoPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white">
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
             Surtir hoy,{" "}
-            <span className="text-[#108910]">pagar después</span>
+            <span className="text-[#0E7A0E]">pagar después</span>
           </h1>
           <p className="text-lg text-[#5C6068]">
             Tu negocio no debería frenarse porque la caja está apretada.
@@ -33,7 +33,7 @@ export default function CreditoPage() {
             { value: "Sin buró", label: "Sin consulta a buró de crédito" },
           ].map(({ value, label }) => (
             <div key={label}>
-              <p className="text-2xl font-extrabold text-[#108910]">{value}</p>
+              <p className="text-2xl font-extrabold text-[#0E7A0E]">{value}</p>
               <p className="text-xs text-[#5C6068] mt-1">{label}</p>
             </div>
           ))}
@@ -61,7 +61,7 @@ export default function CreditoPage() {
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="text-center">
               <div className="w-14 h-14 bg-[#E8F5E8] rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Icon className="w-7 h-7 text-[#108910]" />
+                <Icon className="w-7 h-7 text-[#0E7A0E]" />
               </div>
               <h3 className="text-lg font-semibold text-[#242529] mb-2">
                 {title}
@@ -83,7 +83,7 @@ export default function CreditoPage() {
               { step: "3", title: "Súrtete", desc: "Eliges \"pago a crédito\" al finalizar. Así de simple." },
             ].map(({ step, title, desc }) => (
               <div key={step} className="text-center">
-                <div className="w-10 h-10 bg-[#108910] text-white rounded-full flex items-center justify-center mx-auto mb-3 text-lg font-bold">
+                <div className="w-10 h-10 bg-[#0E7A0E] text-white rounded-full flex items-center justify-center mx-auto mb-3 text-lg font-bold">
                   {step}
                 </div>
                 <h3 className="font-semibold text-[#242529] mb-1">{title}</h3>
@@ -109,13 +109,13 @@ export default function CreditoPage() {
         <div className="text-center mt-10">
           <Link
             href="/auth/register"
-            className="inline-flex items-center gap-2 bg-[#108910] text-white font-semibold px-8 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
+            className="inline-flex items-center gap-2 bg-[#0E7A0E] text-white font-semibold px-8 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
           >
             Crear cuenta y activar mi crédito
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

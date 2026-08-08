@@ -32,7 +32,7 @@ export default function DiningTables({ crud, mesasOcupadasHoy, now }: DiningTabl
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <div className="flex items-center gap-2 mb-4">
-        <UtensilsCrossed className="w-4 h-4 text-[#108910]" />
+        <UtensilsCrossed className="w-4 h-4 text-[#0E7A0E]" />
         <h3 className="text-sm font-semibold text-gray-900">Mesas del salón</h3>
         {mesas.length > 0 && (
           <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
@@ -60,7 +60,7 @@ export default function DiningTables({ crud, mesasOcupadasHoy, now }: DiningTabl
                 value={mesaName}
                 onChange={(e) => onNameChange(e.target.value)}
                 placeholder={mesaEditId ? "Editar nombre…" : "Ej. Mesa 3"}
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
                 aria-label="Nombre de la mesa"
               />
             </div>
@@ -72,7 +72,7 @@ export default function DiningTables({ crud, mesasOcupadasHoy, now }: DiningTabl
                 onChange={(e) => onCapacidadChange(e.target.value)}
                 min="1"
                 placeholder="4"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#0E7A0E]"
                 aria-label="Capacidad de la mesa"
               />
             </div>
@@ -83,7 +83,7 @@ export default function DiningTables({ crud, mesasOcupadasHoy, now }: DiningTabl
                 value={mesaZona}
                 onChange={(e) => onZonaChange(e.target.value)}
                 placeholder="Opcional · Ej. Terraza"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
                 aria-label="Zona de la mesa"
               />
             </div>
@@ -91,7 +91,7 @@ export default function DiningTables({ crud, mesasOcupadasHoy, now }: DiningTabl
           <div className="flex items-center gap-3">
             <button
               onClick={onSave}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
             >
               <Check className="w-3.5 h-3.5" />
               {mesaEditId ? "Guardar cambios" : "Agregar mesa"}
@@ -130,7 +130,7 @@ export default function DiningTables({ crud, mesasOcupadasHoy, now }: DiningTabl
                       )}
                       <button
                         onClick={() => onEdit(m)}
-                        className="p-1.5 text-gray-400 hover:text-[#108910] rounded-lg hover:bg-emerald-50 transition-colors"
+                        className="p-1.5 text-gray-400 hover:text-[#0E7A0E] rounded-lg hover:bg-emerald-50 transition-colors"
                         title="Editar mesa"
                         aria-label={`Editar mesa ${m.nombre}`}
                       >

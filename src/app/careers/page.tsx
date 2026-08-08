@@ -10,12 +10,12 @@ export const metadata: Metadata = {
 
 export default function CareersPage() {
   return (
-    <main className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white">
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
             Construye el futuro del{" "}
-            <span className="text-[#108910]">abasto en México</span>
+            <span className="text-[#0E7A0E]">abasto en México</span>
           </h1>
           <p className="text-lg text-[#5C6068]">
             No somos una startup más. Estamos digitalizando la cadena de
@@ -35,8 +35,8 @@ export default function CareersPage() {
             { icon: MapPin, value: "8", label: "Estados con presencia" },
           ].map(({ icon: Icon, value, label }) => (
             <div key={label} className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-[12px] p-4">
-              <Icon className="w-5 h-5 text-[#108910] mx-auto mb-2" />
-              <p className="text-2xl font-extrabold text-[#108910]">{value}</p>
+              <Icon className="w-5 h-5 text-[#0E7A0E] mx-auto mb-2" />
+              <p className="text-2xl font-extrabold text-[#0E7A0E]">{value}</p>
               <p className="text-xs text-[#5C6068]">{label}</p>
             </div>
           ))}
@@ -73,7 +73,7 @@ export default function CareersPage() {
         ].map((job) => (
           <div
             key={job.title}
-            className="border border-[#E5E7EB] rounded-[12px] p-6 hover:border-[#108910] transition-colors"
+            className="border border-[#E5E7EB] rounded-[12px] p-6 hover:border-[#0E7A0E] transition-colors"
           >
             <h3 className="text-lg font-semibold text-[#242529] mb-1">
               {job.title}
@@ -81,7 +81,7 @@ export default function CareersPage() {
             <p className="text-sm text-[#5C6068] mb-2">
               {job.area} · {job.type}
             </p>
-            <p className="text-sm text-[#8F939B]">{job.desc}</p>
+            <p className="text-sm text-[var(--text-secondary)]">{job.desc}</p>
           </div>
         ))}
       </section>
@@ -99,7 +99,7 @@ export default function CareersPage() {
               "Impacto directo en miles de PYMES",
             ].map((item) => (
               <li key={item} className="flex items-start gap-2">
-                <span className="text-[#108910]">✓</span> {item}
+                <span className="text-[#0E7A0E]">✓</span> {item}
               </li>
             ))}
           </ul>
@@ -111,12 +111,12 @@ export default function CareersPage() {
           </p>
           <Link
             href="/contact"
-            className="inline-flex items-center gap-2 text-[#108910] font-semibold hover:underline"
+            className="inline-flex items-center gap-2 text-[#0E7A0E] font-semibold hover:underline"
           >
             Mándanos tu CV y cuéntanos por qué →
           </Link>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

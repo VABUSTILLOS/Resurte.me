@@ -118,14 +118,14 @@ export function DashboardSidebar() {
           </button>
 
           {/* Avatar */}
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#108910] to-[#16a34a] flex items-center justify-center text-white font-bold text-xs shrink-0">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0E7A0E] to-[#16a34a] flex items-center justify-center text-white font-bold text-xs shrink-0">
             {initial}
           </div>
 
           {/* Nav icons */}
           <Link
             href={city ? `/${city.slug}` : "/"}
-            className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#F0FDF4] text-[#108910] hover:bg-[#dcfce7] transition-colors shrink-0"
+            className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#F0FDF4] text-[#0E7A0E] hover:bg-[#dcfce7] transition-colors shrink-0"
             title="Catálogo"
           >
             <ShoppingBag className="w-4 h-4" />
@@ -187,7 +187,7 @@ export function DashboardSidebar() {
           {/* User card */}
           <div className="px-4 pb-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#108910] to-[#16a34a] flex items-center justify-center text-white font-bold text-base shrink-0 shadow-sm">
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#0E7A0E] to-[#16a34a] flex items-center justify-center text-white font-bold text-base shrink-0 shadow-sm">
                 {initial}
               </div>
               <div className="min-w-0">
@@ -197,7 +197,7 @@ export function DashboardSidebar() {
             </div>
             <div className="flex gap-2.5 mt-3">
               <div className="flex-1 bg-[#F0FDF4] rounded-xl px-3 py-2.5 flex flex-col justify-between min-h-[68px]">
-                <div className="flex items-center gap-1.5 text-xs text-[#108910]">
+                <div className="flex items-center gap-1.5 text-xs text-[#0E7A0E]">
                   <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                   <span className="font-medium leading-tight">Pedidos</span>
                 </div>
@@ -217,7 +217,7 @@ export function DashboardSidebar() {
           <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
             <Link
               href={city ? `/${city.slug}` : "/"}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[#F0FDF4] text-[#108910] text-sm font-semibold transition-colors"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[#F0FDF4] text-[#0E7A0E] text-sm font-semibold transition-colors"
             >
               <ShoppingBag className="w-4 h-4 shrink-0" />
               Catálogo
@@ -270,7 +270,7 @@ export function DashboardSidebar() {
                 </h3>
                 <Link
                   href={city ? `/${city.slug}/mis-pedidos` : "#"}
-                  className="text-[11px] text-[#108910] font-semibold hover:underline"
+                  className="text-[11px] text-[#0E7A0E] font-semibold hover:underline"
                 >
                   Ver todo
                 </Link>
@@ -328,7 +328,7 @@ export function DashboardSidebar() {
           aria-label={mobileOpen ? "Cerrar mi cuenta" : "Abrir mi cuenta"}
           style={{ touchAction: "manipulation" }}
         >
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#108910] to-[#16a34a] flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0E7A0E] to-[#16a34a] flex items-center justify-center text-white font-bold text-sm shadow-sm shrink-0">
             {initial}
           </div>
           <div className="text-left min-w-0 leading-tight">
@@ -339,7 +339,7 @@ export function DashboardSidebar() {
               {mobileOpen ? "Cerrar" : "Mi cuenta"}
             </p>
           </div>
-          <span className="w-1.5 h-1.5 rounded-full bg-[#108910] shrink-0" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#0E7A0E] shrink-0" />
         </button>
       ) : (
         /* Collapsed — just the avatar, tap to expand */
@@ -349,7 +349,7 @@ export function DashboardSidebar() {
           aria-label="Mostrar panel"
           style={{ touchAction: "manipulation" }}
         >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#108910] to-[#16a34a] flex items-center justify-center text-white font-bold text-xs">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0E7A0E] to-[#16a34a] flex items-center justify-center text-white font-bold text-xs">
             {initial}
           </div>
         </button>
@@ -364,7 +364,7 @@ export function DashboardSidebar() {
           <div className="fixed inset-x-0 bottom-0 z-[70] bg-white rounded-t-2xl shadow-2xl max-h-[80vh] overflow-y-auto animate-slide-up pb-[env(safe-area-inset-bottom)]">
             <div className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-100 p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#108910] to-[#16a34a] flex items-center justify-center text-white font-bold text-sm">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0E7A0E] to-[#16a34a] flex items-center justify-center text-white font-bold text-sm">
                   {initial}
                 </div>
                 <div>
@@ -380,7 +380,7 @@ export function DashboardSidebar() {
             <div className="p-4 space-y-3">
               <div className="flex gap-3">
                 <div className="flex-1 bg-[#F0FDF4] rounded-xl p-3 flex flex-col justify-between min-h-[68px]">
-                  <div className="flex items-center gap-1.5 text-xs text-[#108910]">
+                  <div className="flex items-center gap-1.5 text-xs text-[#0E7A0E]">
                     <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                     <span className="font-medium leading-tight">Pedidos</span>
                   </div>
@@ -398,7 +398,7 @@ export function DashboardSidebar() {
               <Link
                 href={city ? `/${city.slug}` : "/"}
                 onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-3 p-3.5 rounded-xl bg-[#F0FDF4] text-[#108910] font-semibold"
+                className="flex items-center gap-3 p-3.5 rounded-xl bg-[#F0FDF4] text-[#0E7A0E] font-semibold"
               >
                 <ShoppingBag className="w-5 h-5" />
                 Catálogo de productos

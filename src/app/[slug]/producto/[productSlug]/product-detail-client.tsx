@@ -77,7 +77,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
         <nav className="flex items-center gap-1.5 text-xs sm:text-sm mb-4 sm:mb-8 overflow-x-auto whitespace-nowrap pb-1">
           <Link
             href={`/${citySlug}`}
-            className="text-[#6b6b6b] hover:text-[#108910] transition-colors flex items-center gap-1.5"
+            className="text-[#6b6b6b] hover:text-[#0E7A0E] transition-colors flex items-center gap-1.5"
           >
             <ArrowLeft className="w-4 h-4" />
             Volver
@@ -85,7 +85,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
           <span className="text-[#c0bab0]">/</span>
           <Link
             href={`/${citySlug}`}
-            className="text-[#6b6b6b] hover:text-[#108910] transition-colors"
+            className="text-[#6b6b6b] hover:text-[#0E7A0E] transition-colors"
           >
             Inicio
           </Link>
@@ -94,7 +94,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
               <span className="text-[#c0bab0]">/</span>
               <Link
                 href={`/${citySlug}/categoria/${category.slug}`}
-                className="text-[#6b6b6b] hover:text-[#108910] transition-colors"
+                className="text-[#6b6b6b] hover:text-[#0E7A0E] transition-colors"
               >
                 {category.name}
               </Link>
@@ -154,8 +154,8 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                     onClick={() => setSelectedImage(idx)}
                     className={`flex-shrink-0 w-16 h-16 rounded-lg border-2 overflow-hidden bg-[#f7f4ef] transition-all ${
                       idx === selectedImage
-                        ? "border-[#108910] ring-1 ring-[#108910]"
-                        : "border-[#ede8df] hover:border-[#108910]/40"
+                        ? "border-[#0E7A0E] ring-1 ring-[#0E7A0E]"
+                        : "border-[#ede8df] hover:border-[#0E7A0E]/40"
                     }`}
                   >
                     <img src={img} alt={`${product.name} ${idx + 1}`} loading="lazy" width={64} height={64} className="w-full h-full object-contain p-1" />
@@ -171,7 +171,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
             {category && (
               <Link
                 href={`/${citySlug}/categoria/${category.slug}`}
-                className="inline-flex items-center gap-1.5 self-start text-sm text-[#108910] font-medium bg-[#e8f5e9] px-3 py-1 rounded-full hover:bg-[#c8e6c8] transition-colors mb-4"
+                className="inline-flex items-center gap-1.5 self-start text-sm text-[#0E7A0E] font-medium bg-[#e8f5e9] px-3 py-1 rounded-full hover:bg-[#c8e6c8] transition-colors mb-4"
               >
                 <span>{getCategoryIcon(category.icon, category.slug)}</span>
                 {category.name}
@@ -186,7 +186,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
             {/* Unit and Brand */}
             <div className="flex flex-wrap items-center gap-3 mt-3">
               {product.unit && (
-                <span className="text-sm font-medium text-[#108910] bg-[#e8f5e9] px-2.5 py-0.5 rounded-full">
+                <span className="text-sm font-medium text-[#0E7A0E] bg-[#e8f5e9] px-2.5 py-0.5 rounded-full">
                   {product.unit}
                 </span>
               )}
@@ -214,7 +214,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                 </span>
                 {hasDiscount && (
                   <>
-                    <span className="text-lg text-[#999893] line-through">
+                    <span className="text-lg text-[var(--text-secondary)] line-through">
                       ${originalPrice.toFixed(2)}
                     </span>
                     <span className="text-sm font-semibold text-[#DE3534] bg-[#fdf2f2] px-2 py-0.5 rounded-full">
@@ -224,7 +224,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                 )}
               </div>
               {hasDiscount && (
-                <p className="text-sm text-[#108910] font-medium mt-1.5">
+                <p className="text-sm text-[#0E7A0E] font-medium mt-1.5">
                   Ahorras ${(originalPrice - displayPrice).toFixed(2)}
                 </p>
               )}
@@ -237,7 +237,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
 
             {/* Quality guarantee badge — prominent trust signal */}
             <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-[#e8f5e9] rounded-xl border border-[#c8e6c8]">
-              <Check className="w-4 h-4 text-[#108910] shrink-0" />
+              <Check className="w-4 h-4 text-[#0E7A0E] shrink-0" />
               <p className="text-xs font-medium text-[#1E6E1E]">
                 Calidad garantizada o te devolvemos tu dinero · Factura (CFDI) incluida
               </p>
@@ -276,7 +276,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                 className={`flex-1 h-12 flex items-center justify-center gap-2 text-sm font-semibold rounded-xl transition-all duration-200 ${
                   added
                     ? "bg-green-500 text-white"
-                    : "bg-[#108910] text-white hover:bg-[#0D720D] active:bg-[#0A610A] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                    : "bg-[#0E7A0E] text-white hover:bg-[#0D720D] active:bg-[#0A610A] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 }`}
               >
                 {added ? (
@@ -298,7 +298,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                 productName={product.name}
                 productPrice={displayPrice}
                 quantity={quantity}
-                className="flex-1 h-12 flex items-center justify-center gap-2 text-sm font-semibold rounded-xl border-2 border-[#25D366] text-[#25D366] hover:bg-[#25D366] hover:text-white transition-all duration-200"
+                className="flex-1 h-12 flex items-center justify-center gap-2 text-sm font-semibold rounded-xl border-2 border-[#25D366] text-[#0F7A3D] hover:bg-[#0F7A3D] hover:text-white transition-all duration-200"
               />
             </div>
 
@@ -321,7 +321,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                   aria-expanded="true"
                 >
                   Descripción
-                  <span className="accordion-icon text-lg leading-none text-[#999893]">+</span>
+                  <span className="accordion-icon text-lg leading-none text-[var(--text-secondary)]">+</span>
                 </button>
                 <div className="accordion-body open">
                   <p className="text-sm text-[#6b6b6b] leading-relaxed whitespace-pre-line">
@@ -347,7 +347,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                   aria-expanded="false"
                 >
                   Calidad y Origen
-                  <span className="accordion-icon text-lg leading-none text-[#999893]">+</span>
+                  <span className="accordion-icon text-lg leading-none text-[var(--text-secondary)]">+</span>
                 </button>
                 <div className="accordion-body">
                   <p className="text-sm text-[#6b6b6b] leading-relaxed">
@@ -373,7 +373,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                   aria-expanded="false"
                 >
                   Envíos y Devoluciones
-                  <span className="accordion-icon text-lg leading-none text-[#999893]">+</span>
+                  <span className="accordion-icon text-lg leading-none text-[var(--text-secondary)]">+</span>
                 </button>
                 <div className="accordion-body">
                   <p className="text-sm text-[#6b6b6b] leading-relaxed">
@@ -386,8 +386,8 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
             {/* Delivery info — Erewhon-style glass box */}
             <div className="mt-6 p-4 rounded-xl border border-[#e0dbd2] bg-[#faf8f5]/80 backdrop-blur-sm">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#108910]/10 flex items-center justify-center shrink-0">
-                  <Package className="w-5 h-5 text-[#108910]" />
+                <div className="w-10 h-10 rounded-full bg-[#0E7A0E]/10 flex items-center justify-center shrink-0">
+                  <Package className="w-5 h-5 text-[#0E7A0E]" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-[#1a1a1a]">

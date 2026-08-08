@@ -12,9 +12,9 @@ interface AllTimeTipProps {
 export default function AllTimeTip({ hasEntries, allTimeStats, foodCostRedAbove }: AllTimeTipProps) {
   if (!hasEntries) return null
   return (
-    <div className="mt-6 bg-gradient-to-r from-[#F0FDF4] to-white rounded-2xl border border-[#108910]/10 p-5">
+    <div className="mt-6 bg-gradient-to-r from-[#F0FDF4] to-white rounded-2xl border border-[#0E7A0E]/10 p-5">
       <div className="flex items-start gap-3">
-        <Receipt className="w-5 h-5 text-[#108910] mt-0.5 shrink-0" />
+        <Receipt className="w-5 h-5 text-[#0E7A0E] mt-0.5 shrink-0" />
         <div>
           <h4 className="font-semibold text-gray-900 mb-1 text-sm">Tu historial en total</h4>
           <p className="text-xs text-gray-500 leading-relaxed">

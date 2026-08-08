@@ -20,7 +20,7 @@ export default function MenuDigitalView({
         <div className="flex items-center gap-2">
           <button
             onClick={onCopyCarta}
-            className="flex items-center gap-1.5 text-xs font-semibold text-[#108910] bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold text-[#0E7A0E] bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg transition-colors"
           >
             <Copy className="w-3.5 h-3.5" />
             Copiar carta
@@ -36,7 +36,7 @@ export default function MenuDigitalView({
         </div>
       </div>
       <div className="max-w-md mx-auto bg-white rounded-3xl border border-gray-100 shadow-lg overflow-hidden">
-        <div className="bg-gradient-to-br from-[#108910] to-green-800 px-6 py-5 text-center">
+        <div className="bg-gradient-to-br from-[#0E7A0E] to-green-800 px-6 py-5 text-center">
           <p className="text-[10px] tracking-widest uppercase text-green-100">Bienvenido a</p>
           <h3 className="text-lg font-extrabold text-white">{restaurantName || "Mi menú"}</h3>
           <p className="text-[10px] text-green-200 mt-0.5">Hecho con Resurte.me</p>
@@ -64,7 +64,7 @@ export default function MenuDigitalView({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline justify-between gap-2">
                             <p className="font-semibold text-gray-800 text-sm truncate">{dish.name}</p>
-                            <p className="font-bold text-[#108910] text-sm shrink-0">${suggested.toFixed(0)}</p>
+                            <p className="font-bold text-[#0E7A0E] text-sm shrink-0">${suggested.toFixed(0)}</p>
                           </div>
                           <p className="text-[10px] text-gray-400 truncate">
                             {dish.ingredients.slice(0, 3).map((i) => i.ingredientName).join(" · ")}

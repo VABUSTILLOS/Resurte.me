@@ -46,7 +46,7 @@ export default function SalesGoals({
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <div className="flex items-center gap-2 mb-4">
-        <Target className="w-4 h-4 text-[#108910]" />
+        <Target className="w-4 h-4 text-[#0E7A0E]" />
         <h3 className="text-sm font-semibold text-gray-900">Metas de venta</h3>
         <button
           onClick={onToggle}
@@ -70,7 +70,7 @@ export default function SalesGoals({
                 onChange={(e) => onGoalFormDiaChange(e.target.value)}
                 min="0"
                 placeholder="Ej. 12000"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
                 aria-label="Meta de venta diaria"
               />
             </div>
@@ -82,13 +82,13 @@ export default function SalesGoals({
                 onChange={(e) => onGoalFormMesChange(e.target.value)}
                 min="0"
                 placeholder="Ej. 360000"
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
                 aria-label="Meta de venta mensual"
               />
             </div>
             <button
               onClick={onSave}
-              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+              className="flex items-center justify-center gap-1.5 px-4 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
             >
               <Check className="w-3.5 h-3.5" />
               Guardar
@@ -106,14 +106,14 @@ export default function SalesGoals({
                     onChange={(e) => onComisionChange(c.key, e.target.value)}
                     min="0"
                     step="0.5"
-                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#108910]"
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#0E7A0E]"
                     aria-label={`Comisión por canal ${c.label}`}
                   />
                 </label>
               ))}
             </div>
             <p className="text-[10px] text-gray-400 mt-1.5">
-              <HandCoins className="w-3 h-3 inline-block mr-1 text-[#108910]" />
+              <HandCoins className="w-3 h-3 inline-block mr-1 text-[#0E7A0E]" />
               Se calcula sobre los ingresos del día/período según el canal de cada venta.
             </p>
           </div>
@@ -130,7 +130,7 @@ export default function SalesGoals({
             <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${
-                  dailyGoalPct >= 100 ? "bg-green-500" : dailyGoalPct >= 50 ? "bg-amber-500" : "bg-[#108910]"
+                  dailyGoalPct >= 100 ? "bg-green-500" : dailyGoalPct >= 50 ? "bg-amber-500" : "bg-[#0E7A0E]"
                 }`}
                 style={{ width: `${Math.min(dailyGoalPct, 100)}%` }}
               />
@@ -153,7 +153,7 @@ export default function SalesGoals({
             <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${
-                  monthlyGoalPct >= 100 ? "bg-green-500" : monthlyGoalPct >= 50 ? "bg-amber-500" : "bg-[#108910]"
+                  monthlyGoalPct >= 100 ? "bg-green-500" : monthlyGoalPct >= 50 ? "bg-amber-500" : "bg-[#0E7A0E]"
                 }`}
                 style={{ width: `${Math.min(monthlyGoalPct, 100)}%` }}
               />

@@ -18,10 +18,10 @@ interface CollectionValueHighlightProps {
 export function CollectionValueHighlight({ value, index }: CollectionValueHighlightProps) {
   const isEven = index % 2 === 0
   const bg = isEven ? "bg-white" : "bg-[#fbf9f6]"
-  const accent = index === 0 ? "bg-[#108910]/8" : index === 1 ? "bg-[#c8a45a]/8" : "bg-[#2b2b2b]/8"
-  const accentBorder = index === 0 ? "border-[#108910]/12" : index === 1 ? "border-[#c8a45a]/12" : "border-[#2b2b2b]/10"
-  const dotColor = index === 0 ? "bg-[#108910]" : index === 1 ? "bg-[#c8a45a]" : "bg-[#2b2b2b]"
-  const lineColor = index === 0 ? "bg-[#108910]/25" : index === 1 ? "bg-[#c8a45a]/25" : "bg-[#2b2b2b]/15"
+  const accent = index === 0 ? "bg-[#0E7A0E]/8" : index === 1 ? "bg-[#c8a45a]/8" : "bg-[#2b2b2b]/8"
+  const accentBorder = index === 0 ? "border-[#0E7A0E]/12" : index === 1 ? "border-[#c8a45a]/12" : "border-[#2b2b2b]/10"
+  const dotColor = index === 0 ? "bg-[#0E7A0E]" : index === 1 ? "bg-[#c8a45a]" : "bg-[#2b2b2b]"
+  const lineColor = index === 0 ? "bg-[#0E7A0E]/25" : index === 1 ? "bg-[#c8a45a]/25" : "bg-[#2b2b2b]/15"
 
   return (
     <section className={`relative overflow-hidden ${bg} border-y border-[#ece6db]`}>

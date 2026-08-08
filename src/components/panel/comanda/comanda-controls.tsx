@@ -32,7 +32,7 @@ export default function ComandaControls({
         <button
           onClick={() => onViewModeChange("board")}
           className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors ${
-            viewMode === "board" ? "bg-[#108910] text-white" : "text-gray-500 hover:bg-gray-50"
+            viewMode === "board" ? "bg-[#0E7A0E] text-white" : "text-gray-500 hover:bg-gray-50"
           }`}
           title="Vista tablero (ventanas)"
           aria-label="Vista tablero de comandas"
@@ -43,7 +43,7 @@ export default function ComandaControls({
         <button
           onClick={() => onViewModeChange("list")}
           className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors ${
-            viewMode === "list" ? "bg-[#108910] text-white" : "text-gray-500 hover:bg-gray-50"
+            viewMode === "list" ? "bg-[#0E7A0E] text-white" : "text-gray-500 hover:bg-gray-50"
           }`}
           title="Vista listado"
           aria-label="Vista listado de comandas"
@@ -55,7 +55,7 @@ export default function ComandaControls({
       <button
         onClick={onSortNewestToggle}
         className={`text-xs font-semibold px-3 py-2 rounded-xl transition-colors ${
-          sortNewest ? "bg-[#108910] text-white" : "bg-white text-gray-600 border border-gray-100 hover:bg-gray-50"
+          sortNewest ? "bg-[#0E7A0E] text-white" : "bg-white text-gray-600 border border-gray-100 hover:bg-gray-50"
         }`}
         title={sortNewest ? "Orden: más recientes primero" : "Orden: primeros en llegar primero"}
       >

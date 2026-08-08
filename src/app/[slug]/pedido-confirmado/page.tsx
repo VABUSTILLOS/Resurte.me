@@ -181,7 +181,7 @@ export default function OrderConfirmedPage() {
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => AnalyticsEvents.shareReferral()}
-          className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-[#25D366] text-white font-semibold rounded-xl hover:bg-[#20BD5A] transition-colors"
+          className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-[#0F7A3D] text-white font-semibold rounded-xl hover:bg-[#0F6B3A] transition-colors"
         >
           <Share2 className="w-4 h-4" />
           Compartir con otro restaurante

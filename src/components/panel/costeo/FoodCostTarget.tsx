@@ -25,7 +25,7 @@ export default function FoodCostTarget({
           >
             −
           </button>
-          <span className="text-2xl font-bold text-[#108910]">{targetFoodCost}%</span>
+          <span className="text-2xl font-bold text-[#0E7A0E]">{targetFoodCost}%</span>
           <button
             onClick={onIncrease}
             className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 transition-colors"

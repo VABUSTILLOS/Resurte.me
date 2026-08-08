@@ -273,7 +273,7 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className="text-[10px] text-gray-300 bg-gray-50 px-1.5 py-0.5 rounded">{r.toolLabel}</span>
-                  {idx === selectedIdx && <ArrowRight className="w-4 h-4 text-[#108910]" />}
+                  {idx === selectedIdx && <ArrowRight className="w-4 h-4 text-[#0E7A0E]" />}
                 </div>
               </button>
             ))

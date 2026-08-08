@@ -96,7 +96,7 @@ export function UserShopView({ categories, products, citySlug }: Props) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           {/* Search bar */}
           <div className="py-3">
-            <div className="flex items-stretch bg-[#F7F5F0] rounded-xl overflow-hidden border border-[#E8E9EB] focus-within:border-[#108910]/40 focus-within:ring-2 focus-within:ring-[#108910]/10 transition-all">
+            <div className="flex items-stretch bg-[#F7F5F0] rounded-xl overflow-hidden border border-[#E8E9EB] focus-within:border-[#0E7A0E]/40 focus-within:ring-2 focus-within:ring-[#0E7A0E]/10 transition-all">
               <div className="flex items-center gap-2 flex-1 pl-4">
                 <Search className="w-5 h-5 text-[#B0B3B8] shrink-0" />
                 <input
@@ -110,7 +110,7 @@ export function UserShopView({ categories, products, citySlug }: Props) {
               {search && (
                 <button
                   onClick={() => setSearch("")}
-                  className="px-3 text-xs text-[#72767E] hover:text-[#343538] transition-colors"
+                  className="px-3 text-xs text-[var(--text-secondary)] hover:text-[#343538] transition-colors"
                 >
                   Limpiar
                 </button>
@@ -126,8 +126,8 @@ export function UserShopView({ categories, products, citySlug }: Props) {
                 onClick={() => handleCategoryClick(null)}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 snap-start ${
                   activeCategoryId === null
-                    ? "bg-[#108910] text-white shadow-md shadow-[#108910]/20"
-                    : "bg-white text-[#5C6068] border border-[#E8E9EB] hover:border-[#108910]/30 hover:text-[#108910]"
+                    ? "bg-[#0E7A0E] text-white shadow-md shadow-[#0E7A0E]/20"
+                    : "bg-white text-[#5C6068] border border-[#E8E9EB] hover:border-[#0E7A0E]/30 hover:text-[#0E7A0E]"
                 }`}
               >
                 <ShoppingBag className="w-4 h-4" />
@@ -144,8 +144,8 @@ export function UserShopView({ categories, products, citySlug }: Props) {
                     onClick={() => handleCategoryClick(cat.id)}
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 snap-start ${
                       isActive
-                        ? "bg-[#108910] text-white shadow-md shadow-[#108910]/20"
-                        : "bg-white text-[#5C6068] border border-[#E8E9EB] hover:border-[#108910]/30 hover:text-[#108910]"
+                        ? "bg-[#0E7A0E] text-white shadow-md shadow-[#0E7A0E]/20"
+                        : "bg-white text-[#5C6068] border border-[#E8E9EB] hover:border-[#0E7A0E]/30 hover:text-[#0E7A0E]"
                     }`}
                   >
                     <span className="text-base leading-none">
@@ -168,7 +168,7 @@ export function UserShopView({ categories, products, citySlug }: Props) {
             <h2 className="text-lg font-bold text-[#242529]">
               {activeCategoryName ?? "Todos los productos"}
             </h2>
-            <p className="text-sm text-[#72767E]">
+            <p className="text-sm text-[var(--text-secondary)]">
               {filteredProducts.length} producto{filteredProducts.length !== 1 ? "s" : ""}
               {search && ` para "${search}"`}
             </p>
@@ -191,8 +191,8 @@ export function UserShopView({ categories, products, citySlug }: Props) {
         ) : (
           <div className="text-center py-20">
             <ShoppingBag className="w-12 h-12 text-[#D1D5DB] mx-auto mb-4" />
-            <p className="text-[#72767E] text-lg font-medium">Sin resultados</p>
-            <p className="text-[#999893] text-sm mt-1">
+            <p className="text-[var(--text-secondary)] text-lg font-medium">Sin resultados</p>
+            <p className="text-[var(--text-secondary)] text-sm mt-1">
               Intenta con otro término de búsqueda o categoría
             </p>
           </div>

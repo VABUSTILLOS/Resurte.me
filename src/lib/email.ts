@@ -90,7 +90,7 @@ export function abandonedCartEmailHtml(cartSummary: {
 <html lang="es">
 <head><meta charset="utf-8"></head>
 <body style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
-  <h1 style="color:#108910;font-size:24px">👋 ¡Tu carrito te espera!</h1>
+  <h1 style="color:#0E7A0E;font-size:24px">👋 ¡Tu carrito te espera!</h1>
   <p style="color:#242529;font-size:16px;line-height:1.6">
     Notamos que dejaste <strong>${cartSummary.itemCount} producto(s)</strong> en tu carrito
     sin completar tu pedido:
@@ -102,13 +102,13 @@ export function abandonedCartEmailHtml(cartSummary: {
     ¿Todavía los necesitas? No te preocupes, tu carrito sigue guardado.
   </p>
   <a href="${cartSummary.cartUrl}"
-     style="display:inline-block;background:#108910;color:#fff;padding:14px 32px;
+     style="display:inline-block;background:#0E7A0E;color:#fff;padding:14px 32px;
             border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
     Retomar mi pedido →
   </a>
   <p style="color:#72767E;font-size:13px;margin-top:32px;border-top:1px solid #E8E9EB;padding-top:16px">
     Resurte.me — Central de abastos digital<br>
-    ¿No quieres estos correos? <a href="https://resurte.me/panel" style="color:#108910">Configura tus preferencias</a>
+    ¿No quieres estos correos? <a href="https://resurte.me/panel" style="color:#0E7A0E">Configura tus preferencias</a>
   </p>
 </body>
 </html>`
@@ -132,23 +132,23 @@ export function reactivationEmailHtml(params: {
 <html lang="es">
 <head><meta charset="utf-8"></head>
 <body style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
-  <h1 style="color:#108910;font-size:24px">Hola ${params.name} 👋</h1>
+  <h1 style="color:#0E7A0E;font-size:24px">Hola ${params.name} 👋</h1>
   <p style="color:#242529;font-size:16px;line-height:1.6">${msg}</p>
   ${
     params.cashbackBalance > 0
-      ? `<p style="background:#F0F9F0;padding:16px;border-radius:8px;color:#108910;font-size:15px;font-weight:600">
+      ? `<p style="background:#F0F9F0;padding:16px;border-radius:8px;color:#0E7A0E;font-size:15px;font-weight:600">
            💰 Tienes <strong>$${params.cashbackBalance} MXN</strong> en cashback (nivel ${params.tier})
          </p>`
       : ""
   }
   <a href="${params.panelUrl}"
-     style="display:inline-block;background:#108910;color:#fff;padding:14px 32px;
+     style="display:inline-block;background:#0E7A0E;color:#fff;padding:14px 32px;
             border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
     Ir a Resurte.me →
   </a>
   <p style="color:#72767E;font-size:13px;margin-top:32px;border-top:1px solid #E8E9EB;padding-top:16px">
     Resurte.me — Central de abastos digital<br>
-    ¿No quieres estos correos? <a href="https://resurte.me/panel" style="color:#108910">Desuscribir</a>
+    ¿No quieres estos correos? <a href="https://resurte.me/panel" style="color:#0E7A0E">Desuscribir</a>
   </p>
 </body>
 </html>`

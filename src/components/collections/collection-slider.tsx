@@ -93,7 +93,7 @@ export function CollectionSlider({ collections, citySlug }: CollectionSliderProp
         <ScrollReveal className="mb-10">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
             <div>
-              <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#108910] mb-3">
+              <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-3">
                 Abastece por giro
               </p>
               <h2 className="text-2xl sm:text-3xl font-bold text-[#242529] tracking-tight">
@@ -110,7 +110,7 @@ export function CollectionSlider({ collections, citySlug }: CollectionSliderProp
                 onClick={() => scroll("left")}
                 disabled={!canScrollLeft}
                 aria-label="Desplazar colecciones a la izquierda"
-                className="w-10 h-10 rounded-full border border-[#d4cfc4] flex items-center justify-center text-[#6b6b6b] hover:bg-white hover:border-[#108910]/40 hover:text-[#108910] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="w-10 h-10 rounded-full border border-[#d4cfc4] flex items-center justify-center text-[#6b6b6b] hover:bg-white hover:border-[#0E7A0E]/40 hover:text-[#0E7A0E] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -118,7 +118,7 @@ export function CollectionSlider({ collections, citySlug }: CollectionSliderProp
                 onClick={() => scroll("right")}
                 disabled={!canScrollRight}
                 aria-label="Desplazar colecciones a la derecha"
-                className="w-10 h-10 rounded-full border border-[#d4cfc4] flex items-center justify-center text-[#6b6b6b] hover:bg-white hover:border-[#108910]/40 hover:text-[#108910] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                className="w-10 h-10 rounded-full border border-[#d4cfc4] flex items-center justify-center text-[#6b6b6b] hover:bg-white hover:border-[#0E7A0E]/40 hover:text-[#0E7A0E] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -153,7 +153,7 @@ export function CollectionSlider({ collections, citySlug }: CollectionSliderProp
                   className="group flex-shrink-0 w-[280px] sm:w-[320px] snap-start"
                 >
                   <ScrollReveal direction="scale" delay={idx * 0.08}>
-                    <div className="relative overflow-hidden rounded-2xl bg-white border border-[#e8e4dc] hover:border-[#108910]/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-all duration-300 hover:-translate-y-1">
+                    <div className="relative overflow-hidden rounded-2xl bg-white border border-[#e8e4dc] hover:border-[#0E7A0E]/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-all duration-300 hover:-translate-y-1">
                       {/* Image container — 4:3 aspect ratio */}
                       <div className="relative w-full aspect-[4/3] overflow-hidden bg-[#e8e4dc]">
                         {cover ? (
@@ -195,18 +195,18 @@ export function CollectionSlider({ collections, citySlug }: CollectionSliderProp
 
                         {/* Institutional badges */}
                         <div className="flex flex-wrap gap-2">
-                          <span className="inline-flex items-center gap-1 text-xs text-[#72767E] bg-[#f7f5f0] rounded-lg px-2.5 py-1.5">
-                            <Box className="w-3.5 h-3.5 text-[#108910]" />
+                          <span className="inline-flex items-center gap-1 text-xs text-[var(--text-secondary)] bg-[#f7f5f0] rounded-lg px-2.5 py-1.5">
+                            <Box className="w-3.5 h-3.5 text-[#0E7A0E]" />
                             Mayoreo
                           </span>
-                          <span className="inline-flex items-center gap-1 text-xs text-[#72767E] bg-[#f7f5f0] rounded-lg px-2.5 py-1.5">
-                            <TrendingUp className="w-3.5 h-3.5 text-[#108910]" />
+                          <span className="inline-flex items-center gap-1 text-xs text-[var(--text-secondary)] bg-[#f7f5f0] rounded-lg px-2.5 py-1.5">
+                            <TrendingUp className="w-3.5 h-3.5 text-[#0E7A0E]" />
                             Precio institucional
                           </span>
                         </div>
 
                         {/* CTA — subtle, B2B */}
-                        <div className="mt-4 flex items-center gap-1.5 text-sm font-semibold text-[#108910] group-hover:text-[#0D720D] group-hover:gap-2.5 transition-all">
+                        <div className="mt-4 flex items-center gap-1.5 text-sm font-semibold text-[#0E7A0E] group-hover:text-[#0D720D] group-hover:gap-2.5 transition-all">
                           Ver colección
                           <ChevronRight className="w-4 h-4" />
                         </div>

@@ -166,7 +166,7 @@ export default function CombosPage() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center py-24"><Loader2 className="w-6 h-6 animate-spin text-[#108910]" /></div>
+    return <div className="flex items-center justify-center py-24"><Loader2 className="w-6 h-6 animate-spin text-[#0E7A0E]" /></div>
   }
 
   if (!restaurant) {
@@ -174,7 +174,7 @@ export default function CombosPage() {
       <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
         <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-3" />
         <h2 className="font-semibold text-gray-900">Primero crea tu restaurante</h2>
-        <p className="text-sm text-gray-500 mt-1">Ve a <Link href="/panel/foodos/restaurante" className="text-[#108910] font-semibold hover:underline">Mi restaurante</Link>.</p>
+        <p className="text-sm text-gray-500 mt-1">Ve a <Link href="/panel/foodos/restaurante" className="text-[#0E7A0E] font-semibold hover:underline">Mi restaurante</Link>.</p>
       </div>
     )
   }
@@ -201,7 +201,7 @@ export default function CombosPage() {
           </div>
           <button
             onClick={() => { setComboForm(EMPTY_COMBO); setShowComboForm(true) }}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#108910] text-white text-sm font-semibold hover:bg-[#0e7a0e]"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e]"
           >
             <Plus className="w-4 h-4" /> Nuevo combo
           </button>
@@ -251,12 +251,12 @@ export default function CombosPage() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Wand2 className="w-5 h-5 text-[#108910]" />
+            <Wand2 className="w-5 h-5 text-[#0E7A0E]" />
             <h2 className="font-semibold text-gray-900">Reglas de cross-sell</h2>
           </div>
           <button
             onClick={() => { setRuleForm(EMPTY_RULE); setShowRuleForm(true) }}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#108910]/30 text-[#108910] text-sm font-semibold hover:bg-[#F0FDF4]"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#0E7A0E]/30 text-[#0E7A0E] text-sm font-semibold hover:bg-[#F0FDF4]"
           >
             <Plus className="w-4 h-4" /> Nueva regla
           </button>
@@ -274,7 +274,7 @@ export default function CombosPage() {
                     {r.trigger_type === "min_ticket" && `Si el ticket es menor a ${formatMoney(r.trigger_value?.min_ticket ?? 0)}`}
                     {" → "}sugiere: {r.suggested_items.map((s) => itemLabel(s)).join(", ")}
                   </p>
-                  {r.offer_text && <p className="text-xs text-[#108910] font-medium mt-1">💬 {r.offer_text}</p>}
+                  {r.offer_text && <p className="text-xs text-[#0E7A0E] font-medium mt-1">💬 {r.offer_text}</p>}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {r.boost_amount > 0 && (
@@ -304,15 +304,15 @@ export default function CombosPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-3">
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Nombre *</label>
-                  <input value={comboForm.name} onChange={(e) => setComboForm({ ...comboForm, name: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]" />
+                  <input value={comboForm.name} onChange={(e) => setComboForm({ ...comboForm, name: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Precio combo *</label>
-                  <input type="number" min="0" step="0.01" value={comboForm.price} onChange={(e) => setComboForm({ ...comboForm, price: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]" />
+                  <input type="number" min="0" step="0.01" value={comboForm.price} onChange={(e) => setComboForm({ ...comboForm, price: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">% descuento</label>
-                  <input type="number" min="0" max="100" value={comboForm.discount_pct} onChange={(e) => setComboForm({ ...comboForm, discount_pct: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]" />
+                  <input type="number" min="0" max="100" value={comboForm.discount_pct} onChange={(e) => setComboForm({ ...comboForm, discount_pct: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]" />
                 </div>
                 <div className="flex items-end">
                   <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer pb-2.5">
@@ -325,7 +325,7 @@ export default function CombosPage() {
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5">Platillos que incluye *</label>
                 <div className="max-h-52 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-50">
                   {menuItems.map((m) => (
-                    <button type="button" key={m.id} onClick={() => toggleComboItem(m.id)} className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 ${comboForm.item_ids.includes(m.id) ? "bg-[#F0FDF4] text-[#108910]" : "text-gray-700"}`}>
+                    <button type="button" key={m.id} onClick={() => toggleComboItem(m.id)} className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 ${comboForm.item_ids.includes(m.id) ? "bg-[#F0FDF4] text-[#0E7A0E]" : "text-gray-700"}`}>
                       <span>{m.name}</span>
                       <span className="flex items-center gap-2">
                         <span className="text-xs text-gray-400">{formatMoney(m.price)}</span>
@@ -338,7 +338,7 @@ export default function CombosPage() {
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setShowComboForm(false)} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50">Cancelar</button>
-                <button type="submit" disabled={!comboForm.name.trim() || comboForm.item_ids.length === 0} className="px-5 py-2 rounded-xl bg-[#108910] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50">Guardar</button>
+                <button type="submit" disabled={!comboForm.name.trim() || comboForm.item_ids.length === 0} className="px-5 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50">Guardar</button>
               </div>
             </form>
           </div>
@@ -349,11 +349,11 @@ export default function CombosPage() {
       {showRuleForm && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setShowRuleForm(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><Wand2 className="w-5 h-5 text-[#108910]" /> Nueva regla de cross-sell</h3>
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><Wand2 className="w-5 h-5 text-[#0E7A0E]" /> Nueva regla de cross-sell</h3>
             <form onSubmit={handleSaveRule} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Nombre *</label>
-                <input value={ruleForm.name} onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })} placeholder="Ej. Papas + refresco" className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]" />
+                <input value={ruleForm.name} onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })} placeholder="Ej. Papas + refresco" className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Se activa cuando…</label>
@@ -395,7 +395,7 @@ export default function CombosPage() {
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5">Sugerir estos platillos *</label>
                 <div className="max-h-44 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-50">
                   {menuItems.map((m) => (
-                    <button type="button" key={m.id} onClick={() => toggleRuleSuggested(m.id)} className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 ${ruleForm.suggested_items.includes(m.id) ? "bg-[#F0FDF4] text-[#108910]" : "text-gray-700"}`}>
+                    <button type="button" key={m.id} onClick={() => toggleRuleSuggested(m.id)} className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 ${ruleForm.suggested_items.includes(m.id) ? "bg-[#F0FDF4] text-[#0E7A0E]" : "text-gray-700"}`}>
                       <span>{m.name}</span>
                       {ruleForm.suggested_items.includes(m.id) ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4 text-gray-300" />}
                     </button>
@@ -405,7 +405,7 @@ export default function CombosPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Mensaje de oferta</label>
-                  <input value={ruleForm.offer_text} onChange={(e) => setRuleForm({ ...ruleForm, offer_text: e.target.value })} placeholder="Añade un refresco por solo $25" className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#108910]/30 focus:border-[#108910]" />
+                  <input value={ruleForm.offer_text} onChange={(e) => setRuleForm({ ...ruleForm, offer_text: e.target.value })} placeholder="Añade un refresco por solo $25" className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Ganancia extra estimada $</label>
@@ -414,7 +414,7 @@ export default function CombosPage() {
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setShowRuleForm(false)} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50">Cancelar</button>
-                <button type="submit" disabled={!ruleForm.name.trim() || ruleForm.suggested_items.length === 0} className="px-5 py-2 rounded-xl bg-[#108910] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50">Guardar</button>
+                <button type="submit" disabled={!ruleForm.name.trim() || ruleForm.suggested_items.length === 0} className="px-5 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50">Guardar</button>
               </div>
             </form>
           </div>

@@ -18,7 +18,7 @@ export default function ComandaEmpty({ dayEntriesLength, filteredLength }: Coman
         <Link
           id="comanda-nueva-venta"
           href="/panel/ventas"
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           Registrar venta

@@ -125,7 +125,7 @@ export default function SaleForm({
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
       <div className="flex items-center gap-2 mb-4">
-        <Plus className="w-4 h-4 text-[#108910]" />
+        <Plus className="w-4 h-4 text-[#0E7A0E]" />
         <h3 className="font-semibold text-gray-900 text-sm">Registrar venta</h3>
       </div>
       <div className="flex flex-wrap items-end gap-3">
@@ -135,7 +135,7 @@ export default function SaleForm({
             id="venta-dish"
             value={formDishId}
             onChange={(e) => setFormDishId(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#108910]"
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#0E7A0E]"
           >
             <option value="">Seleccionar platillo…</option>
             {sharedDishes.map((d) => (
@@ -152,7 +152,7 @@ export default function SaleForm({
             value={formQty}
             onChange={(e) => setFormQty(e.target.value)}
             min="1"
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#0E7A0E]"
           />
         </div>
         <div className="w-40">
@@ -161,7 +161,7 @@ export default function SaleForm({
             type="date"
             value={formDate}
             onChange={(e) => setFormDate(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#108910]"
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
           />
         </div>
         <div className="w-36">
@@ -169,7 +169,7 @@ export default function SaleForm({
           <select
             value={formChannel}
             onChange={(e) => setFormChannel(e.target.value as SaleChannel)}
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#108910]"
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#0E7A0E]"
             aria-label="Canal de venta"
           >
             {SALE_CHANNELS.map((c) => (
@@ -182,7 +182,7 @@ export default function SaleForm({
           <select
             value={formPayment}
             onChange={(e) => setFormPayment(e.target.value as PaymentMethod)}
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#108910]"
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#0E7A0E]"
             aria-label="Método de pago"
           >
             {PAYMENT_METHODS.map((m) => (
@@ -196,7 +196,7 @@ export default function SaleForm({
             <select
               value={formMesaId}
               onChange={(e) => setFormMesaId(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#108910]"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#0E7A0E]"
               aria-label="Mesa del salón"
             >
               <option value="">Sin mesa</option>
@@ -211,7 +211,7 @@ export default function SaleForm({
           <select
             value={formDiscountType}
             onChange={(e) => setFormDiscountType(e.target.value as "monto" | "porcentaje")}
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#108910]"
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#0E7A0E]"
             aria-label="Tipo de descuento"
           >
             <option value="monto">$ Monto</option>
@@ -226,14 +226,14 @@ export default function SaleForm({
             onChange={(e) => setFormDiscountValue(e.target.value)}
             min="0"
             placeholder="0"
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#0E7A0E]"
             aria-label="Valor del descuento"
           />
         </div>
         <button
           onClick={submit}
           disabled={!formDishId}
-          className="flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-sm font-semibold rounded-xl hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#0E7A0E] text-white text-sm font-semibold rounded-xl hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus className="w-4 h-4" />
           Registrar
@@ -247,7 +247,7 @@ export default function SaleForm({
             value={formGiftCode}
             onChange={(e) => setFormGiftCode(e.target.value.toUpperCase())}
             placeholder="RT-XXXX-XXXX"
-            className="w-full max-w-xs px-3 py-2 rounded-xl border border-gray-200 text-sm uppercase focus:outline-none focus:border-[#108910]"
+            className="w-full max-w-xs px-3 py-2 rounded-xl border border-gray-200 text-sm uppercase focus:outline-none focus:border-[#0E7A0E]"
             aria-label="Código de tarjeta de regalo"
           />
           <p className="text-[10px] text-gray-400 mt-1">El saldo de la tarjeta debe cubrir el total de la venta.</p>
@@ -290,8 +290,8 @@ export default function SaleForm({
                       }
                       className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors ${
                         active
-                          ? "bg-[#108910] text-white border-[#108910]"
-                          : "bg-gray-50 text-gray-600 border-gray-200 hover:border-[#108910]"
+                          ? "bg-[#0E7A0E] text-white border-[#0E7A0E]"
+                          : "bg-gray-50 text-gray-600 border-gray-200 hover:border-[#0E7A0E]"
                       }`}
                       aria-pressed={active}
                     >
@@ -310,7 +310,7 @@ export default function SaleForm({
           <select
             value={formClienteId}
             onChange={(e) => { setFormClienteId(e.target.value); setFormRedeemPts("") }}
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#108910]"
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#0E7A0E]"
             aria-label="Cliente frecuente"
           >
             <option value="">Sin cliente</option>
@@ -328,7 +328,7 @@ export default function SaleForm({
               onChange={(e) => setFormRedeemPts(e.target.value)}
               min="0"
               placeholder={`Máx ${(() => clientes.find((c) => c.id === formClienteId)?.puntos || 0)()} pts`}
-              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-center focus:outline-none focus:border-[#0E7A0E]"
               aria-label="Puntos a redimir"
             />
           </div>
@@ -342,7 +342,7 @@ export default function SaleForm({
           type="checkbox"
           checked={deductStock}
           onChange={(e) => onToggleDeductStock(e.target.checked)}
-          className="mt-0.5 accent-[#108910]"
+          className="mt-0.5 accent-[#0E7A0E]"
         />
         <span>
           <span className="font-semibold text-gray-700">Descontar insumos del inventario al vender</span>
