@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { useRouter } from "next/navigation"
@@ -20,7 +19,7 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
-import type { User as SupabaseUser } from "@supabase/supabase-js"
+import type { User as SupabaseUser, SupabaseClient } from "@supabase/supabase-js"
 import { STATUS_LABEL, STATUS_COLOR } from "@/lib/mock-orders"
 
 interface OrderSummary {
@@ -35,10 +34,21 @@ export function DashboardSidebar() {
   const { city } = useCity()
   const { itemCount } = useCart()
   const router = useRouter()
-  // Lazy browser-only client: creating it during SSR would throw when
-  // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
-  const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
+  // Lazy browser-only client: created via dynamic import after mount so
+  // auth-js no longer ships in the initial layout bundle. The consumer
+  // degrades gracefully while `supabase` is null.
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const [user, setUser] = useState<SupabaseUser | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    import("@/lib/supabase/client").then(({ createClient }) => {
+      if (!cancelled) setSupabase(createClient())
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const [orders, setOrders] = useState<OrderSummary[]>([])
   const [cashback] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)

@@ -7,23 +7,34 @@ import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
 import { SearchBar } from "@/components/search/search-bar"
 import { CART_DRAWER_EVENT } from "@/components/cart/cart-drawer"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
-import type { User as SupabaseUser } from "@supabase/supabase-js"
+import type { User as SupabaseUser, SupabaseClient } from "@supabase/supabase-js"
 
 export function Header() {
   const { city } = useCity()
   const { itemCount } = useCart()
   const router = useRouter()
-  // Lazy browser-only client: creating it during SSR would throw when
-  // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
-  const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
+  // Lazy browser-only client: created via dynamic import after mount so
+  // auth-js (78KB) no longer ships in the initial layout bundle. The
+  // consumer degrades gracefully while `supabase` is null.
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const [showCitySelector, setShowCitySelector] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [cashbackBalance, setCashbackBalance] = useState<number | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Dynamically load the Supabase client once the shell is interactive
+  useEffect(() => {
+    let cancelled = false
+    import("@/lib/supabase/client").then(({ createClient }) => {
+      if (!cancelled) setSupabase(createClient())
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Detect auth state on mount and fetch wallet balance
   useEffect(() => {
