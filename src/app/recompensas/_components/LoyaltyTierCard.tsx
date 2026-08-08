@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import { createClient } from "@/lib/supabase/client"
 import { Star, Award, Zap } from "lucide-react"
 import { TIER_CONFIGS } from "./types"
 import type { Tier } from "./types"
-import { isoWeek, localMonthYear } from "@/lib/utils"
+import { getMonthlyCashbackProgress } from "@/lib/wallet-actions"
 
 const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "diamante"]
 
@@ -57,11 +56,8 @@ const TIER_PROGRESS_COLOR: Record<Tier, string> = {
   diamante: "#8b5cf6",
 }
 
-/** Semana ISO de una fecha (1-53), igual que EXTRACT(WEEK ...) en Postgres */
-// (utilidad compartida en src/lib/utils.ts)
-
-/** Mínimo acumulado por semana para que cuente como "semana calificada" */
-export const QUALIFYING_WEEK_MIN = 2500
+// (El umbral $2,500 de "semana calificada" vive en src/lib/utils.ts como
+// QUALIFYING_WEEK_MIN, usado por la server action getMonthlyCashbackProgress.)
 
 export function useLoyaltyTier() {
   const [data, setData] = useState<TierData>({
@@ -71,71 +67,27 @@ export function useLoyaltyTier() {
     monthlyCashback: 0,
   })
   const [loading, setLoading] = useState(true)
-  const [supabase] = useState(() =>
-    typeof window === "undefined" ? null : createClient()
-  )
 
   useEffect(() => {
     let cancelled = false
 
     async function fetchTier() {
-      if (!supabase) {
-        setLoading(false)
-        return
-      }
-
       try {
-        const {
-          data: { session },
-        } = await supabase!.auth.getSession()
-        if (!session?.user?.id) {
-          setLoading(false)
-          return
-        }
+        const progress = await getMonthlyCashbackProgress()
+        if (cancelled || !progress) return
 
-        const monthYear = localMonthYear()
-
-        const { data: orders, error } = await supabase!
-          .from("orders")
-          .select("created_at, total")
-          .eq("user_id", session.user.id)
-          .eq("month_year", monthYear)
-          .eq("payment_status", "paid")
-          .neq("status", "cancelled")
-
-        if (error || !orders?.length) {
-          setData((prev) => ({ ...prev, weekCount: 0, tier: "verde" }))
-          setLoading(false)
-          return
-        }
-
-        // Agrupar gasto por semana ISO: una semana califica si acumula >= $2,500
-        const spendByWeek = new Map<number, number>()
-        for (const o of orders) {
-          const createdAt = o.created_at ? new Date(o.created_at) : null
-          const week = createdAt && !isNaN(createdAt.getTime()) ? isoWeek(createdAt) : 0
-          spendByWeek.set(week, (spendByWeek.get(week) ?? 0) + Number(o.total ?? 0))
-        }
-
-        const weekCount = Array.from(spendByWeek.values()).filter(
-          (spend) => spend >= QUALIFYING_WEEK_MIN
-        ).length
-        const monthlySpend = orders.reduce(
-          (sum, o) => sum + Number(o.total ?? 0),
-          0
+        const tier = progress.currentTier.toLowerCase() as Tier
+        // Cashback estimado del mes: gasto × tasa del nivel actual
+        const monthlyCashback = Math.round(
+          progress.monthlySpend * (progress.currentTierPct / 100)
         )
 
-        const tierMap: Record<number, Tier> = {
-          0: "verde",
-          1: "verde",
-          2: "plata",
-          3: "oro",
-        }
-        const tier: Tier = tierMap[weekCount] ?? "diamante"
-        const rate = TIER_CONFIGS[tier].rate
-        const monthlyCashback = Math.round(monthlySpend * (rate / 100))
-
-        setData({ tier, weekCount, monthlySpend, monthlyCashback })
+        setData({
+          tier,
+          weekCount: progress.weeksWithPurchases,
+          monthlySpend: progress.monthlySpend,
+          monthlyCashback,
+        })
       } catch {
         // Keep defaults
       } finally {
@@ -148,7 +100,7 @@ export function useLoyaltyTier() {
     return () => {
       cancelled = true
     }
-  }, [supabase])
+  }, [])
 
   return { ...data, loading }
 }

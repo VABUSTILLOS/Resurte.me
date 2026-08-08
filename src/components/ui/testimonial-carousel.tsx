@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Star, ChevronLeft, ChevronRight, Quote } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface Testimonial {
   id: string
@@ -94,9 +95,7 @@ function StarRating({ rating, size = "sm" }: { rating: number; size?: "sm" | "md
       {Array.from({ length: 5 }).map((_, i) => (
         <Star
           key={i}
-          className={`${starSize} ${
-            i < rating ? "fill-amber-400 text-amber-400" : "fill-gray-200 text-gray-200"
-          }`}
+          className={cn(starSize, i < rating ? "fill-amber-400 text-amber-400" : "fill-gray-200 text-gray-200")}
         />
       ))}
     </div>

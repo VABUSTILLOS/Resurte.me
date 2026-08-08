@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/mock-orders"
-import { createClient } from "@/lib/supabase/client"
+import { getUserPurchaseHistory } from "@/lib/wallet-actions"
 import type { OrderWithCashback, OrderItem } from "@/types"
 import { Package, Clock, ChevronRight, ArrowLeft, RotateCcw, ShoppingCart } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
@@ -17,70 +17,27 @@ interface OrderWithItems extends OrderWithCashback {
   })[]
 }
 
-interface OrderRow extends OrderWithCashback {
-  order_items: (OrderItem & {
-    products: { id: number; name: string; image_url: string | null; slug: string } | null
-  })[]
-}
-
 export default function OrderHistoryPage() {
   const { city } = useCity()
   const { addItem } = useCart()
   const [orders, setOrders] = useState<OrderWithItems[]>([])
   const [loading, setLoading] = useState(true)
   const [reorderingId, setReorderingId] = useState<number | null>(null)
-  const [supabase] = useState(() =>
-    typeof window === "undefined" ? null : createClient()
-  )
 
   useEffect(() => {
     let cancelled = false
 
     async function fetchOrders() {
-      if (!supabase) {
-        setLoading(false)
-        return
-      }
-
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-        if (!session?.user?.id) {
-          setLoading(false)
-          return
+        const all: OrderWithItems[] = []
+        let page = 0
+        for (;;) {
+          const { orders, hasMore } = await getUserPurchaseHistory(page, 50)
+          all.push(...orders)
+          if (!hasMore) break
+          page += 1
         }
-
-        const { data, error } = await supabase
-          .from("orders")
-          .select(
-            "*, order_items(*, products(id, name, image_url, slug))"
-          )
-          .eq("user_id", session.user.id)
-          .order("created_at", { ascending: false })
-
-        if (error || !data) {
-          setLoading(false)
-          return
-        }
-
-        if (cancelled) return
-
-        const enriched: OrderWithItems[] = (data as OrderRow[]).map((row) => {
-          const { order_items, ...order } = row
-          const items = (order_items ?? []).map((item) => ({
-            id: item.id,
-            order_id: item.order_id,
-            product_id: item.product_id,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            product_name: item.products?.name || `Producto #${item.product_id}`,
-            product_image: item.products?.image_url || "",
-          }))
-          return { ...order, items }
-        })
-
-        setOrders(enriched)
+        if (!cancelled) setOrders(all)
       } catch {
         // Keep defaults
       } finally {
@@ -93,7 +50,7 @@ export default function OrderHistoryPage() {
     return () => {
       cancelled = true
     }
-  }, [supabase])
+  }, [])
 
   const handleRepeatOrder = (order: OrderWithItems, e: React.MouseEvent) => {
     e.preventDefault()

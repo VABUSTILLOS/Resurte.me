@@ -12,6 +12,7 @@ import { CheckoutFlowScreen } from "./_components/CheckoutFlowScreen";
 import { ConfettiOverlay } from "./_components/ConfettiOverlay";
 import { InvoiceScannerScreen } from "./_components/InvoiceScannerScreen";
 import { OnboardingScreen } from "./_components/OnboardingScreen";
+import { getWalletBalance } from "@/lib/wallet-actions";
 import type { Tab, ServiceItem } from "./_components/types";
 
 export default function CashbackPage() {
@@ -36,15 +37,10 @@ export default function CashbackPage() {
       const authed = !!session;
       setIsAuthenticated(authed);
       if (authed) {
-        // Fetch real wallet balance
-        ;(async () => {
-          const { data } = await supabase
-            .from("wallets")
-            .select("balance_credits")
-            .eq("user_id", session.user.id)
-            .single()
-          if (data) setBalance(Number(data.balance_credits))
-        })()
+        // Fetch real wallet balance via server action
+        getWalletBalance().then((wallet) => {
+          if (wallet) setBalance(Number(wallet.balance_credits))
+        })
 
         // Only show onboarding if user hasn't completed it before
         const onboarded = localStorage.getItem("cashback-onboarded");

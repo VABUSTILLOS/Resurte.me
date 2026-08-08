@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
 import {
   getCachedCollectionBySlug,
+  getCachedProductsByCollection,
   getCachedVisibleProducts,
 } from "@/lib/catalog-cache"
 import { Metadata } from "next"
@@ -46,6 +47,8 @@ export default async function CollectionPage({ params }: Props) {
   // Fetch products matching this collection's tags (cached full catalog)
   const tags = (collection as { tags: string[] }).tags || []
 
+  // Productos de esta colección: la capa de datos filtra por intersección de
+  // tags (getProductsByCollection).
   let products: Record<string, unknown>[] = []
   // Full visible catalog used for recipe ingredient → product matching.
   // Ingredients like "Sal", "Aceite vegetal" or "Pan brioche" may not be tagged
@@ -53,10 +56,7 @@ export default async function CollectionPage({ params }: Props) {
   // collection-filtered grid.
   const allProducts = (await getCachedVisibleProducts()) as unknown as Record<string, unknown>[]
   if (tags.length > 0) {
-    products = allProducts.filter((p) => {
-      const productTags: string[] = Array.isArray(p.tags) ? (p.tags as string[]) : []
-      return productTags.some((t: string) => tags.includes(t))
-    })
+    products = (await getCachedProductsByCollection(collectionSlug)) as unknown as Record<string, unknown>[]
   }
 
   return (

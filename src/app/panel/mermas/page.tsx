@@ -6,6 +6,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage"
 import { usePanelConfig } from "@/lib/panel-config"
 import { useToast } from "@/components/toast"
 import EmptyState from "@/components/panel/EmptyState"
+import { t } from "@/lib/i18n/es"
 import Link from "next/link"
 import {
   Trash2, ArrowLeft, DollarSign, TrendingDown, Lightbulb,
@@ -248,7 +249,7 @@ export default function MermasPage() {
           <ArrowLeft className="w-5 h-5 text-gray-400" />
         </Link>
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Calculadora de mermas</h2>
+          <h2 className="text-xl font-bold text-gray-900">{t("mermas.title")}</h2>
           <p className="text-sm text-gray-400">{selectedCollection.name}</p>
         </div>
       </div>
@@ -353,7 +354,7 @@ export default function MermasPage() {
       {showForm ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
           <h4 className="font-semibold text-gray-900 mb-4">
-            {editingId ? "Editar registro de merma" : "Registrar merma"}
+            {editingId ? t("mermas.editEntry") : t("mermas.newEntry")}
           </h4>
           <div className="space-y-3">
             <select
@@ -436,7 +437,7 @@ export default function MermasPage() {
           className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-red-400 hover:text-red-400 transition-colors font-medium mb-6"
         >
           <Plus className="w-5 h-5" />
-          Registrar merma
+          {t("mermas.newEntry")}
         </button>
       )}
 

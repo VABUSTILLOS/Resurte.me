@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle, Clock, TrendingUp } from "lucide-react";
 import type { ActivityItem } from "./types";
-import { createClient } from "@/lib/supabase/client";
+import { getWalletHistory } from "@/lib/wallet-actions";
 
 // Mapea los movimientos reales del monedero a items de actividad.
 // amount > 0 = cashback (invoice), amount < 0 = canje de servicio (redemption).
@@ -29,45 +29,25 @@ function toActivityItem(tx: {
 
 export function ActivityFeed() {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
-  const [supabase] = useState(() =>
-    typeof window === "undefined" ? null : createClient()
-  );
 
   useEffect(() => {
-    if (!supabase) return;
+    let cancelled = false;
 
     async function fetchActivity() {
       try {
-        const { data: { session } } = await supabase!.auth.getSession();
-        if (!session?.user?.id) return;
-
-        // Buscar el monedero del usuario (si no existe, no hay actividad).
-        const { data: wallet } = await supabase!
-          .from("wallets")
-          .select("id")
-          .eq("user_id", session.user.id)
-          .maybeSingle();
-
-        if (!wallet) {
-          setActivities([]);
-          return;
-        }
-
-        const { data: txs } = await supabase!
-          .from("wallet_transactions")
-          .select("id, amount, concept, created_at")
-          .eq("wallet_id", wallet.id)
-          .order("created_at", { ascending: false })
-          .limit(5);
-
-        if (txs) setActivities(txs.map(toActivityItem));
+        const { transactions } = await getWalletHistory(0, 5);
+        if (!cancelled) setActivities(transactions.map(toActivityItem));
       } catch {
         setActivities([]);
       }
     }
 
     fetchActivity();
-  }, [supabase]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (activities.length === 0) {
     return (

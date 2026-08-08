@@ -14,9 +14,10 @@ import { UserShopView } from "@/components/shop/user-shop-view"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import type { Category, Product, RestaurantCollection } from "@/types"
-import { getCategoryIcon } from "@/lib/utils"
+import { cn, getCategoryIcon } from "@/lib/utils"
 import { CollectionSlider } from "@/components/collections/collection-slider"
 import { TestimonialCarousel } from "@/components/ui/testimonial-carousel"
+import { PromoBanner } from "@/components/ui/promo-banner"
 
 // Products per category to show on landing — show first 5, then "Ver Todo"
 const PREVIEW_COUNT = 4
@@ -187,7 +188,7 @@ export function CityLanding({
               </form>
               <div className="mt-3 sm:mt-4">
                 <Link
-                  href={`/${currentCity?.slug || DEFAULT_CITY_SLUG}/buscar`}
+                  href={`/catalogo/${currentCity?.slug || DEFAULT_CITY_SLUG}`}
                   className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-white/80 hover:text-white hover:underline underline-offset-4 transition-colors"
                 >
                   <Grid3X3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -228,6 +229,9 @@ export function CityLanding({
           </div>
         </div>
       </section>
+
+      {/* Promo banner (feature-flag controlled) */}
+      <PromoBanner />
 
       {/* Social proof stats */}
       <section className="bg-white border-b border-[#E8E9EB]">
@@ -879,11 +883,12 @@ export function CityLanding({
             <a
               key={c.slug}
               href={`/${c.slug}`}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-sm transition-all ${
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-2 rounded-full border text-sm transition-all",
                 c.slug === (currentCity?.slug || DEFAULT_CITY_SLUG)
                   ? "bg-[#108910] text-white border-[#108910]"
                   : "border-[#E8E9EB] text-[#72767E] hover:border-[#108910]/40 hover:text-[#108910] hover:bg-[#E9FBE9]"
-              }`}
+              )}
             >
               <MapPin className="w-3 h-3" />
               {c.name}

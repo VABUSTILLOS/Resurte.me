@@ -1,7 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { isoWeek } from "@/lib/utils"
+import { isoWeek, QUALIFYING_WEEK_MIN } from "@/lib/utils"
 import type {
   OrderWithCashback,
   OrderItem,
@@ -152,6 +152,38 @@ export async function getWalletHistory(
 }
 
 // ============================================================
+// TOTAL DE RECOMPENSAS ACUMULADAS
+// ============================================================
+
+/**
+ * Suma todos los abonos positivos del monedero (cashback) del usuario
+ * autenticado. Es el total de recompensas acumuladas desde que entró
+ * al programa, independiente del mes en curso.
+ */
+export async function getTotalRewards(): Promise<number> {
+  const supabase = await createClient()
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return 0
+
+  const { data: wallet } = await supabase
+    .from("wallets")
+    .select("id")
+    .eq("user_id", user.id)
+    .single()
+
+  if (!wallet) return 0
+
+  const { data: txs } = await supabase
+    .from("wallet_transactions")
+    .select("amount")
+    .eq("wallet_id", wallet.id)
+    .gt("amount", 0)
+
+  return (txs ?? []).reduce((sum, t) => sum + Number(t.amount), 0)
+}
+
+// ============================================================
 // DASHBOARD: RESUMEN DE CASHBACK DEL MES ACTUAL
 // ============================================================
 
@@ -166,6 +198,7 @@ export async function getMonthlyCashbackProgress(): Promise<{
   currentTierPct: number
   totalCashbackThisMonth: number
   totalOrdersThisMonth: number
+  monthlySpend: number
   walletBalance: number
 } | null> {
   const supabase = await createClient()
@@ -194,6 +227,7 @@ export async function getMonthlyCashbackProgress(): Promise<{
       currentTierPct: 5,
       totalCashbackThisMonth: 0,
       totalOrdersThisMonth: 0,
+      monthlySpend: 0,
       walletBalance: 0,
     }
   }
@@ -208,7 +242,7 @@ export async function getMonthlyCashbackProgress(): Promise<{
   }
 
   const weekCount = Array.from(spendByWeek.values()).filter(
-    (spend) => spend >= 2500
+    (spend) => spend >= QUALIFYING_WEEK_MIN
   ).length
 
   // Obtener saldo del monedero
@@ -237,6 +271,7 @@ export async function getMonthlyCashbackProgress(): Promise<{
       0
     ),
     totalOrdersThisMonth: orders.length,
+    monthlySpend: orders.reduce((sum, o) => sum + Number(o.total ?? 0), 0),
     walletBalance: Number(wallet?.balance_credits ?? 0),
   }
 }
@@ -249,63 +284,49 @@ export async function getMonthlyCashbackProgress(): Promise<{
  * Canjea créditos del monedero para pagar un servicio interno.
  * REQUIERE service_role key — solo se ejecuta desde el backend/admin.
  *
+ * Usa la función Postgres `redeem_service()` que bloquea la fila del
+ * monedero con FOR UPDATE para evitar débitos concurrentes y registra
+ * la redención de forma atómica (es el mismo flujo que expone /api/redeem).
+ *
  * @param userId  UUID del usuario
- * @param amount  Cantidad a canjear (positiva, se convierte a negativa)
- * @param concept Descripción del servicio canjeado
+ * @param service Servicio canjeado (id/name/cost tomados del catálogo,
+ *                nunca confiar en los valores enviados por el cliente)
  */
 export async function redeemCredits(
   userId: string,
-  amount: number,
-  concept: string
-): Promise<{ success: boolean; newBalance: number; error?: string }> {
+  service: { id: string; name: string; cost: number }
+): Promise<{
+  success: boolean
+  newBalance?: number
+  redemptionId?: string | null
+  error?: string
+}> {
   // Esta función debe llamarse con el service_role client
   const { createServiceClient } = await import("@/lib/supabase/service")
   const supabase = await createServiceClient()
 
-  if (amount <= 0) {
-    return { success: false, newBalance: 0, error: "El monto a canjear debe ser positivo" }
+  const { data, error } = await supabase.rpc("redeem_service", {
+    p_user_id: userId,
+    p_service_id: service.id,
+    p_service_name: service.name,
+    p_cost: service.cost,
+  })
+
+  if (error) {
+    return { success: false, error: error.message }
   }
 
-  // Verificar saldo suficiente
-  const { data: wallet } = await supabase
-    .from("wallets")
-    .select("id, balance_credits")
-    .eq("user_id", userId)
-    .single()
-
-  if (!wallet) {
-    return { success: false, newBalance: 0, error: "Monedero no encontrado" }
-  }
-
-  if (Number(wallet.balance_credits) < amount) {
+  const result = data?.[0]
+  if (!result?.success) {
     return {
       success: false,
-      newBalance: Number(wallet.balance_credits),
-      error: `Saldo insuficiente. Disponible: $${wallet.balance_credits} créditos`,
+      error: result?.error_msg ?? "No se pudo completar el canje",
     }
   }
 
-  // Insertar transacción (negativa = canje)
-  const txAmount = -amount
-  const { error: txError } = await supabase
-    .from("wallet_transactions")
-    .insert({
-      wallet_id: wallet.id,
-      amount: txAmount,
-      concept,
-      order_id: null,
-    })
-
-  if (txError) {
-    return { success: false, newBalance: Number(wallet.balance_credits), error: txError.message }
+  return {
+    success: true,
+    newBalance: result.new_balance,
+    redemptionId: result.redemption_id ?? null,
   }
-
-  // Actualizar saldo
-  const newBalance = Number(wallet.balance_credits) - amount
-  await supabase
-    .from("wallets")
-    .update({ balance_credits: newBalance, updated_at: new Date().toISOString() })
-    .eq("id", wallet.id)
-
-  return { success: true, newBalance }
 }

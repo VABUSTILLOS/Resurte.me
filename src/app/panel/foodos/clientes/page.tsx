@@ -19,6 +19,7 @@ import {
   deleteCampaign,
 } from "../actions"
 import { formatMoney, SEGMENT_META, segmentCustomer } from "@/lib/foodos"
+import StatCard from "@/components/panel/StatCard"
 import type {
   FoodosRestaurant,
   FoodosCustomer,
@@ -522,11 +523,3 @@ export default function ClientesPage() {
   )
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-white border border-stone-200 rounded-2xl p-4">
-      <p className="text-xs text-stone-500">{label}</p>
-      <p className="text-xl font-black text-stone-900 mt-1">{value}</p>
-    </div>
-  )
-}

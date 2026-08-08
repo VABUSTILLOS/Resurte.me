@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import { redeemCredits } from "@/lib/wallet-actions"
 import { SERVICES } from "@/app/recompensas/_components/services-data"
 
 /**
@@ -68,29 +69,27 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Ejecutar el canje con débito real (atómico) ──
-    const { data, error } = await supabase.rpc("redeem_service", {
-      p_user_id: user.id,
-      p_service_id: service.id,
-      p_service_name: service.name,
-      p_cost: service.cost,
+    // Delegado a la server action redeemCredits, que usa el RPC
+    // redeem_service (FOR UPDATE) para el débito atómico del monedero.
+    const result = await redeemCredits(user.id, {
+      id: service.id,
+      name: service.name,
+      cost: service.cost,
     })
 
-    if (error) {
-      console.error("[API redeem] rpc error:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    const result = data?.[0]
-    if (!result?.success) {
-      const message = result?.error_msg ?? "No se pudo completar el canje"
-      return NextResponse.json({ error: message }, { status: 400 })
+    if (!result.success) {
+      console.error("[API redeem] rpc error:", result.error)
+      return NextResponse.json(
+        { error: result.error ?? "No se pudo completar el canje" },
+        { status: 400 }
+      )
     }
 
     return NextResponse.json({
       success: true,
-      newBalance: result.new_balance,
+      newBalance: result.newBalance,
       redemption: {
-        id: result.redemption_id,
+        id: result.redemptionId ?? null,
         service_id: service.id,
         service_name: service.name,
         cost_credits: service.cost,

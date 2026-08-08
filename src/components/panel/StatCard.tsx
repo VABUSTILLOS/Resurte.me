@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react"
 import { LucideIcon } from "lucide-react"
+import { cva } from "class-variance-authority"
 
 interface StatCardProps {
   label: string
@@ -12,19 +13,31 @@ interface StatCardProps {
   suffix?: string
 }
 
-const TONE_STYLES: Record<NonNullable<StatCardProps["tone"]>, string> = {
-  default: "text-gray-900",
-  positive: "text-[#108910]",
-  warning: "text-amber-600",
-  danger: "text-red-600",
-}
+// Variantes con cva (class-variance-authority) para estilos de texto e icono
+// según el tono de la tarjeta.
+const valueStyles = cva("text-2xl font-bold", {
+  variants: {
+    tone: {
+      default: "text-gray-900",
+      positive: "text-[#108910]",
+      warning: "text-amber-600",
+      danger: "text-red-600",
+    },
+  },
+  defaultVariants: { tone: "default" },
+})
 
-const ICON_STYLES: Record<NonNullable<StatCardProps["tone"]>, string> = {
-  default: "bg-gray-50 text-gray-400",
-  positive: "bg-[#F0FDF4] text-[#108910]",
-  warning: "bg-amber-50 text-amber-500",
-  danger: "bg-red-50 text-red-500",
-}
+const iconStyles = cva("w-7 h-7 rounded-lg flex items-center justify-center", {
+  variants: {
+    tone: {
+      default: "bg-gray-50 text-gray-400",
+      positive: "bg-[#F0FDF4] text-[#108910]",
+      warning: "bg-amber-50 text-amber-500",
+      danger: "bg-red-50 text-red-500",
+    },
+  },
+  defaultVariants: { tone: "default" },
+})
 
 export default function StatCard({ label, value, icon: Icon, hint, tone = "default", suffix }: StatCardProps) {
   return (
@@ -32,12 +45,12 @@ export default function StatCard({ label, value, icon: Icon, hint, tone = "defau
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-medium text-gray-400">{label}</p>
         {Icon && (
-          <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${ICON_STYLES[tone]}`}>
+          <span className={iconStyles({ tone })}>
             <Icon className="w-4 h-4" />
           </span>
         )}
       </div>
-      <p className={`text-2xl font-bold ${TONE_STYLES[tone]}`}>
+      <p className={valueStyles({ tone })}>
         {value}
         {suffix && <span className="text-sm font-semibold text-gray-400 ml-1">{suffix}</span>}
       </p>

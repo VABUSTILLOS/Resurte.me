@@ -1,7 +1,6 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr"
 import { type NextRequest, NextResponse } from "next/server"
-import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { MEXICO_CITIES } from "@/lib/cities"
+import { updateSession } from "@/lib/supabase/middleware"
 
 const VALID_SLUGS = MEXICO_CITIES.map((c) => c.slug)
 
@@ -111,43 +110,8 @@ function copyAuthCookies(source: NextResponse, target: NextResponse) {
  * Proxy: refresca sesión Supabase + detección de ciudad + ruteo.
  */
 export async function proxy(request: NextRequest) {
-  // ── Supabase session refresh ──
-  let supabaseResponse = NextResponse.next({ request })
-
-  // Sin Supabase configurado (dev local o preview sin secrets) el sitio
-  // público renderiza igual: no hay sesión que refrescar ni cookies que copiar.
-  if (isSupabaseConfigured()) {
-    // Solo hay sesión que refrescar si el request trae cookies `sb-` (visitante
-    // autenticado). Saltarnos getUser() para visitantes anónimos ahorra un
-    // roundtrip a la red en CADA request del sitio.
-    const hasSessionCookie = request.cookies
-      .getAll()
-      .some((c) => c.name.startsWith("sb-"))
-
-    if (hasSessionCookie) {
-      const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-          cookies: {
-            getAll() {
-              return request.cookies.getAll()
-            },
-            setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-              cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-              supabaseResponse = NextResponse.next({ request })
-              cookiesToSet.forEach(({ name, value, options }) =>
-                supabaseResponse.cookies.set(name, value, options)
-              )
-            },
-          },
-        }
-      )
-
-      // Refresca la sesión (renueva token si expiró, setea cookies)
-      await supabase.auth.getUser()
-    }
-  }
+  // ── Supabase session refresh (delegado a updateSession) ──
+  const { supabaseResponse } = await updateSession(request)
 
   // ── City detection & routing ──
   const { pathname } = request.nextUrl

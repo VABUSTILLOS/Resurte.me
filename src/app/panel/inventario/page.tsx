@@ -7,6 +7,7 @@ import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { uid } from "@/lib/ids"
 import { convertQty, ManualQty, readManualQtys } from "@/lib/panel-units"
+import { t } from "@/lib/i18n/es"
 import {
   Package, Plus, Edit3, Trash2, ShoppingCart,
   ArrowDownToLine, Copy, AlertTriangle, CheckCircle2,
@@ -800,7 +801,7 @@ export default function InventarioPage() {
       {items.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
           <Package className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-          <p className="text-gray-400 font-medium mb-1">Inventario vacío</p>
+          <p className="text-gray-400 font-medium mb-1">{t("inventario.emptyTitle")}</p>
           <p className="text-xs text-gray-300 mb-4">
             Agrega productos manualmente o impórtalos desde el planificador
           </p>
@@ -815,7 +816,7 @@ export default function InventarioPage() {
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs" aria-label="Inventario de artículos">
+            <table className="w-full text-xs" aria-label={t("inventario.title")}>
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50">
                   <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Estado</th>

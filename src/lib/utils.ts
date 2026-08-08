@@ -22,6 +22,12 @@ export function localMonthYear(date = new Date()): string {
 }
 
 /**
+ * Mínimo acumulado por semana ISO para que cuente como "semana calificada"
+ * en el programa de recompensas (igual que la migración 00029).
+ */
+export const QUALIFYING_WEEK_MIN = 2500
+
+/**
  * Semana ISO de una fecha (1-53), igual que EXTRACT(WEEK ...) en Postgres.
  */
 export function isoWeek(date: Date): number {

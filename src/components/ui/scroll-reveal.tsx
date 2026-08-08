@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, type ReactNode } from "react"
+import { cn } from "@/lib/utils"
 
 /**
  * ScrollReveal — Erewhon-style scroll-triggered animation wrapper.
@@ -72,7 +73,7 @@ export function ScrollReveal({
   }, [direction, delay, threshold])
 
   return (
-    <div ref={ref} className={`${hiddenMap[direction]} ${className}`}>
+    <div ref={ref} className={cn(hiddenMap[direction], className)}>
       {children}
     </div>
   )

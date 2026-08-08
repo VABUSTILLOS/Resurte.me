@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
-import { getStripe } from "@/lib/stripe"
 import { computeOrderTotals } from "@/lib/foodos"
 import type { FoodosOrderItem } from "@/types/foodos"
 
@@ -226,44 +225,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Si es tarjeta, crear PaymentIntent y ligarlo al pedido
-    let clientSecret: string | null = null
-    let paymentIntentId: string | null = null
-
-    if (payment_method === "card") {
-      try {
-        const stripe = getStripe()
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: Math.round(total * 100),
-          currency: "mxn",
-          automatic_payment_methods: { enabled: true },
-          metadata: {
-            foodos_order_id: String(order.id),
-            restaurant_id,
-            source: "resurte.me-foodos",
-          },
-        })
-        clientSecret = paymentIntent.client_secret
-        paymentIntentId = paymentIntent.id
-
-        await supabase
-          .from("foodos_orders")
-          .update({ stripe_payment_intent_id: paymentIntentId })
-          .eq("id", order.id)
-      } catch (stripeError) {
-        console.error("FoodOS Stripe error:", stripeError)
-        await supabase.from("foodos_orders").delete().eq("id", order.id)
-        return NextResponse.json(
-          { error: "Error al inicializar el pago con Stripe" },
-          { status: 500 }
-        )
-      }
-    }
+    // El PaymentIntent de Stripe para tarjeta lo crea el storefront llamando a
+    // POST /api/payments/stripe/create-intent con type: "foodos" y el order_id
+    // devuelto aquí (separación de responsabilidades: esta ruta solo registra).
 
     return NextResponse.json({
       orderId: order.id,
-      clientSecret,
-      paymentIntentId,
       total,
     })
   } catch (error) {

@@ -8,6 +8,7 @@ import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { uid } from "@/lib/ids"
 import { convertQty } from "@/lib/panel-units"
+import { t } from "@/lib/i18n/es"
 import Link from "next/link"
 import {
   ArrowLeft, Plus, Trash2, DollarSign, TrendingUp, Receipt,
@@ -953,7 +954,7 @@ export default function VentasPage() {
         </Link>
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-gray-900">Ventas del día</h2>
+            <h2 className="text-xl font-bold text-gray-900">{t("ventas.title")}</h2>
             {entries.length > 0 && (
               <button
                 onClick={copySummary}
@@ -2013,7 +2014,7 @@ export default function VentasPage() {
       {entries.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
           <Receipt className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-          <p className="text-gray-400 font-medium mb-1">Sin ventas registradas</p>
+          <p className="text-gray-400 font-medium mb-1">{t("ventas.emptyTitle")}</p>
           <p className="text-xs text-gray-300 mb-4">Registra tu primera venta del día para ver tu margen real</p>
           <button
             onClick={() => document.getElementById("venta-dish")?.focus()}
@@ -2297,7 +2298,7 @@ export default function VentasPage() {
               )}
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs" aria-label="Ventas del día">
+              <table className="w-full text-xs" aria-label={t("ventas.title")}>
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50/50">
                     <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Platillo</th>

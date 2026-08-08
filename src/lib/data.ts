@@ -1,19 +1,20 @@
-import { createClient } from "@/lib/supabase/server"
+import { createPublicClient } from "@/lib/supabase/public"
 import type { City, Category, Product, RestaurantCollection } from "@/types"
 
-type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>
+type SupabasePublicClient = NonNullable<ReturnType<typeof createPublicClient>>
 
 /**
- * Crea el cliente Supabase degradando con gracia cuando el entorno no tiene
- * secrets configurados (dev local o preview): devuelve null y los consumidores
- * renderizan estados vacíos en lugar de crashear.
+ * Crea el cliente Supabase público (sin cookies) degradando con gracia cuando
+ * el entorno no tiene secrets configurados (dev local o preview): devuelve
+ * null y los consumidores renderizan estados vacíos en lugar de crashear.
+ *
+ * Se usa el cliente público (no el SSR con cookies) para que estas funciones
+ * puedan ejecutarse dentro del scope de unstable_cache, donde cookies() y
+ * headers() no están disponibles. Todas las consultas de esta capa son lecturas
+ * públicas del catálogo; RLS expone la misma data a todos los visitantes.
  */
-async function tryCreateClient(): Promise<SupabaseServerClient | null> {
-  try {
-    return await createClient()
-  } catch {
-    return null
-  }
+async function tryCreateClient(): Promise<SupabasePublicClient | null> {
+  return createPublicClient()
 }
 
 // ============================================================
@@ -52,8 +53,30 @@ export async function getCategories(): Promise<Category[]> {
   const { data } = await supabase
     .from("categories")
     .select("*")
-    .order("name")
+    .order("id")
   return (data as Category[]) ?? []
+}
+
+export async function getCategoryBySlug(slug: string): Promise<Category | null> {
+  const supabase = await tryCreateClient()
+  if (!supabase) return null
+  const { data } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("slug", slug)
+    .single()
+  return (data as Category) ?? null
+}
+
+export async function getCategoryById(id: number): Promise<Category | null> {
+  const supabase = await tryCreateClient()
+  if (!supabase) return null
+  const { data } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("id", id)
+    .single()
+  return (data as Category) ?? null
 }
 
 // ============================================================
@@ -124,14 +147,22 @@ export async function getProductsPaginated(
   return { products, total, hasMore }
 }
 
-export async function getProductBySlug(slug: string): Promise<Product | null> {
+export async function getProductBySlug(
+  slug: string,
+  includeHidden: boolean = false
+): Promise<Product | null> {
   const supabase = await tryCreateClient()
   if (!supabase) return null
-  const { data } = await supabase
+  let query = supabase
     .from("products")
     .select("*")
     .eq("slug", slug)
-    .single()
+
+  if (!includeHidden) {
+    query = query.eq("is_visible", true)
+  }
+
+  const { data } = await query.single()
   return (data as Product) ?? null
 }
 

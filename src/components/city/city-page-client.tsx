@@ -6,14 +6,16 @@ import { MEXICO_CITIES } from "@/lib/cities"
 import { MapPin, Search } from "lucide-react"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { ProductCard } from "@/components/product/product-card"
-import { MOCK_PRODUCTS, MOCK_CATEGORIES } from "@/lib/mock-products"
 import { getCategoryIcon } from "@/lib/utils"
+import type { Category, Product } from "@/types"
 
 interface Props {
   slug: string
+  categories: Category[]
+  products: Product[]
 }
 
-export function CityPageClient({ slug }: Props) {
+export function CityPageClient({ slug, categories, products }: Props) {
   const { setCity } = useCity()
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   const [activeCategory, setActiveCategory] = useState<number | null>(null)
@@ -25,24 +27,24 @@ export function CityPageClient({ slug }: Props) {
   }, [slug, setCity])
 
   const filteredProducts = useMemo(() => {
-    return MOCK_PRODUCTS.filter((p) => {
+    return products.filter((p) => {
       if (activeCategory && p.category_id !== activeCategory) return false
       if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
       return true
     })
-  }, [activeCategory, search])
+  }, [activeCategory, search, products])
 
   const productsByCategory = useMemo(() => {
     if (activeCategory) return null
-    return MOCK_CATEGORIES.reduce(
+    return categories.reduce(
       (acc, cat) => {
-        const products = filteredProducts.filter((p) => p.category_id === cat.id)
-        if (products.length > 0) acc.push({ category: cat, products })
+        const catProducts = filteredProducts.filter((p) => p.category_id === cat.id)
+        if (catProducts.length > 0) acc.push({ category: cat, products: catProducts })
         return acc
       },
-      [] as { category: (typeof MOCK_CATEGORIES)[0]; products: typeof MOCK_PRODUCTS }[]
+      [] as { category: Category; products: Product[] }[]
     )
-  }, [activeCategory, filteredProducts])
+  }, [activeCategory, filteredProducts, categories])
 
   if (!city) return null
 
@@ -99,7 +101,7 @@ export function CityPageClient({ slug }: Props) {
           >
             Todos
           </button>
-          {MOCK_CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <button
               key={cat.slug}
               onClick={() => setActiveCategory(cat.id)}

@@ -4,12 +4,13 @@ const BASE_URL = "https://resurte.me"
 
 export async function GET() {
   // Dynamic imports to avoid build-time evaluation when DB isn't ready
-  const [{ createClient }, { MEXICO_CITIES }, { getAllPosts }, { generateSitemapXml }] =
+  const [{ createClient }, { MEXICO_CITIES }, { getAllPosts }, { generateSitemapXml }, { getCities }] =
     await Promise.all([
       import("@/lib/supabase/server"),
       import("@/lib/cities"),
       import("@/lib/blog"),
       import("@/lib/structured-data"),
+      import("@/lib/data"),
     ])
 
   const entries: SitemapEntry[] = [
@@ -33,7 +34,18 @@ export async function GET() {
     // Supabase not configured — skip dynamic URLs
   }
 
+  // Ciudades: las activas en DB cuando Supabase está disponible; si la tabla
+  // no devuelve nada (DB vacía o sin configurar), se usan todas las estáticas.
+  let activeCitySlugs: string[] = []
+  try {
+    const cities = await getCities()
+    if (cities.length > 0) activeCitySlugs = cities.map((c) => c.slug)
+  } catch {
+    // Supabase not configured — fallback to all static cities
+  }
+
   for (const city of MEXICO_CITIES) {
+    if (activeCitySlugs.length > 0 && !activeCitySlugs.includes(city.slug)) continue
     entries.push({ url: `${BASE_URL}/${city.slug}`, changeFrequency: "daily", priority: 0.9 })
     entries.push({ url: `${BASE_URL}/${city.slug}/buscar`, changeFrequency: "daily", priority: 0.7 })
     entries.push({ url: `${BASE_URL}/${city.slug}/carrito`, changeFrequency: "weekly", priority: 0.5 })

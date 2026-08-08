@@ -22,10 +22,16 @@ declare global {
   }
 }
 
+// Next.js inlina `process.env.NEXT_PUBLIC_*` en el bundle de cliente solo con
+// accesos estáticos. Un índice con accesos literales permite habilitar flags
+// por build-time sin usar `process.env[key]` (que no se reemplaza en client).
+const FEATURE_ENV_INDEX: Record<string, string | undefined> = {
+  PROMO_BANNER: process.env.NEXT_PUBLIC_FEATURE_PROMO_BANNER,
+}
+
 export function isFeatureEnabled(flag: string): boolean {
   if (typeof window === "undefined") return false
-  const key = `NEXT_PUBLIC_FEATURE_${flag.toUpperCase()}`
-  return process.env[key] === "true"
+  return FEATURE_ENV_INDEX[flag.toUpperCase()] === "true"
 }
 
 // ============================================================

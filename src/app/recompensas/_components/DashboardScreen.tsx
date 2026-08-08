@@ -13,6 +13,11 @@ import { TIER_CONFIGS } from "./types";
 import { LoyaltyTierBanner, useLoyaltyTier, TIER_ORDER } from "./LoyaltyTierCard";
 import { ReferralDashboard } from "@/components/referral-dashboard";
 import { createClient } from "@/lib/supabase/client";
+import {
+  getWalletBalance,
+  getWalletHistory,
+  getTotalRewards,
+} from "@/lib/wallet-actions";
 import { localMonthYear } from "@/lib/utils";
 import type { Tier } from "./types";
 import type { ServiceItem } from "./types";
@@ -208,35 +213,18 @@ function WalletView() {
 
   const [balance, setBalance] = useState(0)
   const [transactions, setTransactions] = useState<WalletTransaction[]>([])
-  const [supabase] = useState(() =>
-    typeof window === "undefined" ? null : createClient()
-  )
 
   useEffect(() => {
-    if (!supabase) return
+    let cancelled = false
 
     async function fetchWallet() {
       try {
-        const { data: { session } } = await supabase!.auth.getSession()
-        if (!session?.user?.id) return
-
-        const { data: wallet } = await supabase!
-          .from("wallets")
-          .select("id, balance_credits")
-          .eq("user_id", session.user.id)
-          .single()
-
+        const wallet = await getWalletBalance()
+        if (cancelled) return
         if (wallet) {
           setBalance(Number(wallet.balance_credits))
-
-          const { data: txs } = await supabase!
-            .from("wallet_transactions")
-            .select("id, wallet_id, amount, concept, order_id, created_at")
-            .eq("wallet_id", wallet.id)
-            .order("created_at", { ascending: false })
-            .limit(8)
-
-          if (txs) setTransactions(txs as WalletTransaction[])
+          const { transactions } = await getWalletHistory(0, 8)
+          if (!cancelled) setTransactions(transactions)
         }
       } catch {
         // Keep defaults
@@ -244,7 +232,11 @@ function WalletView() {
     }
 
     fetchWallet()
-  }, [supabase])
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
     <div className="px-4 pt-6 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
@@ -390,21 +382,7 @@ function ProfileView() {
           .neq("status", "cancelled")
         setOrdersThisMonth(monthCount ?? 0)
 
-        const { data: wallet } = await supabase!
-          .from("wallets")
-          .select("id")
-          .eq("user_id", userId)
-          .single()
-        if (wallet) {
-          const { data: txs } = await supabase!
-            .from("wallet_transactions")
-            .select("amount")
-            .eq("wallet_id", wallet.id)
-            .gt("amount", 0)
-          if (txs) {
-            setTotalRewards(txs.reduce((sum, t) => sum + Number(t.amount), 0))
-          }
-        }
+        setTotalRewards(await getTotalRewards())
       } catch {
         // Keep defaults
       }

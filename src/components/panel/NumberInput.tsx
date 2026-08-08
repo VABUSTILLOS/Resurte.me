@@ -1,5 +1,20 @@
 "use client"
 
+import { cva } from "class-variance-authority"
+
+const inputStyles = cva(
+  "w-full px-2.5 py-2 text-sm text-gray-700 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#108910]/20 focus:border-[#108910]",
+  {
+    variants: {
+      disabled: {
+        true: "opacity-50 cursor-not-allowed bg-gray-50",
+        false: "bg-white",
+      },
+    },
+    defaultVariants: { disabled: false },
+  }
+)
+
 interface NumberInputProps {
   value: number
   onChange: (value: number) => void
@@ -47,7 +62,7 @@ export default function NumberInput({
           if (max !== undefined) next = Math.min(max, next)
           onChange(next)
         }}
-        className="w-full px-2.5 py-2 text-sm text-gray-700 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#108910]/20 focus:border-[#108910]"
+        className={inputStyles({ disabled })}
       />
       {unit && (
         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">

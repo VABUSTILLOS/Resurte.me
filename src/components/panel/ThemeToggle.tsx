@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Sun, Moon, Monitor } from "lucide-react"
 import { t } from "@/lib/i18n/es"
+import { cn } from "@/lib/utils"
 
 export type ThemePreference = "light" | "dark" | "system"
 
@@ -72,11 +73,12 @@ export default function ThemeToggle() {
           aria-checked={pref === opt.value}
           aria-label={opt.label}
           onClick={() => setPref(opt.value)}
-          className={`flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
+          className={cn(
+            "flex items-center justify-center w-8 h-8 rounded-full transition-colors",
             pref === opt.value
               ? "bg-[#108910] text-white"
               : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-          }`}
+          )}
         >
           {opt.icon}
         </button>

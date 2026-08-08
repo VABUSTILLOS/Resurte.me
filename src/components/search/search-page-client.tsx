@@ -8,7 +8,7 @@ import { SearchBar } from "@/components/search/search-bar"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import type { Product, Category } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
-import { loadMoreProducts } from "@/app/[slug]/buscar/actions"
+import { loadMoreProducts, searchProducts } from "@/app/[slug]/buscar/actions"
 import Link from "next/link"
 
 type SortOption = "categoria" | "name" | "price-asc" | "price-desc"
@@ -36,6 +36,39 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
   const [sortBy, setSortBy] = useState<SortOption>("categoria")
   const filterBarRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
+
+  // Server-side results: coincidencias en todo el catálogo (no solo la página
+  // cargada). Se fusionan con los resultados client-side por id.
+  const [serverResults, setServerResults] = useState<Product[]>([])
+  const [searchingServer, setSearchingServer] = useState(false)
+
+  // Trigger server search whenever the query changes (debounced 250ms)
+  useEffect(() => {
+    const term = query.trim()
+    if (term.length < 2) {
+      setServerResults([])
+      setSearchingServer(false)
+      return
+    }
+    setSearchingServer(true)
+    let cancelled = false
+    const timeout = setTimeout(() => {
+      searchProducts(term)
+        .then((products) => {
+          if (!cancelled) setServerResults(products)
+        })
+        .catch(() => {
+          if (!cancelled) setServerResults([])
+        })
+        .finally(() => {
+          if (!cancelled) setSearchingServer(false)
+        })
+    }, 250)
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+    }
+  }, [query])
 
   // Build category-product count map for chip badges
   const categoryCounts = useMemo(() => {
@@ -78,13 +111,26 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
     if (!term) return filtered
     if (term.length < 2) return []
 
-    return filtered.filter(
+    const clientMatches = filtered.filter(
       (p) =>
         normalize(p.name).includes(term) ||
         normalize(p.description ?? "").includes(term) ||
         normalize(p.brand ?? "").includes(term)
     )
-  }, [query, selectedCategory, allProducts])
+
+    // Merge server-side matches (whole catalog) with client-side matches,
+    // deduplicating by product id. Server results fill gaps for products
+    // not yet loaded by infinite scroll.
+    if (serverResults.length === 0) return clientMatches
+
+    const byId = new Map<number, Product>()
+    for (const p of clientMatches) byId.set(p.id, p)
+    for (const p of serverResults) {
+      if (selectedCategory && p.category_id !== selectedCategory) continue
+      if (!byId.has(p.id)) byId.set(p.id, p)
+    }
+    return Array.from(byId.values())
+  }, [query, selectedCategory, allProducts, serverResults])
 
   // Sort results
   const sortedResults = useMemo(() => {
@@ -313,6 +359,12 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
                   : `${sortedResults.length} resultado${sortedResults.length !== 1 ? "s" : ""}`}
                 {selectedCat && <span className="text-[#6b6b6b] font-normal"> en {selectedCat.name}</span>}
               </h2>
+              {searchingServer && (
+                <span className="text-xs text-[#999893] flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 border-2 border-[#108910] border-t-transparent rounded-full animate-spin" />
+                  buscando en todo el catálogo…
+                </span>
+              )}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {sortedResults.map((product, idx) => (

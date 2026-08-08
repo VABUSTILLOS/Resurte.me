@@ -34,10 +34,10 @@ export const es = {
     createFirst: "Crear tu primer platillo",
   },
   inventario: {
-    title: "Inventario",
+    title: "Inventario de artículos",
     newItem: "Nuevo artículo",
     importFromPlanner: "Importar desde planificador",
-    emptyTitle: "Tu inventario aún no tiene artículos",
+    emptyTitle: "Inventario vacío",
   },
   planificador: {
     title: "Planificador de pedidos",
@@ -46,8 +46,9 @@ export const es = {
     emptyTitle: "Planifica tu primer pedido",
   },
   mermas: {
-    title: "Control de mermas",
+    title: "Calculadora de mermas",
     newEntry: "Registrar merma",
+    editEntry: "Editar registro de merma",
     emptyTitle: "Aún no registras mermas",
   },
   rentabilidad: {
@@ -58,7 +59,7 @@ export const es = {
   ventas: {
     title: "Ventas del día",
     newSale: "Nueva venta",
-    emptyTitle: "Sin ventas hoy",
+    emptyTitle: "Sin ventas registradas",
     summaryCopied: "Resumen copiado al portapapeles",
   },
   apertura: {
@@ -78,6 +79,14 @@ export const es = {
     dark: "Oscuro",
     system: "Sistema",
     label: "Tema de color",
+  },
+  panel: {
+    title: "Panel de Herramientas",
+    pickRestaurantType: "Elige tu tipo de restaurante",
+    cuisinePrompt: "¿Qué tipo de cocina tienes?",
+    current: "Actual",
+    clearSelection: "Quitar selección",
+    toolsPersonalizedFor: "Todas las herramientas están personalizadas para",
   },
 }
 

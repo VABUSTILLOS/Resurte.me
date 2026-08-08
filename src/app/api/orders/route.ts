@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
-import { getStripe } from "@/lib/stripe"
 
 interface OrderItemInput {
   product_id: number
@@ -433,52 +432,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 5. If payment is "card", create Stripe PaymentIntent
-    let clientSecret: string | null = null
-    let paymentIntentId: string | null = null
-
-    if (payment_method === "card") {
-      try {
-        const stripe = getStripe()
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: Math.round(realTotal * 100), // MXN cents — monto server-side, no el del cliente
-          currency: "mxn",
-          automatic_payment_methods: { enabled: true },
-          metadata: {
-            order_id: String(order.id),
-            source: "resurte.me",
-            user_id: userId ?? "anonymous",
-          },
-        })
-
-        clientSecret = paymentIntent.client_secret
-        paymentIntentId = paymentIntent.id
-
-        // Link PaymentIntent to order
-        await supabase
-          .from("orders")
-          .update({ stripe_payment_intent_id: paymentIntentId })
-          .eq("id", order.id)
-      } catch (stripeError) {
-        console.error("Stripe PaymentIntent error:", stripeError)
-        const stripeMsg = stripeError instanceof Error ? stripeError.message : String(stripeError)
-        // Order is created but payment failed — clean up
-        await supabase.from("order_items").delete().eq("order_id", order.id)
-        await supabase.from("orders").delete().eq("id", order.id)
-        await releaseCoupon(coupon, couponReserved, supabase)
-        return NextResponse.json(
-          { error: "Error al inicializar el pago con Stripe", detail: stripeMsg },
-          { status: 500 }
-        )
-      }
-    }
+    // 5. El PaymentIntent de Stripe para tarjeta lo crea el checkout llamando a
+    //    POST /api/payments/stripe/create-intent con el order_id devuelto aquí
+    //    (separación de responsabilidades: esta ruta solo registra la orden).
 
     return NextResponse.json({
       orderId: order.id,
       cashbackCredits: order.cashback_credits ?? 0,
       cashbackTier: order.cashback_tier ?? undefined,
-      clientSecret,
-      paymentIntentId,
       total: realTotal,
       // Solo para checkout anónimo: el frontend lo persiste en localStorage
       // para reutilizar la dirección en la próxima compra y reclamarla al login.

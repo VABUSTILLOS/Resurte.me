@@ -16,6 +16,8 @@ import {
 } from "lucide-react"
 import EmptyState from "@/components/panel/EmptyState"
 import ConfirmDialog from "@/components/panel/ConfirmDialog"
+import NumberInput from "@/components/panel/NumberInput"
+import { t } from "@/lib/i18n/es"
 
 // Mock ingredients per collection type — in production this comes from Resurte.me catalog
 const MOCK_INGREDIENTS: Record<string, { name: string; unit: string; price: number }[]> = {
@@ -1068,7 +1070,7 @@ export default function CosteoPage() {
         </Link>
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-gray-900">Costeando mi menú</h2>
+            <h2 className="text-xl font-bold text-gray-900">{t("costeo.title")}</h2>
             <button
               onClick={() => setShowShortcuts(true)}
               className="w-6 h-6 rounded-full border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 text-xs font-bold transition-colors"
@@ -1084,7 +1086,7 @@ export default function CosteoPage() {
                 title="Exportar platillos del filtro activo a CSV"
               >
                 <Download className="w-3.5 h-3.5" />
-                Exportar CSV
+                {t("costeo.exportCsv")}
               </button>
             )}
             <button
@@ -1118,7 +1120,7 @@ export default function CosteoPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Percent className="w-5 h-5 text-blue-600" />
-            <h3 className="font-semibold text-gray-900">Food Cost objetivo</h3>
+            <h3 className="font-semibold text-gray-900">{t("costeo.foodCostTarget")}</h3>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -1147,15 +1149,15 @@ export default function CosteoPage() {
         <div className="mb-6">
           <EmptyState
             icon={Calculator}
-            title="Tu menú aún no tiene platillos costeados"
-            description="Costea tu primer platillo con sus ingredientes y el precio sugerido se calculará automáticamente según tu food cost objetivo."
+            title={t("costeo.emptyTitle")}
+            description={t("costeo.emptyDescription")}
             action={
               <button
                 onClick={() => setShowForm(true)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#108910] text-white text-xs font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Crear tu primer platillo
+                {t("costeo.createFirst")}
               </button>
             }
           />
@@ -1327,7 +1329,7 @@ export default function CosteoPage() {
                     <button onClick={() => duplicateDish(dish)} className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-500 transition-colors" title="Duplicar platillo" aria-label={`Duplicar ${dish.name}`}>
                       <Plus className="w-4 h-4" />
                     </button>
-                    <button onClick={() => startEditDish(dish)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title="Editar platillo" aria-label={`Editar ${dish.name}`}>
+                    <button onClick={() => startEditDish(dish)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors" title={t("costeo.editDish")} aria-label={`Editar ${dish.name}`}>
                       <Edit3 className="w-4 h-4" />
                     </button>
                     <button onClick={() => removeDish(dish.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar platillo" aria-label={`Eliminar ${dish.name}`}>
@@ -1397,7 +1399,7 @@ export default function CosteoPage() {
       {showForm ? (
         <div className="bg-white rounded-2xl border border-[#108910]/30 p-5 mb-6">
           <h4 className="font-semibold text-gray-900 mb-4">
-            {editingDishId ? "Editar platillo" : "Nuevo platillo"}
+            {editingDishId ? t("costeo.editDish") : t("costeo.newDish")}
           </h4>
           <input
             type="text"
@@ -1430,12 +1432,12 @@ export default function CosteoPage() {
           {/* Portions input */}
           <div className="flex items-center gap-2 mb-4">
             <span className="text-xs text-gray-400">Rinde:</span>
-            <input
-              type="number"
-              value={newDishPortions || ""}
-              onChange={(e) => setNewDishPortions(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-20 px-3 py-2 rounded-lg border border-gray-200 text-sm text-center focus:outline-none focus:border-[#108910]"
-              min="1"
+            <NumberInput
+              value={newDishPortions}
+              onChange={(v) => setNewDishPortions(Math.max(1, v))}
+              min={1}
+              ariaLabel="Porciones"
+              className="w-20 text-center"
             />
             <span className="text-xs text-gray-400">porciones</span>
           </div>

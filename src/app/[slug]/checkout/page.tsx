@@ -277,11 +277,68 @@ export default function CheckoutPage() {
     )
   }
 
+  /**
+   * Crea el PaymentIntent (POST /api/payments/stripe/create-intent) para una
+   * orden de tarjeta ya registrada y muestra el formulario de Stripe.
+   * Reutilizable en el primer intento y en el reintento tras un fallo.
+   */
+  const initializeCardPayment = async (
+    orderId: number,
+    cashback: { credits: number; tier: string | null } | null
+  ) => {
+    setCreatedOrderId(orderId)
+    setEarnedCashback(cashback)
+
+    try {
+      const guestToken = isLoggedIn === false ? getGuestToken() ?? undefined : undefined
+
+      const intentResponse = await fetch("/api/payments/stripe/create-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: orderId,
+          type: "main",
+          // Checkout anónimo: el servidor valida el guest_token contra la
+          // dirección del pedido antes de crear el intent.
+          ...(guestToken ? { guest_token: guestToken } : {}),
+        }),
+      })
+
+      const intentData = await intentResponse.json()
+
+      if (!intentResponse.ok || !intentData.clientSecret) {
+        setCheckoutError(
+          intentData.error || "No se pudo inicializar el pago con Stripe."
+        )
+        setIsProcessing(false)
+        return
+      }
+
+      setStripeClientSecret(intentData.clientSecret)
+      setShowStripeForm(true)
+      setIsProcessing(false)
+    } catch (intentErr) {
+      setCheckoutError(
+        intentErr instanceof Error
+          ? intentErr.message
+          : "Error de conexión al inicializar el pago."
+      )
+      setIsProcessing(false)
+    }
+  }
+
   const handlePlaceOrder = async () => {
     setIsProcessing(true)
     setCheckoutError(null)
 
     try {
+      // Reintento tras un fallo al crear el intent: la orden ya existe. No se
+      // duplica la orden ni el cupón, solo se reintenta inicializar el pago.
+      if (paymentMethod === "card" && createdOrderId) {
+        await initializeCardPayment(createdOrderId, earnedCashback)
+        return
+      }
+
       // Solo se envía address_id si la dirección seleccionada NO fue editada;
       // si el usuario modificó un campo, se crea/actualiza una nueva.
       const selectedAddress = savedAddresses.find((a) => a.id === selectedAddressId)
@@ -353,16 +410,12 @@ export default function CheckoutPage() {
       const supabase = createClient()
       if (supabase) loadSavedAddresses(supabase)
 
-      // Card payment → show Stripe form
-      if (paymentMethod === "card" && data.clientSecret) {
-        setCreatedOrderId(data.orderId ?? null)
-        setEarnedCashback({
+      // Card payment → crear PaymentIntent (ruta dedicada) y mostrar Stripe form.
+      if (paymentMethod === "card" && data.orderId) {
+        await initializeCardPayment(data.orderId, {
           credits: data.cashbackCredits ?? 0,
           tier: data.cashbackTier ?? null,
         })
-        setStripeClientSecret(data.clientSecret)
-        setShowStripeForm(true)
-        setIsProcessing(false)
         return
       }
 

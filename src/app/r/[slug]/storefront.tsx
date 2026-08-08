@@ -144,6 +144,14 @@ export function FoodosStorefront({
 
     setLoading(true)
     try {
+      // Reintento tras un fallo al crear el intent: el pedido ya existe; no se
+      // duplica, solo se reintenta inicializar el pago.
+      if (paymentMethod === "card" && orderId) {
+        setLoading(false)
+        await submitCardPayment(orderId)
+        return
+      }
+
       const res = await fetch("/api/foodos/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -169,21 +177,54 @@ export function FoodosStorefront({
         return
       }
 
-      if (data.clientSecret) {
-        setOrderId(data.orderId)
-        setTotal(data.total)
-        setClientSecret(data.clientSecret)
-        setLoading(false)
+      setOrderId(data.orderId)
+      setTotal(data.total)
+
+      // Tarjeta → crear PaymentIntent (ruta dedicada) y mostrar el Stripe form.
+      if (paymentMethod === "card") {
+        await submitCardPayment(data.orderId)
         return
       }
 
-      setOrderId(data.orderId)
-      setTotal(data.total)
       setCart([])
       setView("success")
       setLoading(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error inesperado.")
+      setLoading(false)
+    }
+  }
+
+  /** Crea el PaymentIntent para un pedido foodos de tarjeta ya registrado. */
+  const submitCardPayment = async (orderIdValue: string) => {
+    setLoading(true)
+    try {
+      const intentRes = await fetch("/api/payments/stripe/create-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: orderIdValue,
+          type: "foodos",
+        }),
+      })
+
+      const intentData = await intentRes.json()
+      if (!intentRes.ok || !intentData.clientSecret) {
+        setError(
+          intentData.error ?? "No se pudo inicializar el pago con Stripe."
+        )
+        setLoading(false)
+        return
+      }
+
+      setClientSecret(intentData.clientSecret)
+      setLoading(false)
+    } catch (intentErr) {
+      setError(
+        intentErr instanceof Error
+          ? intentErr.message
+          : "Error al inicializar el pago."
+      )
       setLoading(false)
     }
   }

@@ -9,7 +9,8 @@ import {
 } from "@/lib/catalog-cache"
 import { getCityLandingSchema } from "@/lib/structured-data"
 import { createClient, hasSessionCookie } from "@/lib/supabase/server"
-import type { Category, Product, RestaurantCollection } from "@/types"
+import { getCityBySlug } from "@/lib/data"
+import type { Category, Product, RestaurantCollection, City } from "@/types"
 
 // ISR: revalidate every hour so new collections/products appear without manual deploy
 export const revalidate = 3600
@@ -18,9 +19,25 @@ interface Props {
   params: Promise<{ slug: string }>
 }
 
+/**
+ * Resuelve la ciudad con datos de la tabla `cities` de Supabase cuando está
+ * disponible (lat/lng/state actualizados en DB), degradando al catálogo
+ * estático cuando no hay Supabase o la ciudad no existe en DB.
+ */
+async function resolveCity(slug: string): Promise<City | undefined> {
+  const staticCity = MEXICO_CITIES.find((c) => c.slug === slug)
+  try {
+    const dbCity = await getCityBySlug(slug)
+    if (dbCity) return dbCity
+  } catch {
+    // Sin Supabase — usar catálogo estático
+  }
+  return staticCity
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
-  const city = MEXICO_CITIES.find((c) => c.slug === slug)
+  const city = await resolveCity(slug)
 
   if (!city) return { title: "Ciudad no encontrada — Resurte.me" }
 
@@ -60,7 +77,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CityPage({ params }: Props) {
   const { slug } = await params
-  const city = MEXICO_CITIES.find((c) => c.slug === slug)
+  const city = await resolveCity(slug)
 
   if (!city) notFound()
 
