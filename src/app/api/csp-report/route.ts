@@ -17,13 +17,35 @@ import { logger } from "@/lib/logger"
 const MAX_BODY_BYTES = 16 * 1024
 const WINDOW_MS = 60_000
 const MAX_PER_WINDOW = 20
+const MAX_GLOBAL_PER_WINDOW = 200
 
-// fixed-window rate limit simple en memoria. Suficiente para este endpoint:
-// el objetivo es observar violaciones, no endurecer contra atacantes.
+// Límite fijo de ventana en memoria.
+//
+// Evaluación honesta de durabilidad: este store pierde estado en cold
+// start (Vercel serverless). Aceptamos la limitación a propósito:
+//   - El endpoint NO tiene side-effects de datos: solo registra metadata
+//     de violaciones. El peor caso de abuso es ingesta extra de logs,
+//     nunca corrupción de datos ni acceso.
+//   - Un store durable (Supabase/Redis) añadiría latencia y costo por
+//     request para un endpoint de observación; no justifica el tradeoff
+//     hoy.
+// Mitigaciones compensatorias: límite global además del per-IP (protege
+// contra muchos IPs a la vez) y validación estricta del shape del reporte
+// ANTES de contabilizar el rate-limit.
 const ipCounters = new Map<string, { count: number; windowStart: number }>()
+let globalCount = 0
+let globalWindowStart = Date.now()
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now()
+
+  if (now - globalWindowStart >= WINDOW_MS) {
+    globalCount = 0
+    globalWindowStart = now
+  }
+  globalCount += 1
+  if (globalCount > MAX_GLOBAL_PER_WINDOW) return true
+
   const entry = ipCounters.get(ip)
   if (!entry || now - entry.windowStart >= WINDOW_MS) {
     ipCounters.set(ip, { count: 1, windowStart: now })
@@ -32,6 +54,33 @@ function isRateLimited(ip: string): boolean {
   entry.count += 1
   return entry.count > MAX_PER_WINDOW
 }
+
+// Directivas CSP reales que el navegador puede reportar. Cualquier otra
+// cadena en effective-directive indica un POST malformado (spam) y se
+// descarta sin loguear — protege contra ruido que no es una violación real.
+const KNOWN_CSP_DIRECTIVES = new Set([
+  "base-uri",
+  "child-src",
+  "connect-src",
+  "default-src",
+  "font-src",
+  "form-action",
+  "frame-ancestors",
+  "frame-src",
+  "img-src",
+  "manifest-src",
+  "media-src",
+  "object-src",
+  "prefetch-src",
+  "report-to",
+  "script-src",
+  "script-src-attr",
+  "script-src-elem",
+  "style-src",
+  "style-src-attr",
+  "style-src-elem",
+  "worker-src",
+])
 
 /** Recorta query string/credenciales de un URI para no loguear datos de usuario. */
 function safeUri(uri: unknown): string | undefined {
@@ -86,9 +135,20 @@ export async function POST(request: NextRequest) {
     return new NextResponse(null, { status: 204 })
   }
 
+  // Valida que el reporte corresponda a una directiva CSP real. Un POST
+  // con effective-directive desconocida es spam malformado: se descarta
+  // sin loguear (no cuenta contra el rate-limit del autor real).
+  const effectiveDirective = cspReport["effective-directive"]
+  if (
+    typeof effectiveDirective !== "string" ||
+    !KNOWN_CSP_DIRECTIVES.has(effectiveDirective)
+  ) {
+    return new NextResponse(null, { status: 204 })
+  }
+
   logger.warn("[CSP-VIOLATION]", {
     disposition: cspReport["disposition"] ?? "enforce",
-    effective_directive: cspReport["effective-directive"] ?? undefined,
+    effective_directive: effectiveDirective,
     violated_directive: cspReport["violated-directive"] ?? undefined,
     blocked_uri: safeUri(cspReport["blocked-uri"]),
     source_file: safeUri(cspReport["source-file"]),

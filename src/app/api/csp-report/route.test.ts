@@ -58,6 +58,20 @@ describe("POST /api/csp-report", () => {
     expect(spy).not.toHaveBeenCalled()
   })
 
+  it("descarta sin loguear reportes con directiva CSP desconocida", async () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const res = await POST(
+      post({
+        "csp-report": {
+          "effective-directive": "definitely-not-a-directive",
+          "blocked-uri": "https://spam.example/",
+        },
+      })
+    )
+    expect(res.status).toBe(204)
+    expect(spy).not.toHaveBeenCalled()
+  })
+
   it("rechaza JSON inválido con 400", async () => {
     const res = await POST(post("not json", { "content-type": "application/json" }))
     expect(res.status).toBe(400)
