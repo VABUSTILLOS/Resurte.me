@@ -13,6 +13,13 @@ export interface SelectedBump {
   unitPrice: number
 }
 
+/**
+ * Clave de sessionStorage que transporta los bumps seleccionados entre la
+ * página /cart (desktop) y /checkout. El drawer móvil usa el CustomEvent
+ * CHECKOUT_DRAWER_EVENT en su lugar; aquí no aplica.
+ */
+export const BUMPS_STORAGE_KEY = "resurte:selected-bumps"
+
 interface BumpCardsProps {
   /** product_id → quantity del carrito (para derivar reglas server-side). */
   cartItems: { product_id: number; quantity: number }[]

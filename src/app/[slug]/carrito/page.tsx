@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
@@ -15,11 +16,34 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { CouponInput } from "@/components/cart/coupon-input"
+import { BumpCards, BUMPS_STORAGE_KEY, type SelectedBump } from "@/components/checkout/BumpCards"
 
 export default function CartPage() {
   const { cart, itemCount, subtotal, discount, updateQuantity, removeItem, clearCart } = useCart()
   const { city } = useCity()
   const router = useRouter()
+  // Order bumps (cross-sell estilo ThriveCart). La selección se persiste en
+  // sessionStorage para que /checkout la incluya en la orden al pagar.
+  const [selectedBumps, setSelectedBumps] = useState<SelectedBump[]>(() => {
+    if (typeof window === "undefined") return []
+    try {
+      const raw = window.sessionStorage.getItem(BUMPS_STORAGE_KEY)
+      return raw ? (JSON.parse(raw) as SelectedBump[]) : []
+    } catch {
+      return []
+    }
+  })
+  const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
+  const bumpsTotal = Math.max(0, subtotal - discount + bumpsSubtotal)
+
+  const handleBumpsChange = (next: SelectedBump[]) => {
+    setSelectedBumps(next)
+    try {
+      window.sessionStorage.setItem(BUMPS_STORAGE_KEY, JSON.stringify(next))
+    } catch {
+      // no-op: la selección vive solo en memoria
+    }
+  }
 
   if (!city) {
     return (
@@ -148,6 +172,13 @@ export default function CartPage() {
             </div>
           ))}
 
+          {/* Cross-sell: order bumps inteligentes (mecánica ThriveCart) */}
+          <BumpCards
+            cartItems={cart.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity }))}
+            selected={selectedBumps}
+            onChange={handleBumpsChange}
+          />
+
           <Link
             href={`/${city.slug}/buscar`}
             className="inline-flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 font-medium"
@@ -167,6 +198,13 @@ export default function CartPage() {
                 <span className="text-gray-500">Subtotal ({itemCount})</span>
                 <span className="font-semibold text-gray-900">${subtotal.toFixed(2)}</span>
               </div>
+
+              {bumpsSubtotal > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Artículos especiales</span>
+                  <span className="font-semibold text-gray-900">${bumpsSubtotal.toFixed(2)}</span>
+                </div>
+              )}
 
               {discount > 0 && (
                 <div className="flex justify-between text-sm">
@@ -191,7 +229,7 @@ export default function CartPage() {
               <div className="flex justify-between">
                 <span className="text-lg font-bold text-gray-900">Total estimado</span>
                 <span className="text-lg font-bold text-brand-600">
-                  ${(subtotal - discount).toFixed(2)}
+                  ${bumpsTotal.toFixed(2)}
                 </span>
               </div>
               <p className="text-[11px] text-gray-400 text-right -mt-3">+ envío por calcular</p>

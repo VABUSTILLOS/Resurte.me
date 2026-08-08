@@ -7,13 +7,28 @@ import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { CouponInput } from "@/components/cart/coupon-input"
+import { BumpCards, BUMPS_STORAGE_KEY, type SelectedBump } from "@/components/checkout/BumpCards"
 
 export default function CartPage() {
   const { cart, itemCount, subtotal, discount, coupon, removeItem, updateQuantity, clearCart, addItem } = useCart()
   const { city } = useCity()
   const [confirmClear, setConfirmClear] = useState(false)
   const [restoreStatus, setRestoreStatus] = useState<"idle" | "loading" | "done" | "error">("idle")
+  // Order bumps (cross-sell estilo ThriveCart). La selección se persiste en
+  // sessionStorage para que /checkout la incluya en la orden al pagar; si el
+  // usuario edita el carrito, BumpCards descarta los bumps que ya no aplican.
+  const [selectedBumps, setSelectedBumps] = useState<SelectedBump[]>(() => {
+    if (typeof window === "undefined") return []
+    try {
+      const raw = window.sessionStorage.getItem(BUMPS_STORAGE_KEY)
+      return raw ? (JSON.parse(raw) as SelectedBump[]) : []
+    } catch {
+      return []
+    }
+  })
   const deliveryFee = itemCount > 0 ? 35 : 0
+  const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
+  const bumpsTotal = Math.max(0, subtotal - discount + bumpsSubtotal + deliveryFee)
 
   // Restaura el carrito desde el enlace "restore=<order_id>" del email de
   // carrito abandonado. Solo funciona si el usuario tiene sesión (RLS exige
@@ -85,6 +100,18 @@ export default function CartPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Recupera los bumps seleccionados antes de venir a /checkout (sessionStorage
+  // persiste entre páginas del mismo tab; si no está disponible, no se bloquea).
+  // Se lee una sola vez en el inicializador para cumplir la regla de efectos.
+  const handleBumpsChange = (next: SelectedBump[]) => {
+    setSelectedBumps(next)
+    try {
+      sessionStorage.setItem(BUMPS_STORAGE_KEY, JSON.stringify(next))
+    } catch {
+      // no-op: la selección vive solo en memoria
+    }
+  }
 
   const handleClear = () => {
     if (confirmClear) {
@@ -255,6 +282,14 @@ export default function CartPage() {
         })}
       </div>
 
+      {/* Cross-sell: order bumps inteligentes (mecánica ThriveCart). Mismo
+          componente que el drawer móvil — visible también en desktop. */}
+      <BumpCards
+        cartItems={cart.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity }))}
+        selected={selectedBumps}
+        onChange={handleBumpsChange}
+      />
+
       {/* Summary */}
       <div className="bg-white rounded-xl border border-[#e0dbd2] p-5">
         <h2 className="font-bold text-[#242529] mb-4">Resumen del pedido</h2>
@@ -264,6 +299,12 @@ export default function CartPage() {
             <span>Subtotal ({itemCount} productos)</span>
             <span className="tabular-nums">${subtotal.toFixed(2)}</span>
           </div>
+          {bumpsSubtotal > 0 && (
+            <div className="flex justify-between text-[var(--text-secondary)]">
+              <span>Artículos especiales</span>
+              <span className="tabular-nums">${bumpsSubtotal.toFixed(2)}</span>
+            </div>
+          )}
           {discount > 0 && (
             <div className="flex justify-between text-[#0E7A0E]">
               <span>Descuento {coupon ? `(${coupon.code})` : ""}</span>
@@ -281,7 +322,7 @@ export default function CartPage() {
         <div className="flex justify-between items-center pt-4 border-t border-[#e0dbd2]">
           <span className="text-base font-bold text-[#242529]">Total</span>
           <span className="text-xl font-bold text-[#1a1a1a] tabular-nums">
-            ${Math.max(0, subtotal - discount + deliveryFee).toFixed(2)}
+            ${bumpsTotal.toFixed(2)}
           </span>
         </div>
 

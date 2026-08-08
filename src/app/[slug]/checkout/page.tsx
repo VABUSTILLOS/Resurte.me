@@ -34,14 +34,15 @@ import { AddressStep } from "@/components/checkout/AddressStep"
 import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { ReviewStep } from "@/components/checkout/ReviewStep"
 import { PaymentStep } from "@/components/checkout/PaymentStep"
-import { validDeliveryFee } from "@/lib/checkout-config"
+import { BUMPS_STORAGE_KEY, type SelectedBump } from "@/components/checkout/BumpCards"
+import { validDeliveryFee, calcCouponDiscount } from "@/lib/checkout-config"
 
 // ============================================================
 // Page
 // ============================================================
 
 export default function CheckoutPage() {
-  const { cart, itemCount, subtotal, discount, clearCart, coupon } = useCart()
+  const { cart, itemCount, subtotal, clearCart, coupon } = useCart()
   const { city } = useCity()
   const router = useRouter()
 
@@ -61,6 +62,19 @@ export default function CheckoutPage() {
   // Direcciones guardadas del usuario (solo visibles para dueño vía RLS)
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
+
+  // Order bumps elegidos en /cart (desktop). Se cargan de sessionStorage (una
+  // sola vez, en el inicializador) y se incluyen en la orden como items con
+  // item_type="bump"; el servidor valida precios y reglas contra bump_rules.
+  const [selectedBumps] = useState<SelectedBump[]>(() => {
+    if (typeof window === "undefined") return []
+    try {
+      const raw = window.sessionStorage.getItem(BUMPS_STORAGE_KEY)
+      return raw ? (JSON.parse(raw) as SelectedBump[]) : []
+    } catch {
+      return []
+    }
+  })
 
   // Detecta si el usuario tiene sesión para sugerirle iniciarla (historial +
   // créditos de recompensa). null = aún verificando / sin Supabase configurado.
@@ -136,9 +150,17 @@ export default function CheckoutPage() {
   // Cashback estimado devuelto por POST /api/orders (se muestra tras pagar)
   const [earnedCashback, setEarnedCashback] = useState<{ credits: number; tier: string | null } | null>(null)
 
+  // ── Totales en tiempo real (subtotal pagable + bumps seleccionados) ──
+  // El descuento de cupón se calcula sobre el subtotal CON bumps incluidos,
+  // igual que el servidor en POST /api/orders — así el total coincide a 0.01.
+  const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
+  const effectiveSubtotal = subtotal + bumpsSubtotal
+  const discountAmount = calcCouponDiscount(effectiveSubtotal, coupon)
+  const payableSubtotal = effectiveSubtotal - discountAmount
+  const allItemsCount = itemCount + selectedBumps.length
   // Envío gratis desde $500 MXN (misma regla que el servidor en POST /api/orders)
-  const deliveryFee = validDeliveryFee(itemCount, subtotal - discount, 35)
-  const total = subtotal - discount + deliveryFee
+  const deliveryFee = validDeliveryFee(allItemsCount, payableSubtotal, 35)
+  const total = payableSubtotal + deliveryFee
 
   // Persist the order summary so the confirmation page can fire a complete
   // `purchase` event after the cart is cleared.
@@ -150,12 +172,20 @@ export default function CheckoutPage() {
         total,
         cashbackCredits: cashbackCredits ?? 0,
         cashbackTier: cashbackTier ?? null,
-        items: cart.items.map((i) => ({
-          id: String(i.product_id),
-          name: i.name,
-          quantity: i.quantity,
-          price: i.sale_price ?? i.price,
-        })),
+        items: [
+          ...cart.items.map((i) => ({
+            id: String(i.product_id),
+            name: i.name,
+            quantity: i.quantity,
+            price: i.sale_price ?? i.price,
+          })),
+          ...selectedBumps.map((b) => ({
+            id: String(b.productId),
+            name: String(b.productId),
+            quantity: b.quantity,
+            price: b.unitPrice,
+          })),
+        ],
       })
     )
   }
@@ -314,16 +344,25 @@ export default function CheckoutPage() {
           },
           payment_method: paymentMethod,
           phone,
-          subtotal,
+          subtotal: effectiveSubtotal,
           delivery_fee: deliveryFee,
           total,
           coupon_code: coupon?.code,
-          items: cart.items.map((item) => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            unit_price: item.sale_price ?? item.price,
-            name: item.name,
-          })),
+          items: [
+            ...cart.items.map((item) => ({
+              product_id: item.product_id,
+              quantity: item.quantity,
+              unit_price: item.sale_price ?? item.price,
+              name: item.name,
+            })),
+            ...selectedBumps.map((b) => ({
+              product_id: b.productId,
+              quantity: b.quantity,
+              unit_price: b.unitPrice,
+              name: String(b.productId),
+              item_type: "bump" as const,
+            })),
+          ],
         }),
       })
 
@@ -333,6 +372,14 @@ export default function CheckoutPage() {
         setCheckoutError(data.error || "Error al crear el pedido")
         setIsProcessing(false)
         return
+      }
+
+      // La orden ya capturó los bumps; se limpia la selección temporal para que
+      // una próxima compra en este tab no arrastre artículos especiales viejos.
+      try {
+        sessionStorage.removeItem(BUMPS_STORAGE_KEY)
+      } catch {
+        // no-op
       }
 
       // Autoguardado (checkout anónimo): persiste el guest_token del servidor
@@ -510,10 +557,23 @@ export default function CheckoutPage() {
           address={address}
           schedule={schedule}
           city={city}
-          cartItems={cart.items}
-          itemCount={itemCount}
-          subtotal={subtotal}
-          discount={discount}
+          cartItems={[
+            ...cart.items,
+            ...selectedBumps.map((b) => ({
+              product_id: b.productId,
+              name: String(b.productId),
+              slug: "",
+              image_url: "",
+              brand: "",
+              price: b.unitPrice,
+              sale_price: b.unitPrice,
+              quantity: b.quantity,
+              stock_status: "in_stock" as const,
+            })),
+          ]}
+          itemCount={allItemsCount}
+          subtotal={effectiveSubtotal}
+          discount={discountAmount}
           deliveryFee={deliveryFee}
           total={total}
           onEditAddress={() => setStep("address")}
