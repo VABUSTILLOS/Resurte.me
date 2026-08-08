@@ -12,6 +12,8 @@
 const RESEND_API = "https://api.resend.com/emails"
 const FROM_DEFAULT = "Resurte.me <hola@resurte.me>"
 
+import { logger } from "@/lib/logger"
+
 export interface EmailPayload {
   to: string
   subject: string
@@ -33,15 +35,23 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
 
   if (!apiKey) {
     // Dev fallback: log to console
-    console.log("\n📧 [EMAIL DEV] Would send email:")
-    console.log(`   To:      ${payload.to}`)
-    console.log(`   Subject: ${payload.subject}`)
-    console.log(`   Tag:     ${payload.tag ?? "—"}`)
-    console.log(`   HTML:    ${payload.html.slice(0, 120)}...`)
+    logger.warn("email.dev_fallback", {
+      to: payload.to,
+      subject: payload.subject,
+      tag: payload.tag ?? "—",
+      htmlPreview: payload.html.slice(0, 120),
+    })
     return { ok: true, id: "dev-logged" }
   }
 
-  const body: Record<string, unknown> = {
+  const body: {
+    from: string
+    to: string[]
+    subject: string
+    html: string
+    reply_to?: string
+    tags?: { name: string; value: string }[]
+  } = {
     from: payload.from ?? FROM_DEFAULT,
     to: [payload.to],
     subject: payload.subject,

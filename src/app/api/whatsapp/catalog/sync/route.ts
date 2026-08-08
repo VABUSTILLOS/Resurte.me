@@ -9,9 +9,17 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { syncCatalog, type WhatsAppProduct } from "@/lib/whatsapp"
+import { requireAdmin } from "@/lib/admin-auth"
+import { createServiceClient } from "@/lib/supabase/service"
 
 export async function POST(req: NextRequest) {
   try {
+    // Solo administradores pueden sincronizar el catálogo de WhatsApp Commerce.
+    const { response: adminDenied } = await requireAdmin()
+    if (adminDenied) {
+      return adminDenied
+    }
+
     const body = await req.json()
 
     const { products } = body as {
@@ -25,11 +33,28 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // TODO: Verify admin authentication
-
     const result = await syncCatalog(products)
 
-    // TODO: Log sync to Supabase
+    // Log del sync en whatsapp_messages (auditoría de catálogo).
+    const supabase = await createServiceClient()
+    try {
+      const { error: logError } = await supabase.from("whatsapp_messages").insert({
+        from_number: "system",
+        message_type: "catalog_sync",
+        content: JSON.stringify({
+          added: result.added,
+          removed: result.removed,
+          total_in_catalog: products.length,
+          synced_at: new Date().toISOString(),
+        }),
+        direction: "outbound",
+      })
+      if (logError) {
+        console.error("WhatsApp catalog sync log error:", logError)
+      }
+    } catch (logErr) {
+      console.error("WhatsApp catalog sync log unexpected error:", logErr)
+    }
 
     return NextResponse.json({
       success: true,

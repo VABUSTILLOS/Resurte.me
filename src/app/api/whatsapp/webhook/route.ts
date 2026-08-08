@@ -14,7 +14,9 @@
 
 import { createHmac, timingSafeEqual } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
-import { verifyWebhook } from "@/lib/whatsapp"
+import { verifyWebhook, sendTextMessage } from "@/lib/whatsapp"
+import { createServiceClient } from "@/lib/supabase/service"
+import { logger } from "@/lib/logger"
 
 // ============================================================
 // GET — Webhook Verification
@@ -59,7 +61,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
     }
 
-    const body = JSON.parse(rawBody)
+    const body: WhatsAppBody = JSON.parse(rawBody)
 
     // Meta sends an array of entries, each containing changes
     if (!body.entry || !Array.isArray(body.entry)) {
@@ -116,76 +118,255 @@ function verifySignature(
 }
 
 // ============================================================
+// Tipos del payload de Meta (Graph API webhook)
+// ============================================================
+
+interface WhatsAppTextPayload {
+  body?: string
+}
+
+interface WhatsAppMessage {
+  from?: string
+  id?: string
+  timestamp?: string | number
+  type?: string
+  text?: WhatsAppTextPayload
+  interactive?: unknown
+}
+
+interface WhatsAppValue {
+  messages?: WhatsAppMessage[]
+  statuses?: WhatsAppStatus[]
+  metadata?: { display_phone_number?: string }
+}
+
+interface WhatsAppStatus {
+  id?: string
+  status?: string
+  recipient_id?: string
+  timestamp?: string | number
+}
+
+interface WhatsAppChange {
+  value: WhatsAppValue
+}
+
+interface WhatsAppEntry {
+  changes?: WhatsAppChange[]
+}
+
+interface WhatsAppBody {
+  entry?: WhatsAppEntry[]
+}
+
+// ============================================================
 // Handlers
 // ============================================================
 
-async function handleIncomingMessage(
-  message: Record<string, unknown>,
-  value: Record<string, unknown>
-) {
-  const metadata = value.metadata as Record<string, unknown> | undefined
-  const from = (message.from as string) || metadata?.display_phone_number || "unknown"
-  const messageType = (message.type as string) || "unknown"
+async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppValue) {
+  const metadata = value.metadata
+  const from =
+    message.from ||
+    metadata?.display_phone_number ||
+    "unknown"
+  const messageType = message.type || "unknown"
+  const messageId = message.id || null
 
-  // Registro estructurado del evento entrante. El almacenamiento en
-  // `whatsapp_messages` queda pendiente de decidir el modelo de tenant:
-  // esa tabla exige `store_id` (esquema B2B, BIGINT) y FoodOS usa UUID
-  // de `foodos_restaurants`, por lo que no hay mapeo fiable aún.
-  console.log(
-    JSON.stringify({
-      event: "whatsapp.incoming",
-      from,
-      type: messageType,
-      messageId: message.id ?? null,
-      timestamp: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : null,
-      content:
-        messageType === "text" && message.text
-          ? (message.text as { body?: string }).body ?? null
-          : null,
-    })
-  )
-
-  // TODO: Route message based on type:
-  //   - text → Check for order keywords, product queries
-  //   - interactive → Handle button/list replies
-  //   - order → Process WhatsApp Commerce order
-  //   - button → Handle template button clicks
-
-  // Auto-reply for text messages (simple echo for now)
+  // Contenido estructurado (texto simple por ahora; interactive/button
+  // se registran igualmente con su tipo para auditoría).
+  let content: string | null = null
   if (messageType === "text" && message.text) {
-    const text = (message.text as { body: string }).body.toLowerCase()
+    content = message.text.body ?? null
+  } else if (messageType === "interactive" && message.interactive) {
+    content = JSON.stringify(message.interactive)
+  }
 
-    // TODO: Implement NLP / keyword routing
-    if (text.includes("pedido") || text.includes("orden")) {
-      // TODO: Look up recent orders for this phone number
+  // Persistir el mensaje entrante en whatsapp_messages (service_role:
+  // RLS 00034 restringe estas tablas a service client). store_id se
+  // resuelve con el DEFAULT de la tienda activa (migración 00032).
+  const supabase = await createServiceClient()
+  try {
+    const { error } = await supabase.from("whatsapp_messages").insert({
+      from_number: from,
+      message_type: `incoming:${messageType}`,
+      content,
+      direction: "inbound",
+      message_id: messageId,
+    })
+    if (error) {
+      console.error("WhatsApp webhook: failed to persist incoming message:", error)
+    }
+  } catch (err) {
+    console.error("WhatsApp webhook: unexpected error persisting message:", err)
+  }
+
+  logger.info("whatsapp.incoming", {
+    messageId,
+    type: messageType,
+    timestamp: message.timestamp ? new Date(Number(message.timestamp) * 1000).toISOString() : null,
+  })
+
+  // Routing NLP por keywords — solo mensajes de texto reciben respuesta
+  // (los replies de templates/interactive requieren el ID del botón).
+  if (messageType === "text" && content) {
+    const text = content.toLowerCase()
+
+    if (text.includes("pedido") || text.includes("orden") || text.includes("mi pedido")) {
+      await handleOrderLookup(from)
+      return
     }
 
-    if (text.includes("catálogo") || text.includes("productos")) {
-      // TODO: Send catalog link
+    if (text.includes("catálogo") || text.includes("catalogo") || text.includes("productos") || text.includes("menú") || text.includes("menu")) {
+      await sendCatalogLink(from)
+      return
     }
 
-    if (text.includes("ayuda") || text.includes("soporte")) {
-      // TODO: Route to support or send FAQ
+    if (text.includes("ayuda") || text.includes("soporte") || text.includes("contacto")) {
+      await sendSupportInfo(from)
+      return
     }
+
+    // Fallback de bienvenida: orienta al usuario a los comandos disponibles.
+    await sendTextMessage({
+      to: from,
+      text: "¡Hola! 👋 Puedo ayudarte con:\n\n" +
+        "📦 *Tu pedido* — escríbeme \"mi pedido\" para ver el estado.\n" +
+        "🛍️ *Catálogo* — escríbeme \"catálogo\" y te envío el link.\n" +
+        "❓ *Ayuda* — escríbeme \"ayuda\" para hablar con soporte.",
+    }).catch((err) => console.error("WhatsApp webhook: fallback reply failed:", err))
   }
 }
 
-async function handleMessageStatus(
-  status: Record<string, unknown>,
-  _value: Record<string, unknown>
-) {
-  // status.id = message ID
-  // status.status = "sent" | "delivered" | "read" | "failed"
-  // status.timestamp = when the status changed
-  // status.recipient_id = phone number
-  console.log(
-    JSON.stringify({
-      event: "whatsapp.status",
-      messageId: status.id ?? null,
-      status: status.status ?? null,
-      recipientId: status.recipient_id ?? null,
-      timestamp: status.timestamp ? new Date(Number(status.timestamp) * 1000).toISOString() : null,
-    })
-  )
-  // TODO: Update message status in Supabase (depende del modelo de tenant)
+/** Busca el perfil por teléfono (últimos 10 dígitos) y responde con el estado del último pedido. */
+async function handleOrderLookup(from: string) {
+  // Meta envía el número en formato internacional sin '+': 5215512345678.
+  // profiles.phone puede estar como "+52 1 55..." o "5512345678": comparar
+  // por los últimos 10 dígitos cubre ambos formatos de forma fiable.
+  const digits = from.replace(/\D/g, "")
+  const last10 = digits.slice(-10)
+  if (last10.length < 10) {
+    await sendTextMessage({
+      to: from,
+      text: "No pude identificar tu número para buscar tu pedido. Escríbenos a soporte por favor.",
+    }).catch(() => {})
+    return
+  }
+
+  const supabase = await createServiceClient()
+
+  // 1) Encontrar el perfil cuyo teléfono termina en los mismos 10 dígitos.
+  const { data: profiles, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, full_name, phone")
+    .ilike("phone", `%${last10}`)
+    .limit(1)
+
+  if (profileError) {
+    console.error("WhatsApp webhook: profile lookup failed:", profileError)
+    return
+  }
+
+  const profile = profiles?.[0]
+  if (!profile) {
+    await sendTextMessage({
+      to: from,
+      text: "No encontramos un pedido asociado a este número. Si acabas de hacer tu primer pedido, ¡gracias! 🎉\n\n¿Quieres ver el *catálogo*? Escríbeme \"catálogo\".",
+    }).catch(() => {})
+    return
+  }
+
+  // 2) Último pedido del usuario, con su ciudad para contexto.
+  const { data: orders, error: orderError } = await supabase
+    .from("orders")
+    .select(`
+      id,
+      status,
+      total,
+      created_at,
+      city:cities(name)
+    `)
+    .eq("user_id", profile.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+
+  if (orderError) {
+    console.error("WhatsApp webhook: order lookup failed:", orderError)
+    return
+  }
+
+  const order = orders?.[0]
+  if (!order) {
+    await sendTextMessage({
+      to: from,
+      text: "Aún no tienes pedidos registrados en Resurte. Cuando hagas tu primer pedido te avisamos aquí mismo. 📲",
+    }).catch(() => {})
+    return
+  }
+
+  const statusLabel: Record<string, string> = {
+    pending: "pendiente de confirmación",
+    confirmed: "confirmado ✅",
+    preparing: "en preparación 👨‍🍳",
+    out_for_delivery: "en camino 🛵",
+    delivered: "entregado 🎉",
+    cancelled: "cancelado ❌",
+  }
+  const city = (order.city as { name?: string } | null)?.name || "tu ciudad"
+  const total = Number(order.total).toFixed(2)
+
+  await sendTextMessage({
+    to: from,
+    text: `Hola ${profile.full_name || ""} 👋\n\nTu pedido *#${order.id}* (${city}) está: *${statusLabel[order.status as string] || order.status}*\n\nTotal: $${total} MXN\n\n¿Necesitas algo más? Escríbeme \"ayuda\" o \"catálogo\".`,
+  }).catch((err) => console.error("WhatsApp webhook: order status reply failed:", err))
+}
+
+async function sendCatalogLink(from: string) {
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+    "https://resurte.me"
+  await sendTextMessage({
+    to: from,
+    text: "¡Claro! Aquí tienes nuestro catálogo: 🛍️",
+    preview_url: true,
+  }).catch(() => {})
+  await sendTextMessage({
+    to: from,
+    text: `${siteUrl}/comer`,
+    preview_url: true,
+  }).catch((err) => console.error("WhatsApp webhook: catalog link reply failed:", err))
+}
+
+async function sendSupportInfo(from: string) {
+  await sendTextMessage({
+    to: from,
+    text: "¿Necesitas ayuda? 🙋\n\n📞 Escríbenos a *hola@resurte.me* o responde con tu duda y un agente te atenderá en horario de 9:00 a 21:00.\n\nTambién puedes consultar el estado de tu pedido escribiendo \"mi pedido\".",
+  }).catch((err) => console.error("WhatsApp webhook: support reply failed:", err))
+}
+
+async function handleMessageStatus(status: WhatsAppStatus, _value: WhatsAppValue) {
+  const messageId = status.id || null
+  const statusValue = status.status || null
+
+  logger.info("whatsapp.status", {
+    messageId,
+    status: statusValue,
+    timestamp: status.timestamp ? new Date(Number(status.timestamp) * 1000).toISOString() : null,
+  })
+
+  if (!messageId || !statusValue) return
+
+  // Actualizar el status del mensaje original en whatsapp_messages
+  // (columna message_id, migración 00041) vía service client.
+  const supabase = await createServiceClient()
+  try {
+    const { error } = await supabase
+      .from("whatsapp_messages")
+      .update({ status: statusValue })
+      .eq("message_id", messageId)
+    if (error) {
+      console.error("WhatsApp webhook: status update failed:", error)
+    }
+  } catch (err) {
+    console.error("WhatsApp webhook: unexpected error on status update:", err)
+  }
 }

@@ -8,12 +8,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  getMyRestaurant,
-  listCustomers,
+  getFoodosPanelData,
   listAutomations,
+  listCampaigns,
   upsertAutomation,
   toggleAutomation,
-  listCampaigns,
   insertCampaign,
   runCampaignNow,
   deleteCampaign,
@@ -89,21 +88,12 @@ export default function ClientesPage() {
   const [sendingCampaign, setSendingCampaign] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
-      const r = await getMyRestaurant()
+      const { restaurant: r, customers: cs, automations: as, campaigns: cps } = await getFoodosPanelData()
       setRestaurant(r)
-      if (r) {
-        const [cs, as, cps] = await Promise.all([
-          listCustomers(r.id),
-          listAutomations(r.id),
-          listCampaigns(r.id),
-        ])
-        setCustomers(cs)
-        setAutomations(as)
-        setCampaigns(cps)
-      }
+      setCustomers(cs)
+      setAutomations(as)
+      setCampaigns(cps)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar clientes")
     } finally {
@@ -111,7 +101,10 @@ export default function ClientesPage() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const run = async () => { await load() }
+    run()
+  }, [load])
 
   // Recalcular segmento en cliente (espejo del trigger) por si pasó el tiempo
   const computedSegments = useMemo(() => {

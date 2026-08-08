@@ -217,7 +217,7 @@ export default function RentabilidadPage() {
       }
     })
     return merged
-  }, [mockDishes, costeoDishes, priceOverrides, sortBy, costMultiplier, mermaStats])
+  }, [mockDishes, costeoDishes, priceOverrides, sortBy, costMultiplier, mermaFactor])
 
   // Category analysis: counts, avg food cost, avg margin, semaphore per category
   const categoryAnalysis = useMemo(() => {
@@ -603,7 +603,7 @@ export default function RentabilidadPage() {
           <div>
             <h4 className="font-semibold text-gray-900 mb-1 text-sm">¿Cómo usarlo?</h4>
             <p className="text-xs text-gray-500 leading-relaxed">
-              Los platillos de "Mi menú" usan los precios reales del catálogo de Resurte.me vía Costeando mi menú;
+              Los platillos de “Mi menú” usan los precios reales del catálogo de Resurte.me vía Costeando mi menú;
               los platillos de referencia son estimados para tu tipo de cocina. 
               Un food cost arriba del 38% pone en riesgo tu negocio.
             </p>

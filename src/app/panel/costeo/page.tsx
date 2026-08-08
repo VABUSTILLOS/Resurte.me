@@ -11,8 +11,8 @@ import { uid } from "@/lib/ids"
 import Link from "next/link"
 import {
   Calculator, Plus, Trash2, PieChart, ArrowLeft, Gift, Tag,
-  Percent, TrendingDown, AlertCircle, Edit3, Download, CheckSquare,
-  Copy, Printer, BookOpen, Save, X,
+  Percent, TrendingDown, AlertCircle, Edit3, Download,
+  Copy, Printer, BookOpen, Save,
 } from "lucide-react"
 import EmptyState from "@/components/panel/EmptyState"
 import ConfirmDialog from "@/components/panel/ConfirmDialog"
@@ -669,7 +669,7 @@ export default function CosteoPage() {
     if (undoIndex > 0) {
       const newIdx = undoIndex - 1
       setUndoIndex(newIdx)
-      setDishes(undoStack[newIdx])
+      setDishes(undoStack[newIdx]!)
     }
   }
 
@@ -677,7 +677,7 @@ export default function CosteoPage() {
     if (undoIndex < undoStack.length - 1) {
       const newIdx = undoIndex + 1
       setUndoIndex(newIdx)
-      setDishes(undoStack[newIdx])
+      setDishes(undoStack[newIdx]!)
     }
   }
 
@@ -913,16 +913,18 @@ export default function CosteoPage() {
 
   function updateIngredient(idx: number, field: keyof DishIngredient, value: string | number) {
     const updated = [...newDishIngredients]
+    const current = updated[idx]
+    if (!current) return
     if (field === "ingredientName" && typeof value === "string") {
       const found = ingredients.find((ing) => ing.name === value)
       updated[idx] = {
-        ...updated[idx],
+        ...current,
         ingredientName: value,
-        unit: found?.unit || updated[idx].unit,
-        unitPrice: found?.price || updated[idx].unitPrice,
+        unit: found?.unit || current.unit,
+        unitPrice: found?.price || current.unitPrice,
       }
     } else {
-      updated[idx] = { ...updated[idx], [field]: value }
+      updated[idx] = { ...current, [field]: value }
     }
     setNewDishIngredients(updated)
   }
@@ -1264,7 +1266,6 @@ export default function CosteoPage() {
                     </div>
                     <div className="space-y-2.5">
                       {inCat.map((dish) => {
-                        const totalCost = dish.ingredients.reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0)
                         const suggested = dish.sellingPrice
                         const portions = dish.portions || 4
                         return (
@@ -1711,7 +1712,7 @@ export default function CosteoPage() {
                     <div className="mb-3 flex items-center gap-2 text-[11px] font-medium text-red-600 bg-red-50 rounded-lg px-3 py-2">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                       {comboMissingDishes(combo.items).length === 1
-                        ? `El platillo "${comboMissingDishes(combo.items)[0].dishName}" ya no existe — su costo cuenta como $0.`
+                        ? `El platillo "${comboMissingDishes(combo.items)[0]!.dishName}" ya no existe — su costo cuenta como $0.`
                         : `${comboMissingDishes(combo.items).length} platillos de este combo ya no existen — su costo cuenta como $0.`}
                     </div>
                   )}

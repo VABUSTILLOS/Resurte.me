@@ -8,10 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  getMyRestaurant,
-  listOrders,
-  listBranches,
-  listCustomers,
+  getFoodosPanelData,
 } from "../actions"
 import { formatMoney } from "@/lib/foodos"
 import type {
@@ -41,25 +38,15 @@ export default function TableroPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState(30)
-  const [now, setNow] = useState(() => Date.now())
+  const [now] = useState(() => Date.now())
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setNow(Date.now())
     try {
-      const r = await getMyRestaurant()
+      const { restaurant: r, orders: os, branches: bs, customers: cs } = await getFoodosPanelData()
       setRestaurant(r)
-      if (r) {
-        const [os, bs, cs] = await Promise.all([
-          listOrders(r.id),
-          listBranches(r.id),
-          listCustomers(r.id),
-        ])
-        setOrders(os)
-        setBranches(bs)
-        setCustomers(cs)
-      }
+      setOrders(os)
+      setBranches(bs)
+      setCustomers(cs)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar el tablero")
     } finally {
@@ -67,7 +54,10 @@ export default function TableroPage() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const run = async () => { await load() }
+    run()
+  }, [load])
 
   const metrics = useMemo(() => {
     const cutoff = now - days * DAY_MS

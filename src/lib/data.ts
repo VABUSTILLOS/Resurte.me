@@ -235,7 +235,9 @@ export async function getRestaurantCollectionBySlug(
  * Las colecciones funcionan como queries filtradas: los productos deben tener al
  * menos un tag que coincida con los tags de la colección.
  *
- * Usa el operador ?| de PostgreSQL JSONB para intersección de arrays.
+ * El filtrado se hace en PostgreSQL (RPC get_products_by_collection) usando el
+ * operador JSONB `?|` sobre el índice GIN de products.tags, en lugar de traer
+ * todos los productos y filtrar en memoria.
  */
 export async function getProductsByCollection(
   collectionSlug: string
@@ -243,30 +245,14 @@ export async function getProductsByCollection(
   const supabase = await tryCreateClient()
   if (!supabase) return []
 
-  // 1. Obtener la colección y sus tags
-  const { data: collection } = await supabase
-    .from("restaurant_collections")
-    .select("tags")
-    .eq("slug", collectionSlug)
-    .eq("is_active", true)
-    .single()
+  const { data, error } = await supabase.rpc("get_products_by_collection", {
+    p_slug: collectionSlug,
+  })
 
-  if (!collection || !(collection as { tags: string[] }).tags?.length) return []
+  if (error) {
+    console.error("getProductsByCollection error:", error.message)
+    return []
+  }
 
-  const tags = (collection as { tags: string[] }).tags
-
-  // 2. Obtener productos y filtrar por tags
-  const { data } = await supabase
-    .from("products")
-    .select("*")
-    .eq("is_visible", true)
-    .order("name")
-
-  const filteredProducts =
-    (data as (Product & { tags: string[] })[])?.filter((p) => {
-      const productTags: string[] = Array.isArray(p.tags) ? p.tags : []
-      return productTags.some((t) => tags.includes(t))
-    }) ?? []
-
-  return filteredProducts
+  return (data ?? []) as Product[]
 }

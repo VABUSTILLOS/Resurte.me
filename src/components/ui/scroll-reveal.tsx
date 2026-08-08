@@ -25,14 +25,14 @@ interface ScrollRevealProps {
   className?: string
 }
 
-const hiddenMap: Record<string, string> = {
+const hiddenMap: Record<"up" | "left" | "right" | "scale", string> = {
   up: "reveal-hidden",
   left: "reveal-hidden-left",
   right: "reveal-hidden-right",
   scale: "reveal-hidden-scale",
 }
 
-const visibleMap: Record<string, string> = {
+const visibleMap: Record<"up" | "left" | "right" | "scale", string> = {
   up: "reveal-visible",
   left: "reveal-visible-left",
   right: "reveal-visible-right",
@@ -59,6 +59,7 @@ export function ScrollReveal({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
+        if (!entry) return
         if (entry.isIntersecting) {
           el.classList.add(visibleMap[direction])
           el.classList.remove(hiddenMap[direction])

@@ -146,10 +146,6 @@ export async function checkInactiveUsers(): Promise<CronResult> {
   let totalProcessed = 0
 
   for (const window of REACTIVATION_WINDOWS) {
-    const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - window.days)
-    const cutoff = cutoffDate.toISOString()
-
     // Find users whose last sign-in was around `window.days` ago
     // Using auth.users.last_sign_in_at from Supabase Auth
     const { data: inactiveUsers, error: userErr } = await supabase.auth.admin.listUsers({

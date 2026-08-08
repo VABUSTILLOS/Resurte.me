@@ -127,9 +127,9 @@ export function CollectionPageClient({ citySlug, cityName, collection, products,
       )}
 
       {/* ── 4. PRODUCT GRID — First chunk ── */}
-      {productChunks[0]?.length > 0 && (
+      {(productChunks[0]?.length ?? 0) > 0 && (
         <ProductGridSection
-          products={productChunks[0]}
+          products={productChunks[0] ?? []}
           total={products.length}
           citySlug={citySlug}
         />
@@ -139,9 +139,9 @@ export function CollectionPageClient({ citySlug, cityName, collection, products,
       <CollectionValueHighlight value={content.values[0]} index={0} />
 
       {/* ── 6. PRODUCT GRID — Second chunk ── */}
-      {productChunks[1]?.length > 0 && (
+      {(productChunks[1]?.length ?? 0) > 0 && (
         <ProductGridSection
-          products={productChunks[1]}
+          products={productChunks[1] ?? []}
           total={products.length}
           citySlug={citySlug}
           hideHeader
@@ -152,9 +152,9 @@ export function CollectionPageClient({ citySlug, cityName, collection, products,
       <CollectionValueHighlight value={content.values[1]} index={1} />
 
       {/* ── 8. PRODUCT GRID — Third chunk ── */}
-      {productChunks[2]?.length > 0 && (
+      {(productChunks[2]?.length ?? 0) > 0 && (
         <ProductGridSection
-          products={productChunks[2]}
+          products={productChunks[2] ?? []}
           total={products.length}
           citySlug={citySlug}
           hideHeader
@@ -165,9 +165,9 @@ export function CollectionPageClient({ citySlug, cityName, collection, products,
       <CollectionValueHighlight value={content.values[2]} index={2} />
 
       {/* ── 10. PRODUCT GRID — Final chunk ── */}
-      {productChunks[3]?.length > 0 && (
+      {(productChunks[3]?.length ?? 0) > 0 && (
         <ProductGridSection
-          products={productChunks[3]}
+          products={productChunks[3] ?? []}
           total={products.length}
           citySlug={citySlug}
           hideHeader

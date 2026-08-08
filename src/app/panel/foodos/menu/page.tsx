@@ -9,7 +9,7 @@ import Link from "next/link"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes } from "@/hooks/use-local-storage"
 import {
-  getMyRestaurant,
+  getFoodosPanelData,
   listCategories,
   listMenuItems,
   upsertCategory,
@@ -71,16 +71,11 @@ export default function MenuPage() {
   const [sharedDishes] = useSharedDishes(selectedCollection?.slug)
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
-      const r = await getMyRestaurant()
+      const { restaurant: r, categories: cats, items: its } = await getFoodosPanelData()
       setRestaurant(r)
-      if (r) {
-        const [cats, its] = await Promise.all([listCategories(r.id), listMenuItems(r.id)])
-        setCategories(cats)
-        setItems(its)
-      }
+      setCategories(cats)
+      setItems(its)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar el menú")
     } finally {
@@ -89,7 +84,8 @@ export default function MenuPage() {
   }, [])
 
   useEffect(() => {
-    load()
+    const run = async () => { await load() }
+    run()
   }, [load])
 
   const itemsByCategory = useMemo(() => {

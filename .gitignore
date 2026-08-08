@@ -44,3 +44,9 @@ next-env.d.ts
 # AGENTS
 AGENTS.md
 .env*
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

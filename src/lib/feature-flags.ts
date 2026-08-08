@@ -1,5 +1,7 @@
 "use client"
 
+import { logger } from "@/lib/logger"
+
 /**
  * Feature Flags & A/B Testing Framework
  *
@@ -41,11 +43,6 @@ export function isFeatureEnabled(flag: string): boolean {
 interface ABVariant {
   key: string
   weight: number // 0-1, all weights must sum to 1
-}
-
-interface ABAssignment {
-  testId: string
-  variant: string
 }
 
 /**
@@ -108,6 +105,7 @@ function getABVariant(testId: string, variants: ABVariant[]): string {
 
   // Fallback to last variant
   const last = variants[variants.length - 1]
+  if (!last) return "control"
   localStorage.setItem(`ab_${testId}`, last.key)
   return last.key
 }
@@ -138,7 +136,7 @@ export function trackABConversion(
 
   // Log locally for debugging
   if (process.env.NODE_ENV === "development") {
-    console.log(`[AB Test] ${testId}:${variant} → ${goal}`)
+    logger.info("abtest.track", { testId, variant, goal })
   }
 }
 

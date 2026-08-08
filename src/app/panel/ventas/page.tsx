@@ -8,12 +8,13 @@ import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { uid } from "@/lib/ids"
 import { convertQty } from "@/lib/panel-units"
+import { todayStr, dateLabel } from "@/lib/panel-utils"
 import { t } from "@/lib/i18n/es"
 import Link from "next/link"
 import {
   ArrowLeft, Plus, Trash2, DollarSign, TrendingUp, Receipt,
-  Copy, BarChart3, Target, ChevronUp, ChevronDown, AlertCircle, Landmark, Flame,
-  AlertTriangle, ShieldAlert, Percent, Settings2, Check, Users, Gift,
+  Copy, BarChart3, Target, AlertCircle, Flame, Landmark, ShieldAlert,
+  AlertTriangle, Settings2, Check, Users, Gift,
   Clock, CreditCard, HandCoins, UtensilsCrossed,
 } from "lucide-react"
 
@@ -111,26 +112,6 @@ interface StockMovementLike {
   motivo: string
 }
 
-function todayStr() {
-  const d = new Date()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${d.getFullYear()}-${m}-${day}`
-}
-
-function dateLabel(dateStr: string) {
-  const d = new Date(dateStr + "T12:00:00")
-  const today = new Date()
-  const yesterday = new Date(today.getTime() - 86400000)
-  const same = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-  if (same(d, today)) return "Hoy"
-  if (same(d, yesterday)) return "Ayer"
-  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
-  return `${d.getDate()} ${meses[d.getMonth()]}`
-}
-
-// Revenue of an entry after applying its optional discount.
 function entryTotal(e: SaleEntry) {
   let total = e.quantity * e.unitPrice
   if (e.discount) {
@@ -148,7 +129,7 @@ export default function VentasPage() {
   const [entries, setEntries] = useLocalStorage<SaleEntry[]>("ventas-entries", [], slug)
   const panelCfg = usePanelConfig(slug)
   const [inventarioItems, setInventarioItems] = useLocalStorage<InventoryItemLike[]>("inventario-items", [], slug)
-  const [movements, setMovements] = useLocalStorage<StockMovementLike[]>("inventario-movimientos", [], slug)
+  const [, setMovements] = useLocalStorage<StockMovementLike[]>("inventario-movimientos", [], slug)
   const [deductStock, setDeductStock] = useLocalStorage<boolean>("ventas-descontar-stock", false, slug)
   const [dailyGoal, setDailyGoal] = useLocalStorage<number>("ventas-meta-dia", 0, slug)
   const [monthlyGoal, setMonthlyGoal] = useLocalStorage<number>("ventas-meta-mes", 0, slug)
@@ -164,6 +145,12 @@ export default function VentasPage() {
   const [comisiones, setComisiones] = useLocalStorage<Record<string, number>>("ventas-comisiones", {}, slug)
   // Keep comanda statuses in sync: deleting a sale must remove its comanda status
   const [, setComandaStatuses] = useLocalStorage<Record<string, unknown>>("comanda-statuses", {}, slug)
+  // Live tick for "tiempo ocupado" / fichajes abiertos
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60000)
+    return () => clearInterval(t)
+  }, [])
   const [formDishId, setFormDishId] = useState("")
   const [formQty, setFormQty] = useState("1")
   const [formDate, setFormDate] = useState(todayStr())
@@ -219,12 +206,12 @@ export default function VentasPage() {
     const occupied = new Map<string, number>() // mesaId -> first createdAt ts
     dayEntries.forEach((e) => {
       if (!e.mesaId) return
-      const ts = e.createdAt ? Date.parse(e.createdAt) : Date.now()
+      const ts = e.createdAt ? Date.parse(e.createdAt) : now
       const prev = occupied.get(e.mesaId)
       if (prev == null || ts < prev) occupied.set(e.mesaId, ts)
     })
     return occupied
-  }, [dayEntries])
+  }, [dayEntries, now])
 
   const freeMesasForForm = useMemo(() => {
     const used = new Set(entries.filter((e) => e.date === formDate && e.mesaId).map((e) => e.mesaId))
@@ -436,7 +423,7 @@ export default function VentasPage() {
       const emp = byEmp.get(f.empleadoId)
       if (!emp) return
       emp.fichajes += 1
-      const out = f.salida ? Date.parse(f.salida) : Date.now()
+      const out = f.salida ? Date.parse(f.salida) : now
       if (!f.salida) emp.abierto = true
       emp.minutos += Math.max(0, (out - t) / 60000)
     })
@@ -444,7 +431,7 @@ export default function VentasPage() {
     const totalMin = rows.reduce((s, r) => s + r.minutos, 0)
     const totalCosto = rows.reduce((s, r) => s + (r.minutos / 60) * r.tarifa, 0)
     return { rows, totalMin, totalCosto }
-  }, [empleados, fichajes, selectedDate])
+  }, [empleados, fichajes, selectedDate, now])
 
   const empleadosHoy = useMemo(() => {
     const hoy = todayStr()
@@ -930,7 +917,7 @@ export default function VentasPage() {
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [sharedDishes])
+  }, [sharedDishes, toast])
 
   const visibleEntries = showAll ? entries : dayEntries
 
@@ -1622,7 +1609,7 @@ export default function VentasPage() {
                   {mesas.map((m) => {
                     const firstTs = mesasOcupadasHoy.get(m.id)
                     const ocupada = firstTs != null
-                    const mins = ocupada ? Math.max(1, Math.round((Date.now() - firstTs) / 60000)) : 0
+                    const mins = ocupada ? Math.max(1, Math.round((now - firstTs) / 60000)) : 0
                     return (
                       <li key={m.id} className="flex items-center gap-3 py-2">
                         <div className="min-w-0 flex-1">
@@ -1907,7 +1894,7 @@ export default function VentasPage() {
               </button>
             </div>
             {tarjetas.length === 0 ? (
-              <p className="text-[11px] text-gray-400">Aún no emites tarjetas de regalo. Al emitir una, podrás usarla como método de pago "Regalo" en tus ventas.</p>
+              <p className="text-[11px] text-gray-400">Aún no emites tarjetas de regalo. Al emitir una, podrás usarla como método de pago “Regalo” en tus ventas.</p>
             ) : (
               <div className="border-t border-gray-100 pt-3">
                 <ul className="divide-y divide-gray-50">

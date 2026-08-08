@@ -33,7 +33,7 @@ async function main() {
   console.log("🔍 Verificando si la migración ya fue aplicada...")
 
   // Check if referral_code column exists
-  const { data: colCheck, error: colError } = await supabase
+  const { error: colError } = await supabase
     .from("profiles")
     .select("referral_code")
     .limit(1)

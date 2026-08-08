@@ -107,7 +107,7 @@ export default function TemporadaPage() {
   // matches them against inventory. `qtyKg` is kept for legacy data written
   // before the unit unification.
   interface TransferItem { name: string; unit: string; price: number; qty: number; icon?: string; qtyKg?: number }
-  const [transfers, setTransfers] = useLocalStorage<TransferItem[]>("temporada-transfer", [], slug)
+  const [, setTransfers] = useLocalStorage<TransferItem[]>("temporada-transfer", [], slug)
 
   const tips = selectedCollection
     ? (SEASONAL_TIPS[selectedCollection.slug] || DEFAULT_TIPS)

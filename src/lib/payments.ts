@@ -1,5 +1,6 @@
 import { getStripe } from "@/lib/stripe"
 import { createServiceClient } from "@/lib/supabase/service"
+import { toCents } from "@/lib/payment-validation"
 
 export class PaymentIntentError extends Error {
   status: number
@@ -76,7 +77,7 @@ export async function createPaymentIntentForOrder(params: {
     }
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(Number(order.total) * 100), // MXN cents — total real de BD
+      amount: toCents(order.total), // MXN cents — total real de BD
       currency: "mxn",
       automatic_payment_methods: { enabled: true },
       metadata: {
@@ -118,7 +119,7 @@ export async function createPaymentIntentForOrder(params: {
   }
 
   const paymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(Number(order.total) * 100),
+    amount: toCents(order.total),
     currency: "mxn",
     automatic_payment_methods: { enabled: true },
     metadata: {

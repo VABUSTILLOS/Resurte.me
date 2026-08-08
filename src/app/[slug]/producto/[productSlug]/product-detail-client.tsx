@@ -115,6 +115,8 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                 <img
                   src={allImages[selectedImage]}
                   alt={product.name}
+                  width={640}
+                  height={480}
                   className="w-full h-full object-contain p-8"
                 />
               ) : (

@@ -31,12 +31,16 @@ export default function ThemeToggle() {
 
   // On mount: read stored preference, apply it immediately and render the correct
   // active state. The pre-hydration <script> already set data-theme, so applying
-  // the same value again is idempotent (no flash).
+  // the same value again is idempotent (no flash). The setState is deferred to a
+  // macrotask so it doesn't run synchronously during the effect body.
   useEffect(() => {
     const stored = getInitialPreference()
-    setPref(stored)
-    setMounted(true)
     applyTheme(stored)
+    const id = setTimeout(() => {
+      setPref(stored)
+      setMounted(true)
+    }, 0)
+    return () => clearTimeout(id)
   }, [])
 
   useEffect(() => {

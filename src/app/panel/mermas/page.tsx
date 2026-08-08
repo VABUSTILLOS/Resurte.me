@@ -84,11 +84,11 @@ export default function MermasPage() {
   const slug = selectedCollection?.slug || null
   const [entries, setEntries] = useLocalStorage<WasteEntry[]>("mermas-entries", [], slug)
   const [showForm, setShowForm] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState(WASTE_CATEGORIES[0].key)
+  const [selectedCategory, setSelectedCategory] = useState(WASTE_CATEGORIES[0]!.key)
   const [amountKg, setAmountKg] = useState("")
   const [costPerKg, setCostPerKg] = useState("")
   const [note, setNote] = useState("")
-  const [selectedCause, setSelectedCause] = useState(CAUSAS[0].key)
+  const [selectedCause, setSelectedCause] = useState(CAUSAS[0]!.key)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedTip, setExpandedTip] = useState<string | null>(null)
   const [showTrends, setShowTrends] = useState(false)
@@ -151,7 +151,7 @@ export default function MermasPage() {
     setAmountKg("")
     setCostPerKg("")
     setNote("")
-    setSelectedCause(CAUSAS[0].key)
+    setSelectedCause(CAUSAS[0]!.key)
     setEditingId(null)
     setShowForm(false)
   }
@@ -159,7 +159,7 @@ export default function MermasPage() {
   function startEditEntry(entry: WasteEntry) {
     setEditingId(entry.id)
     setSelectedCategory(entry.category)
-    setSelectedCause(entry.cause || CAUSAS[0].key)
+    setSelectedCause(entry.cause || CAUSAS[0]!.key)
     setAmountKg(String(entry.amountKg))
     setCostPerKg(String(entry.costPerKg))
     setNote(entry.note || "")
@@ -172,7 +172,7 @@ export default function MermasPage() {
     setAmountKg("")
     setCostPerKg("")
     setNote("")
-    setSelectedCause(CAUSAS[0].key)
+    setSelectedCause(CAUSAS[0]!.key)
   }
 
   function removeEntry(id: string) {
@@ -197,7 +197,7 @@ export default function MermasPage() {
         setAmountKg("")
         setCostPerKg("")
         setNote("")
-        setSelectedCause(CAUSAS[0].key)
+        setSelectedCause(CAUSAS[0]!.key)
       }
       if (e.key === "Escape") {
         if (deleteConfirmId) setDeleteConfirmId(null)
@@ -329,7 +329,7 @@ export default function MermasPage() {
                     </div>
                     <p className="text-xs text-gray-400">{entry.amountKg} kg × ${entry.costPerKg}/kg</p>
                     {entry.note && (
-                      <p className="text-xs text-gray-500 italic mt-0.5">"{entry.note}"</p>
+                      <p className="text-xs text-gray-500 italic mt-0.5">“{entry.note}”</p>
                     )}
                   </div>
                 </div>

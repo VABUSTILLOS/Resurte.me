@@ -21,7 +21,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
-import { generateMockOrders, STATUS_LABEL, STATUS_COLOR } from "@/lib/mock-orders"
+import { STATUS_LABEL, STATUS_COLOR } from "@/lib/mock-orders"
 
 interface OrderSummary {
   id: number
@@ -39,15 +39,7 @@ export function DashboardSidebar() {
   // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
   const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
   const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [orders] = useState<OrderSummary[]>(() =>
-    generateMockOrders(5).map((o) => ({
-      id: o.id,
-      total: o.total,
-      status: o.status,
-      itemCount: o.items.length,
-      created_at: o.created_at,
-    }))
-  )
+  const [orders, setOrders] = useState<OrderSummary[]>([])
   const [cashback] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => {
@@ -71,6 +63,32 @@ export function DashboardSidebar() {
     if (!supabase) return
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
   }, [supabase])
+
+  // Cargar pedidos reales del usuario (RLS restringe a los suyos).
+  useEffect(() => {
+    if (!supabase || !user) return
+    let cancelled = false
+    supabase
+      .from("orders")
+      .select("id, total, status, created_at, order_items(id)")
+      .order("created_at", { ascending: false })
+      .limit(10)
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return
+        setOrders(
+          data.map((o) => ({
+            id: o.id,
+            total: o.total ?? 0,
+            status: o.status ?? "pending",
+            itemCount: Array.isArray(o.order_items) ? o.order_items.length : 0,
+            created_at: o.created_at ?? new Date().toISOString(),
+          }))
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [supabase, user])
 
   async function handleSignOut() {
     if (!supabase) return

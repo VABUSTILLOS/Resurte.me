@@ -8,10 +8,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  getMyRestaurant,
+  getFoodosPanelData,
   listOrders,
   updateOrderStatus,
-  listBranches,
 } from "../actions"
 import { formatMoney } from "@/lib/foodos"
 import type {
@@ -82,16 +81,11 @@ export default function PedidosPage() {
   const [saving, setSaving] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
-      const r = await getMyRestaurant()
+      const { restaurant: r, orders: os, branches: bs } = await getFoodosPanelData()
       setRestaurant(r)
-      if (r) {
-        const [os, bs] = await Promise.all([listOrders(r.id), listBranches(r.id)])
-        setOrders(os)
-        setBranches(bs)
-      }
+      setOrders(os)
+      setBranches(bs)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar pedidos")
     } finally {
@@ -99,7 +93,16 @@ export default function PedidosPage() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  const handleRetry = () => {
+    setLoading(true)
+    setError(null)
+    load()
+  }
+
+  useEffect(() => {
+    const run = async () => { await load() }
+    run()
+  }, [load])
 
   // Comanda en vivo: refresco automático cada 30s sin bloquear la UI
   useEffect(() => {
@@ -194,7 +197,7 @@ export default function PedidosPage() {
           <p className="text-sm text-stone-500">Comanda en vivo: atiende los pedidos de tu menú digital.</p>
         </div>
         <button
-          onClick={load}
+          onClick={handleRetry}
           disabled={loading}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-stone-200 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
         >

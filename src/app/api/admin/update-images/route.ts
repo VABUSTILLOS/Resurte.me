@@ -11,7 +11,9 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 
-const ADMIN_SECRET = process.env.ADMIN_API_SECRET || "resurte-me-migrate-2024"
+// Requerido: ADMIN_API_SECRET debe estar definido en el entorno (ver .env.local.example).
+// Sin fallback hardcodeado: si falta la env, el endpoint no opera (fail-closed).
+const ADMIN_SECRET = process.env.ADMIN_API_SECRET
 
 const IMAGE_UPDATES: Record<number, string> = {
   1: "https://storage.googleapis.com/takeapp/media/cmihp02pp000604l43fzq2ed7.png",
@@ -302,10 +304,21 @@ const DELETE_IDS = [58, 62, 63, 65, 66, 67, 69, 70, 73, 74, 76, 78, 79, 82, 84, 
 
 export async function POST(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url)
-    const secret = searchParams.get("secret")
+    if (!ADMIN_SECRET) {
+      return NextResponse.json(
+        { error: "Server misconfigured: ADMIN_API_SECRET is not set" },
+        { status: 503 }
+      )
+    }
 
-    if (secret !== ADMIN_SECRET) {
+    // El secreto viaja en el header `x-admin-secret` (no en query string, que
+    // queda expuesto en logs y caché). Se acepta ?secret= solo como compat
+    // con scripts existentes.
+    const headerSecret = req.headers.get("x-admin-secret")
+    const { searchParams } = new URL(req.url)
+    const secret = headerSecret ?? searchParams.get("secret")
+
+    if (!secret || secret !== ADMIN_SECRET) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

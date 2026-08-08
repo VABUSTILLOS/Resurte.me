@@ -48,8 +48,8 @@ const phoneArg = args.find((a) => a.startsWith("--phone="))
 const staffArg = args.find((a) => a.startsWith("--staff="))
 const workflowArg = args.find((a) => a.startsWith("--workflow="))
 
-const CUSTOMER_PHONE = phoneArg ? phoneArg.split("=")[1] : "526141047021"
-const STAFF_PHONE = staffArg ? staffArg.split("=")[1] : CUSTOMER_PHONE
+const CUSTOMER_PHONE = (phoneArg ? phoneArg.split("=")[1] : undefined) ?? "526141047021"
+const STAFF_PHONE = (staffArg ? staffArg.split("=")[1] : undefined) ?? CUSTOMER_PHONE
 
 // ============================================================
 // Mock order data (simula lo que vendría de Supabase)
@@ -281,7 +281,7 @@ async function main() {
 
   // Si se pidió un workflow específico
   if (workflowArg) {
-    const wf = workflowArg.split("=")[1]
+    const wf = workflowArg.split("=")[1] ?? ""
     hr(`Workflow: ${wf}`)
 
     switch (wf) {

@@ -75,7 +75,7 @@ function getNextDays(): { value: string; label: string }[] {
   for (let i = 0; i < 7; i++) {
     const date = new Date(today)
     date.setDate(date.getDate() + i)
-    const iso = date.toISOString().split("T")[0]
+    const iso = date.toISOString().split("T")[0] ?? ""
     const label = i === 0 ? `Hoy — ${formatter.format(date)}` : i === 1 ? `Mañana — ${formatter.format(date)}` : formatter.format(date).replace(/^\w/, (c) => c.toUpperCase())
     days.push({ value: iso, label })
   }
@@ -114,7 +114,7 @@ export default function CheckoutPage() {
   })
   const [schedule, setSchedule] = useState<ScheduleForm>({
     date: getNextDays()[0]?.value ?? "",
-    time: DELIVERY_TIMES[2],
+    time: DELIVERY_TIMES[2] ?? "12:00 PM — 2:00 PM",
   })
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
   const [isProcessing, setIsProcessing] = useState(false)
@@ -443,7 +443,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
         <Link href={`/${city.slug}/carrito`} className="hover:text-brand-600">

@@ -33,11 +33,11 @@ export function ReferralDashboard() {
   const [referredUsers, setReferredUsers] = useState<ReferredUser[]>([])
   const [totalRewards, setTotalRewards] = useState(0)
   const [copied, setCopied] = useState(false)
-  const [loading, setLoading] = useState(true)
+  // Sin cliente de Supabase (SSR), no hay nada que cargar.
+  const [loading, setLoading] = useState(() => supabase != null)
 
   useEffect(() => {
     if (!supabase) {
-      setLoading(false)
       return
     }
 

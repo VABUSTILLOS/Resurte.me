@@ -146,10 +146,10 @@ export async function proxy(request: NextRequest) {
 
   // Extract city slug from path: /:slug/...
   const segments = pathname.split("/").filter(Boolean)
-  const citySlug = segments[0]
+  const citySlug = segments[0] ?? ""
 
   // Valid city slug → set cookie and continue (preserves auth cookies)
-  if (VALID_SLUGS.includes(citySlug)) {
+  if (citySlug && VALID_SLUGS.includes(citySlug)) {
     supabaseResponse.cookies.set("city-slug", citySlug, {
       maxAge: 60 * 60 * 24 * 30,
       path: "/",

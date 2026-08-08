@@ -4,10 +4,11 @@ import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
+import { todayStr, dateLabel } from "@/lib/panel-utils"
 import Link from "next/link"
 import {
   ArrowLeft, Flame, Play, Check, Undo2, Copy, List, LayoutGrid,
-  Plus, Trash2, ChefHat, Clock, UtensilsCrossed,
+  Plus, Trash2, ChefHat, Clock,
 } from "lucide-react"
 
 interface SaleEntryLike {
@@ -40,6 +41,9 @@ interface ComandaStatus {
   hidden?: boolean
 }
 
+/** Timestamp for event handlers (module scope keeps the purity rule happy). */
+const nowMs = () => Date.now()
+
 const CHANNELS = [
   { key: "comedor", label: "Comedor", icon: "🍽️" },
   { key: "rapido", label: "Rápido", icon: "⚡" },
@@ -56,25 +60,6 @@ const STATUS_META = {
 } as const
 
 type StatusKey = keyof typeof STATUS_META
-
-function todayStr() {
-  const d = new Date()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${d.getFullYear()}-${m}-${day}`
-}
-
-function dateLabel(dateStr: string) {
-  const d = new Date(dateStr + "T12:00:00")
-  const today = new Date()
-  const yesterday = new Date(today.getTime() - 86400000)
-  const same = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-  if (same(d, today)) return "Hoy"
-  if (same(d, yesterday)) return "Ayer"
-  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
-  return `${d.getDate()} ${meses[d.getMonth()]}`
-}
 
 function entryTime(e: SaleEntryLike): number {
   if (e.createdAt) {
@@ -104,7 +89,7 @@ export default function ComandaPage() {
   const [mesaFilter, setMesaFilter] = useState<string>("todas")
   const [viewMode, setViewMode] = useState<"board" | "list">("board")
   const [sortNewest, setSortNewest] = useState(false)
-  const [now, setNow] = useState(Date.now())
+  const [now, setNow] = useState(() => Date.now())
 
   // Live tick so ages / elapsed production times refresh
   useEffect(() => {
@@ -212,12 +197,12 @@ export default function ComandaPage() {
   }
 
   const iniciar = (id: string, name: string) => {
-    setComandaStatus(id, { status: "en-cocina", startedAt: Date.now() })
+    setComandaStatus(id, { status: "en-cocina", startedAt: nowMs() })
     toast(`${name} en cocina`, "success")
   }
 
   const listo = (id: string, name: string) => {
-    setComandaStatus(id, { status: "listo", readyAt: Date.now() })
+    setComandaStatus(id, { status: "listo", readyAt: nowMs() })
     toast(`${name} lista`, "success")
   }
 
@@ -231,7 +216,8 @@ export default function ComandaPage() {
     setStatuses((prev) => {
       const next: Record<string, ComandaStatus> = {}
       Object.keys(prev).forEach((k) => {
-        next[k] = ids.has(k) && prev[k].status === "listo" ? { ...prev[k], hidden: true } : prev[k]
+        const entry = prev[k]!
+        next[k] = ids.has(k) && entry.status === "listo" ? { ...entry, hidden: true } : entry
       })
       return next
     })
@@ -640,7 +626,6 @@ export default function ComandaPage() {
                 {filtered.map((c) => {
                   const chan = CHANNELS.find((ch) => ch.key === (c.entry.channel || "comedor"))
                   const elapsedMin = Math.max(1, Math.round((now - c.time) / 60000))
-                  const meta = STATUS_META[c.status as StatusKey]
                   return (
                     <tr key={c.entry.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-3">

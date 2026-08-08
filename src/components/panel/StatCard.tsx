@@ -1,6 +1,5 @@
 "use client"
 
-import { ReactNode } from "react"
 import { LucideIcon } from "lucide-react"
 import { cva } from "class-variance-authority"
 

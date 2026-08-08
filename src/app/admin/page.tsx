@@ -35,11 +35,12 @@ export default function AdminDashboardPage() {
           getActiveStoresCount(),
         ])
         if (cancelled) return
-        setOrders(allOrders)
+        const orderList = allOrders.orders
+        setOrders(orderList)
 
         const today = new Date()
         today.setHours(0, 0, 0, 0)
-        const todaysOrders = allOrders.filter(
+        const todaysOrders = orderList.filter(
           (o) => new Date(o.created_at) >= today
         )
         const revenueToday = todaysOrders

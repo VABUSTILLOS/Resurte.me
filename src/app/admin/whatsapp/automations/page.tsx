@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   MessageCircle,
   Clock,
@@ -113,6 +113,40 @@ const DEFAULT_AUTOMATIONS: AutomationUI[] = [
 
 export default function AdminAutomationsPage() {
   const [automations, setAutomations] = useState<AutomationUI[]>(DEFAULT_AUTOMATIONS)
+  const [savingType, setSavingType] = useState<AutomationType | null>(null)
+  const [savedMsg, setSavedMsg] = useState<{ type: AutomationType; ok: boolean } | null>(null)
+
+  // Load real automations from the API (fallback to defaults on error)
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/whatsapp/automations")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((data) => {
+        if (cancelled) return
+        const rows = (data.automations || []) as Array<{
+          automation_type: AutomationType
+          is_active: boolean
+          trigger_delay_hours: number
+          config: Record<string, unknown>
+        }>
+        if (rows.length > 0) {
+          setAutomations((prev) =>
+            prev.map((a) => {
+              const row = rows.find((r) => r.automation_type === a.type)
+              return row
+                ? { ...a, isActive: row.is_active, delayHours: row.trigger_delay_hours ?? a.delayHours, config: row.config || a.config }
+                : a
+            })
+          )
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) console.error("Failed to load automations:", err)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const toggleAutomation = (type: AutomationType) => {
     setAutomations((prev) =>
@@ -120,15 +154,30 @@ export default function AdminAutomationsPage() {
     )
   }
 
-  const handleSave = (type: AutomationType) => {
+  const handleSave = async (type: AutomationType) => {
     const auto = automations.find((a) => a.type === type)
-    alert(
-      `Automatización "${auto?.label}" guardada.\n\n` +
-        `Estado: ${auto?.isActive ? "Activada" : "Desactivada"}\n` +
-        `Template: ${auto?.templateName}\n` +
-        `Delay: ${auto?.delayHours} horas`
-    )
-    // TODO: POST to /api/whatsapp/automations
+    if (!auto) return
+    setSavingType(type)
+    setSavedMsg(null)
+    try {
+      const res = await fetch("/api/whatsapp/automations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          automation_type: type,
+          trigger_delay_hours: auto.delayHours,
+          is_active: auto.isActive,
+          config: auto.config,
+        }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      setSavedMsg({ type, ok: true })
+    } catch (err) {
+      console.error("Failed to save automation:", err)
+      setSavedMsg({ type, ok: false })
+    } finally {
+      setSavingType(null)
+    }
   }
 
   return (
@@ -247,11 +296,19 @@ export default function AdminAutomationsPage() {
                 {/* Save button */}
                 <button
                   onClick={() => handleSave(auto.type)}
-                  className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors"
+                  disabled={savingType === auto.type}
+                  className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-60"
                 >
                   <Save className="w-4 h-4" />
-                  Guardar configuración
+                  {savingType === auto.type ? "Guardando…" : "Guardar configuración"}
                 </button>
+                {savedMsg && savedMsg.type === auto.type && (
+                  <p className={`text-xs mt-1 ${savedMsg.ok ? "text-green-600" : "text-red-600"}`}>
+                    {savedMsg.ok
+                      ? `Automatización "${auto.label}" guardada correctamente.`
+                      : "Error al guardar. Intenta de nuevo."}
+                  </p>
+                )}
               </div>
             )}
           </div>

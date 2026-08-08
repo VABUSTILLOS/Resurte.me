@@ -45,14 +45,14 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
   // Trigger server search whenever the query changes (debounced 250ms)
   useEffect(() => {
     const term = query.trim()
-    if (term.length < 2) {
-      setServerResults([])
-      setSearchingServer(false)
-      return
-    }
-    setSearchingServer(true)
     let cancelled = false
     const timeout = setTimeout(() => {
+      if (term.length < 2) {
+        setServerResults([])
+        setSearchingServer(false)
+        return
+      }
+      setSearchingServer(true)
       searchProducts(term)
         .then((products) => {
           if (!cancelled) setServerResults(products)
@@ -63,7 +63,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
         .finally(() => {
           if (!cancelled) setSearchingServer(false)
         })
-    }, 250)
+    }, term.length < 2 ? 0 : 250)
     return () => {
       cancelled = true
       clearTimeout(timeout)
@@ -160,19 +160,18 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setLoadingMore(true)
-          loadMoreProducts(page).then(({ products: newProducts, hasMore: more }) => {
-            setAllProducts((prev) => [...prev, ...newProducts])
-            setPage((p) => p + 1)
-            setHasMore(more)
-            setLoadingMore(false)
-          }).catch(() => {
-            // Evitar loop infinito: si la carga falla, detener el scroll
-            setHasMore(false)
-            setLoadingMore(false)
-          })
-        }
+        if (!entry?.isIntersecting) return
+        setLoadingMore(true)
+        loadMoreProducts(page).then(({ products: newProducts, hasMore: more }) => {
+          setAllProducts((prev) => [...prev, ...newProducts])
+          setPage((p) => p + 1)
+          setHasMore(more)
+          setLoadingMore(false)
+        }).catch(() => {
+          // Evitar loop infinito: si la carga falla, detener el scroll
+          setHasMore(false)
+          setLoadingMore(false)
+        })
       },
       { rootMargin: "200px" }
     )

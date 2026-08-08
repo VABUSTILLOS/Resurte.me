@@ -34,7 +34,8 @@ export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get("authorization")
     const cronSecret = process.env.CRON_SECRET
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    // Fail closed: sin CRON_SECRET configurado el endpoint no se expone.
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -72,13 +73,26 @@ export async function POST(req: NextRequest) {
 
     // Handle onboarding workflow (triggered on registration)
     const resolvedType = workflowType || workflow_type
-    if (resolvedType === "onboarding") {
-      return await handleOnboarding(user_id, email, full_name)
+    if (resolvedType === "onboarding" || resolvedType === "referral") {
+      // Auto-servicio: el usuario debe estar autenticado y solo puede
+      // disparar workflows para su PROPIO user_id (evita spam/IDOR).
+      const { getCurrentUser } = await import("@/lib/auth")
+      const user = await getCurrentUser()
+      if (!user || user.id !== user_id) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+
+      if (resolvedType === "onboarding") {
+        return await handleOnboarding(user_id, email, full_name)
+      }
+      return await handleReferral(user_id, email, full_name, body.referral_code)
     }
 
-    // Handle referral code application (triggered on registration)
-    if (resolvedType === "referral") {
-      return await handleReferral(user_id, email, full_name, body.referral_code)
+    // El resto de workflows envían WhatsApp a clientes: solo admins.
+    const { requireAdmin } = await import("@/lib/admin-auth")
+    const { response: adminDenied } = await requireAdmin()
+    if (adminDenied) {
+      return adminDenied
     }
 
     if (!orderId || !resolvedType) {

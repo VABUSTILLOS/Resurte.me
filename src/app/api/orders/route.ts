@@ -467,8 +467,10 @@ export async function POST(request: NextRequest) {
 function extractTime(timeRange: string): string {
   const match = timeRange.match(/(\d{1,2}):(\d{2})/)
   if (!match) return "10:00"
-  let hour = parseInt(match[1])
-  const minute = match[2]
+  const hourStr = match[1] ?? "10"
+  const minuteStr = match[2] ?? "00"
+  let hour = parseInt(hourStr, 10)
+  const minute = minuteStr
   // Convert PM
   if (timeRange.includes("PM") && hour !== 12) hour += 12
   // Convert 12 AM to 0

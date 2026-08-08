@@ -45,27 +45,27 @@ export default async function CollectionPage({ params }: Props) {
   if (!collection) notFound()
 
   // Fetch products matching this collection's tags (cached full catalog)
-  const tags = (collection as { tags: string[] }).tags || []
+  const tags = collection.tags || []
 
   // Productos de esta colección: la capa de datos filtra por intersección de
   // tags (getProductsByCollection).
-  let products: Record<string, unknown>[] = []
+  let products: Product[] = []
   // Full visible catalog used for recipe ingredient → product matching.
   // Ingredients like "Sal", "Aceite vegetal" or "Pan brioche" may not be tagged
   // with this collection, so we match against the whole store, not just the
   // collection-filtered grid.
-  const allProducts = (await getCachedVisibleProducts()) as unknown as Record<string, unknown>[]
+  const allProducts = await getCachedVisibleProducts()
   if (tags.length > 0) {
-    products = (await getCachedProductsByCollection(collectionSlug)) as unknown as Record<string, unknown>[]
+    products = await getCachedProductsByCollection(collectionSlug)
   }
 
   return (
     <CollectionPageClient
       citySlug={slug}
       cityName={city.name}
-      collection={collection as { id: number; name: string; slug: string; description: string | null; image_url: string | null; tags: string[] }}
-      products={products as unknown as Product[]}
-      allProducts={allProducts as unknown as Product[]}
+      collection={collection}
+      products={products}
+      allProducts={allProducts}
     />
   )
 }

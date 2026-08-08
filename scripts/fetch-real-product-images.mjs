@@ -7,7 +7,6 @@
  */
 import sharp from 'sharp'
 import fs from 'fs'
-import path from 'path'
 
 const PLAN = process.env.PLAN || '/tmp/image_plan.json'
 const plan = JSON.parse(fs.readFileSync(PLAN, 'utf8'))

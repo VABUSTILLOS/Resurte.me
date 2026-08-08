@@ -246,8 +246,15 @@ export default function PanelPage() {
   const [showAlerts, setShowAlerts] = useState(true)
   const [showSearch, setShowSearch] = useState(false)
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
   const [pendingBackup, setPendingBackup] = useState<Record<string, unknown> | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Live tick so "mesas ocupadas > 3h" refreshes over time
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60000)
+    return () => clearInterval(t)
+  }, [])
 
   // Cmd+K handler
   useEffect(() => {
@@ -370,11 +377,10 @@ export default function PanelPage() {
       const prev = firstTs.get(e.mesaId)
       if (Number.isFinite(ts) && (prev == null || ts < prev)) firstTs.set(e.mesaId, ts)
     })
-    const now = Date.now()
     const longIds = [...firstTs.entries()].filter(([, ts]) => now - ts > 3 * 3600 * 1000).map(([id]) => id)
     const longNames = longIds.map((id) => mesas.find((m) => m.id === id)?.nombre).filter(Boolean) as string[]
     return { occupied: firstTs.size, total: mesas.length, longCount: longIds.length, longNames }
-  }, [selectedCollection, ventasEntries, mesas])
+  }, [selectedCollection, ventasEntries, mesas, now])
 
   // Planned-menu stock projection: ingredients needed for covers vs inventory
   const projectionShortfall = useMemo(() => {
@@ -625,7 +631,7 @@ export default function PanelPage() {
     if (clientes.length > 0) {
       const frecuentes = clientes.filter((c) => c.visitas >= 10 || c.puntos >= 500)
       if (frecuentes.length > 0) {
-        const top = [...frecuentes].sort((a, b) => (b.puntos + b.visitas * 10) - (a.puntos + a.visitas * 10))[0]
+        const top = [...frecuentes].sort((a, b) => (b.puntos + b.visitas * 10) - (a.puntos + a.visitas * 10))[0]!
         result.push({
           id: "clientes-frecuentes",
           type: "success",

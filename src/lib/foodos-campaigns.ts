@@ -17,6 +17,7 @@ import { sendTextMessage } from "@/lib/whatsapp"
 import type {
   FoodosAutomation,
   FoodosCampaign,
+  FoodosCampaignStatus,
   FoodosCustomer,
   FoodosRestaurant,
 } from "@/types/foodos"
@@ -203,7 +204,16 @@ export async function runFoodosCampaign(
   let sent = 0
   let failed = 0
   let skipped = 0
-  const childRows: Record<string, unknown>[] = []
+  const childRows: {
+    restaurant_id: string
+    automation_id: string | null
+    customer_id: string
+    scheduled_for: string | null
+    status: FoodosCampaignStatus
+    error: string | null
+    sent_at: string | null
+    channel: string
+  }[] = []
 
   for (const customer of targets) {
     const phone = normalizePhone(customer.phone)

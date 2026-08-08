@@ -465,7 +465,7 @@ export default function PlanificadorPage() {
                           dishName: dish.name,
                           ingredients: willOverwrite.map((o) => ({
                             name: o.name,
-                            existing: manualQtys[o.existing].qty + " " + (manualQtys[o.existing].unit || ""),
+                            existing: manualQtys[o.existing]!.qty + " " + (manualQtys[o.existing]!.unit || ""),
                           })),
                         })
                         return
@@ -850,7 +850,7 @@ export default function PlanificadorPage() {
           >
             <h4 id="confirm-import-title" className="font-bold text-gray-900 mb-2">Sobrescribir cantidades manuales</h4>
             <p className="text-xs text-gray-500 mb-4">
-              Importar <span className="font-semibold text-gray-700">"{confirmImport.dishName}"</span> sobrescribirá estas cantidades que ya escribiste a mano:
+              Importar <span className="font-semibold text-gray-700">&quot;{confirmImport.dishName}&quot;</span> sobrescribirá estas cantidades que ya escribiste a mano:
             </p>
             <ul className="space-y-1.5 mb-5 bg-amber-50 border border-amber-200 rounded-xl p-3">
               {confirmImport.ingredients.map((o) => (

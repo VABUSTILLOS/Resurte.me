@@ -48,7 +48,9 @@ export default function AdminOrdersPage() {
 function AdminOrdersContent() {
   const { toast } = useToast()
   const [orders, setOrders] = useState<AdminOrder[]>([])
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all")
   const [search, setSearch] = useState("")
@@ -61,9 +63,10 @@ function AdminOrdersContent() {
 
     async function fetchOrders() {
       try {
-        const data = await getAdminOrders()
+        const { orders: data, hasMore: more } = await getAdminOrders()
         if (!cancelled) {
           setOrders(data)
+          setHasMore(more)
           setError(null)
         }
       } catch (e) {
@@ -80,6 +83,21 @@ function AdminOrdersContent() {
       cancelled = true
     }
   }, [refreshKey])
+
+  async function loadOlder() {
+    if (!orders.length || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const cursor = orders[orders.length - 1]!.created_at
+      const { orders: older, hasMore: more } = await getAdminOrders(100, cursor)
+      setOrders((prev) => [...prev, ...older])
+      setHasMore(more)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar más pedidos")
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   function refresh() {
     setLoading(true)
@@ -133,7 +151,7 @@ function AdminOrdersContent() {
       if (res.ok) {
         const data = await res.json()
         if (data.workflow?.length) {
-          console.log(`📲 WhatsApp workflows triggered:`, data.workflow)
+          console.info("WhatsApp workflows triggered:", data.workflow)
         }
         toast(`Estado del pedido #${id} actualizado a ${newStatus}`, "success")
         refresh()
@@ -325,6 +343,20 @@ function AdminOrdersContent() {
             </tbody>
           </table>
         </div>
+
+        {/* Cargar más (paginación por cursor) */}
+        {hasMore && (
+          <div className="flex justify-center pt-4">
+            <button
+              type="button"
+              onClick={loadOlder}
+              disabled={loadingMore}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loadingMore ? "Cargando…" : "Cargar pedidos anteriores"}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Order detail modal */}

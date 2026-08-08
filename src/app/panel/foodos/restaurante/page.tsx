@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { toDataURL } from "qrcode"
 import {
-  getMyRestaurant,
+  getFoodosPanelData,
   upsertRestaurant,
   setRestaurantStatus,
   listBranches,
@@ -43,10 +43,8 @@ export default function RestaurantePage() {
   const [branchPhone, setBranchPhone] = useState("")
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
-      const r = await getMyRestaurant()
+      const { restaurant: r, branches: b } = await getFoodosPanelData()
       setRestaurant(r)
       if (r) {
         setName(r.name)
@@ -54,7 +52,6 @@ export default function RestaurantePage() {
         setDescription(r.description ?? "")
         setLogoUrl(r.logo_url ?? "")
         setCurrency(r.currency)
-        const b = await listBranches(r.id)
         setBranches(b)
       }
     } catch (e) {
@@ -65,7 +62,8 @@ export default function RestaurantePage() {
   }, [])
 
   useEffect(() => {
-    load()
+    const run = async () => { await load() }
+    run()
   }, [load])
 
   // Regenera el QR cuando cambia el slug

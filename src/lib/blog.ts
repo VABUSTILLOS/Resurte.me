@@ -47,9 +47,26 @@ export interface BlogPostMeta {
   cta?: BlogCTAConfig
 }
 
+interface BlogFrontmatter {
+  date?: unknown
+  updatedAt?: unknown
+  tags?: unknown
+  faq?: unknown
+  cta?: unknown
+  title?: unknown
+  description?: unknown
+  category?: unknown
+  contentType?: unknown
+  author?: unknown
+  authorRole?: unknown
+  coverImage?: unknown
+  coverAlt?: unknown
+  featured?: unknown
+}
+
 function normalizeFrontmatter(
   slug: string,
-  data: Record<string, unknown>,
+  data: BlogFrontmatter,
   body?: string
 ): BlogPostMeta {
   const date = String(data.date ?? "")
@@ -58,7 +75,7 @@ function normalizeFrontmatter(
   const faq = Array.isArray(data.faq)
     ? data.faq
         .filter(
-          (f): f is Record<string, unknown> =>
+          (f): f is { question: unknown; answer: unknown } =>
             !!f && typeof f === "object" && "question" in f && "answer" in f
         )
         .map((f) => ({
@@ -70,7 +87,7 @@ function normalizeFrontmatter(
   // CTA de cierre: opcional por frontmatter; si no viene, se deriva por categoría.
   let cta: BlogCTAConfig | undefined
   if (data.cta && typeof data.cta === "object" && !Array.isArray(data.cta)) {
-    const c = data.cta as Record<string, unknown>
+    const c = data.cta as { variant?: unknown; title?: unknown; cta?: unknown; href?: unknown; collectionSlug?: unknown; collectionName?: unknown }
     const variant = ["coleccion", "herramienta", "crecimiento"].includes(
       String(c.variant)
     )

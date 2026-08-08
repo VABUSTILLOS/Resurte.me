@@ -52,7 +52,6 @@ export function mergeWithCatalog(
   catalog: CatalogProduct[],
 ): { name: string; unit: string; price: number }[] {
   if (catalog.length === 0) return mock
-  const catalogByKey = new Map(catalog.map((p) => [normalizeName(p.name), p]))
   const seen = new Set<string>()
   const merged: { name: string; unit: string; price: number }[] = []
   // Catalog products first (authoritative prices)

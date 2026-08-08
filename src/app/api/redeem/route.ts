@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       .limit(1)
 
     if (existing && existing.length > 0) {
-      const redemption = existing[0]
+      const redemption = existing[0]!
       return NextResponse.json({
         success: true,
         already_redeemed: true,

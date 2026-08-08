@@ -21,6 +21,7 @@
 import { sendTextMessage } from "@/lib/whatsapp"
 import { createServiceClient } from "@/lib/supabase/service"
 import type { OrderStatus, PaymentStatus } from "@/types"
+import { logger } from "@/lib/logger"
 
 // ============================================================
 // Types
@@ -329,7 +330,7 @@ export async function notifyStaffNewOrder(orderId: number): Promise<WorkflowLog[
 
   // If no staff phones configured, skip
   if (!order.staff_phones || order.staff_phones.length === 0) {
-    console.log(`[Workflow] No staff phones configured — using default`)
+    logger.warn("workflow.no_staff_phones", { fallback: "default" })
     return results
   }
 
@@ -667,7 +668,7 @@ export async function onOrderStatusChange(
   // Skip if status didn't actually change
   if (oldStatus === newStatus) return results
 
-  console.log(`[Workflow] Order #${orderId} status: ${oldStatus} → ${newStatus}`)
+  logger.info("workflow.order_status", { orderId, from: oldStatus, to: newStatus })
 
   // Always notify customer of status change
   const statusResult = await notifyCustomerStatusUpdate(orderId, newStatus)

@@ -166,7 +166,12 @@ async function setProductPrice(
 ): Promise<void> {
   const cfg = config || getConfig()
 
-  const body: Record<string, unknown> = {
+  const body: {
+    price: number
+    currency: string
+    sale_price?: number
+    sale_price_start_date?: string
+  } = {
     price: Math.round(price * 100), // WhatsApp uses cents
     currency,
   }
@@ -260,7 +265,17 @@ export async function sendTemplate(
 ): Promise<{ messaging_product: string; messages: { id: string }[] }> {
   const cfg = config || getConfig()
 
-  const body: Record<string, unknown> = {
+  const body: {
+    messaging_product: string
+    recipient_type: string
+    to: string
+    type: string
+    template: {
+      name: string
+      language: { code: string }
+      components?: unknown[]
+    }
+  } = {
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to: params.to,
@@ -274,7 +289,7 @@ export async function sendTemplate(
   }
 
   if (params.components && params.components.length > 0) {
-    ;(body.template as Record<string, unknown>).components = params.components
+    body.template.components = params.components
   }
 
   const res = await waFetch(

@@ -58,8 +58,8 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
       if (existing >= 0) {
         items[existing] = {
-          ...items[existing],
-          quantity: items[existing].quantity + newItem.quantity,
+          ...items[existing]!,
+          quantity: items[existing]!.quantity + newItem.quantity,
         }
       } else {
         items.push(newItem)

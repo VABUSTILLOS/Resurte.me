@@ -19,7 +19,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
   const [growthMode, setGrowthMode] = useState(false);
 
   const selectedService = useMemo(
-    () => SERVICES.find((s) => s.id === targetServiceId) || SERVICES[0],
+    () => SERVICES.find((s) => s.id === targetServiceId) || SERVICES[0]!,
     [targetServiceId]
   );
 

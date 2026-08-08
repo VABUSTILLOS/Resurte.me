@@ -1,9 +1,10 @@
-import { NextResponse, type NextRequest } from "next/server"
+import { after, NextResponse, type NextRequest } from "next/server"
 import { getStripe } from "@/lib/stripe"
 import { headers } from "next/headers"
 import { createServiceClient } from "@/lib/supabase/service"
 import { confirmPaymentToCustomer, notifyCustomerStatusUpdate } from "@/lib/workflows"
-
+import { isAmountSufficient, toCents } from "@/lib/payment-validation"
+import { logger } from "@/lib/logger"
 /**
  * POST /api/webhooks/stripe
  *
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
           currency?: string
           metadata?: Record<string, string>
         }
-        console.log("✅ Payment succeeded:", paymentIntent.id, "amount:", paymentIntent.amount_received)
+        logger.info("stripe.payment.succeeded", { paymentIntent: paymentIntent.id, amount: paymentIntent.amount_received })
 
         const supabase = await createServiceClient()
 
@@ -54,8 +55,7 @@ export async function POST(request: NextRequest) {
           .maybeSingle()
 
         if (!error && order) {
-          const expectedCents = Math.round(Number(order.total) * 100)
-          if (paymentIntent.amount_received >= expectedCents) {
+          if (isAmountSufficient(paymentIntent.amount_received, order.total)) {
             await supabase
               .from("orders")
               .update({
@@ -65,13 +65,19 @@ export async function POST(request: NextRequest) {
               })
               .eq("id", order.id)
 
-            // Trigger WhatsApp: payment confirmation + status update
-            confirmPaymentToCustomer(order.id).catch((e) =>
-              console.error("Workflow: payment_confirmed failed:", e)
-            )
-            notifyCustomerStatusUpdate(order.id, "confirmed").catch((e) =>
-              console.error("Workflow: status_update failed:", e)
-            )
+            // Trigger WhatsApp: payment confirmation + status update.
+            // Se ejecutan con after() para que corran después de enviar la
+            // respuesta (Stripe espera 2xx rápido) pero DENTRO de la vida
+            // del serverless function — a diferencia de fire-and-forget,
+            // no se cancelan al resolver el response.
+            after(() => {
+              confirmPaymentToCustomer(order.id).catch((e) =>
+                console.error("Workflow: payment_confirmed failed:", e)
+              )
+              notifyCustomerStatusUpdate(order.id, "confirmed").catch((e) =>
+                console.error("Workflow: status_update failed:", e)
+              )
+            })
           } else {
             await supabase
               .from("orders")
@@ -81,7 +87,7 @@ export async function POST(request: NextRequest) {
               })
               .eq("id", order.id)
             console.error(
-              `⚠️ Amount mismatch: order ${order.id} expected ${expectedCents}, received ${paymentIntent.amount_received}`
+              `⚠️ Amount mismatch: order ${order.id} expected ${toCents(order.total)}, received ${paymentIntent.amount_received}`
             )
           }
         } else if (error) {
@@ -99,13 +105,12 @@ export async function POST(request: NextRequest) {
         if (foodosError) {
           console.error("Failed to fetch foodos order payment:", foodosError.message)
         } else if (foodosOrder) {
-          const expectedCents = Math.round(Number(foodosOrder.total) * 100)
-          if (paymentIntent.amount_received >= expectedCents) {
+          if (isAmountSufficient(paymentIntent.amount_received, foodosOrder.total)) {
             await supabase
               .from("foodos_orders")
               .update({ payment_status: "paid", updated_at: new Date().toISOString() })
               .eq("id", foodosOrder.id)
-            console.log("✅ FoodOS payment succeeded for order:", foodosOrder.id)
+            logger.info("stripe.foodos.payment.succeeded", { order: foodosOrder.id })
           } else {
             await supabase
               .from("foodos_orders")
@@ -115,7 +120,7 @@ export async function POST(request: NextRequest) {
               })
               .eq("id", foodosOrder.id)
             console.error(
-              `⚠️ FoodOS amount mismatch: order ${foodosOrder.id} expected ${expectedCents}, received ${paymentIntent.amount_received}`
+              `⚠️ FoodOS amount mismatch: order ${foodosOrder.id} expected ${toCents(foodosOrder.total)}, received ${paymentIntent.amount_received}`
             )
           }
         }
@@ -124,7 +129,7 @@ export async function POST(request: NextRequest) {
 
       case "payment_intent.refunded": {
         const paymentIntent = event.data.object as { id: string }
-        console.log("💸 Payment refunded:", paymentIntent.id)
+        logger.info("stripe.refund.succeeded", { paymentIntent: paymentIntent.id })
 
         const supabase = await createServiceClient()
         await supabase
@@ -140,7 +145,7 @@ export async function POST(request: NextRequest) {
 
       case "payment_intent.payment_failed": {
         const paymentIntent = event.data.object as { id: string }
-        console.log("❌ Payment failed:", paymentIntent.id)
+        logger.info("stripe.payment.failed", { paymentIntent: paymentIntent.id })
 
         const supabase = await createServiceClient()
         await supabase
@@ -156,7 +161,7 @@ export async function POST(request: NextRequest) {
 
       case "payment_intent.canceled": {
         const paymentIntent = event.data.object as { id: string }
-        console.log("🚫 Payment canceled:", paymentIntent.id)
+        logger.info("stripe.payment.canceled", { paymentIntent: paymentIntent.id })
 
         const supabase = await createServiceClient()
         const { data: order } = await supabase
@@ -175,7 +180,7 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`)
+        logger.warn("stripe.unhandled_event", { type: event.type })
     }
 
     return NextResponse.json({ received: true })

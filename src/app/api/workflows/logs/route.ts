@@ -7,9 +7,16 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import { requireAdmin } from "@/lib/admin-auth"
 
 export async function GET(req: NextRequest) {
   try {
+    // Los logs de workflows contienen teléfonos y contenido de mensajes: solo admins.
+    const { response: adminDenied } = await requireAdmin()
+    if (adminDenied) {
+      return adminDenied
+    }
+
     const supabase = await createServiceClient()
     const url = req.nextUrl
     const orderId = url.searchParams.get("orderId")

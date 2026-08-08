@@ -112,7 +112,7 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
     return () => clearTimeout(timer)
   }, [supabase])
 
-  const currentStep = STEPS[step]
+  const currentStep = STEPS[step] ?? STEPS[0]!
   const isLast = step === STEPS.length - 1
 
   const handleNext = () => {
@@ -264,7 +264,6 @@ export function OnboardingWizard({ onComplete }: { onComplete?: () => void }) {
                   className="space-y-3"
                 >
                   {(() => {
-                    const isCustom = !BUDGET_OPTIONS.find((b) => b.value === data.monthlyBudget)
                     return BUDGET_OPTIONS.map((opt) => {
                     const selected = data.monthlyBudget === opt.value
                     return (

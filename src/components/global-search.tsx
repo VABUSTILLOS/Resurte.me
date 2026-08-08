@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Search, X, ArrowRight } from "lucide-react"
 
@@ -59,19 +59,22 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
   const [query, setQuery] = useState("")
   const [selectedIdx, setSelectedIdx] = useState(0)
 
-  // Claves reales scoped por colección (mismo formato que useLocalStorage).
-  const storageKey = (key: string) => (slug ? `resurte-${key}-${slug}` : `resurte-${key}`)
-
-  useEffect(() => {
+  // Reset state when the dialog opens. Se ajusta durante el render (patrón
+  // recomendado por React) en vez de en un effect, para evitar re-renders en cascada.
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
     if (open) {
       setQuery("")
       setSelectedIdx(0)
     }
-  }, [open])
+  }
 
   const results = useMemo((): SearchResult[] => {
     if (!query.trim()) return []
     const q = query.toLowerCase()
+    // Claves reales scoped por colección (mismo formato que useLocalStorage).
+    const storageKey = (key: string) => (slug ? `resurte-${key}-${slug}` : `resurte-${key}`)
     const items: SearchResult[] = []
 
     // Index dishes from costeo (datos reales de shared-dishes)
@@ -198,12 +201,12 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
 
     // Limit to 8 results max
     return items.slice(0, 8)
-  }, [query, storageKey])
+  }, [query, slug])
 
-  const goTo = (url: string) => {
+  const goTo = useCallback((url: string) => {
     onClose()
     router.push(url)
-  }
+  }, [onClose, router])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -215,7 +218,7 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [open, results, selectedIdx, onClose])
+  }, [open, results, selectedIdx, onClose, goTo])
 
   // Global Cmd+K handler
   useEffect(() => {

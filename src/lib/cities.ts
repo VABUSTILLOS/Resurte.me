@@ -185,8 +185,8 @@ export const MEXICO_CITIES: City[] = [
 
 export const CITIES_BY_STATE = MEXICO_CITIES.reduce(
   (acc, city) => {
-    if (!acc[city.state]) acc[city.state] = []
-    acc[city.state].push(city)
+    const group = (acc[city.state] ??= [])
+    group.push(city)
     return acc
   },
   {} as Record<string, typeof MEXICO_CITIES>

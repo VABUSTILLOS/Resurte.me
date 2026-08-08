@@ -29,7 +29,7 @@ const CONTAINER_WORDS = new Set(["lata", "paquete", "bote", "frasco", "bolsa", "
 function containerWord(unit: string): string {
   const u = (unit ?? "").trim().toLowerCase();
   const m = u.match(/^(lata|paquete|bote|frasco|bolsa|caja|charola|tarrina|sobre)\b/);
-  return m ? m[1] : u;
+  return m ? m[1] ?? u : u;
 }
 
 /** Multiplicador a piezas para unidades de conteo compuestas: "docena" → 12, "paquete 20pz" → 20. */
@@ -41,7 +41,7 @@ function countMultiplier(unit: string): number | null {
     const m = u.match(/^[a-zñ]+\s+(?:de\s+)?(\d+(?:\.\d+)?)\s*(pz|pzs|piezas?|und|unidades?|hojas?|h)?$/);
     if (m) {
       // "paquete 20pz" → 20 piezas; "lata 2.5kg" → 1 pieza (contenedor)
-      return /pz|pieza|und|hoja|h$/.test(m[2] || "") ? parseFloat(m[1]) : 1;
+      return /pz|pieza|und|hoja|h$/.test(m[2] || "") ? parseFloat(m[1] ?? "0") : 1;
     }
   }
   return null;

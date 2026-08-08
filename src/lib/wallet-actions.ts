@@ -260,7 +260,7 @@ export async function getMonthlyCashbackProgress(): Promise<{
     3: { name: "Oro", pct: 15 },
     4: { name: "Diamante", pct: 20 },
   }
-  const tier = tierMap[Math.min(weekCount, 4)]
+  const tier = tierMap[Math.min(weekCount, 4)] ?? { name: "Verde", pct: 5 }
 
   return {
     weeksWithPurchases: weekCount,

@@ -44,7 +44,7 @@ export function InvoiceScannerScreen({ onClose, balance }: InvoiceScannerScreenP
         // Simulate extraction completion
         setTimeout(() => {
           const mockData = {
-            supplier: ["Distribuidora El Sol", "Carnes Selectas del Norte", "Frutas y Verduras del Valle", "Lácteos La Pradera"][Math.floor(Math.random() * 4)],
+            supplier: ["Distribuidora El Sol", "Carnes Selectas del Norte", "Frutas y Verduras del Valle", "Lácteos La Pradera"][Math.floor(Math.random() * 4)]!,
             amount: Math.round(Math.random() * 25000 + 5000),
             date: new Date().toLocaleDateString("es-MX"),
             folio: `FAC-${String(Math.floor(Math.random() * 9000) + 1000)}`,

@@ -27,7 +27,7 @@ describe("CASHBACK_TIERS", () => {
 
   it("pct es estrictamente creciente con el nivel", () => {
     for (let i = 1; i < TIER_VALUES.length; i++) {
-      expect(TIER_VALUES[i].pct).toBeGreaterThan(TIER_VALUES[i - 1].pct)
+      expect(TIER_VALUES[i]!.pct).toBeGreaterThan(TIER_VALUES[i - 1]!.pct)
     }
   })
 

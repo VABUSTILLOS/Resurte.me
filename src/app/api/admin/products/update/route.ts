@@ -30,7 +30,8 @@ export async function PATCH(request: Request) {
 
     // Whitelist de campos actualizables
     const allowed = ["price", "sale_price", "stock_status", "is_visible", "show_in_whatsapp"] as const
-    const updates: Record<string, unknown> = {}
+    type AllowedField = (typeof allowed)[number]
+    const updates: Partial<Record<AllowedField, unknown>> = {}
     for (const field of allowed) {
       if (field in fields) updates[field] = fields[field]
     }

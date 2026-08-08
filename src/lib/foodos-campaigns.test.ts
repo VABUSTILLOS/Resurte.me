@@ -164,7 +164,7 @@ describe("fetchTargetCustomers", () => {
       "r1"
     )
     expect(rows.length).toBe(1)
-    expect(rows[0].segment).toBe("vip")
+    expect(rows[0]!.segment).toBe("vip")
   })
 
   it("winback filtra por antigüedad de last_order_at", async () => {

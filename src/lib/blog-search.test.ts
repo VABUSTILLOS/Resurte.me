@@ -50,25 +50,25 @@ describe("searchPosts", () => {
   it("busca en el título (case-insensitive)", () => {
     const result = searchPosts(posts, "FOOD COST")
     expect(result).toHaveLength(1)
-    expect(result[0].slug).toBe("food-cost")
+    expect(result[0]!.slug).toBe("food-cost")
   })
 
   it("busca en la descripción", () => {
     const result = searchPosts(posts, "desperdicio")
     expect(result).toHaveLength(1)
-    expect(result[0].slug).toBe("mermas")
+    expect(result[0]!.slug).toBe("mermas")
   })
 
   it("busca en la categoría", () => {
     const result = searchPosts(posts, "marketing")
     expect(result).toHaveLength(1)
-    expect(result[0].slug).toBe("marketing-taqueria")
+    expect(result[0]!.slug).toBe("marketing-taqueria")
   })
 
   it("busca en los tags", () => {
     const result = searchPosts(posts, "promociones")
     expect(result).toHaveLength(1)
-    expect(result[0].slug).toBe("marketing-taqueria")
+    expect(result[0]!.slug).toBe("marketing-taqueria")
   })
 
   it("hace trim de la query", () => {

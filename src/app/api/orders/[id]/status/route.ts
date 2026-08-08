@@ -100,20 +100,12 @@ export async function PATCH(
       })
     }
 
-    const updatePayload: Record<string, unknown> = {
+    const updatePayload = {
       updated_at: new Date().toISOString(),
-    }
-
-    if (status) {
-      updatePayload.status = status
+      ...(status ? { status } : {}),
       // If cancelling, set payment to failed if pending
-      if (status === "cancelled" && currentOrder.payment_status === "pending") {
-        updatePayload.payment_status = "failed"
-      }
-    }
-
-    if (payment_status === "paid") {
-      updatePayload.payment_status = "paid"
+      ...(status === "cancelled" && currentOrder.payment_status === "pending" ? { payment_status: "failed" as const } : {}),
+      ...(payment_status === "paid" ? { payment_status: "paid" as const } : {}),
     }
 
     // Update the order

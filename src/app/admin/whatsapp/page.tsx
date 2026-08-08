@@ -1,16 +1,47 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Search, MessageCircle, Check, Eye, EyeOff, RefreshCw, ImageIcon } from "lucide-react"
-import { MOCK_PRODUCTS, MOCK_CATEGORIES } from "@/lib/mock-products"
 import { getCategoryIcon } from "@/lib/utils"
+import {
+  getAdminWhatsappCatalog,
+  setProductWhatsappVisibility,
+  type AdminWhatsappProduct,
+  type AdminWhatsappCategory,
+} from "@/app/admin/actions"
 
 export default function AdminWhatsAppPage() {
-  const [products, setProducts] = useState(
-    MOCK_PRODUCTS.map((p) => ({ ...p }))
-  )
+  const [products, setProducts] = useState<AdminWhatsappProduct[]>([])
+  const [categories, setCategories] = useState<AdminWhatsappCategory[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [syncingId, setSyncingId] = useState<number | null>(null)
   const [search, setSearch] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCatalog() {
+      try {
+        const data = await getAdminWhatsappCatalog()
+        if (cancelled) return
+        setProducts(data.products)
+        setCategories(data.categories)
+        setError(null)
+      } catch (err) {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : "Error al cargar el catálogo")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadCatalog()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
@@ -22,20 +53,49 @@ export default function AdminWhatsAppPage() {
 
   const totalInCatalog = products.filter((p) => p.show_in_whatsapp).length
 
-  const toggleProduct = (productId: number) => {
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === productId ? { ...p, show_in_whatsapp: !p.show_in_whatsapp } : p
+  const toggleProduct = async (productId: number) => {
+    const product = products.find((p) => p.id === productId)
+    if (!product) return
+    const next = !product.show_in_whatsapp
+    setSyncingId(productId)
+    try {
+      await setProductWhatsappVisibility(productId, next)
+      setProducts((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, show_in_whatsapp: next } : p))
       )
-    )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al actualizar el producto")
+    } finally {
+      setSyncingId(null)
+    }
   }
 
-  const selectAll = () => {
-    setProducts((prev) => prev.map((p) => ({ ...p, show_in_whatsapp: true })))
+  const selectAll = async () => {
+    setSyncingId(-1)
+    try {
+      for (const p of products.filter((p) => !p.show_in_whatsapp)) {
+        await setProductWhatsappVisibility(p.id, true)
+      }
+      setProducts((prev) => prev.map((p) => ({ ...p, show_in_whatsapp: true })))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al actualizar los productos")
+    } finally {
+      setSyncingId(null)
+    }
   }
 
-  const deselectAll = () => {
-    setProducts((prev) => prev.map((p) => ({ ...p, show_in_whatsapp: false })))
+  const deselectAll = async () => {
+    setSyncingId(-1)
+    try {
+      for (const p of products.filter((p) => p.show_in_whatsapp)) {
+        await setProductWhatsappVisibility(p.id, false)
+      }
+      setProducts((prev) => prev.map((p) => ({ ...p, show_in_whatsapp: false })))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al actualizar los productos")
+    } finally {
+      setSyncingId(null)
+    }
   }
 
   const syncCatalog = () => {
@@ -123,7 +183,7 @@ export default function AdminWhatsAppPage() {
           >
             Todas
           </button>
-          {MOCK_CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
@@ -133,7 +193,7 @@ export default function AdminWhatsAppPage() {
                   : "bg-white border border-[#E8E9EB] text-[#72767E] hover:bg-[#F7F5F0]"
               }`}
             >
-              {getCategoryIcon(cat.icon, cat.slug)} {cat.name}
+              {getCategoryIcon(cat.icon ?? "", cat.slug)} {cat.name}
             </button>
           ))}
         </div>
@@ -143,7 +203,8 @@ export default function AdminWhatsAppPage() {
       <div className="flex items-center gap-3 mb-4">
         <button
           onClick={selectAll}
-          className="text-xs font-medium text-[#108910] hover:text-[#0D720D] transition-colors flex items-center gap-1"
+          disabled={syncingId !== null || loading}
+          className="text-xs font-medium text-[#108910] hover:text-[#0D720D] transition-colors flex items-center gap-1 disabled:opacity-50"
         >
           <Eye className="w-3.5 h-3.5" />
           Publicar todos
@@ -151,7 +212,8 @@ export default function AdminWhatsAppPage() {
         <span className="text-[#E8E9EB]">|</span>
         <button
           onClick={deselectAll}
-          className="text-xs font-medium text-[#72767E] hover:text-[#5C6068] transition-colors flex items-center gap-1"
+          disabled={syncingId !== null || loading}
+          className="text-xs font-medium text-[#72767E] hover:text-[#5C6068] transition-colors flex items-center gap-1 disabled:opacity-50"
         >
           <EyeOff className="w-3.5 h-3.5" />
           Ocultar todos
@@ -162,9 +224,22 @@ export default function AdminWhatsAppPage() {
       </div>
 
       {/* Product list — single list with toggles */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       <div className="space-y-2">
-        {filtered.map((product) => {
-          const category = MOCK_CATEGORIES.find((c) => c.id === product.category_id)
+        {loading && (
+          <div className="text-center py-16 bg-white rounded-xl border border-[#E8E9EB]">
+            <RefreshCw className="w-10 h-10 text-[#D9D7D2] mx-auto mb-3 animate-spin" />
+            <p className="text-sm text-[#72767E]">Cargando catálogo...</p>
+          </div>
+        )}
+
+        {!loading && filtered.map((product) => {
+          const category = categories.find((c) => c.id === product.category_id)
           return (
             <div
               key={product.id}
@@ -213,9 +288,9 @@ export default function AdminWhatsAppPage() {
               {/* Price */}
               <div className="text-right shrink-0">
                 <p className="text-sm font-bold text-[#242529]">
-                  ${(product.sale_price ?? product.price).toFixed(2)}
+                  ${((product.sale_price ?? product.price) ?? 0).toFixed(2)}
                 </p>
-                {product.sale_price && (
+                {product.sale_price != null && product.price != null && product.sale_price < product.price && (
                   <p className="text-xs text-[#B0B3B8] line-through">
                     ${product.price.toFixed(2)}
                   </p>
@@ -225,13 +300,16 @@ export default function AdminWhatsAppPage() {
               {/* Toggle */}
               <button
                 onClick={() => toggleProduct(product.id)}
-                className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium transition-all ${
+                disabled={syncingId !== null}
+                className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium transition-all disabled:opacity-60 ${
                   product.show_in_whatsapp
                     ? "bg-[#F5F3F0] text-[#72767E] hover:bg-[#EDEBE6]"
                     : "bg-[#25D366] text-white hover:bg-[#20BD5A] shadow-sm"
                 }`}
               >
-                {product.show_in_whatsapp ? (
+                {syncingId === product.id ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : product.show_in_whatsapp ? (
                   <>
                     <EyeOff className="w-3.5 h-3.5" />
                     Ocultar
@@ -247,7 +325,7 @@ export default function AdminWhatsAppPage() {
           )
         })}
 
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <div className="text-center py-16 bg-white rounded-xl border border-[#E8E9EB]">
             <Search className="w-10 h-10 text-[#D9D7D2] mx-auto mb-3" />
             <p className="text-sm text-[#72767E]">No se encontraron productos.</p>

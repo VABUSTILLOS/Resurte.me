@@ -264,7 +264,7 @@ export function BlogIndexClient({
           </div>
           <div className="mt-6 flex flex-col gap-6">
             <FeaturedBlogCard
-              post={featured[0]}
+              post={featured[0]!}
               size="large"
               priority
             />

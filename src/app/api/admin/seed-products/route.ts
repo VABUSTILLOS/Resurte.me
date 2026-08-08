@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { revalidateCatalogCache } from "@/lib/catalog-cache";
 import { resetCatalogCache } from "@/lib/catalog";
 
+// Fail-closed: el seed solo corre con SEED_API_TOKEN configurado en el
+// entorno. No hay fallback hardcodeado.
+const SEED_API_TOKEN = process.env.SEED_API_TOKEN;
+
 const PRODUCTS: Array<
   [
     string,
@@ -153,8 +157,12 @@ const PRICES: Record<number, number[]> = {
 };
 
 export async function POST(request: Request) {
+  // Fail-closed: si SEED_API_TOKEN no está configurado, el endpoint no opera.
+  if (!SEED_API_TOKEN) {
+    return NextResponse.json({ error: "Server misconfigured: SEED_API_TOKEN is not set" }, { status: 503 });
+  }
   const token = request.headers.get("x-seed-token");
-  if (token !== "resurte-seed-2024") {
+  if (token !== SEED_API_TOKEN) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -223,7 +231,7 @@ export async function POST(request: Request) {
     if (!priceMap) continue;
 
     prices.push(
-      { product_id: p.id, store_id: 1, price: priceMap[idx] ?? priceMap[priceMap.length - 1], sale_price: null, stock_status: "in_stock" }
+      { product_id: p.id, store_id: 1, price: priceMap[idx] ?? priceMap[priceMap.length - 1] ?? 0, sale_price: null, stock_status: "in_stock" }
     );
   }
 

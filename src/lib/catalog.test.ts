@@ -54,7 +54,7 @@ describe("mergeWithCatalog", () => {
   it("default de unit 'kg' para productos del catálogo sin unit", () => {
     const noUnit = [{ name: "Tomate", unit: "", price: 20 }]
     const merged = mergeWithCatalog([], noUnit)
-    expect(merged[0].unit).toBe("kg")
+    expect(merged[0]!.unit).toBe("kg")
   })
 })
 

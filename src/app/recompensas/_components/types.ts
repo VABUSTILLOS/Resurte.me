@@ -26,10 +26,10 @@ export interface TierConfig {
 }
 
 export const TIER_CONFIGS: Record<Tier, Omit<TierConfig, 'tier'>> = {
-  verde: { name: CASHBACK_TIERS[TIER_INDEX.verde].name, rate: CASHBACK_TIERS[TIER_INDEX.verde].pct, color: "emerald", borderColor: "border-emerald-500/20", textColor: "text-emerald-400", bgColor: "bg-emerald-500/10" },
-  plata: { name: CASHBACK_TIERS[TIER_INDEX.plata].name, rate: CASHBACK_TIERS[TIER_INDEX.plata].pct, color: "slate", borderColor: "border-slate-400/30", textColor: "text-slate-300", bgColor: "bg-slate-500/10" },
-  oro: { name: CASHBACK_TIERS[TIER_INDEX.oro].name, rate: CASHBACK_TIERS[TIER_INDEX.oro].pct, color: "amber", borderColor: "border-amber-500/30", textColor: "text-amber-400", bgColor: "bg-amber-500/10" },
-  diamante: { name: CASHBACK_TIERS[TIER_INDEX.diamante].name, rate: CASHBACK_TIERS[TIER_INDEX.diamante].pct, color: "violet", borderColor: "border-violet-400/30", textColor: "text-violet-300", bgColor: "bg-violet-500/10" },
+  verde: { name: CASHBACK_TIERS[TIER_INDEX.verde]!.name, rate: CASHBACK_TIERS[TIER_INDEX.verde]!.pct, color: "emerald", borderColor: "border-emerald-500/20", textColor: "text-emerald-400", bgColor: "bg-emerald-500/10" },
+  plata: { name: CASHBACK_TIERS[TIER_INDEX.plata]!.name, rate: CASHBACK_TIERS[TIER_INDEX.plata]!.pct, color: "slate", borderColor: "border-slate-400/30", textColor: "text-slate-300", bgColor: "bg-slate-500/10" },
+  oro: { name: CASHBACK_TIERS[TIER_INDEX.oro]!.name, rate: CASHBACK_TIERS[TIER_INDEX.oro]!.pct, color: "amber", borderColor: "border-amber-500/30", textColor: "text-amber-400", bgColor: "bg-amber-500/10" },
+  diamante: { name: CASHBACK_TIERS[TIER_INDEX.diamante]!.name, rate: CASHBACK_TIERS[TIER_INDEX.diamante]!.pct, color: "violet", borderColor: "border-violet-400/30", textColor: "text-violet-300", bgColor: "bg-violet-500/10" },
 };
 
 export interface ServiceItem {

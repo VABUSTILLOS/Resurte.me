@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
@@ -361,7 +361,7 @@ export default function InventarioPage() {
     toast("Proveedor eliminado", "warning")
   }
 
-  const proveedorName = (id?: string) => proveedores.find((p) => p.id === id)?.nombre || "Sin proveedor"
+  const proveedorName = useCallback((id?: string) => proveedores.find((p) => p.id === id)?.nombre || "Sin proveedor", [proveedores])
 
   // Group the projected order by supplier
   const groupedOrder = useMemo(() => {
@@ -374,7 +374,7 @@ export default function InventarioPage() {
       groups.get(id)!.items.push(item)
     })
     return [...groups.values()]
-  }, [projectedOrder, proveedores])
+  }, [projectedOrder, proveedorName])
 
   const orderTextFor = (list: typeof projectedOrder) => {
     const header = `🛒 Orden de compra — ${selectedCollection?.name || "Mi inventario"}`
@@ -671,7 +671,7 @@ export default function InventarioPage() {
             </div>
             {proveedores.length === 0 && (
               <p className="text-[10px] text-gray-400">
-                Agrega tus proveedores (p. ej. "Distribuidora Lácteos" o "Carnicería El Norte") para después asignarlos a cada producto.
+                Agrega tus proveedores (p. ej. “Distribuidora Lácteos” o “Carnicería El Norte”) para después asignarlos a cada producto.
               </p>
             )}
             {proveedores.length > 0 && (
@@ -1145,7 +1145,7 @@ export default function InventarioPage() {
                 </select>
                 {proveedores.length === 0 && (
                   <p className="text-[10px] text-gray-400 mt-1">
-                    Agrega proveedores en la sección "Proveedores" de esta página para agrupar tus órdenes de compra.
+                    Agrega proveedores en la sección “Proveedores” de esta página para agrupar tus órdenes de compra.
                   </p>
                 )}
               </div>

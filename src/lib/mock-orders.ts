@@ -32,7 +32,9 @@ const STATUSES = [
 const PAYMENT_METHODS = ["card", "spei", "oxxo", "cash_on_delivery", "mercado_pago"] as const
 
 function randomFrom<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
+  const item = arr[Math.floor(Math.random() * arr.length)]
+  if (item === undefined) throw new Error("randomFrom: empty array")
+  return item
 }
 
 function randomSubtotal(): number {
@@ -53,7 +55,7 @@ export function generateMockOrders(count = 8): MockOrder[] {
     const itemCount = 1 + Math.floor(Math.random() * 5)
 
     const items = Array.from({ length: itemCount }, (_, j) => {
-      const product = PRODUCT_POOL[(i + j) % PRODUCT_POOL.length]
+      const product = PRODUCT_POOL[(i + j) % PRODUCT_POOL.length]!
       return {
         id: i * 10 + j + 1,
         order_id: i + 1,

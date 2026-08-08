@@ -8,13 +8,11 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import {
-  getMyRestaurant,
-  listMenuItems,
-  listCategories,
+  getFoodosPanelData,
   listCombos,
+  listUpsellRules,
   upsertCombo,
   deleteCombo,
-  listUpsellRules,
   upsertUpsellRule,
   deleteUpsellRule,
 } from "../actions"
@@ -80,20 +78,13 @@ export default function CombosPage() {
   const [ruleForm, setRuleForm] = useState<RuleForm>(EMPTY_RULE)
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
-      const r = await getMyRestaurant()
+      const { restaurant: r, items, categories: cats, combos: cs, rules: rs } = await getFoodosPanelData()
       setRestaurant(r)
-      if (r) {
-        const [items, cats, cs, rs] = await Promise.all([
-          listMenuItems(r.id), listCategories(r.id), listCombos(r.id), listUpsellRules(r.id),
-        ])
-        setMenuItems(items)
-        setCategories(cats)
-        setCombos(cs)
-        setRules(rs)
-      }
+      setMenuItems(items)
+      setCategories(cats)
+      setCombos(cs)
+      setRules(rs)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar combos")
     } finally {
@@ -101,7 +92,10 @@ export default function CombosPage() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const run = async () => { await load() }
+    run()
+  }, [load])
 
   function itemById(id: string) { return menuItems.find((m) => m.id === id) }
   function comboFullValue(c: FoodosCombo) {

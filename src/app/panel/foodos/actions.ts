@@ -20,6 +20,7 @@ import type {
   FoodosUpsellRule,
   FoodosRuleTriggerType,
   FoodosAutomation,
+  FoodosOrder,
   FoodosOrderStatus,
   FoodosCustomer,
   FoodosCampaign,
@@ -39,6 +40,70 @@ export async function getMyRestaurant(): Promise<FoodosRestaurant | null> {
     .maybeSingle()
   if (error) throw new Error(error.message)
   return (data as FoodosRestaurant) ?? null
+}
+
+/**
+ * Carga el restaurante del usuario y TODAS sus listas dependientes en una
+ * sola llamada de server action (una sola round-trip HTTP). Las queries se
+ * ejecutan en paralelo del lado del servidor, evitando el N+1 de esperar
+ * `getMyRestaurant()` y luego disparar N server actions más por página.
+ *
+ * Cada página del panel consume solo las listas que necesita.
+ */
+export async function getFoodosPanelData() {
+  const { supabase, user } = await requireAuth()
+  const { data: restaurant, error: rErr } = await supabase
+    .from("foodos_restaurants")
+    .select("*")
+    .eq("user_id", user.id)
+    .maybeSingle()
+  if (rErr) throw new Error(rErr.message)
+
+  const r = restaurant as FoodosRestaurant | null
+  if (!r) {
+    return {
+      restaurant: null,
+      branches: [],
+      orders: [],
+      customers: [],
+      categories: [],
+      items: [],
+      combos: [],
+      rules: [],
+      automations: [],
+      campaigns: [],
+    }
+  }
+
+  const [branches, orders, customers, categories, items, combos, rules, automations, campaigns] =
+    await Promise.all([
+      supabase.from("foodos_branches").select("*").eq("restaurant_id", r.id).order("name"),
+      supabase.from("foodos_orders").select("*").eq("restaurant_id", r.id).order("created_at", { ascending: false }).limit(200),
+      supabase.from("foodos_customers").select("*").eq("restaurant_id", r.id).order("total_spend", { ascending: false }).limit(500),
+      supabase.from("foodos_menu_categories").select("*").eq("restaurant_id", r.id).order("sort_order"),
+      supabase.from("foodos_menu_items").select("*").eq("restaurant_id", r.id).order("sort_order"),
+      supabase.from("foodos_combos").select("*").eq("restaurant_id", r.id).order("created_at"),
+      supabase.from("foodos_upsell_rules").select("*").eq("restaurant_id", r.id).order("created_at"),
+      supabase.from("foodos_automations").select("*").eq("restaurant_id", r.id).order("created_at"),
+      supabase.from("foodos_campaigns").select("*").eq("restaurant_id", r.id).order("created_at", { ascending: false }).limit(200),
+    ])
+
+  for (const q of [branches, orders, customers, categories, items, combos, rules, automations, campaigns]) {
+    if (q.error) throw new Error(q.error.message)
+  }
+
+  return {
+    restaurant: r,
+    branches: (branches.data as FoodosBranch[]) ?? [],
+    orders: (orders.data as FoodosOrder[]) ?? [],
+    customers: (customers.data as FoodosCustomer[]) ?? [],
+    categories: (categories.data as FoodosMenuCategory[]) ?? [],
+    items: (items.data as FoodosMenuItem[]) ?? [],
+    combos: (combos.data as FoodosCombo[]) ?? [],
+    rules: (rules.data as FoodosUpsellRule[]) ?? [],
+    automations: (automations.data as FoodosAutomation[]) ?? [],
+    campaigns: (campaigns.data as FoodosCampaign[]) ?? [],
+  }
 }
 
 export async function upsertRestaurant(input: {

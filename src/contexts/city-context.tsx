@@ -32,7 +32,7 @@ const CityContext = createContext<CityContextValue | null>(null)
 function getCityFromCookie(): string | null {
   if (typeof document === "undefined") return null
   const match = document.cookie.match(/(?:^|;\s*)city-slug=([^;]*)/)
-  return match ? decodeURIComponent(match[1]) : null
+  return match && match[1] ? decodeURIComponent(match[1]) : null
 }
 
 function setCityCookie(slug: string) {

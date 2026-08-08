@@ -3,27 +3,36 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { computeOrderTotals } from "@/lib/foodos"
 import type { FoodosOrderItem } from "@/types/foodos"
 
-// Rate limiting v1: sliding window por IP en memoria (Map).
-// Limitaciones conocidas:
-//  - No persiste entre instancias serverless (Vercel puede usar varias).
-//  - Se reinicia al hacer deploy o escalar a 0.
-// Mejora v2: migrar a Upstash Redis (@upstash/ratelimit) para que el
-// conteo sea compartido y durable entre instancias.
+// Rate limiting: fixed-window counter durable en Supabase
+// (RPC consume_rate_limit, tabla rate_limits). Compartido entre
+// instancias serverless; no se reinicia en deploys.
 const RATE_LIMIT_MAX = 20
-const RATE_LIMIT_WINDOW_MS = 60_000
-const rateBuckets = new Map<string, number[]>()
+const RATE_LIMIT_WINDOW_SECONDS = 60
 
-function rateLimited(ip: string): boolean {
-  const now = Date.now()
-  const cutoff = now - RATE_LIMIT_WINDOW_MS
-  const hits = (rateBuckets.get(ip) ?? []).filter((t) => t > cutoff)
-  if (hits.length >= RATE_LIMIT_MAX) {
-    rateBuckets.set(ip, hits)
-    return true
+interface RateLimitResult {
+  allowed: boolean
+  remaining: number
+  retry_after_seconds: number
+}
+
+async function rateLimited(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  ip: string
+): Promise<RateLimitResult> {
+  const { data, error } = await supabase.rpc("consume_rate_limit", {
+    p_key: `foodos_orders:${ip}`,
+    p_limit: RATE_LIMIT_MAX,
+    p_window_seconds: RATE_LIMIT_WINDOW_SECONDS,
+  })
+
+  if (error || !data || data.length === 0) {
+    // Fail-open en caso de error de BD: no bloquear pedidos legítimos
+    // por una falla del rate limiter.
+    return { allowed: true, remaining: RATE_LIMIT_MAX, retry_after_seconds: 0 }
   }
-  hits.push(now)
-  rateBuckets.set(ip, hits)
-  return false
+
+  const row = data[0] as RateLimitResult
+  return row
 }
 
 function clientIp(request: NextRequest): string {
@@ -60,10 +69,13 @@ interface FoodosOrderBody {
  */
 export async function POST(request: NextRequest) {
   try {
-    if (rateLimited(clientIp(request))) {
+    const supabase = await createServiceClient()
+
+    const rate = await rateLimited(supabase, clientIp(request))
+    if (!rate.allowed) {
       return NextResponse.json(
         { error: "Demasiadas peticiones. Intenta en un minuto." },
-        { status: 429 }
+        { status: 429, headers: { "Retry-After": String(rate.retry_after_seconds) } }
       )
     }
 
@@ -93,8 +105,6 @@ export async function POST(request: NextRequest) {
 
     // Validar montos: NO confiar en el cliente. Cargar el menú real del
     // restaurante y recalcular precios server-side.
-    const supabase = await createServiceClient()
-
     const { data: restaurant } = await supabase
       .from("foodos_restaurants")
       .select("id")

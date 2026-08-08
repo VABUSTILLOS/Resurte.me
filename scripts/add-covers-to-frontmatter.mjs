@@ -2,7 +2,6 @@
 // Inserta después de la línea `featured:` y reemplaza portadas SVG previas.
 import fs from "node:fs"
 import path from "node:path"
-import { execSync } from "node:child_process"
 
 const DIR = path.join(process.cwd(), "src/content/blog")
 const ALTS = {
