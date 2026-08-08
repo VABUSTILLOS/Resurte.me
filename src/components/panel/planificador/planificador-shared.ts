@@ -9,6 +9,26 @@ export interface PlannerProduct {
   category: string
 }
 
+export interface SeasonTransfer {
+  name: string
+  unit: string
+  price: number
+  qty: number
+  icon?: string
+  qtyKg?: number
+}
+
+export interface ImportConfirm {
+  dishName: string
+  ingredients: { name: string; existing: string }[]
+}
+
+export interface RealDemand {
+  avg: number
+  units: number
+  days: number
+}
+
 // Suggested items per collection based on typical restaurant needs
 export const COLLECTION_PRODUCTS: Record<string, PlannerProduct[]> = {
   "hamburguesas-hot-dogs": [
