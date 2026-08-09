@@ -34,7 +34,8 @@ import { AddressStep } from "@/components/checkout/AddressStep"
 import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { ReviewStep } from "@/components/checkout/ReviewStep"
 import { PaymentStep } from "@/components/checkout/PaymentStep"
-import { BUMPS_STORAGE_KEY, type SelectedBump } from "@/components/checkout/BumpCards"
+import { BumpCards } from "@/components/checkout/BumpCards"
+import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { validDeliveryFee, calcCouponDiscount } from "@/lib/checkout-config"
 
 // ============================================================
@@ -63,18 +64,13 @@ export default function CheckoutPage() {
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
 
-  // Order bumps elegidos en /cart (desktop). Se cargan de sessionStorage (una
-  // sola vez, en el inicializador) y se incluyen en la orden como items con
-  // item_type="bump"; el servidor valida precios y reglas contra bump_rules.
-  const [selectedBumps] = useState<SelectedBump[]>(() => {
-    if (typeof window === "undefined") return []
-    try {
-      const raw = window.sessionStorage.getItem(BUMPS_STORAGE_KEY)
-      return raw ? (JSON.parse(raw) as SelectedBump[]) : []
-    } catch {
-      return []
-    }
-  })
+  // Order bumps: selección compartida con /cart, /{ciudad}/carrito y la
+  // MobileCartBar (mecánica ThriveCart). Persiste en sessionStorage y emite
+  // BUMPS_CHANGED_EVENT para sincronizar el total de la barra en tiempo real.
+  // Se incluyen en la orden como items con item_type="bump"; el servidor valida
+  // precios y reglas contra bump_rules. Retrocompatible: sin bumps, la orden
+  // estándar no cambia.
+  const { selectedBumps, setSelectedBumps } = useSelectedBumps()
 
   // Detecta si el usuario tiene sesión para sugerirle iniciarla (historial +
   // créditos de recompensa). null = aún verificando / sin Supabase configurado.
@@ -376,11 +372,7 @@ export default function CheckoutPage() {
 
       // La orden ya capturó los bumps; se limpia la selección temporal para que
       // una próxima compra en este tab no arrastre artículos especiales viejos.
-      try {
-        sessionStorage.removeItem(BUMPS_STORAGE_KEY)
-      } catch {
-        // no-op
-      }
+      setSelectedBumps([])
 
       // Autoguardado (checkout anónimo): persiste el guest_token del servidor
       // y la última dirección+teléfono para reutilizarlos en la próxima compra.
@@ -576,6 +568,16 @@ export default function CheckoutPage() {
           discount={discountAmount}
           deliveryFee={deliveryFee}
           total={total}
+          bumpsSlot={
+            <BumpCards
+              cartItems={cart.items.map((i) => ({
+                product_id: i.product_id,
+                quantity: i.quantity,
+              }))}
+              selected={selectedBumps}
+              onChange={setSelectedBumps}
+            />
+          }
           onEditAddress={() => setStep("address")}
           onEditSchedule={() => setStep("schedule")}
           onBack={() => setStep("schedule")}

@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { MapPin, Clock, ArrowLeft, ArrowRight } from "lucide-react"
 import type { City, CartItem } from "@/types"
 import { getNextDays, type AddressForm, type ScheduleForm } from "./checkout-shared"
@@ -14,6 +15,10 @@ interface ReviewStepProps {
   discount: number
   deliveryFee: number
   total: number
+  /** Slot opcional para inyectar order bumps (mecánica ThriveCart) entre el
+   *  resumen de items y el total, en el flujo de página completa. Retrocompatible:
+   *  si no se pasa, el paso renderiza igual que antes. */
+  bumpsSlot?: ReactNode
   onEditAddress: () => void
   onEditSchedule: () => void
   onBack: () => void
@@ -30,6 +35,7 @@ export function ReviewStep({
   discount,
   deliveryFee,
   total,
+  bumpsSlot,
   onEditAddress,
   onEditSchedule,
   onBack,
@@ -111,6 +117,9 @@ export function ReviewStep({
           ))}
         </ul>
       </div>
+
+      {/* Order bumps (mecánica ThriveCart): se ofrecen justo antes del total */}
+      {bumpsSlot}
 
       {/* Total */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 space-y-2">
