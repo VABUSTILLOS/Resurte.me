@@ -405,16 +405,18 @@ export function CheckoutDrawer() {
     clearCart()
     setIsOpen(false)
 
-    // El UpsellModal (todo upsell-modal) escucha este evento para interceptar
-    // la navegación y ofrecer el 1-click upsell. Si nadie lo maneja, vamos a
-    // la confirmación (comportamiento retrocompatible).
+    // El UpsellModal escucha este evento para interceptar la navegación y
+    // ofrecer el 1-click upsell. `dispatchEvent` retorna false si un listener
+    // llamó a preventDefault() (el modal reclamó el evento). Por lo tanto:
+    // navegamos a la confirmación SOLO si nadie reclamó (`claimed === true`).
+    // Si el modal reclamó, él decide cuándo navegar.
     const claimed = window.dispatchEvent(
       new CustomEvent(ORDER_PAID_EVENT, {
         detail: { orderId: createdOrderId, paymentIntentId, total },
         cancelable: true,
       })
     )
-    if (!claimed) {
+    if (claimed) {
       // Nunca bloquear tras un pago exitoso: city siempre está disponible
       // (CityProvider auto-sanea slugs inválidos); por seguridad se usa el
       // slug por defecto si no lo hubiera.

@@ -51,14 +51,44 @@ export async function POST(request: NextRequest) {
         // Valida el monto recibido contra el total del pedido antes de marcar
         // como pagado. Evita marcar como pagado un intent con monto distinto
         // (p.ej. cliente manipuló el total del body al crear el intent).
+        // Primero se busca por stripe_payment_intent_id (canonical). Si la
+        // columna no se persistió (fallo silencioso del update al crear el
+        // intent), se hace fallback por metadata.order_id, que el PI siempre
+        // lleva y Stripe preserva en el evento.
         const { data: order, error } = await supabase
           .from("orders")
           .select("id, user_id, total, customer_email")
           .eq("stripe_payment_intent_id", paymentIntent.id)
           .maybeSingle()
 
-        if (!error && order) {
-          if (isAmountSufficient(paymentIntent.amount_received, order.total)) {
+        let lookupOrder = order
+        let lookupError = error
+        if ((!order && !error) || error) {
+          const orderIdFromMetadata = Number(paymentIntent.metadata?.order_id)
+          if (Number.isFinite(orderIdFromMetadata) && orderIdFromMetadata > 0) {
+            const fb = await supabase
+              .from("orders")
+              .select("id, user_id, total, customer_email")
+              .eq("id", orderIdFromMetadata)
+              .maybeSingle()
+            if (fb.data && !fb.error) {
+              lookupOrder = fb.data
+              lookupError = null
+              // Repara el dato canónico para que futuros eventos (o el panel
+              // de admin) encuentren la orden por el PI.
+              await supabase
+                .from("orders")
+                .update({ stripe_payment_intent_id: paymentIntent.id })
+                .eq("id", lookupOrder.id)
+            }
+          }
+        }
+        if (lookupError) {
+          logger.error("Failed to fetch order payment:", lookupError.message)
+        }
+
+        if (!lookupError && lookupOrder) {
+          if (isAmountSufficient(paymentIntent.amount_received, lookupOrder.total)) {
             await supabase
               .from("orders")
               .update({
@@ -70,10 +100,10 @@ export async function POST(request: NextRequest) {
                 stripe_customer_id: paymentIntent.customer ?? null,
                 // El email capturado en el drawer llega por esta vía al pedido
                 // aunque la sesión del cliente ya no exista.
-                customer_email: order.customer_email ?? paymentIntent.receipt_email ?? null,
+                customer_email: lookupOrder.customer_email ?? paymentIntent.receipt_email ?? null,
                 updated_at: new Date().toISOString(),
               })
-              .eq("id", order.id)
+              .eq("id", lookupOrder.id)
 
             // Trigger WhatsApp: payment confirmation + status update.
             // Se ejecutan con after() para que corran después de enviar la
@@ -81,10 +111,10 @@ export async function POST(request: NextRequest) {
             // del serverless function — a diferencia de fire-and-forget,
             // no se cancelan al resolver el response.
             after(() => {
-              confirmPaymentToCustomer(order.id).catch((e) =>
+              confirmPaymentToCustomer(lookupOrder.id).catch((e) =>
                 logger.error("Workflow: payment_confirmed failed:", e)
               )
-              notifyCustomerStatusUpdate(order.id, "confirmed").catch((e) =>
+              notifyCustomerStatusUpdate(lookupOrder.id, "confirmed").catch((e) =>
                 logger.error("Workflow: status_update failed:", e)
               )
             })
@@ -95,13 +125,11 @@ export async function POST(request: NextRequest) {
                 payment_status: "amount_mismatch",
                 updated_at: new Date().toISOString(),
               })
-              .eq("id", order.id)
+              .eq("id", lookupOrder.id)
             logger.error(
-              `⚠️ Amount mismatch: order ${order.id} expected ${toCents(order.total)}, received ${paymentIntent.amount_received}`
+              `⚠️ Amount mismatch: order ${lookupOrder.id} expected ${toCents(lookupOrder.total)}, received ${paymentIntent.amount_received}`
             )
           }
-        } else if (error) {
-          logger.error("Failed to fetch order payment:", error.message)
         }
 
         // Upsells 1-click: si este intent corresponde a un order_upsells, se

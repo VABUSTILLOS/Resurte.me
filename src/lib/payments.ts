@@ -542,10 +542,19 @@ export async function createPaymentIntentForOrder(params: {
       },
     })
 
-    await supabase
+    const { error: persistPiError } = await supabase
       .from("orders")
       .update({ stripe_payment_intent_id: paymentIntent.id })
       .eq("id", order.id)
+    if (persistPiError) {
+      // No bloquear el checkout, pero el webhook ya no podrá encontrar la
+      // orden por PI. El webhook hace fallback por metadata.order_id, así que
+      // esta orden seguirá confirmándose correctamente.
+      console.error(
+        `[payments] Failed to persist stripe_payment_intent_id for order ${order.id}:`,
+        persistPiError.message
+      )
+    }
 
     return {
       clientSecret: paymentIntent.client_secret!,

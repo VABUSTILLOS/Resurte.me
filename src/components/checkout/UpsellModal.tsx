@@ -107,6 +107,13 @@ export function UpsellModal() {
   }, [])
 
   const goToConfirmation = useCallback(() => {
+    // Cierra el modal antes de navegar: el modal vive en el layout raíz y
+    // sobrevive la navegación, así que sin esto quedaría flotando con el
+    // spinner sobre la página de confirmación (el "loop" visual).
+    setIsOpen(false)
+    setStage("loading")
+    setUpsell(null)
+    setDownsell(null)
     // Nunca bloquear tras un pago exitoso: si city no está disponible (slug
     // inválido persistido), se navega a la ciudad por defecto en vez de
     // quedarse en el modal en "Preparando tu oferta...".
