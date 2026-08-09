@@ -13,6 +13,8 @@ export interface SelectedBump {
   unitPrice: number
   /** Nombre del producto del bump (para mostrarlo en el resumen del review). */
   name?: string
+  /** Imagen del producto del bump (para mostrarla en el resumen del review). */
+  imageUrl?: string
 }
 
 /**
@@ -54,22 +56,26 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
   const cartKey = cartItems.map((i) => `${i.product_id}:${i.quantity}`).join("|")
   const loading = cartKey !== "" && loadedFor !== cartKey
 
-  // Re-enriquece los bumps seleccionados con el nombre real del producto
-  // cuando la data de reglas está disponible. Los bumps persistidos en
-  // sessionStorage antes de añadir el campo `name` (o con nombre desactualizado)
-  // llegarían al resumen del review como "Artículo especial #X"; aquí se
-  // resuelve el nombre real por ruleId para que SIEMPRE se muestre el producto.
+  // Re-enriquece los bumps seleccionados con el nombre e imagen reales del
+  // producto cuando la data de reglas está disponible. Los bumps persistidos
+  // en sessionStorage antes de añadir los campos `name`/`imageUrl` (o con datos
+  // desactualizados) llegarían al resumen del review como "Artículo especial
+  // #X" o con ícono genérico; aquí se resuelven por ruleId para que SIEMPRE
+  // se muestre el producto real.
   useEffect(() => {
     if (bumps.length === 0 || selected.length === 0) return
-    const nameByRule = new Map(bumps.map((b) => [b.ruleId, b.product.name]))
+    const productByRule = new Map(bumps.map((b) => [b.ruleId, b.product]))
     let changed = false
     const next = selected.map((s) => {
-      const realName = nameByRule.get(s.ruleId)
-      if (realName && realName !== s.name) {
-        changed = true
-        return { ...s, name: realName }
-      }
-      return s
+      const product = productByRule.get(s.ruleId)
+      if (!product) return s
+      const patch: Partial<SelectedBump> = {}
+      if (product.name && product.name !== s.name) patch.name = product.name
+      if (product.image_url && product.image_url !== s.imageUrl)
+        patch.imageUrl = product.image_url
+      if (Object.keys(patch).length === 0) return s
+      changed = true
+      return { ...s, ...patch }
     })
     if (changed) onChange(next)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,6 +162,7 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
           quantity: 1,
           unitPrice: bump.price,
           name: bump.product.name,
+          imageUrl: bump.product.image_url || undefined,
         },
       ]
     } else {
