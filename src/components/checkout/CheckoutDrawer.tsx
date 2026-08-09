@@ -167,12 +167,13 @@ export function CheckoutDrawer() {
     }
   }, [])
 
-  useEffect(() => {
-    if (isLoggedIn !== true) return
-    let cancelled = false
+  // Carga la lista de direcciones guardadas y auto-selecciona la predeterminada
+  // (o la más reciente), autocompletando el formulario. Reutilizable: se llama
+  // al iniciar sesión y de nuevo tras crear una orden para que la dirección
+  // nueva aparezca en "Mis direcciones" sin recargar la página.
+  const loadSavedAddresses = useCallback(() => {
     const supabase = createClient()
     if (!supabase) return
-    claimGuestAddresses()
     const fetchSavedAddresses = async () => {
       // Orden preferido: predeterminada primero. Si el esquema desplegado aún
       // no tiene `is_default` (migración 00050), PostgREST devuelve error y se
@@ -189,31 +190,35 @@ export function CheckoutDrawer() {
         .order("created_at", { ascending: false })
     }
     fetchSavedAddresses().then(({ data, error }) => {
-        if (cancelled) return
-        if (!error && data) {
-          const rows = data as Address[]
-          setSavedAddresses(rows)
-          // Auto-selección: predeterminada o la más reciente; autocompleta el
-          // formulario para que "Continuar al envío" pueda saltar al horario.
-          const preferred = rows.find((a) => a.is_default) ?? rows[0]
-          setSelectedAddressId(preferred?.id ?? null)
-          if (preferred) {
-            setAddress({
-              label: preferred.label,
-              street: preferred.street,
-              number: preferred.number,
-              interior: preferred.interior ?? "",
-              neighborhood: preferred.neighborhood,
-              zip_code: preferred.zip_code,
-              references: preferred.references ?? "",
-            })
-          }
+      if (!error && data) {
+        const rows = data as Address[]
+        setSavedAddresses(rows)
+        // Auto-selección: predeterminada o la más reciente; autocompleta el
+        // formulario para que "Continuar al envío" pueda saltar al horario.
+        const preferred = rows.find((a) => a.is_default) ?? rows[0]
+        setSelectedAddressId(preferred?.id ?? null)
+        if (preferred) {
+          setAddress({
+            label: preferred.label,
+            street: preferred.street,
+            number: preferred.number,
+            interior: preferred.interior ?? "",
+            neighborhood: preferred.neighborhood,
+            zip_code: preferred.zip_code,
+            references: preferred.references ?? "",
+          })
         }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [isLoggedIn])
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (isLoggedIn !== true) return
+    const supabase = createClient()
+    if (!supabase) return
+    claimGuestAddresses()
+    loadSavedAddresses()
+  }, [isLoggedIn, loadSavedAddresses])
 
   // ── Totales en tiempo real (subtotal pagable + bumps seleccionados) ──
   // El descuento de cupón se calcula sobre el subtotal CON bumps incluidos,
@@ -404,6 +409,11 @@ export function CheckoutDrawer() {
     saveLastOrder(createdOrderId ?? undefined, earnedCashback?.credits, earnedCashback?.tier)
     clearCart()
     setIsOpen(false)
+
+    // Refresca "Mis direcciones" sin recargar: la dirección que se guardó con
+    // esta orden debe aparecer al abrir el drawer de nuevo (misma lógica que
+    // la página completa /checkout tras crear la orden).
+    if (isLoggedIn === true) loadSavedAddresses()
 
     // El UpsellModal escucha este evento para interceptar la navegación y
     // ofrecer el 1-click upsell. `dispatchEvent` retorna false si un listener
