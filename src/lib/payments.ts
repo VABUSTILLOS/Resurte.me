@@ -506,6 +506,15 @@ export async function createPaymentIntentForOrder(params: {
       amount: toCents(order.total), // MXN cents — total real de BD
       currency: "mxn",
       automatic_payment_methods: { enabled: true },
+      // Email para que Stripe Link reconozca/prefill al cliente y para el
+      // recibo. El drawer y el checkout de página ya lo envían como
+      // customer_email; aquí se aplica al intent de pago. Se valida con regex
+      // porque Stripe rechaza intents con receipt_email malformado.
+      ...(() => {
+        const candidate = (order.customer_email ?? params.customerEmail ?? "").trim()
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        return emailRegex.test(candidate) ? { receipt_email: candidate } : {}
+      })(),
       ...(customerId ? { customer: customerId } : {}),
       ...(saveCardEnabled
         ? {

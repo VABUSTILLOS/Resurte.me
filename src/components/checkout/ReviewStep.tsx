@@ -1,6 +1,5 @@
 "use client"
 
-import type { ReactNode } from "react"
 import { MapPin, Clock, ArrowLeft, ArrowRight } from "lucide-react"
 import type { City, CartItem } from "@/types"
 import { getNextDays, type AddressForm, type ScheduleForm } from "./checkout-shared"
@@ -15,10 +14,11 @@ interface ReviewStepProps {
   discount: number
   deliveryFee: number
   total: number
-  /** Slot opcional para inyectar order bumps (mecánica ThriveCart) entre el
-   *  resumen de items y el total, en el flujo de página completa. Retrocompatible:
-   *  si no se pasa, el paso renderiza igual que antes. */
-  bumpsSlot?: ReactNode
+  /** Order bumps ya seleccionados (mecánica ThriveCart). Se muestran como
+   *  línea de resumen de solo lectura — la selección ocurrió antes del review
+   *  (carrito o drawer); aquí solo se confirman. Retrocompatible: si no se
+   *  pasan, el paso renderiza igual que antes. */
+  bumpItems?: { product_id: number; name: string; quantity: number; unitPrice: number }[]
   onEditAddress: () => void
   onEditSchedule: () => void
   onBack: () => void
@@ -35,7 +35,7 @@ export function ReviewStep({
   discount,
   deliveryFee,
   total,
-  bumpsSlot,
+  bumpItems,
   onEditAddress,
   onEditSchedule,
   onBack,
@@ -115,11 +115,26 @@ export function ReviewStep({
               </span>
             </li>
           ))}
+          {/* Order bumps seleccionados (mecánica ThriveCart): solo lectura, ya
+              se eligieron en el carrito o drawer — aquí solo se confirman. */}
+          {bumpItems?.map((bump) => (
+            <li
+              key={`bump-${bump.product_id}`}
+              className="flex justify-between text-sm"
+            >
+              <span className="text-gray-600 truncate mr-4 flex items-center gap-2">
+                {bump.quantity}× {bump.name}
+                <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">
+                  Especial
+                </span>
+              </span>
+              <span className="font-medium text-gray-900 shrink-0">
+                ${(bump.unitPrice * bump.quantity).toFixed(2)}
+              </span>
+            </li>
+          ))}
         </ul>
       </div>
-
-      {/* Order bumps (mecánica ThriveCart): se ofrecen justo antes del total */}
-      {bumpsSlot}
 
       {/* Total */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 space-y-2">

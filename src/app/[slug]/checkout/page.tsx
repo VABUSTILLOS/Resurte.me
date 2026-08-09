@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
@@ -34,7 +34,6 @@ import { AddressStep } from "@/components/checkout/AddressStep"
 import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { ReviewStep } from "@/components/checkout/ReviewStep"
 import { PaymentStep } from "@/components/checkout/PaymentStep"
-import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { validDeliveryFee, calcCouponDiscount } from "@/lib/checkout-config"
 
@@ -59,6 +58,31 @@ export default function CheckoutPage() {
   // Teléfono de contacto: se guarda en orders.customer_phone para activar la
   // confirmación por WhatsApp al cliente.
   const [phone, setPhone] = useState("")
+
+  // Email del cliente: se captura al salir del campo (onBlur) como lead y se
+  // pasa a Stripe como customer_email para habilitar Link Pay / prefill.
+  const [email, setEmail] = useState("")
+
+  // Captura de lead onBlur (fire-and-forget, fail-open). Reutiliza el mismo
+  // endpoint que el drawer móvil para no duplicar lógica.
+  const captureLead = useCallback((value: string) => {
+    const cleaned = value.trim()
+    if (!cleaned) return
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(cleaned)) return
+    void fetch("/api/leads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: cleaned,
+        phone: phone.trim() || undefined,
+        source: "checkout_page",
+        coupon_code: coupon?.code ?? undefined,
+      }),
+    }).catch(() => {
+      // Fail-open: nunca bloquear el checkout por captura de leads
+    })
+  }, [phone, coupon?.code])
 
   // Direcciones guardadas del usuario (solo visibles para dueño vía RLS)
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([])
@@ -177,7 +201,7 @@ export default function CheckoutPage() {
           })),
           ...selectedBumps.map((b) => ({
             id: String(b.productId),
-            name: String(b.productId),
+            name: b.name ?? `Artículo especial #${b.productId}`,
             quantity: b.quantity,
             price: b.unitPrice,
           })),
@@ -263,6 +287,7 @@ export default function CheckoutPage() {
           // Checkout anónimo: el servidor valida el guest_token contra la
           // dirección del pedido antes de crear el intent.
           ...(guestToken ? { guest_token: guestToken } : {}),
+          ...(email.trim() ? { customer_email: email.trim() } : {}),
         }),
       })
 
@@ -340,6 +365,7 @@ export default function CheckoutPage() {
           },
           payment_method: paymentMethod,
           phone,
+          email: email.trim() || undefined,
           subtotal: effectiveSubtotal,
           delivery_fee: deliveryFee,
           total,
@@ -528,6 +554,9 @@ export default function CheckoutPage() {
             setAddress(DEFAULT_ADDRESS_FORM)
           }}
           onPhoneChange={setPhone}
+          email={email}
+          onEmailChange={setEmail}
+          onEmailBlur={captureLead}
           onContinue={() => setStep("schedule")}
         />
       )}
@@ -549,35 +578,18 @@ export default function CheckoutPage() {
           address={address}
           schedule={schedule}
           city={city}
-          cartItems={[
-            ...cart.items,
-            ...selectedBumps.map((b) => ({
-              product_id: b.productId,
-              name: String(b.productId),
-              slug: "",
-              image_url: "",
-              brand: "",
-              price: b.unitPrice,
-              sale_price: b.unitPrice,
-              quantity: b.quantity,
-              stock_status: "in_stock" as const,
-            })),
-          ]}
+          cartItems={cart.items}
           itemCount={allItemsCount}
           subtotal={effectiveSubtotal}
           discount={discountAmount}
           deliveryFee={deliveryFee}
           total={total}
-          bumpsSlot={
-            <BumpCards
-              cartItems={cart.items.map((i) => ({
-                product_id: i.product_id,
-                quantity: i.quantity,
-              }))}
-              selected={selectedBumps}
-              onChange={setSelectedBumps}
-            />
-          }
+          bumpItems={selectedBumps.map((b) => ({
+            product_id: b.productId,
+            name: b.name ?? `Artículo especial #${b.productId}`,
+            quantity: b.quantity,
+            unitPrice: b.unitPrice,
+          }))}
           onEditAddress={() => setStep("address")}
           onEditSchedule={() => setStep("schedule")}
           onBack={() => setStep("schedule")}

@@ -11,6 +11,8 @@ export interface SelectedBump {
   productId: number
   quantity: number
   unitPrice: number
+  /** Nombre del producto del bump (para mostrarlo en el resumen del review). */
+  name?: string
 }
 
 /**
@@ -132,6 +134,7 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
           productId: bump.product.id,
           quantity: 1,
           unitPrice: bump.price,
+          name: bump.product.name,
         },
       ]
     } else {
