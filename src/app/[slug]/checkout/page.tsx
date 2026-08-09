@@ -34,6 +34,7 @@ import { AddressStep } from "@/components/checkout/AddressStep"
 import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { ReviewStep } from "@/components/checkout/ReviewStep"
 import { PaymentStep } from "@/components/checkout/PaymentStep"
+import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { validDeliveryFee, calcCouponDiscount } from "@/lib/checkout-config"
 
@@ -600,27 +601,40 @@ export default function CheckoutPage() {
 
       {/* ============ STEP 3: REVIEW ============ */}
       {step === "review" && (
-        <ReviewStep
-          address={address}
-          schedule={schedule}
-          city={city}
-          cartItems={cart.items}
-          itemCount={allItemsCount}
-          subtotal={effectiveSubtotal}
-          discount={discountAmount}
-          deliveryFee={deliveryFee}
-          total={total}
-          bumpItems={selectedBumps.map((b) => ({
-            product_id: b.productId,
-            name: b.name ?? `Artículo especial #${b.productId}`,
-            quantity: b.quantity,
-            unitPrice: b.unitPrice,
-          }))}
-          onEditAddress={() => setStep("address")}
-          onEditSchedule={() => setStep("schedule")}
-          onBack={() => setStep("schedule")}
-          onContinue={() => setStep("payment")}
-        />
+        <>
+          {/* Order bumps (mecánica ThriveCart): visibles justo antes de pagar,
+              igual que en el CheckoutDrawer. Si el carrito no dispara reglas,
+              BumpCards renderiza null y no cambia nada (retrocompatible). */}
+          <BumpCards
+            cartItems={cart.items.map((i) => ({
+              product_id: i.product_id,
+              quantity: i.quantity,
+            }))}
+            selected={selectedBumps}
+            onChange={setSelectedBumps}
+          />
+          <ReviewStep
+            address={address}
+            schedule={schedule}
+            city={city}
+            cartItems={cart.items}
+            itemCount={allItemsCount}
+            subtotal={effectiveSubtotal}
+            discount={discountAmount}
+            deliveryFee={deliveryFee}
+            total={total}
+            bumpItems={selectedBumps.map((b) => ({
+              product_id: b.productId,
+              name: b.name ?? `Artículo especial #${b.productId}`,
+              quantity: b.quantity,
+              unitPrice: b.unitPrice,
+            }))}
+            onEditAddress={() => setStep("address")}
+            onEditSchedule={() => setStep("schedule")}
+            onBack={() => setStep("schedule")}
+            onContinue={() => setStep("payment")}
+          />
+        </>
       )}
 
       {/* ============ STEP 4: PAYMENT ============ */}
