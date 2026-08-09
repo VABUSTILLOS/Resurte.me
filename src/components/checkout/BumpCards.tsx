@@ -54,6 +54,27 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
   const cartKey = cartItems.map((i) => `${i.product_id}:${i.quantity}`).join("|")
   const loading = cartKey !== "" && loadedFor !== cartKey
 
+  // Re-enriquece los bumps seleccionados con el nombre real del producto
+  // cuando la data de reglas está disponible. Los bumps persistidos en
+  // sessionStorage antes de añadir el campo `name` (o con nombre desactualizado)
+  // llegarían al resumen del review como "Artículo especial #X"; aquí se
+  // resuelve el nombre real por ruleId para que SIEMPRE se muestre el producto.
+  useEffect(() => {
+    if (bumps.length === 0 || selected.length === 0) return
+    const nameByRule = new Map(bumps.map((b) => [b.ruleId, b.product.name]))
+    let changed = false
+    const next = selected.map((s) => {
+      const realName = nameByRule.get(s.ruleId)
+      if (realName && realName !== s.name) {
+        changed = true
+        return { ...s, name: realName }
+      }
+      return s
+    })
+    if (changed) onChange(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bumps])
+
   useEffect(() => {
     if (!cartItems || cartItems.length === 0) return
     let cancelled = false
