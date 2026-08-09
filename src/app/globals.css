@@ -439,9 +439,16 @@ textarea:focus-visible,
   top: 0;
 }
 
-/* Touch target minimum for mobile */
+/* Touch target minimum for mobile.
+   NOTE: this rule lives OUTSIDE Tailwind's @layer utilities, and unlayered
+   CSS beats layered CSS in the cascade. Setting display:inline-flex here
+   therefore overrides Tailwind's .hidden{display:none} on any element that
+   has both `hidden` and `touch-target` (e.g. desktop-only header buttons),
+   which pushed the mobile cart button off-screen. The :not(.hidden)
+   selector keeps the 44px touch target on visible buttons while letting
+   `.hidden` win for hidden ones. */
 @media (max-width: 640px) {
-  .touch-target {
+  .touch-target:not(.hidden) {
     min-width: 44px;
     min-height: 44px;
     display: inline-flex;
