@@ -24,7 +24,7 @@ test("debug drawer open", async ({ page }) => {
     return {
       headings: Array.from(document.querySelectorAll("h2")).map((e) => e.textContent),
       hasDrawerHeader: !!Array.from(document.querySelectorAll("h2")).find((e) => e.textContent === "Tu pedido"),
-      consoleErrs: window.__lastErrors || [],
+      consoleErrs: (window as Window & { __lastErrors?: unknown[] }).__lastErrors || [],
     }
   })
   console.log(">> STATE:", JSON.stringify(state))

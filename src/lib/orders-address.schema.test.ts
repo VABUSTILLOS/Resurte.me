@@ -41,11 +41,11 @@ function parseAddressesSchema(sql: string): Map<string, ColumnInfo> {
   // CREATE TABLE addresses ( ... )
   const tableMatch = sql.match(/CREATE TABLE (?:public\.)?addresses\s*\(([\s\S]*?)\)\s*;/)
   if (tableMatch) {
-    for (const line of tableMatch[1].split("\n")) {
+    for (const line of (tableMatch[1] ?? "").split("\n")) {
       const m = line.match(/^\s*(?:"([a-zA-Z_]+)"|([a-zA-Z_]+))\s+([^\s,]+)(.*)$/)
       if (!m) continue
-      const name = m[1] ?? m[2]
-      const type = m[3]
+      const name = m[1] ?? m[2] ?? ""
+      const type = m[3] ?? ""
       const rest = m[4] ?? ""
       cols.set(name, {
         type,
@@ -61,10 +61,10 @@ function parseAddressesSchema(sql: string): Map<string, ColumnInfo> {
   const alterRe =
     /ALTER TABLE (?:public\.)?addresses\s+ADD COLUMN\s+(?:IF NOT EXISTS\s+)?(?:"([a-zA-Z_]+)"|([a-zA-Z_]+))\s+([^;\n]+)/g
   for (const m of sql.matchAll(alterRe)) {
-    const name = m[1] ?? m[2]
-    const def = m[3]
+    const name = m[1] ?? m[2] ?? ""
+    const def = m[3] ?? ""
     cols.set(name, {
-      type: def.trim().split(/\s+/)[0],
+      type: def.trim().split(/\s+/)[0] ?? "",
       notNull: /NOT NULL/.test(def),
       hasDefault: /DEFAULT/.test(def) || /SERIAL/.test(def),
     })
@@ -73,7 +73,7 @@ function parseAddressesSchema(sql: string): Map<string, ColumnInfo> {
   // ALTER TABLE ... ALTER COLUMN ... DROP NOT NULL
   const dropRe = /ALTER TABLE (?:public\.)?addresses\s+ALTER COLUMN\s+([a-zA-Z_]+)\s+DROP NOT NULL/g
   for (const m of sql.matchAll(dropRe)) {
-    const existing = cols.get(m[1])
+    const existing = cols.get(m[1] ?? "")
     if (existing) existing.notNull = false
   }
 
@@ -103,7 +103,7 @@ describe("contrato de esquema public.addresses vs payload de guardado", () => {
 
   it("el esquema migrado incluye las columnas esperadas", () => {
     expect(schema.has("id")).toBe(true)
-    expect(schema.get("user_id")?.type.toLowerCase()).toBe("uuid")
+    expect(schema.get("user_id")?.type?.toLowerCase()).toBe("uuid")
     expect(schema.get("street")?.notNull).toBe(true)
     expect(schema.get("is_default")?.notNull).toBe(true)
     expect(schema.get("is_default")?.hasDefault).toBe(true)

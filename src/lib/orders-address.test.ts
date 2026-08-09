@@ -27,7 +27,9 @@ function postgrestError(code: string, message: string): PostgrestError {
     message,
     details: "",
     hint: "",
-  }
+    name: "PostgrestError",
+    toJSON: () => ({}),
+  } as PostgrestError
 }
 
 interface MockOpts {
@@ -103,8 +105,8 @@ describe("insertAddressResilient", () => {
     expect(supabase.insert).toHaveBeenCalledTimes(2)
     // El reintento NO incluye city_id.
     expect(supabase.insertedPayloads).toHaveLength(1)
-    expect(supabase.insertedPayloads[0].city_id).toBeUndefined()
-    expect(supabase.insertedPayloads[0].street).toBe("Av. Reforma")
+    expect(supabase.insertedPayloads[0]!.city_id).toBeUndefined()
+    expect(supabase.insertedPayloads[0]!.street).toBe("Av. Reforma")
   })
 
   it("reintenta cuando PostgREST reporta schema cache (PGRST205)", async () => {
@@ -126,7 +128,7 @@ describe("insertAddressResilient", () => {
     expect(result.error).toBeNull()
     expect(result.data).toEqual({ id: 77 })
     expect(supabase.insert).toHaveBeenCalledTimes(2)
-    expect(supabase.insertedPayloads[0].city_id).toBeUndefined()
+    expect(supabase.insertedPayloads[0]!.city_id).toBeUndefined()
   })
 
   it("omite city_id desde el inicio para checkout anónimo (city_id null)", async () => {
@@ -135,9 +137,9 @@ describe("insertAddressResilient", () => {
 
     expect(result.error).toBeNull()
     expect(supabase.insert).toHaveBeenCalledTimes(1)
-    expect(supabase.insertedPayloads[0].city_id).toBeUndefined()
-    expect(supabase.insertedPayloads[0].user_id).toBeNull()
-    expect(supabase.insertedPayloads[0].guest_token).toBe("gt-abc")
+    expect(supabase.insertedPayloads[0]!.city_id).toBeUndefined()
+    expect(supabase.insertedPayloads[0]!.user_id).toBeNull()
+    expect(supabase.insertedPayloads[0]!.guest_token).toBe("gt-abc")
   })
 
   it("NO reintenta si el error es real (p. ej. NOT NULL) y lo devuelve", async () => {
@@ -175,6 +177,6 @@ describe("insertAddressResilient", () => {
     delete sinLabel.label
     await insertAddressResilient(supabase as unknown as ServiceClient, sinLabel)
 
-    expect(supabase.insertedPayloads[0].label).toBe("Casa")
+    expect(supabase.insertedPayloads[0]!.label).toBe("Casa")
   })
 })
