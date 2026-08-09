@@ -11,7 +11,7 @@ import { bumpUnitPrice, type BumpRuleRow, type BumpProduct } from "@/lib/order-b
  * rechazo (o el único candidato restante).
  */
 
-export type UpsellOfferProduct = BumpProduct
+type UpsellOfferProduct = BumpProduct
 
 export interface UpsellOffer {
   /** id de la bump_rule que define el descuento de la oferta. */

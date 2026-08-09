@@ -70,6 +70,16 @@
       ],
       "src/lib/storage/storage-schemas.ts": [
         "exports"
+      ],
+      "src/lib/exit-intent.ts": [
+        "exports"
+      ],
+      "src/lib/order-bumps.ts": [
+        "exports",
+        "types"
+      ],
+      "src/lib/orders-address.ts": [
+        "exports"
       ]
     }
   }

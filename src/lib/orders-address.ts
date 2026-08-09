@@ -26,7 +26,7 @@ export interface AddressInsertInput {
   city_id?: number | null
 }
 
-export interface AddressInsertResult {
+interface AddressInsertResult {
   id: number
 }
 

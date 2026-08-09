@@ -5,7 +5,7 @@ import { BUMPS_STORAGE_KEY, type SelectedBump } from "@/components/checkout/Bump
 
 /** Evento global que sincroniza la selección de bumps entre consumidores
  *  (drawer móvil, /cart, /{ciudad}/carrito y MobileCartBar) en la misma pestaña. */
-export const BUMPS_CHANGED_EVENT = "resurte:bumps-changed"
+const BUMPS_CHANGED_EVENT = "resurte:bumps-changed"
 
 /** Lee los bumps persistidos en sessionStorage (clave compartida con /cart).
  *  Retorna [] si no hay datos o el almacenamiento no está disponible. */
