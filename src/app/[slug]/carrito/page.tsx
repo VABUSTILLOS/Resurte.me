@@ -121,6 +121,16 @@ export default function CartPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Items */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Cross-sell: order bumps inteligentes (mecánica ThriveCart). Mismo
+              componente que /cart desktop y el drawer móvil. Ubicados ANTES de
+              la lista de items para quedar arriba del pliegue incluso con
+              carritos grandes. */}
+          <BumpCards
+            cartItems={cart.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity }))}
+            selected={selectedBumps}
+            onChange={setSelectedBumps}
+          />
+
           {cart.items.map((item) => (
             <div
               key={item.product_id}
@@ -197,13 +207,6 @@ export default function CartPage() {
               </div>
             </div>
           ))}
-
-          {/* Cross-sell: order bumps inteligentes (mecánica ThriveCart) */}
-          <BumpCards
-            cartItems={cart.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity }))}
-            selected={selectedBumps}
-            onChange={setSelectedBumps}
-          />
 
           <Link
             href={`/${city.slug}/buscar`}
