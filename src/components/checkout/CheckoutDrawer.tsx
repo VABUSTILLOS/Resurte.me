@@ -357,7 +357,7 @@ export function CheckoutDrawer() {
               product_id: b.productId,
               quantity: b.quantity,
               unit_price: b.unitPrice,
-              name: String(b.productId),
+              name: b.name ?? `Artículo especial #${b.productId}`,
               item_type: "bump" as const,
             })),
           ],
@@ -650,14 +650,68 @@ export function CheckoutDrawer() {
 
           {step === "bumps" && (
             <div className="space-y-5">
-              <BumpCards
-                cartItems={cart.items.map((i) => ({
-                  product_id: i.product_id,
-                  quantity: i.quantity,
-                }))}
-                selected={selectedBumps}
-                onChange={setSelectedBumps}
-              />
+              {/* Revisión final read-only: lista consolidada de TODOS los
+                  productos (catálogo + bumps ya seleccionados) y total a
+                  pagar. Los bumps se eligen en el paso anterior (review). */}
+              <div>
+                <p className="text-xs font-semibold text-[#B87A3A] uppercase tracking-wide mb-2">
+                  Tu pedido ({itemCount + selectedBumps.reduce((n, b) => n + b.quantity, 0)})
+                </p>
+                <ul className="divide-y divide-[#E8E9EB]">
+                  {cart.items.map((item) => (
+                    <li key={item.product_id} className="py-3 flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-[10px] bg-[#F7F5F0] flex items-center justify-center shrink-0 overflow-hidden">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.name}
+                            loading="lazy"
+                            width={48}
+                            height={48}
+                            className="w-full h-full object-contain p-1"
+                          />
+                        ) : (
+                          <ShoppingBag className="w-5 h-5 text-[#C7C8CD]" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-[#242529] truncate">
+                          {item.quantity}× {item.name}
+                        </p>
+                        <p className="text-xs text-[var(--text-secondary)]">
+                          {item.brand}
+                        </p>
+                      </div>
+                      <span className="text-sm font-semibold text-[#242529]">
+                        ${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}
+                      </span>
+                    </li>
+                  ))}
+                  {selectedBumps.map((b) => (
+                    <li key={`bump-${b.productId}`} className="py-3 flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-[10px] bg-[#FDF3E3] flex items-center justify-center shrink-0 overflow-hidden">
+                        <ShoppingBag className="w-5 h-5 text-[#B87A3A]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-[#242529] truncate">
+                            {b.quantity}× {b.name ?? `Artículo especial #${b.productId}`}
+                          </p>
+                          <span className="shrink-0 text-[10px] font-bold text-[#B87A3A] bg-[#FDF3E3] border border-[#EEDCC4] rounded-full px-2 py-0.5 uppercase tracking-wide">
+                            Especial
+                          </span>
+                        </div>
+                        <p className="text-xs text-[var(--text-secondary)]">
+                          Agregado a tu pedido
+                        </p>
+                      </div>
+                      <span className="text-sm font-semibold text-[#B87A3A]">
+                        ${(b.unitPrice * b.quantity).toFixed(2)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
               {/* Resumen con bumps en tiempo real */}
               <div className="bg-[#F7F5F0] rounded-xl p-4 space-y-2 text-sm">
