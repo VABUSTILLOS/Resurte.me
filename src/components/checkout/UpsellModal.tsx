@@ -41,6 +41,11 @@ const RETRY_DELAYS_MS = [800, 1800, 3600]
 const FETCH_TIMEOUT_MS = 10_000
 // Escapatoria global para el cobro del upsell (process-upsell + 3DS).
 const PROCESS_TIMEOUT_MS = 20_000
+// Reintentos máximos de un 409 transitorio ("order_not_confirmed": el webhook
+// tarda ~1-2s en confirmar el pago base). Nunca ilimitado: un 409 permanente
+// (sin método de pago, producto agotado) no se reintenta.
+// Backoff entre reintentos: t≈1.2s, 3s y 5.4s (tres entradas = tres reintentos).
+const PROCESS_RETRY_DELAYS_MS = [1200, 1800, 2400]
 
 function getStripePromise() {
   if (!stripePromise) {
@@ -250,11 +255,15 @@ export function UpsellModal() {
     setStage("processing")
     setError(null)
 
-    const token = ++processAttemptRef.current
+    // Token de proceso: un solo cobro por oferta. Los reintentos NO lo
+    // incrementan (reusarían el mismo settle), para que el safety timer global
+    // siga siendo la única escapatoria si el 409 persiste.
+    const token = processAttemptRef.current
     let settled = false
 
     // Escapatoria global: el modal jamás se queda en "Procesando tu pago..."
-    // si la API se cuelga o el banco nunca responde.
+    // si la API se cuelga o el banco nunca responde. Se crea UNA VEZ por
+    // proceso (no se reinicia en los reintentos).
     const safetyTimer = window.setTimeout(() => {
       settle(() => goToDownsellOrSuccess())
     }, PROCESS_TIMEOUT_MS)
@@ -267,86 +276,119 @@ export function UpsellModal() {
       fn()
     }
 
-    try {
-      const res = await fetch("/api/checkout/process-upsell", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          order_id: id,
-          product_id: offer.productId,
-          quantity: offer.quantity,
-          idempotency_key: idempotencyKey,
-          guest_token: getGuestToken(),
-        }),
+    // Cierra el proceso con un error claro: la orden base permanece intacta.
+    const finishWithError = (message: string) => {
+      settle(() => {
+        setError(message)
+        goToDownsellOrSuccess()
       })
-      const data = await res.json()
+    }
+
+    const attemptCharge = async (attempt: number): Promise<void> => {
       if (token !== processAttemptRef.current) return
-
-      if (res.ok && data.status === "succeeded") {
-        settle(() => {
-          setPaidAmount((prev) => prev + Number(data.amount ?? 0))
-          setStage("success")
-          updateLastOrder(offer, Number(data.amount ?? offer.price))
+      try {
+        const res = await fetch("/api/checkout/process-upsell", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            order_id: id,
+            product_id: offer.productId,
+            quantity: offer.quantity,
+            idempotency_key: idempotencyKey,
+            guest_token: getGuestToken(),
+          }),
         })
-        return
-      }
-
-      if (res.ok && data.status === "requires_action" && data.clientSecret) {
-        // 3DS/SCA: el banco requiere autenticación. La orden base ya está
-        // pagada; confirmamos el intent del upsell y esperamos el webhook.
-        settle(() => setStage("authenticating"))
-        const authenticated = await runThreeDS(data.clientSecret)
+        const data = await res.json()
         if (token !== processAttemptRef.current) return
-        if (authenticated) {
+
+        if (res.ok && data.status === "succeeded") {
           settle(() => {
-            setPaidAmount((prev) => prev + offer.price)
+            setPaidAmount((prev) => prev + Number(data.amount ?? 0))
             setStage("success")
-            updateLastOrder(offer, offer.price)
+            updateLastOrder(offer, Number(data.amount ?? offer.price))
           })
-        } else {
-          // El cliente canceló o falló la verificación → downsell o confirmación.
-          settle(() => {
-            setError(
+          return
+        }
+
+        if (res.ok && data.status === "requires_action" && data.clientSecret) {
+          // 3DS/SCA: el banco requiere autenticación. La orden base ya está
+          // pagada; confirmamos el intent del upsell y esperamos el webhook.
+          // Cancelamos el timer de "procesando" (la verificación 3DS es
+          // interactiva y puede durar más de 20s), pero NO hacemos settle aquí —
+          // si lo hiciéramos, el settle posterior (éxito/fallo) nunca se
+          // ejecutaría y el modal quedaría colgado en "authenticating" para
+          // siempre. runThreeDS siempre resuelve (nunca cuelga).
+          clearTimeout(safetyTimer)
+          setStage("authenticating")
+          const authenticated = await runThreeDS(data.clientSecret)
+          if (token !== processAttemptRef.current) return
+          if (authenticated) {
+            settle(() => {
+              setPaidAmount((prev) => prev + offer.price)
+              setStage("success")
+              updateLastOrder(offer, offer.price)
+            })
+          } else {
+            // El cliente canceló o falló la verificación → downsell o confirmación.
+            finishWithError(
               "No se pudo completar la verificación. Tu pedido principal está confirmado."
             )
-            goToDownsellOrSuccess()
-          })
+          }
+          return
         }
-        return
-      }
 
-      if (res.status === 409) {
-        // Conflicto de idempotencia (cobro duplicado por doble clic, o el
-        // webhook aún no confirmó la orden). Reintentamos con una llave nueva:
-        // si el pago ya existe, el servidor lo reconcilia y devuelve succeeded
-        // sin volver a cobrar; si la orden aún no está confirmada, el retry da
-        // tiempo al webhook. Nunca un cobro doble.
-        logger.warn("process-upsell conflict (409), retrying with fresh key", {
-          orderId: id,
-          productId: offer.productId,
-        })
-        return processOffer(offer, crypto.randomUUID())
-      }
+        if (res.status === 409) {
+          const code: string | undefined = data?.code
+          // 409 transitorio: el webhook aún no confirmó la orden base. Reintento
+          // con backoff, agotando MAX_PROCESS_ATTEMPTS. El servidor es idempotente
+          // por idempotency_key, así que nunca hay cobro doble.
+          const retryable = code === "order_not_confirmed"
+          const delay = PROCESS_RETRY_DELAYS_MS[attempt]
+          if (retryable && delay) {
+            logger.warn("process-upsell conflict (409), retrying with backoff", {
+              orderId: id,
+              productId: offer.productId,
+              attempt: attempt + 1,
+            })
+            window.setTimeout(() => {
+              void attemptCharge(attempt + 1)
+            }, delay)
+            return
+          }
+          // 409 permanente (no_payment_method / out_of_stock) o reintentos
+          // agotados: la orden base está confirmada e intacta.
+          logger.warn("process-upsell conflict (409), giving up", {
+            orderId: id,
+            productId: offer.productId,
+            code,
+            attempts: attempt + 1,
+          })
+          finishWithError(
+            code === "no_payment_method"
+              ? "Este método de pago no permite cargos 1-clic. Tu pedido principal está confirmado."
+              : "No se pudo procesar el cargo 1-clic. Tu pedido principal está confirmado."
+          )
+          return
+        }
 
-      // 4xx (declinado / sin método guardado): orden base intacta.
-      settle(() => {
-        setError(
+        // 4xx (declinado / sin método guardado): orden base intacta.
+        finishWithError(
           typeof data?.error === "string"
             ? data.error
             : "No se pudo agregar el artículo"
         )
-        goToDownsellOrSuccess()
-      })
-    } catch (err) {
-      if (token !== processAttemptRef.current) return
-      logger.warn("process-upsell failed", {
-        error: err instanceof Error ? err.message : String(err),
-      })
-      settle(() => {
-        setError("Error de conexión. Tu pedido principal está confirmado.")
-        goToDownsellOrSuccess()
-      })
+      } catch (err) {
+        if (token !== processAttemptRef.current) return
+        logger.warn("process-upsell failed", {
+          error: err instanceof Error ? err.message : String(err),
+        })
+        finishWithError(
+          "Error de conexión. Tu pedido principal está confirmado."
+        )
+      }
     }
+
+    await attemptCharge(0)
   }
 
   const goToDownsellOrSuccess = useCallback(() => {

@@ -24,7 +24,12 @@ import {
  * Respuestas:
  *  200 { status: "succeeded", paymentIntentId, orderUpsellId, amount }
  *  200 { status: "requires_action", clientSecret, paymentIntentId, orderUpsellId }
- *  4xx { error }  (403/404/409/402 — la orden base queda intacta)
+ *  4xx { error, code? }  (403/404/409/402 — la orden base queda intacta).
+ *    · code "order_not_confirmed" (409) → transitorio, reintentable (el webhook
+ *      tarda ~1-2s en confirmar el pago base).
+ *    · code "no_payment_method" (409) → permanente: el pago base se hizo sin
+ *      método reutilizable (p.ej. wallet), NO reintentar.
+ *    · code "out_of_stock" (409) → permanente, NO reintentar.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -76,7 +81,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof PaymentIntentError) {
       logger.warn("process-upsell error", { error: error.message })
-      return NextResponse.json({ error: error.message }, { status: error.status })
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status }
+      )
     }
 
     logger.error("process-upsell unexpected error:", error)

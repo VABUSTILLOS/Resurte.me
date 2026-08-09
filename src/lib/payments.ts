@@ -6,10 +6,17 @@ import { logger } from "@/lib/logger"
 
 export class PaymentIntentError extends Error {
   status: number
+  /**
+   * Código máquina opcional para que el cliente distinga entre 409
+   * reintentables (order_not_confirmed) y permanentes (no_payment_method,
+   * out_of_stock) sin depender de inspeccionar el mensaje.
+   */
+  code?: string
 
-  constructor(message: string, status = 400) {
+  constructor(message: string, status = 400, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -94,12 +101,17 @@ export async function processUpsellForOrder(
     throw new PaymentIntentError("Pedido no encontrado", 404)
   }
   if (order.payment_status !== "paid" || order.status !== "confirmed") {
-    throw new PaymentIntentError("El pedido aún no está confirmado", 409)
+    throw new PaymentIntentError(
+      "El pedido aún no está confirmado",
+      409,
+      "order_not_confirmed"
+    )
   }
   if (!order.stripe_payment_method_id) {
     throw new PaymentIntentError(
       "No hay método de pago guardado para este pedido",
-      409
+      409,
+      "no_payment_method"
     )
   }
 
@@ -206,7 +218,7 @@ export async function processUpsellForOrder(
     throw new PaymentIntentError("Producto de upsell no encontrado", 404)
   }
   if (product.stock_status === "out_of_stock") {
-    throw new PaymentIntentError("Producto agotado", 409)
+    throw new PaymentIntentError("Producto agotado", 409, "out_of_stock")
   }
 
   // Si el producto tiene una bump_rule activa, se reutiliza su descuento
