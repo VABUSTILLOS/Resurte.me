@@ -16,6 +16,8 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { CouponInput } from "@/components/cart/coupon-input"
+import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
+import { validDeliveryFee, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 import { BumpCards, BUMPS_STORAGE_KEY, type SelectedBump } from "@/components/checkout/BumpCards"
 
 export default function CartPage() {
@@ -34,7 +36,13 @@ export default function CartPage() {
     }
   })
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
-  const bumpsTotal = Math.max(0, subtotal - discount + bumpsSubtotal)
+  // Envío dinámico (misma fórmula que el checkout): gratis desde $500 incluyendo bumps.
+  const deliveryFee = validDeliveryFee(
+    itemCount + selectedBumps.length,
+    Math.max(0, subtotal - discount + bumpsSubtotal),
+    DELIVERY_FEE_FLAT
+  )
+  const bumpsTotal = Math.max(0, subtotal - discount + bumpsSubtotal + deliveryFee)
 
   const handleBumpsChange = (next: SelectedBump[]) => {
     setSelectedBumps(next)
@@ -91,6 +99,12 @@ export default function CartPage() {
       <p className="text-gray-500 text-sm mb-6">
         {itemCount} {itemCount === 1 ? "producto" : "productos"}
       </p>
+
+      {/* Barra de progreso hacia envío gratis (mecánica ThriveCart).
+          Se actualiza en tiempo real al seleccionar order bumps. */}
+      <div className="mb-6">
+        <FreeShippingProgress payableSubtotal={Math.max(0, subtotal - discount + bumpsSubtotal)} />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Items */}
@@ -221,18 +235,24 @@ export default function CartPage() {
                   <Clock className="w-3.5 h-3.5" />
                   Envío
                 </span>
-                <span className="text-gray-400">Calculado en checkout</span>
+                <span className={deliveryFee === 0 ? "font-semibold text-brand-600" : "text-gray-900 font-semibold"}>
+                  {deliveryFee === 0 ? "Gratis 🎉" : `$${DELIVERY_FEE_FLAT.toFixed(2)}`}
+                </span>
               </div>
 
               <hr className="border-gray-100" />
 
               <div className="flex justify-between">
-                <span className="text-lg font-bold text-gray-900">Total estimado</span>
+                <span className="text-lg font-bold text-gray-900">Total</span>
                 <span className="text-lg font-bold text-brand-600">
                   ${bumpsTotal.toFixed(2)}
                 </span>
               </div>
-              <p className="text-[11px] text-gray-400 text-right -mt-3">+ envío por calcular</p>
+              {deliveryFee === 0 && (
+                <p className="text-[11px] text-brand-600 text-right -mt-3">
+                  ¡Tienes envío gratis en este pedido! 🎉
+                </p>
+              )}
 
               <button
                 onClick={() => router.push(`/${city.slug}/checkout`)}

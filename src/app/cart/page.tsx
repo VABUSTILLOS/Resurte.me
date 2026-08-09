@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { CouponInput } from "@/components/cart/coupon-input"
+import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
+import { validDeliveryFee, FREE_SHIPPING_THRESHOLD, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 import { BumpCards, BUMPS_STORAGE_KEY, type SelectedBump } from "@/components/checkout/BumpCards"
 
 export default function CartPage() {
@@ -26,8 +28,8 @@ export default function CartPage() {
       return []
     }
   })
-  const deliveryFee = itemCount > 0 ? 35 : 0
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
+  const deliveryFee = validDeliveryFee(itemCount + selectedBumps.length, Math.max(0, subtotal - discount + bumpsSubtotal), DELIVERY_FEE_FLAT)
   const bumpsTotal = Math.max(0, subtotal - discount + bumpsSubtotal + deliveryFee)
 
   // Restaura el carrito desde el enlace "restore=<order_id>" del email de
@@ -192,6 +194,15 @@ export default function CartPage() {
         </div>
       )}
 
+      {/* Barra de progreso hacia envío gratis (mecánica ThriveCart).
+          El subtotal pagable incluye descuento + bumps para que la barra
+          avance en tiempo real al seleccionar un order bump. */}
+      <div className="mb-4">
+        <FreeShippingProgress
+          payableSubtotal={Math.max(0, subtotal - discount + bumpsSubtotal)}
+        />
+      </div>
+
       {/* Cross-sell: order bumps inteligentes (mecánica ThriveCart). Mismo
           componente que el drawer móvil — visible también en desktop.
           Ubicados ANTES de la lista de items para quedar arriba del pliegue
@@ -316,7 +327,9 @@ export default function CartPage() {
           {itemCount > 0 && (
             <div className="flex justify-between text-[var(--text-secondary)]">
               <span>Envío</span>
-              <span className="tabular-nums">${deliveryFee.toFixed(2)}</span>
+              <span className="tabular-nums">
+                {deliveryFee === 0 ? "Gratis 🎉" : `$${deliveryFee.toFixed(2)}`}
+              </span>
             </div>
           )}
         </div>
@@ -333,7 +346,9 @@ export default function CartPage() {
         </div>
 
         <p className="text-xs text-[#B0B3B8] mt-2">
-          Envío de $35.00 en pedidos de entrega. Aplican restricciones por zona.
+          {deliveryFee === 0
+            ? "¡Tienes envío gratis en este pedido! 🎉"
+            : `Envío de $${DELIVERY_FEE_FLAT.toFixed(2)} · gratis desde $${FREE_SHIPPING_THRESHOLD.toFixed(0)} de compra. Aplican restricciones por zona.`}
         </p>
       </div>
 
@@ -348,7 +363,7 @@ export default function CartPage() {
                     `${i + 1}. ${item.quantity}× ${item.name} — $${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}`
                 )
                 .join("\n") +
-              `\n\n*Total: $${Math.max(0, subtotal - discount + deliveryFee).toFixed(2)} MXN*\n\n¿Me confirman disponibilidad y tiempo de entrega?`
+              `\n\n*Total: $${Math.max(0, subtotal - discount + bumpsSubtotal + deliveryFee).toFixed(2)} MXN*\n\n¿Me confirman disponibilidad y tiempo de entrega?`
           )}`}
           target="_blank"
           rel="noopener noreferrer"
