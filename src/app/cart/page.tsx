@@ -9,25 +9,18 @@ import { useState, useEffect } from "react"
 import { CouponInput } from "@/components/cart/coupon-input"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
 import { validDeliveryFee, FREE_SHIPPING_THRESHOLD, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
-import { BumpCards, BUMPS_STORAGE_KEY, type SelectedBump } from "@/components/checkout/BumpCards"
+import { BumpCards } from "@/components/checkout/BumpCards"
+import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 
 export default function CartPage() {
   const { cart, itemCount, subtotal, discount, coupon, removeItem, updateQuantity, clearCart, addItem } = useCart()
   const { city } = useCity()
   const [confirmClear, setConfirmClear] = useState(false)
   const [restoreStatus, setRestoreStatus] = useState<"idle" | "loading" | "done" | "error">("idle")
-  // Order bumps (cross-sell estilo ThriveCart). La selección se persiste en
-  // sessionStorage para que /checkout la incluya en la orden al pagar; si el
-  // usuario edita el carrito, BumpCards descarta los bumps que ya no aplican.
-  const [selectedBumps, setSelectedBumps] = useState<SelectedBump[]>(() => {
-    if (typeof window === "undefined") return []
-    try {
-      const raw = window.sessionStorage.getItem(BUMPS_STORAGE_KEY)
-      return raw ? (JSON.parse(raw) as SelectedBump[]) : []
-    } catch {
-      return []
-    }
-  })
+  // Order bumps (cross-sell estilo ThriveCart). Estado compartido con el drawer
+  // móvil y /{ciudad}/carrito vía sessionStorage + evento global; se persiste
+  // para que /checkout la incluya en la orden al pagar.
+  const { selectedBumps, setSelectedBumps } = useSelectedBumps()
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
   const deliveryFee = validDeliveryFee(itemCount + selectedBumps.length, Math.max(0, subtotal - discount + bumpsSubtotal), DELIVERY_FEE_FLAT)
   const bumpsTotal = Math.max(0, subtotal - discount + bumpsSubtotal + deliveryFee)
@@ -102,18 +95,6 @@ export default function CartPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // Recupera los bumps seleccionados antes de venir a /checkout (sessionStorage
-  // persiste entre páginas del mismo tab; si no está disponible, no se bloquea).
-  // Se lee una sola vez en el inicializador para cumplir la regla de efectos.
-  const handleBumpsChange = (next: SelectedBump[]) => {
-    setSelectedBumps(next)
-    try {
-      sessionStorage.setItem(BUMPS_STORAGE_KEY, JSON.stringify(next))
-    } catch {
-      // no-op: la selección vive solo en memoria
-    }
-  }
 
   const handleClear = () => {
     if (confirmClear) {
@@ -210,7 +191,7 @@ export default function CartPage() {
       <BumpCards
         cartItems={cart.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity }))}
         selected={selectedBumps}
-        onChange={handleBumpsChange}
+        onChange={setSelectedBumps}
       />
 
       {/* Cart items */}

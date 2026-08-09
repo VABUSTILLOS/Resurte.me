@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
@@ -18,23 +17,17 @@ import Link from "next/link"
 import { CouponInput } from "@/components/cart/coupon-input"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
 import { validDeliveryFee, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
-import { BumpCards, BUMPS_STORAGE_KEY, type SelectedBump } from "@/components/checkout/BumpCards"
+import { BumpCards } from "@/components/checkout/BumpCards"
+import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 
 export default function CartPage() {
   const { cart, itemCount, subtotal, discount, updateQuantity, removeItem, clearCart } = useCart()
   const { city } = useCity()
   const router = useRouter()
-  // Order bumps (cross-sell estilo ThriveCart). La selección se persiste en
-  // sessionStorage para que /checkout la incluya en la orden al pagar.
-  const [selectedBumps, setSelectedBumps] = useState<SelectedBump[]>(() => {
-    if (typeof window === "undefined") return []
-    try {
-      const raw = window.sessionStorage.getItem(BUMPS_STORAGE_KEY)
-      return raw ? (JSON.parse(raw) as SelectedBump[]) : []
-    } catch {
-      return []
-    }
-  })
+  // Order bumps (cross-sell estilo ThriveCart). Estado compartido con el drawer
+  // móvil y /cart vía sessionStorage + evento global; se persiste para que
+  // /checkout la incluya en la orden al pagar.
+  const { selectedBumps, setSelectedBumps } = useSelectedBumps()
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
   // Envío dinámico (misma fórmula que el checkout): gratis desde $500 incluyendo bumps.
   const deliveryFee = validDeliveryFee(
@@ -43,15 +36,6 @@ export default function CartPage() {
     DELIVERY_FEE_FLAT
   )
   const bumpsTotal = Math.max(0, subtotal - discount + bumpsSubtotal + deliveryFee)
-
-  const handleBumpsChange = (next: SelectedBump[]) => {
-    setSelectedBumps(next)
-    try {
-      window.sessionStorage.setItem(BUMPS_STORAGE_KEY, JSON.stringify(next))
-    } catch {
-      // no-op: la selección vive solo en memoria
-    }
-  }
 
   if (!city) {
     return (
@@ -190,7 +174,7 @@ export default function CartPage() {
           <BumpCards
             cartItems={cart.items.map((i) => ({ product_id: i.product_id, quantity: i.quantity }))}
             selected={selectedBumps}
-            onChange={handleBumpsChange}
+            onChange={setSelectedBumps}
           />
 
           <Link

@@ -32,6 +32,7 @@ import { AddressStep } from "@/components/checkout/AddressStep"
 import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
 import { BumpCards, type SelectedBump } from "@/components/checkout/BumpCards"
+import { readStoredBumps } from "@/hooks/use-selected-bumps"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
 
@@ -97,6 +98,9 @@ export function CheckoutDrawer() {
       // detail.bumps; sin detail se conserva el comportamiento retrocompatible
       // (se inician vacíos). Se valida la forma para no aceptar basura.
       const detail = (event as CustomEvent<{ bumps?: unknown }>).detail
+      // Si vienen en detail (drawer móvil / MobileCartBar) se validan y usan;
+      // si no, se leen de sessionStorage (fallback: navegación directa a
+      // /checkout tras seleccionar bumps en /carrito).
       const incomingBumps = Array.isArray(detail?.bumps)
         ? (detail.bumps as SelectedBump[]).filter(
             (b) =>
@@ -107,7 +111,7 @@ export function CheckoutDrawer() {
               b.quantity > 0 &&
               typeof b.unitPrice === "number"
           )
-        : []
+        : readStoredBumps()
       setIsOpen((prev) => {
         const next = !prev
         if (next) {

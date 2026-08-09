@@ -15,7 +15,8 @@ import {
 import Link from "next/link"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { CHECKOUT_DRAWER_EVENT } from "@/components/checkout/CheckoutDrawer"
-import { BumpCards, type SelectedBump } from "@/components/checkout/BumpCards"
+import { BumpCards } from "@/components/checkout/BumpCards"
+import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
 import { validDeliveryFee, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 
@@ -27,8 +28,9 @@ export function CartDrawer() {
   const { cart, itemCount, subtotal, discount, removeItem, updateQuantity, clearCart } = useCart()
   const { city } = useCity()
   // Order bumps seleccionados en el cross-sell del carrito; se transfieren al
-  // CheckoutDrawer vía detail.bumps al presionar "Ir a Checkout".
-  const [selectedBumps, setSelectedBumps] = useState<SelectedBump[]>([])
+  // CheckoutDrawer vía detail.bumps al presionar "Ir a Checkout". Compartidos
+  // con /cart y /{ciudad}/carrito vía sessionStorage + evento global.
+  const { selectedBumps, setSelectedBumps } = useSelectedBumps()
 
   // Totales en tiempo real: los bumps seleccionados se suman al subtotal del
   // drawer (igual que en el checkout) y el envío gratis aplica desde $500.
@@ -361,9 +363,17 @@ export function CartDrawer() {
  * Works on both mobile and desktop.
  */
 export function MobileCartBar() {
-  const { itemCount, subtotal } = useCart()
+  const { itemCount, subtotal, discount } = useCart()
+  const { selectedBumps } = useSelectedBumps()
   const [mounted] = useState(true)
   const { city } = useCity()
+
+  // Total con bumps + envío (misma fórmula que el checkout). Se actualiza en
+  // tiempo real cuando el usuario togglea un bump en el drawer o en /carrito.
+  const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
+  const payableSubtotal = Math.max(0, subtotal - discount + bumpsSubtotal)
+  const deliveryFee = validDeliveryFee(itemCount + selectedBumps.length, payableSubtotal, DELIVERY_FEE_FLAT)
+  const barTotal = payableSubtotal + deliveryFee
 
   if (!mounted || itemCount === 0) return null
 
@@ -379,9 +389,11 @@ export function MobileCartBar() {
             {itemCount}
           </span>
           <span className="text-sm text-[var(--text-secondary)] truncate hidden md:inline">
-            Ver carrito · ${subtotal.toFixed(2)}
+            Ver carrito · ${barTotal.toFixed(2)}
           </span>
-          <span className="font-semibold text-sm text-[#242529] md:hidden">Ver carrito</span>
+          <span className="font-semibold text-sm text-[#242529] md:hidden">
+            Ver carrito · ${barTotal.toFixed(2)}
+          </span>
         </button>
 
         {/* Buttons */}
@@ -393,7 +405,11 @@ export function MobileCartBar() {
             Ver más productos
           </Link>
           <button
-            onClick={() => window.dispatchEvent(new Event(CHECKOUT_DRAWER_EVENT))}
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent(CHECKOUT_DRAWER_EVENT, { detail: { bumps: selectedBumps } })
+              )
+            }
             className="flex items-center gap-1.5 px-3 sm:px-5 py-2.5 text-sm font-semibold text-white bg-[#0E7A0E] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap touch-target"
           >
             Hacer Checkout
