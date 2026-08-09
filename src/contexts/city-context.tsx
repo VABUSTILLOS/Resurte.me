@@ -62,13 +62,17 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
     // The layout resolves a concrete city slug from the request cookie (falling
     // back to DEFAULT_CITY_SLUG) so server and client render the same city —
     // eliminating the "Seleccionar ciudad" hydration mismatch.
+    // Si el slug persistido (cookie/localStorage) ya no existe en
+    // MEXICO_CITIES, se auto-sana a la ciudad por defecto en lugar de dejar
+    // `city` en null (que colgaba el checkout y el modal de upsell).
     const slug =
       initialCitySlug ||
       getCityFromCookie() ||
       getCityFromLocalStorage() ||
       DEFAULT_CITY_SLUG
     const found = MEXICO_CITIES.find((c) => c.slug === slug)
-    return (found as City) || null
+    const defaultCity = MEXICO_CITIES.find((c) => c.slug === DEFAULT_CITY_SLUG)
+    return (found ?? defaultCity ?? MEXICO_CITIES[0] ?? null) as City | null
   })
   // Derived: isLoading is true only during SSR (city not yet computed from cookies)
   const isLoading = city === null
@@ -83,7 +87,12 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
   useEffect(() => {
     const cookieSlug = getCityFromCookie()
     const lsSlug = getCityFromLocalStorage()
-    const effective = cookieSlug || lsSlug || DEFAULT_CITY_SLUG
+    let effective = cookieSlug || lsSlug || DEFAULT_CITY_SLUG
+    // Auto-sanear valores inválidos: si el slug persistido ya no existe en el
+    // catálogo, se promueve el default (evita `city` null en futuras visitas).
+    if (!MEXICO_CITIES.some((c) => c.slug === effective)) {
+      effective = DEFAULT_CITY_SLUG
+    }
     if (!cookieSlug) {
       setCityCookie(effective)
     }

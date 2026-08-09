@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
-import { useCity } from "@/contexts/city-context"
+import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { createClient } from "@/lib/supabase/client"
 import {
   X,
@@ -401,7 +401,6 @@ export function CheckoutDrawer() {
 
   // ── Pago exitoso: persiste last_order, limpia carrito y abre flujo post-pago ──
   const handleStripeSuccess = (paymentIntentId: string) => {
-    if (!city) return
     saveLastOrder(createdOrderId ?? undefined, earnedCashback?.credits, earnedCashback?.tier)
     clearCart()
     setIsOpen(false)
@@ -416,7 +415,11 @@ export function CheckoutDrawer() {
       })
     )
     if (!claimed) {
-      router.push(`/${city.slug}/pedido-confirmado`)
+      // Nunca bloquear tras un pago exitoso: city siempre está disponible
+      // (CityProvider auto-sanea slugs inválidos); por seguridad se usa el
+      // slug por defecto si no lo hubiera.
+      const slug = city?.slug ?? DEFAULT_CITY_SLUG
+      router.push(`/${slug}/pedido-confirmado`)
     }
   }
 

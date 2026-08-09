@@ -33,6 +33,14 @@ export interface UpsellOffer {
 export interface UpsellOffersResult {
   upsell: UpsellOffer | null
   downsell: UpsellOffer | null
+  /**
+   * true cuando la orden base ya está pagada/confirmada en BD (el webhook
+   * llegó). false significa que el webhook aún no ha confirmado el pago
+   * principal — el cliente debe reintentar, NO caer a la confirmación.
+   */
+  orderConfirmed: boolean
+  /** Total base de la orden (orders.total) — referencia server-side para el resumen consolidado. */
+  orderTotal: number
 }
 
 export interface ResolveUpsellOffersParams {
@@ -72,38 +80,55 @@ function toOffer(rule: BumpRuleRow, product: BumpProduct): UpsellOffer {
  *  · El upsell es el candidato de mayor valor; el downsell es una alternativa
  *    de menor precio (si existe y difiere del upsell).
  *  · Si la orden no está pagada/confirmada o no guardó método de pago, devuelve
- *    { upsell: null, downsell: null } — el modal cae directo a la confirmación.
+ *    { upsell: null, downsell: null } con `orderConfirmed: false` cuando el
+ *    webhook aún no llegó (el cliente reintenta) — el modal cae a la
+ *    confirmación solo cuando el pago ya está confirmado.
  *  · Nunca falla por ofertas vacías: ante cualquier error de validación o de
  *    consulta, se devuelve sin ofertas (fail-open, la orden base no se toca).
  */
 export async function resolveUpsellOffers(
   params: ResolveUpsellOffersParams
 ): Promise<UpsellOffersResult> {
-  const empty: UpsellOffersResult = { upsell: null, downsell: null }
+  const base = (
+    orderConfirmed: boolean,
+    orderTotal = 0
+  ): UpsellOffersResult => ({
+    upsell: null,
+    downsell: null,
+    orderConfirmed,
+    orderTotal,
+  })
   const supabase = await createServiceClient()
 
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .select(
-      "id, user_id, payment_status, status, stripe_payment_method_id, address_id"
+      "id, user_id, payment_status, status, stripe_payment_method_id, address_id, total"
     )
     .eq("id", params.orderId)
     .maybeSingle()
 
-  if (orderError || !order) return empty
-  if (order.payment_status !== "paid" || order.status !== "confirmed") return empty
-  if (!order.stripe_payment_method_id) return empty
+  if (orderError || !order) return base(false)
+  const orderTotal = Number(order.total ?? 0)
+  if (order.payment_status !== "paid" || order.status !== "confirmed") {
+    return base(false, orderTotal)
+  }
+  if (!order.stripe_payment_method_id) return base(true, orderTotal)
 
   // Propiedad del pedido (misma regla que processUpsellForOrder).
-  if (order.user_id && params.userId && order.user_id !== params.userId) return empty
-  if (!order.user_id && params.userId) return empty
+  if (order.user_id && params.userId && order.user_id !== params.userId) {
+    return base(true, orderTotal)
+  }
+  if (!order.user_id && params.userId) return base(true, orderTotal)
   if (!order.user_id && params.guestToken && order.address_id) {
     const { data: addr } = await supabase
       .from("addresses")
       .select("guest_token")
       .eq("id", order.address_id)
       .maybeSingle()
-    if (addr?.guest_token && addr.guest_token !== params.guestToken) return empty
+    if (addr?.guest_token && addr.guest_token !== params.guestToken) {
+      return base(true, orderTotal)
+    }
   }
 
   // Productos que ya forman parte de la orden (base + bumps + upsells previos).
@@ -111,7 +136,7 @@ export async function resolveUpsellOffers(
     .from("order_items")
     .select("product_id")
     .eq("order_id", order.id)
-  if (itemsError) return empty
+  if (itemsError) return base(true, orderTotal)
   const existingIds = new Set((existingItems ?? []).map((i) => i.product_id))
 
   // Reglas de bump activas + su producto del catálogo.
@@ -121,7 +146,7 @@ export async function resolveUpsellOffers(
     .eq("is_active", true)
     .order("display_order", { ascending: true })
 
-  if (rulesError) return empty
+  if (rulesError) return base(true, orderTotal)
 
   const candidates: UpsellOffer[] = []
   for (const row of rules ?? []) {
@@ -149,16 +174,16 @@ export async function resolveUpsellOffers(
     )
   }
 
-  if (candidates.length === 0) return empty
+  if (candidates.length === 0) return base(true, orderTotal)
 
   // El upsell es el de mayor valor; el downsell una alternativa más barata.
   const byPriceDesc = [...candidates].sort((a, b) => b.price - a.price)
   const upsell = byPriceDesc[0] ?? null
-  if (!upsell) return empty
+  if (!upsell) return base(true, orderTotal)
   const downsell =
     byPriceDesc.length > 1 ? (byPriceDesc[byPriceDesc.length - 1] ?? null) : null
   if (downsell && downsell.productId === upsell.productId) {
-    return { upsell, downsell: null }
+    return { upsell, downsell: null, orderConfirmed: true, orderTotal }
   }
-  return { upsell, downsell }
+  return { upsell, downsell, orderConfirmed: true, orderTotal }
 }

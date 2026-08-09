@@ -12,7 +12,7 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react"
-import { useCity } from "@/contexts/city-context"
+import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { getGuestToken } from "@/lib/guest-address"
 import { ORDER_PAID_EVENT } from "@/components/checkout/CheckoutDrawer"
 import type { UpsellOffer } from "@/lib/upsell-offers"
@@ -33,6 +33,14 @@ type ModalStage =
   | "success" // confirmación consolidada
 
 let stripePromise: Promise<Stripe | null> | null = null
+
+// Esperas entre reintentos al consultar ofertas (el webhook tarda ~1-2s en
+// confirmar la orden base). Intentos en t≈0, 0.8s, 2.6s y 6.2s.
+const RETRY_DELAYS_MS = [800, 1800, 3600]
+// Escapatoria global para el descubrimiento de ofertas.
+const FETCH_TIMEOUT_MS = 10_000
+// Escapatoria global para el cobro del upsell (process-upsell + 3DS).
+const PROCESS_TIMEOUT_MS = 20_000
 
 function getStripePromise() {
   if (!stripePromise) {
@@ -77,53 +85,151 @@ export function UpsellModal() {
   const [orderId, setOrderId] = useState<number | undefined>(undefined)
   const [baseTotal, setBaseTotal] = useState(0)
 
+  // Vigilancia de procesos asíncronos: evita que un fetch/pago en vuelo navegue
+  // o "cuelgue" el modal tras un nuevo pedido o cierre manual.
+  const mountedRef = useRef(true)
+  // Token de generación para invalidar invocaciones obsoletas (stale closures).
+  const fetchAttemptRef = useRef(0)
+  const processAttemptRef = useRef(0)
+  // Guard de doble clic: un solo cobro por oferta, incluso con clics rápidos.
+  const chargingRef = useRef(false)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
   const goToConfirmation = useCallback(() => {
-    if (!city) return
-    router.push(`/${city.slug}/pedido-confirmado`)
+    // Nunca bloquear tras un pago exitoso: si city no está disponible (slug
+    // inválido persistido), se navega a la ciudad por defecto en vez de
+    // quedarse en el modal en "Preparando tu oferta...".
+    const slug = city?.slug ?? DEFAULT_CITY_SLUG
+    router.push(`/${slug}/pedido-confirmado`)
   }, [city, router])
 
   // ── Descubrimiento de ofertas (server-side, fail-open) ──
-  const fetchOffers = useCallback(async (id?: number) => {
-    if (!id) {
-      goToConfirmation()
-      return
-    }
-    try {
-      const res = await fetch("/api/checkout/upsell-offers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          order_id: id,
-          guest_token: getGuestToken(),
-        }),
-      })
-      const data = (await res.json()) as {
-        upsell?: UpsellOffer | null
-        downsell?: UpsellOffer | null
-      }
-      const up = data.upsell ?? null
-      const down = data.downsell ?? null
-      if (!up) {
-        // Sin ofertas elegibles → confirmación directa (retrocompatible).
+  const fetchOffers = useCallback(
+    async (id?: number) => {
+      if (!id) {
         goToConfirmation()
         return
       }
-      setUpsell(up)
-      setDownsell(down)
-      setStage("upsell")
-    } catch (err) {
-      logger.warn("upsell-offers fetch failed, going to confirmation", {
-        error: err instanceof Error ? err.message : String(err),
-      })
-      goToConfirmation()
-    }
-  }, [goToConfirmation])
+
+      const token = ++fetchAttemptRef.current
+      const startedAt = Date.now()
+      let attempt = 0
+      let settled = false
+
+      // Escapatoria global: el modal jamás se queda en "Preparando tu oferta..."
+      // aunque el webhook tarde o la API se cuelgue.
+      const safetyTimer = window.setTimeout(() => {
+        settleConfirmation()
+      }, FETCH_TIMEOUT_MS)
+
+      // Se ejecuta una sola vez: navega a la confirmación sin pisar un estado
+      // posterior (oferta ya mostrada, otro pedido, cierre manual).
+      const settleConfirmation = () => {
+        if (settled || token !== fetchAttemptRef.current) return
+        settled = true
+        clearTimeout(safetyTimer)
+        goToConfirmation()
+      }
+
+      const nextDelay = (): number | null => {
+        const delay = RETRY_DELAYS_MS[attempt]
+        attempt += 1
+        if (!delay) return null
+        if (Date.now() - startedAt + delay > FETCH_TIMEOUT_MS) return null
+        return delay
+      }
+
+      const attemptFetch = async (): Promise<void> => {
+        if (!mountedRef.current || token !== fetchAttemptRef.current) return
+        try {
+          const res = await fetch("/api/checkout/upsell-offers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              order_id: id,
+              guest_token: getGuestToken(),
+            }),
+          })
+          if (token !== fetchAttemptRef.current) return
+
+          if (res.status === 429) {
+            // Rate limited: reintentar solo empeoraría el límite → confirmación.
+            settleConfirmation()
+            return
+          }
+          if (!res.ok) {
+            // Error 5xx/otro: reintento con backoff, luego confirmación.
+            const delay = nextDelay()
+            if (delay) window.setTimeout(() => void attemptFetch(), delay)
+            else settleConfirmation()
+            return
+          }
+
+          const data = (await res.json()) as {
+            upsell?: UpsellOffer | null
+            downsell?: UpsellOffer | null
+            orderConfirmed?: boolean
+            orderTotal?: number
+          }
+          if (token !== fetchAttemptRef.current) return
+
+          // Total base autoritativo (server-side), por si el total local del
+          // drawer quedó desactualizado con los bumps.
+          if (typeof data.orderTotal === "number" && data.orderTotal > 0) {
+            setBaseTotal(data.orderTotal)
+          }
+
+          if (data.orderConfirmed === false) {
+            // El webhook aún no confirmó el pago base (race ~1-2s) → reintentar.
+            const delay = nextDelay()
+            if (delay) window.setTimeout(() => void attemptFetch(), delay)
+            else settleConfirmation()
+            return
+          }
+
+          const up = data.upsell ?? null
+          const down = data.downsell ?? null
+          if (!up) {
+            // Sin ofertas elegibles → confirmación directa (retrocompatible).
+            settleConfirmation()
+            return
+          }
+          settled = true
+          clearTimeout(safetyTimer)
+          setUpsell(up)
+          setDownsell(down)
+          setStage("upsell")
+        } catch (err) {
+          if (token !== fetchAttemptRef.current) return
+          logger.warn("upsell-offers fetch failed, retrying", {
+            error: err instanceof Error ? err.message : String(err),
+          })
+          const delay = nextDelay()
+          if (delay) window.setTimeout(() => void attemptFetch(), delay)
+          else settleConfirmation()
+        }
+      }
+
+      void attemptFetch()
+    },
+    [goToConfirmation]
+  )
 
   const claimEvent = useCallback(
     (event: Event) => {
       const detail = (event as CustomEvent<OrderPaidDetail>).detail ?? {}
       // Reclamar la navegación: el drawer ya no navega; este modal decide.
       event.preventDefault()
+      // Invalidar cualquier consulta/cobro en vuelto del pedido anterior.
+      fetchAttemptRef.current += 1
+      processAttemptRef.current += 1
+      chargingRef.current = false
       setIsOpen(true)
       setStage("loading")
       setError(null)
@@ -143,6 +249,24 @@ export function UpsellModal() {
     if (!id) return
     setStage("processing")
     setError(null)
+
+    const token = ++processAttemptRef.current
+    let settled = false
+
+    // Escapatoria global: el modal jamás se queda en "Procesando tu pago..."
+    // si la API se cuelga o el banco nunca responde.
+    const safetyTimer = window.setTimeout(() => {
+      settle(() => goToDownsellOrSuccess())
+    }, PROCESS_TIMEOUT_MS)
+
+    // Resuelve una sola vez por invocación y solo si el proceso sigue vigente.
+    const settle = (fn: () => void) => {
+      if (settled || token !== processAttemptRef.current) return
+      settled = true
+      clearTimeout(safetyTimer)
+      fn()
+    }
+
     try {
       const res = await fetch("/api/checkout/process-upsell", {
         method: "POST",
@@ -156,44 +280,72 @@ export function UpsellModal() {
         }),
       })
       const data = await res.json()
+      if (token !== processAttemptRef.current) return
 
       if (res.ok && data.status === "succeeded") {
-        setPaidAmount((prev) => prev + Number(data.amount ?? 0))
-        setStage("success")
-        updateLastOrder(offer, Number(data.amount ?? offer.price))
+        settle(() => {
+          setPaidAmount((prev) => prev + Number(data.amount ?? 0))
+          setStage("success")
+          updateLastOrder(offer, Number(data.amount ?? offer.price))
+        })
         return
       }
 
       if (res.ok && data.status === "requires_action" && data.clientSecret) {
         // 3DS/SCA: el banco requiere autenticación. La orden base ya está
         // pagada; confirmamos el intent del upsell y esperamos el webhook.
-        setStage("authenticating")
+        settle(() => setStage("authenticating"))
         const authenticated = await runThreeDS(data.clientSecret)
+        if (token !== processAttemptRef.current) return
         if (authenticated) {
-          setPaidAmount((prev) => prev + offer.price)
-          setStage("success")
-          updateLastOrder(offer, offer.price)
+          settle(() => {
+            setPaidAmount((prev) => prev + offer.price)
+            setStage("success")
+            updateLastOrder(offer, offer.price)
+          })
         } else {
           // El cliente canceló o falló la verificación → downsell o confirmación.
-          setError(
-            "No se pudo completar la verificación. Tu pedido principal está confirmado."
-          )
-          goToDownsellOrSuccess()
+          settle(() => {
+            setError(
+              "No se pudo completar la verificación. Tu pedido principal está confirmado."
+            )
+            goToDownsellOrSuccess()
+          })
         }
         return
       }
 
-      // 4xx (declinado / sin método guardado / conflicto): orden base intacta.
-      setError(
-        typeof data?.error === "string" ? data.error : "No se pudo agregar el artículo"
-      )
-      goToDownsellOrSuccess()
+      if (res.status === 409) {
+        // Conflicto de idempotencia (cobro duplicado por doble clic, o el
+        // webhook aún no confirmó la orden). Reintentamos con una llave nueva:
+        // si el pago ya existe, el servidor lo reconcilia y devuelve succeeded
+        // sin volver a cobrar; si la orden aún no está confirmada, el retry da
+        // tiempo al webhook. Nunca un cobro doble.
+        logger.warn("process-upsell conflict (409), retrying with fresh key", {
+          orderId: id,
+          productId: offer.productId,
+        })
+        return processOffer(offer, crypto.randomUUID())
+      }
+
+      // 4xx (declinado / sin método guardado): orden base intacta.
+      settle(() => {
+        setError(
+          typeof data?.error === "string"
+            ? data.error
+            : "No se pudo agregar el artículo"
+        )
+        goToDownsellOrSuccess()
+      })
     } catch (err) {
+      if (token !== processAttemptRef.current) return
       logger.warn("process-upsell failed", {
         error: err instanceof Error ? err.message : String(err),
       })
-      setError("Error de conexión. Tu pedido principal está confirmado.")
-      goToDownsellOrSuccess()
+      settle(() => {
+        setError("Error de conexión. Tu pedido principal está confirmado.")
+        goToDownsellOrSuccess()
+      })
     }
   }
 
@@ -215,7 +367,10 @@ export function UpsellModal() {
         logger.warn("upsell 3DS error", { error: result.error.message })
         return false
       }
-      return result.paymentIntent?.status === "succeeded"
+      // "succeeded" → pago confirmado al instante. "processing" → verificación
+      // asíncrona en curso (el webhook reconciliará el upsell): NO es un fallo.
+      const status = result.paymentIntent?.status
+      return status === "succeeded" || status === "processing"
     } catch (err) {
       logger.warn("upsell 3DS unexpected error", {
         error: err instanceof Error ? err.message : String(err),
@@ -225,13 +380,19 @@ export function UpsellModal() {
   }
 
   const handleAccept = (offer: UpsellOffer) => {
+    // Guard anti doble clic: un solo cobro por oferta aunque se clique dos veces
+    // antes de que React re-renderice (idempotencia extra del lado del cliente).
+    if (chargingRef.current) return
+    chargingRef.current = true
     const isDownsellOffer = showDownsell
     const key =
       (isDownsellOffer ? downsellKeyRef.current : upsellKeyRef.current) ??
       crypto.randomUUID()
     if (isDownsellOffer) downsellKeyRef.current = key
     else upsellKeyRef.current = key
-    void processOffer(offer, key)
+    void processOffer(offer, key).finally(() => {
+      chargingRef.current = false
+    })
   }
 
   const handleDecline = () => {
@@ -246,6 +407,11 @@ export function UpsellModal() {
   }
 
   const handleClose = () => {
+    // Invalidar consultas/cobros en vuelo para que sus timeouts de escapatoria
+    // no naveguen tras un cierre manual, y liberar el guard de doble clic.
+    fetchAttemptRef.current += 1
+    processAttemptRef.current += 1
+    chargingRef.current = false
     setIsOpen(false)
     goToConfirmation()
   }
