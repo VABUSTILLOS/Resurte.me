@@ -42,7 +42,7 @@ import { validDeliveryFee, calcCouponDiscount } from "@/lib/checkout-config"
 // ============================================================
 
 export default function CheckoutPage() {
-  const { cart, itemCount, subtotal, clearCart, coupon } = useCart()
+  const { cart, itemCount, subtotal, clearCart, coupon, isLoaded } = useCart()
   const { city } = useCity()
   const router = useRouter()
 
@@ -241,6 +241,32 @@ export default function CheckoutPage() {
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Selecciona tu ciudad</h1>
         <p className="text-gray-400">Elige una ciudad para continuar con el checkout.</p>
+      </div>
+    )
+  }
+
+  // El carrito persistido se carga en el cliente tras la hidratación
+  // (cart-context: SSR-safe). Hasta entonces se muestra un skeleton para no
+  // pestañear el estado "vacío" en recargas con carrito guardado.
+  if (!isLoaded) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16">
+        <div className="h-8 w-48 bg-gray-100 rounded mb-6 animate-pulse" />
+        <div className="h-4 w-72 bg-gray-100 rounded mb-4 animate-pulse" />
+        <div className="space-y-3">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="bg-white rounded-xl border border-gray-100 p-4 flex gap-4 animate-pulse"
+            >
+              <div className="w-20 h-20 rounded-lg bg-gray-100 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-3/4 bg-gray-100 rounded" />
+                <div className="h-4 w-1/4 bg-gray-100 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }

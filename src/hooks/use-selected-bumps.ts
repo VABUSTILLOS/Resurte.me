@@ -29,7 +29,19 @@ export function readStoredBumps(): SelectedBump[] {
  * vacío y el flujo estándar no cambia.
  */
 export function useSelectedBumps() {
-  const [selectedBumps, setSelectedBumps] = useState<SelectedBump[]>(readStoredBumps)
+  // Inicia vacío en ambos lados (SSR y cliente) para que la hidratación
+  // coincida; los bumps persistidos en sessionStorage se cargan después del
+  // mount. Evita el mismatch de hidratación #418 en /cart, /{ciudad}/carrito
+  // y /checkout cuando el usuario ya tenía bumps seleccionados.
+  const [selectedBumps, setSelectedBumps] = useState<SelectedBump[]>([])
+
+  // Carga los bumps persistidos tras la hidratación (solo cliente). Se difiere
+  // a una task posterior al render para no disparar un setState síncrono dentro
+  // del effect (hydrate sessionStorage sin mismatch #418).
+  useEffect(() => {
+    const timer = setTimeout(() => setSelectedBumps(readStoredBumps()), 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   const updateBumps = useCallback((next: SelectedBump[]) => {
     setSelectedBumps(next)

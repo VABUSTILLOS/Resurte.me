@@ -185,12 +185,20 @@ function calcDiscount(subtotal: number, coupon: AppliedCoupon | null): number {
 // ============================================================
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(cartReducer, undefined, loadFromStorage)
+  // SSR-safe: servidor y primer render del cliente usan el carrito vacío para
+  // que la hidratación coincida. El carrito persistido (localStorage) se carga
+  // después del mount vía LOAD_CART — esto evita el mismatch de hidratación
+  // (#418) que obligaba a React a regenerar todo el árbol en cada recarga con
+  // carrito guardado (y que intermitentemente "escondía" bumps y totales).
+  const [state, dispatch] = useReducer(
+    cartReducer,
+    undefined,
+    (): CartState => ({ cart: { ...EMPTY_CART }, coupon: null, isLoaded: false })
+  )
 
-  // Mark as loaded on mount
+  // Load the persisted cart on the client after hydration
   useEffect(() => {
-    dispatch({ type: "LOAD_CART", payload: state })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    dispatch({ type: "LOAD_CART", payload: loadFromStorage() })
   }, [])
 
   // Persist to localStorage on changes
