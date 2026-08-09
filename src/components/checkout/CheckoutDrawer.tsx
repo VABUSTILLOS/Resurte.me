@@ -527,6 +527,17 @@ export function CheckoutDrawer() {
                 </ul>
               </div>
 
+              {/* Teaser de order bumps (mecánica ThriveCart): visibles ya en
+                  el primer paso del checkout, no solo en el paso 4. */}
+              <BumpCards
+                cartItems={cart.items.map((i) => ({
+                  product_id: i.product_id,
+                  quantity: i.quantity,
+                }))}
+                selected={selectedBumps}
+                onChange={setSelectedBumps}
+              />
+
               {/* Resumen */}
               <div className="bg-[#F7F5F0] rounded-xl p-4 space-y-2 text-sm">
                 <div className="flex justify-between">

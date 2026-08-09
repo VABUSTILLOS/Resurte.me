@@ -206,6 +206,60 @@ export function CartDrawer() {
               ))}
             </ul>
           )}
+
+          {/* Cross-sell: order bumps inteligentes (2-3 tarjetas simultáneas).
+              Dentro del área scrollable para que el footer quede compacto y
+              el CTA siempre visible en viewports cortos. */}
+          {cart.items.length > 0 && (
+            <div className="py-4 border-t border-[#E8E9EB]">
+              <BumpCards
+                cartItems={cart.items.map((i) => ({
+                  product_id: i.product_id,
+                  quantity: i.quantity,
+                }))}
+                selected={selectedBumps}
+                onChange={setSelectedBumps}
+              />
+            </div>
+          )}
+
+          {/* Cross-sell: "Restaurantes también compran" hints */}
+          {cart.items.length > 0 && (
+            <div className="pb-4">
+              <div className="bg-[#FDF8F3] rounded-xl border border-[#F0E5D8] p-3">
+                <p className="text-[11px] font-semibold text-[#B87A3A] uppercase tracking-wide mb-2">
+                  🔥 Restaurantes también compran
+                </p>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                  Complementa tu pedido con{" "}
+                  <Link
+                    href={city ? `/${city.slug}/categoria/limpieza-cocina` : "#"}
+                    onClick={() => setIsOpen(false)}
+                    className="text-[#0E7A0E] font-semibold hover:underline"
+                  >
+                    insumos de limpieza
+                  </Link>
+                  ,{" "}
+                  <Link
+                    href={city ? `/${city.slug}/categoria/bebidas` : "#"}
+                    onClick={() => setIsOpen(false)}
+                    className="text-[#0E7A0E] font-semibold hover:underline"
+                  >
+                    bebidas
+                  </Link>{" "}
+                  y{" "}
+                  <Link
+                    href={city ? `/${city.slug}/categoria/botanas-dulces` : "#"}
+                    onClick={() => setIsOpen(false)}
+                    className="text-[#0E7A0E] font-semibold hover:underline"
+                  >
+                    botanas
+                  </Link>{" "}
+                  para maximizar tu ticket.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -215,50 +269,6 @@ export function CartDrawer() {
             <div className="flex items-center justify-between text-sm">
               <span className="text-[var(--text-secondary)]">Subtotal</span>
               <span className="font-semibold text-[#242529]">${subtotal.toFixed(2)}</span>
-            </div>
-
-            {/* Cross-sell: order bumps inteligentes (2-3 tarjetas simultáneas) */}
-            <BumpCards
-              cartItems={cart.items.map((i) => ({
-                product_id: i.product_id,
-                quantity: i.quantity,
-              }))}
-              selected={selectedBumps}
-              onChange={setSelectedBumps}
-            />
-
-            {/* Cross-sell: "Restaurantes también compran" hints */}
-            <div className="bg-[#FDF8F3] rounded-xl border border-[#F0E5D8] p-3">
-              <p className="text-[11px] font-semibold text-[#B87A3A] uppercase tracking-wide mb-2">
-                🔥 Restaurantes también compran
-              </p>
-              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                Complementa tu pedido con{" "}
-                <Link
-                  href={city ? `/${city.slug}/categoria/limpieza-cocina` : "#"}
-                  onClick={() => setIsOpen(false)}
-                  className="text-[#0E7A0E] font-semibold hover:underline"
-                >
-                  insumos de limpieza
-                </Link>
-                ,{" "}
-                <Link
-                  href={city ? `/${city.slug}/categoria/bebidas` : "#"}
-                  onClick={() => setIsOpen(false)}
-                  className="text-[#0E7A0E] font-semibold hover:underline"
-                >
-                  bebidas
-                </Link>{" "}
-                y{" "}
-                <Link
-                  href={city ? `/${city.slug}/categoria/botanas-dulces` : "#"}
-                  onClick={() => setIsOpen(false)}
-                  className="text-[#0E7A0E] font-semibold hover:underline"
-                >
-                  botanas
-                </Link>{" "}
-                para maximizar tu ticket.
-              </p>
             </div>
 
             {/* Delivery fee note (flat $35, server-side) */}

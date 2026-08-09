@@ -43,8 +43,11 @@ export async function POST(request: NextRequest) {
     const supabase = await createServiceClient()
 
     // Rate limit por IP (lectura ligera; no bloquear abusos de scraping).
+    // 120/60s: el cliente re-consulta por cada cambio de carrito y el cliente
+    // reintenta una vez con backoff ante 429, así que el límite no debe ser
+    // tan bajo que un uso normal de revisión del carrito lo dispare.
     const rateKey = `bumps:${clientIp(request)}`
-    const rate = await rateLimited(supabase, rateKey, 60, 60)
+    const rate = await rateLimited(supabase, rateKey, 120, 60)
     if (!rate.allowed) {
       return rateLimitResponse(rate)
     }

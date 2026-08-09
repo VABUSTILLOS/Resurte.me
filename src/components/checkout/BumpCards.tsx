@@ -43,33 +43,67 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
   // Marca la clave del carrito ya cargada para derivar "loading" sin llamar
   // setState sincrónicamente dentro del efecto (regla react-hooks).
   const [loadedFor, setLoadedFor] = useState<string>("")
+  // Última respuesta exitosa por cartKey. Si la API falla (rate-limit 429,
+  // red…), conservamos los bumps ya mostrados en lugar de colapsar a null.
+  const [lastGood, setLastGood] = useState<{ key: string; bumps: OrderBump[] }>({
+    key: "",
+    bumps: [],
+  })
   const cartKey = cartItems.map((i) => `${i.product_id}:${i.quantity}`).join("|")
   const loading = cartKey !== "" && loadedFor !== cartKey
 
   useEffect(() => {
     if (!cartItems || cartItems.length === 0) return
     let cancelled = false
-    fetch("/api/cart/bumps", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: cartItems }),
-    })
-      .then((res) => (res.ok ? res.json() : { bumps: [] }))
-      .then((data: { bumps?: OrderBump[] }) => {
-        if (cancelled) return
-        setBumps(data.bumps ?? [])
-        // Descarta selecciones previas de bumps que ya no aplican.
-        const valid = new Set((data.bumps ?? []).map((b) => b.ruleId))
-        onChange(selected.filter((s) => valid.has(s.ruleId)))
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+    const apply = (data: OrderBump[]) => {
+      if (cancelled) return
+      setBumps(data)
+      setLastGood({ key: cartKey, bumps: data })
+      // Descarta selecciones previas de bumps que ya no aplican.
+      const valid = new Set(data.map((b) => b.ruleId))
+      onChange(selected.filter((s) => valid.has(s.ruleId)))
+      setLoadedFor(cartKey)
+    }
+
+    const attempt = (isRetry: boolean) => {
+      fetch("/api/cart/bumps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: cartItems }),
       })
-      .catch(() => {
-        if (!cancelled) setBumps([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoadedFor(cartKey)
-      })
+        .then((res) => {
+          if (!res.ok) throw new Error(`bumps http ${res.status}`)
+          return res.json()
+        })
+        .then((data: { bumps?: OrderBump[] }) => {
+          apply(data.bumps ?? [])
+        })
+        .catch(() => {
+          if (cancelled) return
+          if (!isRetry) {
+            // Primer fallo (p.ej. 429 rate-limit): reintentar con backoff.
+            retryTimer = setTimeout(() => attempt(true), 2000)
+          } else {
+            // Fallo confirmado: mantener la última respuesta buena del mismo
+            // carrito; solo colapsar si nunca hubo datos para este carrito.
+            console.warn("[BumpCards] fallo al cargar order bumps, usando caché", cartKey)
+            if (lastGood.key === cartKey && lastGood.bumps.length > 0) {
+              setBumps(lastGood.bumps)
+            } else {
+              setBumps([])
+            }
+            setLoadedFor(cartKey)
+          }
+        })
+    }
+
+    attempt(false)
+
     return () => {
       cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cartKey])
