@@ -67,9 +67,12 @@ WHERE c.slug = 'limpieza-cocina'
   AND p.is_visible = true
   AND p.stock_status <> 'out_of_stock'
   AND (p.name ILIKE '%térmico%' OR p.name ILIKE '%termico%' OR p.name ILIKE '%hielera%' OR p.name ILIKE '%bolsa%térmica%' OR p.name ILIKE '%bolsa%termica%')
+  AND NOT EXISTS (
+    SELECT 1 FROM public.bump_rules r
+    WHERE r.trigger_type = 'perishables'
+  )
 ORDER BY p.id
-LIMIT 1
-ON CONFLICT DO NOTHING;
+LIMIT 1;
 
 INSERT INTO public.bump_rules
   (trigger_type, category_slugs, product_id, title, description, discount_pct, is_active, display_order)
@@ -87,9 +90,12 @@ JOIN categories c ON c.id = p.category_id
 WHERE c.slug IN ('bebidas', 'botanas-dulces')
   AND p.is_visible = true
   AND p.stock_status <> 'out_of_stock'
+  AND NOT EXISTS (
+    SELECT 1 FROM public.bump_rules r
+    WHERE r.trigger_type = 'snacks_drinks'
+  )
 ORDER BY p.id
-LIMIT 1
-ON CONFLICT DO NOTHING;
+LIMIT 1;
 
 INSERT INTO public.bump_rules
   (trigger_type, category_slugs, subtotal_min, product_id, title, description, discount_pct, is_active, display_order)
@@ -109,6 +115,9 @@ WHERE c.slug = 'limpieza-cocina'
   AND p.is_visible = true
   AND p.stock_status <> 'out_of_stock'
   AND (p.name ILIKE '%bolsa%reutilizab%' OR p.name ILIKE '%bolsa%ecológica%' OR p.name ILIKE '%bolsa%ecologica%' OR p.name ILIKE '%mandado%')
+  AND NOT EXISTS (
+    SELECT 1 FROM public.bump_rules r
+    WHERE r.trigger_type = 'subtotal_threshold'
+  )
 ORDER BY p.id
-LIMIT 1
-ON CONFLICT DO NOTHING;
+LIMIT 1;

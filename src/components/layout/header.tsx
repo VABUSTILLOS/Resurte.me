@@ -50,7 +50,7 @@ export function Header() {
             .from("wallets")
             .select("balance_credits")
             .eq("user_id", currentUser.id)
-            .single()
+            .maybeSingle()
           setCashbackBalance(wallet ? Number(wallet.balance_credits) : 0)
         } catch {
           // Fallback to localStorage for offline/unauthenticated
