@@ -358,6 +358,158 @@ export async function processUpsellForOrder(
   throw new PaymentIntentError("No se pudo completar el cobro del upsell", 402)
 }
 
+export type SavedCardChargeResult =
+  | { status: "no_saved_card" }
+  | {
+      status: "requires_action"
+      clientSecret: string
+      paymentIntentId: string
+    }
+  | { status: "succeeded"; paymentIntentId: string }
+  | { status: "declined" }
+
+/**
+ * Cobra un pedido PENDIENTE de forma off-session con la tarjeta guardada del
+ * usuario (Express Checkout / compra recurrente con 1 clic, mecánica SamCart).
+ *
+ * · La tarjeta se obtiene de la orden pagada más reciente del usuario que tenga
+ *   `stripe_payment_method_id` (guardada con setup_future_usage off_session).
+ * · Nunca cobra dos veces la misma orden: si ya existe un PaymentIntent ligado,
+ *   lo reconcilia contra Stripe (succeeded / requires_action / declined) en
+ *   lugar de crear un cargo nuevo (idempotencia server-side por order_id).
+ * · Si el banco pide verificación 3DS/SCA, devuelve requires_action con el
+ *   clientSecret; el cliente completa la autenticación con stripe.confirmPayment.
+ * · El webhook de Stripe confirma la orden vía metadata.order_id.
+ *
+ * Lanza PaymentIntentError si el pedido no existe, no es del usuario, no usa
+ * tarjeta o ya no está pendiente. Devuelve `no_saved_card` si el usuario no
+ * tiene ninguna tarjeta guardada (fail-open, el checkout normal continúa).
+ */
+export async function chargeOrderWithSavedCard(params: {
+  orderId: number
+  userId: string
+}): Promise<SavedCardChargeResult> {
+  const supabase = await createServiceClient()
+  const stripe = getStripe()
+
+  const { data: order, error } = await supabase
+    .from("orders")
+    .select(
+      "id, user_id, payment_method, payment_status, total, stripe_payment_intent_id"
+    )
+    .eq("id", params.orderId)
+    .maybeSingle()
+
+  if (error || !order) {
+    throw new PaymentIntentError("Pedido no encontrado", 404)
+  }
+  if (order.user_id !== params.userId) {
+    throw new PaymentIntentError("No autorizado para este pedido", 403)
+  }
+  if (order.payment_method !== "card") {
+    throw new PaymentIntentError("El pedido no usa pago con tarjeta")
+  }
+  if (order.payment_status !== "pending") {
+    throw new PaymentIntentError("El pedido ya no está pendiente de pago")
+  }
+
+  // Idempotencia: si esta orden ya tiene un PaymentIntent, se reconcilia con
+  // Stripe en lugar de crear un cargo nuevo (doble clic / reintento).
+  if (order.stripe_payment_intent_id) {
+    let existing
+    try {
+      existing = await stripe.paymentIntents.retrieve(order.stripe_payment_intent_id)
+    } catch {
+      existing = null
+    }
+    if (existing) {
+      if (existing.status === "succeeded") {
+        return { status: "succeeded", paymentIntentId: existing.id }
+      }
+      if (existing.status === "requires_action" && existing.client_secret) {
+        return {
+          status: "requires_action",
+          clientSecret: existing.client_secret,
+          paymentIntentId: existing.id,
+        }
+      }
+      return { status: "declined" }
+    }
+  }
+
+  // Tarjeta guardada: orden pagada más reciente del usuario con método de pago.
+  const { data: prior } = await supabase
+    .from("orders")
+    .select("stripe_payment_method_id, stripe_customer_id")
+    .eq("user_id", params.userId)
+    .eq("payment_status", "paid")
+    .not("stripe_payment_method_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!prior?.stripe_payment_method_id) {
+    return { status: "no_saved_card" }
+  }
+
+  // Cargo off-session con la tarjeta guardada (mismo patrón que el upsell).
+  let paymentIntent
+  try {
+    paymentIntent = await stripe.paymentIntents.create({
+      amount: toCents(order.total),
+      currency: "mxn",
+      payment_method: prior.stripe_payment_method_id,
+      customer: prior.stripe_customer_id ?? undefined,
+      off_session: true,
+      confirm: true,
+      metadata: {
+        order_id: String(order.id),
+        source: "resurte.me-express",
+      },
+    })
+  } catch (err) {
+    const isAuthRequired =
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code?: string }).code === "authentication_required"
+    if (isAuthRequired && "payment_intent" in err) {
+      const pi = (err as { payment_intent?: { id: string; client_secret?: string | null } }).payment_intent
+      await supabase
+        .from("orders")
+        .update({ stripe_payment_intent_id: pi?.id ?? null })
+        .eq("id", order.id)
+      if (!pi?.client_secret) {
+        return { status: "declined" }
+      }
+      return {
+        status: "requires_action",
+        clientSecret: pi.client_secret,
+        paymentIntentId: pi.id,
+      }
+    }
+    // Declinado / fondos insuficientes: la orden queda pendiente e intacta.
+    return { status: "declined" }
+  }
+
+  await supabase
+    .from("orders")
+    .update({ stripe_payment_intent_id: paymentIntent.id })
+    .eq("id", order.id)
+
+  if (paymentIntent.status === "succeeded") {
+    return { status: "succeeded", paymentIntentId: paymentIntent.id }
+  }
+  if (paymentIntent.status === "requires_action" && paymentIntent.client_secret) {
+    return {
+      status: "requires_action",
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    }
+  }
+  return { status: "declined" }
+}
+
 /**
  * Busca o crea el Stripe Customer del cliente para poder reutilizar su método
  * de pago off-session (1-click upsells).

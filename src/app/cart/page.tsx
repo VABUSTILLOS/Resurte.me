@@ -8,12 +8,12 @@ import Link from "next/link"
 import { useState, useEffect } from "react"
 import { CouponInput } from "@/components/cart/coupon-input"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
-import { validDeliveryFee, FREE_SHIPPING_THRESHOLD, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
+import { calcCheckoutTotals, FREE_SHIPPING_THRESHOLD, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 
 export default function CartPage() {
-  const { cart, itemCount, subtotal, discount, coupon, removeItem, updateQuantity, clearCart, addItem, isLoaded } = useCart()
+  const { cart, itemCount, subtotal, coupon, removeItem, updateQuantity, clearCart, addItem, isLoaded } = useCart()
   const { city } = useCity()
   const [confirmClear, setConfirmClear] = useState(false)
   const [restoreStatus, setRestoreStatus] = useState<"idle" | "loading" | "done" | "error">("idle")
@@ -22,8 +22,17 @@ export default function CartPage() {
   // para que /checkout la incluya en la orden al pagar.
   const { selectedBumps, setSelectedBumps } = useSelectedBumps()
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
-  const deliveryFee = validDeliveryFee(itemCount + selectedBumps.length, Math.max(0, subtotal - discount + bumpsSubtotal), DELIVERY_FEE_FLAT)
-  const bumpsTotal = Math.max(0, subtotal - discount + bumpsSubtotal + deliveryFee)
+  // Totales unificados (misma fórmula que el checkout y el servidor).
+  const totals = calcCheckoutTotals(
+    subtotal,
+    bumpsSubtotal,
+    coupon,
+    itemCount,
+    selectedBumps.length,
+    DELIVERY_FEE_FLAT
+  )
+  const deliveryFee = totals.deliveryFee
+  const bumpsTotal = totals.total
 
   // Restaura el carrito desde el enlace "restore=<order_id>" del email de
   // carrito abandonado. Solo funciona si el usuario tiene sesión (RLS exige
@@ -206,7 +215,7 @@ export default function CartPage() {
           avance en tiempo real al seleccionar un order bump. */}
       <div className="mb-4">
         <FreeShippingProgress
-          payableSubtotal={Math.max(0, subtotal - discount + bumpsSubtotal)}
+          payableSubtotal={totals.payableSubtotal}
         />
       </div>
 
@@ -325,10 +334,10 @@ export default function CartPage() {
               <span className="tabular-nums">${bumpsSubtotal.toFixed(2)}</span>
             </div>
           )}
-          {discount > 0 && (
+          {totals.discountAmount > 0 && (
             <div className="flex justify-between text-[#0E7A0E]">
               <span>Descuento {coupon ? `(${coupon.code})` : ""}</span>
-              <span className="tabular-nums">-${discount.toFixed(2)}</span>
+              <span className="tabular-nums">-${totals.discountAmount.toFixed(2)}</span>
             </div>
           )}
           {itemCount > 0 && (
@@ -370,7 +379,7 @@ export default function CartPage() {
                     `${i + 1}. ${item.quantity}× ${item.name} — $${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}`
                 )
                 .join("\n") +
-              `\n\n*Total: $${Math.max(0, subtotal - discount + bumpsSubtotal + deliveryFee).toFixed(2)} MXN*\n\n¿Me confirman disponibilidad y tiempo de entrega?`
+              `\n\n*Total: $${bumpsTotal.toFixed(2)} MXN*\n\n¿Me confirman disponibilidad y tiempo de entrega?`
           )}`}
           target="_blank"
           rel="noopener noreferrer"

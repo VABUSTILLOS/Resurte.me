@@ -1,17 +1,20 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { createClient } from "@/lib/supabase/client"
+import { AnalyticsEvents } from "@/lib/analytics"
 import {
   X,
   ShoppingBag,
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  Zap,
 } from "lucide-react"
+import { loadStripe } from "@stripe/stripe-js"
 import type { Address } from "@/types"
 import {
   getGuestToken,
@@ -20,7 +23,7 @@ import {
   saveLastAddress,
   claimGuestAddresses,
 } from "@/lib/guest-address"
-import { validDeliveryFee, calcCouponDiscount } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 import {
   DEFAULT_ADDRESS_FORM,
   DELIVERY_TIMES,
@@ -82,6 +85,11 @@ export function CheckoutDrawer() {
   const [earnedCashback, setEarnedCashback] = useState<{
     credits: number
     tier: string | null
+  } | null>(null)
+  const [savedCard, setSavedCard] = useState<{
+    hasSavedCard: boolean
+    last4?: string
+    brand?: string
   } | null>(null)
 
   // Estado de sesión + direcciones guardadas (misma lógica que el checkout)
@@ -167,6 +175,31 @@ export function CheckoutDrawer() {
     }
   }, [])
 
+  // ── Detección de tarjeta guardada (Express Checkout) ──
+  useEffect(() => {
+    if (isLoggedIn !== true) {
+      return
+    }
+    let cancelled = false
+    fetch("/api/payments/stripe/saved-card")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { hasSavedCard?: boolean; last4?: string; brand?: string } | null) => {
+        if (cancelled) return
+        setSavedCard(
+          data
+            ? { hasSavedCard: !!data.hasSavedCard, last4: data.last4, brand: data.brand }
+            : { hasSavedCard: false }
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setSavedCard({ hasSavedCard: false })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isLoggedIn])
+
+
   // Carga la lista de direcciones guardadas y auto-selecciona la predeterminada
   // (o la más reciente), autocompletando el formulario. Reutilizable: se llama
   // al iniciar sesión y de nuevo tras crear una orden para que la dirección
@@ -224,12 +257,27 @@ export function CheckoutDrawer() {
   // El descuento de cupón se calcula sobre el subtotal CON bumps incluidos,
   // igual que el servidor en POST /api/orders — así el total coincide a 0.01.
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
-  const effectiveSubtotal = subtotal + bumpsSubtotal
-  const discountAmount = calcCouponDiscount(effectiveSubtotal, coupon)
-  const payableSubtotal = effectiveSubtotal - discountAmount
-  const allItemsCount = itemCount + selectedBumps.length
-  const deliveryFee = validDeliveryFee(allItemsCount, payableSubtotal, 35)
-  const total = payableSubtotal + deliveryFee
+  const totals = calcCheckoutTotals(
+    subtotal,
+    bumpsSubtotal,
+    coupon,
+    itemCount,
+    selectedBumps.length,
+    DELIVERY_FEE_FLAT
+  )
+  const { discountAmount, payableSubtotal, deliveryFee } = totals
+  const total = totals.total
+
+  // add_payment_info (GA4/Meta): se dispara al entrar al paso de pago del
+  // drawer. Solo una vez por visita (ref) para no duplicar el evento si el
+  // usuario vuelve de 3DS o navega entre pasos.
+  const addPaymentInfoRef = useRef(false)
+  useEffect(() => {
+    if (step === "payment" && !addPaymentInfoRef.current) {
+      addPaymentInfoRef.current = true
+      AnalyticsEvents.addPaymentInfo(total, itemCount + selectedBumps.length)
+    }
+  }, [step, total, itemCount, selectedBumps.length])
 
   const isAddressValid = Boolean(
     address.street.trim() &&
@@ -269,9 +317,11 @@ export function CheckoutDrawer() {
         source: "checkout_drawer",
         coupon_code: coupon?.code ?? undefined,
       }),
-    }).catch(() => {
-      // Fail-open: nunca bloquear el checkout por captura de leads
     })
+      .then(() => AnalyticsEvents.lead())
+      .catch(() => {
+        // Fail-open: nunca bloquear el checkout por captura de leads
+      })
   }, [phone, coupon?.code])
 
   // ── Creación de orden + PaymentIntent (misma lógica que el checkout page) ──
@@ -313,17 +363,18 @@ export function CheckoutDrawer() {
     }
   }
 
-  const handlePlaceOrder = async () => {
-    if (!city) return
-    setIsProcessing(true)
-    setCheckoutError(null)
-
+  // Crea la orden en la BD (misma carga que el checkout page). Devuelve
+  // { orderId, cashback } o null si falla (deja checkoutError seteado).
+  type CreatedOrder = {
+    orderId: number
+    cashback: { credits: number; tier: string | null } | null
+  }
+  const createOrder = async (): Promise<CreatedOrder | null> => {
+    if (!city) {
+      setCheckoutError("No se pudo determinar tu ciudad. Recarga la página.")
+      return null
+    }
     try {
-      if (createdOrderId) {
-        await initializeCardPayment(createdOrderId, earnedCashback)
-        return
-      }
-
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -378,8 +429,7 @@ export function CheckoutDrawer() {
             ? `${data.error || "Error al crear el pedido"} — ${data.detail}`
             : data.error || "Error al crear el pedido"
         )
-        setIsProcessing(false)
-        return
+        return null
       }
 
       if (isLoggedIn === false) {
@@ -387,15 +437,132 @@ export function CheckoutDrawer() {
         saveLastAddress({ ...address, phone })
       }
 
-      if (data.orderId) {
-        await initializeCardPayment(data.orderId, {
+      if (!data.orderId) {
+        setCheckoutError("No se pudo crear el pedido. Intenta de nuevo.")
+        return null
+      }
+
+      return {
+        orderId: data.orderId,
+        cashback: {
           credits: data.cashbackCredits ?? 0,
           tier: data.cashbackTier ?? null,
-        })
+        },
+      }
+    } catch (err) {
+      setCheckoutError(
+        err instanceof Error ? err.message : "Error de conexión. Intenta de nuevo."
+      )
+      return null
+    }
+  }
+
+  const handlePlaceOrder = async () => {
+    if (!city) return
+    setIsProcessing(true)
+    setCheckoutError(null)
+
+    try {
+      if (createdOrderId) {
+        await initializeCardPayment(createdOrderId, earnedCashback)
         return
       }
 
+      const created = await createOrder()
+      if (!created) {
+        setIsProcessing(false)
+        return
+      }
+
+      await initializeCardPayment(created.orderId, created.cashback)
+    } catch (err) {
+      setCheckoutError(
+        err instanceof Error ? err.message : "Error de conexión. Intenta de nuevo."
+      )
       setIsProcessing(false)
+    }
+  }
+
+  // ── Express Checkout: cobra con la tarjeta guardada (off-session) ──
+  const handleExpressCheckout = async () => {
+    if (!city) return
+    setIsProcessing(true)
+    setCheckoutError(null)
+
+    let orderId = createdOrderId
+    let cashback = earnedCashback
+    try {
+      if (!orderId) {
+        const created = await createOrder()
+        if (!created) {
+          setIsProcessing(false)
+          return
+        }
+        orderId = created.orderId
+        cashback = created.cashback
+        setCreatedOrderId(orderId)
+        setEarnedCashback(cashback)
+      }
+
+      const response = await fetch("/api/payments/stripe/express-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setCheckoutError(data.error || "No se pudo completar el pago rápido.")
+        setIsProcessing(false)
+        return
+      }
+
+      if (data.status === "succeeded") {
+        setSavedCard({ hasSavedCard: true })
+        handleStripeSuccess(data.paymentIntentId as string, { orderId, cashback })
+        return
+      }
+
+      if (data.status === "requires_action" && data.clientSecret) {
+        // 3DS / SCA: confirma con if_required; si el banco exige redirección,
+        // Stripe.js la maneja sola y el webhook confirma la orden.
+        const stripe = await loadStripe(
+          process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ""
+        )
+        if (!stripe) {
+          setCheckoutError("No se pudo iniciar la verificación de tu banco.")
+          setIsProcessing(false)
+          return
+        }
+        const { error } = await stripe.confirmPayment({
+          clientSecret: data.clientSecret,
+          redirect: "if_required",
+        })
+        if (error) {
+          setCheckoutError(
+            error.message || "Tu banco no confirmó el pago. Intenta de nuevo."
+          )
+          setIsProcessing(false)
+          return
+        }
+        setSavedCard({ hasSavedCard: true })
+        handleStripeSuccess(data.paymentIntentId as string, { orderId, cashback })
+        return
+      }
+
+      // declined / no_saved_card / cualquier otro: fail-open, se cae al flujo
+      // normal con el formulario de Stripe (la orden queda pendiente e intacta).
+      if (data.status === "no_saved_card") {
+        setSavedCard({ hasSavedCard: false })
+        setCheckoutError(
+          "No encontramos una tarjeta guardada. Guarda una la próxima vez para pagar con 1 clic."
+        )
+      } else {
+        setCheckoutError(
+          "No pudimos cobrar con tu tarjeta guardada. Completa el pago abajo."
+        )
+      }
+      // Inicializa el flujo normal con el mismo pedido ya creado.
+      await initializeCardPayment(orderId, cashback)
     } catch (err) {
       setCheckoutError(
         err instanceof Error ? err.message : "Error de conexión. Intenta de nuevo."
@@ -405,8 +572,13 @@ export function CheckoutDrawer() {
   }
 
   // ── Pago exitoso: persiste last_order, limpia carrito y abre flujo post-pago ──
-  const handleStripeSuccess = (paymentIntentId: string) => {
-    saveLastOrder(createdOrderId ?? undefined, earnedCashback?.credits, earnedCashback?.tier)
+  const handleStripeSuccess = (
+    paymentIntentId: string,
+    opts?: { orderId?: number; cashback?: { credits: number; tier: string | null } | null }
+  ) => {
+    const finalOrderId = opts?.orderId ?? createdOrderId
+    const finalCashback = opts?.cashback ?? earnedCashback
+    saveLastOrder(finalOrderId ?? undefined, finalCashback?.credits, finalCashback?.tier)
     clearCart()
     setIsOpen(false)
 
@@ -422,7 +594,7 @@ export function CheckoutDrawer() {
     // Si el modal reclamó, él decide cuándo navegar.
     const claimed = window.dispatchEvent(
       new CustomEvent(ORDER_PAID_EVENT, {
-        detail: { orderId: createdOrderId, paymentIntentId, total },
+        detail: { orderId: finalOrderId, paymentIntentId, total },
         cancelable: true,
       })
     )
@@ -834,6 +1006,30 @@ export function CheckoutDrawer() {
                       Entrega: {schedule.date} · {schedule.time}
                     </p>
                   </div>
+
+                  {/* Express Checkout: tarjeta guardada (solo sesión iniciada) */}
+                  {isLoggedIn === true && savedCard?.hasSavedCard && (
+                    <button
+                      onClick={handleExpressCheckout}
+                      disabled={isProcessing}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-[#242529] text-white font-bold rounded-xl hover:bg-black disabled:opacity-70 transition-colors"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Procesando...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-5 h-5 text-yellow-400" />
+                          Pagar al instante
+                          {savedCard.last4
+                            ? ` ··· ${savedCard.last4}${savedCard.brand ? ` (${savedCard.brand})` : ""}`
+                            : ""}
+                        </>
+                      )}
+                    </button>
+                  )}
 
                   {/* Trust badges */}
                   <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2 text-xs text-[#6b6b6b]">

@@ -15,6 +15,7 @@ import {
 import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { getGuestToken } from "@/lib/guest-address"
 import { ORDER_PAID_EVENT } from "@/components/checkout/CheckoutDrawer"
+import { trackEvent } from "@/lib/analytics"
 import type { UpsellOffer } from "@/lib/upsell-offers"
 import { logger } from "@/lib/logger"
 
@@ -217,6 +218,14 @@ export function UpsellModal() {
           setUpsell(up)
           setDownsell(down)
           setStage("upsell")
+          // Exposición de la oferta: denominador del conversion rate del upsell.
+          trackEvent("upsell_viewed", {
+            currency: "MXN",
+            value: up.price,
+            item_id: String(up.productId),
+            item_name: up.title,
+            discount_pct: up.discount_pct,
+          })
         } catch (err) {
           if (token !== fetchAttemptRef.current) return
           logger.warn("upsell-offers fetch failed, retrying", {
@@ -439,12 +448,30 @@ export function UpsellModal() {
       crypto.randomUUID()
     if (isDownsellOffer) downsellKeyRef.current = key
     else upsellKeyRef.current = key
+    // Evento de aceptación: mide el conversion rate del upsell/downsell 1-click.
+    trackEvent(isDownsellOffer ? "downsell_accepted" : "upsell_accepted", {
+      currency: "MXN",
+      value: offer.price,
+      item_id: String(offer.productId),
+      item_name: offer.title,
+      quantity: offer.quantity,
+      discount_pct: offer.discount_pct,
+    })
     void processOffer(offer, key).finally(() => {
       chargingRef.current = false
     })
   }
 
   const handleDecline = () => {
+    const offer = showDownsell ? downsell : upsell
+    if (offer) {
+      trackEvent(showDownsell ? "downsell_declined" : "upsell_declined", {
+        currency: "MXN",
+        value: offer.price,
+        item_id: String(offer.productId),
+        item_name: offer.title,
+      })
+    }
     if (!showDownsell && downsell) {
       setShowDownsell(true)
       setStage("downsell")

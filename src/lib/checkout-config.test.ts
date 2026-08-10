@@ -6,6 +6,7 @@ import {
   validDeliveryFee,
   calcCouponDiscount,
   freeShippingProgress,
+  calcCheckoutTotals,
 } from "./checkout-config"
 
 describe("checkout-config", () => {
@@ -65,8 +66,7 @@ describe("checkout-config", () => {
     })
   })
 
-  describe("freeShippingProgress (barra de envío gratis)", () => {
-    it("subtotal $499.99 → falta $0.01, no es gratis", () => {
+  describe("freeShippingProgress (barra de envío gratis)", () => {    it("subtotal $499.99 → falta $0.01, no es gratis", () => {
       const p = freeShippingProgress(499.99)
       expect(p.isFree).toBe(false)
       expect(p.remaining).toBeCloseTo(0.01, 2)
@@ -92,6 +92,61 @@ describe("checkout-config", () => {
       expect(p.remaining).toBe(500)
       expect(p.percent).toBe(0)
       expect(p.message).toBe("Agrega $500.00 más para envío gratis")
+    })
+  })
+
+  describe("calcCheckoutTotals (fuente única de totales con bumps + cupón)", () => {
+    const pctCoupon = { discount_type: "percentage", discount_value: 10, min_order: 0 }
+
+    it("sin bumps ni cupón: subtotal + tarifa fija", () => {
+      const t = calcCheckoutTotals(420, 0, null, 3, 0)
+      expect(t.bumpsSubtotal).toBe(0)
+      expect(t.effectiveSubtotal).toBe(420)
+      expect(t.discountAmount).toBe(0)
+      expect(t.payableSubtotal).toBe(420)
+      expect(t.allItemsCount).toBe(3)
+      expect(t.deliveryFee).toBe(35)
+      expect(t.total).toBe(455)
+    })
+
+    it("aplica el cupón sobre subtotal + bumps (fórmula del servidor)", () => {
+      // Carrito $420 + bump $80 = $500 efectivo → 10% = $50 → pagable $450.
+      const t = calcCheckoutTotals(420, 80, pctCoupon, 3, 1)
+      expect(t.discountAmount).toBe(50)
+      expect(t.payableSubtotal).toBe(450)
+      expect(t.allItemsCount).toBe(4)
+      // Con $450 pagable sigue pagando envío.
+      expect(t.deliveryFee).toBe(35)
+      expect(t.total).toBe(485)
+    })
+
+    it("bumps + cupón cruzan el umbral de envío gratis", () => {
+      // $420 + bump $80 = $500; con cupón 10% → $450 pagable... sin cruzar.
+      // Usamos un cupón que lleve el pagable ≥ umbral para probar envío gratis.
+      const free = calcCheckoutTotals(520, 0, null, 4, 0)
+      expect(free.deliveryFee).toBe(0)
+      expect(free.total).toBe(520)
+    })
+
+    it("cuenta bumps en itemCount para el envío gratis", () => {
+      // Subtotal pagable 460 + bump total 40 → 500 con bumps. El umbral se
+      // evalúa sobre el pagable (incluye bumps), igual que el servidor.
+      const t = calcCheckoutTotals(460, 40, null, 3, 1)
+      expect(t.payableSubtotal).toBe(500)
+      expect(t.deliveryFee).toBe(0)
+      expect(t.total).toBe(500)
+    })
+
+    it("envío a 0 explícito se respeta (retrocompatible)", () => {
+      const t = calcCheckoutTotals(100, 0, null, 1, 0, 0)
+      expect(t.deliveryFee).toBe(0)
+      expect(t.total).toBe(100)
+    })
+
+    it("consistencia: descuento redondeado a 2 decimales", () => {
+      const t = calcCheckoutTotals(250.33, 0, pctCoupon, 2, 0)
+      expect(t.discountAmount).toBe(25.03)
+      expect(t.payableSubtotal).toBeCloseTo(225.3, 2)
     })
   })
 })

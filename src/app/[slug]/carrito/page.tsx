@@ -16,12 +16,12 @@ import {
 import Link from "next/link"
 import { CouponInput } from "@/components/cart/coupon-input"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
-import { validDeliveryFee, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 
 export default function CartPage() {
-  const { cart, itemCount, subtotal, discount, updateQuantity, removeItem, clearCart, isLoaded } = useCart()
+  const { cart, itemCount, subtotal, coupon, updateQuantity, removeItem, clearCart, isLoaded } = useCart()
   const { city } = useCity()
   const router = useRouter()
   // Order bumps (cross-sell estilo ThriveCart). Estado compartido con el drawer
@@ -29,13 +29,19 @@ export default function CartPage() {
   // /checkout la incluya en la orden al pagar.
   const { selectedBumps, setSelectedBumps } = useSelectedBumps()
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
-  // Envío dinámico (misma fórmula que el checkout): gratis desde $500 incluyendo bumps.
-  const deliveryFee = validDeliveryFee(
-    itemCount + selectedBumps.length,
-    Math.max(0, subtotal - discount + bumpsSubtotal),
+  // Totales unificados (misma fórmula que el checkout y el servidor): el
+  // descuento de cupón aplica sobre subtotal + bumps y el envío es gratis desde
+  // el umbral contando bumps.
+  const totals = calcCheckoutTotals(
+    subtotal,
+    bumpsSubtotal,
+    coupon,
+    itemCount,
+    selectedBumps.length,
     DELIVERY_FEE_FLAT
   )
-  const bumpsTotal = Math.max(0, subtotal - discount + bumpsSubtotal + deliveryFee)
+  const { deliveryFee } = totals
+  const bumpsTotal = totals.total
 
   if (!city) {
     return (
@@ -115,7 +121,7 @@ export default function CartPage() {
       {/* Barra de progreso hacia envío gratis (mecánica ThriveCart).
           Se actualiza en tiempo real al seleccionar order bumps. */}
       <div className="mb-6">
-        <FreeShippingProgress payableSubtotal={Math.max(0, subtotal - discount + bumpsSubtotal)} />
+        <FreeShippingProgress payableSubtotal={totals.payableSubtotal} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -235,13 +241,13 @@ export default function CartPage() {
                 </div>
               )}
 
-              {discount > 0 && (
+              {totals.discountAmount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-green-600 flex items-center gap-1">
                     <Tag className="w-3.5 h-3.5" />
                     Descuento
                   </span>
-                  <span className="font-semibold text-green-600">-${discount.toFixed(2)}</span>
+                  <span className="font-semibold text-green-600">-${totals.discountAmount.toFixed(2)}</span>
                 </div>
               )}
 

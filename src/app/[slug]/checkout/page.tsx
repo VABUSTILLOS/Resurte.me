@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
 import { createClient } from "@/lib/supabase/client"
+import { AnalyticsEvents } from "@/lib/analytics"
 import {
   ShoppingBag,
   ArrowLeft,
@@ -36,7 +37,7 @@ import { ReviewStep } from "@/components/checkout/ReviewStep"
 import { PaymentStep } from "@/components/checkout/PaymentStep"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
-import { validDeliveryFee, calcCouponDiscount } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 
 // ============================================================
 // Page
@@ -80,9 +81,11 @@ export default function CheckoutPage() {
         source: "checkout_page",
         coupon_code: coupon?.code ?? undefined,
       }),
-    }).catch(() => {
-      // Fail-open: nunca bloquear el checkout por captura de leads
     })
+      .then(() => AnalyticsEvents.lead())
+      .catch(() => {
+        // Fail-open: nunca bloquear el checkout por captura de leads
+      })
   }, [phone, coupon?.code])
 
   // Direcciones guardadas del usuario (solo visibles para dueño vía RLS)
@@ -96,6 +99,25 @@ export default function CheckoutPage() {
   // precios y reglas contra bump_rules. Retrocompatible: sin bumps, la orden
   // estándar no cambia.
   const { selectedBumps, setSelectedBumps } = useSelectedBumps()
+
+  // begin_checkout (GA4/Meta): se dispara una vez al cargar el checkout con
+  // artículos en el carrito. El drawer móvil ya lo dispara al tocar
+  // "Hacer Checkout"; esta página cubre el flujo full-page.
+  const beganCheckoutRef = useRef(false)
+  useEffect(() => {
+    if (beganCheckoutRef.current || !isLoaded || itemCount === 0) return
+    beganCheckoutRef.current = true
+    AnalyticsEvents.beginCheckout(
+      subtotal,
+      itemCount,
+      cart.items.map((i) => ({
+        item_id: String(i.product_id),
+        item_name: i.name,
+        price: i.sale_price ?? i.price,
+        quantity: i.quantity,
+      }))
+    )
+  }, [isLoaded, itemCount, subtotal, cart.items])
 
   // Detecta si el usuario tiene sesión para sugerirle iniciarla (historial +
   // créditos de recompensa). null = aún verificando / sin Supabase configurado.
@@ -170,18 +192,51 @@ export default function CheckoutPage() {
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
   // Cashback estimado devuelto por POST /api/orders (se muestra tras pagar)
   const [earnedCashback, setEarnedCashback] = useState<{ credits: number; tier: string | null } | null>(null)
+  // Tarjeta guardada del usuario (Express Checkout / pago con 1 clic)
+  const [savedCard, setSavedCard] = useState<{
+    hasSavedCard: boolean
+    last4?: string
+    brand?: string
+  } | null>(null)
+
+  // ── Detección de tarjeta guardada (Express Checkout, solo sesión) ──
+  useEffect(() => {
+    if (isLoggedIn !== true) {
+      return
+    }
+    let cancelled = false
+    fetch("/api/payments/stripe/saved-card")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { hasSavedCard?: boolean; last4?: string; brand?: string } | null) => {
+        if (cancelled) return
+        setSavedCard(
+          data
+            ? { hasSavedCard: !!data.hasSavedCard, last4: data.last4, brand: data.brand }
+            : { hasSavedCard: false }
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setSavedCard({ hasSavedCard: false })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isLoggedIn])
 
   // ── Totales en tiempo real (subtotal pagable + bumps seleccionados) ──
   // El descuento de cupón se calcula sobre el subtotal CON bumps incluidos,
   // igual que el servidor en POST /api/orders — así el total coincide a 0.01.
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
-  const effectiveSubtotal = subtotal + bumpsSubtotal
-  const discountAmount = calcCouponDiscount(effectiveSubtotal, coupon)
-  const payableSubtotal = effectiveSubtotal - discountAmount
-  const allItemsCount = itemCount + selectedBumps.length
-  // Envío gratis desde $500 MXN (misma regla que el servidor en POST /api/orders)
-  const deliveryFee = validDeliveryFee(allItemsCount, payableSubtotal, 35)
-  const total = payableSubtotal + deliveryFee
+  const totals = calcCheckoutTotals(
+    subtotal,
+    bumpsSubtotal,
+    coupon,
+    itemCount,
+    selectedBumps.length,
+    DELIVERY_FEE_FLAT
+  )
+  const { effectiveSubtotal, discountAmount, allItemsCount, deliveryFee } = totals
+  const total = totals.total
 
   // Persist the order summary so the confirmation page can fire a complete
   // `purchase` event after the cart is cleared.
@@ -341,6 +396,111 @@ export default function CheckoutPage() {
     }
   }
 
+  // Crea la orden en la BD con la misma carga que el flujo normal. Devuelve
+  // { orderId, cashback } o null si falla (deja checkoutError seteado).
+  type CreatedOrder = {
+    orderId: number
+    cashback: { credits: number; tier: string | null } | null
+  }
+  const createOrder = async (method: PaymentMethod): Promise<CreatedOrder | null> => {
+    // Solo se envía address_id si la dirección seleccionada NO fue editada;
+    // si el usuario modificó un campo, se crea/actualiza una nueva.
+    const selectedAddress = savedAddresses.find((a) => a.id === selectedAddressId)
+    const selectedAddressUnedited =
+      selectedAddress !== undefined &&
+      selectedAddress.street === address.street &&
+      selectedAddress.number === address.number &&
+      (selectedAddress.interior ?? "") === address.interior &&
+      selectedAddress.neighborhood === address.neighborhood &&
+      selectedAddress.zip_code === address.zip_code &&
+      (selectedAddress.references ?? "") === address.references
+
+    const response = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        city_id: city.id,
+        // Checkout anónimo: reutiliza el token del navegador para que la
+        // dirección se vincule a la misma "sesión" y se pueda reclamar al
+        // iniciar sesión (el servidor genera uno si aún no existe).
+        ...(isLoggedIn === false ? { guest_token: getGuestToken() ?? undefined } : {}),
+        ...(selectedAddressUnedited && selectedAddressId
+          ? { address_id: selectedAddressId }
+          : {}),
+        address: {
+          label: address.label,
+          street: address.street,
+          number: address.number,
+          interior: address.interior,
+          neighborhood: address.neighborhood,
+          zip_code: address.zip_code,
+          references: address.references,
+        },
+        schedule: {
+          date: schedule.date,
+          time: schedule.time,
+        },
+        payment_method: method,
+        phone,
+        email: email.trim() || undefined,
+        subtotal: effectiveSubtotal,
+        delivery_fee: deliveryFee,
+        total,
+        coupon_code: coupon?.code,
+        items: [
+          ...cart.items.map((item) => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_price: item.sale_price ?? item.price,
+            name: item.name,
+          })),
+          ...selectedBumps.map((b) => ({
+            product_id: b.productId,
+            quantity: b.quantity,
+            unit_price: b.unitPrice,
+            name: String(b.productId),
+            item_type: "bump" as const,
+          })),
+        ],
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      setCheckoutError(data.error || "Error al crear el pedido")
+      return null
+    }
+
+    // La orden ya capturó los bumps; se limpia la selección temporal para que
+    // una próxima compra en este tab no arrastre artículos especiales viejos.
+    setSelectedBumps([])
+
+    // Autoguardado (checkout anónimo): persiste el guest_token del servidor
+    // y la última dirección+teléfono para reutilizarlos en la próxima compra.
+    if (isLoggedIn === false) {
+      if (data.guestToken) saveGuestToken(data.guestToken)
+      saveLastAddress({ ...address, phone })
+    }
+
+    // Refresca "Mis direcciones" si el usuario vuelve sin recargar la página.
+    const supabase = createClient()
+    if (supabase) loadSavedAddresses(supabase)
+
+    if (!data.orderId) {
+      setCheckoutError("No se pudo crear el pedido. Intenta de nuevo.")
+      return null
+    }
+
+    return {
+      orderId: data.orderId,
+      cashback: {
+        credits: data.cashbackCredits ?? 0,
+        tier: data.cashbackTier ?? null,
+      },
+    }
+  }
+
   const handlePlaceOrder = async () => {
     setIsProcessing(true)
     setCheckoutError(null)
@@ -353,102 +513,20 @@ export default function CheckoutPage() {
         return
       }
 
-      // Solo se envía address_id si la dirección seleccionada NO fue editada;
-      // si el usuario modificó un campo, se crea/actualiza una nueva.
-      const selectedAddress = savedAddresses.find((a) => a.id === selectedAddressId)
-      const selectedAddressUnedited =
-        selectedAddress !== undefined &&
-        selectedAddress.street === address.street &&
-        selectedAddress.number === address.number &&
-        (selectedAddress.interior ?? "") === address.interior &&
-        selectedAddress.neighborhood === address.neighborhood &&
-        selectedAddress.zip_code === address.zip_code &&
-        (selectedAddress.references ?? "") === address.references
-
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          city_id: city.id,
-          // Checkout anónimo: reutiliza el token del navegador para que la
-          // dirección se vincule a la misma "sesión" y se pueda reclamar al
-          // iniciar sesión (el servidor genera uno si aún no existe).
-          ...(isLoggedIn === false ? { guest_token: getGuestToken() ?? undefined } : {}),
-          ...(selectedAddressUnedited && selectedAddressId
-            ? { address_id: selectedAddressId }
-            : {}),
-          address: {
-            label: address.label,
-            street: address.street,
-            number: address.number,
-            interior: address.interior,
-            neighborhood: address.neighborhood,
-            zip_code: address.zip_code,
-            references: address.references,
-          },
-          schedule: {
-            date: schedule.date,
-            time: schedule.time,
-          },
-          payment_method: paymentMethod,
-          phone,
-          email: email.trim() || undefined,
-          subtotal: effectiveSubtotal,
-          delivery_fee: deliveryFee,
-          total,
-          coupon_code: coupon?.code,
-          items: [
-            ...cart.items.map((item) => ({
-              product_id: item.product_id,
-              quantity: item.quantity,
-              unit_price: item.sale_price ?? item.price,
-              name: item.name,
-            })),
-            ...selectedBumps.map((b) => ({
-              product_id: b.productId,
-              quantity: b.quantity,
-              unit_price: b.unitPrice,
-              name: String(b.productId),
-              item_type: "bump" as const,
-            })),
-          ],
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setCheckoutError(data.error || "Error al crear el pedido")
+      const created = await createOrder(paymentMethod)
+      if (!created) {
         setIsProcessing(false)
         return
       }
 
-      // La orden ya capturó los bumps; se limpia la selección temporal para que
-      // una próxima compra en este tab no arrastre artículos especiales viejos.
-      setSelectedBumps([])
-
-      // Autoguardado (checkout anónimo): persiste el guest_token del servidor
-      // y la última dirección+teléfono para reutilizarlos en la próxima compra.
-      if (isLoggedIn === false) {
-        if (data.guestToken) saveGuestToken(data.guestToken)
-        saveLastAddress({ ...address, phone })
-      }
-
-      // Refresca "Mis direcciones" si el usuario vuelve sin recargar la página.
-      const supabase = createClient()
-      if (supabase) loadSavedAddresses(supabase)
-
       // Card payment → crear PaymentIntent (ruta dedicada) y mostrar Stripe form.
-      if (paymentMethod === "card" && data.orderId) {
-        await initializeCardPayment(data.orderId, {
-          credits: data.cashbackCredits ?? 0,
-          tier: data.cashbackTier ?? null,
-        })
+      if (paymentMethod === "card") {
+        await initializeCardPayment(created.orderId, created.cashback)
         return
       }
 
       // Non-card payment → redirect to confirmation
-      saveLastOrder(data.orderId, data.cashbackCredits, data.cashbackTier)
+      saveLastOrder(created.orderId, created.cashback?.credits, created.cashback?.tier)
       clearCart()
       router.push(`/${city.slug}/pedido-confirmado`)
     } catch (err) {
@@ -459,8 +537,100 @@ export default function CheckoutPage() {
     }
   }
 
-  const handleStripeSuccess = (_paymentIntentId: string) => {
-    saveLastOrder(createdOrderId ?? undefined, earnedCashback?.credits, earnedCashback?.tier)
+  // ── Express Checkout: cobra con la tarjeta guardada (off-session) ──
+  const handleExpressCheckout = async () => {
+    setIsProcessing(true)
+    setCheckoutError(null)
+
+    let orderId = createdOrderId
+    let cashback = earnedCashback
+    try {
+      if (!orderId) {
+        const created = await createOrder("card")
+        if (!created) {
+          setIsProcessing(false)
+          return
+        }
+        orderId = created.orderId
+        cashback = created.cashback
+        setCreatedOrderId(orderId)
+        setEarnedCashback(cashback)
+      }
+
+      const response = await fetch("/api/payments/stripe/express-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setCheckoutError(data.error || "No se pudo completar el pago rápido.")
+        setIsProcessing(false)
+        return
+      }
+
+      if (data.status === "succeeded") {
+        setSavedCard({ hasSavedCard: true })
+        handleStripeSuccess(data.paymentIntentId as string, { orderId, cashback })
+        return
+      }
+
+      if (data.status === "requires_action" && data.clientSecret) {
+        // 3DS / SCA: confirma con if_required; si el banco exige redirección,
+        // Stripe.js la maneja sola y el webhook confirma la orden.
+        const { loadStripe } = await import("@stripe/stripe-js")
+        const stripe = await loadStripe(
+          process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ""
+        )
+        if (!stripe) {
+          setCheckoutError("No se pudo iniciar la verificación de tu banco.")
+          setIsProcessing(false)
+          return
+        }
+        const { error } = await stripe.confirmPayment({
+          clientSecret: data.clientSecret,
+          redirect: "if_required",
+        })
+        if (error) {
+          setCheckoutError(
+            error.message || "Tu banco no confirmó el pago. Intenta de nuevo."
+          )
+          setIsProcessing(false)
+          return
+        }
+        setSavedCard({ hasSavedCard: true })
+        handleStripeSuccess(data.paymentIntentId as string, { orderId, cashback })
+        return
+      }
+
+      // declined / no_saved_card / cualquier otro: fail-open, se cae al flujo
+      // normal con el formulario de Stripe (la orden queda pendiente e intacta).
+      if (data.status === "no_saved_card") {
+        setSavedCard({ hasSavedCard: false })
+        setCheckoutError(
+          "No encontramos una tarjeta guardada. Guarda una la próxima vez para pagar con 1 clic."
+        )
+      } else {
+        setCheckoutError(
+          "No pudimos cobrar con tu tarjeta guardada. Completa el pago abajo."
+        )
+      }
+      await initializeCardPayment(orderId, cashback)
+    } catch (err) {
+      setCheckoutError(
+        err instanceof Error ? err.message : "Error de conexión. Intenta de nuevo."
+      )
+      setIsProcessing(false)
+    }
+  }
+
+  const handleStripeSuccess = (
+    _paymentIntentId: string,
+    opts?: { orderId?: number; cashback?: { credits: number; tier: string | null } | null }
+  ) => {
+    const finalOrderId = opts?.orderId ?? createdOrderId
+    const finalCashback = opts?.cashback ?? earnedCashback
+    saveLastOrder(finalOrderId ?? undefined, finalCashback?.credits, finalCashback?.tier)
     clearCart()
     router.push(`/${city.slug}/pedido-confirmado`)
   }
@@ -646,12 +816,16 @@ export default function CheckoutPage() {
           paymentMethod={paymentMethod}
           total={total}
           deliveryFee={deliveryFee}
+          itemCount={allItemsCount}
           checkoutError={checkoutError}
           isProcessing={isProcessing}
           showStripeForm={showStripeForm}
           stripeClientSecret={stripeClientSecret}
+          isLoggedIn={isLoggedIn === true}
+          savedCard={savedCard}
           onSelectMethod={setPaymentMethod}
           onPlaceOrder={handlePlaceOrder}
+          onExpressCheckout={handleExpressCheckout}
           onBack={() => setStep("review")}
           onStripeSuccess={handleStripeSuccess}
           onStripeBack={handleStripeBack}

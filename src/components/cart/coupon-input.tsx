@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useCart } from "@/contexts/cart-context"
+import { calcCheckoutTotals } from "@/lib/checkout-config"
+import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import type { AppliedCoupon } from "@/types"
 import { Tag, X, Loader2, Check } from "lucide-react"
 
@@ -12,10 +14,21 @@ import { Tag, X, Loader2, Check } from "lucide-react"
  * crear la orden en /api/orders.
  */
 export function CouponInput() {
-  const { subtotal, discount, coupon, applyCoupon, removeCoupon } = useCart()
+  const { subtotal, itemCount, coupon, applyCoupon, removeCoupon } = useCart()
+  const { selectedBumps } = useSelectedBumps()
   const [code, setCode] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Descuento real (incluye order bumps), igual que POST /api/orders.
+  const bumpsSubtotal = useMemo(
+    () => selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0),
+    [selectedBumps]
+  )
+  const totals = useMemo(
+    () => calcCheckoutTotals(subtotal, bumpsSubtotal, coupon, itemCount, selectedBumps.length),
+    [subtotal, bumpsSubtotal, coupon, itemCount, selectedBumps.length]
+  )
 
   // Revalida el cupón persistido (localStorage) al montar o si cambia el
   // subtotal. Si ya no es válido (expiró, se agotó o el carrito bajó del
@@ -77,7 +90,7 @@ export function CouponInput() {
               Cupón {coupon.code} aplicado
             </p>
             <p className="text-xs text-[#0E7A0E]">
-              Descuento de ${discount.toFixed(2)}
+              Descuento de ${totals.discountAmount.toFixed(2)}
             </p>
           </div>
         </div>

@@ -1,21 +1,33 @@
 "use client"
 
-import { CreditCard, CheckCircle2, ArrowLeft } from "lucide-react"
+import { useEffect } from "react"
+import { CreditCard, CheckCircle2, ArrowLeft, Zap } from "lucide-react"
 import { PAYMENT_METHODS, type PaymentMethod } from "@/types"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
 import { PAYMENT_ICONS } from "./checkout-shared"
+import { AnalyticsEvents } from "@/lib/analytics"
+
+interface SavedCardInfo {
+  hasSavedCard: boolean
+  last4?: string
+  brand?: string
+}
 
 interface PaymentStepProps {
   paymentMethod: PaymentMethod
   total: number
   deliveryFee: number
+  itemCount?: number
   checkoutError: string | null
   isProcessing: boolean
   showStripeForm: boolean
   stripeClientSecret: string | null
+  isLoggedIn?: boolean
+  savedCard?: SavedCardInfo | null
   onSelectMethod: (method: PaymentMethod) => void
   onPlaceOrder: () => void
+  onExpressCheckout?: () => void
   onBack: () => void
   onStripeSuccess: (paymentIntentId: string) => void
   onStripeBack: () => void
@@ -25,16 +37,26 @@ export function PaymentStep({
   paymentMethod,
   total,
   deliveryFee,
+  itemCount = 0,
   checkoutError,
   isProcessing,
   showStripeForm,
   stripeClientSecret,
+  isLoggedIn = false,
+  savedCard = null,
   onSelectMethod,
   onPlaceOrder,
+  onExpressCheckout,
   onBack,
   onStripeSuccess,
   onStripeBack,
 }: PaymentStepProps) {
+  // El usuario llegó al paso de pago → add_payment_info (GA4/Meta). Se dispara
+  // una vez por montaje del paso (el paso solo se monta al entrar aquí).
+  useEffect(() => {
+    AnalyticsEvents.addPaymentInfo(total, itemCount)
+  }, [total, itemCount])
+
   return (
     <div>
       {/* Stripe Card Form */}
@@ -134,6 +156,33 @@ export function PaymentStep({
             </div>
             <p className="text-xs text-gray-400 mt-1">Incluye ${deliveryFee.toFixed(2)} de envío</p>
           </div>
+
+          {/* Express Checkout: tarjeta guardada (solo sesión iniciada + método tarjeta) */}
+          {isLoggedIn === true &&
+            paymentMethod === "card" &&
+            savedCard?.hasSavedCard &&
+            onExpressCheckout && (
+              <button
+                onClick={onExpressCheckout}
+                disabled={isProcessing}
+                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-[#242529] text-white font-bold rounded-xl hover:bg-black disabled:opacity-70 transition-colors mb-4"
+              >
+                {isProcessing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-5 h-5 text-yellow-400" />
+                    Pagar al instante
+                    {savedCard.last4
+                      ? ` ··· ${savedCard.last4}${savedCard.brand ? ` (${savedCard.brand})` : ""}`
+                      : ""}
+                  </>
+                )}
+              </button>
+            )}
 
           {/* Payment method instructions */}
           {paymentMethod === "spei" && (

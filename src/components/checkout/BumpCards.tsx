@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Sparkles, Check } from "lucide-react"
 import { MAX_BUMPS } from "@/lib/checkout-config"
 import type { OrderBump } from "@/lib/order-bumps"
+import { AnalyticsEvents } from "@/lib/analytics"
 
 export interface SelectedBump {
   ruleId: number
@@ -234,6 +235,17 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
       return // ya hay MAX_BUMPS seleccionados
     }
     onChange(next)
+    // Evento de selección de bump: mide el AOV incremental de esta mecánica.
+    // add_to_cart es el evento estándar (GA4/Meta) más cercano a "agregó un
+    // artículo especial a su pedido"; se registra con el precio con descuento.
+    if (!isSelected) {
+      AnalyticsEvents.addToCart({
+        id: bump.product.id,
+        name: bump.product.name,
+        price: bump.price,
+        quantity: 1,
+      })
+    }
   }
 
   return (

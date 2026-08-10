@@ -18,26 +18,33 @@ import { CHECKOUT_DRAWER_EVENT } from "@/components/checkout/CheckoutDrawer"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
-import { validDeliveryFee, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 
 // Global event bus to control drawer from header
 export const CART_DRAWER_EVENT = "resurte:toggle-cart-drawer"
 
 export function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false)
-  const { cart, itemCount, subtotal, discount, removeItem, updateQuantity, clearCart } = useCart()
+  const { cart, itemCount, subtotal, coupon, removeItem, updateQuantity, clearCart } = useCart()
   const { city } = useCity()
   // Order bumps seleccionados en el cross-sell del carrito; se transfieren al
   // CheckoutDrawer vía detail.bumps al presionar "Ir a Checkout". Compartidos
   // con /cart y /{ciudad}/carrito vía sessionStorage + evento global.
   const { selectedBumps, setSelectedBumps } = useSelectedBumps()
 
-  // Totales en tiempo real: los bumps seleccionados se suman al subtotal del
-  // drawer (igual que en el checkout) y el envío gratis aplica desde $500.
+  // Totales en tiempo real (fuente única calcCheckoutTotals): el descuento de
+  // cupón se aplica sobre subtotal + bumps, igual que el checkout y el servidor.
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
-  const payableSubtotal = Math.max(0, subtotal - discount + bumpsSubtotal)
-  const deliveryFee = validDeliveryFee(itemCount + selectedBumps.length, payableSubtotal, DELIVERY_FEE_FLAT)
-  const drawerTotal = payableSubtotal + deliveryFee
+  const totals = calcCheckoutTotals(
+    subtotal,
+    bumpsSubtotal,
+    coupon,
+    itemCount,
+    selectedBumps.length,
+    DELIVERY_FEE_FLAT
+  )
+  const { deliveryFee, payableSubtotal } = totals
+  const drawerTotal = totals.total
 
   // Listen for toggle events from header
   useEffect(() => {
@@ -104,14 +111,6 @@ export function CartDrawer() {
           >
             <X className="w-5 h-5 text-[var(--text-secondary)]" />
           </button>
-        </div>
-
-        {/* Cart header */}
-        <div className="px-5 py-2.5 bg-[#F6FDF6] border-b border-brand-100 hidden">
-          <p className="text-xs text-brand-700 flex items-center gap-1">
-            <ShoppingBag className="w-3.5 h-3.5" />
-            Tu pedido Resurte.me
-          </p>
         </div>
 
         {/* Items */}
@@ -365,17 +364,24 @@ export function CartDrawer() {
  * Works on both mobile and desktop.
  */
 export function MobileCartBar() {
-  const { itemCount, subtotal, discount } = useCart()
+  const { cart, itemCount, subtotal, coupon } = useCart()
   const { selectedBumps } = useSelectedBumps()
   const [mounted] = useState(true)
   const { city } = useCity()
 
-  // Total con bumps + envío (misma fórmula que el checkout). Se actualiza en
-  // tiempo real cuando el usuario togglea un bump en el drawer o en /carrito.
+  // Total con bumps + envío (fuente única calcCheckoutTotals, misma que el
+  // checkout). Se actualiza en tiempo real cuando el usuario togglea un bump
+  // en el drawer o en /carrito.
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
-  const payableSubtotal = Math.max(0, subtotal - discount + bumpsSubtotal)
-  const deliveryFee = validDeliveryFee(itemCount + selectedBumps.length, payableSubtotal, DELIVERY_FEE_FLAT)
-  const barTotal = payableSubtotal + deliveryFee
+  const totals = calcCheckoutTotals(
+    subtotal,
+    bumpsSubtotal,
+    coupon,
+    itemCount,
+    selectedBumps.length,
+    DELIVERY_FEE_FLAT
+  )
+  const barTotal = totals.total
 
   if (!mounted || itemCount === 0) return null
 
@@ -407,11 +413,23 @@ export function MobileCartBar() {
             Ver más productos
           </Link>
           <button
-            onClick={() =>
+            onClick={() => {
+              // begin_checkout desde la barra móvil (la otra superficie es el
+              // CartDrawer al tocar "Ir a Checkout").
+              AnalyticsEvents.beginCheckout(
+                subtotal,
+                itemCount,
+                cart.items.map((i) => ({
+                  item_id: String(i.product_id),
+                  item_name: i.name,
+                  price: i.sale_price ?? i.price,
+                  quantity: i.quantity,
+                }))
+              )
               window.dispatchEvent(
                 new CustomEvent(CHECKOUT_DRAWER_EVENT, { detail: { bumps: selectedBumps } })
               )
-            }
+            }}
             className="flex items-center gap-1.5 px-3 sm:px-5 py-2.5 text-sm font-semibold text-white bg-[#0E7A0E] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap touch-target"
           >
             Hacer Checkout
