@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
 import {
@@ -368,6 +368,23 @@ export function MobileCartBar() {
   const { selectedBumps } = useSelectedBumps()
   const [mounted] = useState(true)
   const { city } = useCity()
+  const barRef = useRef<HTMLDivElement>(null)
+
+  // Publica la altura real de la barra (incluye safe-area-inset-bottom) como
+  // --cart-bar-h para que --floating-bottom-offset suba los flotantes por
+  // encima del carril sin hardcodear 80px (el bar mide más en dispositivos
+  // con notch/home indicator).
+  useEffect(() => {
+    const el = barRef.current
+    if (!el) return
+    const setHeight = () => {
+      document.documentElement.style.setProperty("--cart-bar-h", `${el.offsetHeight}px`)
+    }
+    setHeight()
+    const ro = new ResizeObserver(setHeight)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [itemCount])
 
   // Total con bumps + envío (fuente única calcCheckoutTotals, misma que el
   // checkout). Se actualiza en tiempo real cuando el usuario togglea un bump
@@ -386,7 +403,7 @@ export function MobileCartBar() {
   if (!mounted || itemCount === 0) return null
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
+    <div ref={barRef} className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
       <div className="flex items-center gap-3 px-4 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] bg-white border-t border-[#E8E9EB] shadow-[0_-4px_24px_rgba(0,0,0,0.1)]">
         {/* Tap to open drawer — always visible */}
         <button

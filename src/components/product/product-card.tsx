@@ -194,13 +194,14 @@ export const ProductCard = memo(function ProductCard({
         </div>
       </Link>
 
-      {/* Quick-add button — Erewhon-style: fades up below the card on hover */}
+      {/* Quick-add button — mobile: inline dentro del card (sin saliente que
+          pise la fila siguiente). ≥sm: Erewhon-style, flota bajo el card. */}
       {!outOfStock && (
         <button
           onClick={handleAdd}
           aria-label={`Agregar ${product.name} al carrito`}
           className={cn(
-            "quick-add-btn absolute -bottom-2 left-1/2 -translate-x-1/2 z-10 px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ease-out shadow-lg touch-target active:scale-95",
+            "quick-add-btn flex items-center justify-center gap-1.5 w-[calc(100%-1.25rem)] mx-auto mb-3 sm:mb-0 sm:w-auto sm:absolute sm:-bottom-2 sm:left-1/2 sm:-translate-x-1/2 sm:z-10 sm:px-5 px-4 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ease-out shadow-lg touch-target active:scale-95",
             added
               ? "bg-green-500 text-white"
               : "bg-[#0E7A0E] text-white hover:bg-[#0D720D] hover:shadow-xl"

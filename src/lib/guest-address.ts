@@ -19,6 +19,8 @@ export interface GuestAddressData {
   zip_code?: string
   references?: string
   phone?: string
+  /** Email de contacto (captura de lead / notificaciones de la orden). */
+  email?: string
 }
 
 const TOKEN_KEY = "resurte_guest_token"

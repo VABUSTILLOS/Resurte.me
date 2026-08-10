@@ -86,12 +86,12 @@ export function Header() {
       className="sticky top-0 z-50 glass-header"
       style={{ paddingTop: "var(--header-inset-top)" }}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-16 gap-3">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6">
+        <div className="flex items-center justify-between h-16 gap-2 sm:gap-3">
           {/* Logo — Erewhon-style with refined type */}
           <Link href="/" className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[1.35rem] font-bold text-[#0E7A0E] tracking-tight">Resurte</span>
-            <span className="text-[1.35rem] font-bold text-[#1a1a1a] tracking-tight">.me</span>
+            <span className="text-base min-[360px]:text-lg min-[400px]:text-[1.25rem] md:text-[1.35rem] font-bold text-[#0E7A0E] tracking-tight">Resurte</span>
+            <span className="text-base min-[360px]:text-lg min-[400px]:text-[1.25rem] md:text-[1.35rem] font-bold text-[#1a1a1a] tracking-tight">.me</span>
           </Link>
 
           {/* Recompensas badge — shown when user has balance */}
@@ -201,6 +201,16 @@ export function Header() {
                         {user.user_metadata?.full_name || user.email}
                       </p>
                       <p className="text-xs text-[var(--text-secondary)] truncate">{user.email}</p>
+                      {cashbackBalance !== null && cashbackBalance > 0 && (
+                        <Link
+                          href="/recompensas"
+                          onClick={() => setShowUserMenu(false)}
+                          className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[#0E7A0E]"
+                        >
+                          <Coins className="w-3.5 h-3.5" aria-hidden="true" />
+                          ${cashbackBalance.toLocaleString("es-MX")} en recompensas
+                        </Link>
+                      )}
                     </div>
                     <Link
                       href={city ? `/${city.slug}/mis-pedidos` : "/auth/login"}

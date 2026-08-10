@@ -46,6 +46,13 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // La barra sticky add-to-cart ocupa el carril inferior en móvil; marcamos el
+  // body para ocultar el WhatsApp flotante global (ya hay botón in-page).
+  useEffect(() => {
+    document.body.classList.add("has-sticky-atc")
+    return () => document.body.classList.remove("has-sticky-atc")
+  }, [])
+
   const handleAdd = () => {
     for (let i = 0; i < quantity; i++) {
       addItem({
@@ -73,7 +80,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
 
   return (
     <div className="min-h-screen bg-[#faf8f5]">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-4 pb-28 sm:pt-8 sm:pb-8">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-xs sm:text-sm mb-4 sm:mb-8 overflow-x-auto whitespace-nowrap pb-1">
           <Link
@@ -427,6 +434,66 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
         </ScrollReveal>
         )}
       </div>
+
+      {/* Barra sticky add-to-cart — solo móvil. Se oculta automáticamente cuando
+          hay items en el carrito (body.cart-bar-active, ver globals.css). */}
+      {!outOfStock && (
+        <div className="sticky-atc-bar fixed bottom-0 left-0 right-0 z-40 sm:hidden">
+          <div className="flex items-center gap-3 px-4 py-3 bg-white border-t border-[#e0dbd2] shadow-[0_-4px_16px_rgba(0,0,0,0.08)] pb-[calc(0.75rem+var(--inset-bottom))]">
+            {/* Stepper de cantidad */}
+            <div className="flex items-center border border-[#ede8df] rounded-lg overflow-hidden shrink-0">
+              <button
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                disabled={quantity <= 1}
+                className="w-10 h-10 flex items-center justify-center text-[#6b6b6b] hover:bg-[#f0ede5] transition-colors touch-target"
+                aria-label="Disminuir cantidad"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <span className="w-10 text-center text-sm font-semibold text-[#1a1a1a] select-none">
+                {quantity}
+              </span>
+              <button
+                onClick={() => setQuantity(quantity + 1)}
+                className="w-10 h-10 flex items-center justify-center text-[#6b6b6b] hover:bg-[#f0ede5] transition-colors touch-target"
+                aria-label="Aumentar cantidad"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Precio total */}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-[#6b6b6b]">Total</p>
+              <p className="text-base font-bold text-[#1a1a1a] leading-tight truncate">
+                ${(displayPrice * quantity).toFixed(2)}
+              </p>
+            </div>
+
+            {/* CTA */}
+            <button
+              onClick={handleAdd}
+              className={`flex items-center justify-center gap-1.5 shrink-0 h-11 px-4 rounded-xl text-sm font-semibold transition-all duration-200 touch-target ${
+                added
+                  ? "bg-green-500 text-white"
+                  : "bg-[#0E7A0E] text-white hover:bg-[#0D720D] active:bg-[#0A610A] shadow-sm"
+              }`}
+            >
+              {added ? (
+                <>
+                  <Check className="w-5 h-5" />
+                  ¡Agregado!
+                </>
+              ) : (
+                <>
+                  <ShoppingCart className="w-5 h-5" />
+                  Agregar
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

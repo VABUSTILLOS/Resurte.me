@@ -65,6 +65,58 @@
   --header-inset-top: env(safe-area-inset-top, 0px);
   --header-top-offset: calc(4rem + var(--header-inset-top));
   --inset-bottom: env(safe-area-inset-bottom, 0px);
+  /* Fuente única del offset para elementos flotantes del fondo (WhatsApp,
+     StickyCatalogButton, pill de cuenta, cookie banner). Cuando el carrito
+     tiene items, `body.cart-bar-active` sube todos los flotantes por encima
+     del MobileCartBar para evitar colisiones. */
+  --floating-bottom-offset: calc(1rem + var(--inset-bottom));
+}
+
+@media (min-width: 640px) {
+  :root {
+    --floating-bottom-offset: calc(1.5rem + var(--inset-bottom));
+  }
+}
+
+body.cart-bar-active {
+  /* El MobileCartBar publica su altura real en --cart-bar-h (ya incluye el
+     safe-area-inset-bottom en su padding); los flotantes se posicionan encima
+     del carril + 8px de aire. */
+  --floating-bottom-offset: calc(var(--cart-bar-h, 80px) + 8px);
+}
+
+@media (min-width: 640px) {
+  body.cart-bar-active {
+    --floating-bottom-offset: calc(var(--cart-bar-h, 84px) + 8px);
+  }
+}
+
+/* Cuando hay una cuenta logueada, el pill "Mi cuenta" ocupa el bottom-left en
+   mobile; ocultamos el StickyCatalogButton para que no colisionen. En desktop
+   no aplica porque el pill está en el sidebar y el botón flota sin conflicto. */
+@media (max-width: 1023px) {
+  body.has-account-pill .sticky-catalog-button {
+    display: none;
+  }
+}
+
+/* Sticky add-to-cart de la página de producto (solo móvil). Cuando el carrito
+   tiene items, el MobileCartBar domina el carril inferior (z-50) y esta barra
+   se oculta para evitar doble barra y colisión con sus CTAs. */
+@media (max-width: 639px) {
+  body.cart-bar-active .sticky-atc-bar {
+    display: none;
+  }
+}
+
+/* En la página de producto móvil la barra sticky add-to-cart ocupa todo el
+   carril inferior; el WhatsApp flotante global chocaría con ella, así que se
+   oculta (la página ya ofrece "Pedir por WhatsApp" in-page). Cuando el carrito
+   tiene items la barra sticky se oculta y WhatsApp vuelve a flotar. */
+@media (max-width: 639px) {
+  body.has-sticky-atc:not(.cart-bar-active) .whatsapp-floating {
+    display: none;
+  }
 }
 
 /* Theme toggle (light/dark/system) — explicit data-theme wins */

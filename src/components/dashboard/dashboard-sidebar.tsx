@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { useCity } from "@/contexts/city-context"
-import { useCart } from "@/contexts/cart-context"
 import { useRouter } from "next/navigation"
 import {
   Package,
@@ -32,7 +31,6 @@ interface OrderSummary {
 
 export function DashboardSidebar() {
   const { city } = useCity()
-  const { itemCount } = useCart()
   const router = useRouter()
   // Lazy browser-only client: created via dynamic import after mount so
   // auth-js no longer ships in the initial layout bundle. The consumer
@@ -63,16 +61,22 @@ export function DashboardSidebar() {
     localStorage.setItem("sidebar-collapsed", String(next))
   }
 
-  // Match WhatsApp button vertical position: higher when MobileCartBar is visible
-  const hasCartItems = itemCount > 0
-  const pillBottom = hasCartItems
-    ? "bottom-[calc(80px+env(safe-area-inset-bottom))]"
-    : "bottom-[calc(20px+env(safe-area-inset-bottom))]"
-
+  // La posición vertical la maneja --floating-bottom-offset (globals.css):
+  // sube automáticamente cuando el carrito tiene items (body.cart-bar-active).
   useEffect(() => {
     if (!supabase) return
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
   }, [supabase])
+
+  // Cuando hay cuenta logueada, el pill ocupa el bottom-left en mobile:
+  // oculta el StickyCatalogButton para evitar la colisión (ver globals.css).
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    document.body.classList.toggle("has-account-pill", !!user)
+    return () => {
+      document.body.classList.remove("has-account-pill")
+    }
+  }, [user])
 
   // Cargar pedidos reales del usuario (RLS restringe a los suyos).
   useEffect(() => {
@@ -334,7 +338,7 @@ export function DashboardSidebar() {
       {!collapsed ? (
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className={`lg:hidden fixed ${pillBottom} left-3 z-[60] flex items-center gap-2.5 bg-white text-gray-900 pl-1.5 pr-4 py-1.5 rounded-full shadow-[0_4px_24px_rgba(0,0,0,0.15)] ring-1 ring-gray-200 hover:shadow-[0_6px_28px_rgba(0,0,0,0.2)] active:scale-[0.97] transition-all`}
+          className={`lg:hidden fixed bottom-[var(--floating-bottom-offset)] left-3 z-[60] flex items-center gap-2.5 bg-white text-gray-900 pl-1.5 pr-4 py-1.5 rounded-full shadow-[0_4px_24px_rgba(0,0,0,0.15)] ring-1 ring-gray-200 hover:shadow-[0_6px_28px_rgba(0,0,0,0.2)] active:scale-[0.97] transition-all`}
           aria-label={mobileOpen ? "Cerrar mi cuenta" : "Abrir mi cuenta"}
           style={{ touchAction: "manipulation" }}
         >
@@ -355,7 +359,7 @@ export function DashboardSidebar() {
         /* Collapsed — just the avatar, tap to expand */
         <button
           onClick={toggleCollapsed}
-          className={`lg:hidden fixed ${pillBottom} left-3 z-[60] w-11 h-11 rounded-full bg-white shadow-[0_4px_24px_rgba(0,0,0,0.15)] ring-1 ring-gray-200 flex items-center justify-center hover:shadow-[0_6px_28px_rgba(0,0,0,0.2)] active:scale-95 transition-all`}
+          className={`lg:hidden fixed bottom-[var(--floating-bottom-offset)] left-3 z-[60] w-11 h-11 rounded-full bg-white shadow-[0_4px_24px_rgba(0,0,0,0.15)] ring-1 ring-gray-200 flex items-center justify-center hover:shadow-[0_6px_28px_rgba(0,0,0,0.2)] active:scale-95 transition-all`}
           aria-label="Mostrar panel"
           style={{ touchAction: "manipulation" }}
         >

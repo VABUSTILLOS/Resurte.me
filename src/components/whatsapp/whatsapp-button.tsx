@@ -1,7 +1,6 @@
 "use client"
 
 import { MessageCircle } from "lucide-react"
-import { useCart } from "@/contexts/cart-context"
 import { AnalyticsEvents } from "@/lib/analytics"
 
 interface WhatsAppButtonProps {
@@ -17,7 +16,6 @@ export function WhatsAppButton({
   label = "Chatear por WhatsApp",
   position = "bottom-right",
 }: WhatsAppButtonProps) {
-  const { itemCount } = useCart()
   const cleanNumber = phoneNumber.replace(/\D/g, "")
   const encodedMessage = encodeURIComponent(message)
   const waLink = `https://wa.me/${cleanNumber}?text=${encodedMessage}`
@@ -28,18 +26,15 @@ export function WhatsAppButton({
 
   const positionClass = position === "bottom-right" ? "right-4 sm:right-6" : "left-4 sm:left-6"
 
-  // Cart empty: WhatsApp sits at the same bottom level as "Ver más productos" would.
-  // Cart has items: WhatsApp moves up to clear the MobileCartBar (~60px).
-  const hasCartItems = itemCount > 0
-  const bottomMobile = hasCartItems
-    ? "bottom-[calc(80px+env(safe-area-inset-bottom))]"
-    : "bottom-[calc(20px+env(safe-area-inset-bottom))]"
-  const bottomDesktop = hasCartItems
-    ? "sm:bottom-[calc(84px+env(safe-area-inset-bottom))]"
-    : "sm:bottom-[calc(24px+env(safe-area-inset-bottom))]"
-
+  // El offset vertical viene de --floating-bottom-offset (globals.css), que
+  // sube automáticamente cuando el carrito tiene items (body.cart-bar-active)
+  // para no chocar con el MobileCartBar.
   return (
-    <div role="complementary" aria-label="Contacto rápido por WhatsApp" className={`fixed ${bottomMobile} ${bottomDesktop} ${positionClass} z-50`}>
+    <div
+      role="complementary"
+      aria-label="Contacto rápido por WhatsApp"
+      className={`whatsapp-floating fixed bottom-[var(--floating-bottom-offset)] ${positionClass} z-50`}
+    >
       <a
         href={waLink}
         target="_blank"

@@ -21,9 +21,10 @@ export function BottomTabBar({
 }) {
   return (
     <>
-      {/* Mobile: fixed bottom bar */}
-      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 md:hidden">
-        <div className="mx-3 mb-[calc(0.75rem+env(safe-area-inset-bottom))] rounded-2xl border border-white/10 bg-gray-900/80 backdrop-blur-xl px-2 py-2 shadow-2xl shadow-black/40">
+      {/* Mobile: fixed bottom bar. Usa --floating-bottom-offset (globals.css):
+          cuando el carrito tiene items sube por encima del MobileCartBar. */}
+      <nav className="fixed bottom-[var(--floating-bottom-offset)] left-1/2 -translate-x-1/2 w-full max-w-md z-50 md:hidden">
+        <div className="mx-3 rounded-2xl border border-white/10 bg-gray-900/80 backdrop-blur-xl px-2 py-2 shadow-2xl shadow-black/40">
           <div className="flex items-center justify-around">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;

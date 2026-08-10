@@ -30,7 +30,7 @@ export function CookieConsent() {
   if (!visible) return null
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-md z-[60] animate-slide-up">
+    <div className="fixed bottom-[var(--floating-bottom-offset)] left-4 right-4 sm:left-auto sm:right-4 sm:max-w-md z-[60] animate-slide-up">
       <div className="bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.15)] border border-[#ede8df] p-5">
         <div className="flex items-start gap-3 mb-4">
           <div className="w-9 h-9 rounded-xl bg-[#F7F5F0] flex items-center justify-center shrink-0">

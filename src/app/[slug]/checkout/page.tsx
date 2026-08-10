@@ -129,7 +129,8 @@ export default function CheckoutPage() {
     if (!supabase) return
     supabase.auth.getUser().then(({ data }) => {
       if (cancelled) return
-      const loggedIn = !!data.user
+      const user = data.user
+      const loggedIn = !!user
       setIsLoggedIn(loggedIn)
       if (!loggedIn) {
         const last = getLastAddress()
@@ -145,7 +146,21 @@ export default function CheckoutPage() {
             references: last.references ?? prev.references,
           }))
           setPhone((prev) => last.phone ?? prev)
+          setEmail((prev) => (prev || last.email) ?? "")
         }
+      } else {
+        // Logueado: pre-llenar email del auth y teléfono desde profiles.phone
+        // para que el usuario no tenga que escribirlos en cada compra.
+        setEmail((prev) => (prev ? prev : user.email ?? ""))
+        void supabase
+          .from("profiles")
+          .select("phone")
+          .eq("id", user.id)
+          .maybeSingle()
+          .then(({ data: profile }) => {
+            if (cancelled || !profile?.phone) return
+            setPhone((prev) => (prev ? prev : profile.phone))
+          })
       }
     })
     return () => {
@@ -480,7 +495,7 @@ export default function CheckoutPage() {
     // y la última dirección+teléfono para reutilizarlos en la próxima compra.
     if (isLoggedIn === false) {
       if (data.guestToken) saveGuestToken(data.guestToken)
-      saveLastAddress({ ...address, phone })
+      saveLastAddress({ ...address, phone, email: email.trim() || undefined })
     }
 
     // Refresca "Mis direcciones" si el usuario vuelve sin recargar la página.

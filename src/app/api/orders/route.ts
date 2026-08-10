@@ -508,6 +508,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // ── Sincronizar teléfono de contacto en el perfil (best-effort) ──
+    // Persiste profiles.phone del usuario logueado para que el próximo
+    // checkout lo pre-rellene. No bloquea la orden si falla.
+    if (userId && phone?.trim()) {
+      const { error: profilePhoneErr } = await supabase
+        .from("profiles")
+        .update({ phone: phone.trim() })
+        .eq("id", userId)
+      if (profilePhoneErr) {
+        logger.warn("Profile phone sync (best-effort)", {
+          message: profilePhoneErr.message,
+          code: profilePhoneErr.code,
+          details: profilePhoneErr.details,
+        })
+      }
+    }
+
     // 4. Create order items (unit_price real de la BD, no el del cliente)
     const orderItems = items.map((item) => {
       const db = priceByProduct.get(item.product_id)!

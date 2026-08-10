@@ -6,10 +6,11 @@ import { createClient } from "@/lib/supabase/client"
 import { RestaurantProvider, useRestaurant } from "@/contexts/restaurant-context"
 import { ToastProvider } from "@/components/toast"
 import ThemeToggle from "@/components/panel/ThemeToggle"
+import { PanelMobileNav } from "./_components/PanelMobileNav"
 import { t } from "@/lib/i18n/es"
 import type { RestaurantCollection } from "@/types"
 import {
-  Store, ChefHat, ChevronDown, Sparkles,
+  Store, ChefHat, ChevronDown, Sparkles, Menu,
 } from "lucide-react"
 
 const COLLECTION_ICONS: Record<string, string> = {
@@ -37,6 +38,7 @@ function PanelContent({ children }: { children: React.ReactNode }) {
   const { selectedCollection, setSelectedCollection, collections, setCollections } = useRestaurant()
   const [loading, setLoading] = useState(true)
   const [showPicker, setShowPicker] = useState(false)
+  const [showMobileNav, setShowMobileNav] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -64,39 +66,48 @@ function PanelContent({ children }: { children: React.ReactNode }) {
       {/* Top bar with restaurant type selector */}
       <div className="sticky top-[var(--header-top-offset)] z-40 bg-white/90 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
             <div className="flex items-center gap-2 min-w-0">
-              <Store className="w-5 h-5 text-[#0E7A0E] shrink-0" />
-              <h1 className="text-lg font-bold text-gray-900 truncate">
+              <button
+                onClick={() => setShowMobileNav(true)}
+                aria-label="Abrir menú de herramientas"
+                aria-haspopup="dialog"
+                aria-expanded={showMobileNav}
+                className="lg:hidden shrink-0 p-2 rounded-xl hover:bg-gray-100 transition-colors touch-target"
+              >
+                <Menu className="w-5 h-5 text-gray-700" />
+              </button>
+              <Store className="hidden lg:block w-5 h-5 text-[#0E7A0E] shrink-0" />
+              <h1 className="hidden lg:block text-lg font-bold text-gray-900 truncate">
                 {t("panel.title")}
               </h1>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <ThemeToggle />
 
-              <div className="relative">
+              <div className="relative min-w-0">
                 <button
                   onClick={() => setShowPicker(!showPicker)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
-                  selectedCollection
-                    ? "border-[#0E7A0E]/30 bg-[#F0FDF4] text-[#0E7A0E]"
-                    : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
-                }`}
-              >
-                {selectedCollection ? (
-                  <>
-                    <span>{COLLECTION_ICONS[selectedCollection.slug] || "🍽️"}</span>
-                    <span className="max-w-[160px] truncate">{selectedCollection.name}</span>
-                  </>
-                ) : (
-                  <>
-                    <ChefHat className="w-4 h-4" />
-                    <span>{t("panel.pickRestaurantType")}</span>
-                  </>
-                )}
-                <ChevronDown className={`w-4 h-4 transition-transform ${showPicker ? "rotate-180" : ""}`} />
-              </button>
+                  className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
+                    selectedCollection
+                      ? "border-[#0E7A0E]/30 bg-[#F0FDF4] text-[#0E7A0E]"
+                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
+                  }`}
+                >
+                  {selectedCollection ? (
+                    <>
+                      <span>{COLLECTION_ICONS[selectedCollection.slug] || "🍽️"}</span>
+                      <span className="max-w-[110px] sm:max-w-[160px] truncate">{selectedCollection.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChefHat className="w-4 h-4 shrink-0" />
+                      <span className="hidden sm:inline">{t("panel.pickRestaurantType")}</span>
+                    </>
+                  )}
+                  <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${showPicker ? "rotate-180" : ""}`} />
+                </button>
 
               {showPicker && (
                 <>
@@ -157,6 +168,12 @@ function PanelContent({ children }: { children: React.ReactNode }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <ToastProvider>{children}</ToastProvider>
       </div>
+
+      <PanelMobileNav
+        open={showMobileNav}
+        onClose={() => setShowMobileNav(false)}
+        selectedCollection={selectedCollection}
+      />
     </div>
   )
 }

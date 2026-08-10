@@ -234,6 +234,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const itemCount = state.cart.items.reduce((sum, i) => sum + i.quantity, 0)
 
+  // Fuente única para el offset de elementos flotantes del fondo: marca el
+  // body cuando el MobileCartBar está visible para que WhatsApp, la pill de
+  // cuenta, el StickyCatalogButton y el cookie banner suban por encima.
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    document.body.classList.toggle("cart-bar-active", itemCount > 0)
+  }, [itemCount])
+
   const subtotal = calcSubtotal(state.cart.items)
   const discount = calcDiscount(subtotal, state.coupon)
 
