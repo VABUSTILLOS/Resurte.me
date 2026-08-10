@@ -80,6 +80,8 @@ export async function POST(request: NextRequest) {
       items: validItems.map((i) => i.product_id),
       bumpCount: bumps.length,
       rules: bumps.map((b) => `${b.ruleId}:${b.trigger_type}`),
+      ua: request.headers.get("user-agent") ?? "n/a",
+      state: bumpsDiagnostics.state ?? null,
       ...(bumps.length === 0 && bumpsDiagnostics.reason
         ? { reason: bumpsDiagnostics.reason, detail: bumpsDiagnostics.detail }
         : {}),
@@ -94,6 +96,7 @@ export async function POST(request: NextRequest) {
             (bumpsDiagnostics.reason
               ? { items: validItems }
               : { items: validItems, nota: "ninguna regla aplica para este carrito" }),
+          state: bumpsDiagnostics.state ?? null,
         },
       })
     }

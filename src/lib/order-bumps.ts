@@ -109,6 +109,19 @@ export interface BumpCartInput {
 export interface BumpDiagnostics {
   reason?: string
   detail?: unknown
+  /** Estado interno del motor al terminar (para cazar "0 bumps" en prod). */
+  state?: {
+    rulesLoaded: number
+    ruleTriggers: string[]
+    productsLoaded: number
+    productTagsByCart: Record<number, string[] | null>
+    collectionsLoaded: number
+    collectionSlugs: string[]
+    collectionSlugsInCart: string[]
+    cartCategorySlugs: string[]
+    subtotal: number
+    matchedTriggers: string[]
+  }
 }
 
 /** Colección de recetas cargada para detección por tags. */
@@ -435,6 +448,27 @@ export async function resolveBumps(
     rules,
     collectionSlugsInCart
   )
+  // Estado interno del motor: captura SIEMPRE (no solo al fallar) para que el
+  // log "[BUMPS] served" y el _debug de /diagnostico-bumps revelen en qué
+  // etapa el resultado quedó vacío (reglas, colecciones, tags, triggers).
+  if (diagnostics) {
+    const productTagsByCart: Record<number, string[] | null> = {}
+    for (const p of cartProducts) {
+      productTagsByCart[p.id] = p.tags ?? null
+    }
+    diagnostics.state = {
+      rulesLoaded: rules.length,
+      ruleTriggers: rules.map((r) => `${r.id}:${r.trigger_type}`),
+      productsLoaded: cartProducts.length,
+      productTagsByCart,
+      collectionsLoaded: collections.length,
+      collectionSlugs: collections.map((c) => c.slug),
+      collectionSlugsInCart: Array.from(collectionSlugsInCart),
+      cartCategorySlugs: Array.from(cartCategorySlugs),
+      subtotal,
+      matchedTriggers: Array.from(matchedTriggers),
+    }
+  }
   if (matchedTriggers.length === 0 && collectionSlugsInCart.size === 0) return []
 
   const ruleByTrigger = new Map<BumpTriggerType, BumpRuleRow>()
