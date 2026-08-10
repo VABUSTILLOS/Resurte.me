@@ -15,6 +15,7 @@ import {
   Check,
   Zap,
   ShoppingCart,
+  X,
 } from "lucide-react"
 
 const ONBOARDING_KEY = "onboarding-wizard-completed"
@@ -140,6 +141,22 @@ export function OnboardingWizard({
     }
   }
 
+  /**
+   * Salto seguro del wizard. Guarda el flag de completado para que nunca más
+   * vuelva a aparecer (red de seguridad: si el overlay llega a mostrarse por
+   * cualquier vía —bundle viejo cacheado, ruta de comercio, condición nueva—,
+   * el usuario siempre tiene salida y no queda atrapado sin poder ver el carrito).
+   */
+  const handleDismiss = () => {
+    trackEvent("onboarding_wizard_dismiss", {
+      step: step,
+      step_id: currentStep.id,
+    })
+    localStorage.setItem(ONBOARDING_KEY, "true")
+    setVisible(false)
+    onComplete?.()
+  }
+
   const finishOnboarding = async () => {
     setSaving(true)
     trackEvent("onboarding_wizard_complete", {
@@ -208,11 +225,21 @@ export function OnboardingWizard({
         >
           {/* Header with progress */}
           <div className="px-6 pt-6 pb-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="w-4 h-4" />
-              <span className="text-xs font-medium uppercase tracking-wider opacity-80">
-                Configuración inicial
-              </span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                <span className="text-xs font-medium uppercase tracking-wider opacity-80">
+                  Configuración inicial
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleDismiss}
+                aria-label="Cerrar configuración inicial"
+                className="p-1.5 -m-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/15 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
             <h2 className="text-lg font-bold">{currentStep.title}</h2>
             <p className="text-emerald-100 text-xs mt-0.5">{currentStep.subtitle}</p>
@@ -420,7 +447,17 @@ export function OnboardingWizard({
                 ← Atrás
               </button>
             )}
-            {step === 0 && <div />}
+            {step === 0 ? (
+              <button
+                type="button"
+                onClick={handleDismiss}
+                className="text-sm text-gray-500 hover:text-gray-700 font-medium"
+              >
+                Ahora no
+              </button>
+            ) : (
+              <div />
+            )}
             <button
               onClick={handleNext}
               disabled={

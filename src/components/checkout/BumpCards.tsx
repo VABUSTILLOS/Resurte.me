@@ -24,6 +24,28 @@ export interface SelectedBump {
  */
 export const BUMPS_STORAGE_KEY = "resurte:selected-bumps"
 
+/**
+ * Estado de diagnóstico expuesto en `window.__resurteBumpsDebug` para
+ * depurar en producción por qué un usuario no ve los order bumps.
+ * Es aditivo y no altera el render ni el flujo del checkout.
+ */
+export interface BumpCardsDebug {
+  status: "idle" | "loading" | "ok" | "empty" | "error"
+  cartKey: string
+  bumpCount: number
+  lastError?: string
+  /** ISO timestamp de la última carga exitosa de la API. */
+  loadedAt?: string
+  /** Nº de reintentos realizados ante fallo (p.ej. 429 rate-limit). */
+  retries?: number
+}
+
+declare global {
+  interface Window {
+    __resurteBumpsDebug?: BumpCardsDebug
+  }
+}
+
 interface BumpCardsProps {
   /** product_id → quantity del carrito (para derivar reglas server-side). */
   cartItems: { product_id: number; quantity: number }[]
@@ -53,8 +75,35 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
     key: "",
     bumps: [],
   })
+  // Estado de diagnóstico para window.__resurteBumpsDebug.
+  const [lastError, setLastError] = useState<string | undefined>(undefined)
+  const [loadedAt, setLoadedAt] = useState<string | undefined>(undefined)
+  const [retries, setRetries] = useState(0)
   const cartKey = cartItems.map((i) => `${i.product_id}:${i.quantity}`).join("|")
   const loading = cartKey !== "" && loadedFor !== cartKey
+
+  // Instrumentación de diagnóstico temporal: expone en window el estado real
+  // del fetch para que un usuario logueado pueda reportar exactamente qué ve:
+  //   copy(JSON.stringify(window.__resurteBumpsDebug, null, 2))
+  // Se retira tras confirmar la causa raíz del reporte "no veo bumps logueado".
+  useEffect(() => {
+    const status: BumpCardsDebug["status"] =
+      cartKey === ""
+        ? "idle"
+        : loading
+          ? "loading"
+          : bumps.length > 0
+            ? "ok"
+            : "empty"
+    window.__resurteBumpsDebug = {
+      status,
+      cartKey,
+      bumpCount: bumps.length,
+      lastError: lastError ?? undefined,
+      loadedAt: loadedAt ?? undefined,
+      retries: retries,
+    }
+  }, [cartKey, loading, bumps, lastError, loadedAt, retries])
 
   // Re-enriquece los bumps seleccionados con el nombre e imagen reales del
   // producto cuando la data de reglas está disponible. Los bumps persistidos
@@ -90,6 +139,8 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
       if (cancelled) return
       setBumps(data)
       setLastGood({ key: cartKey, bumps: data })
+      setLastError(undefined)
+      setLoadedAt(new Date().toISOString())
       // Descarta selecciones previas de bumps que ya no aplican.
       const valid = new Set(data.map((b) => b.ruleId))
       onChange(selected.filter((s) => valid.has(s.ruleId)))
@@ -109,10 +160,13 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
         .then((data: { bumps?: OrderBump[] }) => {
           apply(data.bumps ?? [])
         })
-        .catch(() => {
+        .catch((err: unknown) => {
           if (cancelled) return
+          const message = err instanceof Error ? err.message : String(err)
+          setLastError(message)
           if (!isRetry) {
             // Primer fallo (p.ej. 429 rate-limit): reintentar con backoff.
+            setRetries((r) => r + 1)
             retryTimer = setTimeout(() => attempt(true), 2000)
           } else {
             // Fallo confirmado: mantener la última respuesta buena del mismo
