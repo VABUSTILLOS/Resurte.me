@@ -15,6 +15,20 @@ import { logger } from "@/lib/logger"
  * falla devuelve bumps vacíos para no bloquear el checkout.
  */
 export async function POST(request: NextRequest) {
+  // ?debug=1: página /diagnostico-bumps agrega el motivo real del fail-open
+  // (o de un resultado vacío) al JSON, para cerrar el misterio "0 bumps
+  // logueado". El contrato normal NO cambia (sin query param, sin campo extra).
+  const debug = request.nextUrl.searchParams.get("debug") === "1"
+  const debugResult = { reason: "" as string, detail: null as unknown }
+
+  const failOpen = (reason: string, detail?: unknown) => {
+    if (debug) {
+      debugResult.reason = reason
+      debugResult.detail = detail ?? null
+    }
+    return NextResponse.json({ bumps: [], ...(debug ? { _debug: debugResult } : {}) })
+  }
+
   try {
     const body = await request.json()
     const { items } = body as {
@@ -23,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ bumps: [] })
+      return failOpen("items_vacio_o_no_array", { itemsType: typeof items, isArray: Array.isArray(items), length: Array.isArray(items) ? items.length : null })
     }
 
     const validItems = items
@@ -37,7 +51,7 @@ export async function POST(request: NextRequest) {
       .map((i) => ({ product_id: i.product_id, quantity: i.quantity }))
 
     if (validItems.length === 0) {
-      return NextResponse.json({ bumps: [] })
+      return failOpen("items_invalidos", { recibidos: items })
     }
 
     const supabase = await createServiceClient()
@@ -49,6 +63,12 @@ export async function POST(request: NextRequest) {
     const rateKey = `bumps:${clientIp(request)}`
     const rate = await rateLimited(supabase, rateKey, 120, 60)
     if (!rate.allowed) {
+      if (debug) {
+        return NextResponse.json(
+          { bumps: [], _debug: { reason: "rate_limit", detail: { remaining: rate.remaining, retry_after_seconds: rate.retry_after_seconds } } },
+          { status: 429, headers: { "Retry-After": String(rate.retry_after_seconds) } },
+        )
+      }
       return rateLimitResponse(rate)
     }
 
@@ -60,10 +80,16 @@ export async function POST(request: NextRequest) {
       bumpCount: bumps.length,
       rules: bumps.map((b) => `${b.ruleId}:${b.trigger_type}`),
     })
+    if (debug && bumps.length === 0) {
+      return NextResponse.json({
+        bumps: [],
+        _debug: { reason: "resolveBumps_vacio", detail: { items: validItems } },
+      })
+    }
     return NextResponse.json({ bumps })
   } catch (error) {
     // Fail-open: nunca bloquear el checkout por errores de bumps.
     logger.warn("bumps error, fail-open", { error: error instanceof Error ? error.message : String(error) })
-    return NextResponse.json({ bumps: [] })
+    return failOpen("excepcion_en_ruta", { error: error instanceof Error ? error.message : String(error) })
   }
 }

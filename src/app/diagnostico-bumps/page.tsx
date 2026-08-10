@@ -33,6 +33,7 @@ type Report = {
   }
   api: { status: number; body: string } | null
   apiError: string | null
+  apiDebug: { reason?: string; detail?: unknown } | null
   bumpsParseados: unknown
   conclusion: string
 }
@@ -93,13 +94,25 @@ export default function DiagnosticoBumpsPage() {
 
       let apiResult: { status: number; body: string } | null = null
       let apiError: string | null = null
+      let apiDebug: { reason?: string; detail?: unknown } | null = null
       try {
-        const resp = await fetch("/api/cart/bumps", {
+        // ?debug=1 hace que la API revele el MOTIVO si devuelve 0 bumps
+        // (items vacíos, fail-open, rate-limit). Sin el flag el contrato no cambia.
+        const resp = await fetch("/api/cart/bumps?debug=1", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ items: apiItems }),
         })
-        apiResult = { status: resp.status, body: await resp.text() }
+        const text = await resp.text()
+        apiResult = { status: resp.status, body: text }
+        try {
+          const parsed = JSON.parse(text)
+          if (parsed && typeof parsed === "object" && "_debug" in parsed) {
+            apiDebug = (parsed as { _debug: { reason?: string; detail?: unknown } })._debug ?? null
+          }
+        } catch {
+          apiDebug = null
+        }
       } catch (err) {
         apiError = err instanceof Error ? err.message : String(err)
       }
@@ -112,6 +125,7 @@ export default function DiagnosticoBumpsPage() {
         storedItems,
         parsedBumps,
         apiError,
+        apiDebug,
         isLoaded,
         sesion,
       })
@@ -134,6 +148,7 @@ export default function DiagnosticoBumpsPage() {
           },
           api: apiResult,
           apiError,
+          apiDebug,
           bumpsParseados: parsedBumps,
           conclusion,
         })
@@ -299,9 +314,21 @@ function Verdict({ report }: { report: Report }) {
             )}
           </>
         ) : (
-          <p className="text-sm font-semibold text-amber-700">
-            0 bumps. Ningún producto de tu carrito dispara una regla de venta cruzada.
-          </p>
+          <>
+            <p className="text-sm font-semibold text-amber-700">
+              0 bumps. Ningún producto de tu carrito dispara una regla de venta cruzada.
+            </p>
+            {report.apiDebug?.reason && (
+              <p className="mt-2 rounded bg-gray-100 px-3 py-2 text-xs font-mono text-gray-700">
+                🕵️ Motivo exacto del servidor: <b>{report.apiDebug.reason}</b>
+                {report.apiDebug.detail ? (
+                  <span className="block overflow-auto whitespace-pre-wrap">
+                    {JSON.stringify(report.apiDebug.detail)}
+                  </span>
+                ) : null}
+              </p>
+            )}
+          </>
         )}
       </div>
 
@@ -346,10 +373,11 @@ function buildConclusion(args: {
   storedItems: { product_id: number | null; quantity: number | null; name: string }[]
   parsedBumps: unknown
   apiError: string | null
+  apiDebug: { reason?: string; detail?: unknown } | null
   isLoaded: boolean
   sesion: { logged: boolean; email?: string | null }
 }): string {
-  const { debugGlobal, contextItems, storedItems, parsedBumps, apiError, isLoaded, sesion } = args
+  const { debugGlobal, contextItems, storedItems, parsedBumps, apiError, apiDebug, isLoaded, sesion } = args
 
   if (contextItems.length > 0 && storedItems.length === 0 && isLoaded) {
     return `⚠️ BUG DETECTADO: el carrito del CONTEXTO React tiene ${contextItems.length} items (los ves en el drawer), pero localStorage.resurte_cart está VACÍO. Esto significa que los items no se están persistiendo (o se guardan bajo otra clave/origen). Los bumps se calculan con esos items, así que sí deberían verse — si no los ves, el problema es de montaje de BumpCards, no de datos.`
@@ -390,6 +418,19 @@ function buildConclusion(args: {
     typeof parsedBumps.bumpCount === "number" &&
     parsedBumps.bumpCount === 0
   ) {
+    const reason = apiDebug?.reason
+    if (reason === "rate_limit") {
+      return "⚠️ RATE-LIMIT: tu IP fue limitada temporalmente (120 peticiones/minuto). El navegador reintenta solo; espera un minuto y vuelve a abrir esta página. Esto NO es lo mismo que «no ver bumps»: verás el carrito normal."
+    }
+    if (reason === "items_vacio_o_no_array" || reason === "items_invalidos") {
+      return `🔴 El servidor recibió el carrito como VACÍO o con items inválidos (motivo: ${reason}). Aunque tu contexto muestre ${contextItems.length} items, lo que llegó al API no fue válido. Detalle: ${JSON.stringify(apiDebug?.detail)}. Este es un BUG REAL de montaje/formato del payload.`
+    }
+    if (reason === "excepcion_en_ruta") {
+      return `🔴 El servidor lanzó una excepción interna y cayó en fail-open (devuelve 0 bumps para no bloquear tu checkout). Detalle: ${JSON.stringify(apiDebug?.detail)}. Es un error de servidor, no de tu carrito.`
+    }
+    if (reason === "resolveBumps_vacio") {
+      return `El servidor procesó tu carrito (${contextItems.length} items) pero el motor de bumps devolvió 0 sin error. Esto significa que ninguna regla aplica a tus productos actuales, o el motor falló internamente. Con ?debug=1 no hubo excepción, así que es reglas/negocio.`
+    }
     return "La API responde pero con 0 bumps para este carrito (reglas de negocio no aplican, o productos sin regla). Coméntame los items de tu carrito."
   }
   return "No se pudo determinar. Envía el bloque completo al chat."
