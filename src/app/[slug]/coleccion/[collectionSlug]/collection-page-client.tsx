@@ -103,7 +103,7 @@ export function CollectionPageClient({ citySlug, cityName, collection, products,
 
             {/* Search */}
             <div className="w-full sm:w-64">
-              <SearchBar citySlug={citySlug} />
+              <SearchBar citySlug={citySlug} mobileOverlay />
             </div>
           </div>
         </div>

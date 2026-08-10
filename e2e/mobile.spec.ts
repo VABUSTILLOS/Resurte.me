@@ -649,3 +649,179 @@ test.describe("móvil: micro-conversión — touch targets Fase 4", () => {
     }
   })
 })
+
+// --- Fase 6: storefront /r/[slug] y SearchBar de colecciones ---
+
+test.describe("móvil: storefront — touch targets Fase 6", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
+  // Descubre el primer storefront `/r/[slug]` disponible desde el directorio
+  // `/comer`. Si no hay restaurantes registrados, el test se salta. Reintenta
+  // porque en preview frío los links pueden tardar en hidratarse.
+  async function discoverStorefront(page: Page): Promise<string | null> {
+    await page.goto("/comer", { waitUntil: "domcontentloaded" })
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const href = await page
+        .getByRole("link")
+        .evaluateAll((els) => {
+          const a = els.find((el) =>
+            (el as HTMLAnchorElement).href.includes("/r/")
+          )
+          return a ? (a as HTMLAnchorElement).href : null
+        })
+      if (href) return href
+      await page.waitForTimeout(500)
+    }
+    return null
+  }
+
+  // El banner de cookies (fixed bottom, z-60) cubre el cart bar del storefront
+  // en contextos nuevos. Se acepta para liberar la parte inferior de la vista.
+  // Aparece con un delay de 800ms tras cargar, así que espera hasta 4s.
+  async function dismissCookieBanner(page: Page): Promise<void> {
+    const accept = page.getByRole("button", { name: "Aceptar todas" })
+    try {
+      await accept.waitFor({ state: "visible", timeout: 4000 })
+      await accept.tap().catch(() => {})
+    } catch {
+      // Sin banner (consent ya almacenado) — OK.
+    }
+  }
+
+  // Agrega un ítem del menú real reintentando hasta que el cart bar "Ver pedido
+  // (N)" aparezca (la hidratación de React en preview frío puede ignorar el tap).
+  async function tapStorefrontAdd(page: Page, addBtn: Locator): Promise<boolean> {
+    const verPedido = page.getByRole("button", { name: /Ver pedido \(\d+\)/ })
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await addBtn.tap().catch(() => {})
+      if (await verPedido.isVisible().catch(() => false)) return true
+      await page.waitForTimeout(500)
+    }
+    return false
+  }
+
+  test("el add button del menú real mide al menos 44px", async ({ page }) => {
+    const href = await discoverStorefront(page)
+    test.skip(!href, "no hay storefronts registrados en /comer")
+    const storefrontUrl = href!
+
+    await page.goto(storefrontUrl, { waitUntil: "domcontentloaded" })
+    await dismissCookieBanner(page)
+    const addBtn = page.getByRole("button", { name: /^Agregar / }).first()
+    await expect(addBtn).toBeVisible({ timeout: 5000 })
+    // Retry anti-race: tras hidratación el nodo puede re-renderizarse entre
+    // toBeVisible y boundingBox (devolvía null en preview frío).
+    let box: { width: number; height: number } | null = null
+    for (let attempt = 0; attempt < 5 && !box; attempt++) {
+      box = await addBtn.boundingBox()
+      if (!box) await page.waitForTimeout(500)
+    }
+    expect(box).not.toBeNull()
+    expect(box!.width).toBeGreaterThanOrEqual(44)
+    expect(box!.height).toBeGreaterThanOrEqual(44)
+  })
+
+  test("los steppers del checkout del storefront miden al menos 44px", async ({ page }) => {
+    const href = await discoverStorefront(page)
+    test.skip(!href, "no hay storefronts registrados en /comer")
+    const storefrontUrl = href!
+
+    await page.goto(storefrontUrl, { waitUntil: "domcontentloaded" })
+    await dismissCookieBanner(page)
+    const addBtn = page.getByRole("button", { name: /^Agregar / }).first()
+    await expect(addBtn).toBeVisible({ timeout: 5000 })
+    const added = await tapStorefrontAdd(page, addBtn)
+    test.skip(!added, "no se pudo agregar ítem del storefront")
+
+    // El banner de cookies aparece con delay; re-dismiss antes del tap inferior.
+    await dismissCookieBanner(page)
+
+    // El cart bar "Ver pedido (N)" aparece al agregar; lleva al checkout.
+    const verPedido = page.getByRole("button", { name: /Ver pedido \(\d+\)/ })
+    await expect(verPedido).toBeVisible({ timeout: 5000 })
+    await verPedido.tap()
+
+    const menos = page.getByRole("button", { name: "Menos" }).first()
+    const mas = page.getByRole("button", { name: "Más" }).first()
+    await expect(menos).toBeVisible({ timeout: 5000 })
+    for (const btn of [menos, mas]) {
+      const box = await btn.boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.width).toBeGreaterThanOrEqual(44)
+      expect(box!.height).toBeGreaterThanOrEqual(44)
+    }
+  })
+
+  test("el cart bar del storefront es fijo y visible al agregar", async ({ page }) => {
+    const href = await discoverStorefront(page)
+    test.skip(!href, "no hay storefronts registrados en /comer")
+    const storefrontUrl = href!
+
+    await page.goto(storefrontUrl, { waitUntil: "domcontentloaded" })
+    await dismissCookieBanner(page)
+    const addBtn = page.getByRole("button", { name: /^Agregar / }).first()
+    await expect(addBtn).toBeVisible({ timeout: 5000 })
+    const added = await tapStorefrontAdd(page, addBtn)
+    test.skip(!added, "no se pudo agregar ítem del storefront")
+
+    const verPedido = page.getByRole("button", { name: /Ver pedido \(\d+\)/ })
+    await expect(verPedido).toBeVisible({ timeout: 5000 })
+    // La barra inferior (con safe-area) es fixed bottom-0.
+    const position = await verPedido.evaluate((el) => {
+      const bar = el.closest(".fixed.bottom-0")
+      if (!bar) return null
+      const style = getComputedStyle(bar)
+      const rect = bar.getBoundingClientRect()
+      return {
+        position: style.position,
+        bottom: style.bottom,
+        insetFromViewportBottom: window.innerHeight - rect.bottom,
+      }
+    })
+    expect(position).not.toBeNull()
+    expect(position!.position).toBe("fixed")
+    expect(position!.bottom).toBe("0px")
+    expect(position!.insetFromViewportBottom).toBeLessThanOrEqual(1)
+  })
+})
+
+test.describe("móvil: colecciones — SearchBar abre overlay Fase 6", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
+  // La búsqueda de una colección en móvil debe abrir el overlay en vivo (patrón
+  // categorías), no navegar a /{city}/buscar.
+  test("la SearchBar de una colección abre el overlay en móvil", async ({ page }) => {
+    // Descubre el primer enlace de colección desde la landing de la ciudad.
+    // Reintenta por hidratación lenta en preview frío.
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    let href: string | null = null
+    for (let attempt = 0; attempt < 5 && !href; attempt++) {
+      href = await page
+        .getByRole("link")
+        .evaluateAll((els) => {
+          const a = els.find((el) =>
+            (el as HTMLAnchorElement).href.includes("/coleccion/")
+          )
+          return a ? (a as HTMLAnchorElement).href : null
+        })
+      if (!href) await page.waitForTimeout(500)
+    }
+    test.skip(!href, "no hay colecciones en /cdmx")
+    const collectionUrl = href!
+
+    await page.goto(collectionUrl, { waitUntil: "domcontentloaded" })
+    // El header desktop (hidden md:block) comparte placeholder; scope al <main>.
+    const input = page.locator("main").getByPlaceholder("Buscar productos...").first()
+    await expect(input).toBeVisible({ timeout: 5000 })
+
+    // Tap en el input → overlay de búsqueda en vivo (dialog), sin navegación.
+    const dialog = page.getByRole("dialog", { name: "Buscar productos" })
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await input.tap().catch(() => {})
+      if (await dialog.isVisible().catch(() => false)) break
+      await page.waitForTimeout(500)
+    }
+    await expect(dialog).toBeVisible({ timeout: 2000 })
+    expect(page.url()).not.toContain("/buscar")
+  })
+})

@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
-import { createClient } from "@/lib/supabase/client"
 import { AnalyticsEvents } from "@/lib/analytics"
 import {
   X,
@@ -14,15 +13,6 @@ import {
   CheckCircle2,
   Zap,
 } from "lucide-react"
-import { loadStripe } from "@stripe/stripe-js"
-import type { Address } from "@/types"
-import {
-  getGuestToken,
-  saveGuestToken,
-  getLastAddress,
-  saveLastAddress,
-  claimGuestAddresses,
-} from "@/lib/guest-address"
 import { calcCheckoutTotals, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 import {
   DEFAULT_ADDRESS_FORM,
@@ -38,6 +28,7 @@ import { BumpCards, type SelectedBump } from "@/components/checkout/BumpCards"
 import { readStoredBumps } from "@/hooks/use-selected-bumps"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
+import { useCheckoutOrder, type CheckoutPaidInfo } from "@/components/checkout/use-checkout-order"
 
 // Evento global para abrir el checkout del drawer (misma mecánica que
 // CART_DRAWER_EVENT). Lo dispara el botón "Ir a Checkout" del CartDrawer.
@@ -76,28 +67,130 @@ export function CheckoutDrawer() {
     time: DELIVERY_TIMES[2] ?? "12:00 PM — 2:00 PM",
   })
   const [selectedBumps, setSelectedBumps] = useState<SelectedBump[]>([])
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  // Consentimiento de guardado de tarjeta (Stripe setup_future_usage → upsells)
   const [saveCardConsent, setSaveCardConsent] = useState(false)
-  const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null)
-  const [showStripeForm, setShowStripeForm] = useState(false)
-  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
-  const [earnedCashback, setEarnedCashback] = useState<{
-    credits: number
-    tier: string | null
-  } | null>(null)
-  const [savedCard, setSavedCard] = useState<{
-    hasSavedCard: boolean
-    last4?: string
-    brand?: string
-  } | null>(null)
-
-  // Estado de sesión + direcciones guardadas (misma lógica que el checkout)
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
-  const [savedAddresses, setSavedAddresses] = useState<Address[]>([])
-  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
   // Guardar la dirección como predeterminada (checkbox en AddressStep, logged-in)
   const [saveAsDefault, setSaveAsDefault] = useState(false)
+
+  useEffect(() => {
+    document.body.style.overflow = isOpen ? "hidden" : ""
+    return () => {
+      document.body.style.overflow = ""
+    }
+  }, [isOpen])
+
+  // ── Totales en tiempo real (subtotal pagable + bumps seleccionados) ──
+  // El descuento de cupón se calcula sobre el subtotal CON bumps incluidos,
+  // igual que el servidor en POST /api/orders — así el total coincide a 0.01.
+  const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
+  const totals = calcCheckoutTotals(
+    subtotal,
+    bumpsSubtotal,
+    coupon,
+    itemCount,
+    selectedBumps.length,
+    DELIVERY_FEE_FLAT
+  )
+  const { discountAmount, payableSubtotal, deliveryFee } = totals
+  const total = totals.total
+
+  // add_payment_info (GA4/Meta): se dispara al entrar al paso de pago del
+  // drawer. Solo una vez por visita (ref) para no duplicar el evento si el
+  // usuario vuelve de 3DS o navega entre pasos.
+  const addPaymentInfoRef = useRef(false)
+  useEffect(() => {
+    if (step === "payment" && !addPaymentInfoRef.current) {
+      addPaymentInfoRef.current = true
+      AnalyticsEvents.addPaymentInfo(total, itemCount + selectedBumps.length)
+    }
+  }, [step, total, itemCount, selectedBumps.length])
+
+  const isAddressValid = Boolean(
+    address.street.trim() &&
+      address.number.trim() &&
+      address.neighborhood.trim() &&
+      address.zip_code.trim().length >= 5
+  )
+
+  // ── Lógica compartida del pedido (sesión, direcciones, createOrder,
+  //    PaymentIntent, Express Checkout) — ver use-checkout-order.ts ──
+  const {
+    isLoggedIn,
+    savedCard,
+    savedAddresses,
+    selectedAddressId,
+    setSelectedAddressId,
+    selectedSavedAddress,
+    selectedAddressUnedited,
+    refreshSavedAddresses,
+    captureLead,
+    handlePlaceOrder,
+    handleExpressCheckout,
+    handleStripeSuccess,
+    handleStripeBack,
+    stripeClientSecret,
+    setStripeClientSecret,
+    showStripeForm,
+    setShowStripeForm,
+    checkoutError,
+    setCheckoutError,
+    isProcessing,
+  } = useCheckoutOrder({
+    city,
+    address,
+    schedule,
+    phone,
+    email,
+    coupon,
+    cartItems: cart.items,
+    selectedBumps,
+    effectiveSubtotal: subtotal + bumpsSubtotal,
+    deliveryFee,
+    total,
+    leadSource: "checkout_drawer",
+    saveDefault: saveAsDefault,
+    saveCard: saveCardConsent,
+    autoSelectSavedAddress: true,
+    setAddress,
+    setPhone,
+    setEmail,
+    // El drawer no necesita limpiar bumps tras crear la orden (los mantiene
+    // seleccionados por si el usuario vuelve atrás). Post-pago: persiste
+    // last_order (merge), limpia carrito, cierra, refresca direcciones,
+    // dispara ORDER_PAID_EVENT (UpsellModal) y navega si nadie lo reclamó.
+    onPaid: (info: CheckoutPaidInfo) => {
+      saveLastOrder(info.orderId ?? undefined, info.cashback?.credits, info.cashback?.tier)
+      clearCart()
+      setIsOpen(false)
+
+      // Refresca "Mis direcciones" sin recargar: la dirección que se guardó
+      // con esta orden debe aparecer al abrir el drawer de nuevo (misma
+      // lógica que la página completa /checkout tras crear la orden).
+      if (isLoggedIn === true) refreshSavedAddresses()
+
+      // El UpsellModal escucha este evento para interceptar la navegación y
+      // ofrecer el 1-click upsell. `dispatchEvent` retorna false si un
+      // listener llamó a preventDefault() (el modal reclamó el evento). Por
+      // lo tanto: navegamos a la confirmación SOLO si nadie lo reclamó.
+      const claimed = window.dispatchEvent(
+        new CustomEvent(ORDER_PAID_EVENT, {
+          detail: {
+            orderId: info.orderId,
+            paymentIntentId: info.paymentIntentId,
+            total,
+          },
+          cancelable: true,
+        })
+      )
+      if (claimed) {
+        // Nunca bloquear tras un pago exitoso: city siempre está disponible
+        // (CityProvider auto-sanea slugs inválidos); por seguridad se usa el
+        // slug por defecto si no lo hubiera.
+        const slug = city?.slug ?? DEFAULT_CITY_SLUG
+        router.push(`/${slug}/pedido-confirmado`)
+      }
+    },
+  })
 
   // ── Apertura / cierre del drawer ──
   useEffect(() => {
@@ -135,497 +228,9 @@ export function CheckoutDrawer() {
     }
     window.addEventListener(CHECKOUT_DRAWER_EVENT, handler)
     return () => window.removeEventListener(CHECKOUT_DRAWER_EVENT, handler)
-  }, [])
-
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? "hidden" : ""
-    return () => {
-      document.body.style.overflow = ""
-    }
-  }, [isOpen])
-
-  // ── Sesión + precarga de dirección anónima ──
-  useEffect(() => {
-    let cancelled = false
-    const supabase = createClient()
-    if (!supabase) return
-    supabase.auth.getUser().then(({ data }) => {
-      if (cancelled) return
-      const user = data.user
-      const loggedIn = !!user
-      setIsLoggedIn(loggedIn)
-      if (!loggedIn) {
-        const last = getLastAddress()
-        if (last) {
-          setAddress((prev) => ({
-            ...prev,
-            label: last.label ?? prev.label,
-            street: last.street ?? prev.street,
-            number: last.number ?? prev.number,
-            interior: last.interior ?? prev.interior,
-            neighborhood: last.neighborhood ?? prev.neighborhood,
-            zip_code: last.zip_code ?? prev.zip_code,
-            references: last.references ?? prev.references,
-          }))
-          setPhone((prev) => last.phone ?? prev)
-          setEmail((prev) => (prev || last.email) ?? "")
-        }
-      } else {
-        // Logueado: pre-llenar email del auth y teléfono desde profiles.phone
-        // para que el usuario no tenga que escribirlos en cada compra.
-        setEmail((prev) => (prev ? prev : user.email ?? ""))
-        void supabase
-          .from("profiles")
-          .select("phone")
-          .eq("id", user.id)
-          .maybeSingle()
-          .then(({ data: profile }) => {
-            if (cancelled || !profile?.phone) return
-            setPhone((prev) => (prev ? prev : profile.phone))
-          })
-      }
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  // ── Detección de tarjeta guardada (Express Checkout) ──
-  useEffect(() => {
-    if (isLoggedIn !== true) {
-      return
-    }
-    let cancelled = false
-    fetch("/api/payments/stripe/saved-card")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { hasSavedCard?: boolean; last4?: string; brand?: string } | null) => {
-        if (cancelled) return
-        setSavedCard(
-          data
-            ? { hasSavedCard: !!data.hasSavedCard, last4: data.last4, brand: data.brand }
-            : { hasSavedCard: false }
-        )
-      })
-      .catch(() => {
-        if (!cancelled) setSavedCard({ hasSavedCard: false })
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [isLoggedIn])
+  }, [setStep, setCheckoutError, setShowStripeForm, setStripeClientSecret, setSelectedBumps, setSaveAsDefault])
 
 
-  // Carga la lista de direcciones guardadas y auto-selecciona la predeterminada
-  // (o la más reciente), autocompletando el formulario. Reutilizable: se llama
-  // al iniciar sesión y de nuevo tras crear una orden para que la dirección
-  // nueva aparezca en "Mis direcciones" sin recargar la página.
-  const loadSavedAddresses = useCallback(() => {
-    const supabase = createClient()
-    if (!supabase) return
-    const fetchSavedAddresses = async () => {
-      // Orden preferido: predeterminada primero. Si el esquema desplegado aún
-      // no tiene `is_default` (migración 00050), PostgREST devuelve error y se
-      // reintenta con el orden clásico — el drawer sigue funcionando.
-      const preferred = await supabase
-        .from("addresses")
-        .select("*")
-        .order("is_default", { ascending: false })
-        .order("created_at", { ascending: false })
-      if (preferred.data && !preferred.error) return preferred
-      return supabase
-        .from("addresses")
-        .select("*")
-        .order("created_at", { ascending: false })
-    }
-    fetchSavedAddresses().then(({ data, error }) => {
-      if (!error && data) {
-        const rows = data as Address[]
-        setSavedAddresses(rows)
-        // Auto-selección: predeterminada o la más reciente; autocompleta el
-        // formulario para que "Continuar al envío" pueda saltar al horario.
-        const preferred = rows.find((a) => a.is_default) ?? rows[0]
-        setSelectedAddressId(preferred?.id ?? null)
-        if (preferred) {
-          setAddress({
-            label: preferred.label,
-            street: preferred.street,
-            number: preferred.number,
-            interior: preferred.interior ?? "",
-            neighborhood: preferred.neighborhood,
-            zip_code: preferred.zip_code,
-            references: preferred.references ?? "",
-          })
-        }
-      }
-    })
-  }, [])
-
-  useEffect(() => {
-    if (isLoggedIn !== true) return
-    const supabase = createClient()
-    if (!supabase) return
-    claimGuestAddresses()
-    loadSavedAddresses()
-  }, [isLoggedIn, loadSavedAddresses])
-
-  // ── Totales en tiempo real (subtotal pagable + bumps seleccionados) ──
-  // El descuento de cupón se calcula sobre el subtotal CON bumps incluidos,
-  // igual que el servidor en POST /api/orders — así el total coincide a 0.01.
-  const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
-  const totals = calcCheckoutTotals(
-    subtotal,
-    bumpsSubtotal,
-    coupon,
-    itemCount,
-    selectedBumps.length,
-    DELIVERY_FEE_FLAT
-  )
-  const { discountAmount, payableSubtotal, deliveryFee } = totals
-  const total = totals.total
-
-  // add_payment_info (GA4/Meta): se dispara al entrar al paso de pago del
-  // drawer. Solo una vez por visita (ref) para no duplicar el evento si el
-  // usuario vuelve de 3DS o navega entre pasos.
-  const addPaymentInfoRef = useRef(false)
-  useEffect(() => {
-    if (step === "payment" && !addPaymentInfoRef.current) {
-      addPaymentInfoRef.current = true
-      AnalyticsEvents.addPaymentInfo(total, itemCount + selectedBumps.length)
-    }
-  }, [step, total, itemCount, selectedBumps.length])
-
-  const isAddressValid = Boolean(
-    address.street.trim() &&
-      address.number.trim() &&
-      address.neighborhood.trim() &&
-      address.zip_code.trim().length >= 5
-  )
-
-  // Dirección guardada actualmente seleccionada (para el badge de ScheduleStep
-  // y para decidir si el formulario no fue editado → reutilizar address_id).
-  const selectedSavedAddress =
-    savedAddresses.find((a) => a.id === selectedAddressId) ?? null
-
-  // El formulario coincide exactamente con la dirección guardada seleccionada:
-  // solo entonces se reutiliza address_id (en lugar de crear/editar una nueva).
-  const selectedAddressUnedited =
-    selectedSavedAddress !== null &&
-    selectedSavedAddress.street === address.street &&
-    selectedSavedAddress.number === address.number &&
-    (selectedSavedAddress.interior ?? "") === address.interior &&
-    selectedSavedAddress.neighborhood === address.neighborhood &&
-    selectedSavedAddress.zip_code === address.zip_code &&
-    (selectedSavedAddress.references ?? "") === address.references
-
-  // ── Captura de lead onBlur (fire-and-forget, fail-open) ──
-  const captureLead = useCallback((value: string) => {
-    const cleaned = value.trim()
-    if (!cleaned) return
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(cleaned)) return
-    void fetch("/api/leads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: cleaned,
-        phone: phone.trim() || undefined,
-        source: "checkout_drawer",
-        coupon_code: coupon?.code ?? undefined,
-      }),
-    })
-      .then(() => AnalyticsEvents.lead())
-      .catch(() => {
-        // Fail-open: nunca bloquear el checkout por captura de leads
-      })
-  }, [phone, coupon?.code])
-
-  // ── Creación de orden + PaymentIntent (misma lógica que el checkout page) ──
-  const initializeCardPayment = async (
-    orderId: number,
-    cashback: { credits: number; tier: string | null } | null
-  ) => {
-    setCreatedOrderId(orderId)
-    setEarnedCashback(cashback)
-    try {
-      const guestToken = isLoggedIn === false ? getGuestToken() ?? undefined : undefined
-      const intentResponse = await fetch("/api/payments/stripe/create-intent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          order_id: orderId,
-          type: "main",
-          save_card: saveCardConsent,
-          ...(guestToken ? { guest_token: guestToken } : {}),
-          ...(email.trim() ? { customer_email: email.trim() } : {}),
-        }),
-      })
-      const intentData = await intentResponse.json()
-      if (!intentResponse.ok || !intentData.clientSecret) {
-        setCheckoutError(
-          intentData.error || "No se pudo inicializar el pago con Stripe."
-        )
-        setIsProcessing(false)
-        return
-      }
-      setStripeClientSecret(intentData.clientSecret)
-      setShowStripeForm(true)
-      setIsProcessing(false)
-    } catch (intentErr) {
-      setCheckoutError(
-        intentErr instanceof Error ? intentErr.message : "Error de conexión al inicializar el pago."
-      )
-      setIsProcessing(false)
-    }
-  }
-
-  // Crea la orden en la BD (misma carga que el checkout page). Devuelve
-  // { orderId, cashback } o null si falla (deja checkoutError seteado).
-  type CreatedOrder = {
-    orderId: number
-    cashback: { credits: number; tier: string | null } | null
-  }
-  const createOrder = async (): Promise<CreatedOrder | null> => {
-    if (!city) {
-      setCheckoutError("No se pudo determinar tu ciudad. Recarga la página.")
-      return null
-    }
-    try {
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          city_id: city.id,
-          ...(isLoggedIn === false ? { guest_token: getGuestToken() ?? undefined } : {}),
-          ...(selectedAddressUnedited && selectedAddressId
-            ? { address_id: selectedAddressId }
-            : {}),
-          ...(isLoggedIn === true ? { save_default: saveAsDefault } : {}),
-          address: {
-            label: address.label,
-            street: address.street,
-            number: address.number,
-            interior: address.interior,
-            neighborhood: address.neighborhood,
-            zip_code: address.zip_code,
-            references: address.references,
-          },
-          schedule: { date: schedule.date, time: schedule.time },
-          payment_method: "card",
-          phone,
-          email: email.trim() || undefined,
-          subtotal: subtotal + bumpsSubtotal,
-          delivery_fee: deliveryFee,
-          total,
-          coupon_code: coupon?.code,
-          items: [
-            ...cart.items.map((item) => ({
-              product_id: item.product_id,
-              quantity: item.quantity,
-              unit_price: item.sale_price ?? item.price,
-              name: item.name,
-            })),
-            ...selectedBumps.map((b) => ({
-              product_id: b.productId,
-              quantity: b.quantity,
-              unit_price: b.unitPrice,
-              name: b.name ?? `Artículo especial #${b.productId}`,
-              item_type: "bump" as const,
-            })),
-          ],
-        }),
-      })
-
-      const data = await response.json()
-      if (!response.ok) {
-        // `detail` es el mensaje real del fallo (p. ej. columna faltante en la
-        // BD): se muestra junto al error genérico para poder diagnosticarlo.
-        setCheckoutError(
-          data.detail
-            ? `${data.error || "Error al crear el pedido"} — ${data.detail}`
-            : data.error || "Error al crear el pedido"
-        )
-        return null
-      }
-
-      if (isLoggedIn === false) {
-        if (data.guestToken) saveGuestToken(data.guestToken)
-        saveLastAddress({ ...address, phone, email: email.trim() || undefined })
-      }
-
-      if (!data.orderId) {
-        setCheckoutError("No se pudo crear el pedido. Intenta de nuevo.")
-        return null
-      }
-
-      return {
-        orderId: data.orderId,
-        cashback: {
-          credits: data.cashbackCredits ?? 0,
-          tier: data.cashbackTier ?? null,
-        },
-      }
-    } catch (err) {
-      setCheckoutError(
-        err instanceof Error ? err.message : "Error de conexión. Intenta de nuevo."
-      )
-      return null
-    }
-  }
-
-  const handlePlaceOrder = async () => {
-    if (!city) return
-    setIsProcessing(true)
-    setCheckoutError(null)
-
-    try {
-      if (createdOrderId) {
-        await initializeCardPayment(createdOrderId, earnedCashback)
-        return
-      }
-
-      const created = await createOrder()
-      if (!created) {
-        setIsProcessing(false)
-        return
-      }
-
-      await initializeCardPayment(created.orderId, created.cashback)
-    } catch (err) {
-      setCheckoutError(
-        err instanceof Error ? err.message : "Error de conexión. Intenta de nuevo."
-      )
-      setIsProcessing(false)
-    }
-  }
-
-  // ── Express Checkout: cobra con la tarjeta guardada (off-session) ──
-  const handleExpressCheckout = async () => {
-    if (!city) return
-    setIsProcessing(true)
-    setCheckoutError(null)
-
-    let orderId = createdOrderId
-    let cashback = earnedCashback
-    try {
-      if (!orderId) {
-        const created = await createOrder()
-        if (!created) {
-          setIsProcessing(false)
-          return
-        }
-        orderId = created.orderId
-        cashback = created.cashback
-        setCreatedOrderId(orderId)
-        setEarnedCashback(cashback)
-      }
-
-      const response = await fetch("/api/payments/stripe/express-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: orderId }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        setCheckoutError(data.error || "No se pudo completar el pago rápido.")
-        setIsProcessing(false)
-        return
-      }
-
-      if (data.status === "succeeded") {
-        setSavedCard({ hasSavedCard: true })
-        handleStripeSuccess(data.paymentIntentId as string, { orderId, cashback })
-        return
-      }
-
-      if (data.status === "requires_action" && data.clientSecret) {
-        // 3DS / SCA: confirma con if_required; si el banco exige redirección,
-        // Stripe.js la maneja sola y el webhook confirma la orden.
-        const stripe = await loadStripe(
-          process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ""
-        )
-        if (!stripe) {
-          setCheckoutError("No se pudo iniciar la verificación de tu banco.")
-          setIsProcessing(false)
-          return
-        }
-        const { error } = await stripe.confirmPayment({
-          clientSecret: data.clientSecret,
-          redirect: "if_required",
-        })
-        if (error) {
-          setCheckoutError(
-            error.message || "Tu banco no confirmó el pago. Intenta de nuevo."
-          )
-          setIsProcessing(false)
-          return
-        }
-        setSavedCard({ hasSavedCard: true })
-        handleStripeSuccess(data.paymentIntentId as string, { orderId, cashback })
-        return
-      }
-
-      // declined / no_saved_card / cualquier otro: fail-open, se cae al flujo
-      // normal con el formulario de Stripe (la orden queda pendiente e intacta).
-      if (data.status === "no_saved_card") {
-        setSavedCard({ hasSavedCard: false })
-        setCheckoutError(
-          "No encontramos una tarjeta guardada. Guarda una la próxima vez para pagar con 1 clic."
-        )
-      } else {
-        setCheckoutError(
-          "No pudimos cobrar con tu tarjeta guardada. Completa el pago abajo."
-        )
-      }
-      // Inicializa el flujo normal con el mismo pedido ya creado.
-      await initializeCardPayment(orderId, cashback)
-    } catch (err) {
-      setCheckoutError(
-        err instanceof Error ? err.message : "Error de conexión. Intenta de nuevo."
-      )
-      setIsProcessing(false)
-    }
-  }
-
-  // ── Pago exitoso: persiste last_order, limpia carrito y abre flujo post-pago ──
-  const handleStripeSuccess = (
-    paymentIntentId: string,
-    opts?: { orderId?: number; cashback?: { credits: number; tier: string | null } | null }
-  ) => {
-    const finalOrderId = opts?.orderId ?? createdOrderId
-    const finalCashback = opts?.cashback ?? earnedCashback
-    saveLastOrder(finalOrderId ?? undefined, finalCashback?.credits, finalCashback?.tier)
-    clearCart()
-    setIsOpen(false)
-
-    // Refresca "Mis direcciones" sin recargar: la dirección que se guardó con
-    // esta orden debe aparecer al abrir el drawer de nuevo (misma lógica que
-    // la página completa /checkout tras crear la orden).
-    if (isLoggedIn === true) loadSavedAddresses()
-
-    // El UpsellModal escucha este evento para interceptar la navegación y
-    // ofrecer el 1-click upsell. `dispatchEvent` retorna false si un listener
-    // llamó a preventDefault() (el modal reclamó el evento). Por lo tanto:
-    // navegamos a la confirmación SOLO si nadie reclamó (`claimed === true`).
-    // Si el modal reclamó, él decide cuándo navegar.
-    const claimed = window.dispatchEvent(
-      new CustomEvent(ORDER_PAID_EVENT, {
-        detail: { orderId: finalOrderId, paymentIntentId, total },
-        cancelable: true,
-      })
-    )
-    if (claimed) {
-      // Nunca bloquear tras un pago exitoso: city siempre está disponible
-      // (CityProvider auto-sanea slugs inválidos); por seguridad se usa el
-      // slug por defecto si no lo hubiera.
-      const slug = city?.slug ?? DEFAULT_CITY_SLUG
-      router.push(`/${slug}/pedido-confirmado`)
-    }
-  }
-
-  const handleStripeBack = () => {
-    setShowStripeForm(false)
-    setStripeClientSecret(null)
-  }
 
   if (!isOpen || !city) return null
 
@@ -1100,7 +705,7 @@ export function CheckoutDrawer() {
                       Atrás
                     </button>
                     <button
-                      onClick={handlePlaceOrder}
+                      onClick={() => handlePlaceOrder()}
                       disabled={isProcessing}
                       className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] disabled:opacity-70 transition-colors"
                     >

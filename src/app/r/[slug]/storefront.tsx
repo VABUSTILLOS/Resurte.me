@@ -454,7 +454,7 @@ function MenuView({
       )}
 
       {cartCount > 0 && (
-        <div className="fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-stone-200">
+        <div className="fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-stone-200 pb-[env(safe-area-inset-bottom)]">
           <div className="max-w-4xl mx-auto px-4 py-3 flex justify-end">
             <button
               onClick={onGoToCart}
@@ -494,7 +494,7 @@ function ItemCard({ item, onAdd }: { item: FoodosMenuItem; onAdd: () => void }) 
           <img src={item.image_url} alt={item.name} width={80} height={80} className="w-20 h-20 rounded-xl object-cover" />
           <button
             onClick={onAdd}
-            className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 shadow"
+            className="absolute -bottom-2 -right-2 w-11 h-11 rounded-full bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 shadow touch-target"
             aria-label={`Agregar ${item.name}`}
           >
             <Plus className="w-4 h-4" />
@@ -503,7 +503,7 @@ function ItemCard({ item, onAdd }: { item: FoodosMenuItem; onAdd: () => void }) 
       ) : (
         <button
           onClick={onAdd}
-          className="shrink-0 w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700"
+          className="shrink-0 w-11 h-11 rounded-full bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 touch-target"
           aria-label={`Agregar ${item.name}`}
         >
           <Plus className="w-5 h-5" />
@@ -586,12 +586,12 @@ function CheckoutView({
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-stone-900 truncate">{item.name}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <button onClick={() => onChangeQty(idx, -1)} className="w-6 h-6 rounded-full bg-stone-100 flex items-center justify-center" aria-label="Menos">
-                          <Minus className="w-3 h-3" />
+                        <button onClick={() => onChangeQty(idx, -1)} className="w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-stone-100 flex items-center justify-center touch-target" aria-label="Menos">
+                          <Minus className="w-4 h-4 sm:w-3 sm:h-3" />
                         </button>
                         <span className="text-sm font-bold">{item.qty}</span>
-                        <button onClick={() => onChangeQty(idx, 1)} className="w-6 h-6 rounded-full bg-stone-100 flex items-center justify-center" aria-label="Más">
-                          <Plus className="w-3 h-3" />
+                        <button onClick={() => onChangeQty(idx, 1)} className="w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-stone-100 flex items-center justify-center touch-target" aria-label="Más">
+                          <Plus className="w-4 h-4 sm:w-3 sm:h-3" />
                         </button>
                       </div>
                     </div>
