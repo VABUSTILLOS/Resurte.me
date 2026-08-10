@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useCart } from "@/contexts/cart-context"
+import { createClient } from "@/lib/supabase/client"
 
 /**
  * Página de diagnóstico visible para el misterio "no veo los order bumps logueado".
@@ -8,11 +10,14 @@ import { useEffect, useState } from "react"
  * El usuario solo navega a /diagnostico-bumps y lee el resultado EN PANTALLA
  * (sin necesidad de abrir la consola). Muestra:
  *   1. Si window.__resurteBumpsDebug existe (sonda eager del bundle nuevo).
- *   2. El carrito real de localStorage de ESTE origen.
- *   3. La respuesta real de POST /api/cart/bumps para ese carrito.
- *   4. Conclusión orientativa.
+ *   2. El carrito real del CONTEXTO React (lo que el usuario ve en el drawer).
+ *   3. El carrito crudo de localStorage de ESTE origen.
+ *   4. Si hay sesión activa.
+ *   5. La respuesta real de POST /api/cart/bumps para el carrito del contexto.
+ *   6. Conclusión orientativa.
  */
 export default function DiagnosticoBumpsPage() {
+  const { cart: contextCart, itemCount, isLoaded } = useCart()
   const [report, setReport] = useState<string>("Cargando…")
 
   useEffect(() => {
@@ -20,17 +25,24 @@ export default function DiagnosticoBumpsPage() {
 
     async function run() {
       const raw = localStorage.getItem("resurte_cart")
-      let cart: { cart?: { items?: { product_id?: number; quantity?: number; name?: string }[] } } | null = null
+      let stored: { cart?: { items?: { product_id?: number; quantity?: number; name?: string }[] } } | null = null
       try {
-        cart = raw ? JSON.parse(raw) : null
+        stored = raw ? JSON.parse(raw) : null
       } catch {
-        cart = null
+        stored = null
       }
 
-      const items = (cart?.cart?.items ?? []).map((i) => ({
+      const storedItems = (stored?.cart?.items ?? []).map((i) => ({
         product_id: typeof i.product_id === "number" ? i.product_id : null,
         quantity: typeof i.quantity === "number" ? i.quantity : null,
         name: i.name ?? "(sin nombre)",
+      }))
+
+      // Carrito real del contexto React (lo que se renderiza en el drawer)
+      const contextItems = contextCart.items.map((i) => ({
+        product_id: i.product_id,
+        quantity: i.quantity,
+        name: i.name,
       }))
 
       const debugGlobal =
@@ -38,17 +50,33 @@ export default function DiagnosticoBumpsPage() {
           ? window.__resurteBumpsDebug
           : "NO EXISTE (bundle viejo o caché)"
 
+      // ¿Hay sesión activa?
+      let sesion: { logged: boolean; email?: string | null } = { logged: false }
+      try {
+        const sb = createClient()
+        if (sb) {
+          const { data } = await sb.auth.getSession()
+          sesion = {
+            logged: !!data.session,
+            email: data.session?.user?.email ?? null,
+          }
+        }
+      } catch {
+        sesion = { logged: false, email: null }
+      }
+
+      // Llamar a la API con el carrito del CONTEXTO (lo que el usuario ve)
+      const apiItems = contextItems
+        .filter((i) => i.product_id !== null && i.quantity !== null)
+        .map((i) => ({ product_id: i.product_id, quantity: i.quantity }))
+
       let apiResult: unknown = null
       let apiError: string | null = null
       try {
         const resp = await fetch("/api/cart/bumps", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            items: items
-              .filter((i) => i.product_id !== null && i.quantity !== null)
-              .map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
-          }),
+          body: JSON.stringify({ items: apiItems }),
         })
         apiResult = { status: resp.status, body: await resp.text() }
       } catch (err) {
@@ -62,10 +90,12 @@ export default function DiagnosticoBumpsPage() {
 
       const conclusion = buildConclusion({
         debugGlobal,
-        items,
+        contextItems,
+        storedItems,
         parsedBumps,
         apiError,
-        raw,
+        isLoaded,
+        sesion,
       })
 
       if (!cancelled) {
@@ -75,11 +105,18 @@ export default function DiagnosticoBumpsPage() {
               url: window.location.href,
               origin: window.location.origin,
               ts: new Date().toISOString(),
+              sesion,
               debugGlobal,
+              carritoContextoReact: {
+                isLoaded,
+                itemCount,
+                items: contextItems,
+                totalItems: contextItems.length,
+              },
               carritoLocalStorage: {
                 existe: !!raw,
-                items,
-                totalItems: items.length,
+                items: storedItems,
+                totalItems: storedItems.length,
               },
               api: apiResult,
               apiError,
@@ -97,7 +134,7 @@ export default function DiagnosticoBumpsPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [contextCart, itemCount, isLoaded])
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -149,18 +186,31 @@ function tryParseBumps(rawBody: string): unknown {
 
 function buildConclusion(args: {
   debugGlobal: unknown
-  items: { product_id: number | null; quantity: number | null; name: string }[]
+  contextItems: { product_id: number; quantity: number; name: string }[]
+  storedItems: { product_id: number | null; quantity: number | null; name: string }[]
   parsedBumps: unknown
   apiError: string | null
-  raw: string | null
+  isLoaded: boolean
+  sesion: { logged: boolean; email?: string | null }
 }): string {
-  const { debugGlobal, items, parsedBumps, apiError, raw } = args
+  const { debugGlobal, contextItems, storedItems, parsedBumps, apiError, isLoaded, sesion } = args
 
-  if (!raw) {
-    return "No hay carrito guardado en este origen (localStorage.resurte_cart vacío). Los bumps solo se muestran con items en el carrito. Si crees tener items, quizá estás en otro origen (www vs sin www)."
+  if (contextItems.length > 0 && storedItems.length === 0 && isLoaded) {
+    return `⚠️ BUG DETECTADO: el carrito del CONTEXTO React tiene ${contextItems.length} items (los ves en el drawer), pero localStorage.resurte_cart está VACÍO. Esto significa que los items no se están persistiendo (o se guardan bajo otra clave/origen). Los bumps se calculan con esos items, así que sí deberían verse — si no los ves, el problema es de montaje de BumpCards, no de datos.`
   }
-  if (items.length === 0) {
-    return "El carrito guardado está VACÍO. Los bumps no se muestran sin items. Agrega productos al carrito y recarga esta página."
+  if (contextItems.length === 0 && storedItems.length > 0) {
+    return "El localStorage tiene items pero el contexto React no los cargó (¿isLoaded=false o hidratación incompleta?). Esto explicaría que no veas el carrito ni los bumps al recargar."
+  }
+  if (contextItems.length > 0 && storedItems.length > 0 && contextItems.length !== storedItems.length) {
+    return `El contexto tiene ${contextItems.length} items y localStorage ${storedItems.length} (difieren). La API se llamó con el carrito del contexto (${contextItems.length}). Si no ves bumps con ${contextItems.length} items, el problema es de reglas o de montaje.`
+  }
+  if (contextItems.length === 0 && storedItems.length === 0) {
+    const origin = typeof window !== "undefined" ? window.location.origin : ""
+    return `No hay items en el carrito en ESTE origen (${origin}). Los bumps solo se muestran con items. Si ves tu carrito lleno en la tienda, es porque estás en el OTRO origen: ${
+      origin.includes("www.")
+        ? "https://resurte.me/diagnostico-bumps"
+        : "https://www.resurte.me/diagnostico-bumps"
+    } (www y sin-www usan localStorage SEPARADO). ${sesion.logged ? "Estás logueado." : "No estás logueado."}`
   }
   if (typeof debugGlobal === "string" && debugGlobal === "NO EXISTE (bundle viejo o caché)") {
     return "El navegador NO está cargando el bundle nuevo (no existe window.__resurteBumpsDebug). Haz recarga forzada: Cmd+Shift+R (Mac) o Ctrl+Shift+R (Windows), o abre en ventana de incógnito."
@@ -175,7 +225,7 @@ function buildConclusion(args: {
     typeof parsedBumps.bumpCount === "number" &&
     parsedBumps.bumpCount > 0
   ) {
-    return `La API devuelve ${parsedBumps.bumpCount} bumps. Si NO los ves en el carrito, el problema es de montaje/UI (BumpCards no se está mostrando). Si SÍ los ves, ¡ya quedó!`
+    return `La API devuelve ${parsedBumps.bumpCount} bumps para tu carrito del contexto (${contextItems.length} items). Si NO los ves en el carrito, el problema es de montaje/UI (BumpCards no se está mostrando). Si SÍ los ves, ¡ya quedó!`
   }
   if (
     parsedBumps &&
