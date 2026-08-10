@@ -53,6 +53,13 @@ export async function POST(request: NextRequest) {
     }
 
     const bumps = await resolveBumps({ items: validItems })
+    // Log del resultado para poder correlacionar en Vercel si el navegador del
+    // usuario recibe bumps (clave del diagnóstico "no veo bumps logueado").
+    logger.info("[BUMPS] served", {
+      items: validItems.map((i) => i.product_id),
+      bumpCount: bumps.length,
+      rules: bumps.map((b) => `${b.ruleId}:${b.trigger_type}`),
+    })
     return NextResponse.json({ bumps })
   } catch (error) {
     // Fail-open: nunca bloquear el checkout por errores de bumps.

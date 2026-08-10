@@ -28,7 +28,7 @@ CREATE OR REPLACE FUNCTION public.consume_rate_limit(
 )
 RETURNS TABLE (allowed BOOLEAN, remaining INTEGER, retry_after_seconds INTEGER)
 LANGUAGE plpgsql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
