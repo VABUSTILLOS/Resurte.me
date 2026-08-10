@@ -18,6 +18,7 @@ import { MobileSearchOverlay } from "@/components/search/mobile-search-overlay"
 import type { Category, Product, RestaurantCollection } from "@/types"
 import { cn, getCategoryIcon } from "@/lib/utils"
 import { CollectionSlider } from "@/components/collections/collection-slider"
+import { MarqueePlaceholder } from "@/components/ui/marquee-placeholder"
 import { TestimonialCarousel } from "@/components/ui/testimonial-carousel"
 import { PromoBanner } from "@/components/ui/promo-banner"
 
@@ -289,14 +290,17 @@ export function CityLanding({
               <div className="flex items-center gap-2 flex-1 pl-4">
                 <Search className="w-5 h-5 text-[#B0B3B8] shrink-0" aria-hidden="true" />
                 <label htmlFor="catalog-search" className="sr-only">Buscar en el catálogo</label>
-                <input
-                  id="catalog-search"
-                  type="text"
-                  placeholder="Buscar frutas, verduras, carnes, abarrotes..."
-                  value={catalogSearch}
-                  onChange={(e) => setCatalogSearch(e.target.value)}
-                  className="flex-1 text-sm text-[#343538] py-3 bg-transparent outline-none placeholder:text-[#B0B3B8]"
-                />
+                <div className="relative flex-1 min-w-0">
+                  <input
+                    id="catalog-search"
+                    type="text"
+                    placeholder=" "
+                    value={catalogSearch}
+                    onChange={(e) => setCatalogSearch(e.target.value)}
+                    className="marquee-input w-full text-sm text-[#343538] py-3 bg-transparent outline-none placeholder:text-[#B0B3B8]"
+                  />
+                  <MarqueePlaceholder text="Buscar frutas, verduras, carnes, abarrotes..." />
+                </div>
               </div>
               <button
                 type="submit"
@@ -408,7 +412,7 @@ export function CityLanding({
                   {remaining > 0 && (
                     <Link
                       href={`/${currentCity?.slug || DEFAULT_CITY_SLUG}/categoria/${cat.slug}`}
-                      className="group flex flex-col items-center justify-center bg-[#F7F5F0] rounded-xl border border-dashed border-[#0E7A0E]/30 hover:border-[#0E7A0E]/60 hover:bg-[#E9FBE9]/50 transition-all duration-200 min-h-[200px]"
+                      className="group flex flex-col items-center justify-center bg-[#F7F5F0] rounded-xl border border-dashed border-[#0E7A0E]/30 hover:border-[#0E7A0E]/60 hover:bg-[#E9FBE9]/50 transition-all duration-200 min-h-[168px] sm:min-h-[220px]"
                     >
                       <div className="w-12 h-12 rounded-full bg-[#0E7A0E]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                         <ArrowRight className="w-5 h-5 text-[#0E7A0E]" />

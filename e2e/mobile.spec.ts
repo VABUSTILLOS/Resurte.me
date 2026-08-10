@@ -304,6 +304,18 @@ async function seedCart(page: Page): Promise<boolean> {
   return tapQuickAdd(page, quickAdd)
 }
 
+// Los previews fríos re-renderizan durante la hidratación (el main pasa por un
+// estado "Cargando productos..." que quita temporalmente los nodos). boundingBox
+// puede volver null justo en esa ventana: reintenta hasta ~3s antes de fallar.
+async function boundingBoxSettled(locator: Locator): Promise<{ x: number; y: number; width: number; height: number } | null> {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const box = await locator.boundingBox()
+    if (box) return box
+    await locator.page().waitForTimeout(500)
+  }
+  return null
+}
+
 test.describe("móvil: carrito — touch-targets de conversión Fase 3", () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
@@ -438,16 +450,19 @@ test.describe("móvil: búsqueda en contexto — overlay Fase 3", () => {
     await expect(page.getByText(/agregado al carrito/).first()).toBeVisible()
   })
 
-  test("'Ver más productos' abre el overlay de búsqueda en móvil", async ({ page }) => {
+  test("en móvil el cart bar ya no tiene 'Ver más productos' y la búsqueda abre desde el header", async ({ page }) => {
     const hasData = await seedCart(page)
     test.skip(!hasData, "no hay productos en /cdmx (sin datos locales)")
 
-    // El botón está en la barra flotante (z-50); se pulsa directamente sin abrir el drawer.
+    // Fase 9: el botón del cart bar desapareció en móvil (redundante con el
+    // StickyCatalogButton "Ver todos" y los links "Ver todo" por categoría).
     const verMas = page.getByRole("button", { name: "Ver más productos" })
-    await expect(verMas).toBeVisible({ timeout: 5000 })
-    await verMas.tap()
+    await expect(verMas).toHaveCount(0)
 
-    // El overlay de búsqueda se abre (dialog visible), sin navegación a /buscar.
+    // La búsqueda en contexto sigue disponible vía el icono de lupa del header:
+    // abre el overlay en vivo sin navegar fuera.
+    const opened = await openSearchOverlay(page)
+    test.skip(!opened, "no se pudo abrir el overlay desde el header")
     const dialog = page.getByRole("dialog", { name: "Buscar productos" })
     await expect(dialog).toBeVisible({ timeout: 2000 })
     expect(page.url()).not.toContain("/buscar")
@@ -571,8 +586,8 @@ test.describe("móvil: micro-conversión — touch targets Fase 4", () => {
     await expect(google).toBeVisible()
 
     for (const el of [email, password, submit, google]) {
-      const box = await el.boundingBox()
-      expect(box).not.toBeNull()
+      const box = await boundingBoxSettled(el)
+      expect(box, `boundingBox null para: ${await el.getAttribute("type") || await el.getAttribute("name") || (await el.textContent())?.slice(0, 20)}`).not.toBeNull()
       expect(box!.height).toBeGreaterThanOrEqual(44)
     }
   })
@@ -584,7 +599,7 @@ test.describe("móvil: micro-conversión — touch targets Fase 4", () => {
     await page.goto("/cdmx/mis-pedidos", { waitUntil: "domcontentloaded" })
     const back = page.getByRole("link", { name: "Volver a inicio" })
     await expect(back).toBeVisible({ timeout: 5000 })
-    const box = await back.boundingBox()
+    const box = await boundingBoxSettled(back)
     expect(box).not.toBeNull()
     expect(box!.width).toBeGreaterThanOrEqual(44)
     expect(box!.height).toBeGreaterThanOrEqual(44)
@@ -1020,36 +1035,34 @@ test.describe("móvil: Fase 8 — h2 sin saltos de línea y cart bar sin empalme
   // En móvil (<640px) el MobileCartBar apila dos filas: "Ver más productos"
   // arriba en su propia fila, y "Ver carrito · $total" + "Hacer Checkout"
   // debajo — sin solapes ni empalmes (8B).
-  test("el cart bar apila 'Ver más productos' sobre 'Hacer Checkout' sin solapes", async ({ page }) => {
+  test("en móvil el cart bar es una fila sin 'Ver más productos' ni solapes", async ({ page }) => {
     const hasData = await seedCart(page)
     test.skip(!hasData, "no hay productos en /cdmx")
     await dismissCookieBanner(page)
 
+    // Fase 9: "Ver más productos" ya NO aparece en móvil (redundante con el
+    // StickyCatalogButton "Ver todos" y los links "Ver todo"). La barra es
+    // una sola fila: "Ver carrito · $total" + "Hacer Checkout".
     const verMas = page.getByRole("button", { name: "Ver más productos" })
+    await expect(verMas).toHaveCount(0)
+
     const checkout = page.getByRole("button", { name: "Hacer Checkout" })
     const verCarrito = page.getByRole("button", { name: /Ver carrito/ })
-    await expect(verMas).toBeVisible({ timeout: 5000 })
     await expect(checkout).toBeVisible({ timeout: 5000 })
     await expect(verCarrito).toBeVisible({ timeout: 5000 })
 
-    const verMasBox = await verMas.boundingBox()
     const checkoutBox = await checkout.boundingBox()
     const carritoBox = await verCarrito.boundingBox()
-    expect(verMasBox).not.toBeNull()
     expect(checkoutBox).not.toBeNull()
     expect(carritoBox).not.toBeNull()
 
-    // "Ver más productos" queda encima (y separado) de la fila inferior.
-    expect(verMasBox!.y).toBeLessThan(checkoutBox!.y)
-    expect(verMasBox!.y + verMasBox!.height).toBeLessThanOrEqual(checkoutBox!.y + 1)
-
-    // Sin solape horizontal entre "Ver carrito" y "Hacer Checkout".
+    // Misma fila (misma línea base) y sin solape horizontal.
+    expect(Math.abs(carritoBox!.y - checkoutBox!.y)).toBeLessThanOrEqual(4)
     expect(carritoBox!.x + carritoBox!.width).toBeLessThanOrEqual(checkoutBox!.x + 1)
 
     // Targets táctiles >= 44px.
-    for (const box of [verMasBox, checkoutBox]) {
-      expect(box!.height).toBeGreaterThanOrEqual(44)
-    }
+    expect(checkoutBox!.height).toBeGreaterThanOrEqual(44)
+    expect(carritoBox!.height).toBeGreaterThanOrEqual(44)
   })
 
   // A 320px con ítems en el carrito, la página no desborda horizontalmente (8B).
@@ -1088,5 +1101,44 @@ test.describe("móvil: Fase 8 — h2 sin saltos de línea y cart bar sin empalme
       )
     expect(lines.length, "no se encontró el H2").toBeGreaterThan(0)
     expect(lines, "el H2 rompe en más de una línea").toEqual(lines.map(() => 1))
+  })
+})
+
+// ===== Fase 9 — placeholder de búsqueda animado (marquee) =====
+// El hint "Buscar frutas, verduras, carnes, abarrotes..." se anima en móvil
+// para alcanzar a leerse completo. Solo visible con input vacío y sin foco.
+test.describe("Fase 9: placeholder animado de búsqueda", () => {
+  test("el marquee del catálogo está visible y animado con input vacío", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1200) // reveal + hidratación
+
+    const input = page.locator("#catalog-search")
+    await expect(input).toBeVisible({ timeout: 5000 })
+    const marquee = input.locator("+ .marquee-placeholder")
+    await expect(marquee).toBeVisible()
+
+    const anim = await marquee.evaluate((el) => getComputedStyle(el).animationName)
+    expect(anim, "el marquee debería animar en móvil").not.toBe("none")
+  })
+
+  test("el marquee desaparece al enfocar o escribir", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1200)
+
+    const input = page.locator("#catalog-search")
+    const marquee = input.locator("+ .marquee-placeholder")
+
+    // Al enfocar (sin escribir) el placeholder se oculta.
+    await input.focus()
+    await expect(marquee).toBeHidden()
+
+    // Al escribir se oculta también.
+    await input.fill("aguacate")
+    await expect(marquee).toBeHidden()
+
+    // Al vaciar y quitar el foco vuelve.
+    await input.fill("")
+    await input.blur()
+    await expect(marquee).toBeVisible()
   })
 })

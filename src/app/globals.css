@@ -442,6 +442,44 @@ label[for] {
   contain-intrinsic-size: auto 500px;
 }
 
+/* ============================================
+   MARQUEE placeholder — hint de búsqueda animado en móvil
+   ============================================ */
+/* Visible solo cuando el input está vacío y sin foco. El input real lleva
+   `placeholder=" "` para que `:placeholder-shown` siempre coincida cuando
+   está vacío; el texto lo pinta este span decorativo. */
+input.marquee-input:placeholder-shown:not(:focus) + .marquee-placeholder {
+  display: flex;
+}
+
+.marquee-placeholder {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+  color: #b0b3b8;
+  animation: marquee-placeholder 14s linear infinite;
+  will-change: transform;
+}
+
+@keyframes marquee-placeholder {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@media (min-width: 640px) {
+  .marquee-placeholder {
+    animation: none;
+  }
+}
+
 /* Performance: skip rendering off-screen layout sections */
 /* NOTE: content-visibility se elimina del footer porque confunde el cálculo
    de contraste de axe-core (no resuelve el bg oscuro fuera del viewport). */
@@ -461,7 +499,8 @@ label[for] {
   .accordion-icon,
   .quick-add-btn,
   .product-card-img-swap .product-card-img-primary,
-  .product-card-img-swap .product-card-img-secondary {
+  .product-card-img-swap .product-card-img-secondary,
+  .marquee-placeholder {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

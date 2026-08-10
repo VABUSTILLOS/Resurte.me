@@ -83,7 +83,7 @@ export const ProductCard = memo(function ProductCard({
   }
 
   return (
-    <div className="product-card group relative flex flex-col" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 320px" }}>
+    <div className="product-card group relative flex flex-col" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 250px" }}>
       <Link
         href={`/${citySlug}/producto/${product.slug}`}
         className="flex-1 flex flex-col relative bg-white rounded-xl border border-[#e0dbd2] overflow-hidden hover:shadow-[0_2px_20px_rgba(0,0,0,0.07)] focus-visible:ring-2 focus-visible:ring-[#0E7A0E] focus-visible:ring-offset-1 transition-all duration-300 ease-out hover:-translate-y-0.5"
@@ -99,7 +99,7 @@ export const ProductCard = memo(function ProductCard({
                 placeholder="blur"
                 blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23faf8f5' width='400' height='300'/%3E%3C/svg%3E"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                className="object-contain p-2 product-card-img-primary"
+                className="object-contain p-1.5 sm:p-2 product-card-img-primary"
               />
               {secondaryImage && (
                 <Image
@@ -110,7 +110,7 @@ export const ProductCard = memo(function ProductCard({
                   placeholder="blur"
                   blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23faf8f5' width='400' height='300'/%3E%3C/svg%3E"
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                  className="object-contain p-2 product-card-img-secondary"
+                  className="object-contain p-1.5 sm:p-2 product-card-img-secondary"
                 />
               )}
             </>
@@ -152,38 +152,38 @@ export const ProductCard = memo(function ProductCard({
         </div>
 
         {/* Product info */}
-        <div className="p-3 pb-2 flex-1 flex flex-col">
+        <div className="p-2.5 pb-1.5 sm:p-3 sm:pb-2 flex-1 flex flex-col">
           {product.unit && (
-            <p className="text-[11px] text-[#0E7A0E] font-medium mb-1 uppercase tracking-wide">
+            <p className="text-[10px] sm:text-[11px] text-[#0E7A0E] font-medium mb-0.5 sm:mb-1 uppercase tracking-wide">
               {product.unit}
             </p>
           )}
           {product.brand && (
-            <p className="text-xs text-[var(--text-secondary)] mb-0.5">{product.brand}</p>
+            <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] mb-0.5">{product.brand}</p>
           )}
           {/* Scanning-friendly tagline — last sentence of description as a use-case hint */}
           {tagline && (
-            <p className="text-[11px] text-[var(--text-secondary)] mb-0.5 line-clamp-1 italic">
+            <p className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] mb-0.5 line-clamp-1 italic">
               {tagline}
             </p>
           )}
-          <h3 className="text-sm text-[#1a1a1a] font-medium line-clamp-2 leading-tight group-hover:text-[#0E7A0E] transition-colors duration-200">
+          <h3 className="text-[13px] sm:text-sm text-[#1a1a1a] font-medium line-clamp-2 leading-tight group-hover:text-[#0E7A0E] transition-colors duration-200">
             {product.name}
           </h3>
 
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-base font-bold text-[#1a1a1a]">
+          <div className="flex items-center gap-2 mt-1.5 sm:mt-2">
+            <span className="text-sm sm:text-base font-bold text-[#1a1a1a]">
               ${price.toFixed(2)}
             </span>
             {hasDiscount && (
-              <span className="text-sm text-[var(--text-secondary)] line-through">
+              <span className="text-xs sm:text-sm text-[var(--text-secondary)] line-through">
                 ${product.price.toFixed(2)}
               </span>
             )}
           </div>
 
           {hasDiscount && (
-            <p className="text-[11px] text-[#0E7A0E] font-medium mt-0.5">
+            <p className="text-[10px] sm:text-[11px] text-[#0E7A0E] font-medium mt-0.5">
               Ahorras ${(product.price - product.sale_price!).toFixed(2)}
             </p>
           )}
@@ -204,7 +204,7 @@ export const ProductCard = memo(function ProductCard({
           onClick={handleAdd}
           aria-label={`Agregar ${product.name} al carrito`}
           className={cn(
-            "quick-add-btn flex items-center justify-center gap-1.5 w-[calc(100%-1.25rem)] mx-auto mb-3 sm:mb-0 sm:w-auto sm:absolute sm:-bottom-2 sm:left-1/2 sm:-translate-x-1/2 sm:z-10 sm:px-5 px-4 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ease-out shadow-lg touch-target active:scale-95",
+            "quick-add-btn flex items-center justify-center gap-1.5 w-[calc(100%-1.25rem)] mx-auto mb-3 sm:mb-0 sm:w-auto sm:absolute sm:-bottom-2 sm:left-1/2 sm:-translate-x-1/2 sm:z-10 sm:px-5 px-3 py-2 rounded-full text-[13px] sm:text-sm font-semibold transition-all duration-300 ease-out shadow-lg touch-target active:scale-95",
             added
               ? "bg-green-500 text-white"
               : "bg-[#0E7A0E] text-white hover:bg-[#0D720D] hover:shadow-xl"
@@ -224,7 +224,7 @@ export const ProductCard = memo(function ProductCard({
         /* Cards agotadas: reservar la misma altura del botón en móvil para
            que las filas del grid 2-col no queden desparejas. ≥sm el botón
            flota (no ocupa espacio), así que el spacer solo aplica en móvil. */
-        <div className="sm:hidden h-[52px]" aria-hidden="true" />
+        <div className="sm:hidden h-11" aria-hidden="true" />
       )}
     </div>
   )

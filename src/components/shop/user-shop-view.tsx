@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from "react"
 import { Search, ShoppingBag } from "lucide-react"
 import { ProductCard } from "@/components/product/product-card"
+import { MarqueePlaceholder } from "@/components/ui/marquee-placeholder"
 import { getCategoryIcon } from "@/lib/utils"
 import type { Category, Product } from "@/types"
 
@@ -99,13 +100,16 @@ export function UserShopView({ categories, products, citySlug }: Props) {
             <div className="flex items-stretch bg-[#F7F5F0] rounded-xl overflow-hidden border border-[#E8E9EB] focus-within:border-[#0E7A0E]/40 focus-within:ring-2 focus-within:ring-[#0E7A0E]/10 transition-all">
               <div className="flex items-center gap-2 flex-1 pl-4">
                 <Search className="w-5 h-5 text-[#B0B3B8] shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Buscar frutas, verduras, carnes, abarrotes..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="flex-1 text-sm text-[#343538] py-2.5 bg-transparent outline-none placeholder:text-[#B0B3B8]"
-                />
+                <div className="relative flex-1 min-w-0">
+                  <input
+                    type="text"
+                    placeholder=" "
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="marquee-input w-full text-sm text-[#343538] py-2.5 bg-transparent outline-none placeholder:text-[#B0B3B8]"
+                  />
+                  <MarqueePlaceholder text="Buscar frutas, verduras, carnes, abarrotes..." />
+                </div>
               </div>
               {search && (
                 <button

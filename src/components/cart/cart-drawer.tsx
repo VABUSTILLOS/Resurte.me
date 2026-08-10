@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
 import { useMediaQuery } from "@/hooks/use-media-query"
-import { MOBILE_SEARCH_EVENT } from "@/components/search/mobile-search-overlay"
 import {
   X,
   ShoppingBag,
@@ -428,37 +427,30 @@ export function MobileCartBar() {
   return (
     <div ref={barRef} className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
       {isMobile ? (
-        /* Mobile (<640px): two stacked rows — "Ver más productos" arriba en su
-           propia fila, carrito + checkout debajo. Sin empalmes a 320px. */
-        <div className={barClass}>
+        /* Mobile (<640px): una sola fila — carrito + checkout. El botón
+           "Ver más productos" se elimina en móvil: redundante con el
+           StickyCatalogButton ("Ver todos") y los links "Ver todo" por
+           categoría; se gana espacio vertical. sm+ sí lo conserva. */
+        <div className={`${barClass} flex items-center gap-3 px-4 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))]`}>
+          {/* Tap to open drawer — flex-1 + truncate absorbe el texto largo a 320px */}
           <button
-            type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent(MOBILE_SEARCH_EVENT))}
-            className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-[#242529] bg-[#F7F5F0] hover:bg-[#EDEAE4] transition-colors whitespace-nowrap touch-target border-b border-[#E8E9EB]/70"
+            onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
+            className="flex items-center gap-2 min-w-0 flex-1 justify-start touch-target"
           >
-            Ver más productos
+            <span className="bg-[#0E7A0E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
+              {itemCount}
+            </span>
+            <span className="font-semibold text-sm text-[#242529] truncate">
+              Ver carrito · ${barTotal.toFixed(2)}
+            </span>
           </button>
-          <div className="flex items-center gap-2 px-4 pt-2.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))]">
-            {/* Tap to open drawer — flex-1 + truncate absorbe el texto largo a 320px */}
-            <button
-              onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
-              className="flex items-center gap-2 min-w-0 flex-1 justify-start touch-target"
-            >
-              <span className="bg-[#0E7A0E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
-                {itemCount}
-              </span>
-              <span className="font-semibold text-sm text-[#242529] truncate">
-                Ver carrito · ${barTotal.toFixed(2)}
-              </span>
-            </button>
-            <button
-              onClick={handleCheckout}
-              className="flex items-center gap-1.5 shrink-0 px-3 py-2.5 text-sm font-semibold text-white bg-[#0E7A0E] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap touch-target"
-            >
-              Hacer Checkout
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            onClick={handleCheckout}
+            className="flex items-center gap-1.5 shrink-0 px-3 py-2.5 text-sm font-semibold text-white bg-[#0E7A0E] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap touch-target"
+          >
+            Hacer Checkout
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       ) : (
         /* sm+: single row — current layout */
