@@ -30,6 +30,9 @@ export const BUMPS_STORAGE_KEY = "resurte:selected-bumps"
  * Es aditivo y no altera el render ni el flujo del checkout.
  */
 export interface BumpCardsDebug {
+  /** true cuando este componente está montado; false = la sonda global lo
+   *  inicializó desde el layout (BumpCards no se renderiza en esta vista). */
+  mounted?: boolean
   status: "idle" | "loading" | "ok" | "empty" | "error"
   cartKey: string
   bumpCount: number
@@ -38,6 +41,13 @@ export interface BumpCardsDebug {
   loadedAt?: string
   /** Nº de reintentos realizados ante fallo (p.ej. 429 rate-limit). */
   retries?: number
+  /** Campos adicionales que la sonda global (BumpsDebugProbe) escribe cuando
+   *  BumpCards NO está montado. */
+  note?: string
+  pageUrl?: string
+  cartCount?: number
+  cartItems?: Array<{ product_id: number; quantity: number; name: string }>
+  ts?: string
 }
 
 declare global {
@@ -96,6 +106,7 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
             ? "ok"
             : "empty"
     window.__resurteBumpsDebug = {
+      mounted: true,
       status,
       cartKey,
       bumpCount: bumps.length,

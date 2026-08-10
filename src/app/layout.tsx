@@ -11,6 +11,7 @@ import { CartDrawer, MobileCartBar } from "@/components/cart/cart-drawer"
 import { CheckoutDrawer } from "@/components/checkout/CheckoutDrawer"
 import { UpsellModal } from "@/components/checkout/UpsellModal"
 import { ExitIntentCoupon } from "@/components/checkout/ExitIntentCoupon"
+import { BumpsDebugProbe } from "@/components/checkout/BumpsDebugProbe"
 import { WhatsAppButton } from "@/components/whatsapp/whatsapp-button"
 import { Analytics } from "@/lib/analytics"
 import { CookieConsent } from "@/components/ui/cookie-consent"
@@ -161,6 +162,7 @@ export default async function RootLayout({
             <CityDetector />
             <CartDrawer />
             <CheckoutDrawer />
+            <BumpsDebugProbe />
             <UpsellModal />
             <ExitIntentCoupon />
             <MobileCartBar />
