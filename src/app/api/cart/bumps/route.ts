@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
-import { resolveBumps } from "@/lib/order-bumps"
+import { resolveBumps, type BumpDiagnostics } from "@/lib/order-bumps"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 
@@ -72,18 +72,29 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse(rate)
     }
 
-    const bumps = await resolveBumps({ items: validItems })
+    const bumpsDiagnostics: BumpDiagnostics = {}
+    const bumps = await resolveBumps({ items: validItems }, bumpsDiagnostics)
     // Log del resultado para poder correlacionar en Vercel si el navegador del
     // usuario recibe bumps (clave del diagnóstico "no veo bumps logueado").
     logger.info("[BUMPS] served", {
       items: validItems.map((i) => i.product_id),
       bumpCount: bumps.length,
       rules: bumps.map((b) => `${b.ruleId}:${b.trigger_type}`),
+      ...(bumps.length === 0 && bumpsDiagnostics.reason
+        ? { reason: bumpsDiagnostics.reason, detail: bumpsDiagnostics.detail }
+        : {}),
     })
     if (debug && bumps.length === 0) {
       return NextResponse.json({
         bumps: [],
-        _debug: { reason: "resolveBumps_vacio", detail: { items: validItems } },
+        _debug: {
+          reason: bumpsDiagnostics.reason ?? "resolveBumps_vacio",
+          detail:
+            bumpsDiagnostics.detail ??
+            (bumpsDiagnostics.reason
+              ? { items: validItems }
+              : { items: validItems, nota: "ninguna regla aplica para este carrito" }),
+        },
       })
     }
     return NextResponse.json({ bumps })

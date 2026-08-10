@@ -100,6 +100,17 @@ export interface BumpCartInput {
   items: { product_id: number; quantity: number }[]
 }
 
+/**
+ * Diagnóstico opcional de `resolveBumps`: se rellena cuando un resultado
+ * vacío (o fail-open) proviene de un error de BD real y no de reglas de
+ * negocio que simplemente no aplican. La ruta `/api/cart/bumps` lo expone
+ * como `_debug.reason` para distinguir "error transitorio" de "no hay match".
+ */
+export interface BumpDiagnostics {
+  reason?: string
+  detail?: unknown
+}
+
 /** Colección de recetas cargada para detección por tags. */
 interface CollectionRow {
   id: number
@@ -227,7 +238,8 @@ export function evaluateTriggerTypes(
  * no bloquear el checkout.
  */
 async function loadActiveRules(
-  supabase: Awaited<ReturnType<typeof createServiceClient>>
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  diagnostics?: BumpDiagnostics
 ): Promise<BumpRuleRow[]> {
   const { data, error } = await supabase
     .from("bump_rules")
@@ -237,6 +249,10 @@ async function loadActiveRules(
 
   if (error) {
     logger.warn("[BUMPS] loadActiveRules error, fail-open", { error: error.message })
+    if (diagnostics) {
+      diagnostics.reason = "load_active_rules_error"
+      diagnostics.detail = { error: error.message }
+    }
     return []
   }
   return (data ?? []) as BumpRuleRow[]
@@ -297,49 +313,111 @@ function buildBump(rule: BumpRuleRow, product: BumpProduct): OrderBump {
 }
 
 /**
+ * Ejecuta una query de Supabase con 1 reintento. Los fallos de BD transitorios
+ * (picos de conexión del pool al hacer requests concurrentes: sesión, wallet,
+ * categorías, bumps) eran la causa de los "0 bumps logueado": un error en
+ * `restaurant_collections` o `categories` se silenciaba como "vacío" y
+ * `resolveBumps` devolvía [] sin rastro en logs. Ahora se reintenta y se
+ * registra el fallo real en `diagnostics.reason`.
+ */
+async function queryWithRetry<T>(
+  run: () => Promise<{ data: T[] | null; error: { message: string } | null }>,
+  diagnostics: BumpDiagnostics | undefined,
+  label: string,
+  reason: string
+): Promise<T[]> {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const { data, error } = await run()
+    if (!error) return (data ?? []) as T[]
+    logger.warn(`[BUMPS] ${label} fetch error (attempt ${attempt}), retrying`, {
+      error: error.message,
+    })
+    if (attempt === 1) await new Promise((r) => setTimeout(r, 250))
+  }
+  if (diagnostics) {
+    diagnostics.reason = reason
+    diagnostics.detail = { label, note: "fallo transitorio tras 2 intentos" }
+  }
+  return []
+}
+
+/**
  * Resuelve los bumps condicionales para un carrito.
  * La entrada es una lista de { product_id, quantity } (sin precios del
  * cliente). Los precios se derivan de `products`.
  *
  * Excluye productos que ya están en el carrito, agotados o no visibles.
  * Retorna [] si no aplica ninguna regla o si la BD falla (fail-open).
+ *
+ * `diagnostics` (opcional) se rellena cuando un resultado vacío proviene de
+ * un error de BD real (con retry) para distinguirlo de "no hay match".
  */
-export async function resolveBumps(input: BumpCartInput): Promise<OrderBump[]> {
+export async function resolveBumps(
+  input: BumpCartInput,
+  diagnostics?: BumpDiagnostics
+): Promise<OrderBump[]> {
   if (input.items.length === 0) return []
 
   const supabase = await createServiceClient()
   const cartProductIds = new Set(input.items.map((i) => i.product_id))
 
-  const [rules, productRows, collectionRows] = await Promise.all([
-    loadActiveRules(supabase),
+  const [rules, productRows, collections] = await Promise.all([
+    loadActiveRules(supabase, diagnostics),
     supabase
       .from("products")
       .select(
         "id, name, slug, description, image_url, price, sale_price, stock_status, category_id, tags, is_visible"
       )
       .in("id", Array.from(cartProductIds)),
-    supabase
-      .from("restaurant_collections")
-      .select("id, slug, name, tags, is_active")
-      .eq("is_active", true),
+    // NOTA: esta query no debe silenciarse. Con solo reglas recipe_collection
+    // activas, un fallo aquí dejaba collectionSlugsInCart vacío y resolveBumps
+    // devolvía [] (el "resolveBumps_vacio" del reporte). Retry + log.
+    queryWithRetry<CollectionRow>(
+      () =>
+        supabase
+          .from("restaurant_collections")
+          .select("id, slug, name, tags, is_active")
+          .eq("is_active", true) as unknown as Promise<{
+          data: CollectionRow[] | null
+          error: { message: string } | null
+        }>,
+      diagnostics,
+      "restaurant_collections",
+      "restaurant_collections_error"
+    ),
   ])
 
   if (productRows.error) {
     logger.warn("[BUMPS] products fetch error, fail-open", { error: productRows.error.message })
+    if (diagnostics) {
+      diagnostics.reason = "products_fetch_error"
+      diagnostics.detail = { error: productRows.error.message }
+    }
     return []
   }
 
   const cartProducts = (productRows.data ?? []) as BumpProduct[]
 
   // Categorías presentes en el carrito (derivadas de los productos ya cargados).
+  // También con retry: un fallo aquí dejaba cartCategorySlugs vacío y podía
+  // vaciar matchedTriggers de las reglas por categoría/umbral.
   const cartCategorySlugs = new Set<string>()
   const categoryIds = new Set(cartProducts.map((p) => p.category_id))
   if (categoryIds.size > 0) {
-    const { data: cats } = await supabase
-      .from("categories")
-      .select("id, slug")
-      .in("id", Array.from(categoryIds))
-    for (const c of cats ?? []) {
+    const cats = await queryWithRetry<{ id: number; slug: string }>(
+      () =>
+        supabase
+          .from("categories")
+          .select("id, slug")
+          .in("id", Array.from(categoryIds)) as unknown as Promise<{
+          data: { id: number; slug: string }[] | null
+          error: { message: string } | null
+        }>,
+      diagnostics,
+      "categories",
+      "categories_fetch_error"
+    )
+    for (const c of cats) {
       if (c.slug) cartCategorySlugs.add(c.slug)
     }
   }
@@ -349,7 +427,6 @@ export async function resolveBumps(input: BumpCartInput): Promise<OrderBump[]> {
     return sum + (p.sale_price ?? p.price) * (item?.quantity ?? 0)
   }, 0)
 
-  const collections = (collectionRows.data ?? []) as CollectionRow[]
   const collectionSlugsInCart = detectCollectionsInCart(cartProducts, collections)
 
   const matchedTriggers = evaluateTriggerTypes(
