@@ -106,7 +106,7 @@ export default function DiagnosticoBumpsPage() {
         Esta página muestra el estado real de los bumps en <b>este navegador y este origen</b>.
         Copia el bloque de abajo y envíalo tal cual.
       </p>
-      <div className="mb-4 rounded border border-[var(--border)] bg-[var(--surface)] p-3">
+      <div className="mb-4 rounded border border-gray-200 bg-gray-50 p-3">
         <button
           type="button"
           onClick={() => {
@@ -121,7 +121,7 @@ export default function DiagnosticoBumpsPage() {
           Clic en el botón y pégalo en el chat.
         </span>
       </div>
-      <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap rounded border border-[var(--border)] bg-black/90 p-4 text-xs text-green-300">
+      <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap rounded border border-gray-700 bg-gray-950 p-4 text-xs text-green-300">
         {report}
       </pre>
     </div>
