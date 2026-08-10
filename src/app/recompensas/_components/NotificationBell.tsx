@@ -54,8 +54,9 @@ export function NotificationBell() {
       <button
         ref={bellRef}
         onClick={() => setIsOpen(!isOpen)}
+        aria-label="Notificaciones"
         className="relative rounded-xl bg-white/5 border border-white/10 p-2.5 text-gray-400 
-          hover:text-white transition-colors"
+          hover:text-white transition-colors touch-target"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (

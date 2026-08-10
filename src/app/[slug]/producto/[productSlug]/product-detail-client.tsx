@@ -276,8 +276,9 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                 <div className="inline-flex items-center border border-[#ede8df] rounded-lg overflow-hidden">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-10 h-10 flex items-center justify-center text-[#6b6b6b] hover:bg-[#f0ede5] transition-colors"
+                    className="w-10 h-10 flex items-center justify-center text-[#6b6b6b] hover:bg-[#f0ede5] transition-colors touch-target"
                     disabled={quantity <= 1}
+                    aria-label="Disminuir cantidad"
                   >
                     <Minus className="w-4 h-4" />
                   </button>
@@ -286,7 +287,8 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                   </span>
                   <button
                     onClick={() => setQuantity(quantity + 1)}
-                    className="w-10 h-10 flex items-center justify-center text-[#6b6b6b] hover:bg-[#f0ede5] transition-colors"
+                    className="w-10 h-10 flex items-center justify-center text-[#6b6b6b] hover:bg-[#f0ede5] transition-colors touch-target"
+                    aria-label="Aumentar cantidad"
                   >
                     <Plus className="w-4 h-4" />
                   </button>

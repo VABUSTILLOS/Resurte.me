@@ -261,7 +261,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide scroll-fade-x snap-x snap-mandatory flex-1">
               <button
                 onClick={() => setSelectedCategory(null)}
-                className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 snap-start ${
+                className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 snap-start touch-target ${
                   selectedCategory === null
                     ? "bg-[#0E7A0E] text-white shadow-md"
                     : "bg-white text-[#1a1a1a] border border-[#e0dbd2] hover:border-[#0E7A0E]/30 hover:bg-[#f7f5f0]"
@@ -278,7 +278,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
                   <button
                     key={cat.id}
                     onClick={() => handleCategoryToggle(cat.id)}
-                    className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 snap-start ${
+                    className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 snap-start touch-target ${
                       selectedCategory === cat.id
                         ? "bg-[#0E7A0E] text-white shadow-md"
                         : "bg-white text-[#1a1a1a] border border-[#e0dbd2] hover:border-[#0E7A0E]/30 hover:bg-[#f7f5f0]"
@@ -297,13 +297,13 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
               {selectedCategory && selectedCat && (
                 <button
                   onClick={() => setSelectedCategory(null)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-[#0E7A0E]/10 text-[#0E7A0E] hover:bg-[#0E7A0E]/20 transition-colors"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-[#0E7A0E]/10 text-[#0E7A0E] hover:bg-[#0E7A0E]/20 transition-colors touch-target"
                 >
                   {getCategoryIcon(selectedCat.icon, selectedCat.slug)} {selectedCat.name}
                   <X className="w-3 h-3" />
                 </button>
               )}
-              <div className="relative flex items-center gap-1.5 bg-white border border-[#e0dbd2] rounded-full px-3 py-1.5">
+              <div className="relative flex items-center gap-1.5 bg-white border border-[#e0dbd2] rounded-full px-3 py-2 sm:py-1.5 touch-target">
                 <ArrowUpDown className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
                 <select
                   value={sortBy}

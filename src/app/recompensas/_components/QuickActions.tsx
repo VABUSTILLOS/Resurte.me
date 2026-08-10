@@ -90,7 +90,7 @@ export function QuickActions({ onViewOrders, onBrowseStore }: QuickActionsProps)
             <span class="text-xl">🔗</span> Copiar enlace de invitación
           </button>
         </div>
-        <button id="invite-close" class="mt-4 w-full text-gray-500 text-sm py-2 hover:text-gray-400 transition-colors">Cancelar</button>
+        <button id="invite-close" class="mt-4 w-full text-gray-500 text-sm py-2 hover:text-gray-400 transition-colors touch-target">Cancelar</button>
       </div>
     `;
     document.body.appendChild(dialog);

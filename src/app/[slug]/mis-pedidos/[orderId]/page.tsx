@@ -11,6 +11,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Package, MapPin, Clock, CreditCard, DollarSign, Store, Truck, CheckCircle2, Circle } from "lucide-react"
 import Link from "next/link"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 import type { OrderStatus, OrderWithCashback, OrderItem } from "@/types"
 
 const ORDER_STATUSES: OrderStatus[] = ["pending", "confirmed", "preparing", "out_for_delivery", "delivered"]
@@ -133,19 +134,11 @@ export default function OrderDetailPage() {
   }, [supabase, orderId])
 
   if (!city) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-        <p className="text-gray-500">Cargando...</p>
-      </div>
-    )
+    return <PageSkeleton />
   }
 
   if (loading) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-        <p className="text-gray-500">Cargando pedido...</p>
-      </div>
-    )
+    return <PageSkeleton titleWidth="w-52" cards={3} />
   }
 
   if (!order) {
@@ -165,7 +158,7 @@ export default function OrderDetailPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex items-center gap-3 mb-6">
-        <Link href={`/${city.slug}/mis-pedidos`} className="p-2 -ml-2 rounded-lg hover:bg-gray-100">
+        <Link href={`/${city.slug}/mis-pedidos`} className="p-2 -ml-2 rounded-lg hover:bg-gray-100 touch-target" aria-label="Volver a mis pedidos">
           <ArrowLeft className="w-5 h-5 text-gray-500" />
         </Link>
         <div>

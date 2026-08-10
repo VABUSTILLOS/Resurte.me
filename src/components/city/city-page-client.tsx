@@ -7,6 +7,8 @@ import { MapPin, Search } from "lucide-react"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { ProductCardGrid } from "@/components/product/product-card"
 import { getCategoryIcon } from "@/lib/utils"
+import { MOBILE_SEARCH_EVENT } from "@/components/search/mobile-search-overlay"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import type { Category, Product } from "@/types"
 
 interface Props {
@@ -20,6 +22,7 @@ export function CityPageClient({ slug, categories, products }: Props) {
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   const [activeCategory, setActiveCategory] = useState<number | null>(null)
   const [search, setSearch] = useState("")
+  const isMobileSearch = useMediaQuery("(max-width: 639px)", true)
 
   // Set city in context on mount
   useEffect(() => {
@@ -79,6 +82,12 @@ export function CityPageClient({ slug, categories, products }: Props) {
             type="text"
             placeholder="Buscar producto..."
             value={search}
+            readOnly={isMobileSearch}
+            onFocus={() => {
+              if (isMobileSearch) {
+                window.dispatchEvent(new CustomEvent(MOBILE_SEARCH_EVENT))
+              }
+            }}
             onChange={(e) => {
               setSearch(e.target.value)
               setActiveCategory(null)
@@ -93,7 +102,7 @@ export function CityPageClient({ slug, categories, products }: Props) {
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide scroll-fade-x snap-x snap-mandatory">
           <button
             onClick={() => setActiveCategory(null)}
-            className={`shrink-0 px-4 py-2 rounded-[10px] text-sm font-medium transition-colors snap-start ${
+            className={`shrink-0 px-4 py-2 rounded-[10px] text-sm font-medium transition-colors snap-start touch-target ${
               activeCategory === null
                 ? "bg-[#0E7A0E] text-white"
                 : "bg-[#F7F5F0] text-[var(--text-secondary)] hover:bg-[#EDEBE6]"
@@ -105,7 +114,7 @@ export function CityPageClient({ slug, categories, products }: Props) {
             <button
               key={cat.slug}
               onClick={() => setActiveCategory(cat.id)}
-              className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-sm font-medium transition-colors snap-start ${
+              className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-sm font-medium transition-colors snap-start touch-target ${
                 activeCategory === cat.id
                   ? "bg-[#0E7A0E] text-white"
                   : "bg-[#F7F5F0] text-[var(--text-secondary)] hover:bg-[#EDEBE6]"

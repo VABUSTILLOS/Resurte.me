@@ -9,6 +9,7 @@ import type { OrderWithCashback, OrderItem } from "@/types"
 import { Package, Clock, ChevronRight, ArrowLeft, RotateCcw, ShoppingCart } from "lucide-react"
 import { AnalyticsEvents } from "@/lib/analytics"
 import Link from "next/link"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 
 interface OrderWithItems extends OrderWithCashback {
   items: (OrderItem & {
@@ -78,18 +79,14 @@ export default function OrderHistoryPage() {
   }
 
   if (!city) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-        <p className="text-gray-500">Cargando...</p>
-      </div>
-    )
+    return <PageSkeleton />
   }
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <Link href={`/${city.slug}`} className="p-2 -ml-2 rounded-lg hover:bg-gray-100">
+        <Link href={`/${city.slug}`} className="p-2 -ml-2 rounded-lg hover:bg-gray-100 touch-target" aria-label="Volver a inicio">
           <ArrowLeft className="w-5 h-5 text-gray-500" />
         </Link>
         <div>
@@ -99,9 +96,7 @@ export default function OrderHistoryPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-16">
-          <p className="text-gray-500">Cargando tus pedidos...</p>
-        </div>
+        <PageSkeleton titleWidth="w-52" cards={3} />
       ) : orders.length === 0 ? (
         <div className="text-center py-16">
           <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -159,7 +154,7 @@ export default function OrderHistoryPage() {
                   <button
                     onClick={(e) => handleRepeatOrder(order, e)}
                     disabled={reorderingId === order.id}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3.5 py-2 sm:px-2.5 sm:py-1.5 sm:text-xs text-sm font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors disabled:opacity-50 touch-target"
                   >
                     {reorderingId === order.id ? (
                       <>

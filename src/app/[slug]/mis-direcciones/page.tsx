@@ -15,6 +15,7 @@ import {
   X,
   CheckCircle2,
 } from "lucide-react"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 
 interface AddressForm {
   label: string
@@ -222,7 +223,7 @@ export default function MisDireccionesPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex items-center gap-3 mb-6">
-        <Link href={city ? `/${city.slug}` : "/"} className="p-2 -ml-2 rounded-lg hover:bg-gray-100">
+        <Link href={city ? `/${city.slug}` : "/"} className="p-2 -ml-2 rounded-lg hover:bg-gray-100 touch-target" aria-label="Volver a inicio">
           <ArrowLeft className="w-5 h-5 text-gray-500" />
         </Link>
         <div>
@@ -248,9 +249,7 @@ export default function MisDireccionesPage() {
 
       {/* Lista de direcciones guardadas */}
       {loading ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500">Cargando direcciones...</p>
-        </div>
+        <PageSkeleton titleWidth="w-48" cards={2} noHeader className="px-0 sm:px-0 py-0" />
       ) : addresses.length > 0 ? (
         <div className="space-y-3 mb-8">
           {addresses.map((addr) => (
@@ -275,7 +274,7 @@ export default function MisDireccionesPage() {
                 <button
                   onClick={() => handleEdit(addr)}
                   aria-label={`Editar ${addr.label}`}
-                  className="p-2 rounded-lg text-gray-500 hover:bg-brand-50 hover:text-brand-600 transition-colors"
+                  className="p-2.5 sm:p-2 rounded-lg text-gray-500 hover:bg-brand-50 hover:text-brand-600 transition-colors touch-target"
                 >
                   <Pencil className="w-4 h-4" />
                 </button>
@@ -283,7 +282,7 @@ export default function MisDireccionesPage() {
                   onClick={() => handleDelete(addr)}
                   disabled={deletingId === addr.id}
                   aria-label={`Eliminar ${addr.label}`}
-                  className="p-2 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
+                  className="p-2.5 sm:p-2 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50 touch-target"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

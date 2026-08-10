@@ -1,13 +1,20 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { Search, X, ArrowRight } from "lucide-react"
+import { Search, X, ArrowRight, Plus, Check } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { searchProducts } from "@/app/[slug]/buscar/actions"
 import { AnalyticsEvents } from "@/lib/analytics"
+import { useCart } from "@/contexts/cart-context"
+import { useToast } from "@/components/toast"
 import type { Product } from "@/types"
+
+/** Evento global para abrir el overlay de búsqueda móvil desde cualquier
+ *  superficie (MobileCartBar, /catalogo, categorías, etc.). El Header lo
+ *  escucha y muestra el overlay. */
+export const MOBILE_SEARCH_EVENT = "resurte:open-mobile-search"
 
 interface MobileSearchOverlayProps {
   citySlug: string
@@ -21,9 +28,12 @@ interface MobileSearchOverlayProps {
  */
 export function MobileSearchOverlay({ citySlug, onClose }: MobileSearchOverlayProps) {
   const router = useRouter()
+  const { addItem } = useCart()
+  const { toast } = useToast()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<Product[]>([])
   const [searching, setSearching] = useState(false)
+  const [addedId, setAddedId] = useState<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -172,11 +182,11 @@ export function MobileSearchOverlay({ citySlug, onClose }: MobileSearchOverlayPr
               const original = p.price ?? 0
               const hasDiscount = !!p.sale_price && p.sale_price < original
               return (
-                <li key={p.id}>
+                <li key={p.id} className="flex items-center gap-2">
                   <Link
                     href={`/${citySlug}/producto/${p.slug}`}
                     onClick={goToResult}
-                    className="flex items-center gap-3 py-3 hover:bg-white/60 rounded-xl transition-colors"
+                    className="flex items-center gap-3 py-3 min-w-0 flex-1 hover:bg-white/60 rounded-xl transition-colors"
                   >
                     <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#f7f4ef] border border-[#ede8df] shrink-0">
                       {p.image_url ? (
@@ -211,6 +221,42 @@ export function MobileSearchOverlay({ citySlug, onClose }: MobileSearchOverlayPr
                     </div>
                     <ArrowRight className="w-4 h-4 text-[var(--text-secondary)] shrink-0" aria-hidden="true" />
                   </Link>
+                  {p.stock_status !== "out_of_stock" && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        addItem({
+                          product_id: p.id,
+                          name: p.name,
+                          slug: p.slug,
+                          image_url: p.image_url,
+                          brand: p.brand,
+                          price: p.price,
+                          sale_price: p.sale_price ?? null,
+                          quantity: 1,
+                          stock_status: p.stock_status as "in_stock" | "low_stock" | "out_of_stock",
+                        })
+                        AnalyticsEvents.addToCart({ id: p.id, name: p.name, price })
+                        toast(`${p.name} agregado al carrito`)
+                        setAddedId(p.id)
+                        setTimeout(() => setAddedId((cur) => (cur === p.id ? null : cur)), 1200)
+                      }}
+                      aria-label={`Agregar ${p.name} al carrito`}
+                      className={`shrink-0 w-11 h-11 rounded-xl flex items-center justify-center border transition-colors touch-target ${
+                        addedId === p.id
+                          ? "bg-[#0E7A0E] text-white border-[#0E7A0E]"
+                          : "bg-white text-[#0E7A0E] border-[#0E7A0E]/30 hover:bg-[#0E7A0E]/5"
+                      }`}
+                    >
+                      {addedId === p.id ? (
+                        <Check className="w-5 h-5" aria-hidden="true" />
+                      ) : (
+                        <Plus className="w-5 h-5" aria-hidden="true" />
+                      )}
+                    </button>
+                  )}
                 </li>
               )
             })}

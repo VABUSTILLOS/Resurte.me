@@ -5,6 +5,7 @@ import { useCity } from "@/contexts/city-context"
 import { CheckCircle2, ArrowRight, Package, Clock, MapPin, Store, Share2, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { AnalyticsEvents } from "@/lib/analytics"
+import { PageSkeleton } from "@/components/ui/page-skeleton"
 
 function generateOrderId(): string {
   const prefix = "RT"
@@ -83,11 +84,7 @@ export default function OrderConfirmedPage() {
   }, [orderId])
 
   if (!city) {
-    return (
-      <div className="max-w-xl mx-auto px-4 py-20 text-center">
-        <p className="text-gray-500">Cargando...</p>
-      </div>
-    )
+    return <PageSkeleton titleWidth="w-48" cards={2} className="max-w-xl" />
   }
 
   return (

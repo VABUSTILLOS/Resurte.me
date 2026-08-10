@@ -46,7 +46,7 @@ export function ScheduleStep({
           <button
             type="button"
             onClick={onEditAddress}
-            className="shrink-0 text-xs font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2"
+            className="shrink-0 text-xs font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 touch-target -my-[14px]"
           >
             Editar
           </button>

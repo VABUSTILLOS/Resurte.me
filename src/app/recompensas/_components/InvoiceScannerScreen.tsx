@@ -76,7 +76,8 @@ export function InvoiceScannerScreen({ onClose, balance }: InvoiceScannerScreenP
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/10">
         <button
           onClick={onClose}
-          className="rounded-xl bg-white/5 p-2 text-gray-400 hover:text-white transition-colors"
+          aria-label="Cerrar escáner"
+          className="rounded-xl bg-white/5 p-2 text-gray-400 hover:text-white transition-colors touch-target"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>

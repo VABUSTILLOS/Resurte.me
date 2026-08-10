@@ -148,7 +148,7 @@ export default function CartPage() {
                   </div>
                   <button
                     onClick={() => removeItem(item.product_id)}
-                    className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                    className="p-2.5 sm:p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors touch-target"
                     title="Quitar"
                   >
                     <Trash2 className="w-4 h-4" />

@@ -7,7 +7,7 @@ import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
 import { SearchBar } from "@/components/search/search-bar"
 import { CART_DRAWER_EVENT } from "@/components/cart/cart-drawer"
-import { MobileSearchOverlay } from "@/components/search/mobile-search-overlay"
+import { MobileSearchOverlay, MOBILE_SEARCH_EVENT } from "@/components/search/mobile-search-overlay"
 import { useRouter } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
 import type { User as SupabaseUser, SupabaseClient } from "@supabase/supabase-js"
@@ -72,6 +72,14 @@ export function Header() {
     }
     document.addEventListener("click", handleClick)
     return () => document.removeEventListener("click", handleClick)
+  }, [])
+
+  // Abre el overlay de búsqueda móvil desde cualquier superficie que dispare
+  // MOBILE_SEARCH_EVENT (MobileCartBar "Ver más productos", /catalogo, etc.)
+  useEffect(() => {
+    const openSearch = () => setShowMobileSearch(true)
+    window.addEventListener(MOBILE_SEARCH_EVENT, openSearch)
+    return () => window.removeEventListener(MOBILE_SEARCH_EVENT, openSearch)
   }, [])
 
   async function handleSignOut() {

@@ -506,7 +506,7 @@ export function UpsellModal() {
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
 
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[min(90dvh,640px)] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 bg-[#1F2937]">
           <div className="flex items-center gap-2 text-white">
@@ -525,13 +525,13 @@ export function UpsellModal() {
             type="button"
             onClick={handleClose}
             aria-label="Cerrar"
-            className="text-white/70 hover:text-white transition-colors"
+            className="text-white/70 hover:text-white transition-colors p-2 -m-2 touch-target"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-5">
+        <div className="p-5 overflow-y-auto flex-1 min-h-0 overscroll-contain">
           {stage === "loading" || stage === "processing" || stage === "authenticating" ? (
             <div className="flex flex-col items-center justify-center py-10">
               <Loader2 className="w-8 h-8 text-[#B87A3A] animate-spin" />

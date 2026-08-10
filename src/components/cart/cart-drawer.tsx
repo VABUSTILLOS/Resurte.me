@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
+import { useMediaQuery } from "@/hooks/use-media-query"
+import { MOBILE_SEARCH_EVENT } from "@/components/search/mobile-search-overlay"
 import {
   X,
   ShoppingBag,
@@ -399,6 +401,7 @@ export function MobileCartBar() {
     DELIVERY_FEE_FLAT
   )
   const barTotal = totals.total
+  const isMobile = useMediaQuery("(max-width: 640px)", true)
 
   if (!mounted || itemCount === 0) return null
 
@@ -423,12 +426,22 @@ export function MobileCartBar() {
 
         {/* Buttons */}
         <div className="flex items-center gap-2 ml-auto">
-          <Link
-            href={city ? `/${city.slug}/buscar` : "#"}
-            className="px-3 sm:px-5 py-2.5 text-sm font-semibold text-[#242529] bg-[#F7F5F0] hover:bg-[#EDEAE4] rounded-[10px] transition-colors whitespace-nowrap touch-target"
-          >
-            Ver más productos
-          </Link>
+          {isMobile ? (
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent(MOBILE_SEARCH_EVENT))}
+              className="px-3 sm:px-5 py-2.5 text-sm font-semibold text-[#242529] bg-[#F7F5F0] hover:bg-[#EDEAE4] rounded-[10px] transition-colors whitespace-nowrap touch-target"
+            >
+              Ver más productos
+            </button>
+          ) : (
+            <Link
+              href={city ? `/${city.slug}/buscar` : "#"}
+              className="px-3 sm:px-5 py-2.5 text-sm font-semibold text-[#242529] bg-[#F7F5F0] hover:bg-[#EDEAE4] rounded-[10px] transition-colors whitespace-nowrap touch-target"
+            >
+              Ver más productos
+            </Link>
+          )}
           <button
             onClick={() => {
               // begin_checkout desde la barra móvil (la otra superficie es el

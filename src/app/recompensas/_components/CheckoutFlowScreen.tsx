@@ -82,7 +82,8 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
       <div className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-white/10">
         <button
           onClick={step === 3 ? onBack : step === 1 ? onBack : () => setStep(step - 1)}
-          className="rounded-xl bg-white/5 p-2 text-gray-400 hover:text-white transition-colors"
+          aria-label="Volver"
+          className="rounded-xl bg-white/5 p-2 text-gray-400 hover:text-white transition-colors touch-target"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>

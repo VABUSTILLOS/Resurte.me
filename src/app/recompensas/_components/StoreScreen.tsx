@@ -87,7 +87,7 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator, balance = 0 }: 
             key={cat.id}
             onClick={() => setActiveCategory(cat.id)}
             className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium 
-              whitespace-nowrap transition-all snap-start ${
+              whitespace-nowrap transition-all snap-start touch-target ${
                 activeCategory === cat.id
                   ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30"
                   : "bg-white/5 text-gray-400 hover:bg-white/10"
@@ -276,7 +276,7 @@ function ServiceCard({
                 onRedeem();
               }}
               className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white 
-                shadow-lg shadow-emerald-900/30 transition-all hover:bg-emerald-500"
+                shadow-lg shadow-emerald-900/30 transition-all hover:bg-emerald-500 touch-target"
             >
               Canjear ahora
             </motion.button>
@@ -347,7 +347,8 @@ function ServiceDetailSheet({
         {/* Close */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 rounded-full bg-white/10 p-1.5 text-gray-400 hover:text-white"
+          aria-label="Cerrar"
+          className="absolute top-4 right-4 rounded-full bg-white/10 p-3 text-gray-400 hover:text-white touch-target"
         >
           <X className="h-4 w-4" />
         </button>

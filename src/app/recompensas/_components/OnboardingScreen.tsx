@@ -495,7 +495,7 @@ export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScre
               </button>
               <button
                 onClick={() => router.push("/auth/login")}
-                className="w-full text-gray-400 text-sm py-2 hover:text-white transition-colors"
+                className="w-full text-gray-400 text-sm py-2 hover:text-white transition-colors touch-target"
               >
                 Ya tengo cuenta — Iniciar sesión
               </button>
@@ -523,7 +523,7 @@ export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScre
               {step > 0 && (
                 <button
                   onClick={() => setStep((s) => s - 1)}
-                  className="w-full text-gray-500 text-sm py-2 hover:text-gray-400 transition-colors"
+                  className="w-full text-gray-500 text-sm py-2 hover:text-gray-400 transition-colors touch-target"
                 >
                   Volver
                 </button>

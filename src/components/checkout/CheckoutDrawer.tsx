@@ -638,7 +638,12 @@ export function CheckoutDrawer() {
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 z-[80] w-full max-w-md bg-white shadow-2xl flex flex-col animate-slide-in-right">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Checkout"
+        className="fixed right-0 top-0 bottom-0 z-[80] w-full max-w-md sm:max-w-2xl bg-white shadow-2xl flex flex-col animate-slide-in-right"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E9EB]">
           <div className="flex items-center gap-2">
@@ -656,7 +661,7 @@ export function CheckoutDrawer() {
                   )
                 }
                 aria-label="Regresar"
-                className="p-2 -ml-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
+                className="p-2 -ml-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
               >
                 <ArrowLeft className="w-4 h-4 text-[var(--text-secondary)]" />
               </button>
@@ -665,7 +670,8 @@ export function CheckoutDrawer() {
           </div>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
+            aria-label="Cerrar checkout"
+            className="p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
           >
             <X className="w-5 h-5 text-[var(--text-secondary)]" />
           </button>

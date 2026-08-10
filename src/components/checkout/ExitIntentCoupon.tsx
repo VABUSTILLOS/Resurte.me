@@ -144,13 +144,13 @@ export function ExitIntentCoupon() {
             initial={{ scale: 0.95, y: 16 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 16 }}
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative max-h-[min(90dvh,640px)] overflow-y-auto overscroll-contain"
           >
             <button
               type="button"
               onClick={() => setVisible(false)}
               aria-label="Cerrar"
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+              className="absolute top-3 right-3 p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors touch-target"
             >
               <X className="w-5 h-5" />
             </button>

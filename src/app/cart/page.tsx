@@ -170,7 +170,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 sm:py-10">
+    <div className="max-w-3xl mx-auto px-4 py-6 sm:py-10 pb-28 sm:pb-10">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -283,7 +283,7 @@ export default function CartPage() {
               <div className="flex flex-col items-end gap-2 shrink-0">
                 <button
                   onClick={() => removeItem(item.product_id)}
-                  className="text-[#B0B3B8] hover:text-[#de3534] transition-colors"
+                  className="text-[#B0B3B8] hover:text-[#de3534] transition-colors p-2.5 sm:p-1 touch-target"
                   aria-label={`Eliminar ${item.name}`}
                 >
                   <Trash2 className="w-4 h-4" />
@@ -291,20 +291,20 @@ export default function CartPage() {
                 <div className="flex items-center gap-1.5 bg-[#F7F5F0] rounded-lg p-1">
                   <button
                     onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
-                    className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-white hover:text-[#1a1a1a] transition-colors"
+                    className="w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-white hover:text-[#1a1a1a] transition-colors touch-target"
                     aria-label="Reducir cantidad"
                   >
-                    <Minus className="w-3.5 h-3.5" />
+                    <Minus className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                   </button>
                   <span className="w-7 text-center text-sm font-semibold text-[#1a1a1a] tabular-nums">
                     {item.quantity}
                   </span>
                   <button
                     onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                    className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-white hover:text-[#0E7A0E] transition-colors"
+                    className="w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-white hover:text-[#0E7A0E] transition-colors touch-target"
                     aria-label="Aumentar cantidad"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                   </button>
                 </div>
                 <span className="text-sm font-semibold text-[#1a1a1a] tabular-nums">

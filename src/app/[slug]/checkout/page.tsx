@@ -717,7 +717,7 @@ export default function CheckoutPage() {
             )}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-500 text-white text-xs font-semibold rounded-lg hover:bg-green-600 transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-3 sm:py-2 bg-green-500 text-white text-xs font-semibold rounded-lg hover:bg-green-600 transition-colors touch-target"
           >
             <MessageCircle className="w-3.5 h-3.5" />
             Pedir por WhatsApp

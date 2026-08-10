@@ -4,12 +4,16 @@ import { useState, useCallback, useRef, useEffect } from "react"
 import { Search, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { AnalyticsEvents } from "@/lib/analytics"
+import { useMediaQuery } from "@/hooks/use-media-query"
+import { MOBILE_SEARCH_EVENT } from "@/components/search/mobile-search-overlay"
 
 interface SearchBarProps {
   citySlug: string
   placeholder?: string
   className?: string
   compact?: boolean
+  /** En móvil el input abre el overlay de búsqueda en vivo (readOnly). */
+  mobileOverlay?: boolean
 }
 
 export function SearchBar({
@@ -17,11 +21,13 @@ export function SearchBar({
   placeholder,
   className = "",
   compact = false,
+  mobileOverlay = false,
 }: SearchBarProps) {
   const [query, setQuery] = useState("")
   const [focused, setFocused] = useState(false)
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
+  const isMobile = useMediaQuery("(max-width: 639px)", true)
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -74,7 +80,13 @@ export function SearchBar({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setFocused(true)}
+          onFocus={() => {
+            if (mobileOverlay && isMobile) {
+              window.dispatchEvent(new CustomEvent(MOBILE_SEARCH_EVENT))
+              return
+            }
+            setFocused(true)
+          }}
           onBlur={() => setTimeout(() => setFocused(false), 200)}
           placeholder={placeholder ?? "Buscar productos..."}
           className="flex-1 bg-transparent px-3 text-[#1a1a1a] placeholder:text-[var(--text-secondary)] focus:outline-none text-sm"

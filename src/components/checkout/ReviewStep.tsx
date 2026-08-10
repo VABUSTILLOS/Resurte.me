@@ -59,7 +59,7 @@ export function ReviewStep({
           </h3>
           <button
             onClick={onEditAddress}
-            className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+            className="text-xs text-brand-600 hover:text-brand-700 font-medium touch-target -my-[14px]"
           >
             Editar
           </button>
@@ -89,7 +89,7 @@ export function ReviewStep({
           </h3>
           <button
             onClick={onEditSchedule}
-            className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+            className="text-xs text-brand-600 hover:text-brand-700 font-medium touch-target -my-[14px]"
           >
             Editar
           </button>

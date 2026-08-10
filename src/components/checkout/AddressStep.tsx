@@ -65,7 +65,7 @@ export function AddressStep({
             </label>
             <Link
               href={`/${city.slug}/mis-direcciones`}
-              className="text-xs font-medium text-brand-600 hover:text-brand-700"
+              className="text-xs font-medium text-brand-600 hover:text-brand-700 touch-target -my-[14px]"
             >
               Gestionar direcciones
             </Link>

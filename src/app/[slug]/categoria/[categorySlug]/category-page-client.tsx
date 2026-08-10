@@ -49,7 +49,7 @@ export function CategoryPageClient({ citySlug, cityName, category, products }: C
 
           {/* Search */}
           <div className="mt-5 max-w-md">
-            <SearchBar citySlug={citySlug} />
+            <SearchBar citySlug={citySlug} mobileOverlay />
           </div>
         </div>
       </div>
