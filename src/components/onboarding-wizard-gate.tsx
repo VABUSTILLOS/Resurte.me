@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 import dynamic from "next/dynamic"
 
 // El wizard usa framer-motion (~120KB). Se importa dinámicamente solo cuando
@@ -16,13 +17,31 @@ const OnboardingWizard = dynamic(
 
 const ONBOARDING_KEY = "onboarding-wizard-completed"
 
+// El onboarding es exclusivo del área de comercios (negocio/panel/admin).
+// Fuera de esas rutas (carrito, checkout, catálogo, home…) el wizard nunca
+// debe aparecer: un cliente logueado vería un overlay full-screen que tapa la
+// página (incluidos los order bumps) sin haber entrado al flujo de comercio.
+const COMMERCE_ROUTES = ["/negocio", "/panel", "/admin"]
+
+function isCommerceRoute(pathname: string | null): boolean {
+  if (!pathname) return false
+  return COMMERCE_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))
+}
+
 export function OnboardingWizardGate() {
+  const pathname = usePathname()
   const [shouldShow, setShouldShow] = useState(false)
 
   useEffect(() => {
     let cancelled = false
 
     async function check() {
+      // Solo aplica al área de comercios. En rutas públicas nunca mostrar.
+      if (!isCommerceRoute(pathname)) {
+        setShouldShow(false)
+        return
+      }
+
       // Check localStorage first (síncrono, no descarga nada adicional)
       if (localStorage.getItem(ONBOARDING_KEY) === "true") return
 
@@ -43,7 +62,7 @@ export function OnboardingWizardGate() {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [])
+  }, [pathname])
 
   if (!shouldShow) return null
   return <OnboardingWizard />
