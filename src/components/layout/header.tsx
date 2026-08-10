@@ -7,6 +7,7 @@ import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
 import { SearchBar } from "@/components/search/search-bar"
 import { CART_DRAWER_EVENT } from "@/components/cart/cart-drawer"
+import { MobileSearchOverlay } from "@/components/search/mobile-search-overlay"
 import { useRouter } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
 import type { User as SupabaseUser, SupabaseClient } from "@supabase/supabase-js"
@@ -21,6 +22,7 @@ export function Header() {
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const [showCitySelector, setShowCitySelector] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showMobileSearch, setShowMobileSearch] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [cashbackBalance, setCashbackBalance] = useState<number | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -133,15 +135,16 @@ export function Header() {
 
           {/* Right actions */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Mobile search shortcut */}
+            {/* Mobile search shortcut — opens live search overlay */}
             {city && (
-              <Link
-                href={`/${city.slug}/buscar`}
+              <button
+                onClick={() => setShowMobileSearch(true)}
                 aria-label="Buscar productos"
+                aria-expanded={showMobileSearch}
                 className="sm:hidden p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
               >
                 <Search className="w-5 h-5 text-[#343538]" aria-hidden="true" />
-              </Link>
+              </button>
             )}
 
             {/* Mobile city trigger */}
@@ -254,6 +257,14 @@ export function Header() {
       {/* City Selector Modal */}
       {showCitySelector && (
         <CitySelector onClose={() => setShowCitySelector(false)} />
+      )}
+
+      {/* Mobile live search overlay */}
+      {showMobileSearch && city && (
+        <MobileSearchOverlay
+          citySlug={city.slug}
+          onClose={() => setShowMobileSearch(false)}
+        />
       )}
     </header>
   )

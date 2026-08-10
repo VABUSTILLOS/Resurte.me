@@ -30,8 +30,11 @@ import {
 
 export const getCachedCategories = unstable_cache(
   async (): Promise<Category[]> => getCategories(),
-  ["catalog-categories"],
-  { revalidate: 3600, tags: ["catalog", "categories"] }
+  // Key versionada: si el catálogo quedó cacheado vacío por un deploy sin env,
+  // el key nuevo fuerza un miss y refetch limpio. TTL corto (igual que
+  // productos) para que un vacío temporal se auto-cure en minutos.
+  ["catalog-categories-v2"],
+  { revalidate: 300, tags: ["catalog", "categories"] }
 )
 
 export const getCachedVisibleProducts = unstable_cache(

@@ -108,7 +108,7 @@ export default function CashbackPage() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="relative mx-auto flex min-h-screen max-w-md flex-col bg-gray-950 md:max-w-none md:flex-row">
+    <div className="relative mx-auto flex min-h-screen max-w-md flex-col bg-gray-950 sm:max-w-2xl md:max-w-4xl md:flex-row">
       {/* Sidebar Navigation (Tablet/Desktop) */}
       {showShell && (
         <div className="hidden md:flex md:w-20 lg:w-64 md:flex-col md:border-r md:border-white/5 md:bg-gray-900/50 md:shrink-0">

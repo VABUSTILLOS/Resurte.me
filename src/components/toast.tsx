@@ -42,8 +42,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastCtx.Provider value={{ toast: addToast }}>
       {children}
-      {/* Toast container */}
-      <div className="fixed bottom-6 right-6 z-[100] space-y-2 max-w-sm">
+      {/* Toast container — mobile: centrado arriba de las barras flotantes
+          (MobileCartBar z-50 / sticky ATC z-40). Desktop: esquina inferior. */}
+      <div className="fixed z-[100] space-y-2 max-w-sm left-4 right-4 sm:left-auto sm:right-6 bottom-[calc(var(--floating-bottom-offset,0px)+1rem)] sm:bottom-6 mx-auto sm:mx-0">
         {toasts.map((t) => {
           const iconMap = {
             success: <CheckCircle2 className="w-4 h-4 text-green-500" />,

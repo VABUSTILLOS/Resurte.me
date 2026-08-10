@@ -91,7 +91,7 @@ export function CartDrawer() {
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 z-[70] w-full max-w-md bg-white shadow-2xl flex flex-col animate-slide-in-right">
+      <div className="fixed right-0 top-0 bottom-0 z-[70] w-full max-w-md sm:max-w-2xl bg-white shadow-2xl flex flex-col animate-slide-in-right">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E9EB]">
           <div className="flex items-center gap-2">
@@ -161,7 +161,7 @@ export function CartDrawer() {
                         <button
                           onClick={() => removeItem(item.product_id)}
                           aria-label={`Eliminar ${item.name} del carrito`}
-                          className="p-2.5 sm:p-1 rounded-md hover:bg-red-50 md:opacity-0 md:group-hover:opacity-100 transition-all touch-target"
+                          className="p-2.5 sm:p-1 rounded-md hover:bg-red-50 transition-all touch-target"
                         >
                           <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-red-400" />
                         </button>

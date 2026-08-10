@@ -15,6 +15,7 @@ import { BumpsDebugProbe } from "@/components/checkout/BumpsDebugProbe"
 import { WhatsAppButton } from "@/components/whatsapp/whatsapp-button"
 import { Analytics } from "@/lib/analytics"
 import { CookieConsent } from "@/components/ui/cookie-consent"
+import { ToastProvider } from "@/components/toast"
 import { OnboardingWizardGate } from "@/components/onboarding-wizard-gate"
 import { getOrganizationSchema } from "@/lib/structured-data"
 import "./globals.css"
@@ -153,27 +154,29 @@ export default async function RootLayout({
           }}
         />
         <Analytics nonce={nonce} />
-        <CityProvider initialCitySlug={initialCitySlug}>
-          <CartProvider>
-            <OnboardingWizardGate />
-            <Header />
-            <main id="main-content" tabIndex={-1} className="flex-1 outline-none"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
-            <Footer />
-            <CityDetector />
-            <CartDrawer />
-            <CheckoutDrawer />
-            <BumpsDebugProbe />
-            <UpsellModal />
-            <ExitIntentCoupon />
-            <MobileCartBar />
-            <WhatsAppButton
-              phoneNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}
-              message="¡Hola! Quiero hacer un pedido en Resurte.me"
-              label="Pedir por WhatsApp"
-            />
-            <CookieConsent />
-          </CartProvider>
-        </CityProvider>
+        <ToastProvider>
+          <CityProvider initialCitySlug={initialCitySlug}>
+            <CartProvider>
+              <OnboardingWizardGate />
+              <Header />
+              <main id="main-content" tabIndex={-1} className="flex-1 outline-none"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
+              <Footer />
+              <CityDetector />
+              <CartDrawer />
+              <CheckoutDrawer />
+              <BumpsDebugProbe />
+              <UpsellModal />
+              <ExitIntentCoupon />
+              <MobileCartBar />
+              <WhatsAppButton
+                phoneNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}
+                message="¡Hola! Quiero hacer un pedido en Resurte.me"
+                label="Pedir por WhatsApp"
+              />
+              <CookieConsent />
+            </CartProvider>
+          </CityProvider>
+        </ToastProvider>
       </body>
     </html>
   )

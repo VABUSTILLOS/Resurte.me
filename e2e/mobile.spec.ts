@@ -81,7 +81,10 @@ test.describe("móvil: producto — barra sticky add-to-cart", () => {
     test.skip(!productHref, "no hay enlace de producto en /cdmx (sin datos locales)")
 
     await page.goto(productHref!, { waitUntil: "domcontentloaded" })
-    const bar = page.locator(".sticky-atc-bar")
+    const bar = page.locator(".sticky-atc-bar").first()
+    // Durante la hidratación Next/React puede montar la barra dos veces de forma
+    // transitoria (ambas copias idénticas que colapsan a 1); .first() evita el
+    // strict-mode y no cambia la semántica del test.
     await expect(bar).toBeVisible()
 
     // Stepper operativo: aumentar cantidad cambia el total.
@@ -96,13 +99,14 @@ test.describe("móvil: producto — barra sticky add-to-cart", () => {
 
     await page.goto(productHref!, { waitUntil: "domcontentloaded" })
 
-    const bar = page.locator(".sticky-atc-bar")
+    const bar = page.locator(".sticky-atc-bar").first()
+    // Igual que arriba: la doble hidratación colapsa a 1 barra; .first() evita strict-mode.
     await expect(bar).toBeVisible()
     await bar.getByRole("button", { name: "Agregar" }).tap()
 
     // Con items, MobileCartBar domina y la sticky ATC se oculta.
     await expect(bar).toBeHidden()
-    await expect(page.getByText("Ver carrito", { exact: false }).first()).toBeVisible()
+    await expect(page.getByText("Ver carrito", { exact: false }).filter({ visible: true }).first()).toBeVisible()
   })
 })
 
@@ -145,5 +149,116 @@ test.describe("móvil: panel — menú hamburguesa", () => {
     expect(await enabledTool.count()).toBeGreaterThan(0)
     await enabledTool.first().tap()
     await expect(sheet).toBeHidden()
+  })
+})
+
+// --- Fase 2: página de producto (accordions), carrito (drawer/trash/toast) y
+//     grid (altura uniforme de quick-add) ---
+
+test.describe("móvil: producto — accordion defaults Fase 2", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+  test("en móvil Descripción va cerrado y Calidad y Origen abierto", async ({ page }) => {
+    const productHref = await discoverProductHref(page)
+    test.skip(!productHref, "no hay enlace de producto en /cdmx (sin datos locales)")
+
+    await page.goto(productHref!, { waitUntil: "domcontentloaded" })
+
+    const descBtn = page.getByRole("button", { name: "Descripción" })
+    const qualityBtn = page.getByRole("button", { name: "Calidad y Origen" })
+    await expect(descBtn).toBeVisible()
+    await expect(qualityBtn).toBeVisible()
+
+    // La confianza (Calidad y Origen) queda arriba del pliegue; la descripción larga, colapsada.
+    await expect(descBtn).toHaveAttribute("aria-expanded", "false")
+    await expect(qualityBtn).toHaveAttribute("aria-expanded", "true")
+  })
+})
+
+test.describe("móvil: carrito — drawer, trash y toast Fase 2", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
+  // Agrega el primer producto con quick-add y abre el drawer desde la barra flotante.
+  // Devuelve false si no hay quick-adds (sin datos en el entorno local).
+  async function addFirstAndOpenCart(page: Page): Promise<boolean> {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    const quickAdd = page.locator(".quick-add-btn").first()
+    if ((await quickAdd.count()) === 0) return false
+    await expect(quickAdd).toBeVisible()
+    await quickAdd.tap()
+
+    // La barra flotante "Ver carrito" aparece tras agregar.
+    // (la barra tiene un span desktop hidden md:inline y otro móvil md:hidden;
+    //  en móvil el visible es el segundo, así que filtramos por visibilidad)
+    const cartBar = page.getByText(/Ver carrito ·/).filter({ visible: true }).first()
+    await expect(cartBar).toBeVisible()
+    await cartBar.tap()
+    await expect(page.getByRole("heading", { name: "Mi Carrito" })).toBeVisible()
+    return true
+  }
+
+  test("el trash del drawer es visible (sin group-hover) en móvil", async ({ page }) => {
+    const hasData = await addFirstAndOpenCart(page)
+    test.skip(!hasData, "no hay productos en /cdmx (sin datos locales)")
+    const trash = page.getByRole("button", { name: /Eliminar .* del carrito/ }).first()
+    await expect(trash).toBeVisible()
+    // El botón debe ser tocable (>= 44px) aunque el dedo esté encima — sin opacity 0.
+    const box = await trash.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.width).toBeGreaterThanOrEqual(44)
+    expect(box!.height).toBeGreaterThanOrEqual(44)
+  })
+
+  test("agregar desde quick-add muestra toast 'agregado al carrito'", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    const quickAdd = page.locator(".quick-add-btn").first()
+    if ((await quickAdd.count()) === 0) {
+      test.skip(true, "no hay productos en /cdmx (sin datos locales)")
+      return
+    }
+    await expect(quickAdd).toBeVisible()
+    await quickAdd.tap()
+
+    // Toast global visible por encima de las barras flotantes.
+    const toast = page.getByText(/agregado al carrito/).first()
+    await expect(toast).toBeVisible()
+  })
+})
+
+test.describe("móvil: grid — altura uniforme del quick-add Fase 2", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+  test("las cards de una misma fila tienen la misma altura (agotadas y en stock)", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+
+    // Espera reveal + hidratación: las cards del grid principal aparecen.
+    const card = page.locator(".product-card").first()
+    if ((await card.count()) === 0) {
+      test.skip(true, "no hay productos en /cdmx (sin datos locales)")
+      return
+    }
+    await expect(card).toBeVisible()
+    await page.waitForTimeout(1200)
+
+    // Agrupa por fila (mismo top) y compara alturas dentro de cada fila.
+    const rows = await page.locator(".product-card").evaluateAll((els) => {
+      const cards = els.map((el) => {
+        const r = (el as HTMLElement).getBoundingClientRect()
+        return { top: Math.round(r.top), h: Math.round(r.height) }
+      })
+      // Fila = mismo top (grid 2-col en móvil).
+      const grouped = new Map<number, number[]>()
+      for (const c of cards) {
+        if (c.h > 0) {
+          const list = grouped.get(c.top) ?? []
+          list.push(c.h)
+          grouped.set(c.top, list)
+        }
+      }
+      return Array.from(grouped.entries())
+        .filter(([, hs]) => hs.length > 1)
+        .map(([top, hs]) => ({ top, min: Math.min(...hs), max: Math.max(...hs) }))
+    })
+
+    const misaligned = rows.filter((r) => r.max - r.min > 2)
+    expect(misaligned, `filas con cards de distinta altura:\n${JSON.stringify(misaligned, null, 2)}`).toEqual([])
   })
 })

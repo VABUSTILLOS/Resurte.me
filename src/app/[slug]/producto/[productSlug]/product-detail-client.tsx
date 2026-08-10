@@ -4,9 +4,12 @@ import { useState, useEffect } from "react"
 import { ArrowLeft, Plus, Minus, Check, ShoppingCart, Package } from "lucide-react"
 import Image from "next/image"
 import { useCart } from "@/contexts/cart-context"
+import { useToast } from "@/components/toast"
 import { ProductCard } from "@/components/product/product-card"
 import { WhatsAppBadge, OrderByWhatsAppButton } from "@/components/whatsapp/whatsapp-button"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
+import { AccordionItem } from "@/components/ui/accordion-item"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import Link from "next/link"
 import type { Category, Product } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
@@ -22,6 +25,7 @@ interface ProductDetailClientProps {
 
 export function ProductDetailClient({ product, category, relatedProducts, citySlug, cityName }: ProductDetailClientProps) {
   const { addItem } = useCart()
+  const { toast } = useToast()
   const [added, setAdded] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [selectedImage, setSelectedImage] = useState(0)
@@ -45,6 +49,15 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // En móvil la "Descripción" ocupa el primer pliegue y empuja la info de
+  // confianza fuera de la vista. Por defecto cerramos Descripción y abrimos
+  // "Calidad y Origen" (confianza arriba). En sm+ se mantiene el orden actual.
+  // initialValue=true: el primer paint (SSR/hidratación) ya muestra el estado
+  // móvil correcto y evita un flash de "Descripción" abierta.
+  const isMobile = useMediaQuery("(max-width: 639px)", true)
+  const descriptionOpen = !isMobile
+  const qualityOpen = isMobile
 
   // La barra sticky add-to-cart ocupa el carril inferior en móvil; marcamos el
   // body para ocultar el WhatsApp flotante global (ya hay botón in-page).
@@ -73,6 +86,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
       price: displayPrice,
       quantity,
     })
+    toast(`${product.name} agregado al carrito`)
     setAdded(true)
     setQuantity(1)
     setTimeout(() => setAdded(false), 1500)
@@ -158,18 +172,19 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
 
             {/* Thumbnail strip */}
             {allImages.length > 1 && (
-              <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+              <div className="flex gap-2 mt-3 overflow-x-auto pb-1 snap-x">
                 {allImages.map((img, idx) => (
                   <button
                     key={idx}
                     onClick={() => setSelectedImage(idx)}
-                    className={`flex-shrink-0 w-16 h-16 rounded-lg border-2 overflow-hidden bg-[#f7f4ef] transition-all ${
+                    aria-label={`Ver imagen ${idx + 1} de ${allImages.length}`}
+                    className={`touch-target flex-shrink-0 w-20 h-20 sm:w-16 sm:h-16 rounded-lg border-2 overflow-hidden bg-[#f7f4ef] transition-all snap-start ${
                       idx === selectedImage
                         ? "border-[#0E7A0E] ring-1 ring-[#0E7A0E]"
                         : "border-[#ede8df] hover:border-[#0E7A0E]/40"
                     }`}
                   >
-                    <img src={img} alt={`${product.name} ${idx + 1}`} loading="lazy" width={64} height={64} className="w-full h-full object-contain p-1" />
+                    <img src={img} alt={`${product.name} ${idx + 1}`} loading="lazy" width={80} height={80} className="w-full h-full object-contain p-1.5 sm:p-1" />
                   </button>
                 ))}
               </div>
@@ -315,83 +330,23 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
 
             {/* Description — Erewhon-style accordion */}
             <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-[#e0dbd2]">
-              {/* Description accordion item */}
-              <div className="border-b border-[#ede8df] pb-3 mb-3">
-                <button
-                  className="accordion-header flex items-center justify-between w-full text-left text-sm font-semibold text-[#1a1a1a] py-2 uppercase tracking-wider"
-                  onClick={(e) => {
-                    const btn = e.currentTarget;
-                    const isOpen = btn.getAttribute("aria-expanded") === "true";
-                    btn.setAttribute("aria-expanded", String(!isOpen));
-                    const body = btn.nextElementSibling as HTMLElement;
-                    if (body) {
-                      if (isOpen) { body.classList.remove("open"); }
-                      else { body.classList.add("open"); }
-                    }
-                  }}
-                  aria-expanded="true"
-                >
-                  Descripción
-                  <span className="accordion-icon text-lg leading-none text-[var(--text-secondary)]">+</span>
-                </button>
-                <div className="accordion-body open">
-                  <p className="text-sm text-[#6b6b6b] leading-relaxed whitespace-pre-line">
-                    {product.description || "Producto seleccionado directamente en la Central de Abastos. Frescura garantizada para que tu negocio sirva siempre lo mejor. Origen verificado, manejo sanitario certificado."}
-                  </p>
-                </div>
-              </div>
+              <AccordionItem title="Descripción" defaultOpen={descriptionOpen}>
+                <p className="text-sm text-[#6b6b6b] leading-relaxed whitespace-pre-line">
+                  {product.description || "Producto seleccionado directamente en la Central de Abastos. Frescura garantizada para que tu negocio sirva siempre lo mejor. Origen verificado, manejo sanitario certificado."}
+                </p>
+              </AccordionItem>
 
-              {/* Quality accordion item */}
-              <div className="border-b border-[#ede8df] pb-3 mb-3">
-                <button
-                  className="accordion-header flex items-center justify-between w-full text-left text-sm font-semibold text-[#1a1a1a] py-2 uppercase tracking-wider"
-                  onClick={(e) => {
-                    const btn = e.currentTarget;
-                    const isOpen = btn.getAttribute("aria-expanded") === "true";
-                    btn.setAttribute("aria-expanded", String(!isOpen));
-                    const body = btn.nextElementSibling as HTMLElement;
-                    if (body) {
-                      if (isOpen) { body.classList.remove("open"); }
-                      else { body.classList.add("open"); }
-                    }
-                  }}
-                  aria-expanded="false"
-                >
-                  Calidad y Origen
-                  <span className="accordion-icon text-lg leading-none text-[var(--text-secondary)]">+</span>
-                </button>
-                <div className="accordion-body">
-                  <p className="text-sm text-[#6b6b6b] leading-relaxed">
-                    <strong>Calidad garantizada para tu negocio.</strong> Todos nuestros productos provienen directamente de distribuidores autorizados en la Central de Abastos. Cada lote pasa por control de frescura, temperatura y manejo sanitario antes de salir a ruta. Si algo no llega en condiciones óptimas, te lo reponemos sin costo.
-                  </p>
-                </div>
-              </div>
+              <AccordionItem title="Calidad y Origen" defaultOpen={qualityOpen}>
+                <p className="text-sm text-[#6b6b6b] leading-relaxed">
+                  <strong>Calidad garantizada para tu negocio.</strong> Todos nuestros productos provienen directamente de distribuidores autorizados en la Central de Abastos. Cada lote pasa por control de frescura, temperatura y manejo sanitario antes de salir a ruta. Si algo no llega en condiciones óptimas, te lo reponemos sin costo.
+                </p>
+              </AccordionItem>
 
-              {/* Delivery accordion item */}
-              <div>
-                <button
-                  className="accordion-header flex items-center justify-between w-full text-left text-sm font-semibold text-[#1a1a1a] py-2 uppercase tracking-wider"
-                  onClick={(e) => {
-                    const btn = e.currentTarget;
-                    const isOpen = btn.getAttribute("aria-expanded") === "true";
-                    btn.setAttribute("aria-expanded", String(!isOpen));
-                    const body = btn.nextElementSibling as HTMLElement;
-                    if (body) {
-                      if (isOpen) { body.classList.remove("open"); }
-                      else { body.classList.add("open"); }
-                    }
-                  }}
-                  aria-expanded="false"
-                >
-                  Envíos y Devoluciones
-                  <span className="accordion-icon text-lg leading-none text-[var(--text-secondary)]">+</span>
-                </button>
-                <div className="accordion-body">
-                  <p className="text-sm text-[#6b6b6b] leading-relaxed">
-                    Envío gratis en pedidos superiores a $2,500 MXN en {cityName}. Entregas el mismo día. Productos perecederos cuentan con garantía de frescura. Facturación electrónica incluida.
-                  </p>
-                </div>
-              </div>
+              <AccordionItem title="Envíos y Devoluciones">
+                <p className="text-sm text-[#6b6b6b] leading-relaxed">
+                  Envío gratis en pedidos superiores a $2,500 MXN en {cityName}. Entregas el mismo día. Productos perecederos cuentan con garantía de frescura. Facturación electrónica incluida.
+                </p>
+              </AccordionItem>
             </div>
 
             {/* Delivery info — Erewhon-style glass box */}

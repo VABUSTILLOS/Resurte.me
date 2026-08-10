@@ -250,10 +250,11 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Filter & sort bar — sticky on scroll */}
+        {/* Filter & sort bar — sticky on scroll. Sin -mx: queda alineada con
+            la grilla (mismo padding del contenedor). */}
         <div
           ref={filterBarRef}
-          className="sticky top-[var(--header-top-offset)] z-20 bg-[#faf8f5]/95 backdrop-blur-sm -mx-4 px-4 sm:mx-0 sm:px-0 py-3 mb-6 border-b border-[#ede8df]"
+          className="sticky top-[var(--header-top-offset)] z-20 bg-[#faf8f5]/95 backdrop-blur-sm py-3 mb-6 border-b border-[#ede8df]"
         >
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             {/* Category chips */}

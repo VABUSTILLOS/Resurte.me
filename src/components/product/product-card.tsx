@@ -4,6 +4,7 @@ import { Plus, Check } from "lucide-react"
 import Image from "next/image"
 import type { Product } from "@/types"
 import { useCart } from "@/contexts/cart-context"
+import { useToast } from "@/components/toast"
 import { cn, getProductTagline } from "@/lib/utils"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { useState, memo } from "react"
@@ -35,6 +36,7 @@ export const ProductCard = memo(function ProductCard({
   onAddToCart,
 }: ProductCardProps) {
   const { addItem } = useCart()
+  const { toast } = useToast()
   const [added, setAdded] = useState(false)
 
   const price = product.sale_price ?? product.price
@@ -75,6 +77,7 @@ export const ProductCard = memo(function ProductCard({
       price,
     })
 
+    toast(`${product.name} agregado al carrito`)
     setAdded(true)
     setTimeout(() => setAdded(false), 1200)
   }
@@ -196,7 +199,7 @@ export const ProductCard = memo(function ProductCard({
 
       {/* Quick-add button — mobile: inline dentro del card (sin saliente que
           pise la fila siguiente). ≥sm: Erewhon-style, flota bajo el card. */}
-      {!outOfStock && (
+      {!outOfStock ? (
         <button
           onClick={handleAdd}
           aria-label={`Agregar ${product.name} al carrito`}
@@ -217,6 +220,11 @@ export const ProductCard = memo(function ProductCard({
             </span>
           )}
         </button>
+      ) : (
+        /* Cards agotadas: reservar la misma altura del botón en móvil para
+           que las filas del grid 2-col no queden desparejas. ≥sm el botón
+           flota (no ocupa espacio), así que el spacer solo aplica en móvil. */
+        <div className="sm:hidden h-[52px]" aria-hidden="true" />
       )}
     </div>
   )

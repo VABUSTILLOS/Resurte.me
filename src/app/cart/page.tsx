@@ -145,6 +145,13 @@ export default function CartPage() {
   if (!cart.items.length) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center px-4">
+        <Link
+          href={`/${city?.slug ?? DEFAULT_CITY_SLUG}`}
+          className="self-start inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[#0E7A0E] transition-colors mb-8"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Seguir comprando
+        </Link>
         <div className="w-20 h-20 rounded-full bg-[#F7F5F0] flex items-center justify-center mb-6">
           <ShoppingCart className="w-10 h-10 text-[#D9D7D2]" />
         </div>

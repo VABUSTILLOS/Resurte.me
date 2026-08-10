@@ -13,6 +13,8 @@ import { StickyCatalogButton } from "@/components/ui/sticky-catalog-button"
 import { UserShopView } from "@/components/shop/user-shop-view"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useMediaQuery } from "@/hooks/use-media-query"
+import { MobileSearchOverlay } from "@/components/search/mobile-search-overlay"
 import type { Category, Product, RestaurantCollection } from "@/types"
 import { cn, getCategoryIcon } from "@/lib/utils"
 import { CollectionSlider } from "@/components/collections/collection-slider"
@@ -48,7 +50,12 @@ export function CityLanding({
   const [showSelector, setShowSelector] = useState(false)
   const [heroSearch, setHeroSearch] = useState("")
   const [catalogSearch, setCatalogSearch] = useState("")
+  const [heroOverlayOpen, setHeroOverlayOpen] = useState(false)
   const router = useRouter()
+
+  // En móvil el hero search abre el overlay de búsqueda en vivo (readOnly
+  // input + tap). En sm+ conserva la navegación del form.
+  const isMobileHero = useMediaQuery("(max-width: 639px)", true)
 
   // Use provided slug or default to Chihuahua
   const resolvedSlug = citySlug || DEFAULT_CITY_SLUG
@@ -96,6 +103,11 @@ export function CityLanding({
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
+    // En móvil el hero search delega al overlay de búsqueda en vivo.
+    if (isMobileHero) {
+      setHeroOverlayOpen(true)
+      return
+    }
     if (heroSearch.trim()) {
       router.push(`/${currentCity?.slug || DEFAULT_CITY_SLUG}/buscar?q=${encodeURIComponent(heroSearch.trim())}`)
     }
@@ -162,8 +174,13 @@ export function CityLanding({
               <p className="mt-3 sm:hidden text-[11px] text-white/50">
                 📄 Factura automática · 🔄 Devolución sin costo · 🚚 Entrega al siguiente día
               </p>
-              <form onSubmit={handleSearch} className="mt-6 sm:mt-8 max-w-lg">
-                <div className="flex items-stretch bg-white rounded-[10px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.25)]">
+              <form
+                onSubmit={handleSearch}
+                className="mt-6 sm:mt-8 max-w-lg"
+              >
+                <div
+                  className="flex items-stretch bg-white rounded-[10px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.25)]"
+                >
                   <div className="flex items-center gap-2 flex-1 pl-3.5 sm:pl-4">
                     <Search className="w-4 h-4 text-[#B0B3B8] shrink-0" aria-hidden="true" />
                     <label htmlFor="hero-search" className="sr-only">Buscar productos</label>
@@ -173,6 +190,17 @@ export function CityLanding({
                       placeholder="¿Qué ingredientes necesita tu cocina hoy?"
                       value={heroSearch}
                       onChange={(e) => setHeroSearch(e.target.value)}
+                      readOnly={isMobileHero}
+                      onFocus={() => {
+                        if (isMobileHero) {
+                          setHeroOverlayOpen(true)
+                        }
+                      }}
+                      onClick={() => {
+                        if (isMobileHero) {
+                          setHeroOverlayOpen(true)
+                        }
+                      }}
                       className="flex-1 text-sm text-[#343538] py-3 sm:py-3.5 bg-transparent outline-none placeholder:text-[#B0B3B8] placeholder:text-xs sm:placeholder:text-sm"
                     />
                   </div>
@@ -900,6 +928,14 @@ export function CityLanding({
       {/* City Selector Modal */}
       {showSelector && (
         <CitySelector onClose={() => setShowSelector(false)} />
+      )}
+
+      {/* Mobile hero search overlay */}
+      {heroOverlayOpen && (
+        <MobileSearchOverlay
+          citySlug={currentCity?.slug || DEFAULT_CITY_SLUG}
+          onClose={() => setHeroOverlayOpen(false)}
+        />
       )}
 
       {/* Sticky catalog button — bottom-left, complements WhatsApp at bottom-right */}
