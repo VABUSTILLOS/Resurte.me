@@ -142,7 +142,7 @@ export function CityLanding({
               <p className="text-[10px] sm:text-xs font-medium tracking-[0.2em] uppercase text-[#3CC73C] mb-3 sm:mb-4">
                 Proveeduría inteligente para tu cocina
               </p>
-              <h1 className="text-[2rem] leading-[1.1] sm:text-5xl lg:text-[3.5rem] font-bold text-white tracking-tight">
+              <h1 className="text-[2rem] leading-[1.1] sm:text-5xl lg:text-[3.5rem] font-bold text-white tracking-tight text-balance">
                 Del campo a tu{" "}
                 <span className="text-[#3CC73C]">cocina</span>
               </h1>
@@ -263,7 +263,7 @@ export function CityLanding({
 
       {/* Social proof stats */}
       <section className="bg-white border-b border-[#E8E9EB]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {[
               { value: "1,200+", label: "Negocios abastecidos", icon: Building2 },
@@ -282,7 +282,7 @@ export function CityLanding({
       </section>
 
       {/* Search bar for products */}
-      <section className="bg-white py-16 border-b border-[#E8E9EB]">
+      <section className="bg-white py-10 sm:py-16 border-b border-[#E8E9EB]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <form onSubmit={handleCatalogSearch} className="max-w-2xl mx-auto">
             <div className="flex items-stretch bg-[#F7F5F0] rounded-xl overflow-hidden border border-[#E8E9EB] focus-within:border-[#0E7A0E]/40 focus-within:ring-2 focus-within:ring-[#0E7A0E]/10 transition-all">
@@ -311,13 +311,13 @@ export function CityLanding({
       </section>
 
       {/* Category icons grid — Erewhon-style gradient cards */}
-      <section className="bg-white py-16">
+      <section className="bg-white py-10 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <ScrollReveal className="text-center mb-8">
-            <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-3">
+            <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-2.5">
               Categorías
             </p>
-            <h2 className="text-2xl font-bold text-[#242529] tracking-tight">
+            <h2 className="text-2xl font-bold text-[#242529] tracking-tight text-balance">
               Todo lo que tu cocina necesita
             </h2>
           </ScrollReveal>
@@ -353,16 +353,16 @@ export function CityLanding({
       )}
 
       {/* Product catalog by category — with "Ver Todo" links (Erewhon-style) */}
-      <section className="bg-white py-16">
+      <section className="bg-white py-10 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <ScrollReveal className="text-center mb-10">
-            <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-3">
+          <ScrollReveal className="text-center mb-8 sm:mb-10">
+            <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-2.5">
               Catálogo completo
             </p>
-            <h2 className="text-3xl font-bold text-[#242529] tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#242529] tracking-tight text-balance">
               Todo lo que tu cocina necesita
             </h2>
-            <p className="text-base text-[#6b6b6b] mt-3 max-w-xl mx-auto leading-relaxed">
+            <p className="text-sm sm:text-base text-[#6b6b6b] mt-3 max-w-xl mx-auto leading-relaxed">
               De la central de abastos a tu negocio. {products.length} productos — por caja, bulto o pieza.
             </p>
           </ScrollReveal>
@@ -373,7 +373,7 @@ export function CityLanding({
             const remaining = catProducts.length - PREVIEW_COUNT
 
             return (
-              <div key={cat.id} className="mb-14 last:mb-0 product-grid-section">
+              <div key={cat.id} className="mb-10 sm:mb-14 last:mb-0 product-grid-section">
                 {/* Category header with "Ver Todo" */}
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
@@ -469,16 +469,16 @@ export function CityLanding({
       </section>
 
       {/* Customer segments — more editorial */}
-      <section className="bg-white py-20">
+      <section className="bg-white py-12 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-3">
+          <div className="text-center mb-8 sm:mb-12">
+            <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-2.5">
               Hecho para ti
             </p>
-            <h2 className="text-3xl font-bold text-[#242529] tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#242529] tracking-tight text-balance">
               ¿Para quién es?
             </h2>
-            <p className="text-base text-[var(--text-secondary)] mt-3 max-w-xl mx-auto leading-relaxed">
+            <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-3 max-w-xl mx-auto leading-relaxed">
               Si tu negocio sirve comida, Resurte es tu proveedor. Sin mínimo, sin membresía, sin complicaciones.
             </p>
           </div>
@@ -521,16 +521,16 @@ export function CityLanding({
       </section>
 
       {/* Cómo funciona — clean editorial */}
-      <section className="bg-white py-20">
+      <section className="bg-white py-12 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-3">
+          <div className="text-center mb-8 sm:mb-12">
+            <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-2.5">
               Así de fácil
             </p>
-            <h2 className="text-3xl font-bold text-[#242529] tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#242529] tracking-tight text-balance">
               Abastece tu negocio en 3 pasos
             </h2>
-            <p className="text-base text-[var(--text-secondary)] mt-3 max-w-xl mx-auto leading-relaxed">
+            <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-3 max-w-xl mx-auto leading-relaxed">
               Sin membresías, sin mínimo de compra. Solo los ingredientes que necesitas, cuando los necesitas.
             </p>
           </div>
@@ -580,16 +580,16 @@ export function CityLanding({
       </section>
 
       {/* Aliado de tu negocio */}
-      <section className="bg-[#F7F5F0] py-20">
+      <section className="bg-[#F7F5F0] py-12 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-3">
+          <div className="text-center mb-8 sm:mb-12">
+            <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-2.5">
               Aliado de tu negocio
             </p>
-            <h2 className="text-3xl font-bold text-[#242529] tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#242529] tracking-tight text-balance">
               Tu negocio no puede parar. Nosotros tampoco.
             </h2>
-            <p className="text-base text-[var(--text-secondary)] mt-3 max-w-xl mx-auto leading-relaxed">
+            <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-3 max-w-xl mx-auto leading-relaxed">
               Calidad consistente, precios que no brincan, facturación automática y un ejecutivo que te contesta en minutos. Así de simple.
             </p>
           </div>
@@ -840,13 +840,13 @@ export function CityLanding({
       </section>
 
       {/* Testimonials */}
-      <section className="bg-white py-20">
+      <section className="bg-white py-12 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-3">
+          <div className="text-center mb-8 sm:mb-12">
+            <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-2.5">
               Lo que dicen
             </p>
-            <h2 className="text-3xl font-bold text-[#242529] tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#242529] tracking-tight text-balance">
               Cocineros que confían en nosotros
             </h2>
           </div>
@@ -855,15 +855,15 @@ export function CityLanding({
       </section>
 
       {/* Newsletter / WhatsApp CTA */}
-      <section className="bg-[#1A1A1A] py-16">
+      <section className="bg-[#1A1A1A] py-10 sm:py-16">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
-          <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#3CC73C] mb-3">
+          <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#3CC73C] mb-2.5">
             Mantente al día
           </p>
-          <h2 className="text-3xl font-bold text-white tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight text-balance">
             Recibe nuestra lista de precios semanal
           </h2>
-          <p className="text-base text-white/60 mt-3 max-w-lg mx-auto leading-relaxed">
+          <p className="text-sm sm:text-base text-white/60 mt-3 max-w-lg mx-auto leading-relaxed">
             Cada lunes te enviamos los precios actualizados. Sin spam, solo lo que necesitas para planear tus compras.
           </p>
 
@@ -894,15 +894,15 @@ export function CityLanding({
       </section>
 
       {/* Delivery Zones */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-20">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
         <div className="text-center mb-8">
-          <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-3">
+          <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#0E7A0E] mb-2.5">
             Cobertura
           </p>
-          <h2 className="text-3xl font-bold text-[#242529] tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-bold text-[#242529] tracking-tight text-balance">
             Zonas de entrega
           </h2>
-          <p className="text-base text-[var(--text-secondary)] mt-3">
+          <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-3">
             Entregamos en {MEXICO_CITIES.length} ciudades de México. ¿No está la tuya? Escríbenos.
           </p>
         </div>

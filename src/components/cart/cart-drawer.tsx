@@ -405,68 +405,98 @@ export function MobileCartBar() {
 
   if (!mounted || itemCount === 0) return null
 
+  const handleCheckout = () => {
+    // begin_checkout desde la barra móvil (la otra superficie es el
+    // CartDrawer al tocar "Ir a Checkout").
+    AnalyticsEvents.beginCheckout(
+      subtotal,
+      itemCount,
+      cart.items.map((i) => ({
+        item_id: String(i.product_id),
+        item_name: i.name,
+        price: i.sale_price ?? i.price,
+        quantity: i.quantity,
+      }))
+    )
+    window.dispatchEvent(
+      new CustomEvent(CHECKOUT_DRAWER_EVENT, { detail: { bumps: selectedBumps } })
+    )
+  }
+
+  const barClass = "bg-white border-t border-[#E8E9EB] shadow-[0_-4px_24px_rgba(0,0,0,0.1)]"
+
   return (
     <div ref={barRef} className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
-      <div className="flex items-center gap-3 px-4 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] bg-white border-t border-[#E8E9EB] shadow-[0_-4px_24px_rgba(0,0,0,0.1)]">
-        {/* Tap to open drawer — always visible */}
-        <button
-          onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
-          className="flex items-center gap-2.5 min-w-0"
-        >
-          <span className="bg-[#0E7A0E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
-            {itemCount}
-          </span>
-          <span className="text-sm text-[var(--text-secondary)] truncate hidden md:inline">
-            Ver carrito · ${barTotal.toFixed(2)}
-          </span>
-          <span className="font-semibold text-sm text-[#242529] md:hidden">
-            Ver carrito · ${barTotal.toFixed(2)}
-          </span>
-        </button>
-
-        {/* Buttons */}
-        <div className="flex items-center gap-2 ml-auto">
-          {isMobile ? (
+      {isMobile ? (
+        /* Mobile (<640px): two stacked rows — "Ver más productos" arriba en su
+           propia fila, carrito + checkout debajo. Sin empalmes a 320px. */
+        <div className={barClass}>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent(MOBILE_SEARCH_EVENT))}
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-[#242529] bg-[#F7F5F0] hover:bg-[#EDEAE4] transition-colors whitespace-nowrap touch-target border-b border-[#E8E9EB]/70"
+          >
+            Ver más productos
+          </button>
+          <div className="flex items-center gap-2 px-4 pt-2.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))]">
+            {/* Tap to open drawer — flex-1 + truncate absorbe el texto largo a 320px */}
             <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent(MOBILE_SEARCH_EVENT))}
-              className="px-3 sm:px-5 py-2.5 text-sm font-semibold text-[#242529] bg-[#F7F5F0] hover:bg-[#EDEAE4] rounded-[10px] transition-colors whitespace-nowrap touch-target"
+              onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
+              className="flex items-center gap-2 min-w-0 flex-1 justify-start touch-target"
             >
-              Ver más productos
+              <span className="bg-[#0E7A0E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
+                {itemCount}
+              </span>
+              <span className="font-semibold text-sm text-[#242529] truncate">
+                Ver carrito · ${barTotal.toFixed(2)}
+              </span>
             </button>
-          ) : (
+            <button
+              onClick={handleCheckout}
+              className="flex items-center gap-1.5 shrink-0 px-3 py-2.5 text-sm font-semibold text-white bg-[#0E7A0E] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap touch-target"
+            >
+              Hacer Checkout
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* sm+: single row — current layout */
+        <div className={`${barClass} flex items-center gap-3 px-4 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))]`}>
+          {/* Tap to open drawer — always visible */}
+          <button
+            onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
+            className="flex items-center gap-2.5 min-w-0"
+          >
+            <span className="bg-[#0E7A0E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
+              {itemCount}
+            </span>
+            <span className="text-sm text-[var(--text-secondary)] truncate hidden md:inline">
+              Ver carrito · ${barTotal.toFixed(2)}
+            </span>
+            <span className="font-semibold text-sm text-[#242529] md:hidden">
+              Ver carrito · ${barTotal.toFixed(2)}
+            </span>
+          </button>
+
+          {/* Buttons */}
+          <div className="flex items-center gap-2 ml-auto">
             <Link
               href={city ? `/${city.slug}/buscar` : "#"}
               className="px-3 sm:px-5 py-2.5 text-sm font-semibold text-[#242529] bg-[#F7F5F0] hover:bg-[#EDEAE4] rounded-[10px] transition-colors whitespace-nowrap touch-target"
             >
               Ver más productos
             </Link>
-          )}
-          <button
-            onClick={() => {
-              // begin_checkout desde la barra móvil (la otra superficie es el
-              // CartDrawer al tocar "Ir a Checkout").
-              AnalyticsEvents.beginCheckout(
-                subtotal,
-                itemCount,
-                cart.items.map((i) => ({
-                  item_id: String(i.product_id),
-                  item_name: i.name,
-                  price: i.sale_price ?? i.price,
-                  quantity: i.quantity,
-                }))
-              )
-              window.dispatchEvent(
-                new CustomEvent(CHECKOUT_DRAWER_EVENT, { detail: { bumps: selectedBumps } })
-              )
-            }}
-            className="flex items-center gap-1.5 px-3 sm:px-5 py-2.5 text-sm font-semibold text-white bg-[#0E7A0E] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap touch-target"
-          >
-            Hacer Checkout
-            <ArrowRight className="w-4 h-4" />
-          </button>
+            <button
+              onClick={handleCheckout}
+              className="flex items-center gap-1.5 px-3 sm:px-5 py-2.5 text-sm font-semibold text-white bg-[#0E7A0E] hover:bg-[#0D720D] rounded-[10px] transition-colors whitespace-nowrap touch-target"
+            >
+              Hacer Checkout
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

@@ -999,3 +999,94 @@ test.describe("móvil: Fase 7 — quick-add uniforme y sin solapes", () => {
     }
   })
 })
+
+// --- Fase 8: homepage móvil — h2 en una línea, cart bar apilada y jerarquía ---
+
+test.describe("móvil: Fase 8 — h2 sin saltos de línea y cart bar sin empalmes", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
+  // El banner de cookies (fixed bottom) cubre el cart bar en contextos nuevos;
+  // se acepta para liberar la parte inferior de la vista antes de medir.
+  async function dismissCookieBanner(page: Page): Promise<void> {
+    const accept = page.getByRole("button", { name: "Aceptar todas" })
+    try {
+      await accept.waitFor({ state: "visible", timeout: 4000 })
+      await accept.tap().catch(() => {})
+    } catch {
+      // Sin banner (consent ya almacenado) — OK.
+    }
+  }
+
+  // En móvil (<640px) el MobileCartBar apila dos filas: "Ver más productos"
+  // arriba en su propia fila, y "Ver carrito · $total" + "Hacer Checkout"
+  // debajo — sin solapes ni empalmes (8B).
+  test("el cart bar apila 'Ver más productos' sobre 'Hacer Checkout' sin solapes", async ({ page }) => {
+    const hasData = await seedCart(page)
+    test.skip(!hasData, "no hay productos en /cdmx")
+    await dismissCookieBanner(page)
+
+    const verMas = page.getByRole("button", { name: "Ver más productos" })
+    const checkout = page.getByRole("button", { name: "Hacer Checkout" })
+    const verCarrito = page.getByRole("button", { name: /Ver carrito/ })
+    await expect(verMas).toBeVisible({ timeout: 5000 })
+    await expect(checkout).toBeVisible({ timeout: 5000 })
+    await expect(verCarrito).toBeVisible({ timeout: 5000 })
+
+    const verMasBox = await verMas.boundingBox()
+    const checkoutBox = await checkout.boundingBox()
+    const carritoBox = await verCarrito.boundingBox()
+    expect(verMasBox).not.toBeNull()
+    expect(checkoutBox).not.toBeNull()
+    expect(carritoBox).not.toBeNull()
+
+    // "Ver más productos" queda encima (y separado) de la fila inferior.
+    expect(verMasBox!.y).toBeLessThan(checkoutBox!.y)
+    expect(verMasBox!.y + verMasBox!.height).toBeLessThanOrEqual(checkoutBox!.y + 1)
+
+    // Sin solape horizontal entre "Ver carrito" y "Hacer Checkout".
+    expect(carritoBox!.x + carritoBox!.width).toBeLessThanOrEqual(checkoutBox!.x + 1)
+
+    // Targets táctiles >= 44px.
+    for (const box of [verMasBox, checkoutBox]) {
+      expect(box!.height).toBeGreaterThanOrEqual(44)
+    }
+  })
+
+  // A 320px con ítems en el carrito, la página no desborda horizontalmente (8B).
+  test("sin overflow horizontal a 320px con carrito lleno", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 })
+    const hasData = await seedCart(page)
+    test.skip(!hasData, "no hay productos en /cdmx")
+    await dismissCookieBanner(page)
+    await expect(page.getByRole("button", { name: "Hacer Checkout" })).toBeVisible({ timeout: 5000 })
+
+    const overflow = await page.evaluate(() => {
+      const doc = document.documentElement
+      const body = document.body
+      return {
+        doc: doc.scrollWidth - doc.clientWidth,
+        body: body.scrollWidth - body.clientWidth,
+      }
+    })
+    expect(overflow.doc, "overflow horizontal del document a 320px").toBeLessThanOrEqual(1)
+    expect(overflow.body, "overflow horizontal del body a 320px").toBeLessThanOrEqual(1)
+  })
+
+  // El H2 "Todo lo que tu cocina necesita" (categorías y catálogo) mide una
+  // sola línea en el viewport móvil tras la escala text-2xl + text-balance (8A).
+  test("el H2 'Todo lo que tu cocina necesita' queda en una sola línea en móvil", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1200) // reveal + hidratación
+    const lines = await page
+      .getByRole("heading", { name: "Todo lo que tu cocina necesita" })
+      .evaluateAll((els) =>
+        els.map((el) => {
+          const range = document.createRange()
+          range.selectNodeContents(el)
+          return range.getClientRects().length
+        })
+      )
+    expect(lines.length, "no se encontró el H2").toBeGreaterThan(0)
+    expect(lines, "el H2 rompe en más de una línea").toEqual(lines.map(() => 1))
+  })
+})
