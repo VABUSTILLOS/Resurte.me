@@ -119,6 +119,31 @@ body.cart-bar-active {
   }
 }
 
+/* Cookie banner visible: la franja ancha (z-60) cubriría WhatsApp,
+   StickyCatalogButton y el sticky ATC; mientras está visible se ocultan para
+   que el usuario no pueda tocar accidentalmente un botón que queda bajo el
+   banner. Al aceptar/desechar el banner, la clase se quita y reaparecen. */
+body.cookie-consent-visible .whatsapp-floating,
+body.cookie-consent-visible .sticky-catalog-button {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  body.cookie-consent-visible .sticky-atc-bar {
+    display: none;
+  }
+}
+
+/* App Recompensas: su BottomTabBar (z-50, `md:hidden`) es el elemento inferior
+   de navegación en móvil; el FAB de WhatsApp global (z-50, misma esquina)
+   chocaría con el último tab. La app ya ofrece soporte interno (QuickActions,
+   LoyaltyTierCard), así que en móvil se oculta el FAB global. */
+@media (max-width: 1023px) {
+  body.has-bottom-tab .whatsapp-floating {
+    display: none;
+  }
+}
+
 /* Theme toggle (light/dark/system) — explicit data-theme wins */
 [data-theme="light"] {
   --background: #faf8f5;

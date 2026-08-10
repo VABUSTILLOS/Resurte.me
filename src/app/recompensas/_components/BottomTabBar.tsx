@@ -2,6 +2,7 @@
 
 import { Home, Wallet, Store, User, Users } from "lucide-react";
 import { motion } from "framer-motion";
+import { useEffect } from "react";
 import type { Tab } from "./types";
 
 const tabs: { id: Tab; label: string; icon: typeof Home }[] = [
@@ -19,6 +20,15 @@ export function BottomTabBar({
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
 }) {
+  // La app de recompensas ya tiene su propio tab bar inferior: oculta el FAB de
+  // WhatsApp global en móvil para que no se solape con el último tab (CSS
+  // body.has-bottom-tab .whatsapp-floating { display:none } ≤1023px).
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    document.body.classList.add("has-bottom-tab")
+    return () => document.body.classList.remove("has-bottom-tab")
+  }, [])
+
   return (
     <>
       {/* Mobile: fixed bottom bar. Usa --floating-bottom-offset (globals.css):

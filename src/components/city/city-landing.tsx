@@ -395,7 +395,7 @@ export function CityLanding({
                 </div>
 
                 {/* Product cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
                   {preview.map((product) => (
                     <ProductCard
                       key={product.id}

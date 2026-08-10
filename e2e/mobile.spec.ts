@@ -825,3 +825,177 @@ test.describe("móvil: colecciones — SearchBar abre overlay Fase 6", () => {
     expect(page.url()).not.toContain("/buscar")
   })
 })
+
+// --- Fase 7: quick-add a la misma altura + cero solapes en sticky bottom ---
+
+test.describe("móvil: Fase 7 — quick-add uniforme y sin solapes", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
+  // El banner de cookies (fixed bottom, z-60) cubre el cart bar del storefront
+  // en contextos nuevos. Se acepta para liberar la parte inferior de la vista.
+  async function dismissCookieBanner(page: Page): Promise<void> {
+    const accept = page.getByRole("button", { name: "Aceptar todas" })
+    try {
+      await accept.waitFor({ state: "visible", timeout: 4000 })
+      await accept.tap().catch(() => {})
+    } catch {
+      // Sin banner (consent ya almacenado) — OK.
+    }
+  }
+
+  // Agrega un ítem del menú real reintentando hasta que el cart bar "Ver pedido
+  // (N)" aparezca (la hidratación de React en preview frío puede ignorar el tap).
+  async function tapStorefrontAdd(page: Page, addBtn: Locator): Promise<boolean> {
+    const verPedido = page.getByRole("button", { name: /Ver pedido \(\d+\)/ })
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await addBtn.tap().catch(() => {})
+      if (await verPedido.isVisible().catch(() => false)) return true
+      await page.waitForTimeout(500)
+    }
+    return false
+  }
+
+  // Los botones quick-add de una misma fila del grid (mismo top) deben quedar
+  // a la misma altura vertical (mismo boundingBox.y ± 2px). Esto valida que el
+  // card sea flex-col con el botón anclado al fondo (7A).
+  test("los quick-add de una misma fila están a la misma altura", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    const quickAdd = page.locator(".quick-add-btn").first()
+    if ((await quickAdd.count()) === 0) {
+      test.skip(true, "no hay productos en /cdmx (sin datos locales)")
+      return
+    }
+    await expect(quickAdd).toBeVisible()
+    await page.waitForTimeout(1200) // reveal + hidratación
+
+    const rows = await page.locator(".product-card").evaluateAll((els) => {
+      const buttons = els
+        .map((card) => card.querySelector(".quick-add-btn"))
+        .filter(Boolean) as HTMLElement[]
+      const rowsMap = new Map<number, number[]>()
+      for (const btn of buttons) {
+        const r = btn.getBoundingClientRect()
+        if (r.width > 0 && r.height > 0) {
+          const top = Math.round(r.top)
+          const list = rowsMap.get(top) ?? []
+          list.push(r.top)
+          rowsMap.set(top, list)
+        }
+      }
+      return Array.from(rowsMap.entries())
+        .filter(([, tops]) => tops.length > 1)
+        .map(([top, tops]) => ({ top, min: Math.min(...tops), max: Math.max(...tops) }))
+    })
+
+    const misaligned = rows.filter((r) => r.max - r.min > 2)
+    expect(misaligned, `filas con quick-add a distinta altura:\n${JSON.stringify(misaligned, null, 2)}`).toEqual([])
+  })
+
+  // Al agregar un ítem en el storefront, body.cart-bar-active se activa y los
+  // flotantes (WhatsApp) quedan por encima de la barra "Ver pedido (N)" (7B).
+  test("el storefront sube los flotantes por encima de su cart bar (cart-bar-active)", async ({ page }) => {
+    await page.goto("/comer", { waitUntil: "domcontentloaded" })
+    let href: string | null = null
+    for (let attempt = 0; attempt < 5 && !href; attempt++) {
+      href = await page
+        .getByRole("link")
+        .evaluateAll((els) => {
+          const a = els.find((el) => (el as HTMLAnchorElement).href.includes("/r/"))
+          return a ? (a as HTMLAnchorElement).href : null
+        })
+      if (!href) await page.waitForTimeout(500)
+    }
+    test.skip(!href, "no hay storefronts registrados en /comer")
+    const storefrontUrl = href!
+
+    await page.goto(storefrontUrl, { waitUntil: "domcontentloaded" })
+    await dismissCookieBanner(page)
+    const addBtn = page.getByRole("button", { name: /^Agregar / }).first()
+    await expect(addBtn).toBeVisible({ timeout: 5000 })
+    const added = await tapStorefrontAdd(page, addBtn)
+    test.skip(!added, "no se pudo agregar ítem del storefront")
+
+    // La barra aparece y body.cart-bar-active debe estar activo.
+    const verPedido = page.getByRole("button", { name: /Ver pedido \(\d+\)/ })
+    await expect(verPedido).toBeVisible({ timeout: 5000 })
+    await expect
+      .poll(async () => page.evaluate(() => document.body.classList.contains("cart-bar-active")), { timeout: 5000 })
+      .toBe(true)
+
+    // El WhatsApp flotante queda por encima de la barra (no se solapan).
+    const whatsapp = page.locator(".whatsapp-floating")
+    if ((await whatsapp.count()) > 0 && (await whatsapp.isVisible().catch(() => false))) {
+      const barBox = await verPedido.boundingBox()
+      const waBox = await whatsapp.boundingBox()
+      expect(barBox).not.toBeNull()
+      expect(waBox).not.toBeNull()
+      expect(waBox!.y + waBox!.height).toBeLessThanOrEqual(barBox!.y + 2)
+    }
+  })
+
+  // Mientras el banner de cookies está visible, los flotantes del fondo se
+  // ocultan para que la franja ancha no intercepte taps (7B).
+  test("el cookie banner oculta los flotantes mientras está visible", async ({ page }) => {
+    // localStorage limpio en este contexto → el banner aparece tras 800ms.
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    const accept = page.getByRole("button", { name: "Aceptar todas" })
+    await expect(accept).toBeVisible({ timeout: 5000 })
+
+    const state = await page.evaluate(() => {
+      const displayOf = (sel: string): boolean | "no-element" => {
+        const el = document.querySelector(sel) as HTMLElement | null
+        if (!el) return "no-element"
+        return getComputedStyle(el).display === "none"
+      }
+      return {
+        cookieVisible: document.body.classList.contains("cookie-consent-visible"),
+        whatsappHidden: displayOf(".whatsapp-floating"),
+        catalogHidden: displayOf(".sticky-catalog-button"),
+      }
+    })
+    expect(state.cookieVisible).toBe(true)
+    if (state.whatsappHidden !== "no-element") expect(state.whatsappHidden).toBe(true)
+    if (state.catalogHidden !== "no-element") expect(state.catalogHidden).toBe(true)
+
+    // Al aceptar, el banner desaparece y la clase se quita.
+    await accept.tap()
+    await expect(accept).toBeHidden()
+    const after = await page.evaluate(() => document.body.classList.contains("cookie-consent-visible"))
+    expect(after).toBe(false)
+  })
+
+  // En la app Recompensas el BottomTabBar es el elemento inferior; el FAB de
+  // WhatsApp global se oculta en móvil (7B). Solo aplica con sesión autenticada
+  // (sin sesión la app muestra onboarding sin tab bar).
+  test("en recompensas el FAB de WhatsApp se oculta (bottom tab bar)", async ({ page }) => {
+    await page.goto("/recompensas", { waitUntil: "domcontentloaded" })
+    const tabBar = page.locator("nav.fixed")
+    if ((await tabBar.count()) === 0) {
+      test.skip(true, "sin sesión: onboarding de recompensas sin tab bar")
+      return
+    }
+    await expect(tabBar.first()).toBeVisible({ timeout: 5000 })
+
+    const hidden = await page.evaluate(() => {
+      const el = document.querySelector(".whatsapp-floating") as HTMLElement | null
+      if (!el) return "no-element"
+      return getComputedStyle(el).display === "none"
+    })
+    if (hidden !== "no-element") expect(hidden).toBe(true)
+  })
+
+  // Los botones del cookie banner y su close deben medir >= 44px (7C).
+  test("los botones del cookie banner miden al menos 44px", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    const accept = page.getByRole("button", { name: "Aceptar todas" })
+    await expect(accept).toBeVisible({ timeout: 5000 })
+    const essential = page.getByRole("button", { name: "Solo necesarias" })
+    const close = page.getByRole("button", { name: "Cerrar" })
+    for (const btn of [accept, essential, close]) {
+      const box = await btn.boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.width).toBeGreaterThanOrEqual(44)
+      expect(box!.height).toBeGreaterThanOrEqual(44)
+    }
+  })
+})

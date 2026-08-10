@@ -83,10 +83,10 @@ export const ProductCard = memo(function ProductCard({
   }
 
   return (
-    <div className="product-card group relative" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 320px" }}>
+    <div className="product-card group relative flex flex-col" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 320px" }}>
       <Link
         href={`/${citySlug}/producto/${product.slug}`}
-        className="block relative bg-white rounded-xl border border-[#e0dbd2] overflow-hidden hover:shadow-[0_2px_20px_rgba(0,0,0,0.07)] focus-visible:ring-2 focus-visible:ring-[#0E7A0E] focus-visible:ring-offset-1 transition-all duration-300 ease-out hover:-translate-y-0.5"
+        className="flex-1 flex flex-col relative bg-white rounded-xl border border-[#e0dbd2] overflow-hidden hover:shadow-[0_2px_20px_rgba(0,0,0,0.07)] focus-visible:ring-2 focus-visible:ring-[#0E7A0E] focus-visible:ring-offset-1 transition-all duration-300 ease-out hover:-translate-y-0.5"
       >
         {/* Product image — Erewhon-style image swap on hover */}
         <div className={cn("aspect-[4/3] sm:aspect-[3/2] lg:aspect-[5/3] bg-[#faf8f5] relative overflow-hidden", secondaryImage && "product-card-img-swap")}>
@@ -152,7 +152,7 @@ export const ProductCard = memo(function ProductCard({
         </div>
 
         {/* Product info */}
-        <div className="p-3 pb-2">
+        <div className="p-3 pb-2 flex-1 flex flex-col">
           {product.unit && (
             <p className="text-[11px] text-[#0E7A0E] font-medium mb-1 uppercase tracking-wide">
               {product.unit}

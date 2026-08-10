@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
   ShoppingBag,
@@ -359,6 +359,29 @@ function MenuView({
     : categories
   const uncategorized = selectedCategory === null ? items.filter((i) => !i.category_id) : []
 
+  // Publica la altura de la barra "Ver pedido" al CSS cuando el carrito local
+  // tiene items, para que WhatsApp/CookieConsent/Toast suban por encima (mismo
+  // mecanismo que el MobileCartBar del carrito global vía body.cart-bar-active).
+  const cartBarRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    const bar = cartBarRef.current
+    if (cartCount > 0 && bar) {
+      const publish = () => {
+        document.documentElement.style.setProperty("--cart-bar-h", `${bar.offsetHeight}px`)
+      }
+      publish()
+      const ro = new ResizeObserver(publish)
+      ro.observe(bar)
+      document.body.classList.add("cart-bar-active")
+      return () => {
+        ro.disconnect()
+        document.body.classList.remove("cart-bar-active")
+      }
+    }
+    document.body.classList.remove("cart-bar-active")
+  }, [cartCount])
+
   return (
     <div>
       {featured.length > 0 && (
@@ -454,7 +477,7 @@ function MenuView({
       )}
 
       {cartCount > 0 && (
-        <div className="fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-stone-200 pb-[env(safe-area-inset-bottom)]">
+        <div ref={cartBarRef} className="fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-stone-200 pb-[env(safe-area-inset-bottom)]">
           <div className="max-w-4xl mx-auto px-4 py-3 flex justify-end">
             <button
               onClick={onGoToCart}

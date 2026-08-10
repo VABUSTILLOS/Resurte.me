@@ -27,6 +27,17 @@ export function CookieConsent() {
     setVisible(false)
   }
 
+  // Mientras el banner de cookies está visible, oculta los flotantes del fondo
+  // (WhatsApp, StickyCatalogButton, sticky ATC) para que la franja ancha no
+  // intercepte taps sobre ellos. El CSS de body.cookie-consent-visible lo hace.
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    if (visible) {
+      document.body.classList.add("cookie-consent-visible")
+      return () => document.body.classList.remove("cookie-consent-visible")
+    }
+  }, [visible])
+
   if (!visible) return null
 
   return (
@@ -47,7 +58,7 @@ export function CookieConsent() {
           <button
             onClick={acceptAll}
             aria-label="Cerrar"
-            className="p-1 rounded-lg hover:bg-[#F7F5F0] text-[var(--text-secondary)] shrink-0"
+            className="p-2.5 touch-target rounded-lg hover:bg-[#F7F5F0] text-[var(--text-secondary)] shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -55,13 +66,13 @@ export function CookieConsent() {
         <div className="flex items-center gap-2">
           <button
             onClick={acceptEssential}
-            className="flex-1 px-4 py-2 text-sm font-medium text-[var(--text-secondary)] bg-[#F7F5F0] rounded-xl hover:bg-[#EDEAE4] transition-colors"
+            className="flex-1 touch-target px-4 py-3 text-sm font-medium text-[var(--text-secondary)] bg-[#F7F5F0] rounded-xl hover:bg-[#EDEAE4] transition-colors"
           >
             Solo necesarias
           </button>
           <button
             onClick={acceptAll}
-            className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-[#0E7A0E] rounded-xl hover:bg-[#0D720D] transition-colors"
+            className="flex-1 touch-target px-4 py-3 text-sm font-semibold text-white bg-[#0E7A0E] rounded-xl hover:bg-[#0D720D] transition-colors"
           >
             Aceptar todas
           </button>
