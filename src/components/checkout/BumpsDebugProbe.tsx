@@ -12,14 +12,36 @@ import { useCart } from "@/contexts/cart-context"
  * desde cualquier ruta (home, catálogo, carrito, checkout) y SIEMPRE obtener
  * un objeto con información, en lugar de `undefined`.
  *
- * Cuando `BumpCards` está montado, ese componente sobrescribe la propiedad con
- * el estado real del fetch (status: idle|loading|ok|empty). Aquí exponemos:
- *   - mounted: false → BumpCards NO está montado en esta vista (drawer cerrado,
- *     sin items, o ruta sin bumps). Explica el `undefined` histórico.
- *   - pageUrl: ruta exacta donde se ejecutó el comando.
- *   - cart: items del carrito en este origen (resurte.me vs www.resurte.me son
- *     orígenes distintos con localStorage distinto).
+ * La definición se hace en DOS momentos:
+ *   1. EAGER (ámbito del módulo): en cuanto el chunk se ejecuta en el navegador,
+ *      antes de que React hidrate. Así es IMPOSIBLE obtener `undefined` si el
+ *      bundle nuevo está cargado, incluso si la hidratación falla (p. ej. un
+ *      error de React al estar logueado impediría que corrieran los useEffect).
+ *   2. EN useEffect: se re-escribe con los datos reales del carrito una vez
+ *      hidratado, para que siempre refleje el estado actual.
  */
+function initDebugProbe() {
+  if (typeof window === "undefined") return
+  try {
+    window.__resurteBumpsDebug = {
+      mounted: false,
+      status: "empty",
+      cartKey: "",
+      bumpCount: 0,
+      note: "Bundle nuevo cargado, pero React aún no hidrata (o la hidratación falló).",
+      pageUrl: window.location.pathname,
+      cartCount: 0,
+      cartItems: [],
+      ts: new Date().toISOString(),
+    }
+  } catch {
+    // window disponible pero read-only en contextos raros; ignorar
+  }
+}
+
+// Eager: se ejecuta al cargar el chunk, antes de la hidratación de React.
+initDebugProbe()
+
 export function BumpsDebugProbe() {
   const { cart } = useCart()
 
