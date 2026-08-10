@@ -602,17 +602,6 @@ export default function CheckoutPage() {
       {/* ============ STEP 3: REVIEW ============ */}
       {step === "review" && (
         <>
-          {/* Order bumps (mecánica ThriveCart): visibles justo antes de pagar,
-              igual que en el CheckoutDrawer. Si el carrito no dispara reglas,
-              BumpCards renderiza null y no cambia nada (retrocompatible). */}
-          <BumpCards
-            cartItems={cart.items.map((i) => ({
-              product_id: i.product_id,
-              quantity: i.quantity,
-            }))}
-            selected={selectedBumps}
-            onChange={setSelectedBumps}
-          />
           <ReviewStep
             address={address}
             schedule={schedule}
@@ -634,6 +623,20 @@ export default function CheckoutPage() {
             onBack={() => setStep("schedule")}
             onContinue={() => setStep("payment")}
           />
+          {/* Order bumps (mecánica ThriveCart): visibles justo antes de pagar,
+              después del resumen de productos, igual que en el CheckoutDrawer.
+              Si el carrito no dispara reglas, BumpCards renderiza null y no
+              cambia nada (retrocompatible). */}
+          <div className="mt-4">
+            <BumpCards
+              cartItems={cart.items.map((i) => ({
+                product_id: i.product_id,
+                quantity: i.quantity,
+              }))}
+              selected={selectedBumps}
+              onChange={setSelectedBumps}
+            />
+          </div>
         </>
       )}
 

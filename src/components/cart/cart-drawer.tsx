@@ -124,23 +124,6 @@ export function CartDrawer() {
             </div>
           )}
 
-          {/* Cross-sell: order bumps inteligentes (mecánica ThriveCart).
-              ANTES de la lista de items para quedar arriba del pliegue
-              incluso con carritos grandes (el usuario debe verlos sin scroll
-              dentro del drawer). Mismo componente que /cart desktop. */}
-          {cart.items.length > 0 && (
-            <div className="py-4 border-b border-[#E8E9EB]">
-              <BumpCards
-                cartItems={cart.items.map((i) => ({
-                  product_id: i.product_id,
-                  quantity: i.quantity,
-                }))}
-                selected={selectedBumps}
-                onChange={setSelectedBumps}
-              />
-            </div>
-          )}
-
           {cart.items.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-[var(--text-secondary)] gap-3 pb-12">
             <ShoppingBag className="w-16 h-16 text-[#E8E9EB]" />
@@ -241,6 +224,23 @@ export function CartDrawer() {
                 </li>
               ))}
             </ul>
+          )}
+
+          {/* Cross-sell: order bumps inteligentes (mecánica ThriveCart).
+              DESPUÉS de la lista de items: primero el usuario revisa sus
+              productos y luego ve las sugerencias complementarias.
+              Mismo componente que /cart desktop. */}
+          {cart.items.length > 0 && (
+            <div className="py-4 mt-1 border-b border-[#E8E9EB]">
+              <BumpCards
+                cartItems={cart.items.map((i) => ({
+                  product_id: i.product_id,
+                  quantity: i.quantity,
+                }))}
+                selected={selectedBumps}
+                onChange={setSelectedBumps}
+              />
+            </div>
           )}
 
           {/* Cross-sell: "Restaurantes también compran" hints */}
