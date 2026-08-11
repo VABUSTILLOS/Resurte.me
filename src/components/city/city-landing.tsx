@@ -275,7 +275,7 @@ export function CityLanding({
               <div key={stat.label} className="flex flex-col items-center gap-1.5">
                 <stat.icon className="w-5 h-5 text-[#0E7A0E] mb-1" />
                 <span className="text-2xl sm:text-3xl font-bold text-[#1a1a1a] tracking-tight">{stat.value}</span>
-                <span className="text-xs text-[var(--text-secondary)]">{stat.label}</span>
+                <span className="text-[13px] text-[var(--text-secondary)]">{stat.label}</span>
               </div>
             ))}
           </div>
@@ -342,7 +342,7 @@ export function CityLanding({
                     <span className="text-sm font-semibold text-[#1a1a1a] text-center leading-tight group-hover:text-[#0E7A0E] transition-colors">
                       {cat.name}
                     </span>
-                    <span className="text-xs text-[var(--text-secondary)]">{count} productos</span>
+                    <span className="text-[13px] text-[var(--text-secondary)]">{count} productos</span>
                   </Link>
                 </ScrollReveal>
               )
@@ -418,7 +418,7 @@ export function CityLanding({
                         <ArrowRight className="w-5 h-5 text-[#0E7A0E]" />
                       </div>
                       <span className="text-sm font-semibold text-[#0E7A0E]">+{remaining} más</span>
-                      <span className="text-xs text-[var(--text-secondary)] mt-0.5">Ver todo</span>
+                      <span className="text-[13px] text-[var(--text-secondary)] mt-0.5">Ver todo</span>
                     </Link>
                   )}
                 </div>
@@ -829,7 +829,7 @@ export function CityLanding({
 
               {/* CTA */}
               <div className="text-center pt-6 sm:pt-8 border-t border-[#f0ede5]">
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)] mb-4">Más de 500 restaurantes y hoteles ya surten con nosotros</p>
+                <p className="text-[13px] sm:text-sm text-[var(--text-secondary)] mb-4">Más de 500 restaurantes y hoteles ya surten con nosotros</p>
                 <Link
                   href="/recompensas"
                   className="btn-pill btn-pill-primary inline-flex items-center justify-center gap-2 text-sm sm:text-base px-6 sm:px-8 py-2.5 sm:py-3 w-full sm:w-auto"
@@ -891,7 +891,7 @@ export function CityLanding({
             </a>
           </div>
 
-          <p className="mt-6 text-xs text-white/60">
+          <p className="mt-6 text-[13px] text-white/60">
             Sin spam. Solo actualizaciones de precios cada lunes. Cancela cuando quieras.
           </p>
         </div>

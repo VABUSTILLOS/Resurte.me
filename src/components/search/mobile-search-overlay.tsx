@@ -207,13 +207,13 @@ export function MobileSearchOverlay({ citySlug, onClose }: MobileSearchOverlayPr
                       <p className="text-sm font-medium text-[#1a1a1a] truncate">
                         {p.name}
                       </p>
-                      <p className="text-xs text-[var(--text-secondary)] truncate">
+                      <p className="text-[13px] text-[var(--text-secondary)] truncate">
                         {p.brand || "Resurte"}
                       </p>
                       <p className="text-sm font-semibold text-[#0E7A0E]">
                         ${price.toFixed(2)}
                         {hasDiscount && (
-                          <span className="text-xs text-[var(--text-secondary)] line-through font-normal ml-1.5">
+                          <span className="text-[13px] text-[var(--text-secondary)] line-through font-normal ml-1.5">
                             ${original.toFixed(2)}
                           </span>
                         )}

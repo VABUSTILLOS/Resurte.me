@@ -167,10 +167,10 @@ export function CartDrawer() {
                           <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-red-400" />
                         </button>
                       </div>
-                      <p className="text-xs text-[var(--text-secondary)]">{item.brand}</p>
+                      <p className="text-[13px] text-[var(--text-secondary)]">{item.brand}</p>
 
                       {item.stock_status === "low_stock" && (
-                        <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
+                        <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
                           Pocas unidades
                         </span>
                       )}
@@ -183,7 +183,7 @@ export function CartDrawer() {
                               <span className="text-sm font-bold text-[#0E7A0E]">
                                 ${item.sale_price}
                               </span>
-                              <span className="text-xs text-[var(--text-secondary)] line-through">
+                              <span className="text-[13px] text-[var(--text-secondary)] line-through">
                                 ${item.price}
                               </span>
                             </div>
@@ -247,10 +247,10 @@ export function CartDrawer() {
           {cart.items.length > 0 && (
             <div className="pb-4">
               <div className="bg-[#FDF8F3] rounded-xl border border-[#F0E5D8] p-3">
-                <p className="text-[11px] font-semibold text-[#B87A3A] uppercase tracking-wide mb-2">
+                <p className="text-xs font-semibold text-[#B87A3A] uppercase tracking-wide mb-2">
                   🔥 Restaurantes también compran
                 </p>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
                   Complementa tu pedido con{" "}
                   <Link
                     href={city ? `/${city.slug}/categoria/limpieza-cocina` : "#"}
@@ -299,7 +299,7 @@ export function CartDrawer() {
             )}
 
             {/* Delivery fee (dinámico: gratis desde $500, igual que el checkout) */}
-            <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
+            <div className="flex items-center justify-between text-[13px] text-[var(--text-secondary)]">
               <span className="flex items-center gap-1.5">
                 <Truck className="w-3.5 h-3.5" />
                 {deliveryFee === 0 ? "Envío gratis" : "Envío a domicilio"}
@@ -334,7 +334,7 @@ export function CartDrawer() {
 
             {/* Continue shopping link */}
             {city && (
-              <div className="flex items-center justify-center gap-4 text-xs">
+              <div className="flex items-center justify-center gap-4 text-[13px]">
                 <Link
                   href={`/${city.slug}`}
                   onClick={() => setIsOpen(false)}

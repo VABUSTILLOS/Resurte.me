@@ -255,7 +255,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                 </p>
               )}
               {product.unit && (
-                <p className="text-xs text-[#6b6b6b] mt-1">
+                <p className="text-[13px] text-[#6b6b6b] mt-1">
                   Precio por {product.unit.toLowerCase()}
                 </p>
               )}
@@ -361,7 +361,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                   <p className="text-sm font-semibold text-[#1a1a1a]">
                     Entrega en {cityName}
                   </p>
-                  <p className="text-xs text-[#6b6b6b] mt-0.5 leading-relaxed">
+                  <p className="text-[13px] text-[#6b6b6b] mt-0.5 leading-relaxed">
                     Envío gratis desde $2,500 MXN. Entrega el mismo día.
                     Facturación electrónica incluida.
                   </p>
@@ -421,7 +421,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
 
             {/* Precio total */}
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-[#6b6b6b]">Total</p>
+              <p className="text-[13px] text-[#6b6b6b]">Total</p>
               <p className="text-base font-bold text-[#1a1a1a] leading-tight truncate">
                 ${(displayPrice * quantity).toFixed(2)}
               </p>

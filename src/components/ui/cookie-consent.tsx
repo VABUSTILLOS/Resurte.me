@@ -51,7 +51,7 @@ export function CookieConsent() {
             <p className="text-sm font-semibold text-[#1a1a1a] mb-1">
               Este sitio usa cookies
             </p>
-            <p className="text-xs text-[#6b6b6b] leading-relaxed">
+            <p className="text-[13px] text-[#6b6b6b] leading-relaxed">
               Usamos cookies para analizar tráfico (Google Analytics) y medir el rendimiento de nuestros anuncios (Meta Pixel). No compartimos tus datos con terceros.
             </p>
           </div>

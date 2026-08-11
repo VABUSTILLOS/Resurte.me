@@ -197,7 +197,7 @@ export function TestimonialCarousel() {
               </div>
               <div>
                 <p className="text-sm font-bold text-[#242529]">{t.author}</p>
-                <p className="text-xs text-[var(--text-secondary)]">
+                <p className="text-[13px] text-[var(--text-secondary)]">
                   {t.role} · {t.city}
                 </p>
               </div>

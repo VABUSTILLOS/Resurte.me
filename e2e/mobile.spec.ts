@@ -1295,3 +1295,118 @@ test.describe("Fase 11 móvil: footer 2 columnas y tamaños de texto", () => {
     expect(taglinePx, `tagline de card debería ser ≥11px (es ${taglinePx}px)`).toBeGreaterThanOrEqual(11)
   })
 })
+
+test.describe("Fase 12 móvil: tamaños de texto de lectura (13px)", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
+  // Helper: comprueba que el computed font-size de un locator visible es ≥13px.
+  async function expectFontGe13(page: Page, locator: Locator, label: string): Promise<void> {
+    if ((await locator.count()) === 0) {
+      test.skip(true, `sin elemento para: ${label}`)
+      return
+    }
+    await expect(locator.first()).toBeVisible({ timeout: 5000 })
+    const px = await locator.first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+    expect(px, `${label} debería ser ≥13px (es ${px}px)`).toBeGreaterThanOrEqual(13)
+  }
+
+  test("homepage: labels de stats, contador, Ver todo, subtexto CTA y fine print ≥13px", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1200) // reveal + hidratación
+
+    await expectFontGe13(page, page.getByText("Negocios abastecidos").first(), "stat label")
+    await expectFontGe13(page, page.getByText(/\d+ productos$/).first(), "contador de productos")
+    await expectFontGe13(page, page.getByText("Ver todo", { exact: true }).first(), "link Ver todo")
+    await expectFontGe13(
+      page,
+      page.getByText(/Más de 500 restaurantes/).first(),
+      "subtexto CTA recompensas",
+    )
+    await expectFontGe13(
+      page,
+      page.getByText(/Sin spam. Solo actualizaciones de precios/).first(),
+      "fine print newsletter",
+    )
+  })
+
+  test("carrito: brand del ítem, cross-sell y Seguir comprando ≥13px", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    const quickAdd = page.locator(".quick-add-btn").first()
+    if ((await quickAdd.count()) === 0) {
+      test.skip(true, "no hay productos en /cdmx (sin datos locales)")
+      return
+    }
+    await expect(quickAdd).toBeVisible()
+    if (!(await tapQuickAdd(page, quickAdd))) {
+      test.skip(true, "no se pudo agregar al carrito")
+      return
+    }
+    const cartBar = page.getByText(/Ver carrito ·/).filter({ visible: true }).first()
+    await expect(cartBar).toBeVisible()
+    await cartBar.tap()
+    await expect(page.getByRole("heading", { name: "Mi Carrito" })).toBeVisible()
+
+    // Brand del ítem — primer p secundario bajo el nombre del producto.
+    const brand = page.locator('p[class*="text-[13px]"][class*="--text-secondary"]').first()
+    if ((await brand.count()) > 0) {
+      await expectFontGe13(page, brand, "brand del ítem")
+    }
+
+    // Cross-sell: descripción bajo "Restaurantes también compran".
+    const crossSell = page.getByText(/Complementa tu pedido con/).first()
+    await expectFontGe13(page, crossSell, "desc cross-sell")
+
+    await expectFontGe13(page, page.getByText("← Seguir comprando").first(), "Seguir comprando")
+  })
+
+  test("búsqueda: contadores de categoría ≥13px", async ({ page }) => {
+    await page.goto("/cdmx/buscar", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1200)
+
+    const chips = page.locator("button").filter({ hasText: /^[A-ZÁÉÍÓÚÑ][a-záéíóúñ ]+ \d+$/ }).first()
+    if ((await chips.count()) > 0) {
+      const countSpan = chips.locator("span")
+      if ((await countSpan.count()) > 0) {
+        await expectFontGe13(page, countSpan.first(), "contador de categoría")
+      }
+    }
+  })
+
+  test("producto: nota de stock, info de envío y Total ≥13px", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    const firstCard = page.locator(".product-card a[href*='/producto/']").first()
+    if ((await firstCard.count()) === 0) {
+      test.skip(true, "no hay product-cards en /cdmx (sin datos locales)")
+      return
+    }
+    const href = await firstCard.getAttribute("href")
+    await page.goto(href!, { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1200)
+
+    // El banner de cookies (z-60) oculta el sticky ATC mientras es visible.
+    const accept = page.getByRole("button", { name: "Aceptar todas" })
+    try {
+      await accept.waitFor({ state: "visible", timeout: 4000 })
+      await accept.tap().catch(() => {})
+      await page.waitForTimeout(300)
+    } catch {
+      // Sin banner (consent ya almacenado) — OK.
+    }
+
+    // Total del sticky bar.
+    const total = page.getByText("Total", { exact: true }).first()
+    await expectFontGe13(page, total, "label Total")
+
+    // Info de envío.
+    const delivery = page.getByText(/Envío gratis desde \$2,500/).first()
+    await expectFontGe13(page, delivery, "info de envío")
+  })
+
+  test("cookie banner: texto de aviso ≥13px", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1200) // delay del banner ~800ms
+
+    const body = page.getByText(/Usamos cookies para analizar tráfico/).first()
+    await expectFontGe13(page, body, "texto del cookie banner")
+  })
+})
