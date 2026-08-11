@@ -164,7 +164,7 @@ export const ProductCard = memo(function ProductCard({
             <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] mb-0.5">{product.brand}</p>
           )}
           {/* Scanning-friendly tagline — last sentence of description as a use-case hint */}
-          <p className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] mb-0.5 line-clamp-1 italic">
+          <p className="text-[11px] text-[var(--text-secondary)] mb-0.5 line-clamp-1 italic">
             {tagline ?? "Abasto directo, sin mínimo de compra"}
           </p>
           <h3 className="text-[13px] sm:text-sm text-[#1a1a1a] font-medium line-clamp-2 leading-tight group-hover:text-[#0E7A0E] transition-colors duration-200">

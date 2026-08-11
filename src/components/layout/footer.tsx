@@ -29,9 +29,9 @@ export function Footer() {
   return (
     <footer className="bg-[#242529] text-[#C7C8CD] mt-auto site-footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-[calc(3rem+env(safe-area-inset-bottom))]">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-8 sm:gap-8">
           {/* Brand */}
-          <div>
+          <div className="col-span-2 md:col-span-1">
             <Link href="/" className="inline-block mb-4" aria-label="Resurte.me — Ir al inicio">
               <span className="text-xl font-bold text-[#3CC73C]">Resurte</span>
               <span className="text-xl font-bold text-[#E8E9EB]">.me</span>

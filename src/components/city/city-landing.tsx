@@ -140,14 +140,14 @@ export function CityLanding({
           <div className="grid grid-cols-1 lg:grid-cols-[52%_48%] min-h-[auto] lg:min-h-[580px]">
             {/* Left: Copy */}
             <div className="pt-10 sm:pt-14 lg:py-20 pb-4 sm:pb-6 z-10 flex flex-col justify-center">
-              <p className="text-[10px] sm:text-xs font-medium tracking-[0.2em] uppercase text-[#3CC73C] mb-3 sm:mb-4">
+              <p className="text-xs font-medium tracking-[0.2em] uppercase text-[#3CC73C] mb-3 sm:mb-4">
                 Proveeduría inteligente para tu cocina
               </p>
               <h1 className="text-[2rem] leading-[1.1] sm:text-5xl lg:text-[3.5rem] font-bold text-white tracking-tight text-balance">
                 Del campo a tu{" "}
                 <span className="text-[#3CC73C]">cocina</span>
               </h1>
-              <p className="mt-3 sm:mt-5 text-sm sm:text-lg text-white/70 sm:text-white/75 leading-relaxed max-w-[480px]">
+              <p className="mt-3 sm:mt-5 text-sm sm:text-lg text-white/75 leading-relaxed max-w-[480px]">
                 Pide los insumos de tu restaurante desde el cel. Te los entregamos al siguiente día, frescos y al mejor precio. Sin madrugar, sin vueltas.
               </p>
               <div className="mt-4 sm:mt-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs sm:text-sm text-white/60 sm:text-white/70">
@@ -172,7 +172,7 @@ export function CityLanding({
                 </span>
               </div>
               {/* Mobile-only compact feature line */}
-              <p className="mt-3 sm:hidden text-[11px] text-white/50">
+              <p className="mt-3 sm:hidden text-xs text-white/60">
                 📄 Factura automática · 🔄 Devolución sin costo · 🚚 Entrega al siguiente día
               </p>
               <form
@@ -517,7 +517,7 @@ export function CityLanding({
                 <h3 className="font-semibold text-[#242529] mb-1.5 group-hover:text-[#0E7A0E] transition-colors text-sm sm:text-base">
                   {seg.title}
                 </h3>
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">{seg.desc}</p>
+                <p className="text-[13px] sm:text-sm text-[var(--text-secondary)] leading-relaxed">{seg.desc}</p>
               </div>
             ))}
           </div>
@@ -642,7 +642,7 @@ export function CityLanding({
                     <span className="mt-0.5 text-[#0E7A0E] shrink-0">✓</span>
                     <div>
                       <strong className="text-[#242529]">{item.title}</strong>
-                      <span className="block text-xs text-[var(--text-secondary)] mt-0.5">{item.desc}</span>
+                      <span className="block text-[13px] sm:text-sm text-[var(--text-secondary)] mt-0.5">{item.desc}</span>
                     </div>
                   </li>
                 ))}

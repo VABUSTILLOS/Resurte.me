@@ -566,8 +566,8 @@ test.describe("móvil: micro-conversión — touch targets Fase 4", () => {
     })
     expect(targets, `touch-targets de /buscar menores a 44px:\n${targets.join("\n")}`).toEqual([])
 
-    const todoBox = await todoChip.boundingBox()
-    const selectBox = await selectWrap.boundingBox()
+    const todoBox = await boundingBoxSettled(todoChip)
+    const selectBox = await boundingBoxSettled(selectWrap)
     expect(todoBox).not.toBeNull()
     expect(selectBox).not.toBeNull()
     expect(todoBox!.height).toBeGreaterThanOrEqual(44)
@@ -1224,5 +1224,74 @@ test.describe("Fase 10 móvil: botones Agregar y grid de catálogo", () => {
     const firstRowCount = tops.filter((t) => t === tops[0]).length
     expect(firstRowCount, `primera fila debería tener 2 cards (tops: ${tops.join(", ")})`).toBe(2)
     expect(tops[2] ?? 0, "el 3er card debe ir en la segunda fila").toBeGreaterThan(tops[0] ?? 0)
+  })
+})
+
+// ===== Fase 11 — footer en 2 columnas (como tablet) y lectura móvil =====
+test.describe("Fase 11 móvil: footer 2 columnas y tamaños de texto", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
+  test("el footer muestra el bloque de marca arriba y los links en 2 filas de 2", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1200) // reveal + hidratación
+
+    const footer = page.locator("footer.site-footer")
+    await expect(footer).toBeVisible({ timeout: 5000 })
+    const grid = footer.locator("div.grid").first()
+    const h2s = grid.locator("h2")
+    await expect(h2s).toHaveCount(4)
+
+    const tops = await h2s.evaluateAll((els) =>
+      els.map((el) => Math.round((el as HTMLElement).getBoundingClientRect().top)),
+    )
+
+    // Primera fila: dos h2 comparten top; segunda fila: los otros dos empiezan más abajo.
+    const firstRowTop = tops[0]
+    const firstRow = tops.filter((t) => t === firstRowTop)
+    expect(firstRow.length, `fila 1 debería tener 2 h2 (tops: ${tops.join(", ")})`).toBe(2)
+
+    const row2Top = tops.find((t) => t > (firstRowTop ?? -1))
+    expect(row2Top, "debería existir una segunda fila").toBeDefined()
+    const secondRow = tops.filter((t) => row2Top !== undefined && t === row2Top)
+    expect(secondRow.length, `fila 2 debería tener 2 h2 (tops: ${tops.join(", ")})`).toBe(2)
+    expect(
+      tops.filter((t) => t !== firstRowTop && row2Top !== undefined && t !== row2Top),
+      "no deberían sobrar h2 sueltos",
+    ).toEqual([])
+
+    // El bloque de marca está arriba, a ancho completo (ocupa 2 columnas).
+    const brand = grid.locator("> div").first()
+    const brandBox = await brand.boundingBox()
+    const firstNavBox = await grid.locator("> nav").first().boundingBox()
+    expect(brandBox, "marca sin bounding box").not.toBeNull()
+    expect(firstNavBox, "nav sin bounding box").not.toBeNull()
+    expect(brandBox!.y + brandBox!.height, "la marca debe quedar arriba de los links").toBeLessThanOrEqual(
+      firstNavBox!.y + 1,
+    )
+    expect(
+      brandBox!.width / firstNavBox!.width,
+      "la marca debe ocupar ~2 columnas (no una)",
+    ).toBeGreaterThan(1.8)
+  })
+
+  test("el hero kicker mide al menos 12px y el tagline de card al menos 11px", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1200) // reveal + hidratación
+
+    // Hero kicker — el label uppercase del hero.
+    const kicker = page.getByText("Proveeduría inteligente para tu cocina")
+    await expect(kicker).toBeVisible({ timeout: 5000 })
+    const kickerPx = await kicker.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+    expect(kickerPx, `kicker del hero debería ser ≥12px (es ${kickerPx}px)`).toBeGreaterThanOrEqual(12)
+
+    // Tagline de card — p italic line-clamp-1 dentro de .product-card.
+    const tagline = page.locator(".product-card .line-clamp-1.italic").first()
+    if ((await tagline.count()) === 0) {
+      test.skip(true, "no hay product-cards en /cdmx (sin datos locales)")
+      return
+    }
+    await expect(tagline).toBeVisible()
+    const taglinePx = await tagline.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+    expect(taglinePx, `tagline de card debería ser ≥11px (es ${taglinePx}px)`).toBeGreaterThanOrEqual(11)
   })
 })
