@@ -1410,3 +1410,116 @@ test.describe("Fase 12 móvil: tamaños de texto de lectura (13px)", () => {
     await expectFontGe13(page, body, "texto del cookie banner")
   })
 })
+
+// ===== Fase 13 — tipografía unificada, swipe en testimonios y sección "3 pasos" =====
+test.describe("móvil: Fase 13 — testimonios (tamaño + swipe) y sección de 3 pasos", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
+  // El banner de cookies (fixed bottom) puede cubrir la parte baja de la sección;
+  // se acepta para liberar el viewport antes de medir.
+  async function dismissCookieBanner(page: Page): Promise<void> {
+    const accept = page.getByRole("button", { name: "Aceptar todas" })
+    try {
+      await accept.waitFor({ state: "visible", timeout: 4000 })
+      await accept.tap().catch(() => {})
+      await page.waitForTimeout(300)
+    } catch {
+      // Sin banner (consent ya almacenado) — OK.
+    }
+  }
+
+  // La sección de testimonios del homepage (h2 "Cocineros que confían en nosotros").
+  async function testimonialSection(page: Page): Promise<Locator> {
+    const heading = page.getByRole("heading", { name: "Cocineros que confían en nosotros" })
+    return page.locator("section").filter({ has: heading })
+  }
+
+  // 13A: el quote del testimonio usa text-base (16px) en móvil, no text-lg (18px).
+  test("el quote del testimonio usa ≤16px en móvil", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1500) // reveal + hidratación
+
+    const section = await testimonialSection(page)
+    const quote = section.locator("blockquote p")
+    const sizes = await quote.evaluateAll((els) =>
+      els.map((el) => parseFloat(getComputedStyle(el).fontSize))
+    )
+    expect(sizes.length, "no se encontró el quote del testimonio").toBeGreaterThan(0)
+    expect(Math.max(...sizes), "quote del testimonio demasiado grande en móvil").toBeLessThanOrEqual(16)
+  })
+
+  // 13B: swipe horizontal (CDP Input.dispatchTouchEvent) cambia de testimonio.
+  test("swipe horizontal en testimonios cambia de autor", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1500)
+
+    const section = await testimonialSection(page)
+    const carousel = section.locator("div.relative.max-w-3xl").first()
+    await expect(carousel).toBeVisible({ timeout: 5000 })
+    await carousel.scrollIntoViewIfNeeded()
+    await page.waitForTimeout(400)
+
+    const author = () => carousel.locator("p.text-sm.font-bold").first().textContent()
+    const before = (await author()) ?? ""
+
+    const box = await carousel.boundingBox()
+    expect(box, "carrusel sin boundingBox").not.toBeNull()
+    const startX = box!.x + box!.width * 0.85
+    const y = box!.y + box!.height * 0.5
+
+    const client = await page.context().newCDPSession(page)
+    await client.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x: startX, y }],
+    })
+    await client.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: startX - 90, y }],
+    })
+    await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] })
+    await client.detach()
+
+    // El autor cambia tras el swipe (ventana < 5s del autoplay para no depender de él).
+    await expect
+      .poll(async () => (await author()) ?? "", { timeout: 4000, intervals: [100, 250, 400] })
+      .not.toBe(before)
+  })
+
+  // 13C: la sección "Abastece tu negocio en 3 pasos" cabe en una sola pantalla.
+  test("la sección 'Abastece tu negocio en 3 pasos' cabe en una pantalla", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1500)
+    await dismissCookieBanner(page)
+
+    const heading = page.getByRole("heading", { name: "Abastece tu negocio en 3 pasos" })
+    await expect(heading).toBeVisible({ timeout: 5000 })
+    const section = page.locator("section").filter({ has: heading })
+
+    // Se scrollea la sección completa (no solo el heading) para que quede
+    // alineada dentro del viewport — así se mide si cabe en una pantalla.
+    await section.scrollIntoViewIfNeeded()
+    await page.waitForTimeout(400)
+
+    const sectionBox = await section.boundingBox()
+    expect(sectionBox, "sección sin boundingBox").not.toBeNull()
+    const vh = page.viewportSize()!.height
+    expect(sectionBox!.y, "la sección arranca dentro del viewport").toBeGreaterThanOrEqual(0)
+    expect(sectionBox!.y + sectionBox!.height, "la sección desborda la pantalla").toBeLessThanOrEqual(vh + 1)
+  })
+
+  // 13A: los h3 de los pasos usan text-sm (14px) en móvil, alineado con "Hecho para ti".
+  test("los h3 de los 3 pasos usan ≤16px en móvil", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1500)
+
+    const heading = page.getByRole("heading", { name: "Abastece tu negocio en 3 pasos" })
+    await expect(heading).toBeVisible({ timeout: 5000 })
+    const section = page.locator("section").filter({ has: heading })
+
+    const sizes = await section
+      .locator("h3")
+      .evaluateAll((els) => els.map((el) => parseFloat(getComputedStyle(el).fontSize)))
+    expect(sizes.length, "no se encontraron los h3 de los pasos").toBe(3)
+    expect(Math.max(...sizes), "h3 de los pasos demasiado grande en móvil").toBeLessThanOrEqual(16)
+  })
+})

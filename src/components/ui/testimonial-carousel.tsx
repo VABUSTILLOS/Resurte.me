@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Star, ChevronLeft, ChevronRight, Quote } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -106,6 +106,8 @@ export function TestimonialCarousel() {
   const [current, setCurrent] = useState(0)
   const [direction, setDirection] = useState(1)
 
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
+
   const goTo = useCallback((index: number) => {
     setDirection(index > current ? 1 : -1)
     setCurrent(index)
@@ -120,6 +122,30 @@ export function TestimonialCarousel() {
     setDirection(-1)
     setCurrent((prev) => (prev - 1 + TESTIMONIALS.length) % TESTIMONIALS.length)
   }, [])
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    if (!touch) return
+    touchStart.current = { x: touch.clientX, y: touch.clientY }
+  }, [])
+
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      const start = touchStart.current
+      touchStart.current = null
+      if (!start) return
+      const touch = e.changedTouches[0]
+      if (!touch) return
+      const dx = touch.clientX - start.x
+      const dy = touch.clientY - start.y
+      // Solo swipe horizontal predominante, evita romper el scroll vertical
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+        if (dx < 0) next()
+        else prev()
+      }
+    },
+    [next, prev],
+  )
 
   // Auto-play
   useEffect(() => {
@@ -155,6 +181,8 @@ export function TestimonialCarousel() {
       className="relative max-w-3xl mx-auto"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Main card */}
       <div className="relative overflow-hidden rounded-2xl bg-white border border-[#E8E9EB] shadow-sm">
@@ -178,7 +206,7 @@ export function TestimonialCarousel() {
 
             {/* Quote text */}
             <blockquote className="text-center">
-              <p className="text-lg sm:text-xl text-[#343538] leading-relaxed font-medium italic">
+              <p className="text-base sm:text-lg text-[#242529] leading-relaxed font-medium italic">
                 &ldquo;{t.quote}&rdquo;
               </p>
             </blockquote>
