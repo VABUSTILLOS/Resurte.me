@@ -132,6 +132,7 @@ export interface Tool {
   color: string
   bgColor: string
   area: ToolArea
+  short?: string
   collectionDesc?: (name: string) => string
   standalone?: boolean
 }
@@ -158,6 +159,7 @@ export const TOOLS: Tool[] = [
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     area: "costos",
+    short: "Costear",
     collectionDesc: (name) => `Costea los platillos típicos de ${name} con precios reales de Resurte.me.`,
   },
   {
@@ -168,6 +170,7 @@ export const TOOLS: Tool[] = [
     color: "text-emerald-600",
     bgColor: "bg-emerald-50",
     area: "planeacion",
+    short: "Planear compras",
     collectionDesc: (name) => `Planea tus compras para ${name} según la demanda esperada.`,
   },
   {
@@ -178,6 +181,7 @@ export const TOOLS: Tool[] = [
     color: "text-red-600",
     bgColor: "bg-red-50",
     area: "costos",
+    short: "Mermas",
     collectionDesc: (name) => `Controla el desperdicio típico de ${name} y reduce pérdidas.`,
   },
   {
@@ -188,6 +192,7 @@ export const TOOLS: Tool[] = [
     color: "text-amber-600",
     bgColor: "bg-amber-50",
     area: "costos",
+    short: "Rentabilidad",
     collectionDesc: (name) => `Monitorea la rentabilidad de tu menú de ${name} en tiempo real.`,
   },
   {
@@ -198,6 +203,7 @@ export const TOOLS: Tool[] = [
     color: "text-purple-600",
     bgColor: "bg-purple-50",
     area: "planeacion",
+    short: "Temporada",
     collectionDesc: (name) => `Descubre los insumos de temporada ideales para ${name}.`,
   },
   {
@@ -208,6 +214,7 @@ export const TOOLS: Tool[] = [
     color: "text-indigo-600",
     bgColor: "bg-indigo-50",
     area: "operacion",
+    short: "Kit apertura",
     collectionDesc: (name) => `Todo lo que necesitas para abrir tu ${name}, en un solo lugar.`,
   },
   {
@@ -218,6 +225,7 @@ export const TOOLS: Tool[] = [
     color: "text-cyan-600",
     bgColor: "bg-cyan-50",
     area: "planeacion",
+    short: "Inventario",
     collectionDesc: (name) => `Controla el inventario de tu ${name} y nunca te quedes sin insumos.`,
   },
   {
@@ -228,6 +236,7 @@ export const TOOLS: Tool[] = [
     color: "text-emerald-600",
     bgColor: "bg-emerald-50",
     area: "operacion",
+    short: "Ventas",
     collectionDesc: (name) => `Registra las ventas de tu ${name} y conoce tu margen real del día.`,
   },
   {
@@ -238,6 +247,7 @@ export const TOOLS: Tool[] = [
     color: "text-orange-600",
     bgColor: "bg-orange-50",
     area: "operacion",
+    short: "Comandas",
     collectionDesc: (name) => `Despacha las comandas de tu ${name} por tipo de servicio y controla los tiempos en cocina.`,
   },
   // ---- Sistema de pedidos (FoodOS) ----
@@ -249,6 +259,7 @@ export const TOOLS: Tool[] = [
     color: "text-emerald-600",
     bgColor: "bg-emerald-50",
     area: "sistema",
+    short: "Perfil",
     standalone: true,
   },
   {
@@ -259,6 +270,7 @@ export const TOOLS: Tool[] = [
     color: "text-orange-600",
     bgColor: "bg-orange-50",
     area: "sistema",
+    short: "Menú digital",
     standalone: true,
   },
   {
@@ -269,6 +281,7 @@ export const TOOLS: Tool[] = [
     color: "text-purple-600",
     bgColor: "bg-purple-50",
     area: "sistema",
+    short: "Combos",
     standalone: true,
   },
   {
@@ -279,6 +292,7 @@ export const TOOLS: Tool[] = [
     color: "text-red-600",
     bgColor: "bg-red-50",
     area: "sistema",
+    short: "Clientes",
     standalone: true,
   },
   {
@@ -289,6 +303,7 @@ export const TOOLS: Tool[] = [
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     area: "sistema",
+    short: "Tablero",
     standalone: true,
   },
   {
@@ -299,6 +314,7 @@ export const TOOLS: Tool[] = [
     color: "text-teal-600",
     bgColor: "bg-teal-50",
     area: "sistema",
+    short: "Marketplace",
     standalone: true,
   },
 ]

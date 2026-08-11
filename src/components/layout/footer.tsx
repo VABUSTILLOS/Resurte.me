@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Heart } from "lucide-react"
 
-const FOOTER_LINKS = {
+export const FOOTER_LINKS = {
   Compañía: [
     { label: "Sobre nosotros", href: "/about" },
     { label: "Zonas de entrega", href: "/ciudades" },

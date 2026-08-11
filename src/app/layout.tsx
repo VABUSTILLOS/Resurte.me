@@ -4,7 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { CityProvider, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { CartProvider } from "@/contexts/cart-context"
 import { Header } from "@/components/layout/header"
-import { Footer } from "@/components/layout/footer"
+import { FooterForRoute } from "@/components/layout/FooterForRoute"
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { CityDetector } from "@/components/city/city-detector"
 import { CartDrawer, MobileCartBar } from "@/components/cart/cart-drawer"
@@ -160,7 +160,7 @@ export default async function RootLayout({
               <OnboardingWizardGate />
               <Header />
               <main id="main-content" tabIndex={-1} className="flex-1 outline-none"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
-              <Footer />
+              <FooterForRoute />
               <CityDetector />
               <CartDrawer />
               <CheckoutDrawer />

@@ -1,7 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { Receipt, Copy, ArrowRight, Target } from "lucide-react"
+import { useState, useSyncExternalStore } from "react"
+import { Receipt, Copy, ArrowRight, Target, ChevronDown } from "lucide-react"
+import { useMediaQuery } from "@/hooks/use-media-query"
 import type { HubGoalProgress, HubTodaySales } from "./hub-data"
 
 interface DaySummaryProps {
@@ -13,18 +15,43 @@ interface DaySummaryProps {
 
 export default function DaySummary({ todaySales, puntosHoy, goalProgress, onCopy }: DaySummaryProps) {
   const copyDisabled = todaySales.count === 0 && todaySales.todayMerma === 0
+  const isDesktop = useMediaQuery("(min-width: 640px)", false)
+  const [collapsedMobile, setCollapsedMobile] = useState(true)
+
+  // SSR/hydration-safe hydration flag: false on the server, true once mounted.
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  )
+
+  // Body is visible until hydrated (SSR/no-flash); then mobile collapses it.
+  const bodyVisible = isDesktop || !hydrated || !collapsedMobile
+
+  const toggle = () => {
+    if (!isDesktop) setCollapsedMobile((c) => !c)
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
       <div className="flex items-center justify-between p-3 sm:p-4 pb-2.5 sm:pb-3">
-        <div className="flex items-center gap-2">
-          <Receipt className="w-5 h-5 text-[#0E7A0E]" />
-          <h3 className="font-semibold text-gray-900 text-sm">Resumen del día</h3>
+        <button
+          onClick={toggle}
+          className="flex items-center gap-2 min-w-0"
+          aria-expanded={bodyVisible}
+          aria-label={bodyVisible ? "Colapsar resumen del día" : "Expandir resumen del día"}
+        >
+          <Receipt className="w-5 h-5 text-[#0E7A0E] shrink-0" />
+          <h3 className="font-semibold text-gray-900 text-sm truncate">Resumen del día</h3>
           {todaySales.count === 0 && (
-            <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Sin ventas aún</span>
+            <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0">Sin ventas aún</span>
           )}
-        </div>
-        <div className="flex items-center gap-2">
+          <ChevronDown
+            className={`w-4 h-4 text-gray-400 shrink-0 transition-transform sm:hidden ${bodyVisible ? "" : "rotate-180"}`}
+            aria-hidden="true"
+          />
+        </button>
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onCopy}
             disabled={copyDisabled}
@@ -41,6 +68,8 @@ export default function DaySummary({ todaySales, puntosHoy, goalProgress, onCopy
           </Link>
         </div>
       </div>
+      {bodyVisible && (
+        <>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-3 sm:px-4 pb-3 sm:pb-4">
         <div className="bg-green-50 rounded-xl p-3 text-center">
           <p className="text-[10px] text-green-600">Ingresos hoy</p>
@@ -113,6 +142,8 @@ export default function DaySummary({ todaySales, puntosHoy, goalProgress, onCopy
             {goalProgress.pct >= 100 ? "¡Meta cumplida! 🎉" : goalProgress.pct >= 50 ? `Vas al ${goalProgress.projected}% de tu meta del día.` : "Aún por debajo del 50% de tu meta."}
           </p>
         </div>
+        )}
+        </>
       )}
     </div>
   )

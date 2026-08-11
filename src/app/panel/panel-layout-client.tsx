@@ -8,6 +8,7 @@ import { ToastProvider } from "@/components/toast"
 import ThemeToggle from "@/components/panel/ThemeToggle"
 import { PanelMobileNav } from "./_components/PanelMobileNav"
 import { PanelQuickNav } from "./_components/PanelQuickNav"
+import { PanelCompactFooter } from "@/components/panel/PanelCompactFooter"
 import { t } from "@/lib/i18n/es"
 import type { RestaurantCollection } from "@/types"
 import {
@@ -166,9 +167,9 @@ function PanelContent({ children }: { children: React.ReactNode }) {
           </div>
           </div>
 
-          {/* Selected collection banner */}
+          {/* Selected collection banner — hidden on mobile (reclaims the sticky nav row) */}
           {selectedCollection && (
-            <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+            <div className="hidden sm:mt-2 sm:flex items-center gap-2 text-xs text-gray-400">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>{t("panel.toolsPersonalizedFor")}</span>
               <span className="font-semibold text-gray-600">{selectedCollection.name}</span>
@@ -180,6 +181,8 @@ function PanelContent({ children }: { children: React.ReactNode }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-24 lg:pb-6">
         <ToastProvider>{children}</ToastProvider>
       </div>
+
+      <PanelCompactFooter />
 
       {selectedCollection && <PanelQuickNav />}
 

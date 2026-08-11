@@ -50,8 +50,13 @@ export default function ToolGrid({ tools, selectedCollection }: ToolGridProps) {
                     <tool.icon className={`w-5 h-5 ${tool.color}`} />
                   </div>
                   <div className="min-w-0 flex-1 sm:flex-none">
-                    <h3 className="text-sm sm:text-base font-bold text-gray-900 sm:mb-1.5 truncate sm:whitespace-normal sm:overflow-visible">
-                      {tool.title}
+                    <h3 className="text-sm sm:text-base font-bold text-gray-900 sm:mb-1.5 truncate sm:whitespace-normal sm:overflow-visible flex items-center gap-1.5 min-w-0 sm:block">
+                      {tool.short && (
+                        <span className={`shrink-0 sm:hidden text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md ${tool.bgColor} ${tool.color}`}>
+                          {tool.short}
+                        </span>
+                      )}
+                      <span className="truncate sm:whitespace-normal">{tool.title}</span>
                     </h3>
                     <p className="hidden sm:block text-sm text-gray-500 leading-relaxed sm:mb-3">
                       {selectedCollection && tool.collectionDesc

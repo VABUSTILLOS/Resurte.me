@@ -25,9 +25,15 @@ function applyTheme(pref: ThemePreference) {
   }
 }
 
+function getOsDark(): boolean {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches
+}
+
 export default function ThemeToggle() {
   const [pref, setPref] = useState<ThemePreference>("system")
   const [mounted, setMounted] = useState(false)
+  const [osDark, setOsDark] = useState<boolean>(false)
+  const [pressed, setPressed] = useState<ThemePreference | null>(null)
 
   // On mount: read stored preference, apply it immediately and render the correct
   // active state. The pre-hydration <script> already set data-theme, so applying
@@ -38,10 +44,22 @@ export default function ThemeToggle() {
     applyTheme(stored)
     const id = setTimeout(() => {
       setPref(stored)
+      setOsDark(getOsDark())
       setMounted(true)
     }, 0)
     return () => clearTimeout(id)
   }, [])
+
+  // Track the OS color scheme so the "system" option can show which theme
+  // is currently resolved (feedback even when OS == stored preference).
+  useEffect(() => {
+    if (!mounted) return
+    if (!window.matchMedia) return
+    const mq = window.matchMedia("(prefers-color-scheme: dark)")
+    const onChange = () => setOsDark(mq.matches)
+    mq.addEventListener("change", onChange)
+    return () => mq.removeEventListener("change", onChange)
+  }, [mounted])
 
   useEffect(() => {
     if (!mounted) return
@@ -57,6 +75,16 @@ export default function ThemeToggle() {
     }
   }, [pref, mounted])
 
+  // Tapping any option (including the already-active one) gives tactile feedback.
+  const handleSelect = (value: ThemePreference) => {
+    setPref(value)
+    setPressed(value)
+    window.setTimeout(() => setPressed(null), 200)
+  }
+
+  const resolvedTheme: "light" | "dark" = pref === "system" ? (osDark ? "dark" : "light") : pref
+  const resolvedLabel = resolvedTheme === "dark" ? t("theme.dark") : t("theme.light")
+
   const options: { value: ThemePreference; label: string; icon: React.ReactNode }[] = [
     { value: "light", label: t("theme.light"), icon: <Sun className="w-3.5 h-3.5" /> },
     { value: "dark", label: t("theme.dark"), icon: <Moon className="w-3.5 h-3.5" /> },
@@ -68,25 +96,45 @@ export default function ThemeToggle() {
       className="flex items-center gap-0.5 p-1 rounded-full border border-gray-200 bg-white/80"
       role="radiogroup"
       aria-label={t("theme.label")}
-      title="Tema: claro, oscuro o según el sistema"
+      title={`Tema: ${pref === "system" ? `según el sistema (ahora ${resolvedLabel.toLowerCase()})` : resolvedLabel}`}
     >
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          role="radio"
-          aria-checked={pref === opt.value}
-          aria-label={opt.label}
-          onClick={() => setPref(opt.value)}
-          className={cn(
-            "flex items-center justify-center w-8 h-8 rounded-full transition-colors",
-            pref === opt.value
-              ? "bg-[#0E7A0E] text-white"
-              : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-          )}
-        >
-          {opt.icon}
-        </button>
-      ))}
+      {options.map((opt) => {
+        const active = pref === opt.value
+        const isSystem = opt.value === "system"
+        const label = isSystem ? `${opt.label} (${resolvedLabel.toLowerCase()})` : opt.label
+        const isPressed = pressed === opt.value
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={label}
+            onClick={() => handleSelect(opt.value)}
+            className={cn(
+              "relative flex items-center justify-center w-8 h-8 rounded-full transition-all duration-150",
+              active
+                ? "bg-[#0E7A0E] text-white"
+                : "text-gray-400 hover:text-gray-600 hover:bg-gray-100",
+              isPressed && "scale-90"
+            )}
+          >
+            {opt.icon}
+            {isSystem && (
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-white/80",
+                  resolvedTheme === "dark" ? "bg-indigo-400" : "bg-amber-400"
+                )}
+              />
+            )}
+          </button>
+        )
+      })}
+      <span className="sr-only" role="status" aria-live="polite">
+        {mounted ? `${t("theme.label")}: ${resolvedLabel}` : ""}
+      </span>
     </div>
   )
 }

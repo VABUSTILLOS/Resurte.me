@@ -29,7 +29,7 @@ export default function ComandaHeader({ collectionName, hasComandas, onCopyRepor
           )}
         </div>
         <p className="text-sm text-gray-400">
-          {collectionName} — monitor de producción tipo SoftRestaurant
+          {collectionName} — monitor de producción de tu cocina en tiempo real
         </p>
       </div>
     </div>

@@ -1815,3 +1815,110 @@ test.describe("Fase 16 — PanelQuickNav solo en móvil", () => {
     await expect(page.getByRole("navigation", { name: "Accesos rápidos del panel" })).toHaveCount(0)
   })
 })
+
+test.describe("Fase 17 — Panel: banner oculto, ThemeToggle con feedback, footer compacto, intuitividad", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo móvil")
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/panel", { waitUntil: "domcontentloaded" })
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
+  })
+
+  async function selectCollection(page: import("@playwright/test").Page) {
+    const nav = page.getByRole("navigation", { name: "Accesos rápidos del panel" })
+    if (await nav.isVisible().catch(() => false)) return
+    const pickerBtn = page.locator("button", { hasText: /Hamburguesas y Hot Dogs/ }).first()
+    await pickerBtn.tap().catch(() => {})
+    await page.waitForTimeout(800)
+  }
+
+  test("el banner 'personalizadas para' está oculto en móvil", async ({ page }) => {
+    await selectCollection(page)
+    const banner = page.getByText("Todas las herramientas están personalizadas para")
+    await expect(banner).toHaveCount(1)
+    await expect(banner).toBeHidden()
+  })
+
+  test("ThemeToggle: dark y system con feedback del tema resuelto", async ({ page }) => {
+    const toggle = page.getByRole("radiogroup", { name: "Tema de color" })
+    await expect(toggle).toBeVisible({ timeout: 8000 })
+
+    await page.getByRole("radio", { name: "Oscuro", exact: true }).tap()
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark")
+
+    // El botón "Sistema" anuncia el tema resuelto y su dot lo pinta (dark → indigo).
+    const system = page.getByRole("radio", { name: /^Sistema \(/ })
+    await expect(system).toHaveAttribute("aria-label", /\(oscuro\)/)
+    await expect(system.locator("span").first()).toHaveClass(/bg-indigo-400/)
+
+    // Volver a "Sistema" → sin atributo data-theme y el dot sigue presente.
+    await system.tap()
+    await expect(page.locator("html")).not.toHaveAttribute("data-theme", /./)
+    await expect(page.getByRole("radio", { name: /^Sistema \(/ })).toHaveAttribute(
+      "aria-label",
+      /\(claro\)|\(oscuro\)/
+    )
+  })
+
+  test("footer del panel es compacto con navs deslizables", async ({ page }) => {
+    const footer = page.locator("footer.panel-compact-footer")
+    await footer.scrollIntoViewIfNeeded()
+    await expect(footer).toBeVisible({ timeout: 8000 })
+    await expect(page.getByRole("link", { name: "Resurte.me — Ir al inicio" })).toBeVisible()
+
+    const carousel = footer.locator("div.flex.gap-4.overflow-x-auto.scrollbar-hide")
+    const m = await carousel.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }))
+    expect(m.sw, "carrusel de navs deslizable").toBeGreaterThan(m.cw)
+
+    const metrics = await footer.evaluate((el) => {
+      const inner = el.firstElementChild as HTMLElement
+      const pb = parseFloat(getComputedStyle(inner).paddingBottom)
+      return { total: el.getBoundingClientRect().height, pb }
+    })
+    // Altura visual del footer (sin el clearance de PanelQuickNav) < 260px
+    // (el footer global de páginas públicas mide ~551px).
+    expect(metrics.total - metrics.pb, "footer compacto").toBeLessThan(260)
+  })
+
+  test("la comanda del panel no menciona SoftRestaurant", async ({ page }) => {
+    await selectCollection(page)
+    await page.goto("/panel/comanda", { waitUntil: "domcontentloaded" })
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
+    const text = await page.evaluate(() => document.body.innerText.toLowerCase())
+    expect(text).not.toContain("softrestaurant")
+  })
+
+  test("DaySummary es colapsable en móvil", async ({ page }) => {
+    await selectCollection(page)
+
+    const expandBtn = page.getByRole("button", { name: "Expandir resumen del día" })
+    await expect(expandBtn).toBeVisible({ timeout: 8000 })
+    await expect(page.getByText("Ingresos hoy")).toBeHidden()
+
+    await expandBtn.tap()
+    await expect(page.getByText("Ingresos hoy")).toBeVisible()
+  })
+
+  test("las cards del grid muestran micro-label 'short'", async ({ page }) => {
+    await selectCollection(page)
+    const grid = page.locator("div.flex.flex-col.gap-2").first()
+    const firstCard = grid.locator("a").first()
+    await expect(firstCard.getByText("Costear")).toBeVisible()
+  })
+})
+
+test.describe("Fase 17 — Banner 'personalizadas para' visible en desktop", () => {
+  test.use({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false })
+
+  test("en desktop el banner sí se muestra tras elegir colección", async ({ page }) => {
+    await page.goto("/panel", { waitUntil: "domcontentloaded" })
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
+
+    const pickerBtn = page.locator("button", { hasText: /Hamburguesas y Hot Dogs/ }).first()
+    // Desktop sin hasTouch → tap() lanza y el catch lo traga; usar click().
+    await pickerBtn.click().catch(() => {})
+    await page.waitForTimeout(800)
+
+    await expect(page.getByText("Todas las herramientas están personalizadas para")).toBeVisible()
+  })
+})
