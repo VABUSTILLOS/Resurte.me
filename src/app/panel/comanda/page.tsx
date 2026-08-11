@@ -18,6 +18,7 @@ import type { InProductionGroup, DishAvgTime } from "@/components/panel/comanda/
 import KitchenBoard from "@/components/panel/comanda/kitchen-board"
 import ComandaList from "@/components/panel/comanda/comanda-list"
 import ComandaEmpty from "@/components/panel/comanda/comanda-empty"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 export default function ComandaPage() {
   const { selectedCollection } = useRestaurant()
@@ -286,6 +287,7 @@ export default function ComandaPage() {
       {dayEntries.length > 0 && filtered.length === 0 && (
         <ComandaEmpty dayEntriesLength={dayEntries.length} filteredLength={filtered.length} />
       )}
+      <ToolGuideHost toolKey="comanda" pathname="/panel/comanda" slug={slug} icon="👨‍🍳" title="Comanda (cocina)" subtitle={selectedCollection.name} />
     </div>
   )
 }

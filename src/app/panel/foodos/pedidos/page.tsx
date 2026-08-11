@@ -34,6 +34,7 @@ import {
   CreditCard,
   Banknote,
 } from "lucide-react"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 const STATUS_FLOW: FoodosOrderStatus[] = [
   "pending",
@@ -332,6 +333,7 @@ export default function PedidosPage() {
           ))}
         </div>
       )}
+      <ToolGuideHost toolKey="pedidos" pathname="/panel/foodos/pedidos" slug={null} icon="🧋" title="Pedidos en vivo" />
     </div>
   )
 }

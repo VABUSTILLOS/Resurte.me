@@ -6,6 +6,7 @@ import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
 import type { ShoppingItem, TransferItem } from "@/components/panel/temporada/temporada-shared"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import Link from "next/link"
 import {
   Calendar, ArrowLeft, Sun, Leaf, DollarSign, TrendingDown,
@@ -459,6 +460,7 @@ export default function TemporadaPage() {
           </div>
         </div>
       </div>
+      <ToolGuideHost toolKey="temporada" pathname="/panel/temporada" slug={slug} icon="🗓️" title="Temporada" subtitle={selectedCollection.name} />
     </div>
   )
 }

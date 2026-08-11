@@ -13,6 +13,7 @@ import {
   DollarSign, Download, Trash2,
 } from "lucide-react"
 import type { WasteEntry } from "@/components/panel/mermas/mermas-shared"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 interface DishData { name: string; cost: number; price: number; category: string; alert?: string }
 
@@ -619,6 +620,7 @@ export default function RentabilidadPage() {
           </div>
         </div>
       </div>
+      <ToolGuideHost toolKey="rentabilidad" pathname="/panel/rentabilidad" slug={slug} icon="📊" title="Rentabilidad" subtitle={selectedCollection.name} />
     </div>
   )
 }

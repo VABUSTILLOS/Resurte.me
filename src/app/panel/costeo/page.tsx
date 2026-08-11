@@ -33,6 +33,7 @@ import CosteoSummary from "@/components/panel/costeo/CosteoSummary"
 import RecipePickerModal from "@/components/panel/costeo/RecipePickerModal"
 import DeleteModals from "@/components/panel/costeo/DeleteModals"
 import ShortcutsOverlay from "@/components/panel/costeo/ShortcutsOverlay"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 let dishCounter = 0
 function nextId() { dishCounter++; return `dish-${Date.now()}-${dishCounter}` }
@@ -686,6 +687,7 @@ export default function CosteoPage() {
     />
 
     <ShortcutsOverlay open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+    <ToolGuideHost toolKey="costeo" pathname="/panel/costeo" slug={slug} icon="🧮" title="Costeo de platillos" subtitle={selectedCollection.name} />
     </div>
   )
 }

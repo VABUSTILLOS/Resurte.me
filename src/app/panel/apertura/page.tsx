@@ -5,6 +5,7 @@ import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
 import Link from "next/link"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import {
   ClipboardCheck, ArrowLeft, CheckCircle2, Circle, DollarSign,
   Package, Store, CalendarClock, Printer,
@@ -587,6 +588,7 @@ export default function AperturaPage() {
           </div>
         </div>
       </div>
+      <ToolGuideHost toolKey="apertura" pathname="/panel/apertura" slug={slug} icon="🚀" title="Apertura de restaurante" subtitle={selectedCollection.name} />
     </div>
   )
 }

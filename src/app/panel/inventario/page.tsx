@@ -22,6 +22,7 @@ import MovementHistory from "@/components/panel/inventario/MovementHistory"
 import InventarioTips from "@/components/panel/inventario/InventarioTips"
 import AddEditModal from "@/components/panel/inventario/AddEditModal"
 import DeleteConfirm from "@/components/panel/inventario/DeleteConfirm"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 export default function InventarioPage() {
   const { selectedCollection } = useRestaurant()
@@ -637,6 +638,7 @@ export default function InventarioPage() {
       onCancel={() => setDeleteConfirm(null)}
       onConfirm={deleteItem}
     />
+    <ToolGuideHost toolKey="inventario" pathname="/panel/inventario" slug={slug} icon="📦" title="Inventario" subtitle={selectedCollection.name} />
     </div>
   )
 }

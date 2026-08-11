@@ -20,6 +20,7 @@ import TopSellers from "@/components/panel/ventas/TopSellers"
 import EntriesList from "@/components/panel/ventas/EntriesList"
 import AllTimeTip from "@/components/panel/ventas/AllTimeTip"
 import DeleteConfirmModal from "@/components/panel/ventas/DeleteConfirmModal"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 export default function VentasPage() {
   const {
@@ -99,6 +100,8 @@ export default function VentasPage() {
     copySummary,
     copyCorte,
   } = useVentasPage()
+
+  const slug = selectedCollection?.slug ?? null
 
   if (!selectedCollection) {
     return (
@@ -315,6 +318,16 @@ export default function VentasPage() {
         deductStock={deductStock}
         onCancel={() => setDeleteConfirm(null)}
         onConfirm={deleteEntry}
+      />
+
+      {/* Guía paso a paso + modo demo */}
+      <ToolGuideHost
+        toolKey="ventas"
+        pathname="/panel/ventas"
+        slug={slug}
+        icon="🧾"
+        title="Ventas del día"
+        subtitle={selectedCollection.name}
       />
     </div>
   )

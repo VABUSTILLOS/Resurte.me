@@ -28,6 +28,7 @@ import type {
 import {
   Sparkles, Plus, Trash2, Percent, Trophy, Loader2, Check, Wand2,
 } from "lucide-react"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 interface ComboForm {
   id?: string
@@ -420,6 +421,7 @@ export default function CombosPage() {
           </div>
         </div>
       )}
+      <ToolGuideHost toolKey="combos" pathname="/panel/foodos/combos" slug={null} icon="🎁" title="Combos y cross-sell" />
     </div>
   )
 }

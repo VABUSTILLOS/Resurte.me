@@ -37,6 +37,7 @@ import {
   Percent,
   CalendarClock,
 } from "lucide-react"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 const AUTOMATION_TYPES: { id: FoodosAutomationType; label: string; hint: string }[] = [
   { id: "order_confirmation", label: "Confirmación de pedido", hint: "Se envía al confirmar cada pedido" },
@@ -512,6 +513,7 @@ export default function ClientesPage() {
           </form>
         </div>
       )}
+      <ToolGuideHost toolKey="clientes" pathname="/panel/foodos/clientes" slug={null} icon="👥" title="Clientes y recurrencia" />
     </div>
   )
 }

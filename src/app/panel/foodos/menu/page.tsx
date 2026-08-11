@@ -27,6 +27,7 @@ import type {
 import {
   UtensilsCrossed, Plus, Pencil, Trash2, Download, Check, X, Star, Loader2, Tag,
 } from "lucide-react"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 interface ItemForm {
   id?: string
@@ -535,6 +536,7 @@ export default function MenuPage() {
           </div>
         </div>
       )}
+      <ToolGuideHost toolKey="menu" pathname="/panel/foodos/menu" slug={null} icon="🍔" title="Menú digital" />
     </div>
   )
 }

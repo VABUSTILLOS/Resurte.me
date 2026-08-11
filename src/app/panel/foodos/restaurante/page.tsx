@@ -19,6 +19,7 @@ import type { FoodosRestaurant, FoodosBranch } from "@/types/foodos"
 import {
   Store, MapPin, Plus, Trash2, QrCode, Copy, Check, ExternalLink, Loader2, Building2,
 } from "lucide-react"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 export default function RestaurantePage() {
   const [loading, setLoading] = useState(true)
@@ -380,6 +381,7 @@ export default function RestaurantePage() {
           </>
         )}
       </div>
+      <ToolGuideHost toolKey="restaurante" pathname="/panel/foodos/restaurante" slug={null} icon="🏪" title="Mi restaurante" />
     </div>
   )
 }

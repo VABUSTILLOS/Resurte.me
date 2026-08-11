@@ -20,6 +20,7 @@ import { ShoppingCart } from "lucide-react"
 import type { PlannerProduct } from "@/components/panel/planificador/planificador-shared"
 import type { SaleEntry } from "@/components/panel/ventas/ventas-shared"
 import type { TransferItem } from "@/components/panel/temporada/temporada-shared"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 export default function PlanificadorPage() {
   const { selectedCollection } = useRestaurant()
@@ -322,6 +323,7 @@ export default function PlanificadorPage() {
           }}
         />
       )}
+      <ToolGuideHost toolKey="planificador" pathname="/panel/planificador" slug={slug} icon="📅" title="Planificador de producción" subtitle={collectionName} />
     </div>
   )
 }

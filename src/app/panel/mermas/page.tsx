@@ -20,6 +20,7 @@ import TrendsPanel from "@/components/panel/mermas/trends-panel"
 import MonthlyGoal from "@/components/panel/mermas/monthly-goal"
 import TipsPanel from "@/components/panel/mermas/tips-panel"
 import DeleteConfirmModal from "@/components/panel/mermas/delete-confirm-modal"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 export default function MermasPage() {
   const { selectedCollection } = useRestaurant()
@@ -266,6 +267,7 @@ export default function MermasPage() {
           onCancel={() => setDeleteConfirmId(null)}
         />
       )}
+      <ToolGuideHost toolKey="mermas" pathname="/panel/mermas" slug={slug} icon="🗑️" title="Control de mermas" subtitle={selectedCollection.name} />
     </div>
   )
 }

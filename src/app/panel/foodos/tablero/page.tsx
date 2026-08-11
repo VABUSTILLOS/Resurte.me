@@ -26,6 +26,7 @@ import {
   Percent,
   Sparkles,
 } from "lucide-react"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 const DAY_MS = 86_400_000
 const CANAL_LABEL: Record<string, string> = { web: "Web", qr: "QR", whatsapp: "WhatsApp" }
@@ -301,6 +302,7 @@ export default function TableroPage() {
           </div>
         </Card>
       )}
+      <ToolGuideHost toolKey="tablero" pathname="/panel/foodos/tablero" slug={null} icon="📊" title="Tablero FoodTech" />
     </div>
   )
 }

@@ -27,6 +27,7 @@ import AlertsPanel from "@/components/panel/hub/AlertsPanel"
 import BackupStrip from "@/components/panel/hub/BackupStrip"
 import ToolGrid from "@/components/panel/hub/ToolGrid"
 import RestoreConfirmModal from "@/components/panel/hub/RestoreConfirmModal"
+import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 export default function PanelPage() {
   const { selectedCollection, collections, setSelectedCollection } = useRestaurant()
@@ -399,6 +400,7 @@ export default function PanelPage() {
       />
 
       <GlobalSearch open={showSearch} onClose={() => setShowSearch(false)} slug={slug} />
+      <ToolGuideHost toolKey="panel" pathname="/panel" slug={slug} icon="🏠" title="Panel de herramientas" subtitle={selectedCollection?.name} />
     </div>
   )
 }
