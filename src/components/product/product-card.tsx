@@ -48,8 +48,10 @@ export const ProductCard = memo(function ProductCard({
   // Second image for hover swap effect
   const secondaryImage = product.images?.[1]
 
-  // Extract scanning-friendly tagline from product description
-  const tagline = getProductTagline(product.description)
+  // Extract scanning-friendly tagline from product description.
+  // Fallback: use the raw description (truncated by line-clamp) or a neutral
+  // line so cards with little text stay visually full (Fase 10).
+  const tagline = getProductTagline(product.description) ?? product.description?.trim() ?? null
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -83,7 +85,7 @@ export const ProductCard = memo(function ProductCard({
   }
 
   return (
-    <div className="product-card group relative flex flex-col" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 250px" }}>
+    <div className="product-card group relative flex flex-col h-full" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 250px" }}>
       <Link
         href={`/${citySlug}/producto/${product.slug}`}
         className="flex-1 flex flex-col relative bg-white rounded-xl border border-[#e0dbd2] overflow-hidden hover:shadow-[0_2px_20px_rgba(0,0,0,0.07)] focus-visible:ring-2 focus-visible:ring-[#0E7A0E] focus-visible:ring-offset-1 transition-all duration-300 ease-out hover:-translate-y-0.5"
@@ -162,11 +164,9 @@ export const ProductCard = memo(function ProductCard({
             <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] mb-0.5">{product.brand}</p>
           )}
           {/* Scanning-friendly tagline — last sentence of description as a use-case hint */}
-          {tagline && (
-            <p className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] mb-0.5 line-clamp-1 italic">
-              {tagline}
-            </p>
-          )}
+          <p className="text-[10px] sm:text-[11px] text-[var(--text-secondary)] mb-0.5 line-clamp-1 italic">
+            {tagline ?? "Abasto directo, sin mínimo de compra"}
+          </p>
           <h3 className="text-[13px] sm:text-sm text-[#1a1a1a] font-medium line-clamp-2 leading-tight group-hover:text-[#0E7A0E] transition-colors duration-200">
             {product.name}
           </h3>
@@ -204,7 +204,7 @@ export const ProductCard = memo(function ProductCard({
           onClick={handleAdd}
           aria-label={`Agregar ${product.name} al carrito`}
           className={cn(
-            "quick-add-btn flex items-center justify-center gap-1.5 w-[calc(100%-1.25rem)] mx-auto mb-3 sm:mb-0 sm:w-auto sm:absolute sm:-bottom-2 sm:left-1/2 sm:-translate-x-1/2 sm:z-10 sm:px-5 px-3 py-2 rounded-full text-[13px] sm:text-sm font-semibold transition-all duration-300 ease-out shadow-lg touch-target active:scale-95",
+            "quick-add-btn flex items-center justify-center gap-1.5 w-[calc(100%-1.75rem)] mx-auto mt-2 sm:mt-0 mb-3 sm:mb-0 sm:w-auto sm:absolute sm:-bottom-2 sm:left-1/2 sm:-translate-x-1/2 sm:z-10 px-3 py-1.5 sm:px-5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 ease-out shadow-lg touch-target active:scale-95",
             added
               ? "bg-green-500 text-white"
               : "bg-[#0E7A0E] text-white hover:bg-[#0D720D] hover:shadow-xl"

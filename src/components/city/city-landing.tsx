@@ -486,7 +486,7 @@ export function CityLanding({
               Si tu negocio sirve comida, Resurte es tu proveedor. Sin mínimo, sin membresía, sin complicaciones.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               {
                 icon: "🍽️",
@@ -511,13 +511,13 @@ export function CityLanding({
             ].map((seg) => (
               <div
                 key={seg.title}
-                className="group p-6 rounded-xl border border-[#E8E9EB] hover:border-[#0E7A0E]/30 hover:shadow-sm hover:-translate-y-1 transition-all duration-200"
+                className="group p-4 sm:p-6 rounded-xl border border-[#E8E9EB] hover:border-[#0E7A0E]/30 hover:shadow-sm hover:-translate-y-1 transition-all duration-200"
               >
                 <div className="text-3xl mb-3">{seg.icon}</div>
-                <h3 className="font-semibold text-[#242529] mb-1.5 group-hover:text-[#0E7A0E] transition-colors">
+                <h3 className="font-semibold text-[#242529] mb-1.5 group-hover:text-[#0E7A0E] transition-colors text-sm sm:text-base">
                   {seg.title}
                 </h3>
-                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{seg.desc}</p>
+                <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">{seg.desc}</p>
               </div>
             ))}
           </div>

@@ -242,7 +242,7 @@ function ProductGridSection({
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-5">
         {products.map((product, idx) => (
-          <ScrollReveal key={product.id} direction="scale" delay={idx * 0.04}>
+          <ScrollReveal key={product.id} direction="scale" delay={idx * 0.04} className="h-full">
             <ProductCard
               product={product}
               citySlug={citySlug}

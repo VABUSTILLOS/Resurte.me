@@ -1142,3 +1142,87 @@ test.describe("Fase 9: placeholder animado de búsqueda", () => {
     await expect(marquee).toBeVisible()
   })
 })
+
+// ===== Fase 10 — quick-add despegado/compacto, cards a misma altura y
+// "Hecho para ti" en 2 columnas =====
+test.describe("Fase 10 móvil: botones Agregar y grid de catálogo", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
+  test("en /buscar las cards y los botones Agregar quedan a la misma altura por fila", async ({ page }) => {
+    await page.goto("/cdmx/buscar", { waitUntil: "domcontentloaded" })
+    const card = page.locator(".product-card").first()
+    if ((await card.count()) === 0) {
+      test.skip(true, "no hay productos en /cdmx/buscar (sin datos locales)")
+      return
+    }
+    await expect(card).toBeVisible()
+    await page.waitForTimeout(1500) // reveal + hidratación
+
+    // Agrupa quick-adds por fila (mismo top) y compara su bottom dentro de la fila.
+    const rows = await page.locator(".quick-add-btn").evaluateAll((els) => {
+      const btns = els.map((el) => {
+        const r = (el as HTMLElement).getBoundingClientRect()
+        return { top: Math.round(r.top), bottom: Math.round(r.bottom) }
+      })
+      const grouped = new Map<number, number[]>()
+      for (const b of btns) {
+        if (b.bottom - b.top > 0) {
+          const list = grouped.get(b.top) ?? []
+          list.push(b.bottom)
+          grouped.set(b.top, list)
+        }
+      }
+      return Array.from(grouped.entries())
+        .filter(([, bs]) => bs.length > 1)
+        .map(([top, bs]) => ({ top, min: Math.min(...bs), max: Math.max(...bs) }))
+    })
+
+    const misaligned = rows.filter((r) => r.max - r.min > 2)
+    expect(
+      misaligned,
+      `filas con quick-adds a distinta altura en /buscar:\n${JSON.stringify(misaligned, null, 2)}`,
+    ).toEqual([])
+  })
+
+  test("el botón Agregar queda despegado del box y mide al menos 44px", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    const quickAdd = page.locator(".quick-add-btn").first()
+    if ((await quickAdd.count()) === 0) {
+      test.skip(true, "no hay quick-adds en /cdmx (sin datos locales)")
+      return
+    }
+    await expect(quickAdd).toBeVisible()
+    await page.waitForTimeout(1500) // reveal + hidratación
+
+    const box = await boundingBoxSettled(quickAdd)
+    expect(box, "quick-add sin bounding box").not.toBeNull()
+    expect(box!.height, "touch-target 44px").toBeGreaterThanOrEqual(44)
+
+    // El box del producto es el Link (ancestro inmediato).
+    const card = quickAdd.locator("xpath=..")
+    const link = card.locator("a").first()
+    const linkBox = await boundingBoxSettled(link)
+    expect(linkBox, "box del producto sin bounding box").not.toBeNull()
+
+    // El botón arranca al menos 6px debajo del borde inferior del box.
+    const gap = Math.round((box!.y - (linkBox!.y + linkBox!.height)) * 10) / 10
+    expect(gap, `gap entre box y botón Agregar (${gap}px)`).toBeGreaterThanOrEqual(6)
+  })
+
+  test("la sección 'Hecho para ti' se muestra en 2 columnas en móvil", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    const heading = page.getByRole("heading", { name: "¿Para quién es?" })
+    await expect(heading).toBeVisible({ timeout: 8000 })
+
+    const section = page.locator("section").filter({ has: heading })
+    const cards = section.locator("div.grid > div")
+    await expect(cards).toHaveCount(4)
+
+    const tops = await cards.evaluateAll((els) =>
+      els.map((el) => Math.round((el as HTMLElement).getBoundingClientRect().top)),
+    )
+    const firstRowCount = tops.filter((t) => t === tops[0]).length
+    expect(firstRowCount, `primera fila debería tener 2 cards (tops: ${tops.join(", ")})`).toBe(2)
+    expect(tops[2] ?? 0, "el 3er card debe ir en la segunda fila").toBeGreaterThan(tops[0] ?? 0)
+  })
+})
