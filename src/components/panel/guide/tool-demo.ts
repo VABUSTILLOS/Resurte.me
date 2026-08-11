@@ -302,7 +302,7 @@ export function getToolDemo(pathname: string): ToolDemoConfig | null {
   return TOOL_DEMOS[pathname] ?? null
 }
 
-export interface DemoNavItem {
+export interface PanelNavItem {
   /** Ruta de la herramienta (ej. /panel/ventas) */
   pathname: string
   /** Identificador corto (para tests y accesibilidad) */
@@ -312,10 +312,10 @@ export interface DemoNavItem {
 }
 
 /**
- * Herramientas disponibles en la barra de navegación del modo demo.
+ * Herramientas disponibles en la barra de navegación del panel.
  * Todas tienen dataset demo en `TOOL_DEMOS`.
  */
-export const DEMO_NAV: DemoNavItem[] = [
+export const PANEL_NAV: PanelNavItem[] = [
   { pathname: "/panel", toolKey: "panel", icon: "🏠", label: "Inicio" },
   { pathname: "/panel/ventas", toolKey: "ventas", icon: "🧾", label: "Ventas" },
   { pathname: "/panel/costeo", toolKey: "costeo", icon: "🧮", label: "Costeo" },

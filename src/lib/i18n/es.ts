@@ -81,7 +81,7 @@ const es = {
     label: "Tema de color",
   },
   panel: {
-    title: "Panel de Herramientas",
+    title: "Mi Restaurante",
     pickRestaurantType: "Elige tu tipo de restaurante",
     cuisinePrompt: "¿Qué tipo de cocina tienes?",
     current: "Actual",

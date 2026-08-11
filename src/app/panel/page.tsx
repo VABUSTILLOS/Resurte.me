@@ -26,6 +26,7 @@ import KitchenMonitor from "@/components/panel/hub/KitchenMonitor"
 import AlertsPanel from "@/components/panel/hub/AlertsPanel"
 import BackupStrip from "@/components/panel/hub/BackupStrip"
 import ToolGrid from "@/components/panel/hub/ToolGrid"
+import PurchaseStimulusCard from "@/components/panel/hub/PurchaseStimulusCard"
 import RestoreConfirmModal from "@/components/panel/hub/RestoreConfirmModal"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
@@ -216,6 +217,11 @@ export default function PanelPage() {
     return missing
   }, [sharedDishes, covers, inventarioItems, selectedCollection])
 
+  // Insumos con stock bajo (<= min) o agotados (0)
+  const lowStockCount = useMemo(() => {
+    return inventarioItems.filter((i) => i.stock <= i.minStock).length
+  }, [inventarioItems])
+
   // ── JSON backup / restore (collection-scoped resurte-* keys) ──
   const backupData = useCallback(() => {
     if (!selectedCollection) return
@@ -342,6 +348,15 @@ export default function PanelPage() {
         <LiveStats stats={stats} panelCfg={panelCfg} mesasInfo={mesasInfo} mesas={mesas} />
       )}
 
+      {selectedCollection && (
+        <PurchaseStimulusCard
+          shortfall={projectionShortfall}
+          lowStockCount={lowStockCount}
+          shoppingList={shoppingList}
+          covers={covers}
+        />
+      )}
+
       <div className="mb-4 sm:mb-6">
         <ToolGrid tools={TOOLS} selectedCollection={selectedCollection} />
       </div>
@@ -400,7 +415,7 @@ export default function PanelPage() {
       />
 
       <GlobalSearch open={showSearch} onClose={() => setShowSearch(false)} slug={slug} />
-      <ToolGuideHost toolKey="panel" pathname="/panel" slug={slug} icon="🏠" title="Panel de herramientas" subtitle={selectedCollection?.name} />
+      <ToolGuideHost toolKey="panel" pathname="/panel" slug={slug} icon="🏠" title="Mi Restaurante" subtitle={selectedCollection?.name} />
     </div>
   )
 }

@@ -19,7 +19,7 @@ export default function HeroSection({ collections, selectedCollection, onSelect 
           </div>
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">
-              Panel para {selectedCollection.name}
+              Mi Restaurante · {selectedCollection.name}
             </h2>
             <p className="text-sm sm:text-base text-gray-500 max-w-2xl line-clamp-2 sm:line-clamp-none">
               Todas las herramientas están calibradas para tu tipo de cocina. 

@@ -75,7 +75,7 @@ export default async function BlogIndexPage({
           config={getBlogIndexCta()}
           heading="¿Listo para impulsar tu restaurante?"
           secondaryHref="/panel"
-          secondaryLabel="Explorar el Panel de Herramientas"
+          secondaryLabel="Explorar Mi Restaurante"
         />
       </div>
     </>

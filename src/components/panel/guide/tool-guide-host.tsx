@@ -7,7 +7,7 @@ import { getToolDemo } from "./tool-demo"
 import ToolGuide from "./tool-guide"
 import GuideToggleButton from "./guide-toggle-button"
 import DemoBanner from "./demo-banner"
-import DemoNav from "./demo-nav"
+import ToolSwitcher from "./tool-switcher"
 import DemoView from "./demo-view"
 
 interface ToolGuideHostProps {
@@ -47,9 +47,9 @@ export default function ToolGuideHost({
       {/* Overlay del modo demo */}
       {showDemo && demo.demoOn && (
         <div className="fixed inset-0 z-40 bg-white flex flex-col">
-          <div className="shrink-0">
+          <div className="shrink-0 border-b border-gray-200">
             <DemoBanner onExit={demo.disableDemo} />
-            <DemoNav />
+            <ToolSwitcher />
           </div>
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">

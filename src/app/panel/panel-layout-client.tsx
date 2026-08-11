@@ -9,6 +9,7 @@ import ThemeToggle from "@/components/panel/ThemeToggle"
 import { PanelMobileNav } from "./_components/PanelMobileNav"
 import { PanelQuickNav } from "./_components/PanelQuickNav"
 import { PanelCompactFooter } from "@/components/panel/PanelCompactFooter"
+import ToolSwitcher from "@/components/panel/guide/tool-switcher"
 import { t } from "@/lib/i18n/es"
 import type { RestaurantCollection } from "@/types"
 import {
@@ -176,6 +177,9 @@ function PanelContent({ children }: { children: React.ReactNode }) {
             </div>
           )}
         </div>
+
+        {/* Persistent tool-switcher bar — shown once a collection is selected */}
+        {selectedCollection && <ToolSwitcher />}
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-24 lg:pb-6">

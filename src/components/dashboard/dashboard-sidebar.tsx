@@ -248,7 +248,7 @@ export function DashboardSidebar() {
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors"
             >
               <LayoutDashboard className="w-4 h-4 shrink-0" />
-              Herramientas
+              Mi Restaurante
               <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-bold ml-auto">
                 Nuevo
               </span>
@@ -433,7 +433,7 @@ export function DashboardSidebar() {
                 className="flex items-center gap-3 p-3.5 rounded-xl bg-indigo-50 text-indigo-800 font-semibold"
               >
                 <LayoutDashboard className="w-5 h-5" />
-                Herramientas para tu negocio
+                Mi Restaurante
                 <span className="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold ml-auto">
                   Nuevo
                 </span>

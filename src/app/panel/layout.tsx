@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { PanelLayoutClient } from "./panel-layout-client"
 
 export const metadata: Metadata = {
-  title: "Panel de Herramientas | Resurte",
+  title: "Mi Restaurante | Resurte",
   description:
     "Herramientas inteligentes para restauranteros: costea tu menú, planifica pedidos, calcula mermas y más.",
 }

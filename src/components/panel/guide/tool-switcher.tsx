@@ -2,23 +2,25 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { DEMO_NAV } from "./tool-demo"
+import { PANEL_NAV } from "./tool-demo"
 
 /**
- * Barra de navegación del modo demo: permite saltar entre herramientas sin
- * salir del demo. La herramienta actual se resalta. Scrolleable en mobile.
+ * Barra de navegación del panel: permite saltar entre herramientas.
+ * Se muestra persistente en todas las páginas del panel y también dentro
+ * del overlay del modo demo. La herramienta actual se resalta.
+ * Scrolleable en mobile.
  */
-export default function DemoNav() {
+export default function ToolSwitcher() {
   const pathname = usePathname()
 
   return (
     <nav
-      className="bg-white/95 backdrop-blur border-b border-gray-200"
-      aria-label="Navegar entre herramientas en modo demo"
+      className="bg-white/95 backdrop-blur"
+      aria-label="Navegar entre herramientas"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 overflow-x-auto">
         <div className="flex items-center gap-1.5 min-w-max">
-          {DEMO_NAV.map((item) => {
+          {PANEL_NAV.map((item) => {
             const active = pathname === item.pathname
             return (
               <Link
