@@ -7,6 +7,7 @@ import { getToolDemo } from "./tool-demo"
 import ToolGuide from "./tool-guide"
 import GuideToggleButton from "./guide-toggle-button"
 import DemoBanner from "./demo-banner"
+import DemoNav from "./demo-nav"
 import DemoView from "./demo-view"
 
 interface ToolGuideHostProps {
@@ -36,7 +37,7 @@ export default function ToolGuideHost({
   toolKey, pathname, slug, icon, title, subtitle, hideDemo = false,
 }: ToolGuideHostProps) {
   const guide = useToolGuide(toolKey, slug ?? null)
-  const demo = useToolDemo(toolKey, slug ?? null)
+  const demo = useToolDemo()
   const guideConfig = getToolGuide(pathname)
   const demoData = getToolDemo(pathname)
   const showDemo = !hideDemo && !!demoData
@@ -46,7 +47,10 @@ export default function ToolGuideHost({
       {/* Overlay del modo demo */}
       {showDemo && demo.demoOn && (
         <div className="fixed inset-0 z-40 bg-white flex flex-col">
-          <DemoBanner onExit={demo.disableDemo} />
+          <div className="shrink-0">
+            <DemoBanner onExit={demo.disableDemo} />
+            <DemoNav />
+          </div>
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
               <DemoView demo={demoData} icon={icon} title={title} subtitle={subtitle} />

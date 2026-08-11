@@ -301,3 +301,35 @@ export const DEMO_BANNER_TEXT =
 export function getToolDemo(pathname: string): ToolDemoConfig | null {
   return TOOL_DEMOS[pathname] ?? null
 }
+
+export interface DemoNavItem {
+  /** Ruta de la herramienta (ej. /panel/ventas) */
+  pathname: string
+  /** Identificador corto (para tests y accesibilidad) */
+  toolKey: string
+  icon: string
+  label: string
+}
+
+/**
+ * Herramientas disponibles en la barra de navegación del modo demo.
+ * Todas tienen dataset demo en `TOOL_DEMOS`.
+ */
+export const DEMO_NAV: DemoNavItem[] = [
+  { pathname: "/panel", toolKey: "panel", icon: "🏠", label: "Inicio" },
+  { pathname: "/panel/ventas", toolKey: "ventas", icon: "🧾", label: "Ventas" },
+  { pathname: "/panel/costeo", toolKey: "costeo", icon: "🧮", label: "Costeo" },
+  { pathname: "/panel/mermas", toolKey: "mermas", icon: "🗑️", label: "Mermas" },
+  { pathname: "/panel/inventario", toolKey: "inventario", icon: "📦", label: "Inventario" },
+  { pathname: "/panel/planificador", toolKey: "planificador", icon: "📋", label: "Planificador" },
+  { pathname: "/panel/rentabilidad", toolKey: "rentabilidad", icon: "📈", label: "Rentabilidad" },
+  { pathname: "/panel/temporada", toolKey: "temporada", icon: "🗓️", label: "Temporada" },
+  { pathname: "/panel/apertura", toolKey: "apertura", icon: "🚀", label: "Apertura" },
+  { pathname: "/panel/comanda", toolKey: "comanda", icon: "👨‍🍳", label: "Comandas" },
+  { pathname: "/panel/foodos/restaurante", toolKey: "restaurante", icon: "🏪", label: "Restaurante" },
+  { pathname: "/panel/foodos/menu", toolKey: "menu", icon: "🍽️", label: "Menú digital" },
+  { pathname: "/panel/foodos/combos", toolKey: "combos", icon: "🎁", label: "Combos" },
+  { pathname: "/panel/foodos/clientes", toolKey: "clientes", icon: "👥", label: "Clientes" },
+  { pathname: "/panel/foodos/tablero", toolKey: "tablero", icon: "📊", label: "Tablero" },
+  { pathname: "/panel/foodos/pedidos", toolKey: "pedidos", icon: "🧾", label: "Pedidos" },
+]

@@ -11,17 +11,15 @@ export interface UseToolDemoReturn {
 }
 
 /**
- * Estado del modo demo de una herramienta.
+ * Estado global del modo demo del panel.
  *
- * Solo persiste el flag (`resurte-demo-on-<toolKey>-<slug>`). El modo demo
- * NUNCA escribe datos: la página decide qué renderizar leyendo los datasets
- * de `tool-demo.ts` y pre-llenando formularios en memoria.
+ * El flag es único para todo el panel (`resurte-demo-mode`): al activarlo en
+ * cualquier herramienta se mantiene activo al navegar a las demás. El modo
+ * demo NUNCA escribe datos: la página decide qué renderizar leyendo los
+ * datasets de `tool-demo.ts` y pre-llenando formularios en memoria.
  */
-export function useToolDemo(
-  toolKey: string,
-  collectionSlug?: string | null,
-): UseToolDemoReturn {
-  const [demoOn, setDemoOn] = useLocalStorage<boolean>(`demo-on-${toolKey}`, false, collectionSlug)
+export function useToolDemo(): UseToolDemoReturn {
+  const [demoOn, setDemoOn] = useLocalStorage<boolean>("demo-mode", false)
 
   return {
     demoOn,
