@@ -68,19 +68,39 @@ test.describe("móvil: render, touch-target y sin overflow", () => {
 // local (Supabase vacío) devuelve null y el test se salta — mismo patrón que a11y.spec.ts.
 async function discoverProductHref(page: Page): Promise<string | null> {
   await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
-  const links = await page.getByRole("link").evaluateAll((els) =>
-    els.map((a) => (a as HTMLAnchorElement).href),
-  )
-  return links.find((h) => h.includes("/producto/")) ?? null
+  // Los product links viven bajo ScrollReveal con content-visibility:auto — pueden
+  // tardar en entrar en el árbol de accesibilidad. Reintenta hasta 5s.
+  const productLink = page.locator('a[href*="/producto/"]').first()
+  for (let attempt = 0; attempt < 10; attempt++) {
+    if (await productLink.isVisible().catch(() => false)) {
+      return await productLink.evaluate((a) => (a as HTMLAnchorElement).href)
+    }
+    await page.waitForTimeout(500)
+  }
+  return null
 }
 
 test.describe("móvil: producto — barra sticky add-to-cart", () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
+  // El banner de cookies (fixed bottom, z-60) cubre la sticky ATC (z-40) en
+  // contextos nuevos y bloquea los taps. Se acepta para liberar el fondo.
+  async function dismissCookieBanner(page: Page): Promise<void> {
+    const accept = page.getByRole("button", { name: "Aceptar todas" })
+    try {
+      await accept.waitFor({ state: "visible", timeout: 4000 })
+      await accept.tap().catch(() => {})
+    } catch {
+      // Sin banner (consent ya almacenado) — OK.
+    }
+  }
+
   test("la barra sticky aparece en producto y el stepper funciona", async ({ page }) => {
     const productHref = await discoverProductHref(page)
     test.skip(!productHref, "no hay enlace de producto en /cdmx (sin datos locales)")
 
     await page.goto(productHref!, { waitUntil: "domcontentloaded" })
+    await dismissCookieBanner(page)
     const bar = page.locator(".sticky-atc-bar").first()
     // Durante la hidratación Next/React puede montar la barra dos veces de forma
     // transitoria (ambas copias idénticas que colapsan a 1); .first() evita el
@@ -88,9 +108,21 @@ test.describe("móvil: producto — barra sticky add-to-cart", () => {
     await expect(bar).toBeVisible()
 
     // Stepper operativo: aumentar cantidad cambia el total.
-    const totalBefore = await bar.locator("text=/\\$/").first().textContent()
-    await bar.getByRole("button", { name: "Aumentar cantidad" }).tap()
-    await expect(bar.locator("text=/\\$/").first()).not.toHaveText(totalBefore ?? "n/a")
+    // Retry anti-hidratación (mismo patrón que tapQuickAdd): el tap puede llegar
+    // antes de que React adjunte el onClick; reintentar hasta que el total cambie.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const totalBefore = await bar.locator("text=/\\$/").first().textContent()
+      await bar.getByRole("button", { name: "Aumentar cantidad" }).tap().catch(() => {})
+      try {
+        await expect(bar.locator("text=/\\$/").first()).not.toHaveText(totalBefore ?? "n/a", {
+          timeout: 3000,
+        })
+        return
+      } catch {
+        await page.waitForTimeout(500)
+      }
+    }
+    throw new Error("el stepper de la barra sticky no cambió el total tras 5 intentos")
   })
 
   test("la barra sticky add-to-cart se oculta cuando hay items (cart-bar-active)", async ({ page }) => {
@@ -98,6 +130,7 @@ test.describe("móvil: producto — barra sticky add-to-cart", () => {
     test.skip(!productHref, "no hay enlace de producto en /cdmx (sin datos locales)")
 
     await page.goto(productHref!, { waitUntil: "domcontentloaded" })
+    await dismissCookieBanner(page)
 
     const bar = page.locator(".sticky-atc-bar").first()
     // Igual que arriba: la doble hidratación colapsa a 1 barra; .first() evita strict-mode.
@@ -1604,5 +1637,45 @@ test.describe("Fase 14 móvil: footer compacto, landings de negocio y hub del pa
       metrics.clientWidth,
     )
     expect(metrics.docOverflow, "el hub no debería desbordar el viewport").toBeLessThanOrEqual(1)
+  })
+})
+
+// Fase 15 — Bug del logo móvil: el tap-target era solo el texto (~26px), por eso
+// los taps que caían en el header (pero fuera de las letras) no navegaban. El fix
+// estira el <Link> a la altura completa del header (self-stretch, 64px) + px-2.
+test.describe("Fase 15 — logo móvil: tap-target amplio y navegación al home", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
+  test("el logo mide ≥44px y un tap en el borde del header navega al home", async ({ page }) => {
+    // Bug reportado desde la página de búsqueda.
+    await page.goto("/cdmx/buscar?q=cebolla", { waitUntil: "domcontentloaded" })
+    const header = page.locator("header")
+    await header.waitFor({ state: "visible", timeout: 10000 })
+
+    const logo = page.getByRole("link", { name: "Resurte — ir al inicio" })
+    await logo.waitFor({ state: "visible", timeout: 10000 })
+    const logoBox = (await boundingBoxSettled(logo))!
+    expect(
+      logoBox.height,
+      `el logo debe estirarse a la altura del header (≥44px); mide ${Math.round(logoBox.height)}px`,
+    ).toBeGreaterThanOrEqual(44)
+
+    const headerBox = (await boundingBoxSettled(header))!
+    // Tap en el borde superior del header, dentro del ancho del logo. Antes del fix
+    // (solo las letras centradas, ~26px) este punto NO pertenecía al link → tap perdido.
+    const tapX = logoBox.x + Math.min(20, logoBox.width / 2)
+    const tapY = headerBox.y + 6
+
+    // Anti-race de hidratación en preview frío: reintentar si el tap no navega.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await page.touchscreen.tap(tapX, tapY)
+      try {
+        await page.waitForURL(/\/cdmx$/, { timeout: 6000 })
+        return
+      } catch {
+        // siguiente intento
+      }
+    }
+    throw new Error("el tap en el borde del logo no navegó al home (tras 3 intentos)")
   })
 })

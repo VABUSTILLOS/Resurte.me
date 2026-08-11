@@ -99,7 +99,11 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-3 sm:px-6">
         <div className="flex items-center justify-between h-16 gap-2 sm:gap-3">
           {/* Logo — Erewhon-style with refined type */}
-          <Link href="/" className="flex items-center gap-1.5 shrink-0">
+          <Link
+            href="/"
+            aria-label="Resurte — ir al inicio"
+            className="flex items-center gap-1.5 shrink-0 self-stretch px-2 -ml-2 select-none"
+          >
             <span className="text-base min-[360px]:text-lg min-[400px]:text-[1.25rem] md:text-[1.35rem] font-bold text-[#0E7A0E] tracking-tight">Resurte</span>
             <span className="text-base min-[360px]:text-lg min-[400px]:text-[1.25rem] md:text-[1.35rem] font-bold text-[#1a1a1a] tracking-tight">.me</span>
           </Link>
