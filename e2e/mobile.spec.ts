@@ -1922,3 +1922,51 @@ test.describe("Fase 17 — Banner 'personalizadas para' visible en desktop", () 
     await expect(page.getByText("Todas las herramientas están personalizadas para")).toBeVisible()
   })
 })
+
+test.describe("Fase 18 — Semáforo de rentabilidad: el simulador ajusta el precio (no el costo)", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo móvil")
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/panel", { waitUntil: "domcontentloaded" })
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
+    const nav = page.getByRole("navigation", { name: "Accesos rápidos del panel" })
+    if (!(await nav.isVisible().catch(() => false))) {
+      const pickerBtn = page.locator("button", { hasText: /Hamburguesas y Hot Dogs/ }).first()
+      await pickerBtn.tap().catch(() => {})
+      await page.waitForTimeout(800)
+    }
+  })
+
+  test("subir el simulador aumenta el precio de venta y deja el costo intacto", async ({ page }) => {
+    await page.goto("/panel/rentabilidad", { waitUntil: "domcontentloaded" })
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
+
+    const slider = page.getByRole("slider", { name: "Ajustar precio de venta" })
+    await expect(slider).toBeVisible({ timeout: 8000 })
+    await expect(page.getByText("Simulador de precio:")).toBeVisible()
+
+    const firstCard = page.locator("div.space-y-3 > div.bg-white").first()
+    const costEl = firstCard.locator("p.font-bold.text-sm").first()
+    const priceBtn = firstCard.locator("button").first()
+    const read = async () => ({
+      cost: parseFloat((await costEl.innerText()).replace("$", "")),
+      price: parseFloat((await priceBtn.innerText()).replace("$", "")),
+    })
+
+    const before = await read()
+    expect(before.price).toBeGreaterThan(0)
+
+    // Subir el precio +10% → solo el precio cambia, el costo queda igual.
+    await slider.fill("10")
+    await expect(page.getByText(/Simulando un aumento de 10% en el precio de venta/)).toBeVisible()
+
+    const after = await read()
+    expect(after.cost, "el costo no debe moverse con el simulador").toBe(before.cost)
+    expect(after.price, "el precio sí sube").toBeGreaterThan(before.price)
+
+    // Restablecer vuelve al precio original.
+    await page.getByText("Restablecer").tap()
+    const reset = await read()
+    expect(reset.price).toBe(before.price)
+  })
+})

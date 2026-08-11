@@ -156,7 +156,7 @@ export default function RentabilidadPage() {
   const [editingName, setEditingName] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
   const [sortBy, setSortBy] = useLocalStorage<string>("rentabilidad-sort", "name", slug)
-  const [costMultiplier, setCostMultiplier] = useLocalStorage<number>("rentabilidad-sim", 0, slug)
+  const [priceMultiplier, setPriceMultiplier] = useLocalStorage<number>("rentabilidad-sim-price", 0, slug)
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
 
   // Merma factor: integrates "Merma del mes" into real cost/margin calculations
@@ -199,26 +199,32 @@ export default function RentabilidadPage() {
       ...d,
       price: priceOverrides[d.name] ?? d.price,
     }))
-    // Apply cost multiplier (simulator) and merma factor into real cost
-    const adjust = (1 + costMultiplier / 100) * mermaFactor
-    if (costMultiplier !== 0 || mermaFactor !== 1) {
+    // Apply merma factor into real cost
+    if (mermaFactor !== 1) {
       merged = merged.map((d) => ({
         ...d,
-        cost: +(d.cost * adjust).toFixed(2),
+        cost: +(d.cost * mermaFactor).toFixed(2),
       }))
     }
-    // Sort
+    // Apply price multiplier (simulator): explore selling price changes and their margins
+    if (priceMultiplier !== 0) {
+      merged = merged.map((d) => ({
+        ...d,
+        price: +(d.price * (1 + priceMultiplier / 100)).toFixed(2),
+      }))
+    }
+    // Sort (values already adjusted)
     merged = [...merged].sort((a, b) => {
       switch (sortBy) {
-        case "margin": return (b.price - b.cost * adjust) - (a.price - a.cost * adjust)
-        case "foodcost": return ((a.cost * adjust) / a.price) - ((b.cost * adjust) / b.price)
+        case "margin": return (b.price - b.cost) - (a.price - a.cost)
+        case "foodcost": return (a.cost / a.price) - (b.cost / b.price)
         case "name": return a.name.localeCompare(b.name)
         case "category": return a.category.localeCompare(b.category)
         default: return 0
       }
     })
     return merged
-  }, [mockDishes, costeoDishes, priceOverrides, sortBy, costMultiplier, mermaFactor])
+  }, [mockDishes, costeoDishes, priceOverrides, sortBy, priceMultiplier, mermaFactor])
 
   // Category analysis: counts, avg food cost, avg margin, semaphore per category
   const categoryAnalysis = useMemo(() => {
@@ -439,21 +445,22 @@ export default function RentabilidadPage() {
           </select>
         </div>
         <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 px-3 py-2">
-          <span className="text-xs text-gray-400 shrink-0">Simulador:</span>
+          <span className="text-xs text-gray-400 shrink-0">Simulador de precio:</span>
           <input
             type="range"
             min="-30"
-            max="30"
-            value={costMultiplier}
-            onChange={(e) => setCostMultiplier(parseFloat(e.target.value))}
+            max="50"
+            value={priceMultiplier}
+            onChange={(e) => setPriceMultiplier(parseFloat(e.target.value))}
             className="flex-1 min-w-0 h-1.5 accent-[#0E7A0E]"
+            aria-label="Ajustar precio de venta"
           />
-          <span className={`text-xs font-bold w-14 text-right ${costMultiplier > 0 ? "text-red-600" : costMultiplier < 0 ? "text-emerald-600" : "text-gray-400"}`}>
-            {costMultiplier > 0 ? "+" : ""}{costMultiplier}%
+          <span className={`text-xs font-bold w-14 text-right ${priceMultiplier > 0 ? "text-emerald-600" : priceMultiplier < 0 ? "text-red-600" : "text-gray-400"}`}>
+            {priceMultiplier > 0 ? "+" : ""}{priceMultiplier}%
           </span>
-          {costMultiplier !== 0 && (
+          {priceMultiplier !== 0 && (
             <button
-              onClick={() => setCostMultiplier(0)}
+              onClick={() => setPriceMultiplier(0)}
               className="text-[10px] text-gray-400 hover:text-gray-600 underline whitespace-nowrap"
             >
               Restablecer
@@ -461,10 +468,10 @@ export default function RentabilidadPage() {
           )}
         </div>
       </div>
-      {costMultiplier !== 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 mb-4 text-xs text-amber-700 flex items-center gap-2">
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-          Simulando {costMultiplier > 0 ? "aumento" : "reducción"} de {Math.abs(costMultiplier)}% en costos de insumos. Los food cost % están ajustados.
+      {priceMultiplier !== 0 && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2 mb-4 text-xs text-indigo-700 flex items-center gap-2">
+          <TrendingUp className="w-3.5 h-3.5 shrink-0" />
+          Simulando {priceMultiplier > 0 ? "un aumento" : "una reducción"} de {Math.abs(priceMultiplier)}% en el precio de venta. Los food cost % y márgenes se recalculan en tiempo real.
         </div>
       )}
       {mermaStats.hasMerma && (
@@ -606,6 +613,7 @@ export default function RentabilidadPage() {
             <p className="text-xs text-gray-500 leading-relaxed">
               Los platillos de “Mi menú” usan los precios reales del catálogo de Resurte.me vía Costeando mi menú;
               los platillos de referencia son estimados para tu tipo de cocina. 
+              Usa el simulador de precio para explorar cómo tu precio de venta impacta tu margen y el food cost.
               Un food cost arriba del 38% pone en riesgo tu negocio.
             </p>
           </div>
