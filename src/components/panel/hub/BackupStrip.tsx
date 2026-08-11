@@ -16,40 +16,40 @@ export default function BackupStrip({
   onNewDish, onMerma, onApertura, onBackup, onRestoreFileSelected, fileInputRef,
 }: BackupStripProps) {
   return (
-    <div className="flex items-center gap-2 mb-6">
-      <span className="text-xs text-gray-400 flex items-center gap-1">
+    <div className="flex items-center gap-2 mb-4 sm:mb-6 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+      <span className="text-xs text-gray-400 flex items-center gap-1 shrink-0">
         <Zap className="w-3.5 h-3.5" />
-        Acciones rápidas:
+        <span className="hidden sm:inline">Acciones rápidas:</span>
       </span>
       <button
         onClick={onNewDish}
-        className="text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+        className="text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors shrink-0 whitespace-nowrap touch-target"
       >
         + Nuevo platillo
       </button>
       <button
         onClick={onMerma}
-        className="text-xs font-semibold bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+        className="text-xs font-semibold bg-red-50 text-red-700 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors shrink-0 whitespace-nowrap touch-target"
       >
         + Registrar merma
       </button>
       <button
         onClick={onApertura}
-        className="text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
+        className="text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors shrink-0 whitespace-nowrap touch-target"
       >
         ✓ Checklist apertura
       </button>
-      <span className="text-[10px] text-gray-300 mx-1">|</span>
+      <span className="hidden sm:inline text-[11px] text-gray-300 mx-1 shrink-0">|</span>
       <button
         onClick={onBackup}
-        className="text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+        className="text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shrink-0 whitespace-nowrap touch-target"
         title="Exportar todos los datos de esta colección a un archivo JSON"
       >
         💾 Respaldo
       </button>
       <button
         onClick={() => fileInputRef.current?.click()}
-        className="text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+        className="text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shrink-0 whitespace-nowrap touch-target"
         title="Restaurar datos desde un archivo JSON de respaldo"
       >
         📥 Restaurar

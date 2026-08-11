@@ -16,7 +16,7 @@ export default function DaySummary({ todaySales, puntosHoy, goalProgress, onCopy
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
-      <div className="flex items-center justify-between p-4 pb-3">
+      <div className="flex items-center justify-between p-3 sm:p-4 pb-2.5 sm:pb-3">
         <div className="flex items-center gap-2">
           <Receipt className="w-5 h-5 text-[#0E7A0E]" />
           <h3 className="font-semibold text-gray-900 text-sm">Resumen del día</h3>
@@ -41,7 +41,7 @@ export default function DaySummary({ todaySales, puntosHoy, goalProgress, onCopy
           </Link>
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-4 pb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-3 sm:px-4 pb-3 sm:pb-4">
         <div className="bg-green-50 rounded-xl p-3 text-center">
           <p className="text-[10px] text-green-600">Ingresos hoy</p>
           <p className="text-lg font-extrabold text-green-700">${todaySales.revenue.toFixed(0)}</p>
@@ -59,7 +59,7 @@ export default function DaySummary({ todaySales, puntosHoy, goalProgress, onCopy
           <p className="text-lg font-extrabold text-amber-700">{todaySales.units}</p>
         </div>
       </div>
-      <div className="border-t border-gray-100 px-4 py-3 grid sm:grid-cols-2 gap-3">
+      <div className="border-t border-gray-100 px-3 sm:px-4 py-2.5 sm:py-3 grid sm:grid-cols-2 gap-2 sm:gap-3">
         <div className="space-y-2">
           <p className="text-[10px] font-semibold text-gray-400 uppercase">Por método de pago</p>
           {todaySales.methods.filter((m) => m.count > 0).length === 0 ? (
@@ -93,7 +93,7 @@ export default function DaySummary({ todaySales, puntosHoy, goalProgress, onCopy
         </div>
       </div>
       {goalProgress && goalProgress.goal > 0 && (
-        <div className="border-t border-gray-100 px-4 py-3">
+        <div className="border-t border-gray-100 px-3 sm:px-4 py-2.5 sm:py-3">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[10px] font-semibold text-gray-400 uppercase flex items-center gap-1">
               <Target className="w-3.5 h-3.5 text-purple-600" />

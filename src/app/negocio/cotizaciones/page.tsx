@@ -13,13 +13,13 @@ export default function CotizacionesPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
+      <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-12 sm:py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
+          <h1 className="text-3xl sm:text-5xl font-bold text-[#242529] mb-4">
             Precio de mayoreo,{" "}
             <span className="text-[#0E7A0E]">trato personal</span>
           </h1>
-          <p className="text-lg text-[#5C6068]">
+          <p className="text-base sm:text-lg text-[#5C6068]">
             Mientras más compras, menos pagas. Te asignamos un ejecutivo
             dedicado que te arma la cotización a tu medida. Sin menú del día,
             sin precios fijos: tu volumen manda.
@@ -29,8 +29,8 @@ export default function CotizacionesPage() {
 
       {/* Guarantee strip */}
       <section className="max-w-xl mx-auto px-4 pb-10">
-        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#0E7A0E]/20 rounded-[16px] p-5 flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#0E7A0E] rounded-xl flex items-center justify-center flex-shrink-0">
+        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#0E7A0E]/20 rounded-[16px] p-4 flex items-center gap-3 sm:gap-4">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 bg-[#0E7A0E] rounded-xl flex items-center justify-center flex-shrink-0">
             <Clock className="w-6 h-6 text-white" />
           </div>
           <div>
@@ -40,8 +40,8 @@ export default function CotizacionesPage() {
         </div>
       </section>
 
-      <section className="max-w-4xl mx-auto px-4 py-16">
-        <div className="grid md:grid-cols-3 gap-8 mb-16">
+      <section className="max-w-4xl mx-auto px-4 py-10 sm:py-16">
+        <div className="grid sm:grid-cols-3 gap-6 sm:gap-8 mb-10 sm:mb-16">
           {[
             {
               icon: Calculator,
@@ -59,23 +59,25 @@ export default function CotizacionesPage() {
               desc: "Una persona real, dedicada a tu cuenta. Te contesta por WhatsApp, te resuelve cambios de último minuto y te consigue lo que necesites aunque no esté en catálogo.",
             },
           ].map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="text-center">
-              <div className="w-14 h-14 bg-[#E8F5E8] rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Icon className="w-7 h-7 text-[#0E7A0E]" />
+            <div key={title} className="flex items-start gap-3 text-left sm:block sm:text-center">
+              <div className="w-12 h-12 bg-[#E8F5E8] rounded-2xl flex items-center justify-center flex-shrink-0 sm:mx-auto sm:mb-4 sm:w-14 sm:h-14">
+                <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-[#0E7A0E]" />
               </div>
-              <h3 className="text-lg font-semibold text-[#242529] mb-2">
-                {title}
-              </h3>
-              <p className="text-sm text-[#5C6068] leading-relaxed">{desc}</p>
+              <div>
+                <h3 className="text-base sm:text-lg font-semibold text-[#242529] sm:mb-2">
+                  {title}
+                </h3>
+                <p className="text-[13px] sm:text-sm text-[#5C6068] leading-relaxed">{desc}</p>
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="bg-[#F9FAFB] rounded-[16px] p-8 text-center">
-          <h2 className="text-2xl font-bold text-[#242529] mb-3">
+        <div className="bg-[#F9FAFB] rounded-[16px] p-5 sm:p-8 text-center">
+          <h2 className="text-xl sm:text-2xl font-bold text-[#242529] mb-3">
             ¿Listo para pagar menos?
           </h2>
-          <p className="text-[#5C6068] mb-6 max-w-lg mx-auto">
+          <p className="text-[13px] sm:text-sm text-[#5C6068] mb-6 max-w-lg mx-auto">
             Mándanos un WhatsApp con lo que necesitas y en menos de 2 horas te
             mandamos tu cotización. Sin compromiso, sin letras chiquitas.
           </p>
@@ -84,10 +86,10 @@ export default function CotizacionesPage() {
               href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Hola, quiero una cotización por volumen para mi negocio.")}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 bg-[#0F7A3D] text-white font-semibold px-6 py-3 rounded-[10px] hover:bg-[#0F6B3A] transition-colors"
+            className="inline-flex items-center justify-center gap-2 bg-[#0F7A3D] text-white font-semibold px-6 py-3 rounded-[10px] hover:bg-[#0F6B3A] transition-colors"
             >
-              <MessageCircle className="w-4 h-4" />
-              Pedir cotización por WhatsApp
+            <MessageCircle className="w-4 h-4" />
+            Pedir cotización por WhatsApp
             </a>
             <Link
               href="/auth/register"

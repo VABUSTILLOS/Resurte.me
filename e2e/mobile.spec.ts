@@ -1523,3 +1523,86 @@ test.describe("móvil: Fase 13 — testimonios (tamaño + swipe) y sección de 3
     expect(Math.max(...sizes), "h3 de los pasos demasiado grande en móvil").toBeLessThanOrEqual(16)
   })
 })
+
+test.describe("Fase 14 móvil: footer compacto, landings de negocio y hub del panel", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
+  async function boundingBoxSettled(
+    locator: Locator,
+    maxRetries = 6,
+  ): Promise<NonNullable<Awaited<ReturnType<Locator["boundingBox"]>>>> {
+    for (let i = 0; i < maxRetries; i++) {
+      const box = await locator.boundingBox()
+      if (box && box.height > 0 && box.width > 0) return box
+      await (locator.page() as Page).waitForTimeout(300)
+    }
+    const box = await locator.boundingBox()
+    if (!box) throw new Error("elemento sin boundingBox tras reintentos")
+    return box
+  }
+
+  // 14A: el footer mide menos de 560px de alto en móvil (antes 677px).
+  test("el footer mide menos de 560px de alto en móvil", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1500)
+
+    const footer = page.locator("footer.site-footer")
+    await expect(footer).toBeVisible({ timeout: 5000 })
+    const box = await boundingBoxSettled(footer)
+    expect(box.height, `footer demasiado alto (${box.height}px)`).toBeLessThan(560)
+  })
+
+  // 14B: hero h1 de /negocio/credito ≤30px y features horizontales en móvil.
+  test("el hero de /negocio/credito usa ≤30px y sus features son horizontales", async ({ page }) => {
+    await page.goto("/negocio/credito", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1000)
+
+    const h1 = page.getByRole("heading", { level: 1 })
+    await expect(h1).toBeVisible({ timeout: 5000 })
+    const h1Px = await h1.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+    expect(h1Px, `h1 del hero demasiado grande (${h1Px}px)`).toBeLessThanOrEqual(30)
+
+    // Features: en móvil el icono y el título comparten el mismo top (flex row).
+    const icon = page.locator("div.bg-\\[\\#E8F5E8\\]").first()
+    await expect(icon).toBeVisible({ timeout: 5000 })
+    const iconBox = await boundingBoxSettled(icon)
+    const title = icon.locator("xpath=../..").locator("h3").first()
+    await expect(title).toBeVisible()
+    const titleBox = await boundingBoxSettled(title)
+    expect(
+      Math.abs(iconBox.y - titleBox.y),
+      `icono y título de feature deberían estar a la misma altura (icon=${iconBox.y}, title=${titleBox.y})`,
+    ).toBeLessThanOrEqual(8)
+  })
+
+  // 14C: el hub del panel — ToolGrid compacto y BackupStrip con scroll horizontal.
+  test("el hub del panel: primera card <110px y BackupStrip con scroll sin overflow", async ({ page }) => {
+    await page.goto("/panel", { waitUntil: "domcontentloaded" })
+    await page.waitForTimeout(1500)
+
+    // Seleccionar un tipo de restaurante para activar el hub (BackupStrip solo aparece con colección).
+    const pickerBtn = page.getByRole("button", { name: /Hamburguesas y Hot Dogs/ }).first()
+    await expect(pickerBtn).toBeVisible({ timeout: 5000 })
+    await pickerBtn.tap()
+    await page.waitForTimeout(800)
+
+    // ToolGrid: primera card (Link horizontal) mide <110px en móvil.
+    const firstTool = page.locator("div.flex.flex-col.gap-2").first().locator("a").first()
+    await expect(firstTool).toBeVisible({ timeout: 5000 })
+    const cardBox = await boundingBoxSettled(firstTool)
+    expect(cardBox.height, `card de ToolGrid demasiado alta (${cardBox.height}px)`).toBeLessThan(110)
+
+    // BackupStrip: overflow-x-auto con scrollWidth > clientWidth, sin overflow del viewport.
+    const strip = page.locator("div.overflow-x-auto.scrollbar-hide").first()
+    await expect(strip).toBeVisible({ timeout: 5000 })
+    const metrics = await strip.evaluate((el) => ({
+      clientWidth: el.clientWidth,
+      scrollWidth: el.scrollWidth,
+      docOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    }))
+    expect(metrics.scrollWidth, "BackupStrip debería ser scrolleable horizontalmente").toBeGreaterThan(
+      metrics.clientWidth,
+    )
+    expect(metrics.docOverflow, "el hub no debería desbordar el viewport").toBeLessThanOrEqual(1)
+  })
+})

@@ -11,7 +11,7 @@ interface KitchenMonitorProps {
 export default function KitchenMonitor({ comandas }: KitchenMonitorProps) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
-      <div className="flex items-center justify-between p-4 pb-3">
+      <div className="flex items-center justify-between p-3 sm:p-4 pb-2.5 sm:pb-3">
         <div className="flex items-center gap-2">
           <Flame className="w-5 h-5 text-orange-500" />
           <h3 className="font-semibold text-gray-900 text-sm">Monitor de cocina</h3>
@@ -28,7 +28,7 @@ export default function KitchenMonitor({ comandas }: KitchenMonitorProps) {
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
-      <div className="grid grid-cols-3 gap-2 px-4 pb-4">
+      <div className="grid grid-cols-3 gap-2 px-3 sm:px-4 pb-3 sm:pb-4">
         <div className="bg-gray-50 rounded-xl p-3 text-center">
           <p className="text-[10px] text-gray-500">Pendientes</p>
           <p className="text-lg font-extrabold text-amber-600">{comandas.pendiente}</p>

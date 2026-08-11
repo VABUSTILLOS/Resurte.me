@@ -12,13 +12,13 @@ interface HeroSectionProps {
 export default function HeroSection({ collections, selectedCollection, onSelect }: HeroSectionProps) {
   if (selectedCollection) {
     return (
-      <div className="bg-gradient-to-r from-[#F0FDF4] to-[#E8F5E8] rounded-2xl p-6 sm:p-8 border border-[#0E7A0E]/10">
-        <div className="flex items-start gap-4">
-          <div className="w-14 h-14 bg-[#0E7A0E]/10 rounded-2xl flex items-center justify-center shrink-0">
-            <ChefHat className="w-7 h-7 text-[#0E7A0E]" />
+      <div className="bg-gradient-to-r from-[#F0FDF4] to-[#E8F5E8] rounded-2xl p-4 sm:p-8 border border-[#0E7A0E]/10">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <div className="w-11 h-11 sm:w-14 sm:h-14 bg-[#0E7A0E]/10 rounded-2xl flex items-center justify-center shrink-0">
+            <ChefHat className="w-6 h-6 sm:w-7 sm:h-7 text-[#0E7A0E]" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">
               Panel para {selectedCollection.name}
             </h2>
             <p className="text-gray-500 max-w-2xl">
@@ -33,13 +33,13 @@ export default function HeroSection({ collections, selectedCollection, onSelect 
   }
 
   return (
-    <div className="bg-white rounded-2xl p-6 sm:p-8 border border-gray-200 shadow-sm">
-      <div className="flex items-start gap-4 mb-6">
-        <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center shrink-0">
-          <Store className="w-7 h-7 text-amber-600" />
+    <div className="bg-white rounded-2xl p-4 sm:p-8 border border-gray-200 shadow-sm">
+      <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <div className="w-11 h-11 sm:w-14 sm:h-14 bg-amber-100 rounded-2xl flex items-center justify-center shrink-0">
+          <Store className="w-6 h-6 sm:w-7 sm:h-7 text-amber-600" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">
             ¡Elige tu tipo de restaurante!
           </h2>
           <p className="text-gray-500 max-w-2xl">
@@ -51,14 +51,14 @@ export default function HeroSection({ collections, selectedCollection, onSelect 
       </div>
 
       {/* Collection picker grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1.5 sm:gap-2">
         {collections.map((c) => (
           <button
             key={c.id}
             onClick={() => onSelect(c)}
-            className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-gray-100 hover:border-[#0E7A0E]/30 hover:bg-[#F0FDF4] transition-all text-center group"
+            className="flex flex-col items-center gap-1 p-2.5 rounded-xl border border-gray-100 hover:border-[#0E7A0E]/30 hover:bg-[#F0FDF4] transition-all text-center group touch-target"
           >
-            <span className="text-2xl group-hover:scale-110 transition-transform">
+            <span className="text-xl sm:text-2xl group-hover:scale-110 transition-transform">
               {COLLECTION_ICONS[c.slug] || "🍽️"}
             </span>
             <span className="text-xs font-medium text-gray-600 group-hover:text-[#0E7A0E] leading-tight">

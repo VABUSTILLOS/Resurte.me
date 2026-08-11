@@ -13,7 +13,7 @@ interface AlertsPanelProps {
 export default function AlertsPanel({ alerts, showAlerts, onToggle }: AlertsPanelProps) {
   if (alerts.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-6 flex items-center gap-3">
+      <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 mb-6 flex items-center gap-3">
         <CheckCircle2 className="w-5 h-5 text-green-500" />
         <span className="text-sm text-gray-600">Todo en orden ✅ — No hay alertas pendientes.</span>
       </div>
@@ -24,7 +24,7 @@ export default function AlertsPanel({ alerts, showAlerts, onToggle }: AlertsPane
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between p-3 sm:p-4 hover:bg-gray-50 transition-colors touch-target"
       >
         <div className="flex items-center gap-2">
           <Bell className="w-5 h-5 text-amber-500" />

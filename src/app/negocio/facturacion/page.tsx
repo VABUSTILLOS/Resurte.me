@@ -11,13 +11,13 @@ export const metadata: Metadata = {
 export default function FacturacionPage() {
   return (
     <div className="min-h-screen bg-white">
-      <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
+      <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-12 sm:py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">
+          <h1 className="text-3xl sm:text-5xl font-bold text-[#242529] mb-4">
             Facturación{" "}
             <span className="text-[#0E7A0E]">sin mover un dedo</span>
           </h1>
-          <p className="text-lg text-[#5C6068]">
+          <p className="text-base sm:text-lg text-[#5C6068]">
             Registras tu RFC una sola vez y olvídate. Cada pedido genera tu CFDI
             4.0 automáticamente. Sin costo, sin recordatorios, sin estrés fiscal.
           </p>
@@ -26,8 +26,8 @@ export default function FacturacionPage() {
 
       {/* Trust badge */}
       <section className="max-w-xl mx-auto px-4 pb-10">
-        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#0E7A0E]/20 rounded-[16px] p-5 flex items-center gap-4">
-          <div className="w-12 h-12 bg-[#0E7A0E] rounded-xl flex items-center justify-center flex-shrink-0">
+        <div className="bg-gradient-to-r from-[#E8F5E8] to-[#F0F7F0] border border-[#0E7A0E]/20 rounded-[16px] p-4 flex items-center gap-3 sm:gap-4">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 bg-[#0E7A0E] rounded-xl flex items-center justify-center flex-shrink-0">
             <Shield className="w-6 h-6 text-white" />
           </div>
           <div>
@@ -37,8 +37,8 @@ export default function FacturacionPage() {
         </div>
       </section>
 
-      <section className="max-w-4xl mx-auto px-4 py-16">
-        <div className="grid md:grid-cols-3 gap-8 mb-16">
+      <section className="max-w-4xl mx-auto px-4 py-10 sm:py-16">
+        <div className="grid sm:grid-cols-3 gap-6 sm:gap-8 mb-10 sm:mb-16">
           {[
             {
               icon: FileText,
@@ -56,23 +56,25 @@ export default function FacturacionPage() {
               desc: "Todas tus facturas viven en tu panel. Descarga PDF y XML cuando quieras. También te las mandamos por correo si lo prefieres.",
             },
           ].map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="text-center">
-              <div className="w-14 h-14 bg-[#E8F5E8] rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Icon className="w-7 h-7 text-[#0E7A0E]" />
+            <div key={title} className="flex items-start gap-3 text-left sm:block sm:text-center">
+              <div className="w-12 h-12 bg-[#E8F5E8] rounded-2xl flex items-center justify-center flex-shrink-0 sm:mx-auto sm:mb-4 sm:w-14 sm:h-14">
+                <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-[#0E7A0E]" />
               </div>
-              <h3 className="text-lg font-semibold text-[#242529] mb-2">
-                {title}
-              </h3>
-              <p className="text-sm text-[#5C6068] leading-relaxed">{desc}</p>
+              <div>
+                <h3 className="text-base sm:text-lg font-semibold text-[#242529] sm:mb-2">
+                  {title}
+                </h3>
+                <p className="text-[13px] sm:text-sm text-[#5C6068] leading-relaxed">{desc}</p>
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="bg-[#F9FAFB] rounded-[16px] p-8 mb-12">
-          <h2 className="text-xl font-bold text-[#242529] mb-4">
+        <div className="bg-[#F9FAFB] rounded-[16px] p-5 sm:p-8 mb-8 sm:mb-12">
+          <h2 className="text-lg sm:text-xl font-bold text-[#242529] mb-3 sm:mb-4">
             ¿Qué necesitas para facturar?
           </h2>
-          <ul className="space-y-3 text-[#5C6068]">
+          <ul className="space-y-2.5 text-[13px] sm:text-sm text-[#5C6068]">
             {[
               "RFC de tu negocio (persona física o moral)",
               "Razón social (nombre o denominación fiscal)",
@@ -91,7 +93,7 @@ export default function FacturacionPage() {
         <div className="text-center">
           <Link
             href="/auth/register"
-            className="inline-flex items-center gap-2 bg-[#0E7A0E] text-white font-semibold px-8 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
+            className="inline-flex items-center gap-2 bg-[#0E7A0E] text-white font-semibold px-6 sm:px-8 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
           >
             Crear cuenta y automatizar mi facturación
             <ArrowRight className="w-4 h-4" />
