@@ -1626,7 +1626,7 @@ test.describe("Fase 14 móvil: footer compacto, landings de negocio y hub del pa
     expect(cardBox.height, `card de ToolGrid demasiado alta (${cardBox.height}px)`).toBeLessThan(110)
 
     // BackupStrip: overflow-x-auto con scrollWidth > clientWidth, sin overflow del viewport.
-    const strip = page.locator("div.overflow-x-auto.scrollbar-hide").first()
+    const strip = page.locator("div.overflow-x-auto.scrollbar-hide").filter({ hasText: "Acciones rápidas" })
     await expect(strip).toBeVisible({ timeout: 5000 })
     const metrics = await strip.evaluate((el) => ({
       clientWidth: el.clientWidth,
@@ -1677,5 +1677,141 @@ test.describe("Fase 15 — logo móvil: tap-target amplio y navegación al home"
       }
     }
     throw new Error("el tap en el borde del logo no navegó al home (tras 3 intentos)")
+  })
+})
+
+test.describe("Fase 16 — Hub del panel des-saturado en móvil y barra de accesos rápidos", () => {
+  test.skip(({ isMobile }) => !isMobile, "solo móvil")
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/panel", { waitUntil: "domcontentloaded" })
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
+  })
+
+  async function boundingBoxSettled(
+    locator: import("@playwright/test").Locator,
+    timeout = 5000
+  ): Promise<{ x: number; y: number; width: number; height: number } | null> {
+    const deadline = Date.now() + timeout
+    let last: { x: number; y: number; width: number; height: number } | null = null
+    while (Date.now() < deadline) {
+      if (!(await locator.isVisible())) return last!
+      last = (await locator.boundingBox()) ?? last
+      if (last) return last
+      await new Promise((r) => setTimeout(r, 300))
+    }
+    return last!
+  }
+
+  async function selectCollection(page: import("@playwright/test").Page) {
+    // Si el hub ya tiene colección seleccionada (persistida), no hace falta el picker.
+    const nav = page.getByRole("navigation", { name: "Accesos rápidos del panel" })
+    if (await nav.isVisible().catch(() => false)) return
+    const pickerBtn = page.locator("button", { hasText: /Hamburguesas y Hot Dogs/ }).first()
+    await pickerBtn.tap().catch(() => {})
+    await page.waitForTimeout(800)
+  }
+
+  test("LiveStats es una tira horizontal swipeable en móvil", async ({ page }) => {
+    await selectCollection(page)
+
+    const strip = page.locator("div.overflow-x-auto.scrollbar-hide.snap-x").first()
+    await expect(strip).toBeVisible({ timeout: 8000 })
+
+    const metrics = await strip.evaluate((el) => ({
+      clientWidth: el.clientWidth,
+      scrollWidth: el.scrollWidth,
+    }))
+    expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth)
+
+    const firstCard = strip.locator("> div").first()
+    const box = await boundingBoxSettled(firstCard)
+    expect(box).toBeTruthy()
+    // Compacta: la tira cabe en ~1-2 filas (vs ~500px del grid grid-cols-2
+    // anterior). Umbral 160 para tolerar la nota de costo real ("Costo: $X").
+    expect(Math.round(box!.height)).toBeLessThanOrEqual(160)
+  })
+
+  test("el hub tiene un solo grid agrupado por 4 áreas con contexto", async ({ page }) => {
+    await selectCollection(page)
+
+    for (const header of [
+      "Costos y rentabilidad",
+      "Planeación y compras",
+      "Operación y apertura",
+      "Sistema de pedidos",
+    ]) {
+      await expect(page.getByRole("heading", { name: header })).toBeVisible({ timeout: 8000 })
+    }
+
+    // El header "Sistema de pedidos" vive dentro del grid unificado (regresión de ToolGrid).
+    const grid = page.locator("div.flex.flex-col.gap-2").first()
+    await expect(grid.getByRole("heading", { name: "Sistema de pedidos" })).toBeVisible()
+
+    // Chip "Incluido gratis" se conserva en el grupo de FoodOS.
+    await expect(page.getByText("Incluido gratis")).toBeVisible()
+  })
+
+  test("la barra inferior de accesos rápidos tiene 5 destinos y navega", async ({ page }) => {
+    await selectCollection(page)
+
+    const nav = page.getByRole("navigation", { name: "Accesos rápidos del panel" })
+    await expect(nav).toBeVisible({ timeout: 8000 })
+
+    for (const label of ["Inicio", "Ventas", "Costeo", "Mermas", "Menú digital"]) {
+      await expect(nav.getByText(label, { exact: true })).toBeVisible()
+    }
+
+    // Tap en "Ventas" navega a /panel/ventas
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await nav.getByText("Ventas", { exact: true }).tap()
+      try {
+        await page.waitForURL(/\/panel\/ventas$/, { timeout: 8000 })
+        break
+      } catch {
+        // reintentar (race de hidratación en preview frío)
+      }
+    }
+    expect(page.url()).toMatch(/\/panel\/ventas$/)
+  })
+
+  test("sin overflow del viewport y el último tool queda visible sobre la barra", async ({ page }) => {
+    await selectCollection(page)
+
+    const grid = page.locator("div.flex.flex-col.gap-2").first()
+    const lastTool = grid.locator("a").last()
+    await lastTool.scrollIntoViewIfNeeded()
+    // Scrollear hasta el fondo: el wrapper del hub tiene pb-24, así el último tool
+    // queda por encima de la barra inferior (que mide ~72px).
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    await page.waitForTimeout(400)
+
+    const toolBox = await boundingBoxSettled(lastTool)
+    const nav = page.getByRole("navigation", { name: "Accesos rápidos del panel" })
+    const navBox = await boundingBoxSettled(nav)
+    expect(toolBox).toBeTruthy()
+    expect(navBox).toBeTruthy()
+    // El último tool no queda tapado por la barra inferior.
+    expect(toolBox!.y + toolBox!.height).toBeLessThanOrEqual(navBox!.y + 2)
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    )
+    expect(overflow).toBeLessThanOrEqual(1)
+  })
+})
+
+test.describe("Fase 16 — PanelQuickNav solo en móvil", () => {
+  test.use({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false })
+
+  test("en desktop la barra inferior de accesos rápidos no se renderiza", async ({ page }) => {
+    await page.goto("/panel", { waitUntil: "domcontentloaded" })
+    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
+
+    const pickerBtn = page.locator("button", { hasText: /Hamburguesas y Hot Dogs/ }).first()
+    await pickerBtn.tap().catch(() => {})
+    await page.waitForTimeout(800)
+
+    await expect(page.getByRole("navigation", { name: "Accesos rápidos del panel" })).toHaveCount(0)
   })
 })

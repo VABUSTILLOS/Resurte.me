@@ -21,11 +21,17 @@ export default function HeroSection({ collections, selectedCollection, onSelect 
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">
               Panel para {selectedCollection.name}
             </h2>
-            <p className="text-gray-500 max-w-2xl">
+            <p className="text-sm sm:text-base text-gray-500 max-w-2xl line-clamp-2 sm:line-clamp-none">
               Todas las herramientas están calibradas para tu tipo de cocina. 
               Resurte.me es tu único proveedor: todos los precios, sugerencias 
               y cálculos usan nuestro catálogo real.
             </p>
+            <a
+              href="#panel-tools"
+              className="mt-2.5 sm:mt-3 inline-flex items-center gap-1.5 bg-[#0E7A0E] text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-[#0B630B] transition-colors touch-target"
+            >
+              Gestionar negocio
+            </a>
           </div>
         </div>
       </div>

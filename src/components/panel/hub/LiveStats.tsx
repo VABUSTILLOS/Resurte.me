@@ -13,7 +13,7 @@ interface LiveStatsProps {
 
 export default function LiveStats({ stats, panelCfg, mesasInfo, mesas }: LiveStatsProps) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 sm:gap-3 mb-4 sm:mb-6">
+    <div className="flex gap-2 overflow-x-auto scrollbar-hide snap-x -mx-4 px-4 pb-1 mb-4 [&>div]:shrink-0 [&>div]:w-32 [&>div]:snap-start sm:grid sm:grid-cols-3 sm:gap-3 sm:mb-6 sm:mx-0 sm:px-0 sm:pb-0 sm:overflow-visible sm:[&>div]:w-auto sm:[&>div]:snap-none lg:grid-cols-7">
       <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 text-center">
         <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-1.5 sm:mb-2">
           <PieChart className="w-4 h-4 text-blue-600" />

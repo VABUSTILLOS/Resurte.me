@@ -7,6 +7,7 @@ import { RestaurantProvider, useRestaurant } from "@/contexts/restaurant-context
 import { ToastProvider } from "@/components/toast"
 import ThemeToggle from "@/components/panel/ThemeToggle"
 import { PanelMobileNav } from "./_components/PanelMobileNav"
+import { PanelQuickNav } from "./_components/PanelQuickNav"
 import { t } from "@/lib/i18n/es"
 import type { RestaurantCollection } from "@/types"
 import {
@@ -60,6 +61,17 @@ function PanelContent({ children }: { children: React.ReactNode }) {
       router.push("/panel")
     }
   }, [loading, selectedCollection, router])
+
+  // Publish a body class so floating elements (cookie banner, toast)
+  // move above the quick-nav bar on mobile.
+  useEffect(() => {
+    if (!loading && selectedCollection) {
+      document.body.classList.add("has-panel-bottom-nav")
+    } else {
+      document.body.classList.remove("has-panel-bottom-nav")
+    }
+    return () => document.body.classList.remove("has-panel-bottom-nav")
+  }, [loading, selectedCollection])
 
   return (
     <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}>
@@ -165,9 +177,11 @@ function PanelContent({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-24 lg:pb-6">
         <ToastProvider>{children}</ToastProvider>
       </div>
+
+      {selectedCollection && <PanelQuickNav />}
 
       <PanelMobileNav
         open={showMobileNav}

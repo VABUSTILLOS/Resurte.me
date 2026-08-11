@@ -45,7 +45,7 @@ export const getCachedVisibleProducts = unstable_cache(
 
 export const getCachedActiveCollections = unstable_cache(
   async (): Promise<RestaurantCollection[]> => getRestaurantCollections(),
-  ["catalog-collections"],
+  ["catalog-collections-v2"],
   { revalidate: 3600, tags: ["catalog", "collections"] }
 )
 
@@ -72,7 +72,7 @@ export const getCachedProductsByCategory = unstable_cache(
 export const getCachedCollectionBySlug = unstable_cache(
   async (slug: string): Promise<RestaurantCollection | null> =>
     getRestaurantCollectionBySlug(slug),
-  ["catalog-collection-by-slug"],
+  ["catalog-collection-by-slug-v2"],
   { revalidate: 3600, tags: ["catalog", "collections"] }
 )
 
@@ -91,7 +91,7 @@ export const getCachedCategoryById = unstable_cache(
 export const getCachedProductsByCollection = unstable_cache(
   async (collectionSlug: string): Promise<Product[]> =>
     getProductsByCollection(collectionSlug),
-  ["catalog-products-by-collection"],
+  ["catalog-products-by-collection-v2"],
   { revalidate: 300, tags: ["catalog", "products"] }
 )
 

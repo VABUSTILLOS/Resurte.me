@@ -5,10 +5,11 @@ import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useEffect, useCallback, useRef } from "react"
+import Link from "next/link"
 import { normalizeName } from "@/lib/normalize"
 import { foodCostStatus, usePanelConfig } from "@/lib/panel-config"
 import { convertQty } from "@/lib/panel-units"
-import { Clock, Search } from "lucide-react"
+import { Clock, Search, ArrowRight } from "lucide-react"
 import { GlobalSearch } from "@/components/global-search"
 import {
   PAYMENT_METHODS, TOOLS, hubEntryTotal,
@@ -26,7 +27,6 @@ import KitchenMonitor from "@/components/panel/hub/KitchenMonitor"
 import AlertsPanel from "@/components/panel/hub/AlertsPanel"
 import BackupStrip from "@/components/panel/hub/BackupStrip"
 import ToolGrid from "@/components/panel/hub/ToolGrid"
-import StandaloneToolGrid from "@/components/panel/hub/StandaloneToolGrid"
 import RestoreConfirmModal from "@/components/panel/hub/RestoreConfirmModal"
 
 export default function PanelPage() {
@@ -385,22 +385,25 @@ export default function PanelPage() {
           </h3>
           <div className="space-y-1.5 sm:space-y-2">
             {sharedDishes.length > 0 && (
-              <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Link href="/panel/costeo" className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg -mx-2 px-2 py-2 touch-target transition-colors">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                <span><strong>{sharedDishes.length}</strong> platillos en tu menú costeado</span>
-              </div>
+                <span className="flex-1 min-w-0 truncate"><strong>{sharedDishes.length}</strong> platillos en tu menú costeado</span>
+                <ArrowRight className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+              </Link>
             )}
             {mermaEntries.length > 0 && (
-              <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Link href="/panel/mermas" className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg -mx-2 px-2 py-2 touch-target transition-colors">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-                <span><strong>{mermaEntries.length}</strong> registros de merma — ${mermaEntries.reduce((s, e) => s + (e.amountKg * e.costPerKg), 0).toFixed(0)} en pérdidas</span>
-              </div>
+                <span className="flex-1 min-w-0 truncate"><strong>{mermaEntries.length}</strong> registros de merma — ${mermaEntries.reduce((s, e) => s + (e.amountKg * e.costPerKg), 0).toFixed(0)} en pérdidas</span>
+                <ArrowRight className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+              </Link>
             )}
             {aperturaChecked.length > 0 && (
-              <div className="flex items-center gap-2 text-xs text-gray-500">
+              <Link href="/panel/apertura" className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg -mx-2 px-2 py-2 touch-target transition-colors">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
-                <span><strong>{aperturaChecked.length}</strong> pasos completados del kit de apertura</span>
-              </div>
+                <span className="flex-1 min-w-0 truncate"><strong>{aperturaChecked.length}</strong> pasos completados del kit de apertura</span>
+                <ArrowRight className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+              </Link>
             )}
             {sharedDishes.length === 0 && mermaEntries.length === 0 && aperturaChecked.length === 0 && (
               <p className="text-xs text-gray-400">Aún no hay actividad. ¡Empieza a usar las herramientas!</p>
@@ -420,8 +423,6 @@ export default function PanelPage() {
       )}
 
       <ToolGrid tools={TOOLS} selectedCollection={selectedCollection} />
-
-      <StandaloneToolGrid tools={TOOLS} />
 
       <RestoreConfirmModal
         open={showRestoreConfirm}

@@ -144,6 +144,13 @@ body.cookie-consent-visible .sticky-catalog-button {
   }
 }
 
+/* Panel: la barra inferior de accesos rápidos (PanelQuickNav, lg:hidden) ocupa
+   el carril inferior en móvil; el cookie banner y el toast flotan por encima
+   de ella con el mismo patrón de body class que `cart-bar-active`. */
+body.has-panel-bottom-nav {
+  --floating-bottom-offset: calc(4.5rem + var(--inset-bottom));
+}
+
 /* Theme toggle (light/dark/system) — explicit data-theme wins */
 [data-theme="light"] {
   --background: #faf8f5;
