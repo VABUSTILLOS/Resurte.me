@@ -3,17 +3,12 @@
 -- Vía: Supabase Dashboard → SQL Editor → New query → Run
 -- Idempotente: seguro de re-ejecutar.
 --
--- ⚠️ PASO 0 · EDITA ESTA LISTA con los emails de tus vendedores
--- ============================================================
--- Pegar aquí los emails de los account managers (uno por línea):
+-- ⚠️ PASO 0 · EDITA LA LISTA DEL PASO 3 con los emails de tus
+-- vendedores (los que pongas ahí se vuelven account managers).
+-- Ejemplo si son 3 vendedores:
 --   'vendedor1@gmail.com',
 --   'vendedor2@gmail.com',
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM auth.users WHERE email = '{{PON_AQUI_EMAIL_VENDEDOR}}') THEN
-    RAISE NOTICE 'Reemplaza {{PON_AQUI_EMAIL_VENDEDOR}} con los emails reales (ver PASO 0 arriba).';
-  END IF;
-END $$;
+--   'vendedor3@gmail.com',
 
 -- ============================================================
 -- PASO 1 · PRE-CHECK (solo lectura)
