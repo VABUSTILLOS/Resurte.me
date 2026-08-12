@@ -16,6 +16,7 @@ import {
   PanelLeft,
   LayoutDashboard,
   Users,
+  Handshake,
 } from "lucide-react"
 import Link from "next/link"
 import type { User as SupabaseUser, SupabaseClient } from "@supabase/supabase-js"
@@ -37,12 +38,27 @@ export function DashboardSidebar() {
   // degrades gracefully while `supabase` is null.
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const [user, setUser] = useState<SupabaseUser | null>(null)
+  // Rol del usuario para navegación por sección (vendedor/admin vs cliente)
+  const [role, setRole] = useState<"admin" | "vendedor" | "cliente" | null>(null)
 
   useEffect(() => {
     let cancelled = false
     import("@/lib/supabase/client").then(({ createClient }) => {
       if (!cancelled) setSupabase(createClient())
     })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  // Resolver el rol del usuario (server action) para ocultar/mostrar
+  // secciones según el perfil (vendedores no ven "Mi Restaurante").
+  useEffect(() => {
+    let cancelled = false
+    import("@/lib/roles-actions").then(({ getMyRole }) =>
+      getMyRole().then((r) => {
+        if (!cancelled) setRole(r)
+      })
+    )
     return () => {
       cancelled = true
     }
@@ -112,6 +128,11 @@ export function DashboardSidebar() {
     router.push("/")
   }
 
+  // Navegación por rol: vendedores no ven "Mi Restaurante" (viven en
+  // Comercialización); la sección Comercialización es para vendedor/admin.
+  const isSeller = role === "vendedor"
+  const showComercializacion = role === "vendedor" || role === "admin"
+
   if (!user) return null
 
   const displayName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Usuario"
@@ -151,13 +172,24 @@ export function DashboardSidebar() {
           >
             <Package className="w-4 h-4" />
           </Link>
-          <Link
-            href="/panel"
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shrink-0"
-            title="Herramientas"
-          >
-            <LayoutDashboard className="w-4 h-4" />
-          </Link>
+          {showComercializacion && (
+            <Link
+              href="/comercializacion"
+              className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shrink-0"
+              title="Comercialización"
+            >
+              <Handshake className="w-4 h-4" />
+            </Link>
+          )}
+          {!isSeller && (
+            <Link
+              href="/panel"
+              className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shrink-0"
+              title="Herramientas"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+            </Link>
+          )}
           <Link
             href="/recompensas"
             className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shrink-0"
@@ -243,16 +275,27 @@ export function DashboardSidebar() {
               <Package className="w-4 h-4 shrink-0" />
               Mis pedidos
             </Link>
-            <Link
-              href="/panel"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors"
-            >
-              <LayoutDashboard className="w-4 h-4 shrink-0" />
-              Mi Restaurante
-              <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-bold ml-auto">
-                Nuevo
-              </span>
-            </Link>
+            {showComercializacion && (
+              <Link
+                href="/comercializacion"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors"
+              >
+                <Handshake className="w-4 h-4 shrink-0" />
+                Comercialización
+              </Link>
+            )}
+            {!isSeller && (
+              <Link
+                href="/panel"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors"
+              >
+                <LayoutDashboard className="w-4 h-4 shrink-0" />
+                Mi Restaurante
+                <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-bold ml-auto">
+                  Nuevo
+                </span>
+              </Link>
+            )}
             <Link
               href="/recompensas"
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors"
@@ -427,17 +470,30 @@ export function DashboardSidebar() {
                 Mis pedidos
                 <ChevronRight className="w-4 h-4 ml-auto" />
               </Link>
-              <Link
-                href="/panel"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-3 p-3.5 rounded-xl bg-indigo-50 text-indigo-800 font-semibold"
-              >
-                <LayoutDashboard className="w-5 h-5" />
-                Mi Restaurante
-                <span className="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold ml-auto">
-                  Nuevo
-                </span>
-              </Link>
+              {showComercializacion && (
+                <Link
+                  href="/comercializacion"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-3 p-3.5 rounded-xl bg-gray-50 text-gray-700 font-semibold"
+                >
+                  <Handshake className="w-5 h-5" />
+                  Comercialización
+                  <ChevronRight className="w-4 h-4 ml-auto" />
+                </Link>
+              )}
+              {!isSeller && (
+                <Link
+                  href="/panel"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-3 p-3.5 rounded-xl bg-indigo-50 text-indigo-800 font-semibold"
+                >
+                  <LayoutDashboard className="w-5 h-5" />
+                  Mi Restaurante
+                  <span className="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-bold ml-auto">
+                    Nuevo
+                  </span>
+                </Link>
+              )}
               <Link
                 href="/recompensas"
                 onClick={() => setMobileOpen(false)}

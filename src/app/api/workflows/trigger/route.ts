@@ -242,6 +242,14 @@ async function handleOnboarding(
 /**
  * Handle referral code application — links a new user to their referrer.
  * Called during registration when a referral code is provided.
+ *
+ * Un código `RESU-…` puede ser de dos tipos:
+ *  1. Código de prospecto de vendedor (`crm_prospects.referral_code`, link de
+ *     registro de Comercialización) → se vincula la cuenta al prospecto y el
+ *     prospecto pasa a `cliente_activo`.
+ *  2. Código de referido de perfil (`profiles.referral_code`, programa
+ *     "Invitar amigos") → flujo actual de referidos.
+ * Como ambos comparten prefijo, se busca SIEMPRE primero en `crm_prospects`.
  */
 async function handleReferral(
   userId: string,
@@ -258,12 +266,66 @@ async function handleReferral(
 
   try {
     const supabase = await createServiceClient()
+    const code = String(referralCode).toUpperCase().trim()
 
+    // 1) Código de prospecto de vendedor (link de registro de Comercialización)
+    const { data: prospect } = await supabase
+      .from("crm_prospects")
+      .select("id, seller_id, referral_code, user_id, name")
+      .eq("referral_code", code)
+      .single()
+
+    if (prospect) {
+      if (prospect.user_id && prospect.user_id !== userId) {
+        return NextResponse.json(
+          { error: "Este código ya está vinculado a otra cuenta" },
+          { status: 400 }
+        )
+      }
+
+      // Vincular la cuenta al prospecto y marcarlo como cliente activo
+      const { error: updateError } = await supabase
+        .from("crm_prospects")
+        .update({ user_id: userId, status: "cliente_activo", last_contact_at: new Date().toISOString() })
+        .eq("id", prospect.id)
+
+      if (updateError) throw updateError
+
+      // Notificar al vendedor por WhatsApp
+      try {
+        const { data: seller } = await supabase
+          .from("profiles")
+          .select("phone, full_name")
+          .eq("id", prospect.seller_id)
+          .single()
+
+        if (seller?.phone) {
+          const { sendTextMessage } = await import("@/lib/whatsapp")
+          await sendTextMessage({
+            to: seller.phone,
+            text: `🎉 ¡Nuevo cliente vinculado!\n\n${fullName || email} se registró con tu link de ${
+              prospect.name || "prospecto"
+            }.\n\nYa puede recibir pedidos asistidos desde Comercialización. 📦`,
+          })
+        }
+      } catch {
+        // Silent fail
+      }
+
+      return NextResponse.json({
+        success: true,
+        workflow_type: "referral",
+        user_id: userId,
+        prospect_id: prospect.id,
+      })
+    }
+
+    // 2) Código de referido de perfil (programa "Invitar amigos")
     // Buscar al referidor por su código
     const { data: referrer } = await supabase
       .from("profiles")
       .select("id, referral_code, full_name")
-      .eq("referral_code", String(referralCode).toUpperCase().trim())
+      .eq("referral_code", code)
       .single()
 
     if (!referrer) {

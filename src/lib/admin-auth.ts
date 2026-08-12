@@ -13,6 +13,44 @@ import { createClient } from "@/lib/supabase/server"
  *   const { user } = await requireAdmin()
  *   if (!user) return 401 (el helper ya construye la respuesta)
  */
+/**
+ * Determina si un usuario autenticado es admin.
+ *
+ * Fuente de verdad: ADMIN_EMAILS (env var) primero; si está vacía, se
+ * consulta la tabla `admin_users` (migración 00030).
+ */
+export async function isAdminUser(user: {
+  id: string
+  email?: string | null
+}): Promise<boolean> {
+  if (!user?.email) return false
+
+  // 1) Env var ADMIN_EMAILS (fuente primaria)
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+
+  if (adminEmails.length > 0) {
+    return adminEmails.includes(user.email.toLowerCase())
+  }
+
+  // 2) Tabla admin_users (opcional, si existe la migración)
+  try {
+    const supabase = await createClient()
+    const { data: adminRow, error } = await supabase
+      .from("admin_users")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    return !error && !!adminRow
+  } catch {
+    // Tabla ausente o RLS — ignorar
+    return false
+  }
+}
+
 export async function requireAdmin() {
   const supabase = await createClient()
   const {
@@ -30,31 +68,8 @@ export async function requireAdmin() {
     }
   }
 
-  // 1) Env var ADMIN_EMAILS (fuente primaria)
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-
-  if (adminEmails.length > 0 && adminEmails.includes(user.email.toLowerCase())) {
+  if (await isAdminUser(user)) {
     return { user, response: null }
-  }
-
-  // 2) Tabla admin_users (opcional, si existe la migración)
-  if (adminEmails.length === 0) {
-    try {
-      const { data: adminRow, error } = await supabase
-        .from("admin_users")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle()
-
-      if (!error && adminRow) {
-        return { user, response: null }
-      }
-    } catch {
-      // Tabla ausente o RLS — ignorar y continuar
-    }
   }
 
   return {

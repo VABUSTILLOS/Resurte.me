@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package, Search } from "lucide-react"
+import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package, Search, Handshake } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
@@ -25,7 +25,21 @@ export function Header() {
   const [showMobileSearch, setShowMobileSearch] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [cashbackBalance, setCashbackBalance] = useState<number | null>(null)
+  const [role, setRole] = useState<"admin" | "vendedor" | "cliente" | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Resolver el rol del usuario (server action) para navegación por sección
+  useEffect(() => {
+    let cancelled = false
+    import("@/lib/roles-actions").then(({ getMyRole }) =>
+      getMyRole().then((r) => {
+        if (!cancelled) setRole(r)
+      })
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Dynamically load the Supabase client once the shell is interactive
   useEffect(() => {
@@ -243,6 +257,16 @@ export function Header() {
                       <MapPin className="w-4 h-4" />
                       Mis direcciones
                     </Link>
+                    {(role === "vendedor" || role === "admin") && (
+                      <Link
+                        href="/comercializacion"
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#343538] hover:bg-[#F7F5F0] transition-colors"
+                      >
+                        <Handshake className="w-4 h-4" />
+                        Comercialización
+                      </Link>
+                    )}
                     <button
                       onClick={handleSignOut}
                       className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
