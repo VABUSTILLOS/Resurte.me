@@ -28,8 +28,8 @@ interface ToolGuideProps {
 /**
  * Panel lateral fijo de guía paso a paso. En desktop es una barra lateral
  * derecha colapsable (no bloquea el uso de la herramienta); en mobile se
- * convierte en drawer con backdrop. Usa z-50 para quedar sobre la top bar
- * (z-40) y la navegación (z-40).
+ * convierte en drawer con backdrop. Queda por encima de la top bar (z-40),
+ * la navegación (z-40) y el overlay de demo (z-[80]).
  */
 export default function ToolGuide({
   guide, open, onClose, demoOn = false,
@@ -72,7 +72,7 @@ export default function ToolGuide({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-black/40 lg:hidden"
+            className="fixed inset-0 z-[85] bg-black/40 lg:hidden"
           />
 
           {/* Panel */}
@@ -81,7 +81,7 @@ export default function ToolGuide({
             initial={{ x: "100%" }}
             animate={{ x: collapsed ? "calc(100% - 44px)" : 0 }}
             transition={{ type: "tween", duration: 0.25 }}
-            className={`fixed top-0 right-0 bottom-0 z-[60] flex flex-col bg-white border-l border-gray-100 shadow-2xl lg:shadow-xl
+            className={`fixed top-0 right-0 bottom-0 z-[90] flex flex-col bg-white border-l border-gray-100 shadow-2xl lg:shadow-xl
               w-[calc(100vw-3rem)] max-w-sm lg:max-w-sm lg:w-96`}
             aria-label={`Guía paso a paso de ${guide.tool}`}
           >

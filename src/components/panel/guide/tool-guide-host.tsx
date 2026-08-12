@@ -46,7 +46,7 @@ export default function ToolGuideHost({
     <>
       {/* Overlay del modo demo */}
       {showDemo && demo.demoOn && (
-        <div className="fixed inset-0 z-40 bg-white flex flex-col">
+        <div className="fixed inset-0 z-[80] bg-white flex flex-col">
           <div className="shrink-0 border-b border-gray-200">
             <DemoBanner onExit={demo.disableDemo} />
             <ToolSwitcher />
