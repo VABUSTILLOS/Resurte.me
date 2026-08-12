@@ -163,3 +163,34 @@ CREATE POLICY "crm_activities_service_all"
   TO service_role
   USING (true)
   WITH CHECK (true);
+
+-- ============================================================
+-- CÓMO ASIGNAR ROLES A VENDEDORES (SQL Editor de Supabase)
+-- ============================================================
+-- El email vive en auth.users; profiles solo tiene id/full_name/...
+-- La columna role fue agregada por esta migración (default 'cliente').
+
+-- 1) Ver usuarios y su rol actual:
+--   SELECT au.email, COALESCE(p.role, 'cliente') AS rol
+--   FROM auth.users au
+--   LEFT JOIN profiles p ON p.id = au.id
+--   ORDER BY au.email;
+
+-- 2) Asignar 'vendedor' a vendedores puntuales por email:
+--   UPDATE profiles p
+--   SET role = 'vendedor'
+--   WHERE p.id IN (
+--     SELECT id FROM auth.users
+--     WHERE email IN ('vendedor1@gmail.com', 'vendedor2@gmail.com')
+--   );
+
+-- 3) Asignar 'vendedor' a todos EXCEPTO el admin (vabustillos@gmail.com):
+--   UPDATE profiles p
+--   SET role = 'vendedor'
+--   WHERE p.role IS DISTINCT FROM 'vendedor'
+--     AND p.id NOT IN (
+--       SELECT id FROM auth.users WHERE email = 'vabustillos@gmail.com'
+--     );
+
+-- Nota: el admin (ADMIN_EMAILS) ve todas las secciones sin importar su
+-- rol; estas queries solo cambian lo que ven los usuarios normales.
