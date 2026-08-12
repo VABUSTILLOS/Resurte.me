@@ -10,11 +10,14 @@ import { PanelMobileNav } from "./_components/PanelMobileNav"
 import { PanelQuickNav } from "./_components/PanelQuickNav"
 import { PanelCompactFooter } from "@/components/panel/PanelCompactFooter"
 import ToolSwitcher from "@/components/panel/guide/tool-switcher"
+import Link from "next/link"
 import { t } from "@/lib/i18n/es"
+import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import type { RestaurantCollection } from "@/types"
 import {
   Store, ChefHat, ChevronDown, Sparkles, Menu,
 } from "lucide-react"
+import { ShoppingCart } from "lucide-react"
 
 const COLLECTION_ICONS: Record<string, string> = {
     "hamburguesas-hot-dogs": "🍔",
@@ -39,6 +42,8 @@ function PanelContent({ children }: { children: React.ReactNode }) {
   // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
   const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
   const { selectedCollection, setSelectedCollection, collections, setCollections } = useRestaurant()
+  const { city } = useCity()
+  const storeHref = `/catalogo/${city?.slug || DEFAULT_CITY_SLUG}`
   const [loading, setLoading] = useState(true)
   const [showPicker, setShowPicker] = useState(false)
   const [showMobileNav, setShowMobileNav] = useState(false)
@@ -98,6 +103,14 @@ function PanelContent({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <Link
+                href={storeHref}
+                aria-label={t("panel.buy")}
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0A5F0A] transition-colors touch-target shrink-0"
+              >
+                <ShoppingCart className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">{t("panel.buy")}</span>
+              </Link>
               <ThemeToggle />
 
               <div className="relative min-w-0">

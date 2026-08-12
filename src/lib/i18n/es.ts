@@ -87,6 +87,8 @@ const es = {
     current: "Actual",
     clearSelection: "Quitar selección",
     toolsPersonalizedFor: "Todas las herramientas están personalizadas para",
+    buy: "Comprar",
+    store: "Tienda",
   },
 }
 
