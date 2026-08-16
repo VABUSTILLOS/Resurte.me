@@ -5,7 +5,6 @@
 // ============================================================
 
 import { useCallback, useEffect, useState } from "react"
-import { toDataURL } from "qrcode"
 import {
   getFoodosPanelData,
   upsertRestaurant,
@@ -67,13 +66,28 @@ export default function RestaurantePage() {
     run()
   }, [load])
 
-  // Regenera el QR cuando cambia el slug
+  // Regenera el QR cuando cambia el slug. `qrcode` se carga bajo demanda para
+  // no incluirlo en el bundle inicial del panel.
   useEffect(() => {
     if (!restaurant) return
     const url = publicRestaurantUrl(restaurant.slug)
-    toDataURL(url, { width: 320, margin: 2 })
-      .then(setQrUrl)
-      .catch(() => setQrUrl(null))
+    let cancelled = false
+    import("qrcode")
+      .then(({ toDataURL }) =>
+        toDataURL(url, { width: 320, margin: 2 })
+          .then((dataUrl) => {
+            if (!cancelled) setQrUrl(dataUrl)
+          })
+          .catch(() => {
+            if (!cancelled) setQrUrl(null)
+          })
+      )
+      .catch(() => {
+        if (!cancelled) setQrUrl(null)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [restaurant])
 
   async function handleSaveRestaurant(e: React.FormEvent) {

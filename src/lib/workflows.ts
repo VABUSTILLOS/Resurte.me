@@ -576,12 +576,14 @@ export async function checkAndSendPaymentReminders(): Promise<{
   let reminded = 0
   let cancelled = 0
 
-  // Get all pending payment orders
+  // Get pending payment orders (bounded: select only what the loop uses and
+  // cap the batch so an unbounded `select("*")` can't grow without limit).
   const { data: orders, error } = await supabase
     .from("orders")
-    .select("*")
+    .select("id, created_at")
     .eq("payment_status", "pending")
     .neq("status", "cancelled")
+    .limit(500)
 
   if (error) {
     logger.error("[Workflow] Failed to fetch pending orders:", error)

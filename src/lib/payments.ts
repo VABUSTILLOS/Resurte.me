@@ -1,5 +1,6 @@
 import { getStripe } from "@/lib/stripe"
 import { createServiceClient } from "@/lib/supabase/service"
+import { applyDiscount, round2 } from "@/lib/money"
 import { toCents } from "@/lib/payment-validation"
 import type Stripe from "stripe"
 import { logger } from "@/lib/logger"
@@ -53,10 +54,6 @@ export interface ProcessUpsellParams {
   idempotencyKey: string
   userId?: string | null
   guestToken?: string | null
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
 }
 
 /**
@@ -232,7 +229,7 @@ export async function processUpsellForOrder(
     .maybeSingle()
 
   const effectivePrice = product.sale_price ?? product.price
-  const unitPrice = round2(effectivePrice * (1 - (Number(bumpRule?.discount_pct) || 0)))
+  const unitPrice = applyDiscount(effectivePrice, Number(bumpRule?.discount_pct) || 0)
   const amount = round2(unitPrice * qty)
   if (amount <= 0) {
     throw new PaymentIntentError("Monto de upsell inválido", 400)

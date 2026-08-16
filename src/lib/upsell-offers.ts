@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service"
+import { round2 } from "@/lib/money"
 import { bumpUnitPrice, type BumpRuleRow, type BumpProduct } from "@/lib/order-bumps"
 
 /**
@@ -49,11 +50,6 @@ export interface ResolveUpsellOffersParams {
   userId?: string | null
   /** guest_token del navegador para validar propiedad en pedidos anónimos. */
   guestToken?: string | null
-}
-
-/** Redondea a 2 decimales (misma regla que el resto del checkout). */
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
 }
 
 function toOffer(rule: BumpRuleRow, product: BumpProduct): UpsellOffer {

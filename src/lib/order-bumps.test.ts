@@ -263,15 +263,29 @@ describe("resolveBumps", () => {
                   }),
                 }
               }
+              const eq = vi.fn().mockImplementation((_col: string, value?: number) => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data:
+                    value !== undefined ? (bumpProducts[value] ?? null) : (bumpProducts[100] ?? null),
+                  error: null,
+                }),
+              }))
+              // Query del carrito (incluye "tags"): devuelve los productos del
+              // carrito. Consultas batched de bumps (sin tags): resuelve por id.
+              if (cols.includes("tags")) {
+                return {
+                  in: vi.fn().mockResolvedValue({ data: cartProducts, error: null }),
+                  eq,
+                }
+              }
               return {
-                in: vi.fn().mockResolvedValue({ data: cartProducts, error: null }),
-                eq: vi.fn().mockImplementation((_col: string, value?: number) => ({
-                  maybeSingle: vi.fn().mockResolvedValue({
-                    data:
-                      value !== undefined ? (bumpProducts[value] ?? null) : (bumpProducts[100] ?? null),
-                    error: null,
-                  }),
+                in: vi.fn().mockImplementation((_col: string, ids?: number[]) => ({
+                  data: (ids ?? [])
+                    .map((id) => bumpProducts[id] ?? null)
+                    .filter(Boolean),
+                  error: null,
                 })),
+                eq,
               }
             }),
           }

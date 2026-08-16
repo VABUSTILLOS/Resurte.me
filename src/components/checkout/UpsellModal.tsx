@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { loadStripe, type Stripe } from "@stripe/stripe-js"
 import {
   X,
   CheckCircle2,
@@ -33,7 +32,7 @@ type ModalStage =
   | "authenticating" // 3DS/SCA en curso
   | "success" // confirmación consolidada
 
-let stripePromise: Promise<Stripe | null> | null = null
+let stripePromise: Promise<import("@stripe/stripe-js").Stripe | null> | null = null
 
 // Esperas entre reintentos al consultar ofertas (el webhook tarda ~1-2s en
 // confirmar la orden base). Intentos en t≈0, 0.8s, 2.6s y 6.2s.
@@ -48,10 +47,15 @@ const PROCESS_TIMEOUT_MS = 20_000
 // Backoff entre reintentos: t≈1.2s, 3s y 5.4s (tres entradas = tres reintentos).
 const PROCESS_RETRY_DELAYS_MS = [1200, 1800, 2400]
 
+// Stripe se carga bajo demanda (import dinámico) la primera vez que el modal
+// necesita autenticar el cobro del upsell (3DS/SCA); así no entra en el bundle
+// inicial del cliente.
 function getStripePromise() {
   if (!stripePromise) {
     const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-    stripePromise = key ? loadStripe(key) : Promise.resolve(null)
+    stripePromise = key
+      ? import("@stripe/stripe-js").then(({ loadStripe }) => loadStripe(key))
+      : Promise.resolve(null)
   }
   return stripePromise
 }

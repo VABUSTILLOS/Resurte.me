@@ -12,13 +12,8 @@ import type {
   FoodosUpsellRule,
 } from "@/types/foodos"
 
-export function formatMoney(amount: number, currency = "MXN"): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount)
-}
+import { formatMoney } from "@/lib/money"
+export { formatMoney }
 
 export function slugify(input: string): string {
   return (input ?? "")

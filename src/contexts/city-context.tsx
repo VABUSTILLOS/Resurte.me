@@ -6,6 +6,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type ReactNode,
 } from "react"
 
@@ -166,21 +167,20 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
     )
   }, [])
 
-  return (
-    <CityContext.Provider
-      value={{
-        city,
-        setCity,
-        cities: MEXICO_CITIES,
-        isLoading,
-        isDetecting,
-        detectionError,
-        requestBrowserLocation,
-      }}
-    >
-      {children}
-    </CityContext.Provider>
+  const value = useMemo<CityContextValue>(
+    () => ({
+      city,
+      setCity,
+      cities: MEXICO_CITIES,
+      isLoading,
+      isDetecting,
+      detectionError,
+      requestBrowserLocation,
+    }),
+    [city, setCity, isLoading, isDetecting, detectionError, requestBrowserLocation]
   )
+
+  return <CityContext.Provider value={value}>{children}</CityContext.Provider>
 }
 
 export function useCity() {

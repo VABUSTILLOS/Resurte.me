@@ -6,6 +6,8 @@
  * SELLER_COMMISSION_RATE (ej: "0.05" = 5%). Solo es una cifra estimada
  * de visualización: no hay ledger de pagos de comisiones.
  */
+import { formatMoney as sharedFormatMoney } from "@/lib/money"
+
 export function getCommissionRate(): number {
   const raw = process.env.SELLER_COMMISSION_RATE
   if (!raw) return 0.05
@@ -15,9 +17,6 @@ export function getCommissionRate(): number {
 }
 
 export function formatMoney(n: number): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    maximumFractionDigits: 2,
-  }).format(n)
+  // Decimales fijos (2) — mismo output que el formato histórico de este módulo.
+  return sharedFormatMoney(n, "MXN", { minDecimals: 2, maxDecimals: 2 })
 }

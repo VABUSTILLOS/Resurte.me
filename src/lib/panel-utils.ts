@@ -30,3 +30,35 @@ export function entryTime(createdAt?: string | null): number {
   const ts = Date.parse(createdAt)
   return Number.isFinite(ts) ? ts : NaN
 }
+
+/** Parsea un string a número no negativo; `0` si es inválido o negativo. */
+export function toNonNegativeNumber(value: string | number | null | undefined): number {
+  if (value === null || value === undefined || value === "") return 0
+  const parsed = typeof value === "number" ? value : parseFloat(value)
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0
+}
+
+/** Parsea a entero; `0` si es inválido. Equivale a `parseInt(x, 10) || 0`. */
+export function toInt(value: string | number | null | undefined): number {
+  if (value === null || value === undefined || value === "") return 0
+  const parsed = typeof value === "number" ? value : parseInt(value, 10)
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : 0
+}
+
+/** True si la fecha (YYYY-MM-DD) cae en el mes actual. */
+export function isCurrentMonth(dateStr: string): boolean {
+  const d = new Date(dateStr)
+  if (Number.isNaN(d.getTime())) return false
+  const now = new Date()
+  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+}
+
+/** Stock bajo pero no agotado: `stock > 0 && stock <= minStock`. */
+export function isLowStock(stock: number, minStock: number): boolean {
+  return stock > 0 && stock <= minStock
+}
+
+/** Agotado: `stock === 0`. */
+export function isOutOfStock(stock: number): boolean {
+  return stock === 0
+}

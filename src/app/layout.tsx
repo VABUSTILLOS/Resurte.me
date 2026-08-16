@@ -8,9 +8,7 @@ import { FooterForRoute } from "@/components/layout/FooterForRoute"
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { CityDetector } from "@/components/city/city-detector"
 import { CartDrawer, MobileCartBar } from "@/components/cart/cart-drawer"
-import { CheckoutDrawer } from "@/components/checkout/CheckoutDrawer"
-import { UpsellModal } from "@/components/checkout/UpsellModal"
-import { ExitIntentCoupon } from "@/components/checkout/ExitIntentCoupon"
+import { CheckoutOverlays } from "@/components/checkout/checkout-overlays"
 import { BumpsDebugProbe } from "@/components/checkout/BumpsDebugProbe"
 import { WhatsAppButton } from "@/components/whatsapp/whatsapp-button"
 import { Analytics } from "@/lib/analytics"
@@ -163,10 +161,8 @@ export default async function RootLayout({
               <FooterForRoute />
               <CityDetector />
               <CartDrawer />
-              <CheckoutDrawer />
+              <CheckoutOverlays />
               <BumpsDebugProbe />
-              <UpsellModal />
-              <ExitIntentCoupon />
               <MobileCartBar />
               <WhatsAppButton
                 phoneNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}

@@ -71,20 +71,24 @@ export function ReferralDashboard() {
           .order("created_at", { ascending: false })
 
         if (referred?.length) {
-          const withOrders = await Promise.all(
-            referred.map(async (ref) => {
-              const { count } = await supabase!
-                .from("orders")
-                .select("id", { count: "exact", head: true })
-                .eq("user_id", ref.id)
-                .neq("status", "cancelled")
-              return {
-                ...ref,
-                email: null,
-                hasOrdered: (count ?? 0) > 0,
-              }
-            })
+          // Una sola query para saber qué usuarios referidos ya ordenaron,
+          // en lugar de un count por usuario (N+1).
+          const { data: orderedRows } = await supabase!
+            .from("orders")
+            .select("user_id")
+            .in(
+              "user_id",
+              referred.map((ref) => ref.id)
+            )
+            .neq("status", "cancelled")
+          const orderedUserIds = new Set(
+            (orderedRows ?? []).map((o) => o.user_id)
           )
+          const withOrders = referred.map((ref) => ({
+            ...ref,
+            email: null,
+            hasOrdered: orderedUserIds.has(ref.id),
+          }))
           setReferredUsers(withOrders)
         }
 

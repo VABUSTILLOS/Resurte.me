@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, useSyncExternalStore, type ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useMemo, useSyncExternalStore, type ReactNode } from "react"
 import type { RestaurantCollection } from "@/types"
 
 interface RestaurantContextType {
@@ -63,8 +63,13 @@ export function RestaurantProvider({ children }: { children: ReactNode }) {
     window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }))
   }, [])
 
+  const value = useMemo<RestaurantContextType>(
+    () => ({ selectedCollection, setSelectedCollection, collections, setCollections }),
+    [selectedCollection, setSelectedCollection, collections, setCollections]
+  )
+
   return (
-    <RestaurantContext.Provider value={{ selectedCollection, setSelectedCollection, collections, setCollections }}>
+    <RestaurantContext.Provider value={value}>
       {children}
     </RestaurantContext.Provider>
   )

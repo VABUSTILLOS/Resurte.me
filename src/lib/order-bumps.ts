@@ -33,6 +33,7 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/service"
+import { applyDiscount } from "@/lib/money"
 import { MAX_BUMPS } from "@/lib/checkout-config"
 import { logger } from "@/lib/logger"
 
@@ -149,22 +150,17 @@ const DRINKS_SLUGS = ["bebidas"]
 /** Descuento por defecto para bumps dinámicos de colección (10%). */
 const DYNAMIC_RECIPE_DISCOUNT = 0.1
 
-/** Redondea a 2 decimales (misma regla que el resto del checkout). */
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
-}
-
 function effectivePrice(product: BumpProduct): number {
   return product.sale_price ?? product.price
 }
 
 function discountPrice(product: BumpProduct, discountPct: number): number {
-  return round2(effectivePrice(product) * (1 - discountPct))
+  return applyDiscount(effectivePrice(product), discountPct)
 }
 
 /** Precio de bump a partir de un precio base y el % de descuento. */
 export function bumpUnitPrice(basePrice: number, discountPct: number): number {
-  return round2(basePrice * (1 - discountPct))
+  return applyDiscount(basePrice, discountPct)
 }
 
 export interface BumpPricingInput {
@@ -323,6 +319,28 @@ function buildBump(rule: BumpRuleRow, product: BumpProduct): OrderBump {
     badgeLabel: isRecipe ? "Sugerido para tu receta / pedido" : undefined,
     collection_slug: rule.collection_slug ?? undefined,
   }
+}
+
+/** Columnas de producto necesarias para construir bumps (sin tags). */
+const BUMP_PRODUCT_COLUMNS =
+  "id, name, slug, description, image_url, price, sale_price, stock_status, category_id, is_visible"
+
+/**
+ * Carga los productos de todas las reglas candidatas en UNA query. Evita el
+ * N+1 de hacer un .maybeSingle() por regla. Fail-open: devuelve un Map vacío
+ * si la BD falla (los candidatos se omiten, igual que antes).
+ */
+async function loadBumpProducts(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  productIds: number[]
+): Promise<Map<number, BumpProduct>> {
+  if (productIds.length === 0) return new Map()
+  const { data, error } = await supabase
+    .from("products")
+    .select(BUMP_PRODUCT_COLUMNS)
+    .in("id", productIds)
+  if (error) return new Map()
+  return new Map((data ?? []).map((product) => [product.id, product as BumpProduct]))
 }
 
 /**
@@ -484,19 +502,22 @@ export async function resolveBumps(
       collectionSlugsInCart.has(r.collection_slug)
   )
 
+  // Carga los productos de todas las reglas de receta en UNA query (evita el
+  // N+1 de un .maybeSingle() por regla).
+  const recipeProductMap = await loadBumpProducts(
+    supabase,
+    recipeRules
+      .filter((r) => !cartProductIds.has(r.product_id))
+      .map((r) => r.product_id)
+  )
+
   const recipeCandidates: OrderBump[] = []
   for (const rule of recipeRules) {
     if (cartProductIds.has(rule.product_id)) continue
     if (recipeCandidates.length >= MAX_BUMPS) break
-    const { data: product, error: prodErr } = await supabase
-      .from("products")
-      .select(
-        "id, name, slug, description, image_url, price, sale_price, stock_status, category_id, is_visible"
-      )
-      .eq("id", rule.product_id)
-      .maybeSingle()
-    if (prodErr || !isUsableBumpProduct(product as BumpProduct | null)) continue
-    recipeCandidates.push(buildBump(rule, product as BumpProduct))
+    const product = recipeProductMap.get(rule.product_id)
+    if (!isUsableBumpProduct(product)) continue
+    recipeCandidates.push(buildBump(rule, product))
   }
 
   // ── 2) Fallback dinámico para colecciones detectadas SIN regla admin ──
@@ -515,20 +536,30 @@ export async function resolveBumps(
   // ── 3) Candidatos por categoría / umbral ──
   const categoryCandidates: OrderBump[] = []
   const usedProductIds = new Set(recipeCandidates.map((b) => b.product.id))
+  const categoryTriggerRules = matchedTriggers
+    .filter((trigger) => trigger !== "recipe_collection")
+    .map((trigger) => ruleByTrigger.get(trigger))
+    .filter(
+      (rule): rule is BumpRuleRow =>
+        rule !== undefined &&
+        !cartProductIds.has(rule.product_id) &&
+        !usedProductIds.has(rule.product_id)
+    )
+
+  // Igual que arriba: una sola query para los productos de todas las reglas.
+  const categoryProductMap = await loadBumpProducts(
+    supabase,
+    categoryTriggerRules.map((rule) => rule.product_id)
+  )
+
   for (const trigger of matchedTriggers) {
     if (trigger === "recipe_collection") continue
     const rule = ruleByTrigger.get(trigger)
     if (!rule) continue
     if (cartProductIds.has(rule.product_id) || usedProductIds.has(rule.product_id)) continue
-    const { data: product, error: prodErr } = await supabase
-      .from("products")
-      .select(
-        "id, name, slug, description, image_url, price, sale_price, stock_status, category_id, is_visible"
-      )
-      .eq("id", rule.product_id)
-      .maybeSingle()
-    if (prodErr || !isUsableBumpProduct(product as BumpProduct | null)) continue
-    categoryCandidates.push(buildBump(rule, product as BumpProduct))
+    const product = categoryProductMap.get(rule.product_id)
+    if (!isUsableBumpProduct(product)) continue
+    categoryCandidates.push(buildBump(rule, product))
   }
 
   // ── Ranking final: recetas/colecciones primero, top MAX_BUMPS, sin dupes ──
