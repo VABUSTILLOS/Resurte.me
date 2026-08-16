@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
 import { uid } from "@/lib/ids"
+import { toInt } from "@/lib/panel-utils"
 import type {
   Cliente,
   Mesa,
@@ -54,7 +55,7 @@ export function useClientesCrud(slug: string | null): ClientesCrud {
       toast("Escribe el nombre del cliente", "warning")
       return
     }
-    const pts = Math.max(0, clientePts ? parseInt(clientePts) || 0 : 0)
+    const pts = Math.max(0, clientePts ? toInt(clientePts) : 0)
     if (clienteEditId) {
       setClientes((prev) =>
         prev.map((c) =>

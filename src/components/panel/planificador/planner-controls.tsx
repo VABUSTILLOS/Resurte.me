@@ -3,6 +3,7 @@
 import { AlertCircle, TrendingUp, Users } from "lucide-react"
 import { WASTE_CATEGORIES } from "./planificador-shared"
 import type { RealDemand } from "./planificador-shared"
+import { toInt } from "@/lib/panel-utils"
 
 interface PlannerControlsProps {
   covers: number
@@ -40,7 +41,7 @@ export default function PlannerControls({
           <input
             type="number"
             value={covers}
-            onChange={(e) => setCovers(Math.max(1, parseInt(e.target.value) || 0))}
+            onChange={(e) => setCovers(Math.max(1, toInt(e.target.value)))}
             className="w-24 text-center text-2xl font-bold text-gray-900 bg-transparent border-b-2 border-gray-200 focus:border-[#0E7A0E] focus:outline-none py-1"
           />
           <button

@@ -4,7 +4,9 @@ import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, TrendingUp, Clock, Wallet, ArrowRight, Sparkles } from "lucide-react";
 import type { ServiceItem } from "./types";
+import { CASHBACK_RATE } from "./types";
 import { SERVICES } from "./StoreScreen";
+import { formatNumber } from "@/lib/money";
 
 interface ROICalculatorScreenProps {
   preselectedService: ServiceItem | null;
@@ -23,7 +25,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
     [targetServiceId]
   );
 
-  const cashbackRate = 0.05;
+  const cashbackRate = CASHBACK_RATE;
   // In growth mode, simulate a 40% spend increase
   const effectiveSpend = growthMode ? Math.round(monthlySpend * 1.4) : monthlySpend;
   const monthlyCashback = Math.round(effectiveSpend * cashbackRate);
@@ -64,7 +66,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
           >
             {SERVICES.map((s) => (
               <option key={s.id} value={s.id} className="bg-gray-900">
-                {s.icon} {s.name} — ${s.cost.toLocaleString("es-MX")} Créditos
+                {s.icon} {s.name} — ${formatNumber(s.cost)} Créditos
               </option>
             ))}
           </select>
@@ -82,7 +84,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
               animate={{ scale: 1 }}
               className="text-white text-2xl font-bold tabular-nums"
             >
-              ${monthlySpend.toLocaleString("es-MX")}
+              ${formatNumber(monthlySpend)}
             </motion.span>
           </div>
 
@@ -150,16 +152,16 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
               <div className="rounded-xl bg-gray-800/50 p-3 text-center">
                 <p className="text-gray-500 text-[10px]">Consumo actual</p>
                 <p className="text-white text-lg font-bold tabular-nums mt-1">
-                  ${monthlySpend.toLocaleString("es-MX")}
+                  ${formatNumber(monthlySpend)}
                 </p>
-                <p className="text-gray-500 text-[10px]">+${Math.round(monthlySpend * cashbackRate).toLocaleString("es-MX")}/mes en recompensas</p>
+                <p className="text-gray-500 text-[10px]">+${formatNumber(Math.round(monthlySpend * cashbackRate))}/mes en recompensas</p>
               </div>
               <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-center">
                 <p className="text-amber-400 text-[10px]">Consumo acelerado</p>
                 <p className="text-amber-400 text-lg font-bold tabular-nums mt-1">
-                  ${effectiveSpend.toLocaleString("es-MX")}
+                  ${formatNumber(effectiveSpend)}
                 </p>
-                <p className="text-amber-400 text-[10px]">+${monthlyCashback.toLocaleString("es-MX")}/mes en recompensas</p>
+                <p className="text-amber-400 text-[10px]">+${formatNumber(monthlyCashback)}/mes en recompensas</p>
               </div>
             </motion.div>
           )}
@@ -186,7 +188,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
           <div className="space-y-3">
             <ResultRow
               label="Recompensas mensuales estimadas"
-              value={`$${monthlyCashback.toLocaleString("es-MX")} Créditos`}
+              value={`$${formatNumber(monthlyCashback)} Créditos`}
               icon={<TrendingUp className="h-5 w-5 text-emerald-400" />}
             />
 
@@ -201,7 +203,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
 
             <ResultRow
               label="Recompensas acumuladas en el período"
-              value={`$${totalAccumulated.toLocaleString("es-MX")} Créditos`}
+              value={`$${formatNumber(totalAccumulated)} Créditos`}
               icon={<Wallet className="h-5 w-5 text-emerald-400" />}
             />
           </div>
@@ -214,7 +216,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
             <div className="flex items-end gap-3 h-20">
               <div className="flex-1 flex flex-col items-center gap-1.5">
                 <span className="text-white font-bold text-sm tabular-nums">
-                  ${monthlySpend.toLocaleString("es-MX")}
+                  ${formatNumber(monthlySpend)}
                 </span>
                 <motion.div
                   className="w-full rounded-t-lg bg-gray-700"
@@ -227,7 +229,7 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
               <ArrowRight className="h-5 w-5 text-gray-600 flex-shrink-0 mb-5" />
               <div className="flex-1 flex flex-col items-center gap-1.5">
                 <span className="text-emerald-400 font-bold text-sm tabular-nums">
-                  ${monthlyCashback.toLocaleString("es-MX")}
+                  ${formatNumber(monthlyCashback)}
                 </span>
                 <motion.div
                   className="w-full rounded-t-lg bg-emerald-600"

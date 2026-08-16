@@ -15,6 +15,8 @@ import {
   RefreshCcw,
 } from "lucide-react";
 import type { InvoiceScanState } from "./types";
+import { CASHBACK_RATE } from "./types";
+import { formatNumber } from "@/lib/money";
 
 interface InvoiceScannerScreenProps {
   onClose: () => void;
@@ -65,7 +67,7 @@ export function InvoiceScannerScreen({ onClose, balance }: InvoiceScannerScreenP
     setScanState({ status: "idle", progress: 0 });
   };
 
-  const cashbackRate = 0.05;
+  const cashbackRate = CASHBACK_RATE;
   const estimatedCashback = scanState.extracted
     ? Math.round(scanState.extracted.amount * cashbackRate)
     : 0;
@@ -267,7 +269,7 @@ function IdleState({
                 <p className="text-gray-500 text-xs">{item.date}</p>
               </div>
               <span className="text-emerald-400 text-sm font-bold tabular-nums">
-                +${Math.round(item.amount * 0.05).toLocaleString("es-MX")}
+                +${formatNumber(Math.round(item.amount * 0.05))}
               </span>
             </div>
           ))}
@@ -433,17 +435,17 @@ function SuccessState({
           <DetailRow label="Fecha" value={date} />
           <DetailRow
             label="Monto factura"
-            value={`$${amount.toLocaleString("es-MX")} Créditos`}
+            value={`$${formatNumber(amount)} Créditos`}
           />
           <hr className="border-white/10" />
           <DetailRow
             label="Recompensas generadas"
-            value={`+$${cashback.toLocaleString("es-MX")} Créditos`}
+            value={`+$${formatNumber(cashback)} Créditos`}
             highlight
           />
           <DetailRow
             label="Nuevo saldo"
-            value={`$${newBalance.toLocaleString("es-MX")} Créditos`}
+            value={`$${formatNumber(newBalance)} Créditos`}
             highlight
           />
         </div>

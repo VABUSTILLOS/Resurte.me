@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, Sparkles, Zap, Gift } from "lucide-react";
+import { formatNumber } from "@/lib/money";
 
 interface GrowthWalletBannerProps {
   balance: number;
@@ -106,8 +107,8 @@ export function GrowthWalletBanner({ balance, nextUnlock, monthlyEarnings }: Gro
             </p>
             <p className={`text-[11px] mt-0.5 ${isNearUnlock ? "text-amber-300 font-medium" : "text-emerald-300"}`}>
               {isNearUnlock
-                ? `⚡ ¡Solo te faltan $${Math.round(remaining).toLocaleString("es-MX")}!`
-                : `Te faltan $${Math.round(remaining).toLocaleString("es-MX")} para desbloquearlo`}
+                ? `⚡ ¡Solo te faltan $${formatNumber(Math.round(remaining))}!`
+                : `Te faltan $${formatNumber(Math.round(remaining))} para desbloquearlo`}
             </p>
           </div>
         </div>
@@ -158,7 +159,7 @@ function AnimatedBalance({ target, isNearUnlock }: { target: number; isNearUnloc
       animate={{ scale: 1 }}
       transition={{ type: "spring", stiffness: 200, damping: 15 }}
     >
-      ${displayed.toLocaleString("es-MX")}
+      ${formatNumber(displayed)}
       <span className="ml-1 text-lg font-semibold text-emerald-200">Créditos</span>
     </motion.h1>
   );

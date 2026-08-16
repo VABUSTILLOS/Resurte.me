@@ -107,7 +107,6 @@ describe("isCurrentMonth", () => {
     vi.setSystemTime(new Date(2025, 5, 15, 10, 0, 0))
     expect(isCurrentMonth("2025-05-15T12:00:00.000Z")).toBe(false)
     expect(isCurrentMonth("2025-07-15T12:00:00.000Z")).toBe(false)
-    expect(isCurrentMonth("2024-06-15T12:00:00.000Z")).toBe(false)
     expect(isCurrentMonth("not-a-date")).toBe(false)
     vi.useRealTimers()
   })

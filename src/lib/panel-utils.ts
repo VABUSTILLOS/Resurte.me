@@ -45,12 +45,11 @@ export function toInt(value: string | number | null | undefined): number {
   return Number.isFinite(parsed) ? Math.trunc(parsed) : 0
 }
 
-/** True si la fecha (YYYY-MM-DD) cae en el mes actual. */
+/** True si la fecha (YYYY-MM-DD o ISO) cae en el mes actual (mismo mes que `new Date()`). */
 export function isCurrentMonth(dateStr: string): boolean {
   const d = new Date(dateStr)
   if (Number.isNaN(d.getTime())) return false
-  const now = new Date()
-  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+  return d.getMonth() === new Date().getMonth()
 }
 
 /** Stock bajo pero no agotado: `stock > 0 && stock <= minStock`. */

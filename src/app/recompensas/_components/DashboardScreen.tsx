@@ -20,6 +20,7 @@ import {
   getTotalRewards,
 } from "@/lib/wallet-actions";
 import { localMonthYear } from "@/lib/utils";
+import { formatNumber } from "@/lib/money";
 import type { Tier } from "./types";
 import type { ServiceItem } from "./types";
 import type { WalletTransaction } from "@/types";
@@ -146,7 +147,7 @@ export function DashboardScreen({
                     {svc.name}
                   </p>
                   <p className="text-emerald-400 text-[10px] font-bold">
-                    ${svc.cost.toLocaleString("es-MX")}
+                    ${formatNumber(svc.cost)}
                   </p>
                 </motion.button>
               ))}
@@ -283,13 +284,13 @@ function WalletView() {
       <div className="rounded-2xl bg-white/5 border border-white/10 p-5 mb-4">
         <p className="text-gray-400 text-xs uppercase tracking-wider">Saldo Total</p>
         <p className="text-white text-4xl font-black tabular-nums mt-1">
-          ${balance.toLocaleString("es-MX")} <span className="text-xl text-gray-400">Créditos</span>
+          ${formatNumber(balance)} <span className="text-xl text-gray-400">Créditos</span>
         </p>
         <div className="mt-5 grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/15 p-3">
             <p className="text-gray-400 text-[10px] uppercase tracking-wider">Recompensas este mes</p>
             <p className="text-emerald-400 text-lg font-bold tabular-nums mt-0.5">
-              +${monthlyCashback.toLocaleString("es-MX")}
+              +${formatNumber(monthlyCashback)}
             </p>
           </div>
           <div className="rounded-xl bg-amber-500/10 border border-amber-500/15 p-3">
@@ -338,7 +339,7 @@ function WalletView() {
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className={`text-sm font-bold tabular-nums ${Number(tx.amount) > 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    {Number(tx.amount) > 0 ? "+" : ""}${Math.abs(Number(tx.amount)).toLocaleString("es-MX")}
+                    {Number(tx.amount) > 0 ? "+" : ""}${formatNumber(Math.abs(Number(tx.amount)))}
                   </p>
                 </div>
               </motion.div>
@@ -444,7 +445,7 @@ function ProfileView() {
       <div className="space-y-2 mb-6">
         <ProfileRow label="Pedidos este mes" value={ordersThisMonth === null ? "—" : String(ordersThisMonth)} />
         <ProfileRow label="Meses en el programa" value={monthsInProgram === null ? "—" : String(monthsInProgram)} />
-        <ProfileRow label="Total recompensas acumuladas" value={`$${Math.round(totalRewards).toLocaleString("es-MX")} Créditos`} />
+        <ProfileRow label="Total recompensas acumuladas" value={`$${formatNumber(Math.round(totalRewards))} Créditos`} />
       </div>
 
       {/* Tier Progression Ladder */}
@@ -517,7 +518,7 @@ function ProfileView() {
                           />
                         </div>
                         <p className="text-gray-600 text-[9px] mt-1">
-                          Semana calificada: ${cond.minWeekly.toLocaleString("es-MX")} o más acumulados
+                          Semana calificada: ${formatNumber(cond.minWeekly)} o más acumulados
                         </p>
                       </div>
                     )}

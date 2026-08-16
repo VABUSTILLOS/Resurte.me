@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { CheckCircle, Clock, TrendingUp } from "lucide-react";
 import type { ActivityItem } from "./types";
 import { getWalletHistory } from "@/lib/wallet-actions";
+import { formatNumber } from "@/lib/money";
 
 // Mapea los movimientos reales del monedero a items de actividad.
 // amount > 0 = cashback (invoice), amount < 0 = canje de servicio (redemption).
@@ -112,7 +113,7 @@ export function ActivityFeed() {
                 }`}
               >
                 {activity.amount > 0 ? "+" : ""}
-                ${Math.abs(activity.amount).toLocaleString("es-MX")} Créditos
+                ${formatNumber(Math.abs(activity.amount))} Créditos
               </span>
             )}
           </motion.div>

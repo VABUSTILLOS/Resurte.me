@@ -3,11 +3,10 @@
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Star, Award, Zap } from "lucide-react"
-import { TIER_CONFIGS } from "./types"
+import { TIER_CONFIGS, TIER_ORDER } from "./types"
 import type { Tier } from "./types"
 import { getMonthlyCashbackProgress } from "@/lib/wallet-actions"
-
-const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "diamante"]
+import { formatNumber } from "@/lib/money"
 
 interface TierData {
   tier: Tier
@@ -211,7 +210,7 @@ function LoyaltyTierCard({
             Gasto este mes
           </p>
           <p className="text-white text-base font-bold tabular-nums mt-0.5">
-            ${monthlySpend.toLocaleString("es-MX")}
+            ${formatNumber(monthlySpend)}
           </p>
         </div>
         <div className="rounded-xl bg-white/5 border border-white/10 p-3">
@@ -221,7 +220,7 @@ function LoyaltyTierCard({
           <p
             className={`text-base font-bold tabular-nums mt-0.5 ${cfg.textColor}`}
           >
-            +${monthlyCashback.toLocaleString("es-MX")}
+            +${formatNumber(monthlyCashback)}
           </p>
         </div>
       </div>

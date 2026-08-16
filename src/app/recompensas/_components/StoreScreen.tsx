@@ -6,6 +6,7 @@ import { CheckCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import type { ServiceItem, Tier } from "./types";
 import { useLoyaltyTier } from "./LoyaltyTierCard";
 import { SERVICES } from "./services-data";
+import { formatNumber } from "@/lib/money";
 
 export { SERVICES };
 
@@ -263,7 +264,7 @@ function ServiceCard({
           <div>
             <p className="text-gray-500 text-[10px] uppercase tracking-wider">Costo en recompensas</p>
             <p className="text-white font-bold text-lg tabular-nums">
-              ${service.cost.toLocaleString("es-MX")}
+              ${formatNumber(service.cost)}
             </p>
           </div>
 
@@ -289,7 +290,7 @@ function ServiceCard({
                 }}
                 className="text-amber-400 text-[10px] font-medium hover:underline"
               >
-                Te faltan ${remaining.toLocaleString("es-MX")}
+                Te faltan ${formatNumber(remaining)}
               </button>
               <p className="text-gray-600 text-[10px] mt-0.5">
                 ~{monthsToUnlock} {monthsToUnlock === 1 ? "mes" : "meses"}
@@ -398,7 +399,7 @@ function ServiceDetailSheet({
           <div>
             <p className="text-gray-500 text-xs">Costo en recompensas</p>
             <p className="text-white font-bold text-xl tabular-nums">
-              ${service.cost.toLocaleString("es-MX")}
+              ${formatNumber(service.cost)}
             </p>
           </div>
           {isUnlocked ? (
@@ -412,7 +413,7 @@ function ServiceDetailSheet({
           ) : (
             <div className="text-right">
               <p className="text-amber-400 text-xs font-medium">
-                Te faltan ${remaining.toLocaleString("es-MX")}
+                Te faltan ${formatNumber(remaining)}
               </p>
               <p className="text-gray-500 text-xs mt-0.5">
                 ~{monthsToUnlock} {monthsToUnlock === 1 ? "mes" : "meses"} con tu consumo actual

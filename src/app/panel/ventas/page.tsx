@@ -2,7 +2,7 @@
 
 import { useVentasPage } from "@/hooks/use-ventas-page"
 import { t } from "@/lib/i18n/es"
-import { todayStr, dateLabel } from "@/lib/panel-utils"
+import { todayStr, dateLabel, toNonNegativeNumber } from "@/lib/panel-utils"
 import Link from "next/link"
 import { ArrowLeft, Copy, Flame, AlertCircle, Receipt } from "lucide-react"
 import SalesGoals from "@/components/panel/ventas/SalesGoals"
@@ -200,7 +200,7 @@ export default function VentasPage() {
         onGoalFormMesChange={setGoalFormMes}
         onSave={saveGoals}
         onComisionChange={(key, value) =>
-          setComisiones((prev) => ({ ...prev, [key]: Math.max(0, parseFloat(value) || 0) }))
+          setComisiones((prev) => ({ ...prev, [key]: toNonNegativeNumber(value) }))
         }
       />
 

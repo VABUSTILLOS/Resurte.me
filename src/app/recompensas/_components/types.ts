@@ -4,6 +4,12 @@ export type Tab = "home" | "wallet" | "store" | "profile" | "referidos";
 
 export type Tier = "verde" | "plata" | "oro" | "diamante";
 
+/** Orden ascendente de niveles de recompensas. */
+export const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "diamante"];
+
+/** Tasa de cashback base usada en cálculos de simulación. */
+export const CASHBACK_RATE = 0.05;
+
 /**
  * Índice numérico de cada tier — espejo de la clave de `CASHBACK_TIERS`
  * (types/index.ts), que es la fuente única del nombre y % de cashback.

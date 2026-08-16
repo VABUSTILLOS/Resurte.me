@@ -7,6 +7,7 @@ import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
+import { toNonNegativeNumber } from "@/lib/panel-utils"
 import { uid } from "@/lib/ids"
 import { Calculator } from "lucide-react"
 import {
@@ -375,7 +376,7 @@ export default function CosteoPage() {
   function addModifier() {
     const nombre = modName.trim()
     if (!nombre) return
-    setNewDishModifiers([...newDishModifiers, { id: uid("mod"), nombre, precio: Math.max(0, parseFloat(modPrice) || 0) }])
+    setNewDishModifiers([...newDishModifiers, { id: uid("mod"), nombre, precio: toNonNegativeNumber(modPrice) }])
     setModName("")
     setModPrice("")
   }

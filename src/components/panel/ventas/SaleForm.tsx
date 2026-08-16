@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Plus } from "lucide-react"
-import { todayStr } from "@/lib/panel-utils"
+import { todayStr, toNonNegativeNumber, toInt } from "@/lib/panel-utils"
 import { SharedDish } from "@/hooks/use-local-storage"
 import {
   Cliente,
@@ -103,7 +103,7 @@ export default function SaleForm({
   const submit = () => {
     onAdd({
       dishId: formDishId,
-      qty: parseInt(formQty) || 0,
+      qty: toInt(formQty),
       date: formDate,
       channel: formChannel,
       payment: formPayment,
@@ -259,9 +259,9 @@ export default function SaleForm({
         const activeMods = mods.filter((m) => formMods.includes(m.id))
         const modTotal = activeMods.reduce((s, m) => s + m.precio, 0)
         const subtotal = (parseInt(formQty) || 1) * (dishPrice(formDishId) + modTotal)
-        const redeemPts = formRedeemPts ? Math.max(0, parseInt(formRedeemPts) || 0) : 0
+        const redeemPts = formRedeemPts ? Math.max(0, toInt(formRedeemPts)) : 0
         const redeemValue = formClienteId && redeemPts > 0 ? Math.min(redeemPts * puntosCanje, subtotal) : 0
-        const discountValue = Math.max(0, parseFloat(formDiscountValue) || 0)
+        const discountValue = toNonNegativeNumber(formDiscountValue)
         const total = redeemValue > 0 ? subtotal - redeemValue : formDiscountType === "porcentaje" ? subtotal * (1 - discountValue / 100) : subtotal - discountValue
         return (
           <>

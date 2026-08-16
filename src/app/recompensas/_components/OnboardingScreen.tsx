@@ -12,15 +12,14 @@ import {
   TrendingUp,
   Clock,
 } from "lucide-react";
-import { TIER_CONFIGS } from "./types";
+import { TIER_CONFIGS, TIER_ORDER } from "./types";
 import type { Tier } from "./types";
 import { SERVICES } from "./StoreScreen";
+import { formatNumber } from "@/lib/money";
 interface OnboardingScreenProps {
   onComplete: () => void;
   isAuthenticated: boolean;
 }
-
-const TIER_ORDER: Tier[] = ["verde", "plata", "oro", "diamante"];
 
 const steps = [
   {
@@ -345,7 +344,7 @@ export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScre
                 </label>
                 <div className="flex items-baseline gap-2 mb-3">
                   <span className="text-white text-2xl font-bold tabular-nums">
-                    ${monthlySpend.toLocaleString("es-MX")}
+                    ${formatNumber(monthlySpend)}
                   </span>
                   <span className="text-gray-500 text-sm">Créditos</span>
                 </div>
@@ -381,12 +380,12 @@ export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScre
                       Tus recompensas mensuales estimadas
                     </p>
                     <p className="text-violet-300 text-3xl font-black tabular-nums">
-                      ${cashbackAmount.toLocaleString("es-MX")}
+                      ${formatNumber(cashbackAmount)}
                     </p>
                     <p className="text-gray-500 text-xs mt-1">
                       Tendrías{" "}
                       <strong className="text-violet-400">
-                        ${cashbackAmount.toLocaleString("es-MX")}
+                        ${formatNumber(cashbackAmount)}
                       </strong>{" "}
                       (el 20% de tu gasto mensual aprox. en insumos)
                     </p>
@@ -422,7 +421,7 @@ export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScre
                               {svc.name}
                             </p>
                             <p className="text-gray-500 text-[10px]">
-                              ${svc.cost.toLocaleString("es-MX")}
+                              ${formatNumber(svc.cost)}
                             </p>
                           </div>
                           <div className="flex items-center gap-1 text-gray-600 text-xs flex-shrink-0">

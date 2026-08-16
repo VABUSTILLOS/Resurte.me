@@ -5,6 +5,7 @@ import {
   AlertTriangle, AlertCircle, TrendingUp, Calendar, ClipboardCheck, Zap, Flame, Gift, UtensilsCrossed,
 } from "lucide-react"
 import { foodCostStatus, type PanelConfig } from "@/lib/panel-config"
+import { isCurrentMonth, isLowStock, isOutOfStock } from "@/lib/panel-utils"
 import { hubEntryTotal, type HubAlert, type HubCollection, type HubComandas, type HubMesasInfo, type HubTodaySales, type HubVenta } from "./hub-data"
 import type { SharedDish } from "@/hooks/use-local-storage"
 import type { WasteEntry } from "@/components/panel/mermas/mermas-shared"
@@ -66,8 +67,8 @@ export function useHubAlerts({
     }
 
     // 1. Low stock from inventario
-    const lowStock = inventarioItems.filter((i) => i.stock <= i.minStock && i.stock > 0)
-    const outOfStock = inventarioItems.filter((i) => i.stock === 0)
+    const lowStock = inventarioItems.filter((i) => isLowStock(i.stock, i.minStock))
+    const outOfStock = inventarioItems.filter((i) => isOutOfStock(i.stock))
     if (outOfStock.length > 0) {
       result.push({ id: "stock-out", type: "danger", icon: AlertTriangle, title: `${outOfStock.length} producto(s) agotado(s)`, detail: `${outOfStock.slice(0, 2).map((i) => i.name).join(", ")}${outOfStock.length > 2 ? ` +${outOfStock.length - 2} más` : ""}`, href: "/panel/inventario" })
     } else if (lowStock.length > 0) {
@@ -85,7 +86,7 @@ export function useHubAlerts({
 
     // 3. Merma close to/exceeding goal
     if (monthlyGoal > 0) {
-      const monthLoss = mermaEntries.filter((e) => new Date(e.date).getMonth() === new Date().getMonth()).reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
+      const monthLoss = mermaEntries.filter((e) => isCurrentMonth(e.date)).reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
       const pct = (monthLoss / monthlyGoal) * 100
       if (pct > 100) {
         result.push({ id: "merma-over-goal", type: "danger", icon: AlertTriangle, title: "Merma del mes excedió la meta", detail: `$${monthLoss.toFixed(0)} vs meta de $${monthlyGoal.toFixed(0)} (${pct.toFixed(0)}%)`, href: "/panel/mermas" })

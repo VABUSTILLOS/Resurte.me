@@ -2,6 +2,7 @@
 
 import { Check, Copy, Gift, Settings2, Trash2, Users } from "lucide-react"
 import type { ClientesCrud } from "@/hooks/use-ventas-crud"
+import { toNonNegativeNumber } from "@/lib/panel-utils"
 
 interface FrequentCustomersProps {
   crud: ClientesCrud
@@ -141,7 +142,7 @@ export default function FrequentCustomers({
                 <input
                   type="number"
                   value={puntosCanje}
-                  onChange={(e) => onPuntosCanjeChange(Math.max(0, parseFloat(e.target.value) || 0))}
+                  onChange={(e) => onPuntosCanjeChange(toNonNegativeNumber(e.target.value))}
                   min="0"
                   step="0.5"
                   className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#0E7A0E]"
@@ -153,7 +154,7 @@ export default function FrequentCustomers({
                 <input
                   type="number"
                   value={tipoCambio}
-                  onChange={(e) => onTipoCambioChange(Math.max(0, parseFloat(e.target.value) || 0))}
+                  onChange={(e) => onTipoCambioChange(toNonNegativeNumber(e.target.value))}
                   min="0"
                   step="0.01"
                   className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs bg-white focus:outline-none focus:border-[#0E7A0E]"

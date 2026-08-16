@@ -8,7 +8,7 @@ import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { uid } from "@/lib/ids"
 import { convertQty } from "@/lib/panel-units"
-import { todayStr, dateLabel } from "@/lib/panel-utils"
+import { todayStr, dateLabel, toNonNegativeNumber, toInt } from "@/lib/panel-utils"
 import { SaleEntry, entryTotal } from "@/components/panel/ventas/ventas-shared"
 import { useClientesCrud, useMesasCrud, useEmpleadosCrud, useTarjetasCrud } from "@/hooks/use-ventas-crud"
 import {
@@ -198,9 +198,9 @@ export function useVentasPage() {
     const mods = (dish.modificadores || []).filter((m) => data.mods.includes(m.id))
     const modTotal = mods.reduce((s, m) => s + m.precio, 0)
     const unitPrice = dish.sellingPrice + modTotal
-    const discountValue = data.discountValue ? Math.max(0, parseFloat(data.discountValue) || 0) : 0
+    const discountValue = toNonNegativeNumber(data.discountValue)
     // Loyalty redemption: convert points to a peso discount (monto)
-    const redeemPts = data.redeemPts ? Math.max(0, parseInt(data.redeemPts) || 0) : 0
+    const redeemPts = data.redeemPts ? Math.max(0, toInt(data.redeemPts)) : 0
     const redeemValue = data.clienteId && redeemPts > 0 ? Math.min(redeemPts * puntosCanje, qty * unitPrice) : 0
     const entry: SaleEntry = {
       id: uid("sale"),

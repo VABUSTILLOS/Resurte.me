@@ -6,6 +6,7 @@ import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
 import { foodCostStatus, usePanelConfig } from "@/lib/panel-config"
 import { normalizeName } from "@/lib/normalize"
+import { isCurrentMonth } from "@/lib/panel-utils"
 import EmptyState from "@/components/panel/EmptyState"
 import Link from "next/link"
 import {
@@ -163,7 +164,7 @@ export default function RentabilidadPage() {
   // Merma factor: integrates "Merma del mes" into real cost/margin calculations
   const mermaStats = useMemo(() => {
     const monthLoss = mermaEntries
-      .filter((e) => new Date(e.date).getMonth() === new Date().getMonth())
+      .filter((e) => isCurrentMonth(e.date))
       .reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
     const mermaPct = monthlyGoal > 0 ? (monthLoss / monthlyGoal) * 100 : 0
     return { monthLoss, mermaPct, hasMerma: mermaEntries.length > 0 }

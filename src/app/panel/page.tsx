@@ -8,6 +8,7 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react"
 import { normalizeName } from "@/lib/normalize"
 import { foodCostStatus, usePanelConfig } from "@/lib/panel-config"
 import { convertQty } from "@/lib/panel-units"
+import { isCurrentMonth, isLowStock, isOutOfStock } from "@/lib/panel-utils"
 import { Search } from "lucide-react"
 import { GlobalSearch } from "@/components/global-search"
 import {
@@ -87,7 +88,7 @@ export default function PanelPage() {
     const avgMargin = sharedDishes.length > 0 ? (totalPrice - totalCosteo) / sharedDishes.length : 0
     const totalMerma = mermaEntries.reduce((s, e) => s + (e.amountKg * e.costPerKg), 0)
     const monthLoss = mermaEntries
-      .filter((e) => new Date(e.date).getMonth() === new Date().getMonth())
+      .filter((e) => isCurrentMonth(e.date))
       .reduce((s, e) => s + e.amountKg * e.costPerKg, 0)
     const mermaVsGoal = monthlyGoal > 0 ? (monthLoss / monthlyGoal) * 100 : 0
     const seasonalSavings = shoppingList.reduce((s, item) => s + item.quantityKg * item.pricePerKg, 0)
@@ -219,7 +220,7 @@ export default function PanelPage() {
 
   // Insumos con stock bajo (<= min) o agotados (0)
   const lowStockCount = useMemo(() => {
-    return inventarioItems.filter((i) => i.stock <= i.minStock).length
+    return inventarioItems.filter((i) => isLowStock(i.stock, i.minStock) || isOutOfStock(i.stock)).length
   }, [inventarioItems])
 
   // ── JSON backup / restore (collection-scoped resurte-* keys) ──

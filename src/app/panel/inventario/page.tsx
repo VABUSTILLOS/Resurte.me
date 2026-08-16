@@ -7,6 +7,7 @@ import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { uid } from "@/lib/ids"
 import { convertQty, ManualQty, readManualQtys } from "@/lib/panel-units"
+import { isLowStock, isOutOfStock } from "@/lib/panel-utils"
 import { Package } from "lucide-react"
 import type { InventoryItem, Proveedor, StockMovement, SortField } from "@/components/panel/inventario/inventario-shared"
 import InventarioHeader from "@/components/panel/inventario/InventarioHeader"
@@ -68,8 +69,8 @@ export default function InventarioPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
   // ── Derived data ──────────────────────────────────────
-  const lowStock = useMemo(() => items.filter((i) => i.stock > 0 && i.stock <= i.minStock), [items])
-  const outOfStock = useMemo(() => items.filter((i) => i.stock === 0), [items])
+  const lowStock = useMemo(() => items.filter((i) => isLowStock(i.stock, i.minStock)), [items])
+  const outOfStock = useMemo(() => items.filter((i) => isOutOfStock(i.stock)), [items])
   const okStock = useMemo(() => items.filter((i) => i.stock > i.minStock), [items])
 
   const getStatus = (item: InventoryItem) => {

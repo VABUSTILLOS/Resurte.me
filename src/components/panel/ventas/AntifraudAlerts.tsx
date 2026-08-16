@@ -2,6 +2,7 @@
 
 import { AlertTriangle, ShieldAlert } from "lucide-react"
 import type { FraudAlert } from "./ventas-shared"
+import { toNonNegativeNumber } from "@/lib/panel-utils"
 
 interface AntifraudAlertsProps {
   fraudAlerts: FraudAlert[]
@@ -27,7 +28,7 @@ export default function AntifraudAlerts({ fraudAlerts, ticketThreshold, tipoCamb
               id="ventas-umbral"
               type="number"
               value={ticketThreshold}
-              onChange={(e) => onTicketThresholdChange(Math.max(0, parseFloat(e.target.value) || 0))}
+              onChange={(e) => onTicketThresholdChange(toNonNegativeNumber(e.target.value))}
               min="0"
               className="w-20 px-2 py-1 rounded-lg border border-red-200 text-xs bg-white focus:outline-none focus:border-red-400"
               aria-label="Umbral de ticket para alerta antifraude"
@@ -41,7 +42,7 @@ export default function AntifraudAlerts({ fraudAlerts, ticketThreshold, tipoCamb
               step="0.01"
               min="0"
               value={tipoCambio}
-              onChange={(e) => onTipoCambioChange(Math.max(0, parseFloat(e.target.value) || 0))}
+              onChange={(e) => onTipoCambioChange(toNonNegativeNumber(e.target.value))}
               className="w-16 px-2 py-1 rounded-lg border border-emerald-200 text-xs bg-white focus:outline-none focus:border-emerald-400"
               aria-label="Tipo de cambio MXN a USD"
             />

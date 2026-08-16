@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Check, CheckCircle, Sparkles } from "lucide-react";
 import type { ServiceItem } from "./types";
 import { createClient } from "@/lib/supabase/client";
+import { formatNumber } from "@/lib/money";
 interface CheckoutFlowScreenProps {
   service: ServiceItem;
   onBack: () => void;
@@ -208,20 +209,20 @@ function Step1Confirm({
         <div className="flex justify-between items-center">
           <span className="text-gray-400 text-sm">Tu saldo actual</span>
           <span className="text-white font-bold tabular-nums">
-            ${balance.toLocaleString("es-MX")} Créditos
+            ${formatNumber(balance)} Créditos
           </span>
         </div>
         <div className="flex justify-between items-center mt-2">
           <span className="text-gray-400 text-sm">Costo del servicio</span>
           <span className="text-white font-bold tabular-nums">
-            - ${service.cost.toLocaleString("es-MX")} Créditos
+            - ${formatNumber(service.cost)} Créditos
           </span>
         </div>
         <hr className="my-3 border-gray-800" />
         <div className="flex justify-between items-center">
           <span className="text-gray-400 text-sm">Te quedaría</span>
           <span className={`font-bold tabular-nums text-lg ${remainingAfter >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-            ${remainingAfter.toLocaleString("es-MX")} Créditos
+            ${formatNumber(remainingAfter)} Créditos
           </span>
         </div>
       </div>

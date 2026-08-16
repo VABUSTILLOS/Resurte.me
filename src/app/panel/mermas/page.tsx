@@ -6,6 +6,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage"
 import { usePanelConfig } from "@/lib/panel-config"
 import { useToast } from "@/components/toast"
 import { Trash2 } from "lucide-react"
+import { isCurrentMonth } from "@/lib/panel-utils"
 import { CAUSAS, nextWasteId } from "@/components/panel/mermas/mermas-shared"
 import type { WasteEntry } from "@/components/panel/mermas/mermas-shared"
 import MermaHeader from "@/components/panel/mermas/merma-header"
@@ -177,7 +178,7 @@ export default function MermasPage() {
 
   const totalLoss = filteredEntries.reduce((sum, e) => sum + (e.amountKg * e.costPerKg), 0)
   const monthLoss = entries
-    .filter((e) => new Date(e.date).getMonth() === new Date().getMonth())
+    .filter((e) => isCurrentMonth(e.date))
     .reduce((sum, e) => sum + e.amountKg * e.costPerKg, 0)
   const goalProgress = monthlyGoal > 0 ? (monthLoss / monthlyGoal) * 100 : 0
 
