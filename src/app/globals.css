@@ -467,7 +467,8 @@ input.marquee-input:placeholder-shown:not(:focus) + .marquee-placeholder {
   overflow: hidden;
   white-space: nowrap;
   pointer-events: none;
-  color: #b0b3b8;
+  /* ≥4.5:1 sobre el contenedor de búsqueda bg-[#F7F5F0] (WCAG AA) */
+  color: #5f6368;
   animation: marquee-placeholder 14s linear infinite;
   will-change: transform;
 }
