@@ -85,16 +85,6 @@ export function BlogIndexClient({
   const [sortOpen, setSortOpen] = useState(false)
   const sortRef = useRef<HTMLDivElement>(null)
 
-  // La página ya no lee searchParams en el servidor (eso la volvía dinámica);
-  // los filtros (?q=, ?categoria=, ?tipo=) se adoptan desde la URL ajustando el
-  // estado DURANTE el render — patrón oficial de React para derivar estado de una
-  // fuente externa, en lugar de setState en un efecto (rule
-  // react-hooks/set-state-in-effect). En SSR estático useSearchParams devuelve
-  // valores vacíos → el HTML inicial coincide sin hydration mismatch; en el
-  // cliente las guardas comparan contra el estado actual, así que el ajuste se
-  // estabiliza en un solo re-render. De paso, esto también refleja cambios de URL
-  // por navegación del cliente (Link/back), que el efecto con [] no cubría.
-
   // Cierra el menú de orden al hacer clic fuera.
   useEffect(() => {
     if (!sortOpen) return
