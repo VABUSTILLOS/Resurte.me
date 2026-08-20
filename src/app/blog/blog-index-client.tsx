@@ -95,27 +95,6 @@ export function BlogIndexClient({
   // estabiliza en un solo re-render. De paso, esto también refleja cambios de URL
   // por navegación del cliente (Link/back), que el efecto con [] no cubría.
 
-  const urlQuery = searchParams.get("q")
-  const urlCategory = searchParams.get("categoria")
-  const urlContentType = searchParams.get("tipo")
-  if (urlQuery && query !== urlQuery) {
-    setQuery(urlQuery)
-  }
-  if (
-    urlCategory &&
-    BLOG_CATEGORIES.some((c) => c.slug === urlCategory) &&
-    activeCategory !== urlCategory
-  ) {
-    setActiveCategory(urlCategory)
-  }
-  if (
-    urlContentType &&
-    BLOG_CONTENT_TYPES.some((t) => t.slug === urlContentType) &&
-    activeContentType !== urlContentType
-  ) {
-    setActiveContentType(urlContentType)
-  }
-
   // Cierra el menú de orden al hacer clic fuera.
   useEffect(() => {
     if (!sortOpen) return
