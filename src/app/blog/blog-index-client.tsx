@@ -87,25 +87,35 @@ export function BlogIndexClient({
   const sortRef = useRef<HTMLDivElement>(null)
 
   // La página ya no lee searchParams en el servidor (eso la volvía dinámica);
-  // los filtros iniciales (?q=, ?categoria=, ?tipo=) se adoptan tras montar.
+  // los filtros (?q=, ?categoria=, ?tipo=) se adoptan desde la URL ajustando el
+  // estado DURANTE el render — patrón oficial de React para derivar estado de una
+  // fuente externa, en lugar de setState en un efecto (rule
+  // react-hooks/set-state-in-effect). En SSR estático useSearchParams devuelve
+  // valores vacíos → el HTML inicial coincide sin hydration mismatch; en el
+  // cliente las guardas comparan contra el estado actual, así que el ajuste se
+  // estabiliza en un solo re-render. De paso, esto también refleja cambios de URL
+  // por navegación del cliente (Link/back), que el efecto con [] no cubría.
   const searchParams = useSearchParams()
-  // Adopta los filtros iniciales (?q=, ?categoria=, ?tipo=) SOLO en el montaje.
-  // Actualizadores funcionales con guardas: si el valor no cambió, React ignora
-  // la actualización y no hay renders en cascada (patrón usado en CityContext).
-  useEffect(() => {
-    const q = searchParams.get("q")
-    const cat = searchParams.get("categoria")
-    const tipo = searchParams.get("tipo")
-    setQuery((prev) => (q && q !== prev ? q : prev))
-    setActiveCategory((prev) =>
-      cat && BLOG_CATEGORIES.some((c) => c.slug === cat) && cat !== prev ? cat : prev
-    )
-    setActiveContentType((prev) =>
-      tipo && BLOG_CONTENT_TYPES.some((t) => t.slug === tipo) && tipo !== prev ? tipo : prev
-    )
-    // Solo en el montaje inicial; cambios posteriores los escribe este mismo componente.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const urlQuery = searchParams.get("q")
+  const urlCategory = searchParams.get("categoria")
+  const urlContentType = searchParams.get("tipo")
+  if (urlQuery && query !== urlQuery) {
+    setQuery(urlQuery)
+  }
+  if (
+    urlCategory &&
+    BLOG_CATEGORIES.some((c) => c.slug === urlCategory) &&
+    activeCategory !== urlCategory
+  ) {
+    setActiveCategory(urlCategory)
+  }
+  if (
+    urlContentType &&
+    BLOG_CONTENT_TYPES.some((t) => t.slug === urlContentType) &&
+    activeContentType !== urlContentType
+  ) {
+    setActiveContentType(urlContentType)
+  }
 
   // Cierra el menú de orden al hacer clic fuera.
   useEffect(() => {
