@@ -96,6 +96,32 @@ export function BlogIndexClient({
   // estabiliza en un solo re-render. De paso, esto también refleja cambios de URL
   // por navegación del cliente (Link/back), que el efecto con [] no cubría.
   const searchParams = useSearchParams()
+  // Adopta los filtros iniciales (?q=, ?categoria=, ?tipo=) de la URL AL MONTAR.
+  // La página se mantiene estática en el servidor (sin leer searchParams en el
+  // server), así que esta es la única vía para que un enlace con filtros
+  // (p.ej. ?q=carne) se aplique en el primer render del cliente. Los setState
+  // son intencionales y se ejecutan una sola vez; la regla
+  // react-hooks/set-state-in-effect no modela el bootstrap de filtros de URL en
+  // páginas estáticas, por eso se deshabilita de forma local y documentada.
+  useEffect(() => {
+    const q = searchParams.get("q")
+    const cat = searchParams.get("categoria")
+    const tipo = searchParams.get("tipo")
+    if (q) {
+      // eslint-disable-next-line
+      setQuery((prev) => (q !== prev ? q : prev))
+    }
+    if (cat && BLOG_CATEGORIES.some((c) => c.slug === cat)) {
+      // eslint-disable-next-line
+      setActiveCategory((prev) => (cat !== prev ? cat : prev))
+    }
+    if (tipo && BLOG_CONTENT_TYPES.some((t) => t.slug === tipo)) {
+      // eslint-disable-next-line
+      setActiveContentType((prev) => (tipo !== prev ? tipo : prev))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const urlQuery = searchParams.get("q")
   const urlCategory = searchParams.get("categoria")
   const urlContentType = searchParams.get("tipo")
