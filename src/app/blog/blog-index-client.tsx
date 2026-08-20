@@ -89,13 +89,20 @@ export function BlogIndexClient({
   // La página ya no lee searchParams en el servidor (eso la volvía dinámica);
   // los filtros iniciales (?q=, ?categoria=, ?tipo=) se adoptan tras montar.
   const searchParams = useSearchParams()
+  // Adopta los filtros iniciales (?q=, ?categoria=, ?tipo=) SOLO en el montaje.
+  // Actualizadores funcionales con guardas: si el valor no cambió, React ignora
+  // la actualización y no hay renders en cascada (patrón usado en CityContext).
   useEffect(() => {
     const q = searchParams.get("q")
     const cat = searchParams.get("categoria")
     const tipo = searchParams.get("tipo")
-    if (q) setQuery(q)
-    if (cat && BLOG_CATEGORIES.some((c) => c.slug === cat)) setActiveCategory(cat)
-    if (tipo && BLOG_CONTENT_TYPES.some((t) => t.slug === tipo)) setActiveContentType(tipo)
+    setQuery((prev) => (q && q !== prev ? q : prev))
+    setActiveCategory((prev) =>
+      cat && BLOG_CATEGORIES.some((c) => c.slug === cat) && cat !== prev ? cat : prev
+    )
+    setActiveContentType((prev) =>
+      tipo && BLOG_CONTENT_TYPES.some((t) => t.slug === tipo) && tipo !== prev ? tipo : prev
+    )
     // Solo en el montaje inicial; cambios posteriores los escribe este mismo componente.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
