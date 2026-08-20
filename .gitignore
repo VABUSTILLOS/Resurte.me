@@ -53,3 +53,16 @@ AGENTS.md
 
 # Verificación de entornos Vercel (secrets redactados)
 .env.*.tmp
+
+# Softgen - prevent committing dependencies and build artifacts
+dist/
+.turbo/
+.env.local
+.env.*.local
+*.key
+*.jwt
+service-account*.json
+firebase-service-account.json
+credentials.json
+.git-credentials
+.secrets

@@ -1,6 +1,11 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: [
+    "3000-07e71408-162f-4d55-afcf-13420ba7fef0.softgen.dev",
+    "*.softgen.dev",
+    "resurte.me",
+  ],
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -24,51 +29,54 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
-  headers: async () => [
-    {
-      source: "/(.*)",
-      headers: [
-        {
-          key: "X-Frame-Options",
-          value: "DENY",
-        },
-        {
-          key: "X-Content-Type-Options",
-          value: "nosniff",
-        },
-        {
-          key: "Referrer-Policy",
-          value: "strict-origin-when-cross-origin",
-        },
-        {
-          key: "Strict-Transport-Security",
-          value: "max-age=31536000; includeSubDomains; preload",
-        },
-        {
-          key: "Permissions-Policy",
-          value: "camera=(), microphone=(), geolocation=(self), interest-cohort=()",
-        },
-      ],
-    },
-    {
-      source: "/images/(.*)",
-      headers: [
-        {
-          key: "Cache-Control",
-          value: "public, max-age=31536000, immutable",
-        },
-      ],
-    },
-    {
-      source: "/:path*.(webp|avif|png|jpg|jpeg|svg|ico)",
-      headers: [
-        {
-          key: "Cache-Control",
-          value: "public, max-age=31536000, immutable",
-        },
-      ],
-    },
-  ],
+  headers: async () => {
+    if (process.env.NODE_ENV !== "production") return []
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "X-Frame-Options",
+            value: "DENY",
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains; preload",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(self), interest-cohort=()",
+          },
+        ],
+      },
+      {
+        source: "/images/(.*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/:path*.(webp|avif|png|jpg|jpeg|svg|ico)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+    ]
+  },
 }
 
 export default nextConfig
