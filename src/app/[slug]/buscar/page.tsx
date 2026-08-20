@@ -8,6 +8,15 @@ import {
   getCachedProductsPaginated,
 } from "@/lib/catalog-cache"
 
+// ISR: catálogo revalidado cada 5 min (alineado con src/lib/catalog-cache.ts).
+export const revalidate = 300
+
+// Next 16: un segmento dinámico sin generateStaticParams cae a render dinámico
+// por request. Pre-render de las 20 ciudades (los slugs inválidos dan 404).
+export function generateStaticParams() {
+  return MEXICO_CITIES.map((c) => ({ slug: c.slug }))
+}
+
 interface Props {
   params: Promise<{ slug: string }>
 }

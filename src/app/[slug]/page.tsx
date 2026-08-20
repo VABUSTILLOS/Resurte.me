@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation"
-import { headers } from "next/headers"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { Metadata } from "next"
 import { CityLanding } from "@/components/city/city-landing"
@@ -10,17 +9,19 @@ import {
   getCachedVisibleProducts,
 } from "@/lib/catalog-cache"
 import { getCityLandingSchema } from "@/lib/structured-data"
-import { hasSessionCookie } from "@/lib/supabase/server"
-import { getCurrentUser } from "@/lib/auth"
 import { getCityBySlug } from "@/lib/data"
 import type { Category, Product, RestaurantCollection, City } from "@/types"
 
-// NOTA (Fase 22): esta página es deliberadamente dinámica. Lee `headers()` para
-// el nonce CSP por-request (generado en src/proxy.ts), lo que descarta ISR.
-// Además, ISR real + nonce por-request son incompatibles: el HTML cacheado
-// llevaría un nonce viejo que no coincide con el header CSP del request
-// siguiente → scripts bloqueados. El rendimiento se mantiene vía
-// `getCached*` (unstable_cache + revalidateTag) con LCP 60-80ms en móvil.
+// ISR: la página se genera en build y se revalida cada 5 minutos (alineado con
+// `unstable_cache` de src/lib/catalog-cache.ts). Antes leía `headers()` para el
+// nonce CSP por request, lo que la convertía en SSR por visita y disparaba el
+// consumo de Fluid Active CPU en Vercel. La CSP ahora es estática
+// (src/lib/csp.ts) y la sesión se detecta en el cliente (CityLanding).
+export const revalidate = 300
+
+export function generateStaticParams() {
+  return MEXICO_CITIES.map((city) => ({ slug: city.slug }))
+}
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -85,24 +86,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CityPage({ params }: Props) {
   const { slug } = await params
   const city = await resolveCity(slug)
-  const nonce = (await headers()).get("x-nonce")
 
   if (!city) notFound()
 
-  // Check auth + fetch catalog. Sin Supabase configurado (dev local/preview)
+  // Fetch de catálogo. Sin Supabase configurado (dev local/preview)
   // la ciudad renderiza vacía en lugar de fallar.
-  let user: unknown = null
   let categories: Category[] = []
   let products: Product[] = []
   let collections: RestaurantCollection[] = []
 
   try {
-    // Solo consultamos la sesión si el request trae cookie de Supabase.
-    // Visitantes anónimos ahorran un roundtrip de red a getUser().
-    if (await hasSessionCookie()) {
-      user = await getCurrentUser()
-    }
-
     const [cats, prods, colls] = await Promise.all([
       getCachedCategories(),
       getCachedVisibleProducts(),
@@ -123,7 +116,6 @@ export default async function CityPage({ params }: Props) {
     <>
       <script
         type="application/ld+json"
-        nonce={nonce ?? undefined}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(getCityLandingSchema(city.name, city.state, city.lat, city.lng)),
         }}
@@ -133,7 +125,6 @@ export default async function CityPage({ params }: Props) {
         categories={categories}
         products={products}
         collections={collections}
-        isLoggedIn={!!user}
       />
     </>
   )

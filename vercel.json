@@ -39,20 +39,8 @@
   "rewrites": [],
   "crons": [
     {
-      "path": "/api/workflows/payment-reminders",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/workflows/trigger?job=abandoned-cart",
+      "path": "/api/cron/daily",
       "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/workflows/trigger?job=reactivation",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/foodos/campaigns/run",
-      "schedule": "0 0 * * *"
     }
   ]
 }

@@ -1,11 +1,26 @@
 import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
 import {
+  getCachedCategories,
   getCachedCategoryBySlug,
   getCachedProductsByCategory,
 } from "@/lib/catalog-cache"
 import { Metadata } from "next"
 import { CategoryPageClient } from "./category-page-client"
+
+// ISR: catálogo revalidado cada 5 min (alineado con src/lib/catalog-cache.ts).
+export const revalidate = 300
+
+// Next 16: sin generateStaticParams el segmento dinámico cae a SSR por request.
+// Pre-render de las categorías de la ciudad por defecto; el resto de ciudades
+// se genera bajo demanda y queda cacheado (dynamicParams=true por defecto).
+export async function generateStaticParams() {
+  const categories = await getCachedCategories()
+  return categories.map((c) => ({
+    slug: "chihuahua",
+    categorySlug: c.slug,
+  }))
+}
 
 interface Props {
   params: Promise<{ slug: string; categorySlug: string }>

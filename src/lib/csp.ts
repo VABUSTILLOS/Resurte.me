@@ -1,53 +1,44 @@
 /**
- * Content Security Policy — nonce-based.
+ * Content Security Policy — estática (sin nonce por request).
  *
- * El proxy genera un nonce por request y lo inyecta aquí junto con el header
- * CSP (ver `src/proxy.ts`). Next.js extrae el nonce de `x-nonce` y lo aplica
- * automáticamente a sus scripts, estilos y componentes `<Script>`.
+ * Hasta F22 el proxy generaba un nonce por request (ver historial de
+ * `src/proxy.ts`). Eso obligaba a TODAS las páginas públicas a leer
+ * `headers()` → SSR por request → consumo crítico de Fluid Active CPU en
+ * Vercel (208% del límite del plan). La política ahora es estática: el
+ * proxy la fija una vez por respuesta y las páginas de catálogo vuelven a
+ * ser ISR/estáticas servidas por el CDN.
+ *
+ * Trade-off de seguridad documentado: `script-src` vuelve al modelo CSP2
+ * clásico (`'self'` + `'unsafe-inline'` + allowlist de hosts de terceros)
+ * en lugar de `strict-dynamic` + nonce. Sigue bloqueando la inyección de
+ * scripts desde orígenes desconocidos (vector principal de XSS) y se
+ * mantienen `object-src 'none'`, `frame-ancestors 'none'` y la allowlist
+ * estricta de `connect-src`. Los reportes siguen llegando a
+ * `/api/csp-report` para monitoreo.
  *
  * Directivas clave:
- * - `script-src 'strict-dynamic'`: los scripts con nonce pueden cargar más
- *   scripts dinámicamente (GA4/Meta Pixel); se ignoran los hosts permitidos
- *   en navegadores modernos pero se mantienen como fallback CSP2.
- * - `style-src-attr 'unsafe-inline'`: permite atributos `style` inline de React
- *   sin abrir `<style>`/CSS externo (que requieren nonce/'self').
+ * - `style-src 'unsafe-inline'`: Next.js y los estilos inline de React lo
+ *   requieren sin nonce.
  * - `frame-ancestors 'none'` + `object-src 'none'`: anti-clickjacking y sin
  *   plugins; el proyecto ya envía `X-Frame-Options: DENY`.
- *
- * Modo endurecido (único desde F22): `script-src` solo permite `'self'` +
- * nonce + `'strict-dynamic'` + Stripe. En navegadores modernos `strict-dynamic`
- * ya permite los scripts cargados dinámicamente por un script con nonce
- * (GA4/Meta Pixel), así que la política endurecida no cambia el comportamiento
- * real; los hosts de terceros solo serían un fallback para navegadores sin
- * soporte. El proxy envía esta política como `Content-Security-Policy` y, en
- * modo observación, también una copia como `Content-Security-Policy-Report-Only`
- * (ver `src/proxy.ts`).
  */
 
 const SUPABASE_HOST = "isogthougrpctnfzcdes.supabase.co"
 
-type CspOptions = {
-  /** DEPRECADO (F22): la policy endurecida es ahora la única. Se mantiene la
-   *  opción como no-op de compatibilidad; GA4/Meta cargan vía strict-dynamic. */
-  hardened?: boolean
-  /** Policy report-only: omite upgrade-insecure-requests (el navegador lo ignora
-   *  en report-only y emite un aviso benigno en consola). */
+type StaticCspOptions = {
+  /** Policy report-only: omite upgrade-insecure-requests (el navegador lo
+   *  ignora en report-only y emite un aviso benigno en consola). */
   reportOnly?: boolean
 }
 
-export function buildCspHeader(nonce: string, options: CspOptions = {}): string {
+export function buildStaticCspHeader(options: StaticCspOptions = {}): string {
   const isDev = process.env.NODE_ENV === "development"
-  // Desde F22 la policy endurecida es la única: con strict-dynamic, GA4/Meta
-  // Pixel cargan vía scripts con nonce en navegadores modernos, así que los
-  // hosts de terceros en script-src son un fallback CSP2 innecesario. Se
-  // mantiene Stripe (dependencia funcional del checkout embebido).
-  const thirdPartyScripts = " https://js.stripe.com"
   return `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}${thirdPartyScripts};
-    style-src 'self' 'nonce-${nonce}';
+    script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net https://js.stripe.com;
+    style-src 'self' 'unsafe-inline';
     style-src-attr 'unsafe-inline';
-    img-src 'self' blob: data: https://${SUPABASE_HOST} https://storage.googleapis.com https://www.facebook.com https://js.stripe.com https://q.stripe.com;
+    img-src 'self' blob: data: https://${SUPABASE_HOST} https://storage.googleapis.com https://www.facebook.com https://www.google-analytics.com https://www.googletagmanager.com https://js.stripe.com https://q.stripe.com;
     font-src 'self' data:;
     connect-src 'self' https://${SUPABASE_HOST} wss://${SUPABASE_HOST} https://www.google-analytics.com https://www.googletagmanager.com https://www.facebook.com https://graph.facebook.com https://connect.facebook.net https://api.stripe.com https://m.stripe.network https://js.stripe.com;
     frame-src https://js.stripe.com https://m.stripe.network https://hooks.stripe.com https://checkout.stripe.com;

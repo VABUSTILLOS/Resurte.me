@@ -1,6 +1,8 @@
+"use client"
+
 import Link from "next/link"
 import { ArrowRight, Package, Wrench, Sparkles } from "lucide-react"
-import { cookies } from "next/headers"
+import { useCity } from "@/contexts/city-context"
 
 /**
  * CTA embebible en posts MDX. Tres variantes alineadas a los activos de
@@ -52,7 +54,7 @@ const DEFAULT_CTA: Record<string, string> = {
   crecimiento: "Ir a la Tienda de Crecimiento",
 }
 
-export async function BlogCTA({
+export function BlogCTA({
   variant = "herramienta",
   href,
   collectionSlug,
@@ -61,8 +63,11 @@ export async function BlogCTA({
   cta,
   children,
 }: BlogCTAProps) {
-  const cookieStore = await cookies()
-  const citySlug = cookieStore.get("city-slug")?.value ?? "chihuahua"
+  // Cliente: la ciudad se resuelve del contexto tras la hidratación (SSR usa
+  // la ciudad por defecto). Antes leía cookies() en el servidor y convertía
+  // todas las páginas del blog en dinámicas.
+  const { city } = useCity()
+  const citySlug = city?.slug ?? "chihuahua"
   const style = VARIANTS[variant]
   const Icon = style.icon
 

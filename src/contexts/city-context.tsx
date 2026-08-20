@@ -60,17 +60,15 @@ export const DEFAULT_CITY_SLUG = "chihuahua"
 
 export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
   const [city, setCityState] = useState<City | null>(() => {
-    // The layout resolves a concrete city slug from the request cookie (falling
-    // back to DEFAULT_CITY_SLUG) so server and client render the same city —
-    // eliminating the "Seleccionar ciudad" hydration mismatch.
-    // Si el slug persistido (cookie/localStorage) ya no existe en
-    // MEXICO_CITIES, se auto-sana a la ciudad por defecto en lugar de dejar
-    // `city` en null (que colgaba el checkout y el modal de upsell).
-    const slug =
-      initialCitySlug ||
-      getCityFromCookie() ||
-      getCityFromLocalStorage() ||
-      DEFAULT_CITY_SLUG
+    // Inicialización DETERMINÍSTICA: el layout raíz ya no lee cookies() en el
+    // servidor (eso convertía todas las rutas en SSR por request). Server y
+    // cliente renderizan la misma ciudad inicial (prop o default) para evitar
+    // hydration mismatch; la ciudad persistida en cookie/localStorage se
+    // adopta en el efecto de montaje de abajo.
+    // Si el slug persistido ya no existe en MEXICO_CITIES, se auto-sana a la
+    // ciudad por defecto en lugar de dejar `city` en null (que colgaba el
+    // checkout y el modal de upsell).
+    const slug = initialCitySlug || DEFAULT_CITY_SLUG
     const found = MEXICO_CITIES.find((c) => c.slug === slug)
     const defaultCity = MEXICO_CITIES.find((c) => c.slug === DEFAULT_CITY_SLUG)
     return (found ?? defaultCity ?? MEXICO_CITIES[0] ?? null) as City | null
@@ -85,6 +83,8 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
   // sincroniza localStorage. Si NO hay cookie pero sí localStorage (p.ej.
   // sesión previa), se promueve ese valor a cookie en lugar de pisarlo con
   // el default — antes ambos divergían y cada mount reseteaba la ciudad.
+  // Además adopta la ciudad persistida si difiere de la inicial (el estado
+  // inicial es siempre el default para que server y cliente coincidan).
   useEffect(() => {
     const cookieSlug = getCityFromCookie()
     const lsSlug = getCityFromLocalStorage()
@@ -100,6 +100,11 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
     if (lsSlug !== effective) {
       setCityLocalStorage(effective)
     }
+    setCityState((current) => {
+      if (current?.slug === effective) return current
+      const found = MEXICO_CITIES.find((c) => c.slug === effective)
+      return found ? (found as City) : current
+    })
   }, [])
 
   const setCity = useCallback((slug: string) => {

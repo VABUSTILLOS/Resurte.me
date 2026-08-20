@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { MobileSearchOverlay } from "@/components/search/mobile-search-overlay"
+import { createClient } from "@/lib/supabase/client"
 import type { Category, Product, RestaurantCollection } from "@/types"
 import { cn, getCategoryIcon } from "@/lib/utils"
 import { CollectionSlider } from "@/components/collections/collection-slider"
@@ -39,13 +40,11 @@ export function CityLanding({
   categories,
   products,
   collections,
-  isLoggedIn = false,
 }: {
   citySlug?: string
   categories: Category[]
   products: Product[]
   collections?: RestaurantCollection[]
-  isLoggedIn?: boolean
 }) {
   const { city, setCity } = useCity()
   const [showSelector, setShowSelector] = useState(false)
@@ -53,6 +52,25 @@ export function CityLanding({
   const [catalogSearch, setCatalogSearch] = useState("")
   const [heroOverlayOpen, setHeroOverlayOpen] = useState(false)
   const router = useRouter()
+
+  // La página es ISR/estática, así que la sesión se detecta en el cliente
+  // tras la hidratación (antes el servidor leía cookies() y eso convertía
+  // todas las páginas de catálogo en SSR por request). Usuarios logueados
+  // verán el landing público un instante antes de cambiar a UserShopView.
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  useEffect(() => {
+    const supabase = createClient()
+    if (!supabase) return
+    supabase.auth.getSession().then(({ data }) => {
+      setIsLoggedIn(!!data.session)
+    })
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   // En móvil el hero search abre el overlay de búsqueda en vivo (readOnly
   // input + tap). En sm+ conserva la navegación del form.

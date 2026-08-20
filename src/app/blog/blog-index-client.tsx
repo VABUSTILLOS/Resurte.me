@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import {
   Search,
   X,
@@ -84,6 +85,20 @@ export function BlogIndexClient({
   const [sortBy, setSortBy] = useState<SortKey>("date-desc")
   const [sortOpen, setSortOpen] = useState(false)
   const sortRef = useRef<HTMLDivElement>(null)
+
+  // La página ya no lee searchParams en el servidor (eso la volvía dinámica);
+  // los filtros iniciales (?q=, ?categoria=, ?tipo=) se adoptan tras montar.
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const q = searchParams.get("q")
+    const cat = searchParams.get("categoria")
+    const tipo = searchParams.get("tipo")
+    if (q) setQuery(q)
+    if (cat && BLOG_CATEGORIES.some((c) => c.slug === cat)) setActiveCategory(cat)
+    if (tipo && BLOG_CONTENT_TYPES.some((t) => t.slug === tipo)) setActiveContentType(tipo)
+    // Solo en el montaje inicial; cambios posteriores los escribe este mismo componente.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Cierra el menú de orden al hacer clic fuera.
   useEffect(() => {

@@ -1,7 +1,27 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { getPublicRestaurantBySlug } from "@/lib/foodos-public"
+import {
+  getPublicMarketplace,
+  getPublicRestaurantBySlug,
+} from "@/lib/foodos-public"
 import { FoodosStorefront } from "./storefront"
+
+// ISR: catálogo revalidado cada 5 min (alineado con src/lib/catalog-cache.ts).
+export const revalidate = 300
+
+// Next 16: sin generateStaticParams el segmento dinámico cae a SSR por request.
+// Pre-render de los restaurantes públicos del marketplace; si Supabase no está
+// disponible en build, se degradan a render bajo demanda (dynamicParams=true).
+export async function generateStaticParams() {
+  try {
+    const marketplace = await getPublicMarketplace()
+    return marketplace
+      .map((entry) => ({ slug: entry.restaurant.slug }))
+      .filter((entry) => Boolean(entry.slug))
+  } catch {
+    return []
+  }
+}
 
 interface PageProps {
   params: Promise<{ slug: string }>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
-import { headers } from "next/headers"
-import { getAllPosts, searchPosts, getBlogIndexCta } from "@/lib/blog"
+import { Suspense } from "react"
+import { getAllPosts, getBlogIndexCta } from "@/lib/blog"
 import { getBlogIndexSchema, getBlogBreadcrumbSchema } from "@/lib/blog-schema"
 import { BlogHero } from "@/components/blog/blog-hero"
 import { PostCTA } from "@/components/blog/post-cta"
@@ -28,15 +28,11 @@ export const metadata: Metadata = {
   },
 }
 
-export default async function BlogIndexPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string; categoria?: string; tipo?: string }>
-}) {
-  const { q, categoria, tipo } = await searchParams
-  const nonce = (await headers()).get("x-nonce")
-  // Pre-filtro server-side: con ?q= el HTML inicial ya llega filtrado (mejor SEO).
-  const posts = q ? searchPosts(q) : getAllPosts()
+// Página estática: los filtros ?q=/?categoria=/?tipo= se aplican en el cliente
+// (BlogIndexClient lee useSearchParams tras montar). Leer searchParams o
+// headers() aquí convertía el índice del blog en SSR por request.
+export default async function BlogIndexPage() {
+  const posts = getAllPosts()
   const jsonLd = [
     getBlogIndexSchema(posts),
     getBlogBreadcrumbSchema("blog"),
@@ -57,19 +53,15 @@ export default async function BlogIndexPage({
     <>
       <script
         type="application/ld+json"
-        nonce={nonce ?? undefined}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <BlogHero
         title="Recursos para tu restaurante"
         subtitle="Guías prácticas, herramientas y datos para que tu restaurante gane más: food cost, mermas, proveeduría, marketing y tecnología. Escrito para dueños como tú, no para corporativos."
       />
-      <BlogIndexClient
-        posts={posts}
-        initialQuery={q ?? ""}
-        initialCategory={categoria ?? "all"}
-        initialContentType={tipo ?? "all"}
-      />
+      <Suspense fallback={null}>
+        <BlogIndexClient posts={posts} />
+      </Suspense>
       <div className="pb-16">
         <PostCTA
           config={getBlogIndexCta()}

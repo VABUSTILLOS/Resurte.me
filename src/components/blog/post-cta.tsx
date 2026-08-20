@@ -1,6 +1,8 @@
+"use client"
+
 import Link from "next/link"
 import { ArrowRight, BookOpen, Package, Sparkles, Wrench } from "lucide-react"
-import { cookies } from "next/headers"
+import { useCity } from "@/contexts/city-context"
 import type { ResolvedPostCta } from "@/lib/blog"
 
 const ICONS = {
@@ -17,7 +19,7 @@ const ICONS = {
  * frontmatter) y se pasa como prop; la ciudad se lee del contexto del usuario
  * para las colecciones.
  */
-export async function PostCTA({
+export function PostCTA({
   config,
   heading = "¿Listo para llevar tu restaurante al siguiente nivel?",
   secondaryHref = "/blog",
@@ -28,8 +30,10 @@ export async function PostCTA({
   secondaryHref?: string
   secondaryLabel?: string
 }) {
-  const cookieStore = await cookies()
-  const citySlug = cookieStore.get("city-slug")?.value ?? "chihuahua"
+  // Cliente: ciudad del contexto tras hidratación (SSR = ciudad por defecto).
+  // Antes leía cookies() y eso forzaba SSR dinámico en todo el blog.
+  const { city } = useCity()
+  const citySlug = city?.slug ?? "chihuahua"
   const Icon = ICONS[config.variant]
 
   let href = config.href

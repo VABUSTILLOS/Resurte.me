@@ -2,6 +2,9 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { MapPin, Truck, Building2 } from "lucide-react"
 
+// ISR: catálogo revalidado cada 5 min (alineado con src/lib/catalog-cache.ts).
+export const revalidate = 300
+
 export const metadata: Metadata = {
   title: "Zonas de entrega — Resurte.me",
   description:

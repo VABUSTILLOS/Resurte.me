@@ -105,18 +105,32 @@ export default function PedidosPage() {
     run()
   }, [load])
 
-  // Comanda en vivo: refresco automático cada 30s sin bloquear la UI
+  // Comanda en vivo: refresco cada 120s (antes 30s) y solo con la pestaña
+  // visible — el polling 30s por pestaña abierta inflaba las invocaciones de
+  // función en Vercel. Al volver a la pestaña se refresca al instante.
   useEffect(() => {
-    const id = setInterval(async () => {
-      if (!restaurant) return
+    if (!restaurant) return
+    let stopped = false
+    const refresh = async () => {
       try {
         const os = await listOrders(restaurant.id)
-        setOrders(os)
+        if (!stopped) setOrders(os)
       } catch {
         // silencioso: el siguiente ciclo reintenta
       }
-    }, 30_000)
-    return () => clearInterval(id)
+    }
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") refresh()
+    }, 120_000)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh()
+    }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => {
+      stopped = true
+      clearInterval(id)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
   }, [restaurant])
 
   const branchName = useMemo(() => {

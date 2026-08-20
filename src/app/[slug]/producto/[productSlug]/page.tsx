@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { Metadata } from "next"
-import { headers } from "next/headers"
 import {
   getCachedCategoryById,
   getCachedProductBySlug,
@@ -10,6 +9,21 @@ import {
 } from "@/lib/catalog-cache"
 import { ProductDetailClient } from "./product-detail-client"
 import { getBreadcrumbSchema, getProductSchema } from "@/lib/structured-data"
+
+// ISR: se revalida cada 5 min (alineado con catalog-cache). La primera
+// visita a cada producto renderiza y cachea; el resto sale del CDN.
+export const revalidate = 300
+
+// Next 16: sin generateStaticParams el segmento dinámico cae a SSR por request.
+// Pre-render de los primeros 100 productos de la ciudad por defecto; el resto
+// se genera bajo demanda y queda cacheado (dynamicParams=true por defecto).
+export async function generateStaticParams() {
+  const products = await getCachedVisibleProducts()
+  return products.slice(0, 100).map((p) => ({
+    slug: "chihuahua",
+    productSlug: p.slug,
+  }))
+}
 
 interface Props {
   params: Promise<{ slug: string; productSlug: string }>
@@ -52,7 +66,6 @@ export default async function ProductPage({ params }: Props) {
   const { slug, productSlug } = await params
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
   if (!city) notFound()
-  const nonce = (await headers()).get("x-nonce")
 
   // Fetch product with category (cached)
   const product = await getCachedProductBySlug(productSlug)
@@ -100,7 +113,6 @@ export default async function ProductPage({ params }: Props) {
     <>
       <script
         type="application/ld+json"
-        nonce={nonce ?? undefined}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <ProductDetailClient

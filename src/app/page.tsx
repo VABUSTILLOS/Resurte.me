@@ -4,10 +4,12 @@ import {
   getCachedCategories,
   getCachedVisibleProducts,
 } from "@/lib/catalog-cache"
-import { hasSessionCookie } from "@/lib/supabase/server"
-import { getCurrentUser } from "@/lib/auth"
 import type { Category, Product } from "@/types"
 import type { Metadata } from "next"
+
+// ISR: la sesión se detecta en el cliente (CityLanding); leer cookies aquí
+// convertía la landing en SSR por request.
+export const revalidate = 300
 
 export const metadata: Metadata = {
   title: "Resurte.me — Central de Abastos Digital para tu Negocio",
@@ -19,17 +21,10 @@ export const metadata: Metadata = {
 }
 
 export default async function Home() {
-  let user: unknown = null
   let categories: Category[] = []
   let products: Product[] = []
 
   try {
-    // Solo consultamos la sesión si el request trae cookie de Supabase.
-    // Visitantes anónimos ahorran un roundtrip de red a getUser().
-    if (await hasSessionCookie()) {
-      user = await getCurrentUser()
-    }
-
     const [cats, prods] = await Promise.all([
       getCachedCategories(),
       getCachedVisibleProducts(),
@@ -52,7 +47,6 @@ export default async function Home() {
       citySlug={undefined}
       categories={categories}
       products={products}
-      isLoggedIn={!!user}
     />
   )
 }

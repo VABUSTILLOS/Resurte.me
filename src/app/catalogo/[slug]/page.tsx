@@ -10,6 +10,15 @@ import {
 import { getCityBySlug } from "@/lib/data"
 import type { Category, Product, City } from "@/types"
 
+// ISR: catálogo revalidado cada 5 min (alineado con src/lib/catalog-cache.ts).
+export const revalidate = 300
+
+// Next 16: sin generateStaticParams el segmento dinámico cae a SSR por request.
+// Pre-render de las 20 ciudades conocidas.
+export function generateStaticParams() {
+  return MEXICO_CITIES.map((c) => ({ slug: c.slug }))
+}
+
 interface Props {
   params: Promise<{ slug: string }>
 }

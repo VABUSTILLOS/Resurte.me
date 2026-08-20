@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next"
-import { cookies, headers } from "next/headers"
 import { Geist, Geist_Mono } from "next/font/google"
-import { CityProvider, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
+import { CityProvider } from "@/contexts/city-context"
 import { CartProvider } from "@/contexts/cart-context"
 import { Header } from "@/components/layout/header"
 import { FooterForRoute } from "@/components/layout/FooterForRoute"
@@ -114,10 +113,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const cookieStore = await cookies()
-  const initialCitySlug =
-    cookieStore.get("city-slug")?.value ?? DEFAULT_CITY_SLUG
-  const nonce = (await headers()).get("x-nonce")
+  // El layout NO lee cookies() ni headers(): hacerlo convertía TODAS las
+  // rutas en SSR por request (208% del límite de Fluid CPU en Vercel). La
+  // ciudad se resuelve en el cliente (CityProvider sincroniza cookie/
+  // localStorage tras la hidratación) y la CSP es estática sin nonce
+  // (ver src/lib/csp.ts y src/proxy.ts).
   return (
     <html
       lang="es-MX"
@@ -127,7 +127,6 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col bg-[#faf8f5] text-[#343538] antialiased max-w-full overflow-x-clip">
         {/* Apply stored theme before hydration to avoid flash of wrong theme */}
         <script
-          nonce={nonce ?? undefined}
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("resurte-theme");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-theme",t)}}catch(e){}})();`,
           }}
@@ -146,14 +145,13 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Resurte.me" />
         <script
           type="application/ld+json"
-          nonce={nonce ?? undefined}
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(getOrganizationSchema()),
           }}
         />
-        <Analytics nonce={nonce} />
+        <Analytics />
         <ToastProvider>
-          <CityProvider initialCitySlug={initialCitySlug}>
+          <CityProvider>
             <CartProvider>
               <OnboardingWizardGate />
               <Header />

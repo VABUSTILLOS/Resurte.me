@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { MEXICO_CITIES } from "@/lib/cities"
-import { buildCspHeader } from "@/lib/csp"
+import { buildStaticCspHeader } from "@/lib/csp"
 import { updateSession } from "@/lib/supabase/middleware"
 
 const VALID_SLUGS = MEXICO_CITIES.map((c) => c.slug)
@@ -111,60 +111,46 @@ function copyAuthCookies(source: NextResponse, target: NextResponse) {
 const ASSET_PATHS = ["/_next", "/api", "/favicon.ico", "/static"]
 
 /**
- * Proxy: refresca sesión Supabase + CSP con nonces + detección de ciudad.
+ * Proxy: refresca sesión Supabase + CSP estática + detección de ciudad.
  *
- * CSP: se genera un nonce por request y se inyecta en `request.headers`
- * (x-nonce + Content-Security-Policy) ANTES de llamar a updateSession. Como
- * updateSession construye `NextResponse.next({ request })` con el MISMO objeto
- * request, las mutaciones de headers se propagan al render y Next.js aplica el
- * nonce a scripts/estilos que genera. El header CSP también se setea en la
- * response para que el navegador lo aplique.
+ * CSP: la política es ESTÁTICA (sin nonce por request) — ver `src/lib/csp.ts`.
+ * El nonce por request obligaba a todas las páginas públicas a leer
+ * `headers()` y las convertía en SSR por request (208% del límite de Fluid
+ * Active CPU en Vercel). Al fijar la CSP solo en la response, las páginas de
+ * catálogo vuelven a ser ISR/estáticas servidas por el CDN.
+ *
+ * `config.matcher` excluye assets estáticos (`_next/static`, `_next/image`,
+ * `public/*`, archivos con extensión): antes el proxy corría en CADA request
+ * (decenas de assets por página), inflando Function Invocations.
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Prefetch (next/link) y assets no renderizan HTML: se omite CSP para evitar
-  // nonces cacheados. updateSession igual refresca la sesión en /api.
+  // Prefetch (next/link) y assets no renderizan HTML: se omite CSP para no
+  // romper respuestas cacheadas. updateSession igual refresca la sesión en /api.
   const isPrefetch =
     request.headers.has("next-router-prefetch") ||
     request.headers.get("purpose") === "prefetch"
   const isAsset = ASSET_PATHS.some((p) => pathname.startsWith(p))
 
-  let cspHeader: string | null = null
-  let cspReportOnlyHeader: string | null = null
   const reportOnlyEnabled = ["true", "1"].includes(
     (process.env.CSP_REPORT_ONLY ?? "").toLowerCase()
   )
-  if (!isPrefetch && !isAsset) {
-    const nonce = Buffer.from(crypto.randomUUID()).toString("base64")
-    // Policy endurecida como enforce: strict-dynamic permite que GA4/Meta Pixel
-    // carguen vía scripts con nonce en navegadores modernos, por lo que los
-    // hosts de terceros en script-src ya no son necesarios (eran fallback CSP2).
-    // Validado con probe en prod: gtag/js y fbevents responden 200 con esta
-    // policy activa (ver fase 22, f22-endurecer-csp).
-    cspHeader = buildCspHeader(nonce, { hardened: true })
-    // En modo report-only se observa el endurecimiento sin romper nada: se
-    // envían ambas policies con el mismo nonce. La report-only quita los hosts
-    // de terceros de script-src; si GA4/Meta Pixel cargan vía strict-dynamic
-    // (navegadores modernos) no generarán reportes, lo que valida que se puede
-    // endurecer. Los reportes de navegadores legacy indican dependencia del
-    // fallback CSP2 (ver src/lib/csp.ts y /api/csp-report).
-    if (reportOnlyEnabled) {
-      cspReportOnlyHeader = buildCspHeader(nonce, { hardened: true, reportOnly: true })
-      request.headers.set("Content-Security-Policy-Report-Only", cspReportOnlyHeader)
-    }
-    request.headers.set("x-nonce", nonce)
-    request.headers.set("Content-Security-Policy", cspHeader)
-  }
+  const applyCsp = !isPrefetch && !isAsset
 
   // ── Supabase session refresh (delegado a updateSession) ──
   const { supabaseResponse } = await updateSession(request)
 
-  if (cspHeader) {
-    supabaseResponse.headers.set("Content-Security-Policy", cspHeader)
-  }
-  if (cspReportOnlyHeader) {
-    supabaseResponse.headers.set("Content-Security-Policy-Report-Only", cspReportOnlyHeader)
+  if (applyCsp) {
+    // Con CSP_REPORT_ONLY=true la política se envía solo como observación
+    // (Content-Security-Policy-Report-Only) sin bloquear nada.
+    const headerName = reportOnlyEnabled
+      ? "Content-Security-Policy-Report-Only"
+      : "Content-Security-Policy"
+    supabaseResponse.headers.set(
+      headerName,
+      buildStaticCspHeader({ reportOnly: reportOnlyEnabled })
+    )
   }
 
   // ── City detection & routing ──
@@ -212,4 +198,16 @@ export async function proxy(request: NextRequest) {
 
   // Unknown route — let Next.js handle (404) with auth cookies
   return supabaseResponse
+}
+
+/**
+ * Sin matcher el proxy corre en TODOS los requests (incluidos _next/static,
+ * _next/image y assets de public/), disparando una invocación de función por
+ * cada asset de cada página. Se limita a páginas HTML y /api/* (refresco de
+ * sesión), excluyendo rutas de assets y archivos con extensión.
+ */
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|images/|favicon|icon\\.png|apple-icon|opengraph-image|robots\\.txt|sitemap\\.xml|manifest\\.json|rss\\.xml|.*\\.(?:webp|avif|png|jpg|jpeg|svg|gif|ico|xml|txt|json|webmanifest|woff2?|map)$).*)",
+  ],
 }
