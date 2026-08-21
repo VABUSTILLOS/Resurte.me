@@ -6,15 +6,27 @@ import type { Product } from "@/types"
 
 const PAGE_SIZE = 24
 
+function isSupabaseUnconfigured(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("Supabase no está configurado")
+}
+
 export async function loadMoreProducts(page: number): Promise<{
   products: Product[]
   hasMore: boolean
 }> {
-  const { products, hasMore } = await getCachedProductsPaginated(
-    page,
-    PAGE_SIZE
-  )
-  return { products, hasMore }
+  try {
+    const { products, hasMore } = await getCachedProductsPaginated(page, PAGE_SIZE)
+    return { products, hasMore }
+  } catch (error) {
+    // Dev local / preview sin secrets de Supabase: degradar a catálogo vacío
+    // en lugar de lanzar al cliente. Un server action que revienta pinta el
+    // overlay de error de Next.js en todo el preview (unhandledRejection).
+    // Los errores reales de la DB se siguen propagando.
+    if (isSupabaseUnconfigured(error)) {
+      return { products: [], hasMore: false }
+    }
+    throw error
+  }
 }
 
 /**
@@ -26,6 +38,11 @@ export async function loadMoreProducts(page: number): Promise<{
  */
 export async function searchProducts(query: string): Promise<Product[]> {
   if (!query.trim() || query.trim().length < 2) return []
-  const { products } = await searchAll(query.trim())
-  return products
+  try {
+    const { products } = await searchAll(query.trim())
+    return products
+  } catch (error) {
+    if (isSupabaseUnconfigured(error)) return []
+    throw error
+  }
 }

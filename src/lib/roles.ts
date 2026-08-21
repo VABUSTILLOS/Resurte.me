@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { requireAuth } from "@/lib/auth"
 import { isAdminUser } from "@/lib/admin-auth"
 import { redirect } from "next/navigation"
@@ -16,6 +17,11 @@ export type AppRole = "admin" | "vendedor" | "cliente" | null
  * Uso en Server Components, layouts y server actions.
  */
 export async function getUserRole(): Promise<AppRole> {
+  // Sin Supabase configurado (dev local / preview sin secrets) no puede haber
+  // sesión: devolvemos null en lugar de lanzar, para que layouts y server
+  // components degraden sin romper el render.
+  if (!isSupabaseConfigured()) return null
+
   const supabase = await createClient()
   const {
     data: { user },
