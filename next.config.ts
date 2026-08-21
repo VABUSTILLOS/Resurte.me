@@ -3,7 +3,9 @@ import type { NextConfig } from "next"
 const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "3000-07e71408-162f-4d55-afcf-13420ba7fef0.softgen.dev",
+    "3000-07e71408-162f-4d55-afcf-13420ba7fef0.proxy.daytona.work",
     "*.softgen.dev",
+    "*.proxy.daytona.work",
     "resurte.me",
   ],
   images: {
