@@ -11,7 +11,15 @@ describe("buildStaticCspHeader", () => {
     expect(scriptSrc).toContain("googletagmanager.com")
     expect(scriptSrc).toContain("connect.facebook.net")
     expect(scriptSrc).toContain("https://js.stripe.com")
-    expect(csp).toContain("report-uri /api/csp-report")
+  })
+
+  it("report-uri solo se solicita en modo report-only (ahorra invocaciones)", () => {
+    // En enforce los navegadores con extensiones/antivirus enviarían un POST
+    // a /api/csp-report por cada página: miles de invocaciones sin valor.
+    expect(buildStaticCspHeader()).not.toContain("report-uri")
+    expect(buildStaticCspHeader({ reportOnly: true })).toContain(
+      "report-uri /api/csp-report"
+    )
   })
 
   it("mantiene directivas de endurecimiento no relacionadas con scripts", () => {

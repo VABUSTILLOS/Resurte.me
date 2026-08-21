@@ -13,8 +13,15 @@
  * en lugar de `strict-dynamic` + nonce. Sigue bloqueando la inyección de
  * scripts desde orígenes desconocidos (vector principal de XSS) y se
  * mantienen `object-src 'none'`, `frame-ancestors 'none'` y la allowlist
- * estricta de `connect-src`. Los reportes siguen llegando a
- * `/api/csp-report` para monitoreo.
+ * estricta de `connect-src`. Los reportes solo se solicitan en modo
+ * report-only (ver abajo).
+ *
+ * `report-uri`: se incluye SOLO en modo report-only. En enforce los
+ * navegadores reales (extensiones, antivirus que inyectan scripts,
+ * traductores) envían reportes POST a `/api/csp-report` en cada página:
+ * miles de Function Invocations en Vercel sin valor accionable una vez la
+ * política está ajustada. Para auditar la política, desplegar con
+ * `CSP_REPORT_ONLY=1` y revisar el endpoint temporalmente.
  *
  * Directivas clave:
  * - `style-src 'unsafe-inline'`: Next.js y los estilos inline de React lo
@@ -45,8 +52,7 @@ export function buildStaticCspHeader(options: StaticCspOptions = {}): string {
     object-src 'none';
     base-uri 'self';
     form-action 'self';
-    frame-ancestors 'none';${!isDev && !options.reportOnly ? "\n    upgrade-insecure-requests;" : ""}
-    report-uri /api/csp-report;
+    frame-ancestors 'none';${!isDev && !options.reportOnly ? "\n    upgrade-insecure-requests;" : ""}${options.reportOnly ? "\n    report-uri /api/csp-report;" : ""}
   `
     .replace(/\s{2,}/g, " ")
     .trim()

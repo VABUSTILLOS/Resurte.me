@@ -205,9 +205,14 @@ export async function proxy(request: NextRequest) {
  * _next/image y assets de public/), disparando una invocación de función por
  * cada asset de cada página. Se limita a páginas HTML y /api/* (refresco de
  * sesión), excluyendo rutas de assets y archivos con extensión.
+ *
+ * Además se excluyen las APIs machine-to-machine (`api/webhooks/`,
+ * `api/cron/`, `api/csp-report`): no usan sesión de usuario y cada request
+ * suyo pagaría doble invocación (proxy + route handler). El resto de /api/*
+ * sigue pasando por el proxy para el refresco de sesión.
  */
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|images/|favicon|icon\\.png|apple-icon|opengraph-image|robots\\.txt|sitemap\\.xml|manifest\\.json|rss\\.xml|.*\\.(?:webp|avif|png|jpg|jpeg|svg|gif|ico|xml|txt|json|webmanifest|woff2?|map)$).*)",
+    "/((?!_next/static|_next/image|api/webhooks|api/cron|api/csp-report|images/|favicon|icon\\.png|apple-icon|opengraph-image|robots\\.txt|sitemap\\.xml|manifest\\.json|rss\\.xml|.*\\.(?:webp|avif|png|jpg|jpeg|svg|gif|ico|xml|txt|json|webmanifest|woff2?|map)$).*)",
   ],
 }
