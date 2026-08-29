@@ -22,7 +22,10 @@ const DRY = args.includes("--dry-run")
 const onlyIdx = args.indexOf("--only")
 const ONLY = onlyIdx >= 0 ? args[onlyIdx + 1].split(",") : null
 
-const missing = JSON.parse(fs.readFileSync(path.join(ROOT, "scripts/missing-images.json"), "utf8"))
+const inputIdx = args.indexOf("--input")
+const INPUT_FILE = inputIdx > -1 ? args[inputIdx + 1] : "scripts/missing-images.json"
+const missing = JSON.parse(fs.readFileSync(path.join(ROOT, INPUT_FILE), "utf8"))
+  .map(m => ({ ...m, slug: m.slug || path.basename(m.path, ".webp") }))
 const OVERRIDES = JSON.parse(fs.readFileSync(path.join(ROOT, "scripts/manual-image-overrides.json"), "utf8"))
 const targets = ONLY ? missing.filter(m => ONLY.includes(m.slug)) : missing
 

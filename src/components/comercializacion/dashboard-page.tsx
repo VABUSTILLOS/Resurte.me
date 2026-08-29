@@ -1,6 +1,8 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
 import {
   Users,
   PhoneCall,
@@ -10,6 +12,7 @@ import {
   Plus,
   Wallet,
   CalendarClock,
+  Download,
 } from "lucide-react"
 import {
   StatCard,
@@ -19,17 +22,19 @@ import {
   EmptyState,
   StatusBadge,
 } from "./ui"
+import { ActivityFormModal } from "./activity-form"
 import type {
   DashboardKpis,
   FollowUp,
   ClientToReorder,
 } from "@/lib/comercializacion/types"
+import type { WeeklyGoals } from "@/lib/comercializacion/goals"
 import { formatMoney } from "@/lib/comercializacion/commissions"
+import { toCsv, downloadCsv } from "@/lib/comercializacion/csv"
 import { formatDateTime } from "@/lib/comercializacion/dates"
 import { weeklyReminderMessage, buildWhatsappLink } from "@/lib/comercializacion/whatsapp"
 import { addActivity } from "@/lib/comercializacion/actions"
 import { useToast } from "@/components/toast"
-import { useState } from "react"
 
 function ReminderButtons({
   client,
@@ -95,17 +100,72 @@ function ReminderButtons({
   )
 }
 
+function GoalBar({
+  label,
+  current,
+  goal,
+  format,
+}: {
+  label: string
+  current: number
+  goal: number
+  format: (n: number) => string
+}) {
+  const pct = Math.min(100, Math.round((current / goal) * 100))
+  const done = current >= goal
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span className="font-semibold text-gray-700">{label}</span>
+        <span className={done ? "font-bold text-[#0E7A0E]" : "text-gray-500"}>
+          {format(current)} / {format(goal)} {done ? "✅" : ""}
+        </span>
+      </div>
+      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${done ? "bg-[#0E7A0E]" : "bg-amber-400"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
 export function DashboardPage({
   kpis,
   followUps,
   clientsToReorder,
   sellerName,
+  goals,
 }: {
   kpis: DashboardKpis
   followUps: FollowUp[]
   clientsToReorder: ClientToReorder[]
   sellerName: string
+  goals: WeeklyGoals
 }) {
+  const router = useRouter()
+  const { toast } = useToast()
+  const [activityFor, setActivityFor] = useState<FollowUp | null>(null)
+
+  function exportCommissionCsv() {
+    const hoy = new Date().toISOString().slice(0, 10)
+    downloadCsv(
+      `comisiones-${hoy}.csv`,
+      toCsv(
+        ["concepto", "monto"],
+        [
+          ["vendedor", sellerName],
+          ["ventas clientes (semana)", kpis.weekRevenue.toFixed(2)],
+          ["comision estimada (semana)", kpis.weekCommission.toFixed(2)],
+          ["ventas clientes (mes)", kpis.monthRevenue.toFixed(2)],
+          ["comision estimada (mes)", kpis.monthCommission.toFixed(2)],
+        ]
+      )
+    )
+    toast("Resumen de comisiones descargado")
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -149,21 +209,55 @@ export function DashboardPage({
         />
       </div>
 
+      {/* Metas semanales */}
+      <SectionCard title="Metas de la semana">
+        <div className="space-y-3">
+          <GoalBar
+            label="Llamadas"
+            current={kpis.callsWeek}
+            goal={goals.calls}
+            format={(n) => String(n)}
+          />
+          <GoalBar
+            label="WhatsApps"
+            current={kpis.whatsappWeek}
+            goal={goals.whatsapps}
+            format={(n) => String(n)}
+          />
+          <GoalBar
+            label="Ventas de clientes"
+            current={kpis.weekRevenue}
+            goal={goals.revenue}
+            format={formatMoney}
+          />
+        </div>
+      </SectionCard>
+
       {/* Comisión estimada */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <StatCard
-          label="Ventas de tus clientes (semana)"
-          value={formatMoney(kpis.weekRevenue)}
-          sub="pedidos pagados, no cancelados"
-          icon={<Wallet className="w-5 h-5" />}
-        />
-        <StatCard
-          label="Comisión estimada (semana)"
-          value={formatMoney(kpis.weekCommission)}
-          sub={`Mes: ${formatMoney(kpis.monthCommission)} · ventas mes ${formatMoney(kpis.monthRevenue)}`}
-          icon={<Wallet className="w-5 h-5" />}
-        />
-      </div>
+      <SectionCard
+        title="Ventas y comisión"
+        action={
+          <Button variant="outline" size="sm" onClick={exportCommissionCsv}>
+            <Download className="w-3.5 h-3.5" />
+            Exportar mes
+          </Button>
+        }
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <StatCard
+            label="Ventas de tus clientes (semana)"
+            value={formatMoney(kpis.weekRevenue)}
+            sub="pedidos pagados, no cancelados"
+            icon={<Wallet className="w-5 h-5" />}
+          />
+          <StatCard
+            label="Comisión estimada (semana)"
+            value={formatMoney(kpis.weekCommission)}
+            sub={`Mes: ${formatMoney(kpis.monthCommission)} · ventas mes ${formatMoney(kpis.monthRevenue)}`}
+            icon={<Wallet className="w-5 h-5" />}
+          />
+        </div>
+      </SectionCard>
 
       {/* Debemos pedir esta semana */}
       <SectionCard
@@ -248,17 +342,37 @@ export function DashboardPage({
                     Seguimiento: {formatDateTime(f.next_follow_up_at)}
                   </p>
                 </div>
-                <Link href={`/comercializacion/prospectos/${f.id}`}>
-                  <Button variant="outline" size="sm">
-                    <ArrowRight className="w-3.5 h-3.5" />
-                    Abrir
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActivityFor(f)}
+                  >
+                    <PhoneCall className="w-3.5 h-3.5" />
+                    Registrar contacto
                   </Button>
-                </Link>
+                  <Link href={`/comercializacion/prospectos/${f.id}`}>
+                    <Button variant="ghost" size="sm">
+                      <ArrowRight className="w-3.5 h-3.5" />
+                      Abrir
+                    </Button>
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </SectionCard>
+
+      <ActivityFormModal
+        open={!!activityFor}
+        onClose={() => setActivityFor(null)}
+        prospectId={activityFor?.id ?? 0}
+        onSaved={() => {
+          toast("Actividad registrada ✅")
+          router.refresh()
+        }}
+      />
     </div>
   )
 }

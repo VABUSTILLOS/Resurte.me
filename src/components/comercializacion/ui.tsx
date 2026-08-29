@@ -177,6 +177,39 @@ export function Modal({
   )
 }
 
+export function ConfirmDialog({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmLabel = "Eliminar",
+  loading = false,
+}: {
+  open: boolean
+  onClose: () => void
+  onConfirm: () => void
+  title: string
+  message: ReactNode
+  confirmLabel?: string
+  loading?: boolean
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title={title} maxWidth="max-w-sm">
+      <div className="text-sm text-gray-600">{message}</div>
+      <div className="flex justify-end gap-2 pt-5">
+        <Button variant="outline" onClick={onClose} disabled={loading}>
+          Cancelar
+        </Button>
+        <Button variant="danger" onClick={onConfirm} disabled={loading}>
+          {loading ? <Spinner className="!w-4 !h-4 !border-white" /> : null}
+          {confirmLabel}
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
 export function EmptyState({
   title,
   subtitle,

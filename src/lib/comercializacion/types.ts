@@ -181,6 +181,21 @@ export interface ClientAddress {
   references: string | null
 }
 
+export interface LastOrderItem {
+  productId: number
+  name: string
+  quantity: number
+  unitPrice: number
+  currentPrice: number | null
+  available: boolean
+}
+
+export interface LastOrderSummary {
+  orderId: number
+  createdAt: string
+  items: LastOrderItem[]
+}
+
 export interface SellerClientSummary {
   prospectId: number
   prospectName: string

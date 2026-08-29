@@ -13,6 +13,8 @@ import {
   Trash2,
   ExternalLink,
   Users,
+  Upload,
+  Download,
 } from "lucide-react"
 import {
   Button,
@@ -22,14 +24,19 @@ import {
   EmptyState,
   StatusBadge,
   Spinner,
+  ConfirmDialog,
 } from "./ui"
 import { ProspectFormModal } from "./prospect-form"
 import { ActivityFormModal } from "./activity-form"
+import { PipelineView } from "./pipeline-view"
+import { ImportCsvModal } from "./import-csv-modal"
 import { useToast } from "@/components/toast"
 import type { Prospect, ProspectStatus } from "@/lib/comercializacion/types"
+import { PROSPECT_STATUS_LABEL } from "@/lib/comercializacion/types"
 import { formatDateTime } from "@/lib/comercializacion/dates"
 import { buildWhatsappLink } from "@/lib/comercializacion/whatsapp"
 import { getProspects, deleteProspect } from "@/lib/comercializacion/actions"
+import { toCsv, downloadCsv } from "@/lib/comercializacion/csv"
 
 interface CityOption {
   id: number
@@ -52,11 +59,30 @@ export function ProspectosPage({
   const [q, setQ] = useState("")
   const [status, setStatus] = useState<ProspectStatus | "todos">("todos")
   const [view, setView] = useState<"todos" | "por_contactar" | "contactados">("todos")
+  const [layout, setLayout] = useState<"lista" | "pipeline">("lista")
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Prospect | null>(null)
   const [activityFor, setActivityFor] = useState<Prospect | null>(null)
   const [menuFor, setMenuFor] = useState<number | null>(null)
   const [copied, setCopied] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState<Prospect | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+
+  // Cerrar el menú "⋯" con click fuera o Escape
+  useEffect(() => {
+    if (menuFor === null) return
+    const onClick = () => setMenuFor(null)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuFor(null)
+    }
+    document.addEventListener("click", onClick)
+    document.addEventListener("keydown", onKey)
+    return () => {
+      document.removeEventListener("click", onClick)
+      document.removeEventListener("keydown", onKey)
+    }
+  }, [menuFor])
 
   const openCreate = searchParams.get("nuevo") === "1"
 
@@ -115,15 +141,42 @@ export function ProspectosPage({
     }
   }
 
-  async function handleDelete(prospect: Prospect) {
-    if (!confirm(`¿Eliminar a "${prospect.name}"? Esta acción no se puede deshacer.`)) return
+  async function performDelete() {
+    if (!deleting) return
+    setDeleteLoading(true)
     try {
-      await deleteProspect(prospect.id)
-      setProspects((prev) => prev.filter((p) => p.id !== prospect.id))
+      await deleteProspect(deleting.id)
+      setProspects((prev) => prev.filter((p) => p.id !== deleting.id))
       toast("Prospecto eliminado")
+      setDeleting(null)
     } catch (e) {
       toast(e instanceof Error ? e.message : "Error al eliminar", "error")
+    } finally {
+      setDeleteLoading(false)
     }
+  }
+
+  function exportCsv() {
+    const rows = filtered.map((p) => [
+      p.name,
+      p.restaurant_name,
+      p.phone,
+      p.whatsapp,
+      p.email,
+      p.city_name,
+      PROSPECT_STATUS_LABEL[p.status],
+      p.last_contact_at,
+      p.next_follow_up_at,
+      p.notes,
+    ])
+    downloadCsv(
+      `prospectos-${new Date().toISOString().slice(0, 10)}.csv`,
+      toCsv(
+        ["nombre", "restaurante", "telefono", "whatsapp", "email", "ciudad", "estado", "ultimo_contacto", "proximo_seguimiento", "notas"],
+        rows
+      )
+    )
+    toast(`${filtered.length} prospecto(s) exportados`)
   }
 
   return (
@@ -136,15 +189,25 @@ export function ProspectosPage({
             Lleva el control de con quién te has comunicado.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditing(null)
-            setShowForm(true)
-          }}
-        >
-          <Plus className="w-4 h-4" />
-          Nuevo prospecto
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={exportCsv} disabled={filtered.length === 0}>
+            <Download className="w-4 h-4" />
+            Exportar
+          </Button>
+          <Button variant="outline" onClick={() => setShowImport(true)}>
+            <Upload className="w-4 h-4" />
+            Importar CSV
+          </Button>
+          <Button
+            onClick={() => {
+              setEditing(null)
+              setShowForm(true)
+            }}
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo prospecto
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -174,29 +237,58 @@ export function ProspectosPage({
           </Select>
         </div>
 
-        {/* Vistas rápidas */}
-        <div className="flex items-center gap-1">
-          {([
-            { key: "todos", label: "Todos" },
-            { key: "por_contactar", label: "🕐 Por contactar" },
-            { key: "contactados", label: "✅ Contactados" },
-          ] as const).map((v) => (
-            <button
-              key={v.key}
-              onClick={() => setView(v.key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-                view === v.key
-                  ? "bg-[#0E7A0E] text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              {v.label}
-            </button>
-          ))}
+        {/* Vistas rápidas + toggle lista/pipeline */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1">
+            {([
+              { key: "todos", label: "Todos" },
+              { key: "por_contactar", label: "🕐 Por contactar" },
+              { key: "contactados", label: "✅ Contactados" },
+            ] as const).map((v) => (
+              <button
+                key={v.key}
+                onClick={() => setView(v.key)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  view === v.key
+                    ? "bg-[#0E7A0E] text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1">
+            {([
+              { key: "lista", label: "Lista" },
+              { key: "pipeline", label: "Pipeline" },
+            ] as const).map((l) => (
+              <button
+                key={l.key}
+                onClick={() => setLayout(l.key)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  layout === l.key
+                    ? "bg-gray-900 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Lista */}
+      {/* Lista o pipeline */}
+      {layout === "pipeline" ? (
+        loading ? (
+          <div className="flex justify-center py-12 bg-white rounded-2xl border border-gray-100">
+            <Spinner />
+          </div>
+        ) : (
+          <PipelineView prospects={filtered} onChanged={reload} />
+        )
+      ) : (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-12">
@@ -291,16 +383,23 @@ export function ProspectosPage({
                       </button>
                       <div className="relative">
                         <button
-                          onClick={() => setMenuFor(menuFor === p.id ? null : p.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setMenuFor(menuFor === p.id ? null : p.id)
+                          }}
                           className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors"
                           title="Más opciones"
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
                         {menuFor === p.id ? (
-                          <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl border border-gray-100 shadow-lg z-20 py-1">
+                          <div
+                            className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl border border-gray-100 shadow-lg z-20 py-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <Link
                               href={`/comercializacion/prospectos/${p.id}`}
+                              onClick={() => setMenuFor(null)}
                               className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
@@ -320,7 +419,7 @@ export function ProspectosPage({
                             <button
                               onClick={() => {
                                 setMenuFor(null)
-                                handleDelete(p)
+                                setDeleting(p)
                               }}
                               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                             >
@@ -338,6 +437,7 @@ export function ProspectosPage({
           </ul>
         )}
       </div>
+      )}
 
       <ProspectFormModal
         open={showForm}
@@ -361,6 +461,26 @@ export function ProspectosPage({
           toast("Actividad registrada ✅")
           reload()
         }}
+      />
+
+      <ImportCsvModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={reload}
+      />
+
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        onConfirm={performDelete}
+        loading={deleteLoading}
+        title="Eliminar prospecto"
+        message={
+          <>
+            ¿Eliminar a <strong>{deleting?.name}</strong>? Esta acción no se
+            puede deshacer.
+          </>
+        }
       />
     </div>
   )

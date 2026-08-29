@@ -5,20 +5,61 @@ import { requireSellerOrAdminAction } from "@/lib/roles"
 import { logger } from "@/lib/logger"
 import { getWeekBounds, getMonthBounds, getTodayBounds } from "./dates"
 import { getCommissionRate } from "./commissions"
-import type {
-  Prospect,
-  Activity,
-  ActivityType,
-  ActivityDirection,
-  DashboardKpis,
-  FollowUp,
-  ClientToReorder,
-  AssistedOrderSummary,
-  CatalogProduct,
-  ClientAddress,
-  SellerClientSummary,
-  ProspectStatus,
+import {
+  ACTIVITY_TYPES,
+  PROSPECT_STATUSES,
+  type Prospect,
+  type Activity,
+  type ActivityType,
+  type ActivityDirection,
+  type DashboardKpis,
+  type FollowUp,
+  type ClientToReorder,
+  type AssistedOrderSummary,
+  type CatalogProduct,
+  type ClientAddress,
+  type SellerClientSummary,
+  type ProspectStatus,
+  type LastOrderSummary,
 } from "./types"
+
+/**
+ * Escapa caracteres especiales para interpolar texto de usuario en
+ * patrones `ilike` / filtros `or()` de PostgREST (%, _, comas, paréntesis,
+ * comillas, backslash). Sin esto, una búsqueda como "50%" o "a,b" rompe
+ * la sintaxis del filtro o altera los resultados.
+ */
+function escapeIlike(raw: string): string {
+  return raw.replace(/[\\%_,()."]/g, (c) => `\\${c}`)
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** Validaciones ligeras de contacto para prospectos (errores en español). */
+function validateProspectContact(input: {
+  name?: string | null
+  email?: string | null
+  phone?: string | null
+  whatsapp?: string | null
+}) {
+  if (input.name !== undefined && input.name !== null && !input.name.trim()) {
+    throw new Error("El nombre del contacto es obligatorio")
+  }
+  if (input.email && !EMAIL_RE.test(input.email.trim())) {
+    throw new Error("El correo no tiene un formato válido")
+  }
+  for (const [label, value] of [
+    ["teléfono", input.phone],
+    ["WhatsApp", input.whatsapp],
+  ] as const) {
+    if (value) {
+      const digits = value.replace(/\D/g, "")
+      if (digits.length < 8 || digits.length > 15) {
+        throw new Error(`El ${label} debe tener entre 8 y 15 dígitos`)
+      }
+    }
+  }
+}
 
 function mapProspect(row: Record<string, unknown>): Prospect {
   return {
@@ -53,6 +94,8 @@ export interface ProspectFilters {
   status?: ProspectStatus | "todos"
   q?: string
   onlyPending?: boolean
+  /** Máximo de filas (default 200) para no traer la tabla completa. */
+  limit?: number
 }
 
 export async function getProspects(
@@ -66,12 +109,13 @@ export async function getProspects(
     .select("*, cities(name)")
     .eq("seller_id", userId)
     .order("created_at", { ascending: false })
+    .limit(filters.limit ?? 200)
 
   if (filters.status && filters.status !== "todos") {
     query = query.eq("status", filters.status)
   }
   if (filters.q) {
-    const q = filters.q.trim()
+    const q = escapeIlike(filters.q.trim())
     query = query.or(
       `name.ilike.%${q}%,restaurant_name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`
     )
@@ -113,7 +157,7 @@ export interface ProspectInput {
 
 export async function createProspect(input: ProspectInput): Promise<Prospect> {
   const { userId } = await requireSellerOrAdminAction()
-  if (!input.name?.trim()) throw new Error("El nombre del contacto es obligatorio")
+  validateProspectContact(input)
 
   const supabase = await createServiceClient()
   const { data, error } = await supabase
@@ -147,6 +191,10 @@ export async function updateProspect(
   input: Partial<ProspectInput>
 ): Promise<Prospect> {
   const { userId } = await requireSellerOrAdminAction()
+  validateProspectContact(input)
+  if (input.status !== undefined && !PROSPECT_STATUSES.includes(input.status)) {
+    throw new Error("Estado de prospecto inválido")
+  }
   const supabase = await createServiceClient()
 
   const patch: Record<string, unknown> = {}
@@ -194,6 +242,80 @@ export async function deleteProspect(id: number): Promise<void> {
     logger.error("[CRM] deleteProspect error:", error)
     throw new Error("Error al eliminar el prospecto")
   }
+}
+
+export interface BulkProspectRow {
+  name: string
+  restaurant_name?: string | null
+  phone?: string | null
+  whatsapp?: string | null
+  email?: string | null
+  city_name?: string | null
+  notes?: string | null
+}
+
+export async function bulkCreateProspects(rows: BulkProspectRow[]): Promise<{
+  created: number
+  errors: { row: number; message: string }[]
+}> {
+  const { userId } = await requireSellerOrAdminAction()
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("No hay filas para importar")
+  }
+  if (rows.length > 200) {
+    throw new Error("Máximo 200 prospectos por importación")
+  }
+
+  const supabase = await createServiceClient()
+
+  // Mapeo ciudad (nombre → id) para resolver city_name por fila
+  const { data: cities } = await supabase.from("cities").select("id, name")
+  const cityMap = new Map<string, number>()
+  for (const c of cities ?? []) {
+    cityMap.set(String(c.name).trim().toLowerCase(), Number(c.id))
+  }
+
+  // Validar todo primero; si hay errores no se inserta nada
+  const errors: { row: number; message: string }[] = []
+  const prepared = rows.map((row, idx) => {
+    try {
+      validateProspectContact(row)
+    } catch (e) {
+      errors.push({ row: idx + 1, message: e instanceof Error ? e.message : "Fila inválida" })
+      return null
+    }
+    const cityKey = row.city_name?.trim().toLowerCase()
+    let city_id: number | null = null
+    if (cityKey) {
+      city_id = cityMap.get(cityKey) ?? null
+      if (city_id === null) {
+        errors.push({ row: idx + 1, message: `Ciudad "${row.city_name}" no existe en el catálogo` })
+        return null
+      }
+    }
+    return {
+      seller_id: userId,
+      name: row.name.trim(),
+      restaurant_name: row.restaurant_name?.trim() || null,
+      phone: row.phone?.trim() || null,
+      whatsapp: row.whatsapp?.trim() || null,
+      email: row.email?.trim() || null,
+      city_id,
+      status: "nuevo",
+      notes: row.notes?.trim() || null,
+      source: "import",
+    }
+  })
+
+  if (errors.length > 0) return { created: 0, errors }
+
+  const toInsert = prepared.filter((r): r is NonNullable<typeof r> => r !== null)
+  const { error } = await supabase.from("crm_prospects").insert(toInsert)
+  if (error) {
+    logger.error("[CRM] bulkCreateProspects error:", error)
+    throw new Error("Error al importar los prospectos")
+  }
+  return { created: toInsert.length, errors: [] }
 }
 
 // ============================================================
@@ -257,6 +379,15 @@ export async function addActivity(
   input: ActivityInput
 ): Promise<void> {
   const { userId } = await requireSellerOrAdminAction()
+  if (!ACTIVITY_TYPES.includes(input.type)) {
+    throw new Error("Tipo de actividad inválido")
+  }
+  if (
+    input.duration_seconds != null &&
+    (!Number.isFinite(input.duration_seconds) || input.duration_seconds <= 0)
+  ) {
+    throw new Error("La duración debe ser mayor a 0")
+  }
   const supabase = await createServiceClient()
 
   // Verificar propiedad
@@ -351,7 +482,7 @@ export async function searchUsersForLinking(
   await requireSellerOrAdminAction()
   if (!query.trim()) return []
   const supabase = await createServiceClient()
-  const q = query.trim()
+  const q = escapeIlike(query.trim())
 
   // Buscar por email o nombre del perfil (el RLS no permite leer emails
   // de auth.users; usamos profiles.phone / auth emails vía join a users).
@@ -663,7 +794,7 @@ export async function searchCatalogProducts(query: string): Promise<CatalogProdu
   await requireSellerOrAdminAction()
   if (!query.trim()) return []
   const supabase = await createServiceClient()
-  const q = query.trim()
+  const q = escapeIlike(query.trim())
 
   const { data, error } = await supabase
     .from("products")
@@ -694,6 +825,58 @@ export interface AssistedOrderItem {
   quantity: number
 }
 
+export async function getClientLastOrder(userId: string): Promise<LastOrderSummary | null> {
+  await requireSellerOrAdminAction()
+  const supabase = await createServiceClient()
+
+  const { data: order, error: orderErr } = await supabase
+    .from("orders")
+    .select("id, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (orderErr) {
+    logger.error("[CRM] getClientLastOrder error:", orderErr)
+    throw new Error("Error al cargar el último pedido del cliente")
+  }
+  if (!order) return null
+
+  const { data: items, error: itemsErr } = await supabase
+    .from("order_items")
+    .select("product_id, quantity, unit_price, products(name, price, sale_price, stock_status, is_visible)")
+    .eq("order_id", order.id)
+
+  if (itemsErr) {
+    logger.error("[CRM] getClientLastOrder items error:", itemsErr)
+    throw new Error("Error al cargar los productos del último pedido")
+  }
+
+  return {
+    orderId: Number(order.id),
+    createdAt: String(order.created_at),
+    items: (items ?? []).map((i) => {
+      const p = (Array.isArray(i.products) ? i.products[0] : i.products) as {
+        name: string
+        price: number | null
+        sale_price: number | null
+        stock_status: string | null
+        is_visible: boolean | null
+      } | null
+      const currentPrice = p ? Number(p.sale_price ?? p.price ?? 0) : null
+      return {
+        productId: Number(i.product_id),
+        name: p?.name ?? "Producto eliminado",
+        quantity: Number(i.quantity),
+        unitPrice: Number(i.unit_price),
+        currentPrice,
+        available: !!p && p.is_visible === true && p.stock_status === "in_stock",
+      }
+    }),
+  }
+}
+
 export async function createAssistedOrder(input: {
   prospectId: number
   addressId: number
@@ -705,6 +888,11 @@ export async function createAssistedOrder(input: {
   const { userId } = await requireSellerOrAdminAction()
   if (!input.items || input.items.length === 0) {
     throw new Error("El pedido debe tener al menos un producto")
+  }
+  for (const item of input.items) {
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+      throw new Error("Las cantidades deben ser enteros mayores a 0")
+    }
   }
   const supabase = await createServiceClient()
 

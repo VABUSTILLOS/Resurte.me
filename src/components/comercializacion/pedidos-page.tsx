@@ -9,6 +9,7 @@ import {
   Trash2,
   ShoppingCart,
   Package,
+  RotateCcw,
 } from "lucide-react"
 import {
   Button,
@@ -23,7 +24,7 @@ import {
 import { useToast } from "@/components/toast"
 import { formatMoney } from "@/lib/comercializacion/commissions"
 import { formatDateTime } from "@/lib/comercializacion/dates"
-import type { SellerClientSummary, AssistedOrderSummary, ClientAddress, CatalogProduct } from "@/lib/comercializacion/types"
+import type { SellerClientSummary, AssistedOrderSummary, ClientAddress, CatalogProduct, LastOrderSummary } from "@/lib/comercializacion/types"
 
 interface CartItem {
   product: CatalogProduct
@@ -62,6 +63,8 @@ export function PedidosPage({
   const [orders, setOrders] = useState<AssistedOrderSummary[]>(initialOrders)
   const [submitting, setSubmitting] = useState(false)
   const [loadingOrders, setLoadingOrders] = useState(false)
+  const [lastOrder, setLastOrder] = useState<LastOrderSummary | null>(null)
+  const [loadingLastOrder, setLoadingLastOrder] = useState(false)
 
   // Pre-selección desde "Hacer pedido" en dashboard/detalle
   useEffect(() => {
@@ -91,9 +94,38 @@ export function PedidosPage({
         setAddresses(res)
         setSelectedAddress(res.length === 1 ? String(res[0]?.id) : "")
       })
-      .catch(() => {})
+      .catch(() => {
+        if (cancelled) return
+        setAddresses([])
+        toast("No se pudieron cargar las direcciones del cliente", "error")
+      })
     return () => {
       cancelled = true
+    }
+  }, [selectedClient, toast])
+
+  // Último pedido del cliente seleccionado (para reorden rápido)
+  useEffect(() => {
+    if (!selectedClient) {
+      const timeout = setTimeout(() => setLastOrder(null), 0)
+      return () => clearTimeout(timeout)
+    }
+    let cancelled = false
+    const startLoading = setTimeout(() => setLoadingLastOrder(true), 0)
+    import("@/lib/comercializacion/actions")
+      .then(({ getClientLastOrder }) => getClientLastOrder(selectedClient))
+      .then((res) => {
+        if (!cancelled) setLastOrder(res)
+      })
+      .catch(() => {
+        if (!cancelled) setLastOrder(null)
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingLastOrder(false)
+      })
+    return () => {
+      cancelled = true
+      clearTimeout(startLoading)
     }
   }, [selectedClient])
 
@@ -111,12 +143,13 @@ export function PedidosPage({
         setProductResults(res)
       } catch {
         setProductResults([])
+        toast("Error al buscar productos", "error")
       } finally {
         setSearchingProducts(false)
       }
     }, 350)
     return () => clearTimeout(t)
-  }, [productQuery])
+  }, [productQuery, toast])
 
   function addToCart(product: CatalogProduct) {
     setCart((prev) => {
@@ -144,6 +177,37 @@ export function PedidosPage({
 
   function removeFromCart(id: number) {
     setCart((prev) => prev.filter((i) => i.product.id !== id))
+  }
+
+  function repeatLastOrder() {
+    if (!lastOrder) return
+    let skipped = 0
+    let priceChanged = 0
+    const items: CartItem[] = []
+    for (const i of lastOrder.items) {
+      if (!i.available || i.currentPrice == null) {
+        skipped++
+        continue
+      }
+      if (Math.abs(i.currentPrice - i.unitPrice) > 0.001) priceChanged++
+      items.push({
+        product: {
+          id: i.productId,
+          name: i.name,
+          brand: null,
+          unit: null,
+          price: i.currentPrice,
+          sale_price: null,
+          stock_status: "in_stock",
+          image_url: null,
+        },
+        quantity: i.quantity,
+      })
+    }
+    setCart(items)
+    if (skipped > 0) toast(`${skipped} producto(s) del pedido anterior ya no están disponibles`, "error")
+    if (priceChanged > 0) toast(`${priceChanged} producto(s) cambiaron de precio; se usa el precio actual`, "warning")
+    if (items.length > 0) toast(`Carrito cargado con ${items.length} producto(s) del pedido #${lastOrder.orderId}`)
   }
 
   const total = cart.reduce((s, i) => s + i.product.price * i.quantity, 0)
@@ -188,7 +252,8 @@ export function PedidosPage({
     try {
       const { getAssistedOrders } = await import("@/lib/comercializacion/actions")
       setOrders(await getAssistedOrders())
-    } catch {
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error al cargar los pedidos", "error")
     } finally {
       setLoadingOrders(false)
     }
@@ -245,6 +310,46 @@ export function PedidosPage({
               </Select>
             </div>
           </div>
+
+          {/* Reorden rápido: último pedido del cliente */}
+          {selectedClient && (loadingLastOrder || lastOrder) ? (
+            <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-3">
+              {loadingLastOrder ? (
+                <div className="flex justify-center py-2">
+                  <Spinner className="w-5 h-5" />
+                </div>
+              ) : lastOrder ? (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-900">
+                      Último pedido #{lastOrder.orderId} · {formatDateTime(lastOrder.createdAt)}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {lastOrder.items
+                        .slice(0, 4)
+                        .map((i) => `${i.quantity}× ${i.name}`)
+                        .join(", ")}
+                      {lastOrder.items.length > 4 ? `, +${lastOrder.items.length - 4} más` : ""}
+                    </p>
+                    {lastOrder.items.some((i) => !i.available) ? (
+                      <p className="text-xs text-amber-600 mt-0.5">
+                        Algunos productos ya no están disponibles.
+                      </p>
+                    ) : null}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={repeatLastOrder}
+                    disabled={!lastOrder.items.some((i) => i.available)}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Repetir pedido
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Búsqueda de productos */}
           <div>
