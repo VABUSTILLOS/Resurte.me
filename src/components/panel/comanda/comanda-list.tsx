@@ -1,5 +1,12 @@
 import { CHANNELS, STATUS_META, fmtTime } from "./comanda-shared"
 import type { ComandaRow } from "./comanda-shared"
+import { t } from "@/lib/i18n/es"
+
+function statusShortLabel(status: keyof typeof STATUS_META): string {
+  if (status === "pendiente") return t("comanda.statusPendingShort")
+  if (status === "en-cocina") return t("comanda.statusCookingShort")
+  return t("comanda.statusReadyShort")
+}
 
 interface ComandaListProps {
   filtered: ComandaRow[]
@@ -17,12 +24,12 @@ export default function ComandaList({ filtered, now, onIniciar, onListo, onRever
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50">
-              <th className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Platillo</th>
-              <th className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Cant.</th>
-              <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Canal</th>
-              <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Captura</th>
-              <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Edad</th>
-              <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Estado</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">{t("comanda.listDish")}</th>
+              <th className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">{t("comanda.listQty")}</th>
+              <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">{t("comanda.listChannel")}</th>
+              <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">{t("comanda.listCapture")}</th>
+              <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">{t("comanda.listAge")}</th>
+              <th className="text-center px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">{t("comanda.listStatus")}</th>
             </tr>
           </thead>
           <tbody>
@@ -49,7 +56,7 @@ export default function ComandaList({ filtered, now, onIniciar, onListo, onRever
                   <td className="px-4 py-3 text-right font-bold text-gray-800">×{c.entry.quantity}</td>
                   <td className="px-4 py-3 text-center text-gray-500">{chan?.icon} {chan?.label}</td>
                   <td className="px-4 py-3 text-center text-gray-500 whitespace-nowrap">{fmtTime(c.time)}</td>
-                  <td className="px-4 py-3 text-center text-gray-500 whitespace-nowrap">hace {elapsedMin} min</td>
+                  <td className="px-4 py-3 text-center text-gray-500 whitespace-nowrap">{t("comanda.age", { min: elapsedMin })}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1">
                       {(Object.keys(STATUS_META) as (keyof typeof STATUS_META)[]).map((s) => (
@@ -65,9 +72,9 @@ export default function ComandaList({ filtered, now, onIniciar, onListo, onRever
                               ? `${STATUS_META[s].bg} ${STATUS_META[s].color}`
                               : "text-gray-400 bg-gray-50 hover:bg-gray-100"
                           }`}
-                          aria-label={`${STATUS_META[s].label}: ${c.entry.dishName}`}
+                          aria-label={`${statusShortLabel(s)}: ${c.entry.dishName}`}
                         >
-                          {STATUS_META[s].label.replace(/s$/, "")}
+                          {statusShortLabel(s)}
                         </button>
                       ))}
                     </div>

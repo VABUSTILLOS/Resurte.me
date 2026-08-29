@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
-import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/mock-orders"
+import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/order-labels"
 import { getUserPurchaseHistory } from "@/lib/wallet-actions"
 import type { OrderWithCashback, OrderItem } from "@/types"
 import { Package, Clock, ChevronRight, ArrowLeft, RotateCcw, ShoppingCart } from "lucide-react"

@@ -107,7 +107,7 @@ const mockDishes = selectedCollection
   ? (DISH_DATA[selectedCollection.slug] || DEFAULT_DISHES)
   : DEFAULT_DISHES
 
-// Dishes reales del costeo (persistidos en localStorage compartido)
+// Dishes reales del costeo (localStorage + sync a BD vía /api/panel/dishes)
 const costeoDishes: DishData[] = useMemo(() => /* sharedDishes → {name, cost, price, ...} */)
 
 const dishes = useMemo(() => {
@@ -123,7 +123,7 @@ const dishes = useMemo(() => {
 
 Reglas:
 
-1. **Datos reales del costeo ganan**: los platillos creados en la herramienta de costeo (persistidos vía `useSharedDishes` en localStorage compartido por colección) reemplazan a los del mock con el mismo `normalizeName()`.
+1. **Datos reales del costeo ganan**: los platillos creados en la herramienta de costeo reemplazan a los del mock con el mismo `normalizeName()`. Se persisten con `useSharedDishes`: localStorage como cache inmediato y tabla `panel_dishes` (migración 00053) sincronizada por dueño (sesión o `guest_token` anónimo) y colección vía `/api/panel/dishes`; al iniciar sesión, `/api/addresses/claim` reclama las filas guest.
 2. **Sin categoría seleccionada** → solo `DEFAULT_DISHES`.
 3. **`alert` en mocks** = pistas de food cost (p.ej. "Costo elevado — considera ajustar porción de portobello") — contenido educativo, no datos de producción.
 

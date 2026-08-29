@@ -55,6 +55,26 @@ function clearGuestToken(): void {
   }
 }
 
+/**
+ * Devuelve el guest_token del navegador, generándolo si aún no existe.
+ * Lo usan los flujos anónimos que persisten datos antes de la primera
+ * compra (p. ej. los platillos del panel); POST /api/orders lo respeta
+ * vía saveGuestToken si ya está presente.
+ */
+export function ensureGuestToken(): string | null {
+  if (typeof window === "undefined") return null
+  const existing = getGuestToken()
+  if (existing) return existing
+  try {
+    const token = crypto.randomUUID()
+    window.localStorage.setItem(TOKEN_KEY, token)
+    return token
+  } catch {
+    // localStorage no disponible (modo privado) — no bloquear
+    return null
+  }
+}
+
 export function getLastAddress(): GuestAddressData | null {
   if (typeof window === "undefined") return null
   try {

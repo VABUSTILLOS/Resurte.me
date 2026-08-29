@@ -101,7 +101,7 @@ Verificación: `npx tsc --noEmit` ✅ · `npx next build` ✅ · `npx vitest run
 ## Observaciones (deuda técnica registrada, no corregida)
 
 - `scripts/*` — migraciones/seeders one-off y herramientas dev manuales. Documentadas, sin tocar.
-- `mock-orders.ts` / `mock-products.ts` — usados en páginas de producción (admin/mis-pedidos); deuda técnica a resolver cuando existan datos reales completos.
+- ~~`mock-orders.ts` / `mock-products.ts`~~ — **resuelto**: los datos mock fueron reemplazados por queries reales; el archivo solo conservaba labels/colores de status y se renombró a `src/lib/order-labels.ts`. `mock-products.ts` ya no existe.
 - ~132 imágenes de producto sin referencia directa en código — candidatas a verificar contra `products.image_url` en Supabase (si están en DB, están en uso).
 - Knip sigue reportando módulos fuera de alcance de esta tarea (`lib/images.ts`, `lib/blog.ts`, `lib/recipes.ts`, `lib/whatsapp.ts`, tipos de `foodos.ts`/`index.ts`, `Skeleton.tsx` en recompensas, `sharp`/`vercel` devDeps) — candidatos a una siguiente iteración.
 
@@ -163,5 +163,5 @@ Símbolos usados solo internamente que ya no se exportan: `ProgressRing`, `Loyal
 ## Observaciones nuevas
 
 - **Bloqueador de build resuelto**: `blog-index-client.tsx` (componente `"use client"`) importaba `searchPosts` desde `lib/blog.ts`, que usa `node:fs` → Turbopack fallaba ("chunking context does not support external modules: node:fs"). Se extrajo el filtro a `lib/blog-search.ts` (puro, sin `fs`); el cliente lo usa sobre los posts que recibe por props y el server pre-filtra con `?q=`. `next build` ✅.
-- `AutomationUI` en `admin/whatsapp/automations` y `MOCK_AUTOMATIONS` en `api/whatsapp/automations` son mocks — el POST queda con `TODO: Upsert en Supabase whatsapp_automations` (la tabla requiere `store_id`, esquema B2B pendiente).
-- `handleIncomingMessage` (webhook whatsapp) solo loggea a console — no inserta en `whatsapp_messages` (modelo de tenant pendiente). `WhatsAppMessage` queda listo para ese insert.
+- ~~`AutomationUI` en `admin/whatsapp/automations` y `MOCK_AUTOMATIONS` en `api/whatsapp/automations` son mocks~~ — **resuelto**: la API persiste en `whatsapp_automations` (semilla + upsert) y el panel carga/guarda vía API; además el campo "Plantilla de WhatsApp" ahora es editable y se persiste (POST acepta `template_name`, valida que exista en `whatsapp_templates`, y GET devuelve el nombre real del template asignado).
+- ~~`handleIncomingMessage` (webhook whatsapp) solo loggea a console~~ — **resuelto**: inserta el mensaje entrante en `whatsapp_messages` (direction `inbound`, tipo `incoming:<type>`) antes del routing NLP.

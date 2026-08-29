@@ -1,5 +1,6 @@
 import { CHANNELS } from "./comanda-shared"
 import type { ComandaRow } from "./comanda-shared"
+import { t } from "@/lib/i18n/es"
 
 interface ChannelFiltersProps {
   channelFilter: string
@@ -21,7 +22,7 @@ export default function ChannelFilters({
           channelFilter === "todos" ? "bg-gray-900 text-white" : "bg-white text-gray-500 border border-gray-100 hover:bg-gray-50"
         }`}
       >
-        Todos
+        {t("comanda.allChannels")}
       </button>
       {CHANNELS.map((c) => {
         const count = comandas.filter((f) => (f.entry.channel || "comedor") === c.key).length
@@ -45,9 +46,9 @@ export default function ChannelFilters({
           value={mesaFilter}
           onChange={(e) => onMesaFilterChange(e.target.value)}
           className="ml-2 text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-600 focus:outline-none focus:border-[#0E7A0E]"
-          aria-label="Filtrar por mesa"
+          aria-label={t("comanda.mesaFilterAria")}
         >
-          <option value="todas">🪑 Todas las mesas</option>
+          <option value="todas">{t("comanda.allMesas")}</option>
           {mesasOcupadas.map((m) => (
             <option key={m.id} value={m.id}>🪑 {m.nombre}</option>
           ))}

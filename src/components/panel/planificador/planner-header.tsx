@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
+import { t } from "@/lib/i18n/es"
 
 interface PlannerHeaderProps {
   collectionName: string
@@ -15,11 +16,11 @@ export default function PlannerHeader({ collectionName, sharedDishesCount }: Pla
         <ArrowLeft className="w-5 h-5 text-gray-400" />
       </Link>
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Planificador de pedidos</h2>
+        <h2 className="text-xl font-bold text-gray-900">{t("planificador.pageTitle")}</h2>
         <p className="text-sm text-gray-400">{collectionName}</p>
         {sharedDishesCount > 0 && (
           <p className="text-xs text-[#0E7A0E] font-medium mt-0.5">
-            {sharedDishesCount} platillos de Costeando mi menú — revisa cantidades abajo
+            {t("planificador.sharedDishesHint", { count: sharedDishesCount })}
           </p>
         )}
       </div>

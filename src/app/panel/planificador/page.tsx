@@ -21,6 +21,7 @@ import type { PlannerProduct } from "@/components/panel/planificador/planificado
 import type { SaleEntry } from "@/components/panel/ventas/ventas-shared"
 import type { TransferItem } from "@/components/panel/temporada/temporada-shared"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
+import { t } from "@/lib/i18n/es"
 
 export default function PlanificadorPage() {
   const { selectedCollection } = useRestaurant()
@@ -111,7 +112,7 @@ export default function PlanificadorPage() {
       setManualQtysRaw((prev) => ({ ...prev, [name]: { qty, unit: t.unit || "kg", price: t.price } }))
     })
     setTransfers([])
-    toast(`${transfers.length} producto(s) de temporada agregados al pedido`, "success")
+    toast(t("planificador.toastTransfersAdded", { count: transfers.length }), "success")
   }
 
   // Import a dish's ingredients as manual quantities, overwriting existing entries
@@ -125,7 +126,7 @@ export default function PlanificadorPage() {
       }
     })
     setManualQtysRaw(newQtys)
-    toast(`"${dish.name}" importado (${dish.ingredients.length} ingredientes)`, "success")
+    toast(t("planificador.toastImported", { name: dish.name, count: dish.ingredients.length }), "success")
   }
 
   // Group by category
@@ -156,9 +157,9 @@ export default function PlanificadorPage() {
     return (
       <div className="text-center py-16">
         <ShoppingCart className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-gray-700 mb-2">Selecciona tu tipo de cocina</h3>
+        <h3 className="text-lg font-semibold text-gray-700 mb-2">{t("planificador.selectCuisineTitle")}</h3>
         <p className="text-sm text-gray-400 max-w-md mx-auto">
-          Usa el selector para personalizar tu lista de insumos y cantidades sugeridas por comensal.
+          {t("planificador.selectCuisineDesc")}
         </p>
       </div>
     )
@@ -192,7 +193,7 @@ export default function PlanificadorPage() {
         if (k) delete cleaned[k]
       })
       setManualQtysRaw(cleaned)
-      toast(`"${dish.name}" quitado del pedido`, "warning")
+      toast(t("planificador.toastRemoved", { name: dish.name }), "warning")
       return
     }
     const willOverwrite = dish.ingredients
@@ -247,9 +248,9 @@ export default function PlanificadorPage() {
       const price = priceFor(p)
       return `• ${p.name}: ${needed} ${unit} — $${(parseFloat(needed) * price).toFixed(0)} MXN ($${price}/${unit})`
     }).join("\n")
-    const header = `Pedido para ${covers} comensales (+${avgWastePct}% merma) — ${collectionName}\n\n`
-    navigator.clipboard.writeText(header + text + `\n\nTotal estimado: $${totalCost.toFixed(0)} MXN\nPedido generado con Resurte.me`)
-    toast("Lista de pedido copiada", "success")
+    const header = `${t("planificador.copyHeader", { covers, pct: avgWastePct, collection: collectionName })}\n\n`
+    navigator.clipboard.writeText(header + text + `\n\n${t("planificador.copyTotal", { total: totalCost.toFixed(0) })}\n${t("planificador.copyFooter")}`)
+    toast(t("planificador.toastCopied"), "success")
   }
 
   return (
@@ -280,7 +281,7 @@ export default function PlanificadorPage() {
         onUseDemand={() => {
           if (realDemand) {
             setCovers(realDemand.avg)
-            toast(`Comensales ajustados a la demanda real (${realDemand.avg})`, "success")
+            toast(t("planificador.toastDemandApplied", { avg: realDemand.avg }), "success")
           }
         }}
         wastePcts={wastePcts}
@@ -323,7 +324,7 @@ export default function PlanificadorPage() {
           }}
         />
       )}
-      <ToolGuideHost toolKey="planificador" pathname="/panel/planificador" slug={slug} icon="📅" title="Planificador de producción" subtitle={collectionName} />
+      <ToolGuideHost toolKey="planificador" pathname="/panel/planificador" slug={slug} icon="📅" title={t("planificador.guideTitle")} subtitle={collectionName} />
     </div>
   )
 }

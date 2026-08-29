@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, Package } from "lucide-react"
 import { findManualQty } from "@/lib/panel-units"
 import type { ManualQtys } from "@/lib/panel-units"
 import type { PlannerProduct } from "./planificador-shared"
+import { t } from "@/lib/i18n/es"
 
 const UNITS = ["kg", "g", "pza", "L", "ml", "rebanada", "docena"]
 
@@ -42,7 +43,7 @@ export default function CategorySection({
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4 text-gray-400" />
                 <span className="font-semibold text-gray-700">{category}</span>
-                <span className="text-xs text-gray-400">({items.length} insumos)</span>
+                <span className="text-xs text-gray-400">{t("planificador.insumosCount", { count: items.length })}</span>
               </div>
               {expanded
                 ? <ChevronUp className="w-4 h-4 text-gray-400" />
@@ -79,7 +80,7 @@ export default function CategorySection({
                           }`}
                           step={unit === "kg" || unit === "L" ? "0.01" : "1"}
                           min="0"
-                          title={isManual ? "Cantidad manual" : "Click para ajustar"}
+                          title={isManual ? t("planificador.manualQtyTitle") : t("planificador.clickToAdjust")}
                         />
                         <select
                           value={unit}
@@ -90,8 +91,8 @@ export default function CategorySection({
                           className={`text-xs py-1 px-1 rounded-lg border focus:outline-none w-14 ${
                             isManual ? "border-amber-300 bg-amber-50 text-amber-800" : "border-gray-200 bg-gray-50 text-gray-500"
                           }`}
-                          title="Unidad de medida"
-                          aria-label={`Unidad de ${item.name}`}
+                          title={t("planificador.unitTitle")}
+                          aria-label={t("planificador.unitAria", { name: item.name })}
                         >
                           {UNITS.map((u) => (
                             <option key={u} value={u}>{u}</option>

@@ -1,6 +1,13 @@
 import { Play, Check, Undo2 } from "lucide-react"
 import { STATUS_META, CHANNELS, fmtTime } from "./comanda-shared"
 import type { StatusKey, ComandaRow } from "./comanda-shared"
+import { t } from "@/lib/i18n/es"
+
+function statusLabel(status: StatusKey): string {
+  if (status === "pendiente") return t("comanda.statusPending")
+  if (status === "en-cocina") return t("comanda.statusCooking")
+  return t("comanda.statusReady")
+}
 
 interface KitchenBoardProps {
   byStatus: Record<StatusKey, ComandaRow[]>
@@ -20,14 +27,14 @@ export default function KitchenBoard({ byStatus, now, onIniciar, onListo, onReve
         return (
           <div key={status} className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col">
             <div className={`flex items-center gap-2 px-4 py-3 border-b border-gray-100 ${meta.bg}`}>
-              <span className={`text-xs font-bold uppercase tracking-wider ${meta.color}`}>{meta.label}</span>
+              <span className={`text-xs font-bold uppercase tracking-wider ${meta.color}`}>{statusLabel(status)}</span>
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${meta.bg} ${meta.color}`}>
                 {cards.length}
               </span>
             </div>
             <div className="flex-1 p-3 space-y-3 min-h-[160px]">
               {cards.length === 0 ? (
-                <p className="text-xs text-gray-300 text-center py-8">Sin comandas</p>
+                <p className="text-xs text-gray-300 text-center py-8">{t("comanda.noComandas")}</p>
               ) : (
                 cards.map((c) => {
                   const chan = CHANNELS.find((ch) => ch.key === (c.entry.channel || "comedor"))
@@ -68,8 +75,8 @@ export default function KitchenBoard({ byStatus, now, onIniciar, onListo, onReve
                       <div className="flex items-center justify-between text-[10px] text-gray-400 mb-2">
                         <span>
                           {c.status === "listo"
-                            ? prodMin != null && `Producción: ${prodMin} min`
-                            : `Esperando ${elapsedMin} min`}
+                            ? prodMin != null && t("comanda.production", { min: prodMin })
+                            : t("comanda.waiting", { min: elapsedMin })}
                         </span>
                       </div>
                       <div className="flex gap-1.5">
@@ -77,11 +84,11 @@ export default function KitchenBoard({ byStatus, now, onIniciar, onListo, onReve
                           <button
                             onClick={() => onIniciar(c.entry.id, c.entry.dishName)}
                             className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 py-1.5 rounded-lg transition-colors"
-                            title={`Iniciar ${c.entry.dishName} en cocina`}
-                            aria-label={`Iniciar comanda de ${c.entry.dishName}`}
+                            title={t("comanda.startTitle", { name: c.entry.dishName })}
+                            aria-label={t("comanda.startAria", { name: c.entry.dishName })}
                           >
                             <Play className="w-3.5 h-3.5" />
-                            Iniciar
+                            {t("comanda.start")}
                           </button>
                         )}
                         {c.status === "en-cocina" && (
@@ -89,17 +96,17 @@ export default function KitchenBoard({ byStatus, now, onIniciar, onListo, onReve
                             <button
                               onClick={() => onListo(c.entry.id, c.entry.dishName)}
                               className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 py-1.5 rounded-lg transition-colors"
-                              title={`Marcar ${c.entry.dishName} como lista`}
-                              aria-label={`Marcar comanda de ${c.entry.dishName} como lista`}
+                              title={t("comanda.readyTitle", { name: c.entry.dishName })}
+                              aria-label={t("comanda.readyAria", { name: c.entry.dishName })}
                             >
                               <Check className="w-3.5 h-3.5" />
-                              Listo
+                              {t("comanda.ready")}
                             </button>
                             <button
                               onClick={() => onRevertir(c.entry.id)}
                               className="flex items-center justify-center text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 p-1.5 rounded-lg transition-colors"
-                              title="Volver a pendiente"
-                              aria-label="Volver comanda a pendiente"
+                              title={t("comanda.backToPending")}
+                              aria-label={t("comanda.backAria")}
                             >
                               <Undo2 className="w-3.5 h-3.5" />
                             </button>
@@ -109,11 +116,11 @@ export default function KitchenBoard({ byStatus, now, onIniciar, onListo, onReve
                           <button
                             onClick={() => onRevertir(c.entry.id)}
                             className="flex-1 flex items-center justify-center gap-1 text-xs font-semibold text-gray-500 bg-gray-50 hover:bg-gray-100 py-1.5 rounded-lg transition-colors"
-                            title="Volver a pendiente"
-                            aria-label={`Volver comanda de ${c.entry.dishName} a pendiente`}
+                            title={t("comanda.backToPending")}
+                            aria-label={t("comanda.reopenAria", { name: c.entry.dishName })}
                           >
                             <Undo2 className="w-3.5 h-3.5" />
-                            Reabrir
+                            {t("comanda.reopen")}
                           </button>
                         )}
                       </div>

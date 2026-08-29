@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { ArrowLeft, Copy } from "lucide-react"
+import { t } from "@/lib/i18n/es"
 
 interface ComandaHeaderProps {
   collectionName: string
@@ -15,21 +16,21 @@ export default function ComandaHeader({ collectionName, hasComandas, onCopyRepor
       </Link>
       <div>
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-gray-900">Comanda de cocina</h2>
+          <h2 className="text-xl font-bold text-gray-900">{t("comanda.pageTitle")}</h2>
           {hasComandas && (
             <button
               onClick={onCopyReporte}
               className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors"
-              title="Copiar reporte de producción del día"
-              aria-label="Copiar reporte de comandas"
+              title={t("comanda.copyReportTitle")}
+              aria-label={t("comanda.copyReportLabel")}
             >
               <Copy className="w-3.5 h-3.5" />
-              Copiar reporte
+              {t("comanda.copyReport")}
             </button>
           )}
         </div>
         <p className="text-sm text-gray-400">
-          {collectionName} — monitor de producción de tu cocina en tiempo real
+          {t("comanda.subtitle", { collection: collectionName })}
         </p>
       </div>
     </div>

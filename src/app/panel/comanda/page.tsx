@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
+import { t } from "@/lib/i18n/es"
 import { todayStr, dateLabel } from "@/lib/panel-utils"
 import { ChefHat } from "lucide-react"
 import { nowMs, entryTime } from "@/components/panel/comanda/comanda-shared"
@@ -147,17 +148,17 @@ export default function ComandaPage() {
 
   const iniciar = (id: string, name: string) => {
     setComandaStatus(id, { status: "en-cocina", startedAt: nowMs() })
-    toast(`${name} en cocina`, "success")
+    toast(t("comanda.toastInKitchen", { name }), "success")
   }
 
   const listo = (id: string, name: string) => {
     setComandaStatus(id, { status: "listo", readyAt: nowMs() })
-    toast(`${name} lista`, "success")
+    toast(t("comanda.toastReady", { name }), "success")
   }
 
   const revertir = (id: string) => {
     setComandaStatus(id, { status: "pendiente", startedAt: undefined, readyAt: undefined })
-    toast("Comanda de vuelta a pendiente", "warning")
+    toast(t("comanda.toastReverted"), "warning")
   }
 
   const limpiarListos = () => {
@@ -170,34 +171,34 @@ export default function ComandaPage() {
       })
       return next
     })
-    toast("Comandas listas ocultas del tablero", "success")
+    toast(t("comanda.toastCleared"), "success")
   }
 
   const copyReporte = () => {
     const lines = [
-      `🍳 Reporte de comandas — ${dateLabel(selectedDate)} (${selectedCollection?.name || ""})`,
+      t("comanda.reportHeader", { date: dateLabel(selectedDate), collection: selectedCollection?.name || "" }),
       "",
-      `Activas: ${activeCount} · En cocina: ${cookingCount} · Listas: ${listoCount}`,
+      t("comanda.reportCounts", { active: activeCount, cooking: cookingCount, ready: listoCount }),
       prodStats.count > 0
-        ? `Tiempo promedio de producción: ${prodStats.avgMin.toFixed(0)} min (${prodStats.count} comanda${prodStats.count > 1 ? "s" : ""})`
-        : "Tiempo promedio de producción: —",
+        ? t(prodStats.count > 1 ? "comanda.reportAvgMany" : "comanda.reportAvgOne", { min: prodStats.avgMin.toFixed(0), count: prodStats.count })
+        : t("comanda.reportAvgNone"),
       ...(inProduction.length > 0
-        ? ["", "En producción ahora:", ...inProduction.map((g) => `${g.dishName} ×${g.count} — ${g.avgMin.toFixed(0)} min promedio`)]
+        ? ["", t("comanda.reportInProduction"), ...inProduction.map((g) => t("comanda.reportDishLine", { name: g.dishName, count: g.count, min: g.avgMin.toFixed(0) }))]
         : []),
       ...(dishAvgTimes.length > 0
-        ? ["", "Tiempos por platillo (listas):", ...dishAvgTimes.map((g) => `${g.dishName} — ${g.avgMin.toFixed(0)} min (${g.count})`)]
+        ? ["", t("comanda.reportTimes"), ...dishAvgTimes.map((g) => t("comanda.reportTimeLine", { name: g.dishName, min: g.avgMin.toFixed(0), count: g.count }))]
         : []),
       ...(filtered.some((f) => f.entry.modificadores?.length)
-        ? ["", "Con modificadores:", ...filtered.filter((f) => f.entry.modificadores?.length).map((f) => `${f.entry.dishName} [+${f.entry.modificadores!.map((m) => m.nombre).join(", ")}] ×${f.entry.quantity}`)]
+        ? ["", t("comanda.reportModifiers"), ...filtered.filter((f) => f.entry.modificadores?.length).map((f) => t("comanda.reportModifierLine", { name: f.entry.dishName, mods: f.entry.modificadores!.map((m) => m.nombre).join(", "), qty: f.entry.quantity }))]
         : []),
       "",
       ...CHANNELS.filter((c) => filtered.some((f) => (f.entry.channel || "comedor") === c.key))
         .map((c) => `${c.icon} ${c.label}: ${filtered.filter((f) => (f.entry.channel || "comedor") === c.key).length}`),
       "",
-      "📈 Registrado en resurte.me",
+      t("comanda.reportFooter"),
     ]
     navigator.clipboard.writeText(lines.join("\n"))
-    toast("Reporte de comandas copiado", "success")
+    toast(t("comanda.toastReportCopied"), "success")
   }
 
   // Ctrl+N → focus the new-sale CTA
@@ -216,9 +217,9 @@ export default function ComandaPage() {
     return (
       <div className="text-center py-16">
         <ChefHat className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-gray-700 mb-2">Selecciona tu tipo de cocina</h3>
+        <h3 className="text-lg font-semibold text-gray-700 mb-2">{t("comanda.selectCuisineTitle")}</h3>
         <p className="text-sm text-gray-400 max-w-md mx-auto">
-          Selecciona tu tipo de restaurante para ver el monitor de comandas de tu cocina.
+          {t("comanda.selectCuisineDescription")}
         </p>
       </div>
     )

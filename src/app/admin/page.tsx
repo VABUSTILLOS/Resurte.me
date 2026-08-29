@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { getAdminOrders, getActiveStoresCount, type AdminOrder } from "./actions"
-import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/mock-orders"
+import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/order-labels"
 
 export default function AdminDashboardPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([])

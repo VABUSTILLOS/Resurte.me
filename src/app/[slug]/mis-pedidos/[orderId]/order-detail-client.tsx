@@ -7,7 +7,7 @@ import {
   STATUS_LABEL,
   PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_LABEL,
-} from "@/lib/mock-orders"
+} from "@/lib/order-labels"
 import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Package, MapPin, Clock, CreditCard, DollarSign, Store, Truck, CheckCircle2, Circle } from "lucide-react"
 import Link from "next/link"

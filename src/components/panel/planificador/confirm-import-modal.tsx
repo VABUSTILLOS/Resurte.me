@@ -1,6 +1,7 @@
 "use client"
 
 import type { ImportConfirm } from "./planificador-shared"
+import { t } from "@/lib/i18n/es"
 
 interface ConfirmImportModalProps {
   confirmImport: ImportConfirm
@@ -22,15 +23,15 @@ export default function ConfirmImportModal({ confirmImport, onCancel, onConfirm 
         aria-modal="true"
         aria-labelledby="confirm-import-title"
       >
-        <h4 id="confirm-import-title" className="font-bold text-gray-900 mb-2">Sobrescribir cantidades manuales</h4>
+        <h4 id="confirm-import-title" className="font-bold text-gray-900 mb-2">{t("planificador.overwriteTitle")}</h4>
         <p className="text-xs text-gray-500 mb-4">
-          Importar <span className="font-semibold text-gray-700">&quot;{confirmImport.dishName}&quot;</span> sobrescribirá estas cantidades que ya escribiste a mano:
+          {t("planificador.overwriteA")} <span className="font-semibold text-gray-700">&quot;{confirmImport.dishName}&quot;</span> {t("planificador.overwriteB")}
         </p>
         <ul className="space-y-1.5 mb-5 bg-amber-50 border border-amber-200 rounded-xl p-3">
           {confirmImport.ingredients.map((o) => (
             <li key={o.name} className="flex items-center justify-between text-xs">
               <span className="text-amber-800 font-medium">{o.name}</span>
-              <span className="text-amber-600">{o.existing} → automático</span>
+              <span className="text-amber-600">{o.existing} {t("planificador.toAutomatic")}</span>
             </li>
           ))}
         </ul>
@@ -39,13 +40,13 @@ export default function ConfirmImportModal({ confirmImport, onCancel, onConfirm 
             onClick={onCancel}
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
           >
-            Cancelar
+            {t("planificador.cancel")}
           </button>
           <button
             onClick={onConfirm}
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
           >
-            Sí, sobrescribir
+            {t("planificador.confirmOverwrite")}
           </button>
         </div>
       </div>

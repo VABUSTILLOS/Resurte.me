@@ -4,6 +4,7 @@ import { AlertCircle, TrendingUp, Users } from "lucide-react"
 import { WASTE_CATEGORIES } from "./planificador-shared"
 import type { RealDemand } from "./planificador-shared"
 import { toInt } from "@/lib/panel-utils"
+import { t } from "@/lib/i18n/es"
 
 interface PlannerControlsProps {
   covers: number
@@ -28,13 +29,13 @@ export default function PlannerControls({
       <div className="bg-white rounded-2xl border border-gray-100 p-5">
         <div className="flex items-center gap-2 mb-3">
           <Users className="w-5 h-5 text-emerald-600" />
-          <h3 className="font-semibold text-gray-900">Comensales esperados</h3>
+          <h3 className="font-semibold text-gray-900">{t("planificador.coversTitle")}</h3>
         </div>
         <div className="flex items-center gap-4">
           <button
             onClick={() => setCovers(Math.max(5, covers - 10))}
             className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 text-lg transition-colors"
-            aria-label="Reducir comensales"
+            aria-label={t("planificador.decreaseAria")}
           >
             −
           </button>
@@ -47,7 +48,7 @@ export default function PlannerControls({
           <button
             onClick={() => setCovers(covers + 10)}
             className="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 text-lg transition-colors"
-            aria-label="Aumentar comensales"
+            aria-label={t("planificador.increaseAria")}
           >
             +
           </button>
@@ -56,17 +57,17 @@ export default function PlannerControls({
           <div className="mt-3 flex items-center gap-2 bg-emerald-50 rounded-xl px-3 py-2">
             <TrendingUp className="w-4 h-4 text-emerald-600 shrink-0" />
             <p className="text-xs text-emerald-800 min-w-0">
-              <span className="font-semibold">📈 Demanda real: {realDemand.avg} platillos/día</span>
+              <span className="font-semibold">{t("planificador.realDemand", { avg: realDemand.avg })}</span>
               <span className="block text-[10px] text-emerald-600">
-                Promedio de ventas en los últimos 7 días ({realDemand.days} registros)
+                {t("planificador.realDemandDetail", { days: realDemand.days })}
               </span>
             </p>
             <button
               onClick={onUseDemand}
               className="ml-auto text-xs font-semibold bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors shrink-0"
-              aria-label="Usar demanda real como comensales esperados"
+              aria-label={t("planificador.useDemandAria")}
             >
-              Usar
+              {t("planificador.useDemand")}
             </button>
           </div>
         )}
@@ -75,7 +76,7 @@ export default function PlannerControls({
       <div className="bg-white rounded-2xl border border-gray-100 p-5">
         <div className="flex items-center gap-2 mb-3">
           <AlertCircle className="w-5 h-5 text-amber-600" />
-          <h3 className="font-semibold text-gray-900">% de merma por categoría</h3>
+          <h3 className="font-semibold text-gray-900">{t("planificador.wasteTitle")}</h3>
         </div>
         <div className="space-y-2">
           {WASTE_CATEGORIES.map((wc) => {

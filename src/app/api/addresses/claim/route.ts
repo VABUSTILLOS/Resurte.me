@@ -9,11 +9,13 @@ import { logger } from "@/lib/logger"
  * Vincula al usuario autenticado las direcciones creadas durante checkouts
  * anónimos (las que tienen user_id NULL y el mismo guest_token). Se llama tras
  * iniciar sesión / registrarse desde el navegador que hizo la compra anónima.
+ * También reclama los platillos del panel guardados con el mismo guest_token
+ * (panel_dishes).
  *
  * Body: { guest_token: string }
  * Auth: requiere sesión activa (auth.uid()).
  *
- * Respuesta: { claimed: number } — cuántas direcciones se vincularon.
+ * Respuesta: { claimed: number, dishesClaimed: number }.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -50,7 +52,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ claimed: data?.length ?? 0 })
+    // Mismo reclamo para los platillos del panel guardados como anónimo.
+    // Best-effort: un fallo aquí no impide reclamar las direcciones.
+    let dishesClaimed = 0
+    const { data: dishes, error: dishesError } = await supabase
+      .from("panel_dishes")
+      .update({ user_id: user.id, guest_token: null })
+      .eq("guest_token", token)
+      .is("user_id", null)
+      .select("id")
+    if (dishesError) {
+      logger.error("Panel dishes claim error:", dishesError)
+    } else {
+      dishesClaimed = dishes?.length ?? 0
+    }
+
+    return NextResponse.json({ claimed: data?.length ?? 0, dishesClaimed })
   } catch (err) {
     logger.error("Claim address error:", err)
     return NextResponse.json(

@@ -115,7 +115,7 @@ const DEFAULT_AUTOMATIONS: AutomationUI[] = [
 export default function AdminAutomationsPage() {
   const [automations, setAutomations] = useState<AutomationUI[]>(DEFAULT_AUTOMATIONS)
   const [savingType, setSavingType] = useState<AutomationType | null>(null)
-  const [savedMsg, setSavedMsg] = useState<{ type: AutomationType; ok: boolean } | null>(null)
+  const [savedMsg, setSavedMsg] = useState<{ type: AutomationType; ok: boolean; detail?: string } | null>(null)
 
   // Load real automations from the API (fallback to defaults on error)
   useEffect(() => {
@@ -129,13 +129,14 @@ export default function AdminAutomationsPage() {
           is_active: boolean
           trigger_delay_hours: number
           config: Record<string, unknown>
+          template_name?: string
         }>
         if (rows.length > 0) {
           setAutomations((prev) =>
             prev.map((a) => {
               const row = rows.find((r) => r.automation_type === a.type)
               return row
-                ? { ...a, isActive: row.is_active, delayHours: row.trigger_delay_hours ?? a.delayHours, config: row.config || a.config }
+                ? { ...a, isActive: row.is_active, delayHours: row.trigger_delay_hours ?? a.delayHours, config: row.config || a.config, templateName: row.template_name || a.templateName }
                 : a
             })
           )
@@ -169,13 +170,17 @@ export default function AdminAutomationsPage() {
           trigger_delay_hours: auto.delayHours,
           is_active: auto.isActive,
           config: auto.config,
+          template_name: auto.templateName,
         }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null) as { error?: string } | null
+        throw new Error(detail?.error || `HTTP ${res.status}`)
+      }
       setSavedMsg({ type, ok: true })
     } catch (err) {
       logger.error("Failed to save automation:", err)
-      setSavedMsg({ type, ok: false })
+      setSavedMsg({ type, ok: false, detail: err instanceof Error ? err.message : undefined })
     } finally {
       setSavingType(null)
     }
@@ -250,7 +255,12 @@ export default function AdminAutomationsPage() {
                   </label>
                   <input
                     type="text"
-                    defaultValue={auto.templateName}
+                    value={auto.templateName}
+                    onChange={(e) =>
+                      setAutomations((prev) =>
+                        prev.map((a) => (a.type === auto.type ? { ...a, templateName: e.target.value } : a))
+                      )
+                    }
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                   />
                   <p className="text-[10px] text-gray-400 mt-1">
@@ -307,7 +317,7 @@ export default function AdminAutomationsPage() {
                   <p className={`text-xs mt-1 ${savedMsg.ok ? "text-green-600" : "text-red-600"}`}>
                     {savedMsg.ok
                       ? `Automatización "${auto.label}" guardada correctamente.`
-                      : "Error al guardar. Intenta de nuevo."}
+                      : `Error al guardar. ${savedMsg.detail || "Intenta de nuevo."}`}
                   </p>
                 )}
               </div>

@@ -20,7 +20,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import type { User as SupabaseUser, SupabaseClient } from "@supabase/supabase-js"
-import { STATUS_LABEL, STATUS_COLOR } from "@/lib/mock-orders"
+import { STATUS_LABEL, STATUS_COLOR } from "@/lib/order-labels"
 
 interface OrderSummary {
   id: number

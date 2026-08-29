@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
+import { t } from "@/lib/i18n/es"
 import Link from "next/link"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import {
@@ -325,10 +326,10 @@ export default function AperturaPage() {
     setChecked((prev) => {
       const arr = Array.isArray(prev) ? prev : []
       if (arr.includes(id)) {
-        toast("Elemento desmarcado", "warning")
+        toast(t("apertura.toastUnchecked"), "warning")
         return arr.filter((i) => i !== id)
       }
-      toast("Elemento marcado como listo", "success")
+      toast(t("apertura.toastChecked"), "success")
       return [...arr, id]
     })
   }
@@ -346,9 +347,9 @@ export default function AperturaPage() {
     return (
       <div className="text-center py-16">
         <ClipboardCheck className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-gray-700 mb-2">Selecciona tu tipo de cocina</h3>
+        <h3 className="text-lg font-semibold text-gray-700 mb-2">{t("apertura.selectCuisineTitle")}</h3>
         <p className="text-sm text-gray-400 max-w-md mx-auto">
-          Selecciona tu tipo de restaurante para recibir un checklist y calculadora de inversión personalizados.
+          {t("apertura.selectCuisineDescription")}
         </p>
       </div>
     )
@@ -361,16 +362,16 @@ export default function AperturaPage() {
           <ArrowLeft className="w-5 h-5 text-gray-400" />
         </Link>
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Kit de apertura</h2>
+          <h2 className="text-xl font-bold text-gray-900">{t("apertura.title")}</h2>
           <p className="text-sm text-gray-400">{selectedCollection.name}</p>
         </div>
         <button
           onClick={() => window.print()}
           className="ml-auto flex items-center gap-2 text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200 px-3 py-2 rounded-xl transition-colors"
-          aria-label="Imprimir kit de apertura"
+          aria-label={t("apertura.printLabel")}
         >
           <Printer className="w-4 h-4" />
-          Imprimir
+          {t("apertura.print")}
         </button>
       </div>
 
@@ -379,7 +380,7 @@ export default function AperturaPage() {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <ClipboardCheck className="w-5 h-5 text-indigo-600" />
-            <h3 className="font-semibold text-gray-900">Progreso de apertura</h3>
+            <h3 className="font-semibold text-gray-900">{t("apertura.progressTitle")}</h3>
           </div>
           <span className="text-sm font-bold text-indigo-600">
             {completedCount}/{checklist.length}
@@ -392,10 +393,10 @@ export default function AperturaPage() {
           />
         </div>
         <p className="text-xs text-gray-400 mt-2">
-          {progress >= 80 ? "¡Casi listo para abrir!" :
-           progress >= 50 ? "Vas por buen camino." :
-           progress > 0 ? "Continúa con los siguientes pasos." :
-           "Marca los pasos conforme los completes."}
+          {progress >= 80 ? t("apertura.progressAlmost") :
+           progress >= 50 ? t("apertura.progressGood") :
+           progress > 0 ? t("apertura.progressContinue") :
+           t("apertura.progressStart")}
         </p>
       </div>
 
@@ -428,7 +429,7 @@ export default function AperturaPage() {
                   onChange={(e) => setPhaseDate(phase, e.target.value)}
                   className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#0E7A0E] bg-white"
                 />
-                <span className="text-xs text-gray-400">Fecha objetivo</span>
+                <span className="text-xs text-gray-400">{t("apertura.targetDate")}</span>
               </div>
             </div>
             <div className="divide-y divide-gray-50">
@@ -461,7 +462,7 @@ export default function AperturaPage() {
         >
           <div className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-indigo-600" />
-            <h3 className="font-semibold text-gray-900">Calculadora de inversión inicial</h3>
+            <h3 className="font-semibold text-gray-900">{t("apertura.calculatorTitle")}</h3>
           </div>
           <span className="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2.5 py-1 rounded-full">
             ${invLow.toLocaleString()} – ${invHigh.toLocaleString()}
@@ -487,9 +488,9 @@ export default function AperturaPage() {
                     <button
                       onClick={() => setCustomItems((prev) => prev.filter((_, i) => i !== idx))}
                       className="text-[10px] text-red-400 hover:text-red-600"
-                      aria-label={`Eliminar rubro ${item.name}`}
+                      aria-label={t("apertura.removeItem", { name: item.name })}
                     >
-                      eliminar
+                      {t("apertura.deleteWord")}
                     </button>
                   </div>
                   <span className="text-sm font-mono font-semibold text-indigo-600">
@@ -501,7 +502,7 @@ export default function AperturaPage() {
               <div className="flex flex-wrap items-end gap-2 pt-3 border-t border-gray-100">
                 <input
                   type="text"
-                  placeholder="Nombre del rubro"
+                  placeholder={t("apertura.customNamePlaceholder")}
                   value={newCustomName}
                   onChange={(e) => setNewCustomName(e.target.value)}
                   className="flex-1 min-w-[120px] px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#0E7A0E]"
@@ -509,7 +510,7 @@ export default function AperturaPage() {
                 <input
                   type="number"
                   min="0"
-                  placeholder="Min $"
+                  placeholder={t("apertura.minPlaceholder")}
                   value={newCustomLow}
                   onChange={(e) => setNewCustomLow(e.target.value)}
                   className="w-20 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#0E7A0E]"
@@ -517,7 +518,7 @@ export default function AperturaPage() {
                 <input
                   type="number"
                   min="0"
-                  placeholder="Max $"
+                  placeholder={t("apertura.maxPlaceholder")}
                   value={newCustomHigh}
                   onChange={(e) => setNewCustomHigh(e.target.value)}
                   className="w-20 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-[#0E7A0E]"
@@ -528,15 +529,15 @@ export default function AperturaPage() {
                     const low = parseFloat(newCustomLow)
                     const high = parseFloat(newCustomHigh)
                     if (low < 0 || high < 0 || high < low) {
-                      toast("Verifica los montos (sin negativos y máximo ≥ mínimo)", "error")
+                      toast(t("apertura.toastInvalidAmounts"), "error")
                       return
                     }
                     if (customItems.length >= 20) {
-                      toast("Máximo 20 rubros personalizados", "error")
+                      toast(t("apertura.toastMaxCustom"), "error")
                       return
                     }
                     if (customItems.some((i) => i.name.toLowerCase() === newCustomName.trim().toLowerCase())) {
-                      toast("Ese rubro ya existe", "error")
+                      toast(t("apertura.toastDuplicate"), "error")
                       return
                     }
                     setCustomItems((prev) => [...prev, {
@@ -545,16 +546,16 @@ export default function AperturaPage() {
                       high,
                     }])
                     setNewCustomName(""); setNewCustomLow(""); setNewCustomHigh("")
-                    toast("Rubro de inversión agregado", "success")
+                    toast(t("apertura.toastAdded"), "success")
                   }}
                   className="text-xs font-semibold bg-[#0E7A0E] text-white px-3 py-1.5 rounded-lg hover:bg-[#0D720D] transition-colors"
                 >
-                  Agregar
+                  {t("common.add")}
                 </button>
               </div>
             </div>
             <div className="border-t border-gray-100 pt-3 flex justify-between">
-              <span className="font-bold text-gray-900">Total estimado</span>
+              <span className="font-bold text-gray-900">{t("apertura.totalEstimated")}</span>
               <span className="font-bold text-[#0E7A0E]">
                 ${invLow.toLocaleString()} – ${invHigh.toLocaleString()} MXN
               </span>
@@ -571,19 +572,17 @@ export default function AperturaPage() {
           </div>
           <div>
             <h4 className="font-semibold text-gray-900 mb-1 text-sm">
-              Tu primer pedido con Resurte.me
+              {t("apertura.ctaTitle")}
             </h4>
             <p className="text-xs text-gray-500 mb-3">
-              Cuando estés listo para abrir, tu primer pedido de insumos está a un clic. 
-              Nuestro catálogo tiene todo lo que necesitas para {selectedCollection.name.toLowerCase()}, 
-              con envío gratis desde $2,500 MXN.
+              {t("apertura.ctaDescription", { collection: selectedCollection.name.toLowerCase() })}
             </p>
             <Link
               href="/auth/register"
               className="inline-flex items-center gap-2 text-sm font-semibold bg-[#0E7A0E] text-white px-5 py-2.5 rounded-xl hover:bg-[#0D720D] transition-colors"
             >
               <Store className="w-4 h-4" />
-              Crear cuenta y empezar
+              {t("apertura.ctaButton")}
             </Link>
           </div>
         </div>

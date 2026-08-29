@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from "react"
 import { clearStored, normalizeStored, readStored, storageKeyFor, writeStored } from "@/lib/storage"
+import { ensureGuestToken } from "@/lib/guest-address"
 
 // Cache parsed values keyed by storage key so getSnapshot returns a
 // referentially stable snapshot between renders (required by
@@ -93,6 +94,95 @@ export interface SharedDish {
   modificadores?: { id: string; nombre: string; precio: number }[]
 }
 
-export function useSharedDishes(collectionSlug?: string | null) {
-  return useLocalStorage<SharedDish[]>("shared-dishes", [], collectionSlug)
+const SHARED_DISHES_KEY = "shared-dishes"
+
+/**
+ * Push de la lista completa al servidor con debounce por colección.
+ * Best-effort: si falla (offline, rate limit) localStorage conserva el
+ * estado y el próximo cambio reintenta.
+ */
+const dishesPushTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+function scheduleDishesPush(collection: string, token: string, dishes: SharedDish[]) {
+  clearTimeout(dishesPushTimers.get(collection))
+  dishesPushTimers.set(
+    collection,
+    setTimeout(() => {
+      dishesPushTimers.delete(collection)
+      fetch("/api/panel/dishes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-guest-token": token },
+        body: JSON.stringify({ collection_slug: collection, dishes }),
+      }).catch(() => {
+        // Sync es best-effort; localStorage sigue siendo la fuente inmediata.
+      })
+    }, 800),
+  )
+}
+
+/**
+ * Platillos compartidos del panel con persistencia en BD (panel_dishes).
+ *
+ * localStorage sigue siendo el cache inmediato; este hook además:
+ *  - Al montar: descarga los platillos del dueño. Si el servidor tiene
+ *    datos, estos ganan (multi-dispositivo); si está vacío y hay datos
+ *    locales, los sube (migración desde la era localStorage-only).
+ *  - En cada set: escribe localStorage de inmediato y programa un push
+ *    debounced al servidor (misma identidad: sesión o guest_token).
+ */
+export function useSharedDishes(
+  collectionSlug?: string | null,
+): [SharedDish[], (value: SharedDish[] | ((prev: SharedDish[]) => SharedDish[])) => void, () => void] {
+  const [dishes, setDishes, clearDishes] = useLocalStorage<SharedDish[]>(SHARED_DISHES_KEY, [], collectionSlug)
+  const collection = collectionSlug || "default"
+
+  useEffect(() => {
+    const token = ensureGuestToken()
+    if (!token) return
+    let cancelled = false
+    fetch(`/api/panel/dishes?collection=${encodeURIComponent(collection)}`, {
+      headers: { "x-guest-token": token },
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then((data: { dishes?: SharedDish[] }) => {
+        if (cancelled || !Array.isArray(data.dishes)) return
+        if (data.dishes.length > 0) {
+          // Setter crudo: no debe re-diparar el push.
+          setDishes(data.dishes)
+        } else {
+          const local = readStored<SharedDish[]>(SHARED_DISHES_KEY, [], collectionSlug)
+          if (local.length > 0) scheduleDishesPush(collection, token, local)
+        }
+      })
+      .catch(() => {
+        // Offline o BD caída: localStorage sigue funcionando.
+      })
+    return () => {
+      cancelled = true
+    }
+    // Solo al montar / cambiar de colección; dishes y setters se leen del storage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collection])
+
+  const setAndSync = useCallback(
+    (value: SharedDish[] | ((prev: SharedDish[]) => SharedDish[])) => {
+      setDishes(value)
+      const token = ensureGuestToken()
+      if (!token) return
+      const next =
+        value instanceof Function
+          ? value(readStored<SharedDish[]>(SHARED_DISHES_KEY, [], collectionSlug))
+          : value
+      scheduleDishesPush(collection, token, next)
+    },
+    [setDishes, collection, collectionSlug],
+  )
+
+  const clearAndSync = useCallback(() => {
+    clearDishes()
+    const token = ensureGuestToken()
+    if (token) scheduleDishesPush(collection, token, [])
+  }, [clearDishes, collection])
+
+  return [dishes, setAndSync, clearAndSync]
 }

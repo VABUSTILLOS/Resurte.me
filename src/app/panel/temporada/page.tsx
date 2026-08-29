@@ -6,6 +6,7 @@ import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
 import type { ShoppingItem, TransferItem } from "@/components/panel/temporada/temporada-shared"
+import { t } from "@/lib/i18n/es"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import Link from "next/link"
 import {
@@ -120,7 +121,7 @@ export default function TemporadaPage() {
       if (prev.some((s) => s.key === item.key)) return prev
       return [...prev, { key: item.key, name: item.name, icon: item.icon, pricePerKg: item.highPrice, quantityKg: 1 }]
     })
-    toast(`${item.icon} ${item.name} agregado a la lista`, "success")
+    toast(t("temporada.toastAdded", { icon: item.icon, name: item.name }), "success")
   }
 
   function transferToPlanner(item: { name: string; icon: string; highPrice: number }) {
@@ -129,7 +130,7 @@ export default function TemporadaPage() {
       if (exists) return prev.map((t) => t.name === item.name ? { ...t, qty: t.qty + 5 } : t)
       return [...prev, { name: item.name, unit: "kg", price: item.highPrice, qty: 5 }]
     })
-    toast(`${item.icon} ${item.name} enviado al planificador`, "success")
+    toast(t("temporada.toastSentToPlanner", { icon: item.icon, name: item.name }), "success")
     router.push("/panel/planificador")
   }
 
@@ -145,14 +146,17 @@ export default function TemporadaPage() {
       })
       return next
     })
-    toast(`${shoppingList.length} producto${shoppingList.length > 1 ? "s" : ""} enviado${shoppingList.length > 1 ? "s" : ""} al planificador`, "success")
+    toast(
+      t(shoppingList.length > 1 ? "temporada.toastListSentMany" : "temporada.toastListSentOne", { count: shoppingList.length }),
+      "success"
+    )
     router.push("/panel/planificador")
   }
 
   function removeFromShoppingList(key: string) {
     setShoppingList((prev) => prev.filter((s) => s.key !== key))
     const item = shoppingList.find((s) => s.key === key)
-    if (item) toast(`${item.icon} ${item.name} quitado de la lista`, "warning")
+    if (item) toast(t("temporada.toastRemoved", { icon: item.icon, name: item.name }), "warning")
   }
 
   function updateShoppingQty(key: string, qty: number) {
@@ -162,18 +166,18 @@ export default function TemporadaPage() {
   function copyShoppingList() {
     const lines = shoppingList.map((s) => `• ${s.icon} ${s.name}: ${s.quantityKg} kg × $${s.pricePerKg}/kg = $${(s.quantityKg * s.pricePerKg).toFixed(0)} MXN`)
     const total = shoppingList.reduce((sum, s) => sum + s.quantityKg * s.pricePerKg, 0)
-    const text = `Lista de compras de temporada — ${MONTHS[viewMonth]}\n\n${lines.join("\n")}\n\nTotal estimado: $${total.toFixed(0)} MXN\nGenerado con Resurte.me`
+    const text = `${t("temporada.copyHeader", { month: MONTHS[viewMonth] ?? "" })}\n\n${lines.join("\n")}\n\n${t("temporada.totalEstimated", { total: total.toFixed(0) })}\nGenerado con Resurte.me`
     navigator.clipboard.writeText(text)
-    toast("Lista de compras copiada", "success")
+    toast(t("temporada.toastListCopied"), "success")
   }
 
   if (!selectedCollection) {
     return (
       <div className="text-center py-16">
         <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-gray-700 mb-2">Selecciona tu tipo de cocina</h3>
+        <h3 className="text-lg font-semibold text-gray-700 mb-2">{t("temporada.selectCuisineTitle")}</h3>
         <p className="text-sm text-gray-400 max-w-md mx-auto">
-          Selecciona tu tipo de restaurante para recibir recomendaciones estacionales personalizadas.
+          {t("temporada.selectCuisineDescription")}
         </p>
       </div>
     )
@@ -186,7 +190,7 @@ export default function TemporadaPage() {
           <ArrowLeft className="w-5 h-5 text-gray-400" />
         </Link>
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Planificador de temporada</h2>
+          <h2 className="text-xl font-bold text-gray-900">{t("temporada.title")}</h2>
           <p className="text-sm text-gray-400">{selectedCollection.name}</p>
         </div>
       </div>
@@ -197,22 +201,22 @@ export default function TemporadaPage() {
           <button
             onClick={() => setViewMonth(viewMonth === 1 ? 12 : viewMonth - 1)}
             className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-            aria-label="Mes anterior"
-            title="Mes anterior"
+            aria-label={t("temporada.prevMonth")}
+            title={t("temporada.prevMonth")}
           >
             <ChevronLeft className="w-5 h-5 text-gray-400" />
           </button>
           <div className="text-center">
             <span className="text-2xl font-bold text-gray-900">{MONTHS[viewMonth]}</span>
             <p className="text-xs text-gray-400 mt-0.5">
-              {viewMonth === today.getMonth() + 1 ? "Mes actual" : ""}
+              {viewMonth === today.getMonth() + 1 ? t("temporada.currentMonth") : ""}
             </p>
           </div>
           <button
             onClick={() => setViewMonth(viewMonth === 12 ? 1 : viewMonth + 1)}
             className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
-            aria-label="Mes siguiente"
-            title="Mes siguiente"
+            aria-label={t("temporada.nextMonth")}
+            title={t("temporada.nextMonth")}
           >
             <ChevronRight className="w-5 h-5 text-gray-400" />
           </button>
@@ -222,7 +226,7 @@ export default function TemporadaPage() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Leaf className="w-4 h-4 text-emerald-600" />
-            <h4 className="text-sm font-semibold text-gray-700">De temporada en {MONTHS[viewMonth]}</h4>
+            <h4 className="text-sm font-semibold text-gray-700">{t("temporada.inSeasonIn", { month: MONTHS[viewMonth] ?? "" })}</h4>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
            {inSeasonNow.map((item) => {
@@ -240,7 +244,7 @@ export default function TemporadaPage() {
                    className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
                      inList ? "bg-emerald-600 text-white" : "bg-white text-emerald-600 hover:bg-emerald-600 hover:text-white border border-emerald-200"
                    }`}
-                   title={inList ? "Quitar de la lista" : "Agregar a lista de compras"}
+                   title={inList ? t("temporada.removeFromList") : t("temporada.addToList")}
                  >
                    {inList ? <X className="w-3 h-3" /> : "+"}
                  </button>
@@ -256,14 +260,14 @@ export default function TemporadaPage() {
                  onClick={() => transferToPlanner(item)}
                  className="w-full text-[10px] font-semibold bg-white text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 rounded-lg py-1 transition-colors flex items-center justify-center gap-1"
                >
-                 <ShoppingCart className="w-3 h-3" /> Agregar al planificador
+                 <ShoppingCart className="w-3 h-3" /> {t("temporada.addToPlanner")}
                </button>
              </div>
              )
            })}
             {inSeasonNow.length === 0 && (
               <p className="col-span-full text-sm text-gray-400 text-center py-4">
-                Pocos productos de temporada este mes. Buen momento para enfocarte en proteínas y secos.
+                {t("temporada.emptySeason")}
               </p>
             )}
           </div>
@@ -276,10 +280,10 @@ export default function TemporadaPage() {
               <div className="flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5 text-emerald-600" />
                 <h4 className="text-sm font-semibold text-gray-700">
-                  Lista de compras — {MONTHS[viewMonth]}
+                  {t("temporada.shoppingListTitle", { month: MONTHS[viewMonth] ?? "" })}
                 </h4>
                 <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
-                  {shoppingList.length} producto{shoppingList.length > 1 ? "s" : ""}
+                  {shoppingList.length} {t(shoppingList.length > 1 ? "temporada.products" : "temporada.product")}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -288,15 +292,15 @@ export default function TemporadaPage() {
                   className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg transition-colors"
                 >
                   <Copy className="w-3.5 h-3.5" />
-                  Copiar lista
+                  {t("temporada.copyList")}
                 </button>
                 <button
                   onClick={transferShoppingListToPlanner}
                   className="flex items-center gap-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1.5 rounded-lg transition-colors"
-                  title="Envía la lista de compras al planificador"
+                  title={t("temporada.sendToPlannerHint")}
                 >
                   <ShoppingCart className="w-3.5 h-3.5" />
-                  Enviar al planificador
+                  {t("temporada.sendToPlanner")}
                 </button>
               </div>
             </div>
@@ -312,7 +316,7 @@ export default function TemporadaPage() {
                       <button
                         onClick={() => updateShoppingQty(s.key, s.quantityKg - 0.5)}
                         className="w-5 h-5 rounded bg-white text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors"
-                        aria-label={`Reducir cantidad de ${s.name}`}
+                        aria-label={t("temporada.reduceQty", { name: s.name })}
                       >
                         −
                       </button>
@@ -322,7 +326,7 @@ export default function TemporadaPage() {
                       <button
                         onClick={() => updateShoppingQty(s.key, s.quantityKg + 0.5)}
                         className="w-5 h-5 rounded bg-white text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors"
-                        aria-label={`Aumentar cantidad de ${s.name}`}
+                        aria-label={t("temporada.increaseQty", { name: s.name })}
                       >
                         +
                       </button>
@@ -333,8 +337,8 @@ export default function TemporadaPage() {
                     <button
                       onClick={() => removeFromShoppingList(s.key)}
                       className="p-0.5 rounded text-gray-400 hover:text-red-500 transition-colors"
-                      aria-label={`Quitar ${s.name} de la lista`}
-                      title={`Quitar ${s.name} de la lista`}
+                      aria-label={t("temporada.removeItem", { name: s.name })}
+                      title={t("temporada.removeItem", { name: s.name })}
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -343,7 +347,7 @@ export default function TemporadaPage() {
               ))}
             </div>
             <div className="mt-3 pt-3 border-t border-emerald-100 flex justify-between items-center">
-              <span className="text-xs text-gray-500">Subtotal estimado</span>
+              <span className="text-xs text-gray-500">{t("temporada.estimatedSubtotal")}</span>
               <span className="font-extrabold text-emerald-700 text-lg">
                 ${shoppingList.reduce((sum, s) => sum + s.quantityKg * s.pricePerKg, 0).toFixed(0)} MXN
               </span>
@@ -365,7 +369,7 @@ export default function TemporadaPage() {
             <div className="flex items-center gap-2 text-xs">
               <TrendingDown className="w-3.5 h-3.5 text-emerald-600" />
               <span className="font-semibold text-emerald-700">
-                Ahorro estimado: {tip.savings}
+                {t("temporada.estimatedSavings", { savings: tip.savings })}
               </span>
             </div>
           </div>
@@ -377,10 +381,10 @@ export default function TemporadaPage() {
         <div className="flex items-center gap-2 mb-3">
           <Eye className="w-4 h-4 text-purple-600" />
           <h4 className="text-sm font-semibold text-gray-700">
-            El próximo mes — {MONTHS[viewMonth === 12 ? 1 : viewMonth + 1]}
+            {t("temporada.nextMonthTitle", { month: MONTHS[viewMonth === 12 ? 1 : viewMonth + 1] ?? "" })}
           </h4>
           <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-semibold">
-            Anticipa tu compra
+            {t("temporada.anticipatePurchase")}
           </span>
         </div>
         {(() => {
@@ -391,7 +395,7 @@ export default function TemporadaPage() {
           if (nextItems.length === 0) {
             return (
               <p className="text-sm text-gray-400">
-                Los mismos productos se mantienen en temporada. ¡Buen momento para planear con calma!
+                {t("temporada.nextMonthEmpty")}
               </p>
             )
           }
@@ -402,7 +406,7 @@ export default function TemporadaPage() {
                   <span className="text-lg">{item.icon}</span>
                   <div>
                     <span className="text-sm font-medium text-purple-800">{item.name}</span>
-                    <p className="text-[10px] text-purple-500">Entra en temporada</p>
+                    <p className="text-[10px] text-purple-500">{t("temporada.entersSeason")}</p>
                   </div>
                 </div>
               ))}
@@ -415,7 +419,7 @@ export default function TemporadaPage() {
       <div className="bg-white rounded-2xl border border-gray-100 p-5 overflow-x-auto">
         <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-purple-600" />
-          Calendario anual rápido
+          {t("temporada.annualCalendar")}
         </h4>
         <div className="min-w-[600px]">
           {/* Header */}
@@ -436,7 +440,7 @@ export default function TemporadaPage() {
                 <div
                   key={i}
                   className={`h-5 rounded ${item.months.includes(i + 1) ? "bg-emerald-200" : "bg-gray-100"}`}
-                  title={item.months.includes(i + 1) ? `${item.name} — Temporada alta` : "Fuera de temporada"}
+                  title={item.months.includes(i + 1) ? `${item.name} — ${t("temporada.highSeason")}` : t("temporada.outOfSeason")}
                 />
               ))}
             </div>
@@ -451,11 +455,10 @@ export default function TemporadaPage() {
           <DollarSign className="w-5 h-5 text-purple-600 mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-semibold text-purple-800 mb-1">
-              Arma tu menú de temporada con Resurte.me
+              {t("temporada.ctaTitle")}
             </p>
             <p className="text-xs text-purple-600">
-              Nuestro catálogo se actualiza con disponibilidad real. Los productos de temporada 
-              suelen tener mejor precio porque hay mayor oferta. Revisa cada mes para ajustar tu menú.
+              {t("temporada.ctaDescription")}
             </p>
           </div>
         </div>

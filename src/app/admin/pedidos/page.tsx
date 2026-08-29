@@ -10,7 +10,7 @@ import {
   STATUS_COLOR,
   PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_LABEL,
-} from "@/lib/mock-orders"
+} from "@/lib/order-labels"
 import { Search, RefreshCw, X } from "lucide-react"
 import type { OrderStatus } from "@/types"
 import { ToastProvider, useToast } from "@/components/toast"

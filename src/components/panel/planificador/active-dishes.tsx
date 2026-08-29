@@ -3,6 +3,7 @@
 import { Package } from "lucide-react"
 import { convertQty, unitDimension } from "@/lib/panel-units"
 import type { SharedDish } from "@/hooks/use-local-storage"
+import { t } from "@/lib/i18n/es"
 
 interface ActiveDishesProps {
   sharedDishes: SharedDish[]
@@ -25,10 +26,10 @@ export default function ActiveDishes({
       <div className="flex items-center gap-2 mb-3">
         <Package className="w-4 h-4 text-green-600" />
         <h3 className="text-sm font-semibold text-gray-700">
-          Tus platillos activos ({sharedDishes.length})
+          {t("planificador.activeDishes", { count: sharedDishes.length })}
         </h3>
         <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full ml-auto">
-          Del Costeador
+          {t("planificador.fromCosteador")}
         </span>
       </div>
       <div className="grid sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
@@ -53,18 +54,18 @@ export default function ActiveDishes({
             <div key={dish.id} className="flex items-center justify-between bg-green-50/50 rounded-xl px-3 py-2 text-xs">
               <span className="font-medium text-gray-700 truncate mr-2">{dish.name}</span>
               <span className="text-green-700 whitespace-nowrap font-medium">
-                ~{summary} para {covers} pax
+                ~{summary} {t("planificador.forPax", { covers })}
               </span>
             </div>
           )
         })}
       </div>
       <p className="text-[10px] text-gray-400 mt-2">
-        Estimación basada en las cantidades por platillo × {covers} comensales. Agrega ~{avgWastePct}% de merma promedio.
+        {t("planificador.estimateNote", { covers, pct: avgWastePct })}
       </p>
       <details className="mt-3">
         <summary className="text-xs font-semibold text-[#0E7A0E] cursor-pointer hover:text-green-800 transition-colors">
-          + Importar ingredientes de un platillo al planificador
+          {t("planificador.importToggle")}
         </summary>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {sharedDishes.map((dish) => {
@@ -80,14 +81,13 @@ export default function ActiveDishes({
                 }`}
               >
                 {imported ? "✓ " : "+ "}
-                {dish.name} ({dish.ingredients.length} ing.)
+                {dish.name} {t("planificador.ingredientsShort", { count: dish.ingredients.length })}
               </button>
             )
           })}
         </div>
         <p className="text-[10px] text-gray-400 mt-2">
-          Al importar un platillo, sus ingredientes se agregan como cantidades manuales (resaltadas en ámbar). 
-          Click de nuevo para quitar. Las cantidades se escalan a {covers} comensales.
+          {t("planificador.importNote", { covers })}
         </p>
       </details>
     </div>

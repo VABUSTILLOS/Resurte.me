@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { Calculator, Package, ShoppingCart, TrendingDown, TrendingUp } from "lucide-react"
 import type { PlannerProduct } from "./planificador-shared"
+import { t } from "@/lib/i18n/es"
 
 interface ShoppingListProps {
   products: PlannerProduct[]
@@ -39,10 +40,10 @@ export default function ShoppingList({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Calculator className="w-5 h-5 text-emerald-600" />
-            <h3 className="font-bold text-gray-900">Costo total estimado</h3>
+            <h3 className="font-bold text-gray-900">{t("planificador.totalTitle")}</h3>
           </div>
           <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-semibold">
-            Para {covers} comensales
+            {t("planificador.forCovers", { covers })}
           </span>
         </div>
         <p className="text-4xl font-extrabold text-[#0E7A0E] mb-2">
@@ -50,10 +51,10 @@ export default function ShoppingList({
         </p>
         <div className="flex flex-wrap gap-3 text-xs text-gray-500">
           <span className="bg-white rounded-lg px-2.5 py-1">
-            ${(totalCost / covers).toFixed(2)} por comensal
+            ${(totalCost / covers).toFixed(2)} {t("planificador.perCover")}
           </span>
           <span className="bg-white rounded-lg px-2.5 py-1">
-            +~{avgWastePct}% promedio incluido por merma
+            {t("planificador.wasteIncluded", { pct: avgWastePct })}
           </span>
         </div>
       </div>
@@ -65,11 +66,10 @@ export default function ShoppingList({
             <TrendingDown className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
             <div>
               <h4 className="font-semibold text-amber-800 text-sm mb-1">
-                Oportunidad de ahorro por reducción de merma
+                {t("planificador.savingsTitle")}
               </h4>
               <p className="text-xs text-amber-700 mb-2">
-                Si reduces tu merma del <strong>{avgWastePct}%</strong> al <strong>5%</strong> (nivel óptimo), 
-                ahorrarías aproximadamente:
+                {t("planificador.savingsA")} <strong>{avgWastePct}%</strong> {t("planificador.savingsB")} <strong>5%</strong> {t("planificador.savingsC")}
               </p>
               <p className="text-2xl font-extrabold text-amber-700">
                 ${(() => {
@@ -95,28 +95,28 @@ export default function ShoppingList({
           className="w-full flex items-center justify-center gap-2 bg-[#0E7A0E] hover:bg-green-800 text-white font-bold py-3 rounded-2xl transition-colors"
         >
           <ShoppingCart className="w-5 h-5" />
-          {showOrder ? "Ocultar lista de pedido" : "Generar lista de pedido"}
+          {showOrder ? t("planificador.hideOrder") : t("planificador.showOrder")}
         </button>
 
         {/* Order summary */}
         {showOrder && (
           <div className="bg-white rounded-2xl border-2 border-[#0E7A0E]/20 p-5">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-bold text-gray-900">📋 Lista de pedido — {collectionName}</h4>
+              <h4 className="font-bold text-gray-900">{t("planificador.orderListTitle", { collection: collectionName })}</h4>
               <div className="flex items-center gap-2">
                 <button
                   onClick={onCopy}
                   className="text-xs font-semibold text-[#0E7A0E] hover:text-green-800 transition-colors"
                 >
-                  📋 Copiar
+                  {t("planificador.copyOrder")}
                 </button>
                 <Link
                   href="/panel/inventario"
                   className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#0E7A0E] text-white px-3 py-1.5 rounded-lg hover:bg-[#0D720D] transition-colors"
-                  title="Importa estas cantidades como stock en tu inventario"
+                  title={t("planificador.sendToInventoryTitle")}
                 >
                   <Package className="w-3.5 h-3.5" />
-                  Enviar a inventario
+                  {t("planificador.sendToInventory")}
                 </Link>
               </div>
             </div>
@@ -138,7 +138,7 @@ export default function ShoppingList({
               })}
             </div>
             <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between">
-              <span className="font-bold text-gray-900">Total estimado</span>
+              <span className="font-bold text-gray-900">{t("planificador.totalEstimated")}</span>
               <span className="font-extrabold text-[#0E7A0E] text-lg">${totalCost.toFixed(0)} MXN</span>
             </div>
           </div>
@@ -149,11 +149,10 @@ export default function ShoppingList({
             <TrendingUp className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-semibold text-emerald-800 mb-1">
-                ¿Listo para hacer tu pedido?
+                {t("planificador.readyTitle")}
               </p>
               <p className="text-xs text-emerald-600">
-                Todos estos insumos están disponibles en Resurte.me. Arma tu carrito con las cantidades sugeridas 
-                y recibe todo en una sola entrega. Los precios son en tiempo real de nuestro catálogo.
+                {t("planificador.readyDesc")}
               </p>
             </div>
           </div>

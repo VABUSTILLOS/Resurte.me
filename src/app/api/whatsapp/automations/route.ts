@@ -123,10 +123,27 @@ export async function GET() {
 
   const automations = (data || []) as WhatsAppAutomation[]
 
+  // Nombre real de la plantilla asignada (si template_id resuelve a una
+  // fila de whatsapp_templates); fallback al nombre del mapa por defecto.
+  const templateIds = automations.map((a) => a.template_id).filter((id): id is number => id != null)
+  const templateNames = new Map<number, string>()
+  if (templateIds.length > 0) {
+    const { data: templates } = await supabase
+      .from("whatsapp_templates")
+      .select("id, template_name")
+      .in("id", templateIds)
+    for (const t of (templates || []) as Array<{ id: number; template_name: string }>) {
+      templateNames.set(t.id, t.template_name)
+    }
+  }
+
   return NextResponse.json({
     automations: automations.map((a) => ({
       ...a,
-      template_name: AUTOMATION_TEMPLATE_MAP[a.automation_type]?.name || "unknown",
+      template_name:
+        (a.template_id != null ? templateNames.get(a.template_id) : undefined) ||
+        AUTOMATION_TEMPLATE_MAP[a.automation_type]?.name ||
+        "unknown",
     })),
   })
 }
@@ -145,7 +162,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
 
-    const { automation_type, trigger_delay_hours, is_active, config } = body
+    const { automation_type, trigger_delay_hours, is_active, config, template_name } = body
 
     if (!automation_type) {
       return NextResponse.json(
@@ -156,9 +173,13 @@ export async function POST(req: NextRequest) {
 
     const supabase = await createServiceClient()
 
-    // Resolver template_id desde el template_name del mapa (si el
-    // template de Meta ya está registrado en whatsapp_templates).
-    const templateName = AUTOMATION_TEMPLATE_MAP[automation_type]?.name
+    // Resolver template_id: si el cliente envía template_name, debe existir
+    // en whatsapp_templates (registrada/aprobada en Meta). Si no se envía,
+    // se usa el nombre por defecto del mapa de automatizaciones.
+    const templateName =
+      typeof template_name === "string" && template_name.trim()
+        ? template_name.trim()
+        : AUTOMATION_TEMPLATE_MAP[automation_type]?.name
     let templateId: number | null = null
     if (templateName) {
       const { data: tpl } = await supabase
@@ -167,6 +188,12 @@ export async function POST(req: NextRequest) {
         .eq("template_name", templateName)
         .maybeSingle()
       templateId = (tpl as { id?: number } | null)?.id ?? null
+      if (templateId === null && typeof template_name === "string" && template_name.trim()) {
+        return NextResponse.json(
+          { error: `Template "${templateName}" no está registrada en whatsapp_templates` },
+          { status: 400 }
+        )
+      }
     }
 
     // Upsert por automation_type (único por tienda).

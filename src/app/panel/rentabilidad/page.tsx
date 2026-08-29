@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
 import { useToast } from "@/components/toast"
+import { t } from "@/lib/i18n/es"
 import { foodCostStatus, usePanelConfig } from "@/lib/panel-config"
 import { normalizeName } from "@/lib/normalize"
 import { isCurrentMonth } from "@/lib/panel-utils"
@@ -185,7 +186,7 @@ export default function RentabilidadPage() {
         price: d.sellingPrice,
         category: "Mi menú",
         alert: foodCostStatus((totalCost / d.sellingPrice) * 100, panelCfg) === "red"
-          ? "Food cost elevado — revisa ingredientes"
+          ? t("rentabilidad.highCostAlert")
           : undefined,
       }
     }),
@@ -262,11 +263,11 @@ export default function RentabilidadPage() {
   }, [dishes, categoryFilter])
 
   function exportCSV() {
-    const header = "Platillo,Categoría,Costo,Precio Venta,Margen,Food Cost %,Estado"
+    const header = t("rentabilidad.csvHeader")
     const rows = dishes.map((d) => {
       const fc = ((d.cost / d.price) * 100).toFixed(1)
       const st = foodCostStatus(parseFloat(fc), panelCfg)
-      const status = st === "green" ? "Excelente" : st === "amber" ? "Aceptable" : "Revisar"
+      const status = st === "green" ? t("rentabilidad.statusExcellent") : st === "amber" ? t("rentabilidad.statusAcceptable") : t("rentabilidad.statusReview")
       return `"${d.name}","${d.category}",${d.cost.toFixed(2)},${d.price.toFixed(2)},${(d.price - d.cost).toFixed(2)},${fc}%,${status}`
     })
     const csv = [header, ...rows].join("\n")
@@ -277,16 +278,16 @@ export default function RentabilidadPage() {
     a.download = `rentabilidad-${slug || "menu"}.csv`
     a.click()
     URL.revokeObjectURL(url)
-    toast("Rentabilidad exportada a CSV", "success")
+    toast(t("rentabilidad.csvExported"), "success")
   }
 
   if (!selectedCollection) {
     return (
       <div className="text-center py-16">
         <TrendingUp className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-gray-700 mb-2">Selecciona tu tipo de cocina</h3>
+        <h3 className="text-lg font-semibold text-gray-700 mb-2">{t("rentabilidad.selectCuisineTitle")}</h3>
         <p className="text-sm text-gray-400 max-w-md mx-auto">
-          Selecciona tu tipo de restaurante para ver el semáforo de rentabilidad de platillos típicos.
+          {t("rentabilidad.selectCuisineDescription")}
         </p>
       </div>
     )
@@ -294,9 +295,9 @@ export default function RentabilidadPage() {
 
   function getStatus(cost: number, price: number) {
     const pct = (cost / price) * 100
-    if (foodCostStatus(pct, panelCfg) === "green") return { color: "green", label: "Excelente", icon: CheckCircle2 }
-    if (foodCostStatus(pct, panelCfg) === "amber") return { color: "amber", label: "Aceptable", icon: AlertTriangle }
-    return { color: "red", label: "Revisar", icon: Circle }
+    if (foodCostStatus(pct, panelCfg) === "green") return { color: "green", label: t("rentabilidad.statusExcellent"), icon: CheckCircle2 }
+    if (foodCostStatus(pct, panelCfg) === "amber") return { color: "amber", label: t("rentabilidad.statusAcceptable"), icon: AlertTriangle }
+    return { color: "red", label: t("rentabilidad.statusReview"), icon: Circle }
   }
 
   const fcStatus = (pct: number) => foodCostStatus(pct, panelCfg)
@@ -313,21 +314,21 @@ export default function RentabilidadPage() {
         </Link>
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-gray-900">Semáforo de rentabilidad</h2>
+            <h2 className="text-xl font-bold text-gray-900">{t("rentabilidad.pageTitle")}</h2>
             <button
               onClick={exportCSV}
               className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors"
-              aria-label="Exportar rentabilidad a CSV"
+              aria-label={t("rentabilidad.exportCsvLabel")}
             >
               <Download className="w-3.5 h-3.5" />
-              Exportar CSV
+              {t("rentabilidad.exportCsv")}
             </button>
           </div>
           <p className="text-sm text-gray-400">
             {selectedCollection.name}
             {costeoDishes.length > 0 && (
               <span className="ml-2 text-[#0E7A0E] font-medium">
-                +{costeoDishes.length} platillos de Costeando mi menú
+                {t("rentabilidad.fromCosteo", { count: costeoDishes.length })}
               </span>
             )}
           </p>
@@ -339,20 +340,20 @@ export default function RentabilidadPage() {
         <div className="bg-green-50 rounded-2xl border border-green-200 p-4 text-center">
           <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto mb-1" />
           <p className="text-2xl font-extrabold text-green-700">{greenCount}</p>
-          <p className="text-xs text-green-600">Platillos rentables</p>
-          <p className="text-[10px] text-green-500">Food cost ≤ 30%</p>
+          <p className="text-xs text-green-600">{t("rentabilidad.summaryGreen")}</p>
+          <p className="text-[10px] text-green-500">{t("rentabilidad.summaryGreenHint")}</p>
         </div>
         <div className="bg-amber-50 rounded-2xl border border-amber-200 p-4 text-center">
           <AlertTriangle className="w-5 h-5 text-amber-600 mx-auto mb-1" />
           <p className="text-2xl font-extrabold text-amber-700">{amberCount}</p>
-          <p className="text-xs text-amber-600">En observación</p>
-          <p className="text-[10px] text-amber-500">Food cost 30-38%</p>
+          <p className="text-xs text-amber-600">{t("rentabilidad.summaryAmber")}</p>
+          <p className="text-[10px] text-amber-500">{t("rentabilidad.summaryAmberHint")}</p>
         </div>
         <div className="bg-red-50 rounded-2xl border border-red-200 p-4 text-center">
           <Circle className="w-5 h-5 text-red-600 mx-auto mb-1" />
           <p className="text-2xl font-extrabold text-red-700">{redCount}</p>
-          <p className="text-xs text-red-600">Requieren ajuste</p>
-          <p className="text-[10px] text-red-500">Food cost &gt; 38%</p>
+          <p className="text-xs text-red-600">{t("rentabilidad.summaryRed")}</p>
+          <p className="text-[10px] text-red-500">{t("rentabilidad.summaryRedHint")}</p>
         </div>
       </div>
 
@@ -362,11 +363,11 @@ export default function RentabilidadPage() {
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-[#0E7A0E]" />
-              <h3 className="font-bold text-gray-900 text-sm">Análisis por categoría</h3>
+              <h3 className="font-bold text-gray-900 text-sm">{t("rentabilidad.categoryAnalysis")}</h3>
             </div>
             {worstCategory && foodCostStatus(worstCategory.avgFc, panelCfg) === "red" && (
               <span className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-full font-semibold">
-                ⚠️ {worstCategory.category}: peor food cost ({worstCategory.avgFc.toFixed(1)}%)
+                {t("rentabilidad.worstFoodCost", { category: worstCategory.category, pct: worstCategory.avgFc.toFixed(1) })}
               </span>
             )}
           </div>
@@ -385,12 +386,12 @@ export default function RentabilidadPage() {
                   <span className="font-semibold text-gray-800 truncate">{c.category}</span>
                 </div>
                 <div className="flex items-center justify-between text-gray-500 mt-1">
-                  <span>{c.count} platillo{c.count !== 1 ? "s" : ""}</span>
+                  <span>{c.count !== 1 ? t("rentabilidad.dishCountMany", { count: c.count }) : t("rentabilidad.dishCountOne", { count: c.count })}</span>
                   <span className={`font-bold ${c.status === "ok" ? "text-green-700" : c.status === "justo" ? "text-amber-700" : "text-red-700"}`}>
                     {c.avgFc.toFixed(1)}% FC
                   </span>
                 </div>
-                <p className="text-gray-400 mt-1">Margen prom. ${c.avgMargin.toFixed(0)}</p>
+                <p className="text-gray-400 mt-1">{t("rentabilidad.avgMargin", { margin: c.avgMargin.toFixed(0) })}</p>
               </div>
             ))}
           </div>
@@ -402,7 +403,7 @@ export default function RentabilidadPage() {
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-4 h-4 text-red-600" />
-            <h4 className="font-semibold text-red-800 text-sm">Alertas de rentabilidad</h4>
+            <h4 className="font-semibold text-red-800 text-sm">{t("rentabilidad.alertsTitle")}</h4>
           </div>
           <div className="space-y-1.5">
             {alerts.map((dish, idx) => (
@@ -418,27 +419,27 @@ export default function RentabilidadPage() {
       {/* Sort + Simulator controls */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 px-3 py-2">
-          <span className="text-xs text-gray-400 shrink-0">Ordenar:</span>
+          <span className="text-xs text-gray-400 shrink-0">{t("rentabilidad.sortLabel")}</span>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
             className="text-xs font-semibold text-gray-700 bg-transparent focus:outline-none"
           >
-            <option value="name">Nombre A-Z</option>
-            <option value="margin">Mayor margen</option>
-            <option value="foodcost">Menor food cost</option>
-            <option value="category">Categoría</option>
+            <option value="name">{t("rentabilidad.sortName")}</option>
+            <option value="margin">{t("rentabilidad.sortMargin")}</option>
+            <option value="foodcost">{t("rentabilidad.sortFoodCost")}</option>
+            <option value="category">{t("rentabilidad.sortCategory")}</option>
           </select>
         </div>
         <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 px-3 py-2">
-          <span className="text-xs text-gray-400 shrink-0">Categoría:</span>
+          <span className="text-xs text-gray-400 shrink-0">{t("rentabilidad.categoryLabel")}</span>
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="text-xs font-semibold text-gray-700 bg-transparent focus:outline-none"
-            aria-label="Filtrar por categoría"
+            aria-label={t("rentabilidad.categoryFilterLabel")}
           >
-            <option value="all">Todas ({dishes.length})</option>
+            <option value="all">{t("rentabilidad.categoryAll", { count: dishes.length })}</option>
             {categoryAnalysis.map((c) => (
               <option key={c.category} value={c.category}>
                 {c.category} ({c.count})
@@ -447,7 +448,7 @@ export default function RentabilidadPage() {
           </select>
         </div>
         <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 px-3 py-2">
-          <span className="text-xs text-gray-400 shrink-0">Simulador de precio:</span>
+          <span className="text-xs text-gray-400 shrink-0">{t("rentabilidad.simulatorLabel")}</span>
           <input
             type="range"
             min="-30"
@@ -455,7 +456,7 @@ export default function RentabilidadPage() {
             value={priceMultiplier}
             onChange={(e) => setPriceMultiplier(parseFloat(e.target.value))}
             className="flex-1 min-w-0 h-1.5 accent-[#0E7A0E]"
-            aria-label="Ajustar precio de venta"
+            aria-label={t("rentabilidad.simulatorAria")}
           />
           <span className={`text-xs font-bold w-14 text-right ${priceMultiplier > 0 ? "text-emerald-600" : priceMultiplier < 0 ? "text-red-600" : "text-gray-400"}`}>
             {priceMultiplier > 0 ? "+" : ""}{priceMultiplier}%
@@ -465,7 +466,7 @@ export default function RentabilidadPage() {
               onClick={() => setPriceMultiplier(0)}
               className="text-[10px] text-gray-400 hover:text-gray-600 underline whitespace-nowrap"
             >
-              Restablecer
+              {t("rentabilidad.reset")}
             </button>
           )}
         </div>
@@ -473,17 +474,19 @@ export default function RentabilidadPage() {
       {priceMultiplier !== 0 && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2 mb-4 text-xs text-indigo-700 flex items-center gap-2">
           <TrendingUp className="w-3.5 h-3.5 shrink-0" />
-          Simulando {priceMultiplier > 0 ? "un aumento" : "una reducción"} de {Math.abs(priceMultiplier)}% en el precio de venta. Los food cost % y márgenes se recalculan en tiempo real.
+          {priceMultiplier > 0
+            ? t("rentabilidad.simulatingIncrease", { pct: Math.abs(priceMultiplier) })
+            : t("rentabilidad.simulatingDecrease", { pct: Math.abs(priceMultiplier) })}
         </div>
       )}
       {mermaStats.hasMerma && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-2 mb-4 text-xs text-red-700 flex items-center gap-2">
           <Trash2 className="w-3.5 h-3.5 shrink-0" />
-          Pérdida mensual por merma: <strong>${mermaStats.monthLoss.toFixed(0)}</strong>
+          {t("rentabilidad.mermaLoss")} <strong>${mermaStats.monthLoss.toFixed(0)}</strong>
           {monthlyGoal > 0 && (
-            <span> — {mermaStats.mermaPct.toFixed(0)}% de tu meta de ${monthlyGoal.toFixed(0)}</span>
+            <span>{t("rentabilidad.mermaGoal", { pct: mermaStats.mermaPct.toFixed(0), goal: monthlyGoal.toFixed(0) })}</span>
           )}
-          <span className="ml-auto text-red-500">Ya incluida en costos y márgenes</span>
+          <span className="ml-auto text-red-500">{t("rentabilidad.mermaIncluded")}</span>
         </div>
       )}
 
@@ -491,15 +494,15 @@ export default function RentabilidadPage() {
       {dishes.length === 0 ? (
         <EmptyState
           icon={TrendingUp}
-          title="Aún no tienes platillos para analizar"
-          description="Costea tu menú para ver el semáforo de rentabilidad con datos reales: margen, food cost y ajustes sugeridos."
+          title={t("rentabilidad.emptyTitle")}
+          description={t("rentabilidad.emptyDescription")}
           action={
             <Link
               href="/panel/costeo"
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-[#0D720D] transition-colors"
             >
               <DollarSign className="w-3.5 h-3.5" />
-              Ir al Costeador
+              {t("rentabilidad.emptyAction")}
             </Link>
           }
         />
@@ -537,11 +540,11 @@ export default function RentabilidadPage() {
 
               <div className="grid grid-cols-3 gap-3 mt-3 pt-3 border-t border-gray-50">
                 <div className="text-center">
-                  <p className="text-[10px] text-gray-400">Costo</p>
+                  <p className="text-[10px] text-gray-400">{t("rentabilidad.costLabel")}</p>
                   <p className="font-bold text-sm text-gray-700">${dish.cost}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-[10px] text-gray-400">Precio</p>
+                  <p className="text-[10px] text-gray-400">{t("rentabilidad.priceLabel")}</p>
                   {editingName === dish.name ? (
                     <input
                       autoFocus
@@ -571,18 +574,18 @@ export default function RentabilidadPage() {
                     <button
                       onClick={() => { setEditingName(dish.name); setEditValue(String(dish.price)) }}
                       className="font-bold text-sm text-[#0E7A0E] hover:text-green-800 hover:underline transition-colors"
-                      title="Click para editar precio de venta"
-                      aria-label={`Editar precio de ${dish.name}`}
+                      title={t("rentabilidad.editPriceTitle")}
+                      aria-label={t("rentabilidad.editPriceAria", { name: dish.name })}
                     >
                       ${dish.price}
                       {priceOverrides[dish.name] !== undefined && (
-                        <span className="block text-[9px] text-amber-500">editado</span>
+                        <span className="block text-[9px] text-amber-500">{t("rentabilidad.edited")}</span>
                       )}
                     </button>
                   )}
                 </div>
                 <div className="text-center">
-                  <p className="text-[10px] text-gray-400">Margen</p>
+                  <p className="text-[10px] text-gray-400">{t("rentabilidad.marginLabel")}</p>
                   <p className={`font-bold text-sm ${margin > 0 ? "text-green-600" : "text-red-600"}`}>
                     ${margin.toFixed(0)} ({foodCost}%)
                   </p>
@@ -594,7 +597,7 @@ export default function RentabilidadPage() {
                   <div className="mt-2 pt-2 border-t border-red-100 flex items-center justify-between text-[10px] bg-red-50/50 rounded-lg px-3 py-1.5">
                     <span className="text-red-500 flex items-center gap-1">
                       <Trash2 className="w-3 h-3" />
-                      Merma ya incluida en el costo ({mermaStats.mermaPct.toFixed(0)}%)
+                      {t("rentabilidad.mermaIncludedCost", { pct: mermaStats.mermaPct.toFixed(0) })}
                     </span>
                     <span className="font-bold text-red-600">+${mermaAmount.toFixed(0)}</span>
                   </div>
@@ -611,12 +614,9 @@ export default function RentabilidadPage() {
         <div className="flex items-start gap-3">
           <DollarSign className="w-5 h-5 text-[#0E7A0E] mt-0.5 shrink-0" />
           <div>
-            <h4 className="font-semibold text-gray-900 mb-1 text-sm">¿Cómo usarlo?</h4>
+            <h4 className="font-semibold text-gray-900 mb-1 text-sm">{t("rentabilidad.tipTitle")}</h4>
             <p className="text-xs text-gray-500 leading-relaxed">
-              Los platillos de “Mi menú” usan los precios reales del catálogo de Resurte.me vía Costeando mi menú;
-              los platillos de referencia son estimados para tu tipo de cocina. 
-              Usa el simulador de precio para explorar cómo tu precio de venta impacta tu margen y el food cost.
-              Un food cost arriba del 38% pone en riesgo tu negocio.
+              {t("rentabilidad.tipDescription")}
             </p>
           </div>
         </div>
