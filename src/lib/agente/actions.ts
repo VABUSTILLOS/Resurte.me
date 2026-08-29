@@ -584,7 +584,7 @@ export async function getAgentKpis(): Promise<AgentKpis> {
       (Date.now() - new Date(firstCreated).getTime()) / (1000 * 60 * 60 * 24 * 30.44)
     monthIndex = Math.min(3, Math.max(1, Math.floor(elapsed) + 1))
   }
-  const target = MONTH_TARGETS[monthIndex - 1]
+  const target = MONTH_TARGETS[monthIndex - 1] ?? MONTH_TARGETS[0]
 
   // ---- Resultados del mes ----
   const monthRegistros = prospects.filter((p) => p.created_at >= month.startISO).length
@@ -625,7 +625,7 @@ export async function getAgentKpis(): Promise<AgentKpis> {
     })
 
   const byTier = segmentConv(
-    [1, 2, 3].map((t) => ({ key: String(t), label: TIER_LABEL[t] })),
+    [1, 2, 3].map((t) => ({ key: String(t), label: TIER_LABEL[t] ?? `Tier ${t}` })),
     (p) => (p.tier ? String(p.tier) : null)
   )
   const byZone = segmentConv(
