@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next"
+import { Suspense } from "react"
 import { Geist, Geist_Mono } from "next/font/google"
 import { CityProvider } from "@/contexts/city-context"
 import { CartProvider } from "@/contexts/cart-context"
@@ -159,7 +160,11 @@ export default async function RootLayout({
               <main id="main-content" tabIndex={-1} className="flex-1 outline-none"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
               <FooterForRoute />
               <CityDetector />
-              <UtmCapture />
+              {/* useSearchParams() exige un boundary de Suspense: sin él el
+                  prerender estático de /[slug]/* y /404 aborta el build. */}
+              <Suspense fallback={null}>
+                <UtmCapture />
+              </Suspense>
               <CartDrawer />
               <CheckoutOverlays />
               <BumpsDebugProbe />
