@@ -81,22 +81,28 @@ function recommendedChannelFor(touches: number, whatsapp: string | null): TouchC
 // ============================================================
 
 export async function getDailyQueue(): Promise<AgentQueueItem[]> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
 
+  const prospectsQuery = supabase
+    .from("crm_prospects")
+    .select(PROSPECT_COLS)
+    .in("status", [...ACTIVE_STATUSES, "inactivo"])
+    .order("created_at", { ascending: false })
+    .limit(300)
+  const activitiesQuery = supabase
+    .from("crm_activities")
+    .select("prospect_id")
+    .eq("direction", "saliente")
+  // El admin ve la operación completa; el vendedor solo lo suyo
+  if (role !== "admin") {
+    prospectsQuery.eq("seller_id", userId)
+    activitiesQuery.eq("seller_id", userId)
+  }
+
   const [{ data: prospects, error }, { data: activities }] = await Promise.all([
-    supabase
-      .from("crm_prospects")
-      .select(PROSPECT_COLS)
-      .eq("seller_id", userId)
-      .in("status", [...ACTIVE_STATUSES, "inactivo"])
-      .order("created_at", { ascending: false })
-      .limit(300),
-    supabase
-      .from("crm_activities")
-      .select("prospect_id")
-      .eq("seller_id", userId)
-      .eq("direction", "saliente"),
+    prospectsQuery,
+    activitiesQuery,
   ])
 
   if (error) {
@@ -185,16 +191,16 @@ export async function generateAgentMessage(
   prospectId: number,
   kind: MessageKind
 ): Promise<AgentMessage> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   if (!MESSAGE_KINDS.includes(kind)) throw new Error("Tipo de mensaje inválido")
 
   const supabase = await createServiceClient()
-  const { data: prospect, error } = await supabase
+  const prospectQuery = supabase
     .from("crm_prospects")
     .select(PROSPECT_COLS + ", notes, employees, instagram, weekly_volume_min, weekly_volume_max")
     .eq("id", prospectId)
-    .eq("seller_id", userId)
-    .single()
+  if (role !== "admin") prospectQuery.eq("seller_id", userId)
+  const { data: prospect, error } = await prospectQuery.single()
 
   if (error || !prospect) throw new Error("Prospecto no encontrado")
   const p = prospect as unknown as ProspectRow & {
@@ -278,16 +284,17 @@ export async function generateAgentMessage(
 export async function getAgentMessages(
   status: AgentMessageStatus = "borrador"
 ): Promise<AgentMessage[]> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
 
-  const { data, error } = await supabase
+  const query = supabase
     .from("crm_agent_messages")
     .select("id, prospect_id, kind, message, status, model, created_at, crm_prospects(name, restaurant_name, whatsapp, phone)")
-    .eq("seller_id", userId)
     .eq("status", status)
     .order("created_at", { ascending: false })
     .limit(50)
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { data, error } = await query
 
   if (error) {
     logger.error("[AgenteIA] getAgentMessages error:", error)
@@ -317,15 +324,16 @@ export async function getAgentMessages(
 }
 
 export async function updateAgentMessageText(id: number, text: string): Promise<void> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   if (!text.trim()) throw new Error("El mensaje no puede estar vacío")
   const supabase = await createServiceClient()
-  const { error } = await supabase
+  const query = supabase
     .from("crm_agent_messages")
     .update({ message: text.trim() })
     .eq("id", id)
-    .eq("seller_id", userId)
     .in("status", ["borrador", "aprobado"])
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { error } = await query
   if (error) {
     logger.error("[AgenteIA] updateAgentMessageText error:", error)
     throw new Error("Error al actualizar el mensaje")
@@ -336,16 +344,17 @@ export async function setAgentMessageStatus(
   id: number,
   status: "aprobado" | "descartado"
 ): Promise<void> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
   const patch: Record<string, unknown> = { status }
   if (status === "aprobado") patch.approved_at = new Date().toISOString()
-  const { error } = await supabase
+  const query = supabase
     .from("crm_agent_messages")
     .update(patch)
     .eq("id", id)
-    .eq("seller_id", userId)
     .neq("status", "enviado")
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { error } = await query
   if (error) {
     logger.error("[AgenteIA] setAgentMessageStatus error:", error)
     throw new Error("Error al actualizar el mensaje")
@@ -358,15 +367,15 @@ export async function setAgentMessageStatus(
  * mensaje prellenado. El envío real lo hace el vendedor (asistido).
  */
 export async function sendAgentMessage(id: number): Promise<{ link: string }> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
 
-  const { data: msg, error } = await supabase
+  const msgQuery = supabase
     .from("crm_agent_messages")
     .select("id, prospect_id, kind, message, status, crm_prospects(whatsapp, phone, status)")
     .eq("id", id)
-    .eq("seller_id", userId)
-    .single()
+  if (role !== "admin") msgQuery.eq("seller_id", userId)
+  const { data: msg, error } = await msgQuery.single()
 
   if (error || !msg) throw new Error("Mensaje no encontrado")
   if (msg.status === "enviado") throw new Error("Este mensaje ya fue enviado")
@@ -413,15 +422,15 @@ export async function registerAgentTouch(
   type: Exclude<TouchChannel, "whatsapp">,
   summary?: string
 ): Promise<void> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
 
-  const { data: prospect, error } = await supabase
+  const prospectQuery = supabase
     .from("crm_prospects")
     .select("id, status")
     .eq("id", prospectId)
-    .eq("seller_id", userId)
-    .single()
+  if (role !== "admin") prospectQuery.eq("seller_id", userId)
+  const { data: prospect, error } = await prospectQuery.single()
   if (error || !prospect) throw new Error("Prospecto no encontrado")
 
   const { error: actErr } = await supabase.from("crm_activities").insert({
@@ -498,27 +507,33 @@ export async function updateAgentGoals(goals: AgentGoals): Promise<void> {
 // ============================================================
 
 export async function getAgentKpis(): Promise<AgentKpis> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
   const week = getWeekBounds()
   const month = getMonthBounds()
   const today = getTodayBounds()
   const goals = await getAgentGoals()
 
+  const prospectsQuery = supabase
+    .from("crm_prospects")
+    .select("id, status, tier, zone, user_id, created_at")
+  const activitiesQuery = supabase
+    .from("crm_activities")
+    .select("type, occurred_at")
+    .gte("occurred_at", week.startISO)
+  const messagesQuery = supabase
+    .from("crm_agent_messages")
+    .select("status, sent_at")
+  if (role !== "admin") {
+    prospectsQuery.eq("seller_id", userId)
+    activitiesQuery.eq("seller_id", userId)
+    messagesQuery.eq("seller_id", userId)
+  }
+
   const [prospectsRes, activitiesRes, messagesRes] = await Promise.all([
-    supabase
-      .from("crm_prospects")
-      .select("id, status, tier, zone, user_id, created_at")
-      .eq("seller_id", userId),
-    supabase
-      .from("crm_activities")
-      .select("type, occurred_at")
-      .eq("seller_id", userId)
-      .gte("occurred_at", week.startISO),
-    supabase
-      .from("crm_agent_messages")
-      .select("status, sent_at")
-      .eq("seller_id", userId),
+    prospectsQuery,
+    activitiesQuery,
+    messagesQuery,
   ])
 
   if (prospectsRes.error) {

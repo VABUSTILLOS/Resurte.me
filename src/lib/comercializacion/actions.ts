@@ -35,6 +35,68 @@ function escapeIlike(raw: string): string {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+function digitsOf(value: string | null | undefined): string {
+  return (value ?? "").replace(/\D/g, "")
+}
+
+export type DuplicateMatch = {
+  /** Dígitos del teléfono buscado que coincidió. */
+  phone: string
+  prospectId: number
+  prospectName: string
+}
+
+/**
+ * Busca prospectos del vendedor que ya tienen alguno de los teléfonos dados
+ * (comparando solo dígitos, contra phone y whatsapp). Para advertir
+ * duplicados antes de crear o importar.
+ */
+export async function findDuplicatesByPhone(
+  phones: string[]
+): Promise<DuplicateMatch[]> {
+  const { userId, role } = await requireSellerOrAdminAction()
+  const wanted = new Map<string, string>()
+  for (const p of phones) {
+    const d = digitsOf(p)
+    if (d.length >= 8) wanted.set(d, d)
+  }
+  if (wanted.size === 0) return []
+
+  const supabase = await createServiceClient()
+  const query = supabase
+    .from("crm_prospects")
+    .select("id, name, phone, whatsapp")
+    .limit(2000)
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { data, error } = await query
+
+  if (error) {
+    logger.error("[CRM] findDuplicatesByPhone error:", error)
+    return []
+  }
+
+  const matches: DuplicateMatch[] = []
+  for (const row of data ?? []) {
+    const existing = [digitsOf(row.phone as string | null), digitsOf(row.whatsapp as string | null)]
+    for (const d of existing) {
+      // Coincidencia exacta o por últimos 10 dígitos (con/sin código de país).
+      const tail = d.length > 10 ? d.slice(-10) : d
+      for (const w of wanted.keys()) {
+        const wTail = w.length > 10 ? w.slice(-10) : w
+        if (d === w || (tail.length >= 10 && tail === wTail)) {
+          matches.push({
+            phone: w,
+            prospectId: Number(row.id),
+            prospectName: String(row.name),
+          })
+          break
+        }
+      }
+    }
+  }
+  return matches
+}
+
 /** Validaciones ligeras de contacto para prospectos (errores en español). */
 function validateProspectContact(input: {
   name?: string | null
@@ -96,20 +158,27 @@ export interface ProspectFilters {
   onlyPending?: boolean
   /** Máximo de filas (default 200) para no traer la tabla completa. */
   limit?: number
+  /** Desplazamiento para paginación ("Cargar más"). */
+  offset?: number
 }
 
 export async function getProspects(
   filters: ProspectFilters = {}
 ): Promise<Prospect[]> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
+
+  const limit = filters.limit ?? 200
+  const offset = filters.offset ?? 0
 
   let query = supabase
     .from("crm_prospects")
     .select("*, cities(name)")
-    .eq("seller_id", userId)
     .order("created_at", { ascending: false })
-    .limit(filters.limit ?? 200)
+    .range(offset, offset + limit - 1)
+
+  // El admin ve la cartera completa; el vendedor solo la suya
+  if (role !== "admin") query = query.eq("seller_id", userId)
 
   if (filters.status && filters.status !== "todos") {
     query = query.eq("status", filters.status)
@@ -190,7 +259,7 @@ export async function updateProspect(
   id: number,
   input: Partial<ProspectInput>
 ): Promise<Prospect> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   validateProspectContact(input)
   if (input.status !== undefined && !PROSPECT_STATUSES.includes(input.status)) {
     throw new Error("Estado de prospecto inválido")
@@ -212,13 +281,12 @@ export async function updateProspect(
     patch.next_follow_up_at = input.next_follow_up_at || null
   if (input.notes !== undefined) patch.notes = input.notes?.trim() || null
 
-  const { data, error } = await supabase
+  const query = supabase
     .from("crm_prospects")
     .update(patch)
     .eq("id", id)
-    .eq("seller_id", userId)
-    .select("*, cities(name)")
-    .single()
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { data, error } = await query.select("*, cities(name)").single()
 
   if (error) {
     logger.error("[CRM] updateProspect error:", error)
@@ -231,13 +299,14 @@ export async function updateProspect(
 }
 
 export async function deleteProspect(id: number): Promise<void> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
-  const { error } = await supabase
+  const query = supabase
     .from("crm_prospects")
     .delete()
     .eq("id", id)
-    .eq("seller_id", userId)
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { error } = await query
   if (error) {
     logger.error("[CRM] deleteProspect error:", error)
     throw new Error("Error al eliminar el prospecto")
@@ -326,15 +395,15 @@ export async function getProspectDetail(id: number): Promise<{
   prospect: Prospect
   activities: Activity[]
 }> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
 
-  const { data: prospect, error } = await supabase
+  const prospectQuery = supabase
     .from("crm_prospects")
     .select("*, cities(name)")
     .eq("id", id)
-    .eq("seller_id", userId)
-    .single()
+  if (role !== "admin") prospectQuery.eq("seller_id", userId)
+  const { data: prospect, error } = await prospectQuery.single()
 
   if (error || !prospect) {
     throw new Error("Prospecto no encontrado")
@@ -378,7 +447,7 @@ export async function addActivity(
   prospectId: number,
   input: ActivityInput
 ): Promise<void> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   if (!ACTIVITY_TYPES.includes(input.type)) {
     throw new Error("Tipo de actividad inválido")
   }
@@ -391,12 +460,12 @@ export async function addActivity(
   const supabase = await createServiceClient()
 
   // Verificar propiedad
-  const { data: prospect, error: ownerErr } = await supabase
+  const ownerQuery = supabase
     .from("crm_prospects")
     .select("id, status")
     .eq("id", prospectId)
-    .eq("seller_id", userId)
-    .single()
+  if (role !== "admin") ownerQuery.eq("seller_id", userId)
+  const { data: prospect, error: ownerErr } = await ownerQuery.single()
   if (ownerErr || !prospect) {
     throw new Error("Prospecto no encontrado")
   }
@@ -422,6 +491,57 @@ export async function addActivity(
   await supabase.from("crm_prospects").update(patch).eq("id", prospectId)
 }
 
+export async function updateActivity(
+  id: number,
+  input: Partial<ActivityInput>
+): Promise<void> {
+  const { userId, role } = await requireSellerOrAdminAction()
+  if (input.type !== undefined && !ACTIVITY_TYPES.includes(input.type)) {
+    throw new Error("Tipo de actividad inválido")
+  }
+  if (
+    input.duration_seconds != null &&
+    (!Number.isFinite(input.duration_seconds) || input.duration_seconds <= 0)
+  ) {
+    throw new Error("La duración debe ser mayor a 0")
+  }
+  const supabase = await createServiceClient()
+
+  const patch: Record<string, unknown> = {}
+  if (input.type !== undefined) patch.type = input.type
+  if (input.direction !== undefined) patch.direction = input.direction
+  if (input.outcome !== undefined) patch.outcome = input.outcome ?? null
+  if (input.summary !== undefined) patch.summary = input.summary?.trim() || null
+  if (input.duration_seconds !== undefined)
+    patch.duration_seconds = input.duration_seconds ?? null
+
+  const query = supabase
+    .from("crm_activities")
+    .update(patch)
+    .eq("id", id)
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { error } = await query
+  if (error) {
+    logger.error("[CRM] updateActivity error:", error)
+    throw new Error("Error al actualizar la actividad")
+  }
+}
+
+export async function deleteActivity(id: number): Promise<void> {
+  const { userId, role } = await requireSellerOrAdminAction()
+  const supabase = await createServiceClient()
+  const query = supabase
+    .from("crm_activities")
+    .delete()
+    .eq("id", id)
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { error } = await query
+  if (error) {
+    logger.error("[CRM] deleteActivity error:", error)
+    throw new Error("Error al eliminar la actividad")
+  }
+}
+
 // ============================================================
 // VINCULACIÓN DE CUENTA
 // ============================================================
@@ -432,15 +552,15 @@ export async function getProspectClientOrders(prospectId: number): Promise<{
   revenue: number
   commission: number
 }> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
 
-  const { data: prospect, error } = await supabase
+  const prospectQuery = supabase
     .from("crm_prospects")
     .select("id, user_id")
     .eq("id", prospectId)
-    .eq("seller_id", userId)
-    .maybeSingle()
+  if (role !== "admin") prospectQuery.eq("seller_id", userId)
+  const { data: prospect, error } = await prospectQuery.maybeSingle()
   if (error || !prospect || !prospect.user_id) {
     return { orders: [], revenue: 0, commission: 0 }
   }
@@ -508,11 +628,11 @@ export async function linkProspectAccount(
   prospectId: number,
   userId: string
 ): Promise<void> {
-  const { userId: sellerId } = await requireSellerOrAdminAction()
+  const { userId: sellerId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
 
   // Verificar que el usuario existe y no está vinculado a otro prospecto
-  // del mismo vendedor.
+  // del mismo vendedor (para admin: a ningún prospecto en general).
   const { data: profile } = await supabase
     .from("profiles")
     .select("id")
@@ -520,19 +640,20 @@ export async function linkProspectAccount(
     .maybeSingle()
   if (!profile) throw new Error("El usuario no existe")
 
-  const { data: existing } = await supabase
+  const existingQuery = supabase
     .from("crm_prospects")
     .select("id")
     .eq("user_id", userId)
-    .eq("seller_id", sellerId)
-    .maybeSingle()
+  if (role !== "admin") existingQuery.eq("seller_id", sellerId)
+  const { data: existing } = await existingQuery.maybeSingle()
   if (existing) throw new Error("Este usuario ya está vinculado a otro prospecto tuyo")
 
-  const { error } = await supabase
+  const updateQuery = supabase
     .from("crm_prospects")
     .update({ user_id: userId })
     .eq("id", prospectId)
-    .eq("seller_id", sellerId)
+  if (role !== "admin") updateQuery.eq("seller_id", sellerId)
+  const { error } = await updateQuery
   if (error) {
     logger.error("[CRM] linkProspectAccount error:", error)
     throw new Error("Error al vincular la cuenta")
@@ -555,21 +676,34 @@ export async function getSellerDisplayName(): Promise<string> {
 }
 
 export async function getDashboardKpis(): Promise<DashboardKpis> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
   const week = getWeekBounds()
   const month = getMonthBounds()
   const today = getTodayBounds()
 
+  const prospectsQuery = supabase.from("crm_prospects").select("id, status, next_follow_up_at, user_id")
+  const activitiesQuery = supabase.from("crm_activities").select("id, type, occurred_at")
+  const linkedQuery = supabase
+    .from("crm_prospects")
+    .select("id, user_id")
+    .not("user_id", "is", null)
+  const activeClientsQuery = supabase
+    .from("crm_prospects")
+    .select("id")
+    .eq("status", "cliente_activo")
+  if (role !== "admin") {
+    prospectsQuery.eq("seller_id", userId)
+    activitiesQuery.eq("seller_id", userId)
+    linkedQuery.eq("seller_id", userId)
+    activeClientsQuery.eq("seller_id", userId)
+  }
+
   const [prospectsRes, activitiesRes, linkedRes, activeClientsRes] = await Promise.all([
-    supabase.from("crm_prospects").select("id, status, next_follow_up_at, user_id").eq("seller_id", userId),
-    supabase.from("crm_activities").select("id, type, occurred_at").eq("seller_id", userId),
-    supabase
-      .from("crm_prospects")
-      .select("id, user_id")
-      .eq("seller_id", userId)
-      .not("user_id", "is", null),
-    supabase.from("crm_prospects").select("id").eq("seller_id", userId).eq("status", "cliente_activo"),
+    prospectsQuery,
+    activitiesQuery,
+    linkedQuery,
+    activeClientsQuery,
   ])
 
   if (prospectsRes.error || activitiesRes.error) {
@@ -634,18 +768,19 @@ export async function getDashboardKpis(): Promise<DashboardKpis> {
 }
 
 export async function getPendingFollowUps(): Promise<FollowUp[]> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
   const now = new Date().toISOString()
 
-  const { data, error } = await supabase
+  const query = supabase
     .from("crm_prospects")
     .select("id, name, restaurant_name, whatsapp, phone, status, next_follow_up_at, last_contact_at, user_id")
-    .eq("seller_id", userId)
     .lte("next_follow_up_at", now)
     .not("status", "in", "(perdido,inactivo)")
     .order("next_follow_up_at", { ascending: true })
     .limit(20)
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { data, error } = await query
 
   if (error) {
     logger.error("[CRM] getPendingFollowUps error:", error)
@@ -664,18 +799,40 @@ export async function getPendingFollowUps(): Promise<FollowUp[]> {
   }))
 }
 
+/** Seguimientos vencidos (fecha anterior a hoy CDMX), para badge en la navegación. */
+export async function getOverdueFollowUpCount(): Promise<number> {
+  const { userId, role } = await requireSellerOrAdminAction()
+  const supabase = await createServiceClient()
+  const { startISO } = getTodayBounds()
+
+  const query = supabase
+    .from("crm_prospects")
+    .select("id", { count: "exact", head: true })
+    .lt("next_follow_up_at", startISO)
+    .not("status", "in", "(perdido,inactivo)")
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { count, error } = await query
+
+  if (error) {
+    logger.error("[CRM] getOverdueFollowUpCount error:", error)
+    return 0
+  }
+  return count ?? 0
+}
+
 /** Clientes vinculados activos que aún no piden en la semana actual. */
 export async function getClientsToReorder(): Promise<ClientToReorder[]> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
   const week = getWeekBounds()
 
-  const { data, error } = await supabase
+  const query = supabase
     .from("crm_prospects")
     .select("id, name, restaurant_name, whatsapp, phone, user_id")
-    .eq("seller_id", userId)
     .not("user_id", "is", null)
     .in("status", ["cliente_activo", "en_seguimiento"])
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { data, error } = await query
 
   if (error) {
     logger.error("[CRM] getClientsToReorder error:", error)
@@ -723,15 +880,16 @@ export async function getClientsToReorder(): Promise<ClientToReorder[]> {
 // ============================================================
 
 export async function getSellerClients(): Promise<SellerClientSummary[]> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
 
-  const { data, error } = await supabase
+  const query = supabase
     .from("crm_prospects")
     .select("id, name, restaurant_name, user_id, status")
-    .eq("seller_id", userId)
     .not("user_id", "is", null)
     .order("name")
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { data, error } = await query
 
   if (error) {
     logger.error("[CRM] getSellerClients error:", error)
@@ -885,7 +1043,7 @@ export async function createAssistedOrder(input: {
   scheduledFor?: string
   note?: string
 }): Promise<{ orderId: number }> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   if (!input.items || input.items.length === 0) {
     throw new Error("El pedido debe tener al menos un producto")
   }
@@ -897,12 +1055,12 @@ export async function createAssistedOrder(input: {
   const supabase = await createServiceClient()
 
   // 1) Prospecto del vendedor, vinculado a una cuenta real
-  const { data: prospect, error: prospectErr } = await supabase
+  const prospectQuery = supabase
     .from("crm_prospects")
     .select("id, name, user_id, city_id, whatsapp, phone, email, restaurant_name")
     .eq("id", input.prospectId)
-    .eq("seller_id", userId)
-    .single()
+  if (role !== "admin") prospectQuery.eq("seller_id", userId)
+  const { data: prospect, error: prospectErr } = await prospectQuery.single()
   if (prospectErr || !prospect) throw new Error("Prospecto no encontrado")
   if (!prospect.user_id) {
     throw new Error("Este prospecto aún no está vinculado a una cuenta. Vincula su cuenta primero.")
@@ -1018,15 +1176,16 @@ export async function createAssistedOrder(input: {
 }
 
 export async function getAssistedOrders(): Promise<AssistedOrderSummary[]> {
-  const { userId } = await requireSellerOrAdminAction()
+  const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
 
-  const { data, error } = await supabase
+  const query = supabase
     .from("orders")
     .select("id, status, payment_status, total, created_at, profiles(full_name), order_items(id)")
-    .eq("seller_id", userId)
     .order("created_at", { ascending: false })
     .limit(50)
+  if (role !== "admin") query.eq("seller_id", userId)
+  const { data, error } = await query
 
   if (error) {
     logger.error("[CRM] getAssistedOrders error:", error)
