@@ -24,7 +24,7 @@ import PurchaseOrder from "@/components/panel/inventario/PurchaseOrder"
 import MovementHistory from "@/components/panel/inventario/MovementHistory"
 import InventarioTips from "@/components/panel/inventario/InventarioTips"
 import AddEditModal from "@/components/panel/inventario/AddEditModal"
-import DeleteConfirm from "@/components/panel/inventario/DeleteConfirm"
+import ConfirmDialog from "@/components/panel/ConfirmDialog"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 export default function InventarioPage() {
@@ -636,10 +636,14 @@ export default function InventarioPage() {
       onSave={saveItem}
     />
 
-    <DeleteConfirm
-      deleteConfirm={deleteConfirm}
+    <ConfirmDialog
+      open={deleteConfirm !== null}
+      title="¿Eliminar producto?"
+      message="Esta acción no se puede deshacer."
+      confirmLabel="Eliminar"
+      danger
       onCancel={() => setDeleteConfirm(null)}
-      onConfirm={deleteItem}
+      onConfirm={() => { if (deleteConfirm) deleteItem(deleteConfirm) }}
     />
     <ToolGuideHost toolKey="inventario" pathname="/panel/inventario" slug={slug} icon="📦" title="Inventario" subtitle={selectedCollection.name} />
     </div>

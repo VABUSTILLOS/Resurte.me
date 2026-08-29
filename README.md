@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Resurte.me
 
-## Getting Started
+Marketplace mayorista de insumos para restaurantes en México + suite de herramientas de gestión (SaaS) para restauranteros.
 
-First, run the development server:
+## Áreas del producto
+
+| Ruta | Descripción |
+| --- | --- |
+| `/` y `/[ciudad]` | Landing pública y catálogo por ciudad (marketplace B2B). |
+| `/panel` | Suite de ~13 herramientas para restaurantes: ventas, comanda, mermas, costeo, inventario, planificador, temporada, apertura, personal, rentabilidad, analítica y FoodOS (menú digital). |
+| `/admin` | Backoffice interno: pedidos, productos, visibilidad, WhatsApp y workflows. |
+| `/negocio` | Portal B2B para negocios aliados. |
+| `/comercializacion` | Flujos de comercialización. |
+
+## Stack
+
+- **Next.js 16** (App Router) + **React 19** + **TypeScript** estricto
+- **Tailwind CSS 4**
+- **Supabase** (base de datos, auth, storage)
+- **Stripe** (pagos)
+- **Vitest** (unitarios) + **Playwright** (e2e) + **knip** (código muerto)
+
+## Desarrollo
 
 ```bash
+npm install
+cp .env.local.example .env.local   # completa los valores
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Comandos
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Comando | Descripción |
+| --- | --- |
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Build de producción |
+| `npm run lint` | ESLint |
+| `npx tsc --noEmit` | Typecheck |
+| `npm test` | Tests unitarios (Vitest) |
+| `npm run test:e2e` | Tests e2e (Playwright) |
 
-## Learn More
+## Variables de entorno
 
-To learn more about Next.js, take a look at the following resources:
+Todas están documentadas en [`.env.local.example`](.env.local.example): Supabase, URL del sitio, GA4, verificación de Google y CSP.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Documentación
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [`docs/OPS.md`](docs/OPS.md) — operación
+- [`docs/MOCKS.md`](docs/MOCKS.md) — mocks y datos de prueba
+- [`docs/agente-ia.md`](docs/agente-ia.md) — guía del agente IA
+- [`docs/guia-captura-campo.md`](docs/guia-captura-campo.md) — captura en campo

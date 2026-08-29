@@ -1,4 +1,7 @@
+import { useEscapeKey } from "@/hooks/use-escape-key"
+
 export default function ShortcutsOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useEscapeKey(onClose, open)
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>

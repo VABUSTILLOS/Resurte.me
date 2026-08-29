@@ -154,6 +154,7 @@ const DEFAULT_DISHES: DishData[] = [
 export default function RentabilidadPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
+  const [tab, setTab] = useState<"platillos" | "analisis">("platillos")
   const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
   const [mermaEntries] = useSyncedRows<WasteEntry>("mermas-entries", [], slug)
@@ -414,6 +415,28 @@ export default function RentabilidadPage() {
         </div>
       </div>
 
+      {tab === "platillos" && (
+        <>
+      {/* Tabs: Platillos / Análisis */}
+      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 w-fit max-w-full overflow-x-auto" role="tablist" aria-label="Secciones de rentabilidad">
+        {([
+          ["platillos", "Platillos"],
+          ["analisis", "Análisis"],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab(key)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+              tab === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* Summary bar */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="bg-green-50 rounded-2xl border border-green-200 p-4 text-center">
@@ -436,6 +459,11 @@ export default function RentabilidadPage() {
         </div>
       </div>
 
+        </>
+      )}
+
+      {tab === "analisis" && (
+        <>
       {/* Ventas reales del mes × costeo */}
       {realSales && (
         <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
@@ -525,6 +553,11 @@ export default function RentabilidadPage() {
         </div>
       )}
 
+        </>
+      )}
+
+      {tab === "platillos" && (
+        <>
       {/* Alert box */}
       {alerts.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
@@ -748,6 +781,8 @@ export default function RentabilidadPage() {
           </div>
         </div>
       </div>
+        </>
+      )}
       <ToolGuideHost toolKey="rentabilidad" pathname="/panel/rentabilidad" slug={slug} icon="📊" title="Rentabilidad" subtitle={selectedCollection.name} />
     </div>
   )

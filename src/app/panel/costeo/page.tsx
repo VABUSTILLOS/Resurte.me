@@ -44,6 +44,7 @@ export default function CosteoPage() {
   const { selectedCollection } = useRestaurant()
   const { toast } = useToast()
   const slug = selectedCollection?.slug || null
+  const [tab, setTab] = useState<"platillos" | "combos">("platillos")
 
   const mockIngredients = selectedCollection
     ? (MOCK_INGREDIENTS[selectedCollection.slug] || DEFAULT_INGREDIENTS)
@@ -550,6 +551,28 @@ export default function CosteoPage() {
       onOpenRecipes={() => setShowRecipes(true)}
     />
 
+    {/* Tabs: Platillos / Combos */}
+    <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 w-fit max-w-full overflow-x-auto" role="tablist" aria-label="Secciones de costeo">
+      {([
+        ["platillos", "Platillos"],
+        ["combos", "Combos"],
+      ] as const).map(([key, label]) => (
+        <button
+          key={key}
+          role="tab"
+          aria-selected={tab === key}
+          onClick={() => setTab(key)}
+          className={`px-4 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+            tab === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+
+    {tab === "platillos" && (
+      <>
     <FoodCostTarget
       targetFoodCost={targetFoodCost}
       onDecrease={() => setTargetFoodCost(Math.max(panelCfg.costeoTargetFcMin, targetFoodCost - 5))}
@@ -635,6 +658,11 @@ export default function CosteoPage() {
       normalizeName={normalizeName}
     />
 
+    <CosteoSummary dishes={dishes} />
+      </>
+    )}
+
+    {tab === "combos" && (
     <CombosSection
       combos={combos}
       showComboForm={showComboForm}
@@ -655,8 +683,7 @@ export default function CosteoPage() {
       addCombo={addCombo}
       targetFoodCost={targetFoodCost}
     />
-
-    <CosteoSummary dishes={dishes} />
+    )}
 
     <RecipePickerModal
       open={showRecipes}

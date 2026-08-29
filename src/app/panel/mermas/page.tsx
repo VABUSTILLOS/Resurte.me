@@ -23,7 +23,7 @@ import TopCauses from "@/components/panel/mermas/top-causes"
 import TrendsPanel from "@/components/panel/mermas/trends-panel"
 import MonthlyGoal from "@/components/panel/mermas/monthly-goal"
 import TipsPanel from "@/components/panel/mermas/tips-panel"
-import DeleteConfirmModal from "@/components/panel/mermas/delete-confirm-modal"
+import ConfirmDialog from "@/components/panel/ConfirmDialog"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 export default function MermasPage() {
@@ -371,12 +371,15 @@ export default function MermasPage() {
         </p>
       </div>
 
-      {deleteConfirmId && (
-        <DeleteConfirmModal
-          onConfirm={confirmDeleteEntry}
-          onCancel={() => setDeleteConfirmId(null)}
-        />
-      )}
+      <ConfirmDialog
+        open={deleteConfirmId !== null}
+        title="¿Eliminar este registro?"
+        message="Esta acción no se puede deshacer. Perderás el registro de merma y su costo asociado."
+        confirmLabel="Sí, eliminar"
+        danger
+        onConfirm={confirmDeleteEntry}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
       <ToolGuideHost toolKey="mermas" pathname="/panel/mermas" slug={slug} icon="🗑️" title="Control de mermas" subtitle={selectedCollection.name} />
     </div>
   )

@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Clock, Users, Plus, Search, ShoppingCart } f
 import Image from "next/image"
 import Link from "next/link"
 import { useCart } from "@/contexts/cart-context"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { CollectionRecipe } from "@/types"
 import type { Product } from "@/types"
 
@@ -101,6 +102,9 @@ function RecipeIngredient({
   const [open, setOpen] = useState(false)
   const { addItem } = useCart()
   const matched = matchIngredient(name, products)
+
+  const closePopover = useCallback(() => setOpen(false), [])
+  useEscapeKey(closePopover, open)
 
   // Close on outside click
   const handleAddToCart = useCallback(() => {

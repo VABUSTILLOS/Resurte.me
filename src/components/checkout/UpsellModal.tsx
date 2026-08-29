@@ -15,6 +15,7 @@ import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { getGuestToken } from "@/lib/guest-address"
 import { ORDER_PAID_EVENT } from "@/components/checkout/CheckoutDrawer"
 import { trackEvent } from "@/lib/analytics"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { UpsellOffer } from "@/lib/upsell-offers"
 import { logger } from "@/lib/logger"
 
@@ -495,6 +496,8 @@ export function UpsellModal() {
     setIsOpen(false)
     goToConfirmation()
   }
+
+  useEscapeKey(handleClose, isOpen)
 
   // Listener global del evento de pago.
   useEffect(() => {

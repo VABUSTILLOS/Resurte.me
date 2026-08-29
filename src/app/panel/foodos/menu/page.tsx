@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes } from "@/hooks/use-local-storage"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import {
   getFoodosPanelData,
   listCategories,
@@ -69,6 +70,9 @@ export default function MenuPage() {
   const [editingItem, setEditingItem] = useState<ItemForm | null>(null)
   const [showItemForm, setShowItemForm] = useState(false)
   const [importing, setImporting] = useState(false)
+
+  const closeItemForm = useCallback(() => setShowItemForm(false), [])
+  useEscapeKey(closeItemForm, showItemForm)
 
   const [sharedDishes] = useSharedDishes(selectedCollection?.slug)
 

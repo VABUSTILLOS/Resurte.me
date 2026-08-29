@@ -1,4 +1,5 @@
 import { X } from "lucide-react"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { Proveedor } from "./inventario-shared"
 
 interface Props {
@@ -44,6 +45,7 @@ export default function AddEditModal({
   onCancel,
   onSave,
 }: Props) {
+  useEscapeKey(onCancel, showForm)
   if (!showForm) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onCancel}>

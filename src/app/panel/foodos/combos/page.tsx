@@ -17,6 +17,7 @@ import {
   deleteUpsellRule,
 } from "../actions"
 import { formatMoney } from "@/lib/foodos"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import type {
   FoodosRestaurant,
   FoodosMenuItem,
@@ -78,6 +79,11 @@ export default function CombosPage() {
   const [comboForm, setComboForm] = useState<ComboForm>(EMPTY_COMBO)
   const [showRuleForm, setShowRuleForm] = useState(false)
   const [ruleForm, setRuleForm] = useState<RuleForm>(EMPTY_RULE)
+
+  const closeComboForm = useCallback(() => setShowComboForm(false), [])
+  const closeRuleForm = useCallback(() => setShowRuleForm(false), [])
+  useEscapeKey(closeComboForm, showComboForm)
+  useEscapeKey(closeRuleForm, showRuleForm && !showComboForm)
 
   const load = useCallback(async () => {
     try {

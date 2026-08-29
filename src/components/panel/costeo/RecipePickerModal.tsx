@@ -1,5 +1,6 @@
 import { BookOpen } from "lucide-react"
 import RecipeCard from "./RecipeCard"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import { PRESET_RECIPES, type Recipe } from "./costeo-shared"
 
 export default function RecipePickerModal({
@@ -27,6 +28,7 @@ export default function RecipePickerModal({
   onClose: () => void
   normalizeName: (s: string) => string
 }) {
+  useEscapeKey(onClose, open)
   if (!open) return null
   const presets = (PRESET_RECIPES[slug || ""] || []).filter((r) => normalizeName(r.name).includes(normalizeName(recipeSearch.trim())))
   return (

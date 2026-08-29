@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useVentasPage } from "@/hooks/use-ventas-page"
 import { t } from "@/lib/i18n/es"
 import { entryTotal } from "@/components/panel/ventas/ventas-shared"
@@ -20,7 +21,7 @@ import WeekTrend from "@/components/panel/ventas/WeekTrend"
 import TopSellers from "@/components/panel/ventas/TopSellers"
 import EntriesList from "@/components/panel/ventas/EntriesList"
 import AllTimeTip from "@/components/panel/ventas/AllTimeTip"
-import DeleteConfirmModal from "@/components/panel/ventas/DeleteConfirmModal"
+import ConfirmDialog from "@/components/panel/ConfirmDialog"
 import AppOrdersCard from "@/components/panel/ventas/app-orders-card"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
@@ -104,6 +105,7 @@ export default function VentasPage() {
   } = useVentasPage()
 
   const slug = selectedCollection?.slug ?? null
+  const [tab, setTab] = useState<"hoy" | "analisis" | "extras">("hoy")
 
   const exportVentasCsv = () => {
     if (reportEntries.length === 0) return
@@ -200,161 +202,203 @@ export default function VentasPage() {
         counterRevenue={entries.filter((e) => e.date.startsWith(todayStr())).reduce((s, e) => s + entryTotal(e), 0)}
       />
 
-      {/* ── Register sale form ───────────────────────────── */}
-      <SaleForm
-        sharedDishes={sharedDishes}
-        entries={entries}
-        clientes={clientesCrud.clientes}
-        mesas={mesasCrud.mesas}
-        puntosTasa={puntosTasa}
-        puntosCanje={puntosCanje}
-        deductStock={deductStock}
-        dishCost={dishCost}
-        dishPrice={dishPrice}
-        onToggleDeductStock={setDeductStock}
-        onAdd={handleAddEntry}
-        onEscape={() => setDeleteConfirm(null)}
-        toast={toast}
-      />
+      {/* ── Tabs: Hoy / Análisis / Extras ────────────────── */}
+      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 w-fit max-w-full overflow-x-auto" role="tablist" aria-label="Secciones de ventas">
+        {([
+          ["hoy", "Hoy"],
+          ["analisis", "Análisis"],
+          ["extras", "Extras"],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab(key)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+              tab === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-      {/* ── Sales goals ──────────────────────────────────── */}
-      <SalesGoals
-        showGoals={showGoals}
-        goalFormDia={goalFormDia}
-        goalFormMes={goalFormMes}
-        dailyGoal={dailyGoal}
-        monthlyGoal={monthlyGoal}
-        dayStats={dayStats}
-        dailyGoalPct={dailyGoalPct}
-        monthlyGoalPct={monthlyGoalPct}
-        monthRevenue={monthRevenue}
-        projectedRevenue={projectedRevenue}
-        onPace={onPace}
-        comisiones={comisiones}
-        onToggle={toggleGoals}
-        onGoalFormDiaChange={setGoalFormDia}
-        onGoalFormMesChange={setGoalFormMes}
-        onSave={saveGoals}
-        onComisionChange={(key, value) =>
-          setComisiones((prev) => ({ ...prev, [key]: toNonNegativeNumber(value) }))
-        }
-      />
-
-      {/* ── Clientes frecuentes ──────────────────────────── */}
-      <FrequentCustomers
-        crud={clientesCrud}
-        puntosTasa={puntosTasa}
-        puntosCanje={puntosCanje}
-        tipoCambio={tipoCambio}
-        onCopy={copyClientes}
-        onPuntosTasaChange={setPuntosTasa}
-        onPuntosCanjeChange={setPuntosCanje}
-        onTipoCambioChange={setTipoCambio}
-      />
-
-      {/* ── Mesas del salón ──────────────────────────────── */}
-      <DiningTables crud={mesasCrud} mesasOcupadasHoy={mesasOcupadasHoy} now={now} />
-
-      {/* ── Reloj checador ───────────────────────────────── */}
-      <RelojChecador
-        crud={empleadosCrud}
-        empleadoCount={empleadosCrud.empleados.length}
-        empleadosHoy={empleadosHoy}
-        fichajesHoy={fichajesHoy}
-        selectedDate={selectedDate}
-        onCopyHoras={copyHoras}
-      />
-
-      {/* ── Tarjetas de regalo ───────────────────────────── */}
-      <GiftCards crud={tarjetasCrud} />
-
-      {/* ── Antifraud alerts ─────────────────────────────── */}
-      <AntifraudAlerts
-        fraudAlerts={fraudAlerts}
-        ticketThreshold={ticketThreshold}
-        tipoCambio={tipoCambio}
-        onTicketThresholdChange={setTicketThreshold}
-        onTipoCambioChange={setTipoCambio}
-      />
-
-      {/* ── Day stats ────────────────────────────────────── */}
-      <DayStats
-        hasEntries={entries.length > 0}
-        dayStats={dayStats}
-        selectedDate={selectedDate}
-        showAll={showAll}
-        tipoCambio={tipoCambio}
-        panelCfg={panelCfg}
-        onDateChange={(v) => {
-          setSelectedDate(v || todayStr())
-          setShowAll(false)
-        }}
-        onToggleShowAll={() => setShowAll(!showAll)}
-        onFocusFirstDish={() => document.getElementById("venta-dish")?.focus()}
-      />
-
-      {entries.length > 0 && (
+      {tab === "hoy" && (
         <>
-          <CorteCaja
-            methodBreakdown={methodBreakdown}
-            revenue={dayStats.revenue}
-            dayEntryCount={dayEntries.length}
-            selectedDateLabel={dateLabel(selectedDate)}
-            tipoCambio={tipoCambio}
-            onCopy={copyCorte}
-          />
-
-          <ManagementReport
-            reportPeriod={reportPeriod}
-            reportStats={reportStats}
-            reportEntries={reportEntries}
-            reportMethods={reportMethods}
-            reportChannels={reportChannels}
-            reportTop={reportTop}
-            comparison={comparison}
-            tipoCambio={tipoCambio}
-            onPeriodChange={setReportPeriod}
-            onCopy={copyGerencial}
-            onExportCsv={exportVentasCsv}
-          />
-
-          <div className="grid lg:grid-cols-2 gap-6 mb-6">
-            <WeekTrend weekTrend={weekTrend} />
-            <TopSellers
-              topSellers={topSellers}
-              totalUnits={dayStats.units}
-              selectedDateLabel={dateLabel(selectedDate)}
-            />
-          </div>
-
-          <EntriesList
-            showAll={showAll}
-            entriesCount={entries.length}
-            dayEntriesCount={dayEntries.length}
-            units={dayStats.units}
-            selectedDateLabel={dateLabel(selectedDate)}
-            visibleEntries={visibleEntries}
+          {/* ── Register sale form ───────────────────────────── */}
+          <SaleForm
+            sharedDishes={sharedDishes}
+            entries={entries}
             clientes={clientesCrud.clientes}
+            mesas={mesasCrud.mesas}
+            puntosTasa={puntosTasa}
+            puntosCanje={puntosCanje}
+            deductStock={deductStock}
             dishCost={dishCost}
-            onAdjustQty={adjustQty}
-            onDeleteClick={(id) => setDeleteConfirm(id)}
+            dishPrice={dishPrice}
+            onToggleDeductStock={setDeductStock}
+            onAdd={handleAddEntry}
+            onEscape={() => setDeleteConfirm(null)}
+            toast={toast}
+          />
+
+          {/* ── Day stats ────────────────────────────────────── */}
+          <DayStats
+            hasEntries={entries.length > 0}
+            dayStats={dayStats}
+            selectedDate={selectedDate}
+            showAll={showAll}
+            tipoCambio={tipoCambio}
+            panelCfg={panelCfg}
+            onDateChange={(v) => {
+              setSelectedDate(v || todayStr())
+              setShowAll(false)
+            }}
+            onToggleShowAll={() => setShowAll(!showAll)}
+            onFocusFirstDish={() => document.getElementById("venta-dish")?.focus()}
+          />
+
+          {entries.length > 0 && (
+            <>
+              <CorteCaja
+                methodBreakdown={methodBreakdown}
+                revenue={dayStats.revenue}
+                dayEntryCount={dayEntries.length}
+                selectedDateLabel={dateLabel(selectedDate)}
+                tipoCambio={tipoCambio}
+                onCopy={copyCorte}
+              />
+
+              <EntriesList
+                showAll={showAll}
+                entriesCount={entries.length}
+                dayEntriesCount={dayEntries.length}
+                units={dayStats.units}
+                selectedDateLabel={dateLabel(selectedDate)}
+                visibleEntries={visibleEntries}
+                clientes={clientesCrud.clientes}
+                dishCost={dishCost}
+                onAdjustQty={adjustQty}
+                onDeleteClick={(id) => setDeleteConfirm(id)}
+              />
+            </>
+          )}
+        </>
+      )}
+
+      {tab === "analisis" && (
+        <>
+          {/* ── Sales goals ──────────────────────────────────── */}
+          <SalesGoals
+            showGoals={showGoals}
+            goalFormDia={goalFormDia}
+            goalFormMes={goalFormMes}
+            dailyGoal={dailyGoal}
+            monthlyGoal={monthlyGoal}
+            dayStats={dayStats}
+            dailyGoalPct={dailyGoalPct}
+            monthlyGoalPct={monthlyGoalPct}
+            monthRevenue={monthRevenue}
+            projectedRevenue={projectedRevenue}
+            onPace={onPace}
+            comisiones={comisiones}
+            onToggle={toggleGoals}
+            onGoalFormDiaChange={setGoalFormDia}
+            onGoalFormMesChange={setGoalFormMes}
+            onSave={saveGoals}
+            onComisionChange={(key, value) =>
+              setComisiones((prev) => ({ ...prev, [key]: toNonNegativeNumber(value) }))
+            }
+          />
+
+          {entries.length > 0 && (
+            <>
+              <ManagementReport
+                reportPeriod={reportPeriod}
+                reportStats={reportStats}
+                reportEntries={reportEntries}
+                reportMethods={reportMethods}
+                reportChannels={reportChannels}
+                reportTop={reportTop}
+                comparison={comparison}
+                tipoCambio={tipoCambio}
+                onPeriodChange={setReportPeriod}
+                onCopy={copyGerencial}
+                onExportCsv={exportVentasCsv}
+              />
+
+              <div className="grid lg:grid-cols-2 gap-6 mb-6">
+                <WeekTrend weekTrend={weekTrend} />
+                <TopSellers
+                  topSellers={topSellers}
+                  totalUnits={dayStats.units}
+                  selectedDateLabel={dateLabel(selectedDate)}
+                />
+              </div>
+            </>
+          )}
+
+          {/* All-time tip */}
+          <AllTimeTip
+            hasEntries={entries.length > 0}
+            allTimeStats={allTimeStats}
+            foodCostRedAbove={panelCfg.foodCostRedAbove}
           />
         </>
       )}
 
-      {/* All-time tip */}
-      <AllTimeTip
-        hasEntries={entries.length > 0}
-        allTimeStats={allTimeStats}
-        foodCostRedAbove={panelCfg.foodCostRedAbove}
-      />
+      {tab === "extras" && (
+        <>
+          {/* ── Clientes frecuentes ──────────────────────────── */}
+          <FrequentCustomers
+            crud={clientesCrud}
+            puntosTasa={puntosTasa}
+            puntosCanje={puntosCanje}
+            tipoCambio={tipoCambio}
+            onCopy={copyClientes}
+            onPuntosTasaChange={setPuntosTasa}
+            onPuntosCanjeChange={setPuntosCanje}
+            onTipoCambioChange={setTipoCambio}
+          />
+
+          {/* ── Mesas del salón ──────────────────────────────── */}
+          <DiningTables crud={mesasCrud} mesasOcupadasHoy={mesasOcupadasHoy} now={now} />
+
+          {/* ── Reloj checador ───────────────────────────────── */}
+          <RelojChecador
+            crud={empleadosCrud}
+            empleadoCount={empleadosCrud.empleados.length}
+            empleadosHoy={empleadosHoy}
+            fichajesHoy={fichajesHoy}
+            selectedDate={selectedDate}
+            onCopyHoras={copyHoras}
+          />
+
+          {/* ── Tarjetas de regalo ───────────────────────────── */}
+          <GiftCards crud={tarjetasCrud} />
+
+          {/* ── Antifraud alerts ─────────────────────────────── */}
+          <AntifraudAlerts
+            fraudAlerts={fraudAlerts}
+            ticketThreshold={ticketThreshold}
+            tipoCambio={tipoCambio}
+            onTicketThresholdChange={setTicketThreshold}
+            onTipoCambioChange={setTipoCambio}
+          />
+        </>
+      )}
 
       {/* Delete confirm */}
-      <DeleteConfirmModal
-        entryId={deleteConfirm}
-        deductStock={deductStock}
+      <ConfirmDialog
+        open={deleteConfirm !== null}
+        title="¿Eliminar esta venta?"
+        message={deductStock
+          ? "Esta acción no se puede deshacer. El stock que se descontó al registrar esta venta no se repondrá automáticamente."
+          : "Esta acción no se puede deshacer."}
+        confirmLabel="Eliminar"
+        danger
         onCancel={() => setDeleteConfirm(null)}
-        onConfirm={deleteEntry}
+        onConfirm={() => { if (deleteConfirm) deleteEntry(deleteConfirm) }}
       />
 
       {/* Guía paso a paso + modo demo */}
