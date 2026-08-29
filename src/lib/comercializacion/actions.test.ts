@@ -27,7 +27,8 @@ function tableMock(results: Result[]) {
   ]
   for (const m of methods) builder[m] = vi.fn().mockReturnValue(builder)
   builder.then = function (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) {
-    const r = results.length > 1 ? results.shift()! : (results[0] ?? { data: [], error: null })
+    const first = results[0] ?? { data: [], error: null }
+    const r = results.length > 1 ? (results.shift() ?? first) : first
     return Promise.resolve(r).then(resolve, reject)
   }
   return builder

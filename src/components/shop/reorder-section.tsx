@@ -98,6 +98,7 @@ export function ReorderSection({ products }: Props) {
   const handleAddOne = (item: ReorderItem) => {
     addItem(toCartItem(item))
     AnalyticsEvents.addToCart({ id: item.product_id, name: item.name, price: item.price, quantity: item.quantity })
+    AnalyticsEvents.reorderQuickAdd(item.product_id)
     setAddedId(item.product_id)
     setTimeout(() => setAddedId(null), 1200)
   }

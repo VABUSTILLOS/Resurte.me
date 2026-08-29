@@ -866,7 +866,8 @@ export async function getClientsToReorder(): Promise<ClientToReorder[]> {
   const weekByUser = new Map<string, string>()
   for (const o of orders ?? []) {
     const uid = String(o.user_id)
-    if (!weekByUser.has(uid) || (o.created_at ?? "") > weekByUser.get(uid)!) {
+    const prev = weekByUser.get(uid)
+    if (!prev || (o.created_at ?? "") > prev) {
       weekByUser.set(uid, String(o.created_at))
     }
   }
@@ -1148,7 +1149,8 @@ export async function createAssistedOrder(input: {
 
   // 5) Items
   const items = input.items.map((item) => {
-    const p = productMap.get(item.productId)!
+    const p = productMap.get(item.productId)
+    if (!p) throw new Error(`Producto ${item.productId} no disponible`)
     return {
       order_id: Number(order.id),
       product_id: item.productId,

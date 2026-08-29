@@ -32,7 +32,13 @@ export default function CashbackPage() {
 
   // Check auth state on mount
   useEffect(() => {
-    if (!supabase) return
+    if (!supabase) {
+      // Supabase no configurado (dev/preview sin secrets): degradar con gracia
+      // mostrando el onboarding como a un visitante no autenticado.
+      setIsAuthenticated(false);
+      setShowOnboarding(true);
+      return;
+    }
     supabase.auth.getSession().then(({ data: { session } }) => {
       const authed = !!session;
       setIsAuthenticated(authed);
