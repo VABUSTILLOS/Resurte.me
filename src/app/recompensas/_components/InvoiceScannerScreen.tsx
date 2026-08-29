@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -9,6 +10,7 @@ import {
   CheckCircle,
   TrendingUp,
   FileText,
+  FileImage,
   Scan,
   Sparkles,
   X,
@@ -23,13 +25,62 @@ interface InvoiceScannerScreenProps {
   balance: number;
 }
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+function isAcceptedFile(file: File): { ok: boolean; isImage: boolean; isPdf: boolean } {
+  const isImage = file.type.startsWith("image/");
+  const isPdf =
+    file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  return { ok: isImage || isPdf, isImage, isPdf };
+}
+
 export function InvoiceScannerScreen({ onClose, balance }: InvoiceScannerScreenProps) {
   const [scanState, setScanState] = useState<InvoiceScanState>({
     status: "idle",
     progress: 0,
   });
   const [dragOver, setDragOver] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Liberar el object URL cuando cambie el archivo o se desmonte el componente
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  const clearSelectedFile = useCallback(() => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setFileError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  }, []);
+
+  const handleFile = useCallback((file: File | undefined | null) => {
+    if (!file) return;
+    const { ok, isImage } = isAcceptedFile(file);
+    if (!ok) {
+      setFileError("Formato no compatible. Sube una imagen (JPG, PNG) o un PDF.");
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setFileError("El archivo supera los 10 MB. Elige una factura más ligera.");
+      return;
+    }
+    setFileError(null);
+    setSelectedFile(file);
+    setPreviewUrl(isImage ? URL.createObjectURL(file) : null);
+  }, []);
 
   const simulateScan = useCallback(() => {
     setScanState({ status: "scanning", progress: 0 });
@@ -63,8 +114,17 @@ export function InvoiceScannerScreen({ onClose, balance }: InvoiceScannerScreenP
     }, 200);
   }, []);
 
+  const startScan = () => {
+    if (!selectedFile) {
+      setFileError("Primero selecciona un archivo o toma una foto de tu factura.");
+      return;
+    }
+    simulateScan();
+  };
+
   const reset = () => {
     setScanState({ status: "idle", progress: 0 });
+    clearSelectedFile();
   };
 
   const cashbackRate = CASHBACK_RATE;
@@ -95,12 +155,23 @@ export function InvoiceScannerScreen({ onClose, balance }: InvoiceScannerScreenP
               dragOver={dragOver}
               setDragOver={setDragOver}
               fileInputRef={fileInputRef}
-              onScan={simulateScan}
+              cameraInputRef={cameraInputRef}
+              selectedFile={selectedFile}
+              previewUrl={previewUrl}
+              fileError={fileError}
+              onFileSelected={handleFile}
+              onRemoveFile={clearSelectedFile}
+              onScan={startScan}
             />
           )}
 
           {scanState.status === "scanning" && (
-            <ScanningState key="scanning" progress={scanState.progress} />
+            <ScanningState
+              key="scanning"
+              progress={scanState.progress}
+              previewUrl={previewUrl}
+              fileName={selectedFile?.name ?? null}
+            />
           )}
 
           {scanState.status === "extracting" && (
@@ -134,11 +205,23 @@ function IdleState({
   dragOver,
   setDragOver,
   fileInputRef,
+  cameraInputRef,
+  selectedFile,
+  previewUrl,
+  fileError,
+  onFileSelected,
+  onRemoveFile,
   onScan,
 }: {
   dragOver: boolean;
   setDragOver: (v: boolean) => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
+  cameraInputRef: React.RefObject<HTMLInputElement | null>;
+  selectedFile: File | null;
+  previewUrl: string | null;
+  fileError: string | null;
+  onFileSelected: (file: File | undefined | null) => void;
+  onRemoveFile: () => void;
   onScan: () => void;
 }) {
   return (
@@ -212,7 +295,7 @@ function IdleState({
         onDrop={(e) => {
           e.preventDefault();
           setDragOver(false);
-          onScan();
+          onFileSelected(e.dataTransfer.files?.[0]);
         }}
         className="w-full rounded-3xl border-2 border-dashed bg-white p-10 
           flex flex-col items-center justify-center cursor-pointer
@@ -233,12 +316,21 @@ function IdleState({
           Arrastra aquí o toca para buscar en tus archivos
         </p>
         <p className="text-[#6e737b] text-xs mt-3">PDF, JPG, PNG — máx 10MB</p>
-        <input ref={fileInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={onScan} />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,application/pdf"
+          className="hidden"
+          onChange={(e) => {
+            onFileSelected(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
       </motion.div>
 
       {/* Camera Button */}
       <button
-        onClick={onScan}
+        onClick={() => cameraInputRef.current?.click()}
         className="mt-4 w-full rounded-2xl bg-white border border-cream-300 py-4 
           flex items-center justify-center gap-2 text-warm-700 font-medium shadow-sm
           hover:bg-cream-100 transition-colors active:scale-[0.98]"
@@ -246,6 +338,59 @@ function IdleState({
         <Camera className="h-5 w-5 text-brand-500" />
         Tomar foto de la factura
       </button>
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          onFileSelected(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+
+      {/* File error */}
+      {fileError && (
+        <motion.p
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-3 w-full rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700"
+          role="alert"
+        >
+          {fileError}
+        </motion.p>
+      )}
+
+      {/* Selected file preview */}
+      {selectedFile && (
+        <FilePreviewCard
+          file={selectedFile}
+          previewUrl={previewUrl}
+          onRemove={onRemoveFile}
+          onChangeFile={() => fileInputRef.current?.click()}
+        />
+      )}
+
+      {/* Scan CTA */}
+      <button
+        onClick={onScan}
+        disabled={!selectedFile}
+        className={`mt-4 w-full rounded-2xl py-4 text-base font-bold transition-all active:scale-[0.98]
+          flex items-center justify-center gap-2 ${
+          selectedFile
+            ? "bg-brand-500 text-white shadow-lg hover:bg-brand-600"
+            : "bg-cream-100 text-[#6e737b] cursor-not-allowed"
+        }`}
+      >
+        <Scan className="h-5 w-5" />
+        Escanear factura
+      </button>
+      {!selectedFile && !fileError && (
+        <p className="mt-2 text-[#6e737b] text-xs text-center">
+          Selecciona un archivo o toma una foto para comenzar (demo)
+        </p>
+      )}
 
       {/* Recent scans placeholder */}
       <div className="mt-6 w-full">
@@ -279,7 +424,77 @@ function IdleState({
   );
 }
 
-function ScanningState({ progress }: { progress: number }) {
+function FilePreviewCard({
+  file,
+  previewUrl,
+  onRemove,
+  onChangeFile,
+}: {
+  file: File;
+  previewUrl: string | null;
+  onRemove: () => void;
+  onChangeFile: () => void;
+}) {
+  const isPdf =
+    file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mt-4 w-full rounded-2xl bg-white border border-cream-300 p-4 shadow-sm"
+    >
+      <div className="flex items-center gap-3">
+        {previewUrl && !isPdf ? (
+          <Image
+            src={previewUrl}
+            alt={`Vista previa de ${file.name}`}
+            width={64}
+            height={64}
+            unoptimized
+            className="h-16 w-16 rounded-xl object-cover border border-cream-300 flex-shrink-0"
+          />
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-brand-50 border border-brand-200 flex-shrink-0">
+            {isPdf ? (
+              <FileText className="h-7 w-7 text-brand-500" />
+            ) : (
+              <FileImage className="h-7 w-7 text-brand-500" />
+            )}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-warm-700 text-sm font-semibold truncate">{file.name}</p>
+          <p className="text-[#6e737b] text-xs mt-0.5">
+            {isPdf ? "PDF" : "Imagen"} · {formatFileSize(file.size)}
+          </p>
+          <button
+            onClick={onChangeFile}
+            className="mt-1 text-brand-500 text-xs font-medium hover:underline"
+          >
+            Elegir otro archivo
+          </button>
+        </div>
+        <button
+          onClick={onRemove}
+          aria-label="Quitar archivo seleccionado"
+          className="rounded-xl bg-cream-100 p-2 text-[#5c6069] hover:text-warm-700 transition-colors touch-target flex-shrink-0"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+function ScanningState({
+  progress,
+  previewUrl,
+  fileName,
+}: {
+  progress: number;
+  previewUrl?: string | null;
+  fileName?: string | null;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -289,11 +504,22 @@ function ScanningState({ progress }: { progress: number }) {
       {/* Animated scanner ring */}
       <div className="relative mb-8">
         <motion.div
-          className="h-32 w-32 rounded-2xl border-2 border-brand-200 bg-brand-50 flex items-center justify-center"
+          className="h-32 w-32 rounded-2xl border-2 border-brand-200 bg-brand-50 flex items-center justify-center overflow-hidden"
           animate={{ boxShadow: ["0 0 0px rgba(14,122,14,0)", "0 0 40px rgba(14,122,14,0.25)", "0 0 0px rgba(14,122,14,0)"] }}
           transition={{ duration: 1.5, repeat: Infinity }}
         >
-          <Scan className="h-12 w-12 text-brand-500" />
+          {previewUrl ? (
+            <Image
+              src={previewUrl}
+              alt="Factura en análisis"
+              width={128}
+              height={128}
+              unoptimized
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Scan className="h-12 w-12 text-brand-500" />
+          )}
         </motion.div>
         {/* Scanning line */}
         <motion.div
@@ -305,6 +531,9 @@ function ScanningState({ progress }: { progress: number }) {
 
       <h2 className="text-warm-700 text-lg font-bold">Analizando factura...</h2>
       <p className="text-[#5c6069] text-sm mt-1">Extrayendo datos relevantes</p>
+      {fileName && (
+        <p className="text-[#6e737b] text-xs mt-1 truncate max-w-xs">{fileName}</p>
+      )}
 
       {/* Progress bar */}
       <div className="mt-6 w-full max-w-xs">

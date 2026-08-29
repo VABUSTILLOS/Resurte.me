@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, TrendingUp, Star, Megaphone, Gift, Sparkles } from "lucide-react";
-import type { Notification } from "./types";
+import { Bell, TrendingUp, Star, Megaphone, Gift, Sparkles, BellOff } from "lucide-react";
+import type { Notification, Tier } from "./types";
+import { getWalletHistory, getMonthlyCashbackProgress } from "@/lib/wallet-actions";
+import { deriveNotifications, type WalletMovement } from "./notifications-data";
+
+const READ_IDS_KEY = "rewards-notifications-read";
 
 const iconMap: Record<Notification["type"], { icon: typeof Bell; bg: string; color: string }> = {
   cashback_earned: { icon: TrendingUp, bg: "bg-brand-50", color: "text-brand-500" },
@@ -13,15 +17,40 @@ const iconMap: Record<Notification["type"], { icon: typeof Bell; bg: string; col
   new_feature: { icon: Gift, bg: "bg-pink-50", color: "text-pink-700" },
 };
 
+function loadReadIds(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(READ_IDS_KEY);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((id): id is string => typeof id === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function persistReadIds(ids: ReadonlySet<string>) {
+  try {
+    window.localStorage.setItem(READ_IDS_KEY, JSON.stringify([...ids]));
+  } catch {
+    // localStorage lleno o no disponible: el estado en memoria sigue funcionando.
+  }
+}
+
+interface TierProgress {
+  tier: Tier;
+  weekCount: number;
+}
+
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
-  // Sin data fake: no existe tabla de notificaciones en Supabase.
-  // Arranca vacío y mostrará el estado "No hay notificaciones".
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [movements, setMovements] = useState<WalletMovement[]>([]);
+  // null = usuario no autenticado (la server action devolvió null) → estado vacío.
+  const [progress, setProgress] = useState<TierProgress | null>(null);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const panelRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLButtonElement>(null);
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -38,14 +67,69 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchNotifications() {
+      try {
+        const [history, monthly] = await Promise.all([
+          getWalletHistory(0, 5),
+          getMonthlyCashbackProgress(),
+        ]);
+        if (cancelled) return;
+        // Estado "leído" persistido (se lee aquí, de forma asíncrona, para no
+        // bloquear el primer render ni desincronizar la hidratación).
+        setReadIds(loadReadIds());
+        setMovements(history.transactions);
+        setProgress(
+          monthly
+            ? {
+                tier: monthly.currentTier.toLowerCase() as Tier,
+                weekCount: monthly.weeksWithPurchases,
+              }
+            : null
+        );
+      } catch {
+        if (!cancelled) {
+          setMovements([]);
+          setProgress(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetchNotifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const notifications = useMemo<Notification[]>(() => {
+    if (loading || !progress) return [];
+    return deriveNotifications({
+      movements,
+      tier: progress.tier,
+      weekCount: progress.weekCount,
+    }).map((n) => ({ ...n, read: readIds.has(n.id) }));
+  }, [loading, progress, movements, readIds]);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   const markAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    const next = new Set(readIds);
+    for (const n of notifications) next.add(n.id);
+    persistReadIds(next);
+    setReadIds(next);
   };
 
   const markRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    if (readIds.has(id)) return;
+    const next = new Set(readIds);
+    next.add(id);
+    persistReadIds(next);
+    setReadIds(next);
   };
 
   return (
@@ -104,20 +188,39 @@ export function NotificationBell() {
                     </span>
                   )}
                 </h3>
-                <button
-                  onClick={markAllRead}
-                  className="text-brand-500 text-xs font-medium hover:underline"
-                >
-                  Marcar todo leído
-                </button>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllRead}
+                    className="text-brand-500 text-xs font-medium hover:underline"
+                  >
+                    Marcar todo leído
+                  </button>
+                )}
               </div>
 
               {/* List */}
               <div className="max-h-[60vh] overflow-y-auto divide-y divide-cream-300">
-                {notifications.length === 0 ? (
+                {loading ? (
+                  // Skeleton de carga (mismo patrón visual que LoyaltyTierCard).
+                  <div className="p-4 space-y-3 animate-pulse" aria-label="Cargando notificaciones">
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className="h-9 w-9 rounded-xl bg-cream-100 flex-shrink-0" />
+                        <div className="flex-1 space-y-2 py-0.5">
+                          <div className="h-3.5 w-3/4 rounded bg-cream-100" />
+                          <div className="h-3 w-full rounded bg-cream-100" />
+                          <div className="h-2.5 w-1/3 rounded bg-cream-100" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : notifications.length === 0 ? (
                   <div className="py-12 text-center">
-                    <Bell className="h-10 w-10 text-cream-300 mx-auto mb-3" />
-                    <p className="text-[#6e737b] text-sm">No hay notificaciones</p>
+                    <BellOff className="h-10 w-10 text-cream-300 mx-auto mb-3" />
+                    <p className="text-warm-700 text-sm font-semibold">Estás al día</p>
+                    <p className="text-[#6e737b] text-xs mt-1">
+                      No tienes notificaciones nuevas.
+                    </p>
                   </div>
                 ) : (
                   notifications.map((notif) => {

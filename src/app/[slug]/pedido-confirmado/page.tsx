@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { useCity } from "@/contexts/city-context"
-import { CheckCircle2, ArrowRight, Package, Clock, MapPin, Store, Share2, Sparkles } from "lucide-react"
+import { CheckCircle2, ArrowRight, Package, Clock, MapPin, Store, Share2, Sparkles, TicketPercent } from "lucide-react"
 import Link from "next/link"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
+import type { RepurchaseCouponInfo } from "@/types"
 
 function generateOrderId(): string {
   const prefix = "RT"
@@ -43,6 +44,20 @@ export default function OrderConfirmedPage() {
             tier: parsed.cashbackTier ?? null,
           }
         }
+      }
+    } catch {
+      // Ignore malformed session data
+    }
+    return null
+  })
+
+  // Cupón de recompra emitido con este pedido (solo usuarios logueados)
+  const [repurchaseCoupon] = useState<RepurchaseCouponInfo | null>(() => {
+    try {
+      const raw = sessionStorage.getItem("last_order")
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed?.repurchaseCoupon?.code) return parsed.repurchaseCoupon
       }
     } catch {
       // Ignore malformed session data
@@ -155,6 +170,31 @@ export default function OrderConfirmedPage() {
               <p className="text-sm text-brand-50 mt-0.5">
                 {cashback.tier ? `Nivel ${cashback.tier}` : "Recompensa"} — se abonan a tu wallet cuando la tienda confirme el pago de este pedido.
               </p>
+            </div>
+          </div>
+        )}
+
+        {repurchaseCoupon && (
+          <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl p-4 flex items-start gap-4 shadow-sm">
+            <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+              <TicketPercent className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-white text-sm">
+                ¡Tu próximo pedido con {repurchaseCoupon.discount_value}% de descuento!
+              </p>
+              <p className="text-sm text-amber-50 mt-0.5">
+                Usa el cupón <span className="font-mono font-bold">{repurchaseCoupon.code}</span>
+                {repurchaseCoupon.min_order > 0 ? ` en pedidos desde $${repurchaseCoupon.min_order.toFixed(2)}` : ""}
+                {" · "}Vence el {new Date(repurchaseCoupon.expires_at).toLocaleDateString("es-MX", { day: "numeric", month: "long" })}
+              </p>
+              <Link
+                href={`/${city.slug}`}
+                className="inline-flex items-center gap-1 mt-2 text-sm font-bold text-white underline underline-offset-2 hover:text-amber-100"
+              >
+                Usarlo ahora
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
           </div>
         )}

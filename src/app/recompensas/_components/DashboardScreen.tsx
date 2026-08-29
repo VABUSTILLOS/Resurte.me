@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, TrendingUp, Star, CheckCircle, Lock } from "lucide-react";
+import { ArrowRight, TrendingUp, Star, CheckCircle, Lock, HelpCircle } from "lucide-react";
 import { GrowthWalletBanner } from "./GrowthWalletBanner";
 import { QuickActions } from "./QuickActions";
 import { ActivityFeed } from "./ActivityFeed";
@@ -12,6 +12,8 @@ import { SERVICES } from "./StoreScreen";
 import { TIER_CONFIGS } from "./types";
 import { LoyaltyTierBanner, useLoyaltyTier, TIER_ORDER } from "./LoyaltyTierCard";
 import { TierBenefitsSection } from "./TierBenefitsSection";
+import { MonthlyGoalCard } from "./MonthlyGoalCard";
+import { AchievementsSection } from "./AchievementsSection";
 import { ReferralDashboard } from "@/components/referral-dashboard";
 import { useOnboardingCompleted } from "@/components/onboarding-wizard";
 import { createClient } from "@/lib/supabase/client";
@@ -31,6 +33,7 @@ interface DashboardScreenProps {
   onServiceSelect: (service: ServiceItem) => void;
   onNavigateStore?: () => void;
   onViewOrders?: () => void;
+  onShowOnboarding?: () => void;
   walletView?: boolean;
   profileView?: boolean;
   referralView?: boolean;
@@ -42,6 +45,7 @@ export function DashboardScreen({
   onOpenCalculator,
   onNavigateStore,
   onViewOrders,
+  onShowOnboarding,
   walletView,
   profileView,
   referralView,
@@ -53,7 +57,7 @@ export function DashboardScreen({
     return <WalletView />;
   }
   if (profileView) {
-    return <ProfileView />;
+    return <ProfileView onShowOnboarding={onShowOnboarding} />;
   }
   if (referralView) {
     return <ReferralDashboard />;
@@ -105,10 +109,13 @@ export function DashboardScreen({
             />
           </div>
 
+          <MonthlyGoalCard />
+
           <QuickActions onViewOrders={onViewOrders} onBrowseStore={onNavigateStore} />
 
           <div className="px-0 md:px-6 lg:px-0">
             <TierBenefitsSection />
+            <AchievementsSection />
           </div>
 
           {/* Cashback Disclaimer */}
@@ -356,7 +363,7 @@ function WalletView() {
   );
 }
 
-function ProfileView() {
+function ProfileView({ onShowOnboarding }: { onShowOnboarding?: () => void }) {
   const { tier, weekCount } = useLoyaltyTier()
   const currentTierIdx = TIER_ORDER.indexOf(tier)
 
@@ -534,6 +541,25 @@ function ProfileView() {
           })}
         </div>
       </div>
+
+      {/* Volver a ver el onboarding */}
+      {onShowOnboarding && (
+        <button
+          onClick={onShowOnboarding}
+          className="mb-6 w-full rounded-2xl bg-white border border-cream-300 shadow-sm p-4 flex items-center gap-3 text-left hover:border-brand-200 transition-colors"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 flex-shrink-0">
+            <HelpCircle className="h-4.5 w-4.5 text-brand-500" />
+          </div>
+          <div className="flex-1">
+            <p className="text-warm-700 text-sm font-semibold">¿Cómo funciona?</p>
+            <p className="text-[#6e737b] text-[11px]">
+              Vuelve a ver la guía del programa de recompensas
+            </p>
+          </div>
+          <ArrowRight className="h-4 w-4 text-[#6e737b]" />
+        </button>
+      )}
 
       {/* Invite */}
       <div className="rounded-2xl bg-violet-50 border border-violet-200 p-4">

@@ -211,6 +211,15 @@ export interface AppliedCoupon {
   min_order: number
 }
 
+/** Cupón personal de recompra/reactivación emitido para un usuario. */
+export interface RepurchaseCouponInfo {
+  code: string
+  discount_type: 'percentage' | 'fixed_amount'
+  discount_value: number
+  min_order: number
+  expires_at: string
+}
+
 // --- Cashback & Wallet Types ---
 
 export type CashbackTier = 'Verde' | 'Plata' | 'Oro' | 'Diamante'

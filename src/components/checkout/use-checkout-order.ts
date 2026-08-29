@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, type Dispatch, type SetStateAction } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { AnalyticsEvents } from "@/lib/analytics"
-import type { Address, City, PaymentMethod, CartItem } from "@/types"
+import type { Address, City, PaymentMethod, CartItem, RepurchaseCouponInfo } from "@/types"
 import {
   getGuestToken,
   saveGuestToken,
@@ -36,12 +36,15 @@ import type { SelectedBump } from "@/components/checkout/BumpCards"
 export type CreatedOrder = {
   orderId: number
   cashback: { credits: number; tier: string | null } | null
+  repurchaseCoupon?: RepurchaseCouponInfo | null
 }
 
 export type CheckoutPaidInfo = {
   orderId: number | null
   cashback: { credits: number; tier: string | null } | null
   paymentIntentId: string
+  /** Cupón de recompra emitido con esta orden (solo usuarios logueados). */
+  repurchaseCoupon?: RepurchaseCouponInfo | null
 }
 
 export interface CheckoutOrderOptions {
@@ -386,12 +389,16 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
 
         onAfterOrderCreatedRef.current?.()
 
+        const repurchaseCoupon = (data.repurchaseCoupon ?? null) as RepurchaseCouponInfo | null
+        setRepurchaseCoupon(repurchaseCoupon)
+
         return {
           orderId: data.orderId,
           cashback: {
             credits: data.cashbackCredits ?? 0,
             tier: data.cashbackTier ?? null,
           },
+          repurchaseCoupon,
         }
       } catch (err) {
         setCheckoutError(
@@ -478,9 +485,10 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
         orderId: finalOrderId,
         cashback: finalCashback,
         paymentIntentId,
+        repurchaseCoupon,
       })
     },
-    [createdOrderId, earnedCashback]
+    [createdOrderId, earnedCashback, repurchaseCoupon]
   )
 
   const handleStripeBack = useCallback(() => {
@@ -514,6 +522,7 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
           orderId: created.orderId,
           cashback: created.cashback,
           paymentIntentId: "",
+          repurchaseCoupon: created.repurchaseCoupon ?? null,
         })
       } catch (err) {
         setCheckoutError(

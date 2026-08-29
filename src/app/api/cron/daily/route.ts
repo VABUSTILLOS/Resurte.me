@@ -44,6 +44,13 @@ export async function GET(req: NextRequest) {
         return checkInactiveUsers()
       },
     ],
+    [
+      "reorder-reminders",
+      async () => {
+        const { checkReorderReminders } = await import("@/lib/reorder-reminders")
+        return checkReorderReminders()
+      },
+    ],
     ["foodos-campaigns", () => runDueFoodosCampaigns()],
   ]
 

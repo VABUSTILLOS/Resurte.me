@@ -37,7 +37,8 @@ export default function CashbackPage() {
       // mostrando el onboarding como a un visitante no autenticado.
       const t = setTimeout(() => {
         setIsAuthenticated(false);
-        setShowOnboarding(true);
+        const onboarded = localStorage.getItem("cashback-onboarded");
+        if (!onboarded) setShowOnboarding(true);
       }, 0);
       return () => clearTimeout(t);
     }
@@ -54,8 +55,10 @@ export default function CashbackPage() {
         const onboarded = localStorage.getItem("cashback-onboarded");
         if (!onboarded) setShowOnboarding(true);
       } else {
-        // Always show onboarding for unauthenticated users
-        setShowOnboarding(true);
+        // Visitantes: onboarding solo en la primera visita; pueden
+        // "Explorar sin cuenta" y volver a verlo desde Perfil.
+        const onboarded = localStorage.getItem("cashback-onboarded");
+        if (!onboarded) setShowOnboarding(true);
       }
     });
 
@@ -180,6 +183,7 @@ export default function CashbackPage() {
                 <DashboardScreen
                   onOpenCalculator={handleOpenCalculator}
                   onServiceSelect={handleServiceSelect}
+                  onShowOnboarding={() => setShowOnboarding(true)}
                   profileView
                 />
               )}

@@ -14,7 +14,7 @@ import {
   MessageCircle,
 } from "lucide-react"
 import Link from "next/link"
-import type { PaymentMethod, Address } from "@/types"
+import type { PaymentMethod, Address, RepurchaseCouponInfo } from "@/types"
 import {
   DEFAULT_ADDRESS_FORM,
   DELIVERY_TIMES,
@@ -103,7 +103,7 @@ export default function CheckoutPage() {
 
   // Persist the order summary so the confirmation page can fire a complete
   // `purchase` event after the cart is cleared.
-  const saveLastOrder = (orderId?: number, cashbackCredits?: number, cashbackTier?: string | null) => {
+  const saveLastOrder = (orderId?: number, cashbackCredits?: number, cashbackTier?: string | null, repurchaseCoupon?: RepurchaseCouponInfo | null) => {
     sessionStorage.setItem(
       "last_order",
       JSON.stringify({
@@ -111,6 +111,7 @@ export default function CheckoutPage() {
         total,
         cashbackCredits: cashbackCredits ?? 0,
         cashbackTier: cashbackTier ?? null,
+        repurchaseCoupon: repurchaseCoupon ?? null,
         items: [
           ...cart.items.map((i) => ({
             id: String(i.product_id),
@@ -177,7 +178,7 @@ export default function CheckoutPage() {
     // navega a la confirmación. `city` es City | null en el closure (el hook se
     // declara antes del early return), por eso se usa `city?.slug ?? DEFAULT_CITY_SLUG`.
     onPaid: (info: CheckoutPaidInfo) => {
-      saveLastOrder(info.orderId ?? undefined, info.cashback?.credits, info.cashback?.tier)
+      saveLastOrder(info.orderId ?? undefined, info.cashback?.credits, info.cashback?.tier, info.repurchaseCoupon)
       clearCart()
       router.push(`/${city?.slug ?? DEFAULT_CITY_SLUG}/pedido-confirmado`)
     },

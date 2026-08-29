@@ -114,12 +114,47 @@ export function abandonedCartEmailHtml(cartSummary: {
 </html>`
 }
 
+export function reorderReminderEmailHtml(params: {
+  name: string
+  daysSinceLastOrder: number
+  shopUrl: string
+}): string {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"></head>
+<body style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
+  <h1 style="color:#0E7A0E;font-size:24px">Hola ${params.name} 🥑</h1>
+  <p style="color:#242529;font-size:16px;line-height:1.6">
+    Han pasado <strong>${params.daysSinceLastOrder} días</strong> desde tu último pedido.
+    Según tu ritmo de compra, es momento de resurtir tu cocina.
+  </p>
+  <a href="${params.shopUrl}"
+     style="display:inline-block;background:#0E7A0E;color:#fff;padding:14px 32px;
+            border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
+    Repetir mi pedido →
+  </a>
+  <p style="color:#5C6068;font-size:14px;line-height:1.6">
+    En la home encontrarás la sección <strong>"Volver a pedir"</strong> con los productos
+    de tu último pedido listos para agregar con un toque.
+  </p>
+  <p style="color:#72767E;font-size:13px;margin-top:32px;border-top:1px solid #E8E9EB;padding-top:16px">
+    Resurte.me — Central de abastos digital<br>
+    ¿No quieres estos correos? <a href="https://resurte.me/panel" style="color:#0E7A0E">Configura tus preferencias</a>
+  </p>
+</body>
+</html>`
+}
+
 export function reactivationEmailHtml(params: {
   name: string
   daysInactive: number
   tier: string
   cashbackBalance: number
   panelUrl: string
+  /** Cupón personal de reactivación (opcional). */
+  couponCode?: string
+  couponDiscountPct?: number
+  couponExpiresAt?: string
 }): string {
   const messages: Record<string, string> = {
     "30": "Hace un mes que no pasas por Resurte.me. ¿Todo bien? Tenemos productos frescos esperándote.",
@@ -138,6 +173,16 @@ export function reactivationEmailHtml(params: {
     params.cashbackBalance > 0
       ? `<p style="background:#F0F9F0;padding:16px;border-radius:8px;color:#0E7A0E;font-size:15px;font-weight:600">
            💰 Tienes <strong>$${params.cashbackBalance} MXN</strong> en cashback (nivel ${params.tier})
+         </p>`
+      : ""
+  }
+  ${
+    params.couponCode
+      ? `<p style="background:#FFF7E6;border:1px dashed #F59E0B;padding:16px;border-radius:8px;color:#92400E;font-size:15px">
+           🎁 Regalo de bienvenida de vuelta: <strong>${params.couponDiscountPct}% de descuento</strong>
+           en tu próximo pedido con el cupón
+           <span style="font-family:monospace;font-weight:700">${params.couponCode}</span>
+           ${params.couponExpiresAt ? `<br><span style="font-size:13px">Válido hasta el ${params.couponExpiresAt}</span>` : ""}
          </p>`
       : ""
   }

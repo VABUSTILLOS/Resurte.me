@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -16,6 +16,7 @@ import { TIER_CONFIGS, TIER_ORDER } from "./types";
 import type { Tier } from "./types";
 import { SERVICES } from "./StoreScreen";
 import { formatNumber } from "@/lib/money";
+import { trackEvent } from "@/lib/analytics";
 interface OnboardingScreenProps {
   onComplete: () => void;
   isAuthenticated: boolean;
@@ -87,12 +88,31 @@ export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScre
 
   const isLast = step === steps.length - 1;
 
+  useEffect(() => {
+    trackEvent("rewards_onboarding_start", {
+      event_category: "rewards",
+      is_authenticated: isAuthenticated,
+    });
+    // Solo al montar: el inicio del onboarding ocurre una vez por apertura.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleNext = () => {
     if (isLast) {
+      trackEvent("rewards_onboarding_complete", { event_category: "rewards" });
       onComplete();
     } else {
       setStep((s) => s + 1);
     }
+  };
+
+  const handleExploreDemo = () => {
+    trackEvent("rewards_explore_demo", { event_category: "rewards" });
+    trackEvent("rewards_onboarding_complete", {
+      event_category: "rewards",
+      via: "explore_demo",
+    });
+    onComplete();
   };
 
   return (
@@ -513,7 +533,10 @@ export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScre
           {isLast && !isAuthenticated ? (
             <>
               <button
-                onClick={() => router.push("/auth/register")}
+                onClick={() => {
+                  trackEvent("rewards_signup_click", { event_category: "rewards" });
+                  router.push("/auth/register");
+                }}
                 className="w-full rounded-2xl bg-brand-500 py-4 text-base font-bold text-white 
                   shadow-lg transition-all active:scale-[0.98] hover:bg-brand-600
                   flex items-center justify-center gap-2"
@@ -526,6 +549,12 @@ export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScre
                 className="w-full text-[#5c6069] text-sm py-2 hover:text-warm-700 transition-colors touch-target"
               >
                 Ya tengo cuenta — Iniciar sesión
+              </button>
+              <button
+                onClick={handleExploreDemo}
+                className="w-full text-brand-500 text-sm font-medium py-2 hover:underline transition-colors touch-target"
+              >
+                Explorar sin cuenta →
               </button>
             </>
           ) : (

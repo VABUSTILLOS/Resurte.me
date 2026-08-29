@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
-import { Star, Award, Zap } from "lucide-react"
+import { Star, Award, Zap, Flame } from "lucide-react"
 import { TIER_BENEFITS, TIER_CONFIGS, TIER_ORDER } from "./types"
 import type { Tier } from "./types"
 import { getMonthlyCashbackProgress } from "@/lib/wallet-actions"
 import { formatNumber } from "@/lib/money"
+import { useQualifyingStreak } from "./use-qualifying-streak"
 
 interface TierData {
   tier: Tier
@@ -101,6 +102,7 @@ function LoyaltyTierCard({
   const isMaxTier = tier === "diamante"
   const progressColor = TIER_PROGRESS_COLOR[tier]
   const accent = TIER_ACCENT[tier]
+  const { streak } = useQualifyingStreak()
 
   if (loading) {
     return (
@@ -207,6 +209,22 @@ function LoyaltyTierCard({
           </p>
         </div>
       </div>
+
+      {/* Racha de semanas calificadas */}
+      {streak > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.3 }}
+          className="mb-4 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2"
+        >
+          <Flame className="h-4 w-4 text-amber-600 flex-shrink-0" />
+          <p className="text-amber-700 text-xs font-semibold">
+            {streak} {streak === 1 ? "semana seguida" : "semanas seguidas"} calificando
+            — ¡no pierdas la racha!
+          </p>
+        </motion.div>
+      )}
 
       {/* Benefits */}
       <div className="space-y-1.5">

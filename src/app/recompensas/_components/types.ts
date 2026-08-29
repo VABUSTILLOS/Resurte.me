@@ -128,3 +128,83 @@ export interface InvoiceScanState {
     folio: string;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Logros (badges) — se desbloquean con datos reales de compras y monedero
+// ---------------------------------------------------------------------------
+
+/** Datos reales agregados contra los que se evalúan los logros. */
+export interface AchievementStats {
+  totalOrders: number;
+  totalRewards: number;
+  totalRedemptions: number;
+  tier: Tier;
+  weekStreak: number;
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  isUnlocked: (stats: AchievementStats) => boolean;
+}
+
+export const ACHIEVEMENTS: Achievement[] = [
+  {
+    id: "primera-compra",
+    title: "Primera compra",
+    description: "Realizaste tu primer pedido de insumos",
+    icon: "🛒",
+    isUnlocked: (s) => s.totalOrders >= 1,
+  },
+  {
+    id: "cliente-frecuente",
+    title: "Cliente frecuente",
+    description: "Acumula 5 pedidos en el programa",
+    icon: "📦",
+    isUnlocked: (s) => s.totalOrders >= 5,
+  },
+  {
+    id: "primer-canje",
+    title: "Primer canje",
+    description: "Canjeaste Créditos por un servicio de la Tienda",
+    icon: "🎁",
+    isUnlocked: (s) => s.totalRedemptions >= 1,
+  },
+  {
+    id: "nivel-plata",
+    title: "Nivel Plata",
+    description: "Alcanzaste el nivel Plata o superior",
+    icon: "🥈",
+    isUnlocked: (s) => TIER_ORDER.indexOf(s.tier) >= TIER_ORDER.indexOf("plata"),
+  },
+  {
+    id: "nivel-oro",
+    title: "Nivel Oro",
+    description: "Alcanzaste el nivel Oro o superior",
+    icon: "🥇",
+    isUnlocked: (s) => TIER_ORDER.indexOf(s.tier) >= TIER_ORDER.indexOf("oro"),
+  },
+  {
+    id: "nivel-diamante",
+    title: "Nivel Diamante",
+    description: "El nivel máximo del programa",
+    icon: "💎",
+    isUnlocked: (s) => s.tier === "diamante",
+  },
+  {
+    id: "racha-3",
+    title: "Constancia",
+    description: "3 semanas calificadas seguidas",
+    icon: "🔥",
+    isUnlocked: (s) => s.weekStreak >= 3,
+  },
+  {
+    id: "mil-creditos",
+    title: "Acumulador",
+    description: "$1,000 en Créditos generados en total",
+    icon: "💰",
+    isUnlocked: (s) => s.totalRewards >= 1000,
+  },
+];

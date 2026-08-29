@@ -15,6 +15,7 @@ import { logger } from "@/lib/logger"
 
 import { createServiceClient } from "@/lib/supabase/service"
 import { sendEmail, abandonedCartEmailHtml, reactivationEmailHtml } from "@/lib/email"
+import { getActivePersonalCoupon, issuePersonalCoupon } from "@/lib/repurchase-coupon"
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -211,6 +212,12 @@ export async function checkInactiveUsers(): Promise<CronResult> {
         const cashbackBalance = wallet?.balance_credits ?? 0
         const tier = lastOrder?.cashback_tier ?? "Verde"
 
+        // Cupón personal de reactivación ("te extrañamos"): reutiliza uno
+        // vigente si ya existe para no acumular cupones por usuario.
+        const coupon =
+          (await getActivePersonalCoupon(supabase, user.id)) ??
+          (await issuePersonalCoupon(supabase, user.id, "reactivation"))
+
         const result = await sendEmail({
           to: user.email!,
           subject: window.subject,
@@ -220,6 +227,16 @@ export async function checkInactiveUsers(): Promise<CronResult> {
             tier,
             cashbackBalance,
             panelUrl: "https://resurte.me/panel",
+            ...(coupon
+              ? {
+                  couponCode: coupon.code,
+                  couponDiscountPct: coupon.discount_value,
+                  couponExpiresAt: new Date(coupon.expires_at).toLocaleDateString("es-MX", {
+                    day: "numeric",
+                    month: "long",
+                  }),
+                }
+              : {}),
           }),
           tag: `reactivation-${window.days}d`,
         })
@@ -230,7 +247,12 @@ export async function checkInactiveUsers(): Promise<CronResult> {
           email_type: window.type,
           status: result.ok ? "sent" : "failed",
           error: result.error ?? null,
-          metadata: { days_inactive: window.days, tier, cashback_balance: cashbackBalance },
+          metadata: {
+            days_inactive: window.days,
+            tier,
+            cashback_balance: cashbackBalance,
+            ...(coupon ? { coupon_code: coupon.code } : {}),
+          },
         })
 
         if (result.ok) totalSent++

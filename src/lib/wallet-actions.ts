@@ -1,6 +1,9 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/service"
+import { getActivePersonalCoupon } from "@/lib/repurchase-coupon"
+import { computeRunningOutProducts } from "@/lib/reorder-heuristics"
 import { isoWeek, QUALIFYING_WEEK_MIN } from "@/lib/utils"
 import type {
   OrderWithCashback,
@@ -8,7 +11,53 @@ import type {
   Wallet,
   WalletTransaction,
   WalletHistoryPage,
+  RepurchaseCouponInfo,
 } from "@/types"
+
+/**
+ * Cupón personal de recompra/reactivación vigente del usuario autenticado.
+ * Lo usa el home post-login para mostrar el banner "tienes un cupón".
+ */
+export async function getActiveRepurchaseCoupon(): Promise<RepurchaseCouponInfo | null> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return null
+  const service = await createServiceClient()
+  return getActivePersonalCoupon(service, user.id)
+}
+
+/**
+ * Productos que "se le están acabando" al usuario según su cadencia de
+ * recompra (heurística de reorder-heuristics). Mira los últimos 20 pedidos.
+ */
+export async function getRunningOutProducts(): Promise<
+  { product_id: number; daysSinceLast: number; avgIntervalDays: number }[]
+> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data } = await supabase
+    .from("orders")
+    .select("created_at, order_items(product_id)")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(20)
+
+  if (!data) return []
+
+  const purchases = data.flatMap((order) =>
+    ((order.order_items ?? []) as { product_id: number }[]).map((item) => ({
+      product_id: item.product_id,
+      purchased_at: order.created_at as string,
+    }))
+  )
+  return computeRunningOutProducts(purchases)
+}
 
 // ============================================================
 // HISTORIAL DE COMPRAS DEL USUARIO
