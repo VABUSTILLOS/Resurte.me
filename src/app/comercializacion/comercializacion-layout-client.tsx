@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Users, ShoppingCart } from "lucide-react"
+import { LayoutDashboard, Users, ShoppingCart, Bot } from "lucide-react"
 import { ToastProvider } from "@/components/toast"
 import { useState, useEffect } from "react"
 import type { User } from "@supabase/supabase-js"
@@ -10,6 +10,7 @@ import type { User } from "@supabase/supabase-js"
 const NAV_ITEMS = [
   { href: "/comercializacion", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/comercializacion/prospectos", label: "Prospectos", icon: Users },
+  { href: "/comercializacion/agente", label: "Agente IA", icon: Bot },
   { href: "/comercializacion/pedidos", label: "Pedidos", icon: ShoppingCart },
 ]
 
