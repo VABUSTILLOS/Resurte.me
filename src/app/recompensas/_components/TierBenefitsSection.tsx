@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Check, Lock, Star } from "lucide-react";
 import { TIER_BENEFITS, TIER_CONFIGS, TIER_ORDER, TIER_REQUIREMENTS } from "./types";
 import { useLoyaltyTier } from "./LoyaltyTierCard";
+import { CollapsibleSection } from "./CollapsibleSection";
 
 /**
  * Comparativa de los 4 niveles del programa de recompensas.
@@ -15,18 +16,23 @@ export function TierBenefitsSection() {
   const currentIdx = TIER_ORDER.indexOf(currentTier);
 
   return (
-    <section className="mx-4 mt-6 md:mx-0" aria-label="Beneficios por nivel">
-      <div className="mb-3 flex items-center gap-2">
-        <Star className="h-4 w-4 text-brand-500" />
-        <h2 className="text-sm font-bold text-warm-700">
-          Beneficios por nivel
-        </h2>
-      </div>
-      <p className="mb-4 text-xs text-[#5c6069]">
-        Sube de nivel con semanas calificadas (compra semanal desde $2,500) y
-        aumenta tu cashback.
-      </p>
-
+    <CollapsibleSection
+      className="mx-4 mt-6 md:mx-0"
+      title={
+        <>
+          <Star className="h-4 w-4 text-brand-500" />
+          <h2 className="text-sm font-bold text-warm-700">
+            Beneficios por nivel
+          </h2>
+        </>
+      }
+      subtitle={
+        <p className="mb-4 text-xs text-[#5c6069]">
+          Sube de nivel con semanas calificadas (compra semanal desde $2,500) y
+          aumenta tu cashback.
+        </p>
+      }
+    >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {TIER_ORDER.map((tier, i) => {
           const cfg = TIER_CONFIGS[tier];
@@ -100,6 +106,6 @@ export function TierBenefitsSection() {
           );
         })}
       </div>
-    </section>
+    </CollapsibleSection>
   );
 }

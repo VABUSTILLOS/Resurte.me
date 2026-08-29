@@ -41,14 +41,58 @@ export default function CartPage() {
     let cancelled = false
     const params = new URLSearchParams(window.location.search)
     const orderId = params.get("restore")
+    const token = params.get("t")
     if (!orderId || isNaN(Number(orderId))) return
-
-    const supabase = createClient()
-    if (!supabase) return
 
     ;(async () => {
       setRestoreStatus("loading")
       try {
+        // Con token (email de carrito abandonado) la restauración va por API
+        // y funciona también para invitados sin sesión.
+        if (token) {
+          const res = await fetch(
+            `/api/cart/restore?order=${encodeURIComponent(orderId)}&t=${encodeURIComponent(token)}`,
+          )
+          if (cancelled) return
+          if (!res.ok) {
+            setRestoreStatus("error")
+            return
+          }
+          const { items } = (await res.json()) as {
+            items: Array<{
+              product_id: number
+              quantity: number
+              price: number
+              name: string
+              slug: string
+              image_url: string
+            }>
+          }
+          if (!items || items.length === 0) {
+            setRestoreStatus("error")
+            return
+          }
+          items.forEach((item) => {
+            addItem({
+              product_id: item.product_id,
+              name: item.name,
+              slug: item.slug,
+              image_url: item.image_url,
+              brand: "",
+              price: item.price,
+              sale_price: null,
+              quantity: item.quantity,
+              stock_status: "in_stock",
+            })
+          })
+          setRestoreStatus("done")
+          window.history.replaceState({}, "", window.location.pathname)
+          return
+        }
+
+        const supabase = createClient()
+        if (!supabase) return
+
         const { data, error } = await supabase
           .from("orders")
           .select("id, order_items(*, products(id, name, image_url, slug))")

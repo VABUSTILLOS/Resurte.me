@@ -6,6 +6,7 @@ import { PAYMENT_METHODS, type PaymentMethod } from "@/types"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
 import { PAYMENT_ICONS } from "./checkout-shared"
+import { SocialProofBadge } from "./social-proof"
 import { AnalyticsEvents } from "@/lib/analytics"
 
 interface SavedCardInfo {
@@ -146,6 +147,7 @@ export function PaymentStep({
               <CheckCircle2 className="w-4 h-4 text-[#0E7A0E]" />
               <span>Garantía de frescura: si algo no llega bien, te lo reponemos</span>
             </div>
+            <SocialProofBadge />
           </div>
 
           {/* Total reminder */}

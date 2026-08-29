@@ -2,6 +2,11 @@
  * Plantillas deterministas del Plan de Prospección Chihuahua.
  * Se usan como fallback cuando no hay LLM configurado, y como base
  * de estilo en el prompt del agente.
+ *
+ * Estilo "teaser": los mensajes despiertan interés con los niveles de
+ * recompensas (Verde 5% → Diamante 20%) y el gancho de "los únicos que
+ * regresan marketing digital por tus compras". La mecánica detallada la
+ * explica resurte.me/recompensas — no el mensaje.
  */
 
 import type { MessageKind } from "./types"
@@ -21,80 +26,74 @@ export function renderTemplate(kind: MessageKind, ctx: TemplateContext): string 
   const r = ctx.restaurantName ? ` (${ctx.restaurantName})` : ""
   switch (kind) {
     case "primer_contacto":
-      return `${greeting(ctx)} Soy ${ctx.sellerName} de Resurte.me. Vi que ${ctx.restaurantName ?? "su restaurante"} está activo y se ve que manejan un concepto muy interesante.
+      return `${greeting(ctx)} Soy ${ctx.sellerName} de Resurte.me. Vi que ${ctx.restaurantName ?? "su restaurante"} está activo y manejan un concepto muy interesante.
 
-Le escribo porque estamos lanzando en Chihuahua una plataforma de abasto que ya usan más de 2,000 restaurantes en CDMX, Monterrey y Guadalajara.
+Somos la plataforma de abasto que ya usan más de 2,000 restaurantes en México — y los ÚNICOS proveedores que le regresan recompensas de marketing digital por sus compras.
 
-No somos solo un proveedor más: somos su socio de crecimiento. Cada pedido que hace con nosotros — lo que ya compra de todos modos — fortalece su negocio.
+Así de simple: usted ya compra insumos cada semana. Con nosotros, esa misma compra también paga el marketing de su restaurante:
 
-ASÍ FUNCIONA:
-• Se registra en 3 minutos y desde su primer pedido genera 5% de cashback
-• Compra sus insumos cada semana (desde $2,500) y sube de nivel: hasta 20% de cashback
-• Su cashback se acumula en Créditos canjeables por marketing digital, fotografía profesional y desarrollo web para su restaurante
+🟢 Verde 5% · 🥈 Plata 10% · 🥇 Oro 15% · 💎 Diamante 20%
 
-PROMO DE LANZAMIENTO CHIHUAHUA: si se registra esta semana, su primer pedido tiene ENVÍO GRATIS y crédito a 7 días.
+Sus recompensas se canjean por reseñas de Google, fotografía profesional, redes sociales y más. Nuestro interés es ayudarle a crecer — para seguir siendo su proveedor.
 
-¿Le mando el enlace para registrarse? No necesita tarjeta, solo su RFC.
+PROMO DE LANZAMIENTO CHIHUAHUA: envío gratis + crédito a 7 días en su primer pedido.
+
+¿Le mando el enlace para ver su programa? No necesita tarjeta, solo su RFC.
 
 Saludos,
-${ctx.sellerName} · Resurte.me Chihuahua`
+${ctx.sellerName} · Resurte.me y crece`
 
     case "seguimiento":
       return `${greeting(ctx)} Soy ${ctx.sellerName} de Resurte.me${r}.
 
-El otro día le platiqué de nuestra plataforma de abasto con entrega el mismo día en Chihuahua. Solo quería confirmar si pudo revisar la información.
+El otro día le platiqué de nuestra plataforma de abasto con entrega el mismo día. Solo quería confirmar si pudo revisar la información.
 
-Le recuerdo la oferta de lanzamiento: envío gratis en su primer pedido + crédito a 7 días desde el día 1. Y desde ese primer pedido empieza a generar cashback que se convierte en marketing y crecimiento para su restaurante.
+Le recuerdo lo que nos hace únicos: con Resurte.me no tiene que elegir entre surtir su negocio o invertir en mercadotecnia — obtiene ambos. Cada compra genera recompensas canjeables por marketing digital para su restaurante.
 
-Puede probar con un pedido de solo $500, sin compromiso. ¿Le mando el catálogo de esta semana?`
+Oferta de lanzamiento: envío gratis + crédito a 7 días en su primer pedido, desde solo $500.
+
+¿Le mando el catálogo de esta semana?`
 
     case "cierre_urgencia":
       return `${greeting(ctx)}
 
-Le escribo porque la promo de lanzamiento en Chihuahua — envío gratis + crédito a 7 días en su primer pedido — termina este viernes a medianoche.
+La promo de lanzamiento en Chihuahua — envío gratis + crédito a 7 días en su primer pedido — termina este viernes a medianoche.
 
-Y para que vea lo que su compra de siempre puede hacer por su negocio:
-• Pedido semanal de $4,000 → $200 en Créditos desde la primera semana (5% de cashback)
-• Con su compra semanal constante sube de nivel hasta 20%: ese mismo pedido le dejaría $800
+Una sola cuenta: con $4,000 de compra semanal empieza en 🟢 Verde y genera $200 en recompensas… desde su primer pedido. Recompensas que se convierten en reseñas de Google, fotos profesionales y clientes nuevos.
 
-Sus Créditos se canjean por marketing, fotografía y web: su restaurante crece con lo que ya gasta en insumos.
-
-El registro es gratis, sin compromiso, y puede hacer su primer pedido de solo $500 para probar.
+Somos los únicos proveedores que le regresan marketing por surtirse. Nuestro interés es simple: que usted crezca, para seguir siendo su proveedor.
 
 ¿Le mando el enlace ahora?`
 
     case "reorden":
       return `${greeting(ctx)} Soy ${ctx.sellerName}, su asesor de Resurte.me${r}.
 
-Ya es momento de su pedido semanal de insumos. 🛒 Recuerde: pida antes de las 10:00 AM y le llega el mismo día por la tarde, sin salir de su cocina.
+Ya es momento de su pedido semanal. 🛒 Pida antes de las 10:00 AM y le llega el mismo día, sin salir de su cocina.
 
-¿Le armo su lista con lo de siempre o prefiere pedir directo en resurte.me? Su cashback sigue acumulándose en Créditos con cada compra, y cada semana calificada (desde $2,500) lo acerca al siguiente nivel: hasta 20% de cashback para invertir en el crecimiento de su restaurante.`
+Y recuerde: cada pedido hace crecer sus recompensas y lo acerca a su siguiente nivel — hasta 💎 Diamante con 20% en cada compra.
+
+¿Le armo su lista con lo de siempre o prefiere pedir directo en resurte.me?`
 
     case "reactivacion":
-      return `${greeting(ctx)} Soy ${ctx.sellerName} de Resurte.me. Noté que hace tiempo se registró pero no ha hecho pedidos últimamente.
+      return `${greeting(ctx)} Soy ${ctx.sellerName} de Resurte.me. Noté que hace tiempo no hace pedidos.
 
-Lanzamos esta semana "REGRESO EL CHEF" — bono de reactivación:
-• Su compra de esta semana califica de inmediato para subir de nivel y ganar más cashback
+Sus recompensas siguen siendo suyas — y esta semana lanzamos "REGRESO EL CHEF":
+• Su compra califica de inmediato para subir de nivel
 • Envío gratis sin importe mínimo
-• 10% de descuento adicional en su primer producto de carne
+• 10% adicional en su primer producto de carne
 
-Además, sus Créditos siguen ahí esperándolo: canjéelos por marketing o fotografía profesional para su restaurante.
-
-¿Qué le detuvo la última vez? Si fue precio, catálogo o algo del servicio, me encantaría saberlo para ayudarle.
+Recuerde: somos los únicos que le regresan marketing digital por sus compras. ¿Qué le detuvo la última vez? Me encantaría saberlo para ayudarle.
 
 ¿Le mando el catálogo actualizado?`
 
     case "upsell":
       return `${greeting(ctx)} ¡Buenas noticias!
 
-Revisé su cuenta y está muy cerca de subir de nivel en el Programa de Recompensas. Al subir desbloquea:
-• Más cashback en cada pedido (10%, 15% y hasta 20%)
-• Nivel Oro: envío gratis desde $1,500 y asesor de cuenta dedicado
-• Nivel Diamante: productos exclusivos por mayoreo y eventos de la industria
+Revisé su cuenta y está a nada de subir de nivel en sus recompensas. El siguiente nivel significa más % en cada pedido — camino a 💎 Diamante con 20% — y más servicios por canjear: Meta Ads, menú digital, tienda en línea.
 
-Recuerde: sube de nivel con semanas calificadas — solo necesita su compra semanal desde $2,500. Más cashback = más Créditos para el marketing y la web de su restaurante.
+Entre más compra, más gana. Así de simple. Y si su restaurante crece, mejor para ambos: nuestro interés es seguir siendo su proveedor.
 
-¿Le armo un pedido sugerido para que suba de nivel hoy mismo?`
+¿Le armo un pedido sugerido para subir de nivel hoy mismo?`
   }
 }
 
@@ -105,18 +104,21 @@ SOBRE RESURTE.ME:
 - Plataforma B2B de abasto para restaurantes: entrega en menos de 24 horas (pedido antes de 10 AM = entrega el mismo día).
 - Precios de central de abastos, crédito a 7/15/30 días sin aval, facturación CFDI 4.0 automática.
 - Pedido mínimo $500 MXN; envío gratis desde $3,000 MXN.
-- Programa de Recompensas Resurte.me: cashback del 5% al 20% según nivel (Verde 5%, Plata 10%, Oro 15%, Diamante 20%). Se sube de nivel con semanas calificadas (compra semanal desde $2,500 MXN): 2 semanas = Plata, 3 = Oro, 4 = Diamante.
-- El cashback se acumula como Créditos en el monedero digital y se canjea en la Tienda de Crecimiento por servicios reales: marketing digital, fotografía profesional, Google/Meta Ads, menú digital y desarrollo web.
-- Posicionamiento clave: Resurte.me es el SOCIO DE CRECIMIENTO del restaurante. El cliente fortalece su negocio haciendo lo que ya hace (comprar sus insumos): cada peso gastado regresa como crecimiento, no solo como despensa.
+- Programa de Recompensas: cada compra genera recompensas según el nivel del cliente: 🟢 Verde 5% (empiezas aquí al registrarte) · 🥈 Plata 10% · 🥇 Oro 15% · 💎 Diamante 20% (se sube comprando con constancia semanal). Entre más compras, más ganas. Así de simple.
+- Las recompensas se canjean en la Tienda de Crecimiento por servicios reales: gestión de reseñas Google, optimización de Google Maps, fotografía profesional, gestión de redes sociales, Meta/Google Ads, TikTok, menú digital, tienda en línea, consultoría y desarrollo web.
+- Somos los ÚNICOS proveedores que regresan recompensas de marketing digital en las compras. Mensaje central: con Resurte.me no eliges entre surtir tu negocio o invertir en mercadotecnia y crecimiento — obtienes AMBOS.
+- Nuestro interés es ayudar al restaurante a crecer para seguir siendo su proveedor: si ellos crecen, nosotros crecemos. Lema de marca: "Resurte.me y crece".
 - Oferta de lanzamiento Chihuahua: envío gratis en primer pedido + crédito a 7 días desde el día 1.
 - Productos estrella locales: carne de res de Chihuahua, queso menonita de Cuauhtémoc, tortillas de harina, chile colorado.
 
 REGLAS DE ESTILO:
 - Español mexicano, trato de "usted", tono cálido y directo, norteño pero profesional.
-- Máximo 120 palabras salvo primer contacto (puede llegar a 180).
-- Siempre un gancho de valor concreto (ahorro, tiempo, cashback en Créditos) y UNA sola pregunta de cierre.
-- Usa saltos de línea y viñetas con "•". Nada de hashtags ni emojis excesivos (máximo 1).
+- Máximo 120 palabras salvo primer contacto (puede llegar a 150). El objetivo es DESPERTAR INTERÉS, no explicar el programa.
+- NO expliques la mecánica detallada (semanas calificadas, umbrales, cálculos). Menciona los niveles con su % o UN canje concreto, y deja los detalles para resurte.me/recompensas o la llamada.
+- Siempre un gancho de valor concreto (ahorro, tiempo, recompensas de marketing) y UNA sola pregunta de cierre.
+- Usa saltos de línea y viñetas con "•". Nada de hashtags ni emojis excesivos (los emojis de nivel 🟢🥈🥇💎 están permitidos; máximo 1 emoji adicional).
 - El dolor principal del restaurantero: salir a comprar a la central bajo el sol, perder horas, sin crédito.
-- Nunca hables de puntos ni de un "Club del Chef": el programa es cashback + Créditos + niveles (Verde, Plata, Oro, Diamante).
+- Usa la palabra "recompensas". NUNCA hables de puntos, "cashback" técnico ni de un "Club del Chef".
+- Puedes usar el lema "Resurte.me y crece" como cierre cuando caiga natural (máximo una vez).
 - Nunca inventes precios ni datos del restaurante que no estén en el contexto.
 - Devuelve SOLO el texto del mensaje, sin comillas ni explicaciones.`

@@ -5,6 +5,7 @@ import { useCity } from "@/contexts/city-context"
 import { CheckCircle2, ArrowRight, Package, Clock, MapPin, Store, Share2, Sparkles, TicketPercent } from "lucide-react"
 import Link from "next/link"
 import { AnalyticsEvents } from "@/lib/analytics"
+import { trackActiveExperimentsConversion } from "@/lib/checkout-experiments"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 import type { RepurchaseCouponInfo } from "@/types"
 
@@ -96,6 +97,8 @@ export default function OrderConfirmedPage() {
         price: i.price,
       }))
     )
+    // Atribuye la compra a todos los experimentos A/B activos del checkout.
+    trackActiveExperimentsConversion("purchase")
   }, [orderId])
 
   if (!city) {

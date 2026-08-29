@@ -173,17 +173,17 @@ const MESSAGE_KINDS: MessageKind[] = [
 
 const KIND_INSTRUCTION: Record<MessageKind, string> = {
   primer_contacto:
-    "Primer contacto en frío. Preséntate, menciona que viste su restaurante, explica en 3 viñetas cómo funciona (registro 3 min, 5% de cashback desde el primer pedido, semanas calificadas desde $2,500 suben su nivel hasta 20%, Créditos canjeables por marketing/fotografía/web) y cierra con la promo de lanzamiento (envío gratis + crédito a 7 días esta semana) y la pregunta: ¿le mando el enlace?",
+    "Primer contacto en frío. Preséntate, menciona que viste su restaurante y suelta el gancho: somos los únicos proveedores que regresan recompensas de marketing digital por sus compras (niveles Verde 5% → Diamante 20%, sin explicar la mecánica). Da UN ejemplo de canje concreto (reseñas Google o fotografía profesional). Cierra con la promo de lanzamiento (envío gratis + crédito a 7 días) y la pregunta: ¿le mando el enlace?",
   seguimiento:
-    "Seguimiento amable a alguien que ya contactamos y no respondió. Recuerda la oferta de lanzamiento (envío gratis + crédito 7 días + cashback desde el primer pedido) y propone un pedido de prueba de $500. Cierra preguntando si le mandas el catálogo.",
+    "Seguimiento amable a alguien que ya contactamos y no respondió. Gancho: con Resurte.me no eliges entre surtir tu negocio o invertir en mercadotecnia — obtienes ambos. Recuerda la oferta de lanzamiento (envío gratis + crédito 7 días) y propone un pedido de prueba de $500. Cierra preguntando si le mandas el catálogo.",
   cierre_urgencia:
-    "Cierre con urgencia: la promo de lanzamiento (envío gratis + crédito a 7 días) termina el viernes. Haz la cuenta concreta de cashback (pedido semanal de $4,000: al inicio 5% = $200 en Créditos; con compra semanal constante sube de nivel hasta 20% = $800). Refuerza: registro gratis, primer pedido desde $500. Pregunta: ¿le mando el enlace ahora?",
+    "Cierre con urgencia: la promo de lanzamiento (envío gratis + crédito a 7 días) termina el viernes. Haz UNA sola cuenta simple (ej. $4,000 de compra semanal = $200 en recompensas desde el nivel Verde). Refuerza: registro gratis, primer pedido desde $500. Pregunta: ¿le mando el enlace ahora?",
   reorden:
-    "Cliente activo: recordatorio de reorden semanal. Refuerza el beneficio clave (pide antes de 10 AM, llega el mismo día) y sus Créditos de cashback acumulados; cada semana calificada (desde $2,500) lo acerca al siguiente nivel. Ofrece armarle la lista 'con lo de siempre'.",
+    "Cliente activo: recordatorio de reorden semanal. Refuerza el beneficio clave (pide antes de 10 AM, llega el mismo día) y que cada pedido hace crecer sus recompensas y lo acerca al siguiente nivel. Ofrece armarle la lista 'con lo de siempre'.",
   reactivacion:
-    "Cliente dormido: bono 'REGRESO EL CHEF' (su compra de esta semana califica de inmediato para subir de nivel y ganar más cashback + envío gratis sin mínimo + 10% en su primer producto de carne). Recuerda que sus Créditos siguen disponibles para canjear por marketing o fotografía. Pregunta qué le detuvo (precio, catálogo, servicio) y ofrece el catálogo actualizado.",
+    "Cliente dormido: 'sus recompensas siguen siendo suyas' + bono 'REGRESO EL CHEF' (su compra califica de inmediato para subir de nivel + envío gratis sin mínimo + 10% en su primer producto de carne). Pregunta qué le detuvo (precio, catálogo, servicio) y ofrece el catálogo actualizado.",
   upsell:
-    "Está cerca de subir de nivel en el Programa de Recompensas. Lista 2-3 beneficios reales del siguiente nivel (más % de cashback hasta 20%, envío gratis desde $1,500 en Oro, asesor de cuenta dedicado, productos exclusivos por mayoreo en Diamante) y ofrece armar un pedido sugerido (desde $2,500) para subir hoy.",
+    "Está a nada de subir de nivel: menciona el nombre y % del siguiente nivel (Plata 10%, Oro 15% o Diamante 20%) y UN servicio que podría canjear en ese nivel (Meta Ads, menú digital, tienda en línea). Ofrece armar un pedido sugerido para subir hoy.",
 }
 
 export async function generateAgentMessage(

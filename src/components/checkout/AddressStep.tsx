@@ -1,9 +1,16 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { MapPin, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import type { City, Address } from "@/types"
 import type { AddressForm } from "./checkout-shared"
+
+interface ColoniasResult {
+  neighborhoods: string[]
+  municipality: string | null
+  state: string | null
+}
 
 interface AddressStepProps {
   address: AddressForm
@@ -46,6 +53,32 @@ export function AddressStep({
   saveAsDefault = false,
   onSaveAsDefaultChange,
 }: AddressStepProps) {
+  // Autocompletado de colonia por CP (catálogo postal_codes; fail-open).
+  const [colonias, setColonias] = useState<ColoniasResult | null>(null)
+
+  useEffect(() => {
+    if (address.zip_code.length !== 5) {
+      setColonias(null)
+      return
+    }
+    let cancelled = false
+    fetch(`/api/address/colonias?cp=${address.zip_code}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: ColoniasResult | null) => {
+        if (!cancelled && data && data.neighborhoods.length > 0) {
+          setColonias(data)
+        } else if (!cancelled) {
+          setColonias(null)
+        }
+      })
+      .catch(() => {
+        /* fail-open: el formulario sigue en modo manual */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [address.zip_code])
+
   return (
     <div>
       <h2 className="text-xl font-bold text-gray-900 mb-1">
@@ -196,8 +229,16 @@ export function AddressStep({
             value={address.neighborhood}
             onChange={(e) => onUpdateAddress("neighborhood", e.target.value)}
             placeholder="Roma Norte"
+            list={colonias ? "checkout-colonias" : undefined}
             className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
           />
+          {colonias && (
+            <datalist id="checkout-colonias">
+              {colonias.neighborhoods.map((n) => (
+                <option key={n} value={n} />
+              ))}
+            </datalist>
+          )}
         </div>
       </div>
 
@@ -214,6 +255,11 @@ export function AddressStep({
           maxLength={5}
           className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
         />
+        {colonias && (colonias.municipality || colonias.state) && (
+          <p className="mt-1.5 text-xs text-gray-500">
+            {[colonias.municipality, colonias.state].filter(Boolean).join(", ")}
+          </p>
+        )}
       </div>
 
       {/* References */}

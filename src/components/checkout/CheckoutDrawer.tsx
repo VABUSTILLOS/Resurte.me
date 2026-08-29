@@ -25,6 +25,7 @@ import { AddressStep } from "@/components/checkout/AddressStep"
 import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
 import { BumpCards, type SelectedBump } from "@/components/checkout/BumpCards"
+import { SocialProofBadge } from "@/components/checkout/social-proof"
 import { readStoredBumps } from "@/hooks/use-selected-bumps"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
@@ -388,6 +389,40 @@ export function CheckoutDrawer() {
                 </div>
               </div>
 
+              {/* Modo express 1-click (cliente recurrente con dirección y
+                  tarjeta guardadas): crea la orden con la dirección/horario
+                  preseleccionados y cobra off-session, sin recorrer los pasos. */}
+              {isLoggedIn === true &&
+                savedCard?.hasSavedCard &&
+                selectedAddressId !== null &&
+                isAddressValid && (
+                  <button
+                    onClick={() => void handleExpressCheckout()}
+                    disabled={isProcessing || itemCount === 0}
+                    className="w-full flex flex-col items-center gap-0.5 px-6 py-3 mb-3 bg-[#242529] text-white font-bold rounded-xl hover:bg-black disabled:opacity-70 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      {isProcessing ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Procesando...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 text-yellow-400" />
+                          Pedir al instante
+                          {savedCard.last4 ? ` ··· ${savedCard.last4}` : ""}
+                        </>
+                      )}
+                    </span>
+                    {!isProcessing && (
+                      <span className="text-[11px] font-normal text-white/70 truncate max-w-full">
+                        {address.street} {address.number} · {schedule.date} {schedule.time}
+                      </span>
+                    )}
+                  </button>
+                )}
+
               <button
                 onClick={() => {
                   // Usuario logueado con dirección guardada válida → salta el
@@ -669,6 +704,7 @@ export function CheckoutDrawer() {
                       <CheckCircle2 className="w-4 h-4 text-[#0E7A0E]" />
                       <span>Garantía de frescura: si algo no llega bien, te lo reponemos</span>
                     </div>
+                    <SocialProofBadge />
                   </div>
 
                   {/* Guardado de tarjeta (condiciona setup_future_usage → upsells 1-click) */}

@@ -85,14 +85,14 @@ export function AchievementsSection() {
         </span>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="flex gap-2 overflow-x-auto snap-x scrollbar-hide max-md:-mx-4 max-md:px-4 max-md:pb-1 md:grid md:grid-cols-4 md:overflow-visible">
         {ACHIEVEMENTS.map((a) => {
           const unlocked = a.isUnlocked(full);
           return (
             <div
               key={a.id}
               title={a.description}
-              className={`flex flex-col items-center gap-1 rounded-xl border p-2.5 text-center transition-colors ${
+              className={`flex flex-col items-center gap-1 rounded-xl border p-2.5 text-center transition-colors max-md:flex-shrink-0 max-md:w-28 max-md:snap-start ${
                 unlocked
                   ? "bg-brand-50 border-brand-200"
                   : "bg-cream-50 border-cream-300 opacity-70"

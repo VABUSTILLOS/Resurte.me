@@ -6,6 +6,8 @@ import { ShieldCheck } from "lucide-react"
 
 const ADMIN_NAV = [
   { href: "/admin", label: "Dashboard", exact: true },
+  { href: "/admin/conversion", label: "Conversión", exact: false },
+  { href: "/admin/marketing", label: "Marketing", exact: false },
   { href: "/admin/pedidos", label: "Pedidos", exact: false },
   { href: "/admin/productos", label: "Productos", exact: false },
   { href: "/admin/visibilidad", label: "Visibilidad", exact: false },

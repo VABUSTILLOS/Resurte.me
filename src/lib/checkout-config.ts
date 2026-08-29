@@ -2,15 +2,25 @@
  * Configuración compartida del checkout (cliente y servidor).
  *
  * Fuente única de verdad para las constantes de conversión del checkout
- * drawer: umbral de envío gratis y límites de bumps. Mantener sincronizada
- * con `bump_rules.subtotal_min` cuando se ajuste desde Supabase.
+ * drawer: umbral de envío gratis y límites de bumps. El umbral y la tarifa
+ * son configurables vía env (`NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD` y
+ * `NEXT_PUBLIC_DELIVERY_FEE_FLAT`) para ajustarlos sin deploy de código;
+ * al cambiarlos, alinear también `bump_rules.subtotal_min` en Supabase.
  */
 
+/** Lee un número positivo desde env con fallback (inválido → fallback). */
+function envNumber(name: string, fallback: number): number {
+  const raw = process.env[name]
+  if (!raw) return fallback
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
 /** Subtotal mínimo (MXN) para que el envío sea gratis. */
-export const FREE_SHIPPING_THRESHOLD = 500
+export const FREE_SHIPPING_THRESHOLD = envNumber("NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD", 500)
 
 /** Tarifa fija de envío a domicilio cuando NO aplica envío gratis. */
-export const DELIVERY_FEE_FLAT = 35
+export const DELIVERY_FEE_FLAT = envNumber("NEXT_PUBLIC_DELIVERY_FEE_FLAT", 35)
 
 /** Máximo de order bumps mostrados simultáneamente en el drawer. */
 export const MAX_BUMPS = 3

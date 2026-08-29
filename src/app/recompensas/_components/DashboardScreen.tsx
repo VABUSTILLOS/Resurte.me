@@ -65,13 +65,19 @@ export function DashboardScreen({
     return <ReferralDashboard />;
   }
 
-  // Pick 3 featured services for the home preview
-  const featuredServices = SERVICES.filter((s) =>
-    ["google-maps", "meta-ads", "menu-digital"].includes(s.id)
-  ).sort((a, b) => a.cost - b.cost);
+  // Pick featured services for the home preview (3 destacados + más baratos hasta 6)
+  const featuredServices = (() => {
+    const featured = SERVICES.filter((s) =>
+      ["google-maps", "meta-ads", "menu-digital"].includes(s.id)
+    ).sort((a, b) => a.cost - b.cost);
+    const rest = SERVICES.filter((s) => !featured.includes(s))
+      .sort((a, b) => a.cost - b.cost)
+      .slice(0, Math.max(0, 6 - featured.length));
+    return [...featured, ...rest];
+  })();
 
   return (
-    <div className="pt-1 pb-4 md:max-w-none lg:max-w-6xl lg:mx-auto">
+    <div className="pt-1 pb-4 md:max-w-none">
       {/* Top Header with Notifications */}
       <div className="flex items-center justify-between px-4 mb-2 md:px-6 lg:px-8">
         <div>
@@ -95,113 +101,119 @@ export function DashboardScreen({
         </div>
       )}
 
-      {/* Main Dashboard Grid */}
-      <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:px-8">
-        {/* Left Column: Wallet + Quick Actions */}
-        <div className="lg:col-span-2">
-          <div className="px-0 md:px-6 lg:px-0">
+      {/* Main Dashboard Grid — 12 col en lg: 8 principal + 4 lateral.
+          En móvil el orden lo marcan las clases order-*:
+          wallet+nivel → mes → acciones → actividad → logros → tienda → teaser → beneficios → historias */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-12 lg:gap-6 lg:px-8">
+        {/* Hero: monedero + nivel lado a lado en desktop */}
+        <div className="order-1 md:px-6 lg:order-none lg:col-span-8 lg:col-start-1 lg:row-start-1 lg:px-0">
+          <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
             <LoyaltyTierBanner />
-            <GrowthWalletBanner
-              balance={balance}
-              nextUnlock={{
-                name: "Campaña Meta Ads — Nivel Plata",
-                cost: 16000,
-                progressPercent: Math.min(Math.round((balance / 16000) * 100), 100),
-              }}
-            />
+            <div className="flex flex-col gap-2">
+              <GrowthWalletBanner
+                balance={balance}
+                nextUnlock={{
+                  name: "Campaña Meta Ads — Nivel Plata",
+                  cost: 16000,
+                  progressPercent: Math.min(Math.round((balance / 16000) * 100), 100),
+                }}
+              />
+              <p className="mx-4 text-[10px] italic leading-relaxed text-[#6e737b] md:mx-0">
+                ⓘ Tus Créditos solo pueden canjearse por servicios en la Tienda
+                de Crecimiento. No son canjeables por dinero en efectivo.
+              </p>
+            </div>
           </div>
-
-          <MonthlyGoalCard />
-
-          <QuickActions onViewOrders={onViewOrders} onBrowseStore={onNavigateStore} onScanInvoice={onScanInvoice} />
-
-          <div className="px-0 md:px-6 lg:px-0">
-            <TierBenefitsSection />
-            <AchievementsSection />
-          </div>
-
-          {/* Cashback Disclaimer */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.3 }}
-            className="mx-4 mt-2.5 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 md:mx-6 lg:mx-0"
-          >
-            <p className="text-amber-700 text-[11px] leading-relaxed">
-              ⓘ Tus Créditos solo pueden canjearse por servicios en la Tienda de Crecimiento. No son canjeables por dinero en efectivo.
-            </p>
-          </motion.div>
-
-          {/* Store Preview Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 0.4 }}
-            className="mx-4 mt-4 md:mx-6 lg:mx-0"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-warm-700 text-[13px] font-bold">Tienda de Crecimiento</p>
-              <button
-                onClick={onNavigateStore}
-                className="flex items-center gap-1 text-brand-500 text-xs font-medium hover:underline"
-              >
-                Ver todo <ArrowRight className="h-3 w-3" />
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {featuredServices.map((svc) => (
-                <motion.button
-                  key={svc.id}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={onNavigateStore}
-                  className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-cream-300 shadow-sm p-3 text-center hover:border-brand-200 transition-colors"
-                >
-                  <span className="text-2xl">{svc.icon}</span>
-                  <p className="text-warm-700 text-[10px] font-medium leading-tight line-clamp-2">
-                    {svc.name}
-                  </p>
-                  <p className="text-brand-500 text-[10px] font-bold">
-                    ${formatNumber(svc.cost)}
-                  </p>
-                </motion.button>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Impact Teaser */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 0.4 }}
-            className="mx-4 mt-4 rounded-xl bg-brand-50
-              border border-brand-200 p-3 md:mx-6 lg:mx-0"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-100">
-                <svg className="h-5 w-5 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 0 1 5.814-5.519l2.74-1.22m0 0-5.94-2.28m5.94 2.28-2.28 5.941" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <p className="text-warm-700 text-[13px] font-semibold">
-                  Con tu consumo actual, en 3 meses desbloqueas tu Campaña Meta Ads
-                </p>
-                <button
-                  onClick={() => onOpenCalculator()}
-                  className="mt-1.5 text-brand-500 text-xs font-medium hover:underline"
-                >
-                  Calcular proyección exacta →
-                </button>
-              </div>
-            </div>
-          </motion.div>
         </div>
 
-        {/* Right Column: Activity + Stories */}
-        <div className="lg:col-span-1 mt-4 lg:mt-0">
-          <div className="md:px-6 lg:px-0">
-            <ActivityFeed />
+        <div className="order-2 lg:order-none lg:col-span-8 lg:col-start-1 lg:row-start-2">
+          <MonthlyGoalCard />
+        </div>
+
+        <div className="order-3 md:px-6 lg:order-none lg:col-span-8 lg:col-start-1 lg:row-start-3 lg:px-0">
+          <QuickActions onViewOrders={onViewOrders} onBrowseStore={onNavigateStore} onScanInvoice={onScanInvoice} />
+        </div>
+
+        {/* Lateral: actividad reciente */}
+        <div className="order-4 md:px-6 lg:order-none lg:col-span-4 lg:col-start-9 lg:row-start-1 lg:self-start lg:px-0">
+          <ActivityFeed />
+        </div>
+
+        {/* Lateral: logros */}
+        <div className="order-5 lg:order-none lg:col-span-4 lg:col-start-9 lg:row-start-2 lg:self-start">
+          <AchievementsSection />
+        </div>
+
+        {/* Store preview — carrusel en móvil, grid 3×2 en desktop */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.4 }}
+          className="order-6 mx-4 md:mx-6 lg:order-none lg:col-span-8 lg:col-start-1 lg:row-start-4 lg:mx-0"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-warm-700 text-[13px] font-bold">Tienda de Crecimiento</p>
+            <button
+              onClick={onNavigateStore}
+              className="flex items-center gap-1 text-brand-500 text-xs font-medium hover:underline"
+            >
+              Ver todo <ArrowRight className="h-3 w-3" />
+            </button>
           </div>
+          <div className="flex gap-2 overflow-x-auto snap-x scrollbar-hide max-md:-mx-4 max-md:px-4 max-md:pb-1 md:grid md:grid-cols-3 md:overflow-visible">
+            {featuredServices.map((svc) => (
+              <motion.button
+                key={svc.id}
+                whileTap={{ scale: 0.95 }}
+                onClick={onNavigateStore}
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-cream-300 shadow-sm p-3 text-center hover:border-brand-200 transition-colors max-md:w-32 max-md:flex-shrink-0 max-md:snap-start"
+              >
+                <span className="text-2xl">{svc.icon}</span>
+                <p className="text-warm-700 text-[10px] font-medium leading-tight line-clamp-2">
+                  {svc.name}
+                </p>
+                <p className="text-brand-500 text-[10px] font-bold">
+                  ${formatNumber(svc.cost)}
+                </p>
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Lateral: teaser de proyección */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8, duration: 0.4 }}
+          className="order-7 mx-4 rounded-xl bg-brand-50 border border-brand-200 p-3 md:mx-6 lg:order-none lg:col-span-4 lg:col-start-9 lg:row-start-3 lg:self-start lg:mx-0"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-100">
+              <svg className="h-5 w-5 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 0 1 5.814-5.519l2.74-1.22m0 0-5.94-2.28m5.94 2.28-2.28 5.941" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-warm-700 text-[13px] font-semibold">
+                Con tu consumo actual, en 3 meses desbloqueas tu Campaña Meta Ads
+              </p>
+              <button
+                onClick={() => onOpenCalculator()}
+                className="mt-1.5 text-brand-500 text-xs font-medium hover:underline"
+              >
+                Calcular proyección exacta →
+              </button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Beneficios por nivel — ancho completo, colapsable en móvil */}
+        <div className="order-8 md:px-6 lg:order-none lg:col-span-12 lg:row-start-5 lg:px-0">
+          <TierBenefitsSection />
+        </div>
+
+        {/* Historias de impacto — ancho completo, colapsable en móvil */}
+        <div className="order-9 lg:order-none lg:col-span-12 lg:row-start-6">
           <ImpactStories />
         </div>
       </div>

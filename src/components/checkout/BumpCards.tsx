@@ -6,6 +6,10 @@ import { Sparkles, Check } from "lucide-react"
 import { MAX_BUMPS } from "@/lib/checkout-config"
 import type { OrderBump } from "@/lib/order-bumps"
 import { AnalyticsEvents } from "@/lib/analytics"
+import {
+  CHECKOUT_EXPERIMENTS,
+  useCheckoutExperiment,
+} from "@/lib/checkout-experiments"
 
 export interface SelectedBump {
   ruleId: number
@@ -92,6 +96,9 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
   const [retries, setRetries] = useState(0)
   const cartKey = cartItems.map((i) => `${i.product_id}:${i.quantity}`).join("|")
   const loading = cartKey !== "" && loadedFor !== cartKey
+
+  // A/B del encabezado del paso de bumps (variante "urgencia" vs control).
+  const headlineVariant = useCheckoutExperiment(CHECKOUT_EXPERIMENTS.bumpsHeadline)
 
   // Instrumentación de diagnóstico temporal: expone en window el estado real
   // del fetch para que un usuario logueado pueda reportar exactamente qué ve:
@@ -253,7 +260,9 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
       <div className="flex items-center gap-1.5">
         <Sparkles className="w-4 h-4 text-[#B87A3A]" />
         <p className="text-xs font-semibold text-[#B87A3A] uppercase tracking-wide">
-          Agrega a tu pedido
+          {headlineVariant === "urgencia"
+            ? "Antes de pagar, ¿sumamos algo?"
+            : "Agrega a tu pedido"}
         </p>
       </div>
       {bumps.map((bump) => {

@@ -119,7 +119,7 @@ export default function CashbackPage() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="relative mx-auto flex min-h-screen max-w-md flex-col sm:max-w-2xl md:max-w-5xl md:flex-row">
+    <div className="relative mx-auto flex min-h-screen max-w-md flex-col sm:max-w-2xl md:max-w-6xl md:flex-row xl:max-w-7xl">
       {/* Sidebar Navigation (Tablet/Desktop) */}
       {showShell && (
         <div className="hidden md:flex md:w-20 lg:w-64 md:flex-col md:border-r md:border-cream-300 md:bg-white/60 md:shrink-0">
@@ -154,7 +154,7 @@ export default function CashbackPage() {
               balance={balance}
             />
           ) : (
-            <div key="main" className="flex-1 overflow-y-auto pb-20 md:pb-0">
+            <div key="main" className="flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
               {activeTab === "home" && (
                 <DashboardScreen
                   onOpenCalculator={handleOpenCalculator}

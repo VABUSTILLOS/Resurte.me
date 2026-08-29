@@ -4,6 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, Quote, ArrowRight, Play } from "lucide-react";
 import type { ImpactStory } from "./types";
+import { CollapsibleSection } from "./CollapsibleSection";
 
 const stories: ImpactStory[] = [
   {
@@ -80,20 +81,22 @@ export function ImpactStories() {
   }, []);
 
   return (
-    <div className="mx-4 mt-4 mb-2 md:mx-6 lg:mx-0">
-      {/* Section Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h2 className="text-warm-700 text-[15px] font-bold">Historias de Crecimiento</h2>
-          <p className="text-[#6e737b] text-[10px] mt-0.5">
+    <CollapsibleSection
+      className="mx-4 mt-4 mb-2 md:mx-6 lg:mx-0"
+      title={
+        <h2 className="text-warm-700 text-[15px] font-bold">Historias de Crecimiento</h2>
+      }
+      subtitle={
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[#6e737b] text-[10px]">
             Restaurantes como el tuyo ya están creciendo
           </p>
+          <button className="text-brand-500 text-xs font-medium flex items-center gap-1 hover:underline">
+            Ver más <ArrowRight className="h-3 w-3" />
+          </button>
         </div>
-        <button className="text-brand-500 text-xs font-medium flex items-center gap-1 hover:underline">
-          Ver más <ArrowRight className="h-3 w-3" />
-        </button>
-      </div>
-
+      }
+    >
       {/* Horizontal Scroll */}
       <div
         ref={scrollRef}
@@ -106,7 +109,7 @@ export function ImpactStories() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.08 * i }}
-            className="flex-shrink-0 w-[85%] snap-center rounded-2xl bg-white border border-cream-300 shadow-sm
+            className="flex-shrink-0 w-[85%] md:w-96 snap-center md:snap-start rounded-2xl bg-white border border-cream-300 shadow-sm
               overflow-hidden hover:border-brand-200 transition-colors"
           >
             {/* Photo placeholder */}
@@ -185,6 +188,6 @@ export function ImpactStories() {
           />
         ))}
       </div>
-    </div>
+    </CollapsibleSection>
   );
 }

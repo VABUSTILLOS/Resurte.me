@@ -99,7 +99,7 @@ export const VALUE_PROPS = [
   "Entrega en menos de 24 horas (pides antes de las 10 AM y llega el mismo día)",
   "Precios de central de abastos",
   "Crédito a 7/15/30 días sin aval, según historial",
-  "Programa de Recompensas: cashback del 5% al 20% según tu nivel, canjeable por servicios de marketing, fotografía y web — somos tu socio de crecimiento",
+  "Programa de Recompensas: del 5% (Verde) al 20% (Diamante) en cada compra, canjeables por marketing digital, fotografía y web — los únicos proveedores que te regresan crecimiento por surtirte. Resurte.me y crece",
   "Facturación CFDI 4.0 automática",
   "Pedido mínimo de $500 MXN y envío gratis desde $3,000 MXN",
 ]

@@ -226,8 +226,8 @@ function LoyaltyTierCard({
         </motion.div>
       )}
 
-      {/* Benefits */}
-      <div className="space-y-1.5">
+      {/* Benefits — solo en ≥tablet: en móvil ya los cubre "Beneficios por nivel" */}
+      <div className="hidden md:block space-y-1.5">
         {benefits.map((benefit, i) => (
           <motion.div
             key={benefit}

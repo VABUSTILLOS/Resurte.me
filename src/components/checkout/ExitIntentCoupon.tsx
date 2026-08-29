@@ -28,6 +28,9 @@ import {
 /** Código de cupón de recuperación (configurable vía env; vacío = sin cupón). */
 const EXIT_INTENT_COUPON = process.env.NEXT_PUBLIC_EXIT_INTENT_COUPON ?? ""
 
+/** Minutos de vigencia mostrados en el countdown de urgencia del cupón. */
+const COUNTDOWN_MINUTES = 15
+
 export function ExitIntentCoupon() {
   const { itemCount, subtotal, applyCoupon } = useCart()
   const [visible, setVisible] = useState(false)
@@ -37,7 +40,20 @@ export function ExitIntentCoupon() {
   const [couponApplied, setCouponApplied] = useState(false)
   const [couponError, setCouponError] = useState<string | null>(null)
   const [isApplying, setIsApplying] = useState(false)
+  const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_MINUTES * 60)
   const shownRef = useRef(false)
+
+  // Countdown de urgencia: arranca al mostrarse el modal y se limpia al cerrar.
+  useEffect(() => {
+    if (!visible) return
+    setSecondsLeft(COUNTDOWN_MINUTES * 60)
+    const timer = setInterval(() => {
+      setSecondsLeft((s) => Math.max(0, s - 1))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [visible])
+
+  const countdownLabel = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`
 
   // El modal solo se muestra una vez por pestaña y solo si hay compras posibles.
   const canShow =
@@ -186,11 +202,17 @@ export function ExitIntentCoupon() {
                 <h2 className="text-xl font-black text-[#242529] mb-1">
                   ¡Espera! Tu carrito está casi listo 🛒
                 </h2>
-                <p className="text-sm text-gray-500 mb-5">
+                <p className="text-sm text-gray-500 mb-3">
                   {EXIT_INTENT_COUPON
                     ? "Déjanos tu email y te damos un cupón exclusivo para que no dejes tu pedido pendiente."
                     : "Déjanos tu email y te avisamos cuando tus productos favoritos vuelvan a estar disponibles."}
                 </p>
+
+                {EXIT_INTENT_COUPON && secondsLeft > 0 && (
+                  <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4 text-center">
+                    ⏳ Tu cupón se reserva por {countdownLabel} min
+                  </p>
+                )}
 
                 <form
                   onSubmit={(e) => {
