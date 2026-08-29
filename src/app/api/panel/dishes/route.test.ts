@@ -26,7 +26,7 @@ function guestReq(url: string, init?: { method?: string; body?: string; headers?
 }
 
 /** Chainable mock de PostgREST: cualquier método devuelve el mismo builder. */
-function chainMock(result: { data?: unknown; error?: unknown }) {
+function chainMock() {
   const builder: Record<string, unknown> = {}
   for (const method of ["select", "eq", "is", "order", "delete", "insert", "update"]) {
     builder[method] = vi.fn().mockReturnValue(builder)
@@ -36,7 +36,7 @@ function chainMock(result: { data?: unknown; error?: unknown }) {
 }
 
 function serviceWith(table: string, result: { data?: unknown; error?: unknown }) {
-  const builder = chainMock(result)
+  const builder = chainMock()
   // select/order/delete/insert resuelven la promesa con el resultado final
   builder.select = vi.fn().mockReturnValue(builder)
   builder.eq = vi.fn().mockReturnValue(builder)
@@ -44,7 +44,7 @@ function serviceWith(table: string, result: { data?: unknown; error?: unknown })
   builder.delete = vi.fn().mockReturnValue(builder)
   builder.insert = vi.fn().mockResolvedValue(result)
   vi.mocked(createServiceClient).mockResolvedValue({
-    from: vi.fn((t: string) => (t === table ? builder : chainMock({}))),
+    from: vi.fn((t: string) => (t === table ? builder : chainMock())),
   } as never)
   return builder
 }

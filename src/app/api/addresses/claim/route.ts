@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
+import { rateLimited, rateLimitResponse, clientIp } from "@/lib/rate-limit"
 
 /**
  * POST /api/addresses/claim
@@ -32,6 +33,14 @@ export async function POST(request: NextRequest) {
     const token = body.guest_token?.trim()
     if (!token) {
       return NextResponse.json({ error: "Falta guest_token" }, { status: 400 })
+    }
+
+    // Rate limit: 10 requests per minute per user
+    const ip = clientIp(request)
+    const rlKey = `addr-claim:${user.id}:${ip}`
+    const rl = await rateLimited(await createServiceClient(), rlKey, 10, 60)
+    if (!rl.allowed) {
+      return rateLimitResponse(rl)
     }
 
     // Service role para hacer el UPDATE (RLS no permite tocar direcciones

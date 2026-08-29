@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
 import {
   createPaymentIntentForOrder,
   PaymentIntentError,
 } from "@/lib/payments"
+import { rateLimited, rateLimitResponse, clientIp } from "@/lib/rate-limit"
 
 /**
  * POST /api/payments/stripe/create-intent
@@ -35,6 +37,14 @@ export async function POST(request: NextRequest) {
     const {
       data: { user },
     } = await supabaseClient.auth.getUser()
+
+    // Rate limit: 15 requests per minute per IP (authenticated or not)
+    const ip = clientIp(request)
+    const rlKey = `pi-create:${type}:${ip}:${user?.id ?? "anon"}`
+    const rl = await rateLimited(await createServiceClient(), rlKey, 15, 60)
+    if (!rl.allowed) {
+      return rateLimitResponse(rl)
+    }
 
     const result = await createPaymentIntentForOrder({
       type: type === "foodos" ? "foodos" : "main",

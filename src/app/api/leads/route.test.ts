@@ -6,7 +6,7 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }))
 vi.mock("@/lib/rate-limit", () => ({
   rateLimited: vi.fn(),
   clientIp: vi.fn(() => "1.2.3.4"),
-  rateLimitResponse: vi.fn((rate: { allowed: boolean }) =>
+  rateLimitResponse: vi.fn(() =>
     new Response(JSON.stringify({ error: "Rate limit" }), { status: 429 })
   ),
 }))

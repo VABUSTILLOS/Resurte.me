@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
 import {
   processUpsellForOrder,
   PaymentIntentError,
 } from "@/lib/payments"
+import { rateLimited, rateLimitResponse, clientIp } from "@/lib/rate-limit"
 
 /**
  * POST /api/checkout/process-upsell
@@ -53,6 +55,14 @@ export async function POST(request: NextRequest) {
     const {
       data: { user },
     } = await supabaseClient.auth.getUser()
+
+    // Rate limit: 5 requests per minute per user/IP (upsell es acción agresiva)
+    const ip = clientIp(request)
+    const rlKey = `upsell:${user?.id ?? "anon"}:${ip}`
+    const rl = await rateLimited(await createServiceClient(), rlKey, 5, 60)
+    if (!rl.allowed) {
+      return rateLimitResponse(rl)
+    }
 
     const result = await processUpsellForOrder({
       orderId: order_id,
