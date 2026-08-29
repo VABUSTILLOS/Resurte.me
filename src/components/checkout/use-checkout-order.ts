@@ -133,6 +133,7 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
     credits: number
     tier: string | null
   } | null>(null)
+  const [repurchaseCoupon, setRepurchaseCoupon] = useState<RepurchaseCouponInfo | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
   // ── Sesión + precarga de dirección anónima ──
