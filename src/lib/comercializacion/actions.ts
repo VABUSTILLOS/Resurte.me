@@ -31,6 +31,8 @@ function mapProspect(row: Record<string, unknown>): Prospect {
     email: (row.email as string | null) ?? null,
     city_id: row.city_id != null ? Number(row.city_id) : null,
     city_name: (row.city_name as string | null) ?? null,
+    tier: row.tier != null ? Number(row.tier) : null,
+    zone: (row.zone as string | null) ?? null,
     status: row.status as ProspectStatus,
     user_id: (row.user_id as string | null) ?? null,
     referral_code: (row.referral_code as string | null) ?? null,
@@ -102,6 +104,8 @@ export interface ProspectInput {
   whatsapp?: string | null
   email?: string | null
   city_id?: number | null
+  tier?: number | null
+  zone?: string | null
   status?: ProspectStatus
   next_follow_up_at?: string | null
   notes?: string | null
@@ -122,6 +126,8 @@ export async function createProspect(input: ProspectInput): Promise<Prospect> {
       whatsapp: input.whatsapp?.trim() || null,
       email: input.email?.trim() || null,
       city_id: input.city_id ?? null,
+      tier: input.tier ?? null,
+      zone: input.zone ?? null,
       status: input.status ?? "nuevo",
       next_follow_up_at: input.next_follow_up_at || null,
       notes: input.notes?.trim() || null,
@@ -151,6 +157,8 @@ export async function updateProspect(
   if (input.whatsapp !== undefined) patch.whatsapp = input.whatsapp?.trim() || null
   if (input.email !== undefined) patch.email = input.email?.trim() || null
   if (input.city_id !== undefined) patch.city_id = input.city_id ?? null
+  if (input.tier !== undefined) patch.tier = input.tier ?? null
+  if (input.zone !== undefined) patch.zone = input.zone ?? null
   if (input.status !== undefined) patch.status = input.status
   if (input.next_follow_up_at !== undefined)
     patch.next_follow_up_at = input.next_follow_up_at || null
