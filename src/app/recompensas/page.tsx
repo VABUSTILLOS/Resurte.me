@@ -161,6 +161,7 @@ export default function CashbackPage() {
                   onServiceSelect={handleServiceSelect}
                   onNavigateStore={handleNavigateStore}
                   onViewOrders={handleViewOrders}
+                  onScanInvoice={() => setShowScanner(true)}
                   balance={balance}
                 />
               )}

@@ -33,6 +33,7 @@ interface DashboardScreenProps {
   onServiceSelect: (service: ServiceItem) => void;
   onNavigateStore?: () => void;
   onViewOrders?: () => void;
+  onScanInvoice?: () => void;
   onShowOnboarding?: () => void;
   walletView?: boolean;
   profileView?: boolean;
@@ -45,6 +46,7 @@ export function DashboardScreen({
   onOpenCalculator,
   onNavigateStore,
   onViewOrders,
+  onScanInvoice,
   onShowOnboarding,
   walletView,
   profileView,
@@ -111,7 +113,7 @@ export function DashboardScreen({
 
           <MonthlyGoalCard />
 
-          <QuickActions onViewOrders={onViewOrders} onBrowseStore={onNavigateStore} />
+          <QuickActions onViewOrders={onViewOrders} onBrowseStore={onNavigateStore} onScanInvoice={onScanInvoice} />
 
           <div className="px-0 md:px-6 lg:px-0">
             <TierBenefitsSection />
