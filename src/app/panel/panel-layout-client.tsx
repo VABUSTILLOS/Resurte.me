@@ -1,11 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { RestaurantProvider, useRestaurant } from "@/contexts/restaurant-context"
 import { ToastProvider } from "@/components/toast"
 import ThemeToggle from "@/components/panel/ThemeToggle"
+import { SyncStatusBadge } from "@/components/panel/sync-status-badge"
+import { LanguageToggle } from "@/components/panel/language-toggle"
+import { useLocale } from "@/lib/i18n/use-locale"
+import { usePanelRealtimeSync } from "@/hooks/use-panel-realtime-sync"
+import { usePanelRole } from "@/hooks/use-panel-role"
+import { canAccessTool, toolKeyForPath } from "@/lib/panel-roles"
 import { PanelMobileNav } from "./_components/PanelMobileNav"
 import { PanelQuickNav } from "./_components/PanelQuickNav"
 import { PanelCompactFooter } from "@/components/panel/PanelCompactFooter"
@@ -15,7 +21,7 @@ import { t } from "@/lib/i18n/es"
 import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import type { RestaurantCollection } from "@/types"
 import {
-  Store, ChefHat, ChevronDown, Sparkles, Menu,
+  Store, ChefHat, ChevronDown, Sparkles, Menu, Lock,
 } from "lucide-react"
 import { ShoppingCart } from "lucide-react"
 
@@ -47,6 +53,14 @@ function PanelContent({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [showPicker, setShowPicker] = useState(false)
   const [showMobileNav, setShowMobileNav] = useState(false)
+  const { locale, setLocale } = useLocale()
+  usePanelRealtimeSync()
+
+  // Fase 4.6: gate por rol — un miembro solo abre las herramientas de su rol.
+  const pathname = usePathname()
+  const { role, viaMember, loading: roleLoading } = usePanelRole()
+  const gatedTool = toolKeyForPath(pathname ?? "")
+  const denied = !roleLoading && gatedTool !== null && !canAccessTool(role, gatedTool)
 
   useEffect(() => {
     async function load() {
@@ -111,6 +125,13 @@ function PanelContent({ children }: { children: React.ReactNode }) {
                 <ShoppingCart className="w-4 h-4 shrink-0" />
                 <span className="hidden sm:inline">{t("panel.buy")}</span>
               </Link>
+              <SyncStatusBadge />
+              {viaMember && (
+                <span className="hidden sm:inline-flex items-center px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-medium">
+                  {t(`personal.role_${role}`)}
+                </span>
+              )}
+              <LanguageToggle locale={locale} setLocale={setLocale} />
               <ThemeToggle />
 
               <div className="relative min-w-0">
@@ -196,7 +217,23 @@ function PanelContent({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-24 lg:pb-6">
-        <ToastProvider>{children}</ToastProvider>
+        {denied ? (
+          <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center max-w-md mx-auto mt-8">
+            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-6 h-6 text-gray-400" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">{t("personal.noAccessTitle")}</h2>
+            <p className="text-sm text-gray-500">{t("personal.noAccessDescription")}</p>
+            <Link
+              href="/panel"
+              className="inline-block mt-5 px-4 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-medium hover:bg-[#0c6b0c] transition-colors"
+            >
+              {t("personal.backToHub")}
+            </Link>
+          </div>
+        ) : (
+          <ToastProvider>{children}</ToastProvider>
+        )}
       </div>
 
       <PanelCompactFooter />

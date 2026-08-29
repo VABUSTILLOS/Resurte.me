@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSyncedStorage } from "@/hooks/use-synced-storage"
+import { useSyncedRows } from "@/hooks/use-synced-rows"
 import { usePanelConfig } from "@/lib/panel-config"
 import { useToast } from "@/components/toast"
 import { Trash2, Download } from "lucide-react"
@@ -29,7 +30,7 @@ export default function MermasPage() {
   const { selectedCollection } = useRestaurant()
   const { toast } = useToast()
   const slug = selectedCollection?.slug || null
-  const [entries, setEntries] = useSyncedStorage<WasteEntry[]>("mermas-entries", [], slug)
+  const [entries, setEntries] = useSyncedRows<WasteEntry>("mermas-entries", [], slug)
   const [showForm, setShowForm] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState("frutas_verduras")
   const [amountKg, setAmountKg] = useState("")
@@ -46,7 +47,7 @@ export default function MermasPage() {
   const [monthlyGoal, setMonthlyGoal] = useSyncedStorage<number>("merma-monthly-goal", 0, slug)
   // Integración con inventario: la merma puede descontar stock de un item
   const [inventarioItems, setInventarioItems] = useSyncedStorage<InventoryItem[]>("inventario-items", [], slug)
-  const [, setMovements] = useSyncedStorage<StockMovement[]>("inventario-movimientos", [], slug)
+  const [, setMovements] = useSyncedRows<StockMovement>("inventario-movimientos", [], slug)
   const [selectedItemId, setSelectedItemId] = useState("")
   const panelCfg = usePanelConfig(slug)
 

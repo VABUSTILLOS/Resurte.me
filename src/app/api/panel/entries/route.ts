@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
+import { resolveEffectiveOwner, ownerColumn } from "@/lib/panel/owner"
+import { canWriteEntry } from "@/lib/panel-roles"
 
 /**
  * GET /api/panel/entries?tool=<storage-key>&collection=<slug>
@@ -16,32 +17,8 @@ import { logger } from "@/lib/logger"
  * direcciones guest y /api/panel/dishes).
  */
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const TOOL_RE = /^[a-z0-9][a-z0-9-]{0,39}$/
 const MAX_VALUE_BYTES = 256 * 1024 // 256 KB por clave; las listas del panel son pequeñas
-
-interface Owner {
-  userId: string | null
-  guestToken: string | null
-}
-
-/** Sesión autenticada gana; si no hay, se usa el guest_token del navegador. */
-async function resolveOwner(req: NextRequest): Promise<Owner | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (user) return { userId: user.id, guestToken: null }
-
-  const token = (req.headers.get("x-guest-token") || "").trim()
-  if (!UUID_RE.test(token)) return null
-  return { userId: null, guestToken: token }
-}
-
-function ownerColumn(owner: Owner): [string, string] {
-  if (owner.userId) return ["user_id", owner.userId]
-  return ["guest_token", owner.guestToken ?? ""]
-}
 
 function isValidTool(tool: unknown): tool is string {
   return typeof tool === "string" && TOOL_RE.test(tool)
@@ -49,7 +26,7 @@ function isValidTool(tool: unknown): tool is string {
 
 export async function GET(req: NextRequest) {
   try {
-    const owner = await resolveOwner(req)
+    const owner = await resolveEffectiveOwner(req)
     if (!owner) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
@@ -97,7 +74,7 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const owner = await resolveOwner(req)
+    const owner = await resolveEffectiveOwner(req)
     if (!owner) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
@@ -114,6 +91,9 @@ export async function PUT(req: NextRequest) {
     const body = (await req.json()) as { tool?: unknown; collection_slug?: string; value?: unknown }
     if (!isValidTool(body.tool)) {
       return NextResponse.json({ error: "tool inválido" }, { status: 400 })
+    }
+    if (!canWriteEntry(owner.role, body.tool)) {
+      return NextResponse.json({ error: "Tu rol no puede modificar esta clave" }, { status: 403 })
     }
     if (!("value" in body)) {
       return NextResponse.json({ error: "Falta value" }, { status: 400 })

@@ -3,6 +3,7 @@
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes } from "@/hooks/use-local-storage"
 import { useSyncedStorage } from "@/hooks/use-synced-storage"
+import { useSyncedRows } from "@/hooks/use-synced-rows"
 import { useToast } from "@/components/toast"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useEffect, useCallback, useRef } from "react"
@@ -21,6 +22,10 @@ import type { ShoppingItem } from "@/components/panel/temporada/temporada-shared
 import type { InventoryItem } from "@/components/panel/inventario/inventario-shared"
 import type { Cliente } from "@/components/panel/ventas/ventas-shared"
 import { useHubAlerts } from "@/components/panel/hub/use-hub-alerts"
+import { useAlertHistory } from "@/components/panel/hub/use-alert-history"
+import { usePanelRole } from "@/hooks/use-panel-role"
+import { canAccessTool, toolKeyForPath } from "@/lib/panel-roles"
+import { ensureGuestToken } from "@/lib/guest-address"
 import HeroSection from "@/components/panel/hub/HeroSection"
 import LiveStats from "@/components/panel/hub/LiveStats"
 import DaySummary from "@/components/panel/hub/DaySummary"
@@ -30,6 +35,7 @@ import BackupStrip from "@/components/panel/hub/BackupStrip"
 import ToolGrid from "@/components/panel/hub/ToolGrid"
 import PurchaseStimulusCard from "@/components/panel/hub/PurchaseStimulusCard"
 import RestoreConfirmModal from "@/components/panel/hub/RestoreConfirmModal"
+import ServerRestoreModal from "@/components/panel/hub/ServerRestoreModal"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 export default function PanelPage() {
@@ -38,12 +44,12 @@ export default function PanelPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
-  const [mermaEntries] = useSyncedStorage<WasteEntry[]>("mermas-entries", [], slug)
+  const [mermaEntries] = useSyncedRows<WasteEntry>("mermas-entries", [], slug)
   const [aperturaChecked] = useSyncedStorage<string[]>("apertura-checked", [], slug)
   const [monthlyGoal] = useSyncedStorage<number>("merma-monthly-goal", 0, slug)
   const [shoppingList] = useSyncedStorage<ShoppingItem[]>("temporada-shopping-list", [], slug)
   const [inventarioItems] = useSyncedStorage<InventoryItem[]>("inventario-items", [], slug)
-  const [ventasEntries] = useSyncedStorage<HubVenta[]>("ventas-entries", [], slug)
+  const [ventasEntries] = useSyncedRows<HubVenta>("ventas-entries", [], slug)
   const [mesas] = useSyncedStorage<HubMesa[]>("mesas", [], slug)
   const [ventasMetaDia] = useSyncedStorage<number>("ventas-meta-dia", 0, slug)
   const [ventasUmbralTicket] = useSyncedStorage<number>("ventas-umbral-ticket", 3000, slug)
@@ -58,6 +64,10 @@ export default function PanelPage() {
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [pendingBackup, setPendingBackup] = useState<Record<string, unknown> | null>(null)
+  const [pendingServerBackup, setPendingServerBackup] = useState<{
+    entries: unknown[]; rows: unknown[]; dishes: unknown[]; raw: string
+  } | null>(null)
+  const [restoring, setRestoring] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Live tick so "mesas ocupadas > 3h" refreshes over time
@@ -224,39 +234,52 @@ export default function PanelPage() {
     return inventarioItems.filter((i) => isLowStock(i.stock, i.minStock) || isOutOfStock(i.stock)).length
   }, [inventarioItems])
 
-  // ── JSON backup / restore (collection-scoped resurte-* keys) ──
-  const backupData = useCallback(() => {
-    if (!selectedCollection) return
-    const prefix = `resurte-`
-    const suffix = `-${selectedCollection.slug}`
-    const data: Record<string, unknown> = {}
-    let count = 0
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (!key || !key.startsWith(prefix) || !key.endsWith(suffix)) continue
-      try {
-        data[key] = JSON.parse(localStorage.getItem(key) || "null")
-        count++
-      } catch {
-        // Skip corrupt entries
+  // ── Respaldo completo del panel (servidor, Fase 4.4) ──
+  // Descarga TODAS las claves del restaurante (panel_entries + panel_rows +
+  // panel_dishes) desde /api/panel/backup, ya con nombre y timestamp.
+  const backupData = useCallback(async () => {
+    try {
+      const token = ensureGuestToken()
+      const res = await fetch("/api/panel/backup", {
+        headers: token ? { "x-guest-token": token } : {},
+      })
+      if (!res.ok) {
+        toast("No se pudo generar el respaldo", "warning")
+        return
       }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      const stamp = new Date().toISOString().slice(0, 10)
+      a.href = url
+      a.download = `resurte-panel-respaldo-${stamp}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast("Respaldo completo exportado", "success")
+    } catch {
+      toast("No se pudo generar el respaldo", "warning")
     }
-    const payload = { app: "resurte-me", version: 1, collection: selectedCollection.slug, exportedAt: new Date().toISOString(), data }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `resurte-${selectedCollection.slug}-respaldo-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast(`Respaldo exportado (${count} datos de ${selectedCollection.name})`, "success")
-  }, [selectedCollection, toast])
+  }, [toast])
 
   const onRestoreFileSelected = useCallback((file: File) => {
     const reader = new FileReader()
     reader.onload = () => {
       try {
-        const parsed = JSON.parse(String(reader.result))
+        const raw = String(reader.result)
+        const parsed = JSON.parse(raw)
+        // Respaldo v2 (servidor, Fase 4.4): preview de conteos + confirmación.
+        if (parsed && parsed.app === "resurte-me" && parsed.version === 2) {
+          const entries = Array.isArray(parsed.entries) ? parsed.entries : []
+          const rows = Array.isArray(parsed.rows) ? parsed.rows : []
+          const dishes = Array.isArray(parsed.dishes) ? parsed.dishes : []
+          if (entries.length + rows.length + dishes.length === 0) {
+            toast("El respaldo no contiene datos", "warning")
+            return
+          }
+          setPendingServerBackup({ entries, rows, dishes, raw })
+          return
+        }
+        // Respaldo v1 (localStorage, legado).
         if (!parsed || typeof parsed !== "object" || !parsed.data || typeof parsed.data !== "object") {
           toast("Archivo de respaldo no válido", "warning")
           return
@@ -273,6 +296,39 @@ export default function PanelPage() {
     }
     reader.readAsText(file)
   }, [selectedCollection, toast])
+
+  const confirmServerRestore = useCallback(async () => {
+    if (!pendingServerBackup || restoring) return
+    setRestoring(true)
+    try {
+      const token = ensureGuestToken()
+      const res = await fetch("/api/panel/backup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "x-guest-token": token } : {}),
+        },
+        body: pendingServerBackup.raw,
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        toast(body?.error || "Error al importar el respaldo", "warning")
+        return
+      }
+      const body = await res.json()
+      toast(
+        `Respaldo importado (${body.counts.entries + body.counts.rows + body.counts.dishes} registros). Recargando…`,
+        "success",
+      )
+      setPendingServerBackup(null)
+      // Recarga completa: todos los hooks locales deben releer el estado importado.
+      setTimeout(() => window.location.reload(), 800)
+    } catch {
+      toast("Error al importar el respaldo", "warning")
+    } finally {
+      setRestoring(false)
+    }
+  }, [pendingServerBackup, restoring, toast])
 
   const confirmRestore = useCallback(() => {
     if (!pendingBackup) return
@@ -335,6 +391,17 @@ export default function PanelPage() {
     clientes,
     panelCfg,
   })
+  useAlertHistory(alerts, slug)
+
+  // Fase 4.6: las herramientas visibles dependen del rol del operador.
+  const { role } = usePanelRole()
+  const visibleTools = useMemo(
+    () => TOOLS.filter((tool) => {
+      const key = toolKeyForPath(tool.href)
+      return !key || canAccessTool(role, key)
+    }),
+    [role],
+  )
 
   return (
     <div>
@@ -360,7 +427,7 @@ export default function PanelPage() {
       )}
 
       <div className="mb-4 sm:mb-6">
-        <ToolGrid tools={TOOLS} selectedCollection={selectedCollection} />
+        <ToolGrid tools={visibleTools} selectedCollection={selectedCollection} />
       </div>
 
       {selectedCollection && todaySales && (
@@ -414,6 +481,13 @@ export default function PanelPage() {
         pendingBackup={pendingBackup}
         onCancel={() => { setShowRestoreConfirm(false); setPendingBackup(null) }}
         onConfirm={confirmRestore}
+      />
+
+      <ServerRestoreModal
+        backup={pendingServerBackup}
+        restoring={restoring}
+        onCancel={() => setPendingServerBackup(null)}
+        onConfirm={confirmServerRestore}
       />
 
       <GlobalSearch open={showSearch} onClose={() => setShowSearch(false)} slug={slug} />

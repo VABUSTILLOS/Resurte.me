@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes } from "@/hooks/use-local-storage"
 import { useSyncedStorage } from "@/hooks/use-synced-storage"
+import { useSyncedRows } from "@/hooks/use-synced-rows"
 import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { getCatalogProducts } from "@/lib/catalog"
@@ -31,7 +32,7 @@ export default function PlanificadorPage() {
   const [sharedDishes] = useSharedDishes(slug)
 
   const [covers, setCovers] = useSyncedStorage<number>("planner-covers", 50, slug)
-  const [ventasEntries] = useSyncedStorage<SaleEntry[]>("ventas-entries", [], slug)
+  const [ventasEntries] = useSyncedRows<SaleEntry>("ventas-entries", [], slug)
   const [wastePcts, setWastePcts] = useSyncedStorage<Record<string, number>>("planner-waste-pcts", {}, slug)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
   const [showOrder, setShowOrder] = useState(false)

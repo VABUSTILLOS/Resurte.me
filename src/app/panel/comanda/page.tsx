@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSyncedStorage } from "@/hooks/use-synced-storage"
+import { useSyncedRows } from "@/hooks/use-synced-rows"
 import { useToast } from "@/components/toast"
 import { t } from "@/lib/i18n/es"
 import { todayStr, dateLabel } from "@/lib/panel-utils"
@@ -25,7 +26,7 @@ export default function ComandaPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
   const { toast } = useToast()
-  const [entries] = useSyncedStorage<SaleEntryLike[]>("ventas-entries", [], slug)
+  const [entries] = useSyncedRows<SaleEntryLike>("ventas-entries", [], slug)
   const [mesas] = useSyncedStorage<MesaLike[]>("mesas", [], slug)
   const [statuses, setStatuses] = useSyncedStorage<Record<string, ComandaStatus>>("comanda-statuses", {}, slug)
   const [selectedDate, setSelectedDate] = useState(todayStr())

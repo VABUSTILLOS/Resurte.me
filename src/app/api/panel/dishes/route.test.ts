@@ -28,7 +28,7 @@ function guestReq(url: string, init?: { method?: string; body?: string; headers?
 /** Chainable mock de PostgREST: cualquier método devuelve el mismo builder. */
 function chainMock() {
   const builder: Record<string, unknown> = {}
-  for (const method of ["select", "eq", "is", "order", "delete", "insert", "update"]) {
+  for (const method of ["select", "eq", "is", "order", "delete", "insert", "update", "limit"]) {
     builder[method] = vi.fn().mockReturnValue(builder)
   }
   builder.then = undefined

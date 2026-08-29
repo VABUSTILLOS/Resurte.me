@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
+import { resolveEffectiveOwner, ownerColumn } from "@/lib/panel/owner"
+import { canWriteDishes } from "@/lib/panel-roles"
 
 /**
  * GET /api/panel/dishes?collection=<slug> — platillos del costeo del dueño.
@@ -13,7 +14,6 @@ import { logger } from "@/lib/logger"
  * anónimo del navegador, mismo patrón que las direcciones guest).
  */
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_DISHES = 200
 
 interface DishInput {
@@ -34,28 +34,6 @@ function isValidDish(x: unknown): x is DishInput {
     typeof d.foodCostPercent === "number" &&
     typeof d.sellingPrice === "number"
   )
-}
-
-interface Owner {
-  userId: string | null
-  guestToken: string | null
-}
-
-/** Sesión autenticada gana; si no hay, se usa el guest_token del navegador. */
-async function resolveOwner(req: NextRequest): Promise<Owner | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (user) return { userId: user.id, guestToken: null }
-
-  const token = (req.headers.get("x-guest-token") || "").trim()
-  if (!UUID_RE.test(token)) return null
-  return { userId: null, guestToken: token }
-}
-
-function ownerColumn(owner: Owner): [string, string] {
-  return owner.userId ? ["user_id", owner.userId] : ["guest_token", owner.guestToken!]
 }
 
 interface DishRow {
@@ -80,7 +58,7 @@ function rowToDish(row: DishRow): DishInput {
 
 export async function GET(req: NextRequest) {
   try {
-    const owner = await resolveOwner(req)
+    const owner = await resolveEffectiveOwner(req)
     if (!owner) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
@@ -118,9 +96,12 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const owner = await resolveOwner(req)
+    const owner = await resolveEffectiveOwner(req)
     if (!owner) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+    }
+    if (!canWriteDishes(owner.role)) {
+      return NextResponse.json({ error: "Tu rol no puede modificar el costeo" }, { status: 403 })
     }
 
     const service = await createServiceClient()

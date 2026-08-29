@@ -5,20 +5,32 @@ import { usePathname } from "next/navigation"
 import { LayoutGrid, Receipt, Calculator, Trash2, UtensilsCrossed, Store } from "lucide-react"
 import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { t } from "@/lib/i18n/es"
+import { usePanelRole } from "@/hooks/use-panel-role"
+import { canAccessTool, type PanelToolKey } from "@/lib/panel-roles"
+
+interface NavItem {
+  href: string
+  label: string
+  icon: React.ElementType
+  exact: boolean
+  /** Herramienta de la matriz de roles (Fase 4.6); undefined = siempre visible */
+  tool?: PanelToolKey
+}
 
 export function PanelQuickNav() {
   const pathname = usePathname()
   const { city } = useCity()
+  const { role } = usePanelRole()
   const storeHref = `/catalogo/${city?.slug || DEFAULT_CITY_SLUG}`
 
-  const NAV_ITEMS = [
+  const NAV_ITEMS: NavItem[] = ([
     { href: "/panel", label: "Inicio", icon: LayoutGrid, exact: true },
     { href: storeHref, label: t("panel.store"), icon: Store, exact: false },
-    { href: "/panel/ventas", label: "Ventas", icon: Receipt, exact: false },
-    { href: "/panel/costeo", label: "Costeo", icon: Calculator, exact: false },
-    { href: "/panel/mermas", label: "Mermas", icon: Trash2, exact: false },
-    { href: "/panel/foodos/menu", label: "Menú digital", icon: UtensilsCrossed, exact: false },
-  ]
+    { href: "/panel/ventas", label: "Ventas", icon: Receipt, exact: false, tool: "ventas" },
+    { href: "/panel/costeo", label: "Costeo", icon: Calculator, exact: false, tool: "costeo" },
+    { href: "/panel/mermas", label: "Mermas", icon: Trash2, exact: false, tool: "mermas" },
+    { href: "/panel/foodos/menu", label: "Menú digital", icon: UtensilsCrossed, exact: false, tool: "foodos" },
+  ] as NavItem[]).filter((item) => !item.tool || canAccessTool(role, item.tool))
 
   return (
     <nav

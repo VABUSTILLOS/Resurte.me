@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import { useSyncedStorage } from "@/hooks/use-synced-storage"
+import { useSyncedRows } from "@/hooks/use-synced-rows"
 import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { uid } from "@/lib/ids"
@@ -41,7 +42,7 @@ export default function InventarioPage() {
   const manualQtys = useMemo(() => readManualQtys(manualQtysRaw), [manualQtysRaw])
   const [covers] = useSyncedStorage<number>("planner-covers", 50, slug)
   const [sharedDishes] = useSharedDishes(slug)
-  const [movements, setMovements] = useSyncedStorage<StockMovement[]>("inventario-movimientos", [], slug)
+  const [movements, setMovements] = useSyncedRows<StockMovement>("inventario-movimientos", [], slug)
   const [showMovements, setShowMovements] = useState(false)
   const [projectionIncluded, setProjectionIncluded] = useState(false)
   const [groupBySupplier, setGroupBySupplier] = useState(false)

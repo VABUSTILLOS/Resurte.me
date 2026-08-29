@@ -91,7 +91,22 @@ export async function POST(request: NextRequest) {
       entriesClaimed = entries?.length ?? 0
     }
 
-    return NextResponse.json({ claimed: data?.length ?? 0, dishesClaimed, entriesClaimed })
+    // Mismo reclamo para las filas por entidad (panel_rows, 00057).
+    // Best-effort: un fallo aquí no impide reclamar las direcciones.
+    let rowsClaimed = 0
+    const { data: panelRows, error: rowsError } = await supabase
+      .from("panel_rows")
+      .update({ user_id: user.id, guest_token: null })
+      .eq("guest_token", token)
+      .is("user_id", null)
+      .select("id")
+    if (rowsError) {
+      logger.error("Panel rows claim error:", rowsError)
+    } else {
+      rowsClaimed = panelRows?.length ?? 0
+    }
+
+    return NextResponse.json({ claimed: data?.length ?? 0, dishesClaimed, entriesClaimed, rowsClaimed })
   } catch (err) {
     logger.error("Claim address error:", err)
     return NextResponse.json(

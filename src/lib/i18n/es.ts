@@ -1,13 +1,17 @@
 /**
  * i18n structure for the panel tools.
  *
- * Scope: Spanish only (current product language). This module establishes the
- * structure so future locales can be added without touching component code.
+ * Spanish is the product's default language and the fallback dictionary.
+ * Additional locales (see `./en`) self-register in `./locale`; `t()` reads
+ * from the active locale and falls back to these strings when a key is
+ * missing there.
  *
  * Usage: `t("costeo.newDish")` — fallback returns the key if a string is missing.
  */
 
-const es = {
+import { registerDictionary, translate } from "./locale"
+
+export const es = {
   common: {
     save: "Guardar",
     cancel: "Cancelar",
@@ -21,6 +25,7 @@ const es = {
     copy: "Copiar",
     back: "Volver",
     loading: "Cargando…",
+    language: "Idioma",
   },
   costeo: {
     title: "Costeando mi menú",
@@ -184,6 +189,105 @@ const es = {
     tipDescription:
       "Los platillos de “Mi menú” usan los precios reales del catálogo de Resurte.me vía Costeando mi menú; los platillos de referencia son estimados para tu tipo de cocina. Usa el simulador de precio para explorar cómo tu precio de venta impacta tu margen y el food cost. Un food cost arriba del 38% pone en riesgo tu negocio.",
     csvHeader: "Platillo,Categoría,Costo,Precio Venta,Margen,Food Cost %,Estado",
+  },
+  analitica: {
+    pageTitle: "Analítica del restaurante",
+    description: "KPIs cruzados de ventas, mermas y el costeo real de tu menú.",
+    rangeLabel: "Rango de fechas",
+    range_7d: "7 días",
+    range_30d: "30 días",
+    range_month: "Mes actual",
+    kpiRevenue: "Ingresos",
+    kpiCost: "Costo de ventas",
+    kpiMargin: "Margen bruto",
+    kpiFoodCost: "Food cost real",
+    kpiWaste: "Merma",
+    kpiWasteRate: "Tasa de merma",
+    kpiTickets: "{count} ventas",
+    kpiAvgTicket: "Ticket promedio",
+    wasteEntries: "{count} registros de merma",
+    wasteRateHint: "merma sobre ingresos",
+    trendTitle: "Tendencia de ingresos",
+    trendHint: "Pasa el cursor sobre cada barra para ver el detalle (ingresos y merma del día).",
+    topDishesTitle: "Top platillos por margen real",
+    topDishesUnits: "{units} vendidos",
+    emptyTitle: "Sin datos en este rango",
+    emptyDescription:
+      "Registra ventas y mermas para ver la analítica cruzada de tu restaurante: márgenes reales, food cost y tasa de merma.",
+    selectCuisineTitle: "Selecciona tu tipo de cocina",
+    selectCuisineDescription:
+      "Selecciona tu tipo de restaurante para ver la analítica cruzada de ventas, mermas y costeo.",
+    alertsHistoryTitle: "Historial de alertas",
+    alertsHistoryEmpty: "Aún no se han disparado alertas en el panel.",
+    alertFiredAt: "Disparada {date}",
+    timesFired: "{count} veces",
+  },
+  personal: {
+    pageTitle: "Personal y roles",
+    description: "Invita a tu equipo al panel: cada rol ve solo sus herramientas.",
+    loginRequired: "Inicia sesión como dueño para administrar el personal de tu panel.",
+    loadError: "No se pudo cargar el personal",
+    inviteTitle: "Invitar a un miembro",
+    inviteEmailLabel: "Correo del miembro",
+    inviteEmailPlaceholder: "correo@ejemplo.com",
+    inviteRoleLabel: "Rol del miembro",
+    inviteButton: "Invitar",
+    inviteSending: "Invitando…",
+    inviteSuccess: "Invitación creada para {email}. Comparte el enlace para que se una.",
+    inviteError: "No se pudo crear la invitación",
+    inviteEmailInvalid: "Escribe un correo válido",
+    updateError: "No se pudo actualizar al miembro",
+    membersTitle: "Miembros del panel",
+    membersEmpty: "Aún no has invitado a nadie. Cada miembro entra con su propia cuenta.",
+    statusActivo: "Activo",
+    statusPendiente: "Pendiente",
+    changeRoleLabel: "Cambiar rol de {email}",
+    copyInviteLink: "Copiar enlace",
+    copied: "Copiado",
+    revoke: "Revocar",
+    revokeAria: "Revocar acceso de {email}",
+    revokeConfirm: "¿Revocar el acceso de {email}? Perderá acceso al panel de inmediato.",
+    matrixTitle: "Permisos por rol",
+    matrixHint: "Herramientas que puede usar cada rol. El dueño siempre tiene acceso total.",
+    matrixTool: "Herramienta",
+    matrixAllowed: "Permitido",
+    noAccessTitle: "Sin acceso a esta herramienta",
+    noAccessDescription: "Tu rol no incluye esta herramienta. Pide al dueño del panel que ajuste tu rol.",
+    backToHub: "Volver al panel",
+    role_dueno: "Dueño",
+    role_gerente: "Gerente",
+    role_cocina: "Cocina",
+    role_mesero: "Mesero",
+    roleDesc_gerente: "Ve y edita todo excepto la administración del personal.",
+    roleDesc_cocina: "Comanda, inventario y mermas. No ve ventas ni costos.",
+    roleDesc_mesero: "Ventas y comanda. No ve costos, inventario ni mermas.",
+    tool_costeo: "Costeo del menú",
+    tool_planificador: "Planificador semanal",
+    tool_mermas: "Control de mermas",
+    tool_rentabilidad: "Rentabilidad",
+    tool_analitica: "Analítica",
+    tool_temporada: "Compras de temporada",
+    tool_apertura: "Apertura diaria",
+    tool_comanda: "Comanda digital",
+    tool_inventario: "Inventario",
+    tool_ventas: "Ventas del día",
+    tool_foodos: "Menú digital (Foodos)",
+    tool_personal: "Personal y roles",
+  },
+  unirse: {
+    pageTitle: "Únete al panel",
+    description:
+      "Te invitaron a colaborar en el panel de un restaurante. Inicia sesión con el mismo correo de la invitación y acepta para entrar.",
+    acceptButton: "Aceptar invitación",
+    accepting: "Aceptando…",
+    successTitle: "¡Listo!",
+    successDescription: "Ahora colaboras en este panel con el rol {role}.",
+    goToPanel: "Ir al panel",
+    errorInvalid: "El enlace de invitación no es válido.",
+    errorLogin: "Inicia sesión primero con el correo al que llegó la invitación.",
+    errorEmailMismatch: "Esta invitación es para otro correo. Inicia sesión con el correo invitado.",
+    errorAlreadyMember: "Ya eres miembro de otro panel. Pide que te revoquen ahí primero.",
+    errorGeneric: "No se pudo aceptar la invitación. Inténtalo de nuevo.",
   },
   ventas: {
     title: "Ventas del día",
@@ -609,24 +713,20 @@ const es = {
     toolsPersonalizedFor: "Todas las herramientas están personalizadas para",
     buy: "Comprar",
     store: "Tienda",
+    syncSaving: "Guardando…",
+    syncSynced: "Sincronizado",
+    syncError: "Error al guardar",
+    syncRetry: "Reintentar",
   },
 }
 
 export type TranslationKey = string
 
+/** Shape of a full translation dictionary (see `./en`). */
+export type Dictionary = typeof es
+
+registerDictionary("es", es, { fallback: true })
+
 export function t(key: TranslationKey, vars?: Record<string, string | number>): string {
-  const parts = key.split(".")
-  let node: unknown = es
-  for (const part of parts) {
-    if (node && typeof node === "object" && part in (node as Record<string, unknown>)) {
-      node = (node as Record<string, unknown>)[part]
-    } else {
-      return key
-    }
-  }
-  if (typeof node !== "string") return key
-  if (!vars) return node
-  return node.replace(/\{(\w+)\}/g, (m, name: string) =>
-    name in vars ? String(vars[name]) : m
-  )
+  return translate(key, vars)
 }

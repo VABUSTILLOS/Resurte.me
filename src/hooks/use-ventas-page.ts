@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes } from "@/hooks/use-local-storage"
 import { useSyncedStorage } from "@/hooks/use-synced-storage"
+import { useSyncedRows } from "@/hooks/use-synced-rows"
 import { usePanelConfig } from "@/lib/panel-config"
 import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
@@ -33,6 +34,7 @@ export interface InventoryItemLike {
 }
 
 export interface StockMovementLike {
+  id?: string // asignado por useSyncedRows al primer set
   fecha: string
   itemId: string
   itemName: string
@@ -85,10 +87,10 @@ export function useVentasPage() {
   const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
 
-  const [entries, setEntries] = useSyncedStorage<SaleEntry[]>("ventas-entries", [], slug)
+  const [entries, setEntries] = useSyncedRows<SaleEntry>("ventas-entries", [], slug)
   const panelCfg = usePanelConfig(slug)
   const [inventarioItems, setInventarioItems] = useSyncedStorage<InventoryItemLike[]>("inventario-items", [], slug)
-  const [, setMovements] = useSyncedStorage<StockMovementLike[]>("inventario-movimientos", [], slug)
+  const [, setMovements] = useSyncedRows<StockMovementLike>("inventario-movimientos", [], slug)
   const [deductStock, setDeductStock] = useSyncedStorage<boolean>("ventas-descontar-stock", false, slug)
   const [dailyGoal, setDailyGoal] = useSyncedStorage<number>("ventas-meta-dia", 0, slug)
   const [monthlyGoal, setMonthlyGoal] = useSyncedStorage<number>("ventas-meta-mes", 0, slug)

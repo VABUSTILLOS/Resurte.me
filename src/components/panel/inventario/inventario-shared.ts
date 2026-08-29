@@ -19,6 +19,7 @@ export interface Proveedor {
 }
 
 export interface StockMovement {
+  id?: string // asignado por useSyncedRows (panel_rows) al primer set
   fecha: string
   itemId: string
   itemName: string

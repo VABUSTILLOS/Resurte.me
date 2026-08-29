@@ -3,7 +3,7 @@ import type { RestaurantCollection } from "@/types"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp, Calendar, ClipboardCheck,
   Package, Receipt, Flame, QrCode, UtensilsCrossed, Gift, Megaphone,
-  BarChart3, Compass,
+  BarChart3, Compass, Users,
 } from "lucide-react"
 
 export type HubCollection = RestaurantCollection
@@ -196,6 +196,17 @@ export const TOOLS: Tool[] = [
     collectionDesc: (name) => `Monitorea la rentabilidad de tu menú de ${name} en tiempo real.`,
   },
   {
+    title: "Analítica del restaurante",
+    description: "KPIs cruzados de ventas, mermas y costeo real: tasa de merma, food cost real, tendencias y top de platillos por margen.",
+    icon: BarChart3,
+    href: "/panel/analitica",
+    color: "text-purple-600",
+    bgColor: "bg-purple-50",
+    area: "costos",
+    short: "Analítica",
+    collectionDesc: (name) => `Cruza ventas, mermas y costeo de ${name} para ver tus márgenes reales.`,
+  },
+  {
     title: "Planificador de temporada",
     description: "Calendario de frutas y verduras de temporada en México. Arma menús estacionales con los insumos más frescos y baratos del momento.",
     icon: Calendar,
@@ -315,6 +326,17 @@ export const TOOLS: Tool[] = [
     bgColor: "bg-teal-50",
     area: "sistema",
     short: "Marketplace",
+    standalone: true,
+  },
+  {
+    title: "Personal y roles",
+    description: "Invita a tu equipo al panel: gerente, cocina y meseros ven solo sus herramientas. Cada quien entra con su propia cuenta.",
+    icon: Users,
+    href: "/panel/personal",
+    color: "text-indigo-600",
+    bgColor: "bg-indigo-50",
+    area: "sistema",
+    short: "Personal",
     standalone: true,
   },
 ]

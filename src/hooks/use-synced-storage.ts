@@ -4,6 +4,14 @@ import { useCallback, useEffect } from "react"
 import { readStored, storageKeyFor } from "@/lib/storage"
 import { ensureGuestToken } from "@/lib/guest-address"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import {
+  applyRemoteEntry,
+  markSaving,
+  markSaved,
+  markSyncError,
+  notePushed,
+  registerSyncKey,
+} from "@/lib/panel-sync"
 
 /**
  * Estado persistente con respaldo en Supabase (tabla `panel_entries`,
@@ -32,20 +40,61 @@ const pulledKeys = new Set<string>()
 function schedulePush(tool: string, collection: string, token: string, value: unknown) {
   const id = `${tool}:${collection}`
   clearTimeout(pushTimers.get(id))
+  markSaving(id)
   pushTimers.set(
     id,
     setTimeout(() => {
       pushTimers.delete(id)
+      notePushed(id, value)
       fetch("/api/panel/entries", {
         method: "PUT",
         headers: { "Content-Type": "application/json", "x-guest-token": token },
         body: JSON.stringify({ tool, collection_slug: collection, value }),
-      }).catch(() => {
-        // Sync es best-effort; localStorage sigue siendo la fuente inmediata.
       })
+        .then((res) => {
+          if (res.ok) markSaved(id)
+          else markSyncError(id)
+        })
+        .catch(() => {
+          // Sync es best-effort; localStorage sigue siendo la fuente inmediata.
+          markSyncError(id)
+        })
     }, PUSH_DEBOUNCE_MS),
   )
 }
+
+/**
+ * Re-descarga todas las claves registradas (fallback de multi-dispositivo
+ * para guests sin Realtime y recuperación tras reconexión). Omite claves
+ * con un pull en vuelo.
+ */
+const pullingKeys = new Set<string>()
+
+export function refreshSyncedKeys() {
+  const token = ensureGuestToken()
+  if (!token) return
+  pulledKeys.forEach((storageKey) => {
+    if (pullingKeys.has(storageKey)) return
+    const meta = syncKeyMeta.get(storageKey)
+    if (!meta) return
+    pullingKeys.add(storageKey)
+    fetch(`/api/panel/entries?tool=${encodeURIComponent(meta.key)}&collection=${encodeURIComponent(meta.collection)}`, {
+      headers: { "x-guest-token": token },
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then((data: { found?: boolean; value?: unknown }) => {
+        if (data.found) applyRemoteEntry(meta.key, meta.collection, data.value)
+      })
+      .catch(() => {
+        // Offline: conservar estado local.
+      })
+      .finally(() => pullingKeys.delete(storageKey))
+  })
+}
+
+// storageKey → info para re-pulls (refreshSyncedKeys) y para saber el
+// collectionSlug al aplicar cambios remotos de claves no montadas.
+const syncKeyMeta = new Map<string, { key: string; collection: string; collectionSlug: string | null }>()
 
 export function useSyncedStorage<T>(
   key: string,
@@ -57,6 +106,9 @@ export function useSyncedStorage<T>(
   const storageKey = storageKeyFor(key, collectionSlug)
 
   useEffect(() => {
+    const id = `${key}:${collection}`
+    registerSyncKey(id, { key, collection, collectionSlug: collectionSlug ?? null })
+    syncKeyMeta.set(storageKey, { key, collection, collectionSlug: collectionSlug ?? null })
     if (pulledKeys.has(storageKey)) return
     pulledKeys.add(storageKey)
     const token = ensureGuestToken()

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
 import { useSyncedStorage } from "@/hooks/use-synced-storage"
+import { useSyncedRows } from "@/hooks/use-synced-rows"
 import { useToast } from "@/components/toast"
 import { t } from "@/lib/i18n/es"
 import { foodCostStatus, usePanelConfig } from "@/lib/panel-config"
@@ -155,8 +156,8 @@ export default function RentabilidadPage() {
   const slug = selectedCollection?.slug || null
   const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
-  const [mermaEntries] = useSyncedStorage<WasteEntry[]>("mermas-entries", [], slug)
-  const [ventasEntries] = useSyncedStorage<SaleEntry[]>("ventas-entries", [], slug)
+  const [mermaEntries] = useSyncedRows<WasteEntry>("mermas-entries", [], slug)
+  const [ventasEntries] = useSyncedRows<SaleEntry>("ventas-entries", [], slug)
   const panelCfg = usePanelConfig(slug)
   const [monthlyGoal] = useSyncedStorage<number>("merma-monthly-goal", 0, slug)
   const [priceOverrides, setPriceOverrides] = useSyncedStorage<Record<string, number>>("rentabilidad-prices", {}, slug)
