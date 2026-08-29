@@ -1,6 +1,7 @@
 import { after, NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import { issuePersonalCoupon, type IssuedCoupon } from "@/lib/repurchase-coupon"
 import { runNewOrderWorkflows } from "@/lib/workflows"
 import type { Coupon } from "@/types"
 import { logger } from "@/lib/logger"
@@ -252,7 +253,7 @@ export async function POST(request: NextRequest) {
     if (code) {
       const { data: found, error: couponErr } = await supabase
         .from("coupons")
-        .select("id, code, discount_type, discount_value, min_order, max_uses, used_count, expires_at")
+        .select("id, code, discount_type, discount_value, min_order, max_uses, used_count, expires_at, user_id")
         .ilike("code", code) // case-insensitive: "BIENVENIDO" == "bienvenido"
         .maybeSingle()
 
@@ -284,6 +285,13 @@ export async function POST(request: NextRequest) {
       if (found.max_uses > 0 && found.used_count >= found.max_uses) {
         return NextResponse.json(
           { error: "El cupón ya fue utilizado el máximo de veces" },
+          { status: 400 }
+        )
+      }
+      // Cupones personales (recompra/reactivación): solo los puede usar su dueño.
+      if (found.user_id && found.user_id !== userId) {
+        return NextResponse.json(
+          { error: "Este cupón no es válido para tu cuenta" },
           { status: 400 }
         )
       }
@@ -555,6 +563,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // ── Cupón personal de recompra (best-effort, solo usuarios logueados) ──
+    // Se emite tras crear la orden para incentivar la siguiente compra; si
+    // falla no bloquea el checkout.
+    let repurchaseCoupon: IssuedCoupon | null = null
+    if (userId) {
+      repurchaseCoupon = await issuePersonalCoupon(supabase, userId, "post_purchase")
+    }
+
     // 5. El PaymentIntent de Stripe para tarjeta lo crea el checkout llamando a
     //    POST /api/payments/stripe/create-intent con el order_id devuelto aquí
     //    (separación de responsabilidades: esta ruta solo registra la orden).
@@ -571,6 +587,8 @@ export async function POST(request: NextRequest) {
       cashbackCredits: order.cashback_credits ?? 0,
       cashbackTier: order.cashback_tier ?? undefined,
       total: realTotal,
+      // Cupón personal de recompra emitido con esta orden (null si anónimo).
+      repurchaseCoupon,
       // Solo para checkout anónimo: el frontend lo persiste en localStorage
       // para reutilizar la dirección en la próxima compra y reclamarla al login.
       guestToken,
@@ -599,7 +617,7 @@ function extractTime(timeRange: string): string {
   return `${String(hour).padStart(2, "0")}:${minute}`
 }
 
-type CouponRow = Pick<Coupon, "id" | "code" | "discount_type" | "discount_value" | "min_order" | "max_uses" | "used_count" | "expires_at">
+type CouponRow = Pick<Coupon, "id" | "code" | "discount_type" | "discount_value" | "min_order" | "max_uses" | "used_count" | "expires_at" | "user_id">
 
 /**
  * Revierte la reserva de un cupón si el pedido no llegó a completarse.

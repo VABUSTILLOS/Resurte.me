@@ -180,6 +180,9 @@ export interface Coupon {
   max_uses: number
   used_count: number
   expires_at: string | null
+  /** NULL = cupón público; UUID = cupón personal (recompra/reactivación). */
+  user_id?: string | null
+  origin?: 'post_purchase' | 'reactivation' | null
   created_at: string
 }
 

@@ -35,9 +35,11 @@ export default function CashbackPage() {
     if (!supabase) {
       // Supabase no configurado (dev/preview sin secrets): degradar con gracia
       // mostrando el onboarding como a un visitante no autenticado.
-      setIsAuthenticated(false);
-      setShowOnboarding(false); // TEMP-VERIFY
-      return;
+      const t = setTimeout(() => {
+        setIsAuthenticated(false);
+        setShowOnboarding(true);
+      }, 0);
+      return () => clearTimeout(t);
     }
     supabase.auth.getSession().then(({ data: { session } }) => {
       const authed = !!session;

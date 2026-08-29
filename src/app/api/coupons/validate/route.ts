@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import type { AppliedCoupon } from "@/types"
 import { logger } from "@/lib/logger"
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     const { data: coupon, error } = await supabase
       .from("coupons")
-      .select("id, code, discount_type, discount_value, min_order, max_uses, used_count, expires_at")
+      .select("id, code, discount_type, discount_value, min_order, max_uses, used_count, expires_at, user_id")
       .ilike("code", code) // case-insensitive: "BIENVENIDO" == "bienvenido"
       .maybeSingle()
 
@@ -59,6 +60,18 @@ export async function POST(request: NextRequest) {
     }
     if (coupon.max_uses > 0 && coupon.used_count >= coupon.max_uses) {
       return NextResponse.json({ error: "El cupón ya fue utilizado el máximo de veces" }, { status: 400 })
+    }
+
+    // Cupones personales (recompra/reactivación): solo su dueño puede aplicarlos.
+    if (coupon.user_id) {
+      const supabaseAuth = await createClient()
+      const { data: { user } } = await supabaseAuth.auth.getUser()
+      if (!user || user.id !== coupon.user_id) {
+        return NextResponse.json(
+          { error: "Este cupón es personal y no pertenece a tu cuenta" },
+          { status: 400 }
+        )
+      }
     }
 
     const appliedCoupon: AppliedCoupon = {
