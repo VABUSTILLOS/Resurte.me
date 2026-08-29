@@ -27,6 +27,7 @@ import {
   Sparkles,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
+import { t } from "@/lib/i18n/es"
 
 const DAY_MS = 86_400_000
 const CANAL_LABEL: Record<string, string> = { web: "Web", qr: "QR", whatsapp: "WhatsApp" }
@@ -49,7 +50,7 @@ export default function TableroPage() {
       setBranches(bs)
       setCustomers(cs)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar el tablero")
+      setError(e instanceof Error ? e.message : t("foodos.tablero.loadError"))
     } finally {
       setLoading(false)
     }
@@ -146,14 +147,14 @@ export default function TableroPage() {
     if (loading) {
       return (
         <div className="flex items-center justify-center py-24 text-stone-500">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando...
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> {t("foodos.common.loading")}
         </div>
       )
     }
     return (
       <div className="max-w-2xl mx-auto mt-16 bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
-        <h1 className="text-xl font-black text-stone-900">Primero configura tu restaurante</h1>
-        <p className="text-stone-600 mt-2">Registra tu perfil para ver métricas de tus pedidos.</p>
+        <h1 className="text-xl font-black text-stone-900">{t("foodos.common.setupTitle")}</h1>
+        <p className="text-stone-600 mt-2">{t("foodos.tablero.setupBody")}</p>
       </div>
     )
   }
@@ -162,8 +163,8 @@ export default function TableroPage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-black text-stone-900">Tablero FoodTech</h1>
-          <p className="text-sm text-stone-500">Rendimiento de tu canal de pedidos directo.</p>
+          <h1 className="text-2xl font-black text-stone-900">{t("foodos.tablero.title")}</h1>
+          <p className="text-sm text-stone-500">{t("foodos.tablero.subtitle")}</p>
         </div>
         <div className="flex gap-2">
           {[7, 30, 90].map((d) => (
@@ -174,7 +175,7 @@ export default function TableroPage() {
                 days === d ? "bg-stone-900 text-white" : "bg-white border border-stone-200 text-stone-600"
               }`}
             >
-              {d} días
+              {t("foodos.tablero.days", { days: d })}
             </button>
           ))}
         </div>
@@ -186,15 +187,15 @@ export default function TableroPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Kpi icon={<ShoppingBag className="w-5 h-5" />} label="Pedidos" value={String(metrics.count)} accent="bg-emerald-100 text-emerald-600" />
-        <Kpi icon={<TrendingUp className="w-5 h-5" />} label="Ingresos" value={formatMoney(metrics.revenue)} accent="bg-blue-100 text-blue-600" />
-        <Kpi icon={<Percent className="w-5 h-5" />} label="Ticket promedio" value={formatMoney(metrics.avgTicket)} accent="bg-purple-100 text-purple-600" />
-        <Kpi icon={<Repeat className="w-5 h-5" />} label="Recompra" value={`${metrics.repeatRate.toFixed(0)}%`} accent="bg-amber-100 text-amber-600" />
+        <Kpi icon={<ShoppingBag className="w-5 h-5" />} label={t("foodos.tablero.kpiOrders")} value={String(metrics.count)} accent="bg-emerald-100 text-emerald-600" />
+        <Kpi icon={<TrendingUp className="w-5 h-5" />} label={t("foodos.tablero.kpiRevenue")} value={formatMoney(metrics.revenue)} accent="bg-blue-100 text-blue-600" />
+        <Kpi icon={<Percent className="w-5 h-5" />} label={t("foodos.tablero.kpiAvgTicket")} value={formatMoney(metrics.avgTicket)} accent="bg-purple-100 text-purple-600" />
+        <Kpi icon={<Repeat className="w-5 h-5" />} label={t("foodos.tablero.kpiRepeat")} value={`${metrics.repeatRate.toFixed(0)}%`} accent="bg-amber-100 text-amber-600" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Pedidos por día */}
-        <Card title="Pedidos por día">
+        <Card title={t("foodos.tablero.byDay")}>
           <div className="flex items-end gap-1 h-40">
             {metrics.byDay.map((d, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-1">
@@ -210,7 +211,7 @@ export default function TableroPage() {
         </Card>
 
         {/* Canales y cumplimiento */}
-        <Card title="Canales y entrega">
+        <Card title={t("foodos.tablero.channelsCard")}>
           <div className="space-y-3">
             {["web", "qr", "whatsapp"].map((ch) => {
               const count = metrics.byChannel.get(ch) ?? 0
@@ -228,18 +229,18 @@ export default function TableroPage() {
               )
             })}
             <div className="pt-2 border-t border-stone-100 flex justify-between text-sm">
-              <span className="text-stone-600">A domicilio</span>
+              <span className="text-stone-600">{t("foodos.common.fulfillmentDelivery")}</span>
               <span className="font-bold text-stone-900">{metrics.deliveryCount}</span>
-              <span className="text-stone-600 ml-6">Para llevar</span>
+              <span className="text-stone-600 ml-6">{t("foodos.common.fulfillmentPickup")}</span>
               <span className="font-bold text-stone-900">{metrics.pickupCount}</span>
             </div>
           </div>
         </Card>
 
         {/* Top platillos */}
-        <Card title="Top platillos">
+        <Card title={t("foodos.tablero.topItems")}>
           {metrics.topItems.length === 0 ? (
-            <p className="text-sm text-stone-400 py-6 text-center">Sin pedidos en el periodo.</p>
+            <p className="text-sm text-stone-400 py-6 text-center">{t("foodos.tablero.emptyPeriod")}</p>
           ) : (
             <div className="space-y-3">
               {metrics.topItems.map((item, idx) => (
@@ -252,7 +253,7 @@ export default function TableroPage() {
                     </span>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-stone-900 truncate">{item.name}</p>
-                      <p className="text-xs text-stone-500">{item.qty} vendidos</p>
+                      <p className="text-xs text-stone-500">{t("foodos.tablero.sold", { qty: item.qty })}</p>
                     </div>
                   </div>
                   <p className="text-sm font-bold text-stone-900 shrink-0">{formatMoney(item.revenue)}</p>
@@ -263,7 +264,7 @@ export default function TableroPage() {
         </Card>
 
         {/* Combos / cross-sell */}
-        <Card title="Combos y cross-sell">
+        <Card title={t("foodos.tablero.combosCard")}>
           <div className="flex items-center gap-4">
             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-100 to-amber-100 flex items-center justify-center">
               <div className="text-center">
@@ -273,21 +274,21 @@ export default function TableroPage() {
             </div>
             <div>
               <p className="text-sm text-stone-600">
-                <strong className="text-stone-900">{formatMoney(metrics.comboRevenue)}</strong> en ventas de combos y sugerencias
+                <strong className="text-stone-900">{formatMoney(metrics.comboRevenue)}</strong> {t("foodos.tablero.comboSales")}
               </p>
-              <p className="text-xs text-stone-500 mt-1">de {formatMoney(metrics.revenue)} totales</p>
+              <p className="text-xs text-stone-500 mt-1">{t("foodos.tablero.ofTotal", { total: formatMoney(metrics.revenue) })}</p>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-stone-100 flex items-center gap-2 text-sm text-stone-600">
             <Users className="w-4 h-4 text-stone-400" />
-            {metrics.customers} clientes · {metrics.repeatRate.toFixed(0)}% recurrentes
+            {t("foodos.tablero.customersRepeat", { count: metrics.customers, rate: metrics.repeatRate.toFixed(0) })}
           </div>
         </Card>
       </div>
 
       {/* Por sucursal */}
       {branches.length > 1 && (
-        <Card title="Por sucursal" className="mt-6">
+        <Card title={t("foodos.tablero.byBranch")} className="mt-6">
           <div className="grid gap-3 md:grid-cols-3">
             {branches.map((b) => {
               const count = metrics.byBranch.get(b.id) ?? 0
@@ -295,14 +296,14 @@ export default function TableroPage() {
                 <div key={b.id} className="bg-stone-50 rounded-xl p-4">
                   <p className="text-sm font-bold text-stone-900">{b.name}</p>
                   <p className="text-2xl font-black text-stone-900 mt-1">{count}</p>
-                  <p className="text-xs text-stone-500">pedidos</p>
+                  <p className="text-xs text-stone-500">{t("foodos.tablero.orders")}</p>
                 </div>
               )
             })}
           </div>
         </Card>
       )}
-      <ToolGuideHost toolKey="tablero" pathname="/panel/foodos/tablero" slug={null} icon="📊" title="Tablero FoodTech" />
+      <ToolGuideHost toolKey="tablero" pathname="/panel/foodos/tablero" slug={null} icon="📊" title={t("foodos.tablero.guideTitle")} />
     </div>
   )
 }

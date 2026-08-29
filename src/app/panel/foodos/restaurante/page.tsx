@@ -19,6 +19,7 @@ import {
   Store, MapPin, Plus, Trash2, QrCode, Copy, Check, ExternalLink, Loader2, Building2,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
+import { t } from "@/lib/i18n/es"
 
 export default function RestaurantePage() {
   const [loading, setLoading] = useState(true)
@@ -55,7 +56,7 @@ export default function RestaurantePage() {
         setBranches(b)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar tu restaurante")
+      setError(e instanceof Error ? e.message : t("foodos.restaurante.loadError"))
     } finally {
       setLoading(false)
     }
@@ -105,7 +106,7 @@ export default function RestaurantePage() {
       })
       setRestaurant(saved)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar")
+      setError(err instanceof Error ? err.message : t("foodos.restaurante.saveError"))
     } finally {
       setSaving(false)
     }
@@ -163,9 +164,9 @@ export default function RestaurantePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Mi restaurante</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t("foodos.restaurante.title")}</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Activa tu canal de pedidos directo: menú digital, QR y checkout sin comisiones.
+            {t("foodos.restaurante.subtitle")}
           </p>
         </div>
         {restaurant && (
@@ -177,7 +178,7 @@ export default function RestaurantePage() {
                 : "bg-[#0E7A0E] text-white hover:bg-[#0e7a0e]"
             }`}
           >
-            {restaurant.status === "active" ? "Pausar" : "Activar tienda"}
+            {restaurant.status === "active" ? t("foodos.restaurante.pauseStore") : t("foodos.restaurante.activateStore")}
           </button>
         )}
       </div>
@@ -193,47 +194,47 @@ export default function RestaurantePage() {
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-6">
           <div className="flex items-center gap-2 mb-5">
             <Store className="w-5 h-5 text-[#0E7A0E]" />
-            <h2 className="font-semibold text-gray-900">Perfil público</h2>
+            <h2 className="font-semibold text-gray-900">{t("foodos.restaurante.profileTitle")}</h2>
           </div>
           <form onSubmit={handleSaveRestaurant} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Nombre del restaurante *</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t("foodos.restaurante.nameLabel")}</label>
                 <input
                   value={name}
                   onChange={(e) => { setName(e.target.value); if (!restaurant) setSlug(e.target.value) }}
-                  placeholder="Taquería El Compa"
+                  placeholder={t("foodos.restaurante.namePlaceholder")}
                   className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5">
-                  Slug público (aparece en la URL) *
+                  {t("foodos.restaurante.slugLabel")}
                 </label>
                 <input
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
-                  placeholder="taqueria-el-compa"
+                  placeholder={t("foodos.restaurante.slugPlaceholder")}
                   className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
                 />
                 <p className="text-[11px] text-gray-400 mt-1">
-                  Tu menú quedará en {publicRestaurantUrl(slug || "...")}
+                  {t("foodos.restaurante.slugHelp", { url: publicRestaurantUrl(slug || "...") })}
                 </p>
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1.5">Descripción</label>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t("foodos.restaurante.descriptionLabel")}</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Cocina mexicana, hecha en casa, delivery a toda la colonia…"
+                placeholder={t("foodos.restaurante.descriptionPlaceholder")}
                 rows={3}
                 className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">URL del logo</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t("foodos.restaurante.logoLabel")}</label>
                 <input
                   value={logoUrl}
                   onChange={(e) => setLogoUrl(e.target.value)}
@@ -242,14 +243,14 @@ export default function RestaurantePage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Moneda</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t("foodos.restaurante.currencyLabel")}</label>
                 <select
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
                   className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
                 >
-                  <option value="MXN">MXN — Peso mexicano</option>
-                  <option value="USD">USD — Dólar</option>
+                  <option value="MXN">{t("foodos.restaurante.currencyMxn")}</option>
+                  <option value="USD">{t("foodos.restaurante.currencyUsd")}</option>
                 </select>
               </div>
             </div>
@@ -259,11 +260,11 @@ export default function RestaurantePage() {
                 disabled={saving || !name.trim()}
                 className="px-5 py-2.5 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? "Guardando…" : restaurant ? "Guardar cambios" : "Crear mi tienda"}
+                {saving ? t("foodos.restaurante.saving") : restaurant ? t("foodos.restaurante.saveChanges") : t("foodos.restaurante.createStore")}
               </button>
               {restaurant?.status === "draft" && (
                 <span className="text-xs text-gray-400">
-                  El QR y la URL se activan cuando actives la tienda.
+                  {t("foodos.restaurante.draftHint")}
                 </span>
               )}
             </div>
@@ -274,13 +275,13 @@ export default function RestaurantePage() {
         <div className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col items-center">
           <div className="flex items-center gap-2 mb-4 self-start">
             <QrCode className="w-5 h-5 text-[#0E7A0E]" />
-            <h2 className="font-semibold text-gray-900">Tu código QR</h2>
+            <h2 className="font-semibold text-gray-900">{t("foodos.restaurante.qrTitle")}</h2>
           </div>
           {restaurant ? (
             <>
               <div className="bg-white rounded-2xl border border-gray-200 p-3 shadow-sm">
                 {qrUrl ? (
-                  <img src={qrUrl} alt={`QR de ${restaurant.name}`} width={208} height={208} className="w-52 h-52" />
+                  <img src={qrUrl} alt={t("foodos.restaurante.qrAlt", { name: restaurant.name })} width={208} height={208} className="w-52 h-52" />
                 ) : (
                   <div className="w-52 h-52 flex items-center justify-center text-gray-300">
                     <Loader2 className="w-6 h-6 animate-spin" />
@@ -288,7 +289,7 @@ export default function RestaurantePage() {
                 )}
               </div>
               <p className="text-xs text-gray-400 mt-3 text-center">
-                Imprímelo y pégalo en mesas, empaques o publicidad. Escanearlo lleva directo a tu menú.
+                {t("foodos.restaurante.qrHint")}
               </p>
               <div className="w-full mt-4">
                 <div className="flex items-center gap-2 rounded-xl bg-gray-50 border border-gray-200 px-3 py-2">
@@ -313,7 +314,7 @@ export default function RestaurantePage() {
             <div className="flex flex-col items-center text-center py-8">
               <Building2 className="w-12 h-12 text-gray-300 mb-3" />
               <p className="text-sm text-gray-400 max-w-[220px]">
-                Crea tu restaurante para generar el QR y tu menú público.
+                {t("foodos.restaurante.qrEmpty")}
               </p>
             </div>
           )}
@@ -324,11 +325,11 @@ export default function RestaurantePage() {
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <div className="flex items-center gap-2 mb-5">
           <MapPin className="w-5 h-5 text-[#0E7A0E]" />
-          <h2 className="font-semibold text-gray-900">Sucursales</h2>
+          <h2 className="font-semibold text-gray-900">{t("foodos.restaurante.branchesTitle")}</h2>
         </div>
 
         {!restaurant ? (
-          <p className="text-sm text-gray-400">Guarda tu restaurante primero para agregar sucursales.</p>
+          <p className="text-sm text-gray-400">{t("foodos.restaurante.branchesEmpty")}</p>
         ) : (
           <>
             {branches.length > 0 && (
@@ -341,10 +342,10 @@ export default function RestaurantePage() {
                       {b.address && <p className="text-xs text-gray-500">{b.address}</p>}
                       <div className="flex gap-3 mt-1.5">
                         {b.pickup_active && (
-                          <span className="text-[10px] font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Para llevar</span>
+                          <span className="text-[10px] font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{t("foodos.common.fulfillmentPickup")}</span>
                         )}
                         {b.delivery_active && (
-                          <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Delivery</span>
+                          <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{t("foodos.restaurante.deliveryBadge")}</span>
                         )}
                       </div>
                     </div>
@@ -363,25 +364,25 @@ export default function RestaurantePage() {
               <input
                 value={branchName}
                 onChange={(e) => setBranchName(e.target.value)}
-                placeholder="Sucursal Centro"
+                placeholder={t("foodos.restaurante.branchNamePlaceholder")}
                 className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
               />
               <input
                 value={branchCity}
                 onChange={(e) => setBranchCity(e.target.value)}
-                placeholder="Ciudad (ej. Guadalajara)"
+                placeholder={t("foodos.restaurante.branchCityPlaceholder")}
                 className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
               />
               <input
                 value={branchAddress}
                 onChange={(e) => setBranchAddress(e.target.value)}
-                placeholder="Dirección"
+                placeholder={t("foodos.restaurante.branchAddressPlaceholder")}
                 className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
               />
               <input
                 value={branchPhone}
                 onChange={(e) => setBranchPhone(e.target.value)}
-                placeholder="Teléfono WhatsApp"
+                placeholder={t("foodos.restaurante.branchPhonePlaceholder")}
                 className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
               />
               <button
@@ -389,13 +390,13 @@ export default function RestaurantePage() {
                 disabled={!branchName.trim()}
                 className="sm:col-span-3 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-[#0E7A0E]/40 text-[#0E7A0E] text-sm font-semibold hover:bg-[#F0FDF4] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                <Plus className="w-4 h-4" /> Agregar sucursal
+                <Plus className="w-4 h-4" /> {t("foodos.restaurante.addBranch")}
               </button>
             </form>
           </>
         )}
       </div>
-      <ToolGuideHost toolKey="restaurante" pathname="/panel/foodos/restaurante" slug={null} icon="🏪" title="Mi restaurante" />
+      <ToolGuideHost toolKey="restaurante" pathname="/panel/foodos/restaurante" slug={null} icon="🏪" title={t("foodos.restaurante.guideTitle")} />
     </div>
   )
 }

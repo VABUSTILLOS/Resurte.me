@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
+import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { useToast } from "@/components/toast"
 import { t } from "@/lib/i18n/es"
 import { foodCostStatus, usePanelConfig } from "@/lib/panel-config"
@@ -12,9 +13,11 @@ import EmptyState from "@/components/panel/EmptyState"
 import Link from "next/link"
 import {
   TrendingUp, ArrowLeft, Circle, AlertTriangle, CheckCircle2,
-  DollarSign, Download, Trash2,
+  DollarSign, Download, Trash2, Printer,
 } from "lucide-react"
 import type { WasteEntry } from "@/components/panel/mermas/mermas-shared"
+import { entryTotal } from "@/components/panel/ventas/ventas-shared"
+import type { SaleEntry } from "@/components/panel/ventas/ventas-shared"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 interface DishData { name: string; cost: number; price: number; category: string; alert?: string }
@@ -152,10 +155,11 @@ export default function RentabilidadPage() {
   const slug = selectedCollection?.slug || null
   const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
-  const [mermaEntries] = useLocalStorage<WasteEntry[]>("mermas-entries", [], slug)
+  const [mermaEntries] = useSyncedStorage<WasteEntry[]>("mermas-entries", [], slug)
+  const [ventasEntries] = useSyncedStorage<SaleEntry[]>("ventas-entries", [], slug)
   const panelCfg = usePanelConfig(slug)
-  const [monthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
-  const [priceOverrides, setPriceOverrides] = useLocalStorage<Record<string, number>>("rentabilidad-prices", {}, slug)
+  const [monthlyGoal] = useSyncedStorage<number>("merma-monthly-goal", 0, slug)
+  const [priceOverrides, setPriceOverrides] = useSyncedStorage<Record<string, number>>("rentabilidad-prices", {}, slug)
   const [editingName, setEditingName] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
   const [sortBy, setSortBy] = useLocalStorage<string>("rentabilidad-sort", "name", slug)
@@ -262,6 +266,32 @@ export default function RentabilidadPage() {
     return dishes.filter((d) => d.category === categoryFilter)
   }, [dishes, categoryFilter])
 
+  // Ventas reales del mes cruzadas con el costo del costeo (o el unitCost registrado)
+  const realSales = useMemo(() => {
+    const monthEntries = ventasEntries.filter((e) => isCurrentMonth(e.date))
+    if (monthEntries.length === 0) return null
+    const costByName = new Map(dishes.map((d) => [normalizeName(d.name), d.cost]))
+    let revenue = 0
+    let cost = 0
+    let units = 0
+    const byDish = new Map<string, { name: string; units: number; margin: number }>()
+    monthEntries.forEach((e) => {
+      const total = entryTotal(e)
+      const unitCost = costByName.get(normalizeName(e.dishName)) ?? e.unitCost ?? 0
+      const margin = total - unitCost * e.quantity
+      revenue += total
+      cost += unitCost * e.quantity
+      units += e.quantity
+      const key = normalizeName(e.dishName) || e.dishName
+      const agg = byDish.get(key) || { name: e.dishName, units: 0, margin: 0 }
+      agg.units += e.quantity
+      agg.margin += margin
+      byDish.set(key, agg)
+    })
+    const top = Array.from(byDish.values()).sort((a, b) => b.margin - a.margin).slice(0, 3)
+    return { revenue, cost, margin: revenue - cost, units, top, entries: monthEntries.length }
+  }, [ventasEntries, dishes])
+
   function exportCSV() {
     const header = t("rentabilidad.csvHeader")
     const rows = dishes.map((d) => {
@@ -279,6 +309,45 @@ export default function RentabilidadPage() {
     a.click()
     URL.revokeObjectURL(url)
     toast(t("rentabilidad.csvExported"), "success")
+  }
+
+  function printSummary() {
+    const greens = dishes.filter((d) => foodCostStatus((d.cost / d.price) * 100, panelCfg) === "green").length
+    const ambers = dishes.filter((d) => foodCostStatus((d.cost / d.price) * 100, panelCfg) === "amber").length
+    const reds = dishes.filter((d) => foodCostStatus((d.cost / d.price) * 100, panelCfg) === "red").length
+    const statusLabel = (st: string) => st === "ok" ? t("rentabilidad.statusExcellent") : st === "justo" ? t("rentabilidad.statusAcceptable") : t("rentabilidad.statusReview")
+    const monthName = new Date().toLocaleDateString("es-MX", { month: "long", year: "numeric" })
+    const catRows = categoryAnalysis
+      .map((c) => `<tr><td>${c.category}</td><td>${c.count}</td><td>${c.avgFc.toFixed(1)}%</td><td>$${c.avgMargin.toFixed(2)}</td><td>${statusLabel(c.status)}</td></tr>`)
+      .join("")
+    const realSalesHtml = realSales
+      ? `<h2>Ventas reales del mes (${realSales.entries} ventas)</h2>
+         <table><tr><th>Ingresos</th><th>Costo</th><th>Margen</th><th>Unidades</th></tr>
+         <tr><td>$${realSales.revenue.toFixed(2)}</td><td>$${realSales.cost.toFixed(2)}</td><td>$${realSales.margin.toFixed(2)}</td><td>${realSales.units}</td></tr></table>
+         <h3>Top 3 platillos por margen</h3>
+         <ol>${realSales.top.map((d) => `<li>${d.name} — $${d.margin.toFixed(2)} (${d.units} uds)</li>`).join("")}</ol>`
+      : ""
+    const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Resumen de rentabilidad — ${monthName}</title>
+      <style>body{font-family:system-ui,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;color:#111}
+      h1{font-size:20px}h2{font-size:15px;margin-top:24px}h3{font-size:13px}
+      table{border-collapse:collapse;width:100%;font-size:13px}td,th{border:1px solid #ddd;padding:6px 8px;text-align:left}
+      .semaforo span{display:inline-block;margin-right:12px;padding:4px 10px;border-radius:8px;font-size:13px}
+      .g{background:#dcfce7}.a{background:#fef3c7}.r{background:#fee2e2}
+      @media print{button{display:none}}</style></head><body>
+      <h1>Resumen de rentabilidad — ${selectedCollection?.name ?? "Menú"}</h1>
+      <p>${monthName} · ${dishes.length} platillos analizados</p>
+      <p class="semaforo"><span class="g">🟢 ${greens}</span><span class="a">🟡 ${ambers}</span><span class="r">🔴 ${reds}</span></p>
+      <h2>Análisis por categoría</h2>
+      <table><tr><th>Categoría</th><th>Platillos</th><th>Food cost prom.</th><th>Margen prom.</th><th>Estado</th></tr>${catRows}</table>
+      ${realSalesHtml}
+      <script>window.onload=()=>window.print()</script></body></html>`
+    const win = window.open("", "_blank")
+    if (!win) {
+      toast(t("rentabilidad.printBlocked"), "error")
+      return
+    }
+    win.document.write(html)
+    win.document.close()
   }
 
   if (!selectedCollection) {
@@ -306,6 +375,7 @@ export default function RentabilidadPage() {
   const redCount = dishes.filter((d) => fcStatus((d.cost / d.price) * 100) === "red").length
   const alerts = dishes.filter((d) => d.alert)
 
+
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
@@ -322,6 +392,14 @@ export default function RentabilidadPage() {
             >
               <Download className="w-3.5 h-3.5" />
               {t("rentabilidad.exportCsv")}
+            </button>
+            <button
+              onClick={printSummary}
+              className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition-colors"
+              aria-label={t("rentabilidad.printSummaryLabel")}
+            >
+              <Printer className="w-3.5 h-3.5" />
+              {t("rentabilidad.printSummary")}
             </button>
           </div>
           <p className="text-sm text-gray-400">
@@ -356,6 +434,54 @@ export default function RentabilidadPage() {
           <p className="text-[10px] text-red-500">{t("rentabilidad.summaryRedHint")}</p>
         </div>
       </div>
+
+      {/* Ventas reales del mes × costeo */}
+      {realSales && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <DollarSign className="w-5 h-5 text-[#0E7A0E]" />
+            <h3 className="font-bold text-gray-900 text-sm">{t("rentabilidad.realSalesTitle")}</h3>
+            <span className="text-[10px] text-gray-400">
+              {t("rentabilidad.realSalesEntries", { count: realSales.entries })}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+            <div className="rounded-xl bg-gray-50 p-3 text-xs">
+              <p className="text-gray-400">{t("rentabilidad.realSalesRevenue")}</p>
+              <p className="font-bold text-gray-900 text-base">${realSales.revenue.toFixed(0)}</p>
+            </div>
+            <div className="rounded-xl bg-gray-50 p-3 text-xs">
+              <p className="text-gray-400">{t("rentabilidad.realSalesCost")}</p>
+              <p className="font-bold text-gray-900 text-base">${realSales.cost.toFixed(0)}</p>
+            </div>
+            <div className={`rounded-xl p-3 text-xs ${realSales.margin >= 0 ? "bg-green-50" : "bg-red-50"}`}>
+              <p className="text-gray-400">{t("rentabilidad.realSalesMargin")}</p>
+              <p className={`font-bold text-base ${realSales.margin >= 0 ? "text-green-700" : "text-red-700"}`}>
+                ${realSales.margin.toFixed(0)}
+              </p>
+            </div>
+            <div className="rounded-xl bg-gray-50 p-3 text-xs">
+              <p className="text-gray-400">{t("rentabilidad.realSalesUnits")}</p>
+              <p className="font-bold text-gray-900 text-base">{realSales.units}</p>
+            </div>
+          </div>
+          {realSales.top.length > 0 && (
+            <div className="space-y-1">
+              {realSales.top.map((d, i) => (
+                <div key={i} className="flex items-center justify-between text-xs text-gray-600">
+                  <span className="truncate">
+                    {i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"} {d.name}
+                    <span className="text-gray-400"> ×{d.units}</span>
+                  </span>
+                  <span className={`font-semibold ${d.margin >= 0 ? "text-green-700" : "text-red-600"}`}>
+                    ${d.margin.toFixed(0)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Category analysis */}
       {categoryAnalysis.length > 0 && (

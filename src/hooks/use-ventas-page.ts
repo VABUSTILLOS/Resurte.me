@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
-import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
+import { useSharedDishes } from "@/hooks/use-local-storage"
+import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { usePanelConfig } from "@/lib/panel-config"
 import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
@@ -40,6 +41,36 @@ export interface StockMovementLike {
   motivo: string
 }
 
+type DishIngredient = { ingredientName: string; quantity: number; unit: string }
+
+/**
+ * Calcula cuánto descuenta del inventario una venta de `qty` platillos,
+ * empatando ingredientes de la receta con items por nombre normalizado.
+ */
+export function computeDeductions(
+  ingredients: DishIngredient[],
+  qty: number,
+  inventarioItems: InventoryItemLike[],
+) {
+  const deductions = new Map<string, { itemId: string; itemName: string; neededQty: number }>()
+  ingredients.forEach((ing) => {
+    const key = normalizeName(ing.ingredientName)
+    if (!key) return
+    const totalQty = (ing.quantity || 0) * qty
+    if (totalQty <= 0) return
+    const item = inventarioItems.find((i) => normalizeName(i.name) === key)
+    if (!item) return
+    // Convert the recipe quantity (in the ingredient's unit) to the inventory item's unit
+    const neededQty = convertQty(totalQty, ing.unit || "g", item.unit) ?? totalQty
+    deductions.set(item.id, {
+      itemId: item.id,
+      itemName: item.name,
+      neededQty: (deductions.get(item.id)?.neededQty || 0) + neededQty,
+    })
+  })
+  return deductions
+}
+
 /**
  * Estado y acciones del panel de ventas.
  *
@@ -54,24 +85,24 @@ export function useVentasPage() {
   const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
 
-  const [entries, setEntries] = useLocalStorage<SaleEntry[]>("ventas-entries", [], slug)
+  const [entries, setEntries] = useSyncedStorage<SaleEntry[]>("ventas-entries", [], slug)
   const panelCfg = usePanelConfig(slug)
-  const [inventarioItems, setInventarioItems] = useLocalStorage<InventoryItemLike[]>("inventario-items", [], slug)
-  const [, setMovements] = useLocalStorage<StockMovementLike[]>("inventario-movimientos", [], slug)
-  const [deductStock, setDeductStock] = useLocalStorage<boolean>("ventas-descontar-stock", false, slug)
-  const [dailyGoal, setDailyGoal] = useLocalStorage<number>("ventas-meta-dia", 0, slug)
-  const [monthlyGoal, setMonthlyGoal] = useLocalStorage<number>("ventas-meta-mes", 0, slug)
-  const [ticketThreshold, setTicketThreshold] = useLocalStorage<number>("ventas-umbral-ticket", 3000, slug)
-  const [puntosTasa, setPuntosTasa] = useLocalStorage<number>("ventas-puntos-tasa", 100, slug)
-  const [puntosCanje, setPuntosCanje] = useLocalStorage<number>("ventas-puntos-canje", 1, slug)
-  const [tipoCambio, setTipoCambio] = useLocalStorage<number>("ventas-tipo-cambio", 1, slug)
+  const [inventarioItems, setInventarioItems] = useSyncedStorage<InventoryItemLike[]>("inventario-items", [], slug)
+  const [, setMovements] = useSyncedStorage<StockMovementLike[]>("inventario-movimientos", [], slug)
+  const [deductStock, setDeductStock] = useSyncedStorage<boolean>("ventas-descontar-stock", false, slug)
+  const [dailyGoal, setDailyGoal] = useSyncedStorage<number>("ventas-meta-dia", 0, slug)
+  const [monthlyGoal, setMonthlyGoal] = useSyncedStorage<number>("ventas-meta-mes", 0, slug)
+  const [ticketThreshold, setTicketThreshold] = useSyncedStorage<number>("ventas-umbral-ticket", 3000, slug)
+  const [puntosTasa, setPuntosTasa] = useSyncedStorage<number>("ventas-puntos-tasa", 100, slug)
+  const [puntosCanje, setPuntosCanje] = useSyncedStorage<number>("ventas-puntos-canje", 1, slug)
+  const [tipoCambio, setTipoCambio] = useSyncedStorage<number>("ventas-tipo-cambio", 1, slug)
   const clientesCrud = useClientesCrud(slug)
   const mesasCrud = useMesasCrud(slug)
   const empleadosCrud = useEmpleadosCrud(slug)
   const tarjetasCrud = useTarjetasCrud(slug)
-  const [comisiones, setComisiones] = useLocalStorage<Record<string, number>>("ventas-comisiones", {}, slug)
+  const [comisiones, setComisiones] = useSyncedStorage<Record<string, number>>("ventas-comisiones", {}, slug)
   // Keep comanda statuses in sync: deleting a sale must remove its comanda status
-  const [, setComandaStatuses] = useLocalStorage<Record<string, unknown>>("comanda-statuses", {}, slug)
+  const [, setComandaStatuses] = useSyncedStorage<Record<string, unknown>>("comanda-statuses", {}, slug)
   // Live tick for "tiempo ocupado" / fichajes abiertos
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -202,6 +233,9 @@ export function useVentasPage() {
     // Loyalty redemption: convert points to a peso discount (monto)
     const redeemPts = data.redeemPts ? Math.max(0, toInt(data.redeemPts)) : 0
     const redeemValue = data.clienteId && redeemPts > 0 ? Math.min(redeemPts * puntosCanje, qty * unitPrice) : 0
+    // Deductions se calculan antes de crear la entrada para persistir
+    // stockDeducted junto con la venta (permite revertir stock al borrarla).
+    const deductions = deductStock ? computeDeductions(dish.ingredients, qty, inventarioItems) : new Map<string, { itemId: string; itemName: string; neededQty: number }>()
     const entry: SaleEntry = {
       id: uid("sale"),
       dishId: dish.id,
@@ -219,6 +253,7 @@ export function useVentasPage() {
         ? { type: "monto", value: redeemValue }
         : discountValue > 0 ? { type: data.discountType, value: discountValue } : undefined,
       createdAt: new Date().toISOString(),
+      stockDeducted: deductions.size > 0,
     }
     const total = entryTotal(entry)
 
@@ -267,22 +302,6 @@ export function useVentasPage() {
     // Optional: deduct dish ingredients from inventory (opt-in)
     let deducted = 0
     if (deductStock) {
-      const deductions = new Map<string, { itemId: string; itemName: string; neededQty: number }>()
-      dish.ingredients.forEach((ing) => {
-        const key = normalizeName(ing.ingredientName)
-        if (!key) return
-        const totalQty = (ing.quantity || 0) * qty
-        if (totalQty <= 0) return
-        const item = inventarioItems.find((i) => normalizeName(i.name) === key)
-        if (!item) return
-        // Convert the recipe quantity (in the ingredient's unit) to the inventory item's unit
-        const neededQty = convertQty(totalQty, ing.unit || "g", item.unit) ?? totalQty
-        deductions.set(item.id, {
-          itemId: item.id,
-          itemName: item.name,
-          neededQty: (deductions.get(item.id)?.neededQty || 0) + neededQty,
-        })
-      })
       if (deductions.size > 0) {
         setInventarioItems((prev) =>
           prev.map((i) => {
@@ -322,6 +341,7 @@ export function useVentasPage() {
   }
 
   const deleteEntry = (id: string) => {
+    const entry = entries.find((e) => e.id === id)
     setEntries((prev) => prev.filter((e) => e.id !== id))
     // Remove the orphaned comanda status so it doesn't linger forever
     setComandaStatuses((prev) => {
@@ -330,8 +350,35 @@ export function useVentasPage() {
       delete next[id]
       return next
     })
+    // Revertir el stock que la venta descontó (según la receta actual del platillo)
+    if (entry?.stockDeducted) {
+      const dish = sharedDishes.find((d) => d.id === entry.dishId)
+      if (dish) {
+        const deductions = computeDeductions(dish.ingredients, entry.quantity, inventarioItems)
+        if (deductions.size > 0) {
+          setInventarioItems((prev) =>
+            prev.map((i) => {
+              const d = deductions.get(i.id)
+              return d ? { ...i, stock: i.stock + d.neededQty } : i
+            })
+          )
+          const restores: StockMovementLike[] = Array.from(deductions.values()).map((d) => ({
+            fecha: new Date().toISOString(),
+            itemId: d.itemId,
+            itemName: d.itemName,
+            tipo: "entrada",
+            delta: d.neededQty,
+            motivo: `Venta eliminada: ${entry.dishName} ×${entry.quantity}`,
+          }))
+          setMovements((prev) => [...restores, ...prev].slice(0, 500))
+        }
+      }
+    }
     setDeleteConfirm(null)
-    toast("Venta eliminada", "warning")
+    toast(
+      entry?.stockDeducted ? "Venta eliminada · stock restaurado en inventario" : "Venta eliminada",
+      "warning",
+    )
   }
 
   const copyClientes = () => {

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
-import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { useToast } from "@/components/toast"
 import { t } from "@/lib/i18n/es"
 import Link from "next/link"
@@ -304,10 +304,10 @@ export default function AperturaPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
   const { toast } = useToast()
-  const [checked, setChecked] = useLocalStorage<string[]>("apertura-checked", [], slug)
+  const [checked, setChecked] = useSyncedStorage<string[]>("apertura-checked", [], slug)
   const [showCalculator, setShowCalculator] = useState(false)
-  const [phaseDates, setPhaseDates] = useLocalStorage<Record<string, string>>("apertura-dates", {}, slug)
-  const [customItems, setCustomItems] = useLocalStorage<{ name: string; low: number; high: number }[]>("apertura-custom", [], slug)
+  const [phaseDates, setPhaseDates] = useSyncedStorage<Record<string, string>>("apertura-dates", {}, slug)
+  const [customItems, setCustomItems] = useSyncedStorage<{ name: string; low: number; high: number }[]>("apertura-custom", [], slug)
   const [newCustomName, setNewCustomName] = useState("")
   const [newCustomLow, setNewCustomLow] = useState("")
   const [newCustomHigh, setNewCustomHigh] = useState("")

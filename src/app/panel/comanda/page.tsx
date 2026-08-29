@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
-import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { useToast } from "@/components/toast"
 import { t } from "@/lib/i18n/es"
 import { todayStr, dateLabel } from "@/lib/panel-utils"
@@ -25,9 +25,9 @@ export default function ComandaPage() {
   const { selectedCollection } = useRestaurant()
   const slug = selectedCollection?.slug || null
   const { toast } = useToast()
-  const [entries] = useLocalStorage<SaleEntryLike[]>("ventas-entries", [], slug)
-  const [mesas] = useLocalStorage<MesaLike[]>("mesas", [], slug)
-  const [statuses, setStatuses] = useLocalStorage<Record<string, ComandaStatus>>("comanda-statuses", {}, slug)
+  const [entries] = useSyncedStorage<SaleEntryLike[]>("ventas-entries", [], slug)
+  const [mesas] = useSyncedStorage<MesaLike[]>("mesas", [], slug)
+  const [statuses, setStatuses] = useSyncedStorage<Record<string, ComandaStatus>>("comanda-statuses", {}, slug)
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [channelFilter, setChannelFilter] = useState<"todos" | string>("todos")
   const [mesaFilter, setMesaFilter] = useState<string>("todas")

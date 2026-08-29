@@ -1,7 +1,8 @@
 "use client"
 
 import { useRestaurant } from "@/contexts/restaurant-context"
-import { useSharedDishes, useLocalStorage } from "@/hooks/use-local-storage"
+import { useSharedDishes } from "@/hooks/use-local-storage"
+import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { useToast } from "@/components/toast"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useEffect, useCallback, useRef } from "react"
@@ -37,19 +38,19 @@ export default function PanelPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
-  const [mermaEntries] = useLocalStorage<WasteEntry[]>("mermas-entries", [], slug)
-  const [aperturaChecked] = useLocalStorage<string[]>("apertura-checked", [], slug)
-  const [monthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
-  const [shoppingList] = useLocalStorage<ShoppingItem[]>("temporada-shopping-list", [], slug)
-  const [inventarioItems] = useLocalStorage<InventoryItem[]>("inventario-items", [], slug)
-  const [ventasEntries] = useLocalStorage<HubVenta[]>("ventas-entries", [], slug)
-  const [mesas] = useLocalStorage<HubMesa[]>("mesas", [], slug)
-  const [ventasMetaDia] = useLocalStorage<number>("ventas-meta-dia", 0, slug)
-  const [ventasUmbralTicket] = useLocalStorage<number>("ventas-umbral-ticket", 3000, slug)
-  const [clientes] = useLocalStorage<Cliente[]>("clientes", [], slug)
-  const [puntosTasa] = useLocalStorage<number>("ventas-puntos-tasa", 100, slug)
-  const [comandaStatuses] = useLocalStorage<Record<string, { status: "pendiente" | "en-cocina" | "listo"; startedAt?: number; readyAt?: number }>>("comanda-statuses", {}, slug)
-  const [covers] = useLocalStorage<number>("planner-covers", 0, slug)
+  const [mermaEntries] = useSyncedStorage<WasteEntry[]>("mermas-entries", [], slug)
+  const [aperturaChecked] = useSyncedStorage<string[]>("apertura-checked", [], slug)
+  const [monthlyGoal] = useSyncedStorage<number>("merma-monthly-goal", 0, slug)
+  const [shoppingList] = useSyncedStorage<ShoppingItem[]>("temporada-shopping-list", [], slug)
+  const [inventarioItems] = useSyncedStorage<InventoryItem[]>("inventario-items", [], slug)
+  const [ventasEntries] = useSyncedStorage<HubVenta[]>("ventas-entries", [], slug)
+  const [mesas] = useSyncedStorage<HubMesa[]>("mesas", [], slug)
+  const [ventasMetaDia] = useSyncedStorage<number>("ventas-meta-dia", 0, slug)
+  const [ventasUmbralTicket] = useSyncedStorage<number>("ventas-umbral-ticket", 3000, slug)
+  const [clientes] = useSyncedStorage<Cliente[]>("clientes", [], slug)
+  const [puntosTasa] = useSyncedStorage<number>("ventas-puntos-tasa", 100, slug)
+  const [comandaStatuses] = useSyncedStorage<Record<string, { status: "pendiente" | "en-cocina" | "listo"; startedAt?: number; readyAt?: number }>>("comanda-statuses", {}, slug)
+  const [covers] = useSyncedStorage<number>("planner-covers", 0, slug)
   const panelCfg = usePanelConfig(slug)
 
   const [showAlerts, setShowAlerts] = useState(true)

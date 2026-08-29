@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useSyncedStorage } from "@/hooks/use-synced-storage"
 
 /**
  * Configuración central de umbrales y constantes del panel.
@@ -54,8 +54,8 @@ function parseConfig(raw: string | null | undefined): Partial<PanelConfig> {
  * global > defaults.
  */
 export function usePanelConfig(slug: string | null): PanelConfig {
-  const [globalRaw] = useLocalStorage<string>("panel-config", "", slug && "global")
-  const [perCollectionRaw] = useLocalStorage<string>("panel-config", "", slug)
+  const [globalRaw] = useSyncedStorage<string>("panel-config", "", slug && "global")
+  const [perCollectionRaw] = useSyncedStorage<string>("panel-config", "", slug)
   return useMemo(() => {
     const merged = {
       ...DEFAULT_PANEL_CONFIG,

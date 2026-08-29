@@ -2,6 +2,7 @@
 
 import { useVentasPage } from "@/hooks/use-ventas-page"
 import { t } from "@/lib/i18n/es"
+import { entryTotal } from "@/components/panel/ventas/ventas-shared"
 import { todayStr, dateLabel, toNonNegativeNumber } from "@/lib/panel-utils"
 import Link from "next/link"
 import { ArrowLeft, Copy, Flame, AlertCircle, Receipt } from "lucide-react"
@@ -20,6 +21,7 @@ import TopSellers from "@/components/panel/ventas/TopSellers"
 import EntriesList from "@/components/panel/ventas/EntriesList"
 import AllTimeTip from "@/components/panel/ventas/AllTimeTip"
 import DeleteConfirmModal from "@/components/panel/ventas/DeleteConfirmModal"
+import AppOrdersCard from "@/components/panel/ventas/app-orders-card"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
 export default function VentasPage() {
@@ -103,6 +105,34 @@ export default function VentasPage() {
 
   const slug = selectedCollection?.slug ?? null
 
+  const exportVentasCsv = () => {
+    if (reportEntries.length === 0) return
+    const header = "Fecha,Platillo,Cantidad,Precio unitario,Costo unitario,Total,Método de pago,Canal,Descuento"
+    const rows = reportEntries.map((e) => {
+      const discount = e.quantity * e.unitPrice - entryTotal(e)
+      return [
+        e.date,
+        `"${e.dishName.replace(/"/g, '""')}"`,
+        e.quantity,
+        e.unitPrice.toFixed(2),
+        e.unitCost.toFixed(2),
+        entryTotal(e).toFixed(2),
+        e.paymentMethod,
+        e.channel,
+        discount.toFixed(2),
+      ].join(",")
+    })
+    const csv = [header, ...rows].join("\n")
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `ventas-${reportPeriod}-${slug || "panel"}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast("Ventas exportadas a CSV", "success")
+  }
+
   if (!selectedCollection) {
     return (
       <div className="text-center py-16">
@@ -163,6 +193,12 @@ export default function VentasPage() {
           </Link>
         </div>
       )}
+
+      {/* Mostrador vs. pedidos reales de la app (solo si hay restaurante FoodOS) */}
+      <AppOrdersCard
+        counterCount={entries.filter((e) => e.date.startsWith(todayStr())).length}
+        counterRevenue={entries.filter((e) => e.date.startsWith(todayStr())).reduce((s, e) => s + entryTotal(e), 0)}
+      />
 
       {/* ── Register sale form ───────────────────────────── */}
       <SaleForm
@@ -279,6 +315,7 @@ export default function VentasPage() {
             tipoCambio={tipoCambio}
             onPeriodChange={setReportPeriod}
             onCopy={copyGerencial}
+            onExportCsv={exportVentasCsv}
           />
 
           <div className="grid lg:grid-cols-2 gap-6 mb-6">

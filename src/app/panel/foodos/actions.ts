@@ -6,7 +6,8 @@
 // Todas usan requireAuth() y respetan RLS (owner-only).
 // ============================================================
 
-import { requireAuth } from "@/lib/auth"
+import { requireAuth, getCurrentUser } from "@/lib/auth"
+import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { slugify } from "@/lib/foodos"
 import { revalidatePath } from "next/cache"
@@ -478,6 +479,51 @@ export async function deleteUpsellRule(id: string): Promise<void> {
 // ------------------------------------------------------------
 // Pedidos
 // ------------------------------------------------------------
+
+/**
+ * Resumen ligero de pedidos reales de la app para compararlos con las
+ * ventas de mostrador registradas en /panel/ventas. Retorna null para
+ * invitados o usuarios sin restaurante FoodOS (no redirige).
+ */
+export async function getOrdersSummary(): Promise<{
+  todayCount: number
+  todayRevenue: number
+  weekCount: number
+  weekRevenue: number
+  pendingCount: number
+} | null> {
+  const user = await getCurrentUser()
+  if (!user) return null
+  const supabase = await createClient()
+  const { data: restaurant } = await supabase
+    .from("foodos_restaurants")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle()
+  if (!restaurant) return null
+
+  const now = new Date()
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+  const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: orders, error } = await supabase
+    .from("foodos_orders")
+    .select("total, status, created_at")
+    .eq("restaurant_id", restaurant.id)
+    .gte("created_at", startOfWeek)
+  if (error) throw new Error(error.message)
+
+  const cancelled: FoodosOrderStatus = "cancelled"
+  const valid = (orders ?? []).filter((o) => o.status !== cancelled)
+  const today = valid.filter((o) => o.created_at >= startOfDay)
+  return {
+    todayCount: today.length,
+    todayRevenue: today.reduce((s, o) => s + o.total, 0),
+    weekCount: valid.length,
+    weekRevenue: valid.reduce((s, o) => s + o.total, 0),
+    pendingCount: (orders ?? []).filter((o) => o.status === "pending").length,
+  }
+}
 
 export async function listOrders(restaurantId: string) {
   const { supabase } = await requireAuth()

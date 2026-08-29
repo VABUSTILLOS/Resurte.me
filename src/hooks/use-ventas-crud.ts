@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { useToast } from "@/components/toast"
 import { uid } from "@/lib/ids"
 import { toInt } from "@/lib/panel-utils"
@@ -41,7 +41,7 @@ export interface ClientesCrud {
 
 export function useClientesCrud(slug: string | null): ClientesCrud {
   const { toast } = useToast()
-  const [clientes, setClientes] = useLocalStorage<Cliente[]>("clientes", [], slug)
+  const [clientes, setClientes] = useSyncedStorage<Cliente[]>("clientes", [], slug)
   const [showClientes, setShowClientes] = useState(false)
   const [clienteName, setClienteName] = useState("")
   const [clientePhone, setClientePhone] = useState("")
@@ -143,7 +143,7 @@ export interface MesasCrud {
 
 export function useMesasCrud(slug: string | null): MesasCrud {
   const { toast } = useToast()
-  const [mesas, setMesas] = useLocalStorage<Mesa[]>("mesas", [], slug)
+  const [mesas, setMesas] = useSyncedStorage<Mesa[]>("mesas", [], slug)
   const [showMesas, setShowMesas] = useState(false)
   const [mesaName, setMesaName] = useState("")
   const [mesaCapacidad, setMesaCapacidad] = useState("")
@@ -240,8 +240,8 @@ export interface EmpleadosCrud {
 
 export function useEmpleadosCrud(slug: string | null): EmpleadosCrud {
   const { toast } = useToast()
-  const [empleados, setEmpleados] = useLocalStorage<Empleado[]>("reloj-empleados", [], slug)
-  const [fichajes, setFichajes] = useLocalStorage<Fichaje[]>("reloj-fichajes", [], slug)
+  const [empleados, setEmpleados] = useSyncedStorage<Empleado[]>("reloj-empleados", [], slug)
+  const [fichajes, setFichajes] = useSyncedStorage<Fichaje[]>("reloj-fichajes", [], slug)
   const [showReloj, setShowReloj] = useState(false)
   const [empNombre, setEmpNombre] = useState("")
   const [empRol, setEmpRol] = useState("")
@@ -345,7 +345,7 @@ export interface TarjetasCrud {
 
 export function useTarjetasCrud(slug: string | null): TarjetasCrud {
   const { toast } = useToast()
-  const [tarjetas, setTarjetas] = useLocalStorage<TarjetaRegalo[]>("tarjetas-regalo", [], slug)
+  const [tarjetas, setTarjetas] = useSyncedStorage<TarjetaRegalo[]>("tarjetas-regalo", [], slug)
   const [showTarjetas, setShowTarjetas] = useState(false)
   const [tarjetaMonto, setTarjetaMonto] = useState("")
 

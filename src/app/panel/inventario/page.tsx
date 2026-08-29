@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
+import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { uid } from "@/lib/ids"
@@ -30,17 +31,17 @@ export default function InventarioPage() {
   const slug = selectedCollection?.slug || "default"
   const { toast } = useToast()
 
-  const [items, setItems] = useLocalStorage<InventoryItem[]>("inventario-items", [], slug)
-  const [proveedores, setProveedores] = useLocalStorage<Proveedor[]>("proveedores", [], slug)
+  const [items, setItems] = useSyncedStorage<InventoryItem[]>("inventario-items", [], slug)
+  const [proveedores, setProveedores] = useSyncedStorage<Proveedor[]>("proveedores", [], slug)
   const [sortBy, setSortBy] = useLocalStorage<SortField>("inventario-sort", "name", slug)
   // NOTE: planificador writes to "planner-manual-qtys" (was previously "planificador-qtys")
-  const [manualQtysRaw] = useLocalStorage<Record<string, number | ManualQty>>("planner-manual-qtys", {}, slug)
+  const [manualQtysRaw] = useSyncedStorage<Record<string, number | ManualQty>>("planner-manual-qtys", {}, slug)
   // Normalized quantities: legacy bare numbers → { qty, unit } so the import
   // preserves real units instead of assuming grams.
   const manualQtys = useMemo(() => readManualQtys(manualQtysRaw), [manualQtysRaw])
-  const [covers] = useLocalStorage<number>("planner-covers", 50, slug)
+  const [covers] = useSyncedStorage<number>("planner-covers", 50, slug)
   const [sharedDishes] = useSharedDishes(slug)
-  const [movements, setMovements] = useLocalStorage<StockMovement[]>("inventario-movimientos", [], slug)
+  const [movements, setMovements] = useSyncedStorage<StockMovement[]>("inventario-movimientos", [], slug)
   const [showMovements, setShowMovements] = useState(false)
   const [projectionIncluded, setProjectionIncluded] = useState(false)
   const [groupBySupplier, setGroupBySupplier] = useState(false)

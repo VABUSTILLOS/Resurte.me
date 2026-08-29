@@ -1,6 +1,6 @@
 "use client"
 
-import { BarChart3, Copy } from "lucide-react"
+import { BarChart3, Copy, Download } from "lucide-react"
 import type { Comparison, ReportChannelRow, ReportMethodRow, ReportStats, TopSeller } from "./ventas-shared"
 
 type ReportPeriod = "hoy" | "7d" | "30d"
@@ -16,6 +16,7 @@ interface ManagementReportProps {
   tipoCambio: number
   onPeriodChange: (p: ReportPeriod) => void
   onCopy: () => void
+  onExportCsv: () => void
 }
 
 export default function ManagementReport({
@@ -29,6 +30,7 @@ export default function ManagementReport({
   tipoCambio,
   onPeriodChange,
   onCopy,
+  onExportCsv,
 }: ManagementReportProps) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
@@ -47,6 +49,16 @@ export default function ManagementReport({
               {p === "hoy" ? "Hoy" : p === "7d" ? "7 días" : "30 días"}
             </button>
           ))}
+          <button
+            onClick={onExportCsv}
+            disabled={reportEntries.length === 0}
+            title="Exportar ventas del período a CSV"
+            aria-label="Exportar ventas a CSV"
+            className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-3.5 h-3.5" />
+            CSV
+          </button>
           <button
             onClick={onCopy}
             disabled={reportEntries.length === 0}

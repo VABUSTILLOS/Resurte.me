@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { useToast } from "@/components/toast"
 import type { ShoppingItem, TransferItem } from "@/components/panel/temporada/temporada-shared"
 import { t } from "@/lib/i18n/es"
@@ -103,8 +104,8 @@ export default function TemporadaPage() {
   const { toast } = useToast()
   const today = new Date()
   const [viewMonth, setViewMonth] = useLocalStorage<number>("temporada-month", today.getMonth() + 1, slug)
-  const [shoppingList, setShoppingList] = useLocalStorage<ShoppingItem[]>("temporada-shopping-list", [], slug)
-  const [, setTransfers] = useLocalStorage<TransferItem[]>("temporada-transfer", [], slug)
+  const [shoppingList, setShoppingList] = useSyncedStorage<ShoppingItem[]>("temporada-shopping-list", [], slug)
+  const [, setTransfers] = useSyncedStorage<TransferItem[]>("temporada-transfer", [], slug)
 
   const tips = selectedCollection
     ? (SEASONAL_TIPS[selectedCollection.slug] || DEFAULT_TIPS)

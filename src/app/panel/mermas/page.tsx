@@ -2,13 +2,15 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
-import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { usePanelConfig } from "@/lib/panel-config"
 import { useToast } from "@/components/toast"
-import { Trash2 } from "lucide-react"
+import { Trash2, Download } from "lucide-react"
 import { isCurrentMonth } from "@/lib/panel-utils"
-import { CAUSAS, nextWasteId } from "@/components/panel/mermas/mermas-shared"
+import { convertQty } from "@/lib/panel-units"
+import { CAUSAS, WASTE_CATEGORIES, nextWasteId } from "@/components/panel/mermas/mermas-shared"
 import type { WasteEntry } from "@/components/panel/mermas/mermas-shared"
+import type { InventoryItem, StockMovement } from "@/components/panel/inventario/inventario-shared"
 import MermaHeader from "@/components/panel/mermas/merma-header"
 import DateFilter from "@/components/panel/mermas/date-filter"
 import type { DateFilterValue } from "@/components/panel/mermas/date-filter"
@@ -27,7 +29,7 @@ export default function MermasPage() {
   const { selectedCollection } = useRestaurant()
   const { toast } = useToast()
   const slug = selectedCollection?.slug || null
-  const [entries, setEntries] = useLocalStorage<WasteEntry[]>("mermas-entries", [], slug)
+  const [entries, setEntries] = useSyncedStorage<WasteEntry[]>("mermas-entries", [], slug)
   const [showForm, setShowForm] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState("frutas_verduras")
   const [amountKg, setAmountKg] = useState("")
@@ -41,7 +43,11 @@ export default function MermasPage() {
   const [showMonthlyGoal, setShowMonthlyGoal] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [dateFilter, setDateFilter] = useState<DateFilterValue>("all")
-  const [monthlyGoal, setMonthlyGoal] = useLocalStorage<number>("merma-monthly-goal", 0, slug)
+  const [monthlyGoal, setMonthlyGoal] = useSyncedStorage<number>("merma-monthly-goal", 0, slug)
+  // Integración con inventario: la merma puede descontar stock de un item
+  const [inventarioItems, setInventarioItems] = useSyncedStorage<InventoryItem[]>("inventario-items", [], slug)
+  const [, setMovements] = useSyncedStorage<StockMovement[]>("inventario-movimientos", [], slug)
+  const [selectedItemId, setSelectedItemId] = useState("")
   const panelCfg = usePanelConfig(slug)
 
   // Filtro por rango de fechas — calculado siempre (nunca después de un early return)
@@ -59,6 +65,7 @@ export default function MermasPage() {
     setCostPerKg("")
     setNote("")
     setSelectedCause(CAUSAS[0]!.key)
+    setSelectedItemId("")
     setEditingId(null)
   }
 
@@ -89,7 +96,7 @@ export default function MermasPage() {
       } : e))
       toast("Entrada de merma actualizada", "success")
     } else {
-      setEntries((prev) => [...prev, {
+      const entry: WasteEntry = {
         id: nextWasteId(),
         category: selectedCategory,
         cause: selectedCause,
@@ -97,8 +104,39 @@ export default function MermasPage() {
         costPerKg: cost,
         date: new Date().toISOString(),
         note: note.trim() || undefined,
-      }])
-      toast("Entrada de merma registrada", "warning")
+      }
+      // Vincular con inventario: la merma descuenta stock del item elegido
+      const item = inventarioItems.find((i) => i.id === selectedItemId)
+      if (item) {
+        const neededQty = convertQty(kg, "kg", item.unit)
+        if (neededQty !== null) {
+          setInventarioItems((prev) =>
+            prev.map((i) => (i.id === item.id ? { ...i, stock: Math.max(0, i.stock - neededQty) } : i)),
+          )
+          const movement: StockMovement = {
+            fecha: entry.date,
+            itemId: item.id,
+            itemName: item.name,
+            tipo: "salida",
+            delta: -neededQty,
+            motivo: `Merma: ${entry.note || selectedCause}`,
+          }
+          setMovements((prev) => [movement, ...prev].slice(0, 500))
+          entry.itemId = item.id
+          entry.itemName = item.name
+          entry.stockDeducted = true
+        } else {
+          toast(`No se pudo convertir kg a ${item.unit}: el stock de ${item.name} no se modificó`, "warning")
+        }
+      }
+      setEntries((prev) => [...prev, entry])
+      toast(
+        entry.stockDeducted
+          ? `Entrada de merma registrada · stock de ${entry.itemName} descontado`
+          : "Entrada de merma registrada",
+        "warning",
+      )
+      setSelectedItemId("")
     }
     resetForm()
     setShowForm(false)
@@ -125,10 +163,62 @@ export default function MermasPage() {
 
   function confirmDeleteEntry() {
     if (deleteConfirmId) {
+      const entry = entries.find((e) => e.id === deleteConfirmId)
       setEntries((prev) => prev.filter((e) => e.id !== deleteConfirmId))
-      toast("Entrada de merma eliminada", "error")
+      // Revertir el stock que la merma descontó del item vinculado
+      if (entry?.stockDeducted && entry.itemId) {
+        const item = inventarioItems.find((i) => i.id === entry.itemId)
+        const restoreQty = item ? convertQty(entry.amountKg, "kg", item.unit) : null
+        if (item && restoreQty !== null) {
+          setInventarioItems((prev) =>
+            prev.map((i) => (i.id === item.id ? { ...i, stock: i.stock + restoreQty } : i)),
+          )
+          const movement: StockMovement = {
+            fecha: new Date().toISOString(),
+            itemId: item.id,
+            itemName: item.name,
+            tipo: "entrada",
+            delta: restoreQty,
+            motivo: `Merma eliminada: ${entry.note || entry.cause}`,
+          }
+          setMovements((prev) => [movement, ...prev].slice(0, 500))
+          toast("Entrada de merma eliminada · stock restaurado", "error")
+        } else {
+          toast("Entrada de merma eliminada", "error")
+        }
+      } else {
+        toast("Entrada de merma eliminada", "error")
+      }
       setDeleteConfirmId(null)
     }
+  }
+
+  const exportMermasCsv = () => {
+    if (filteredEntries.length === 0) return
+    const header = "Fecha,Categoría,Causa,Cantidad (kg),Costo/kg,Total,Item inventario,Nota"
+    const rows = filteredEntries.map((e) => {
+      const category = WASTE_CATEGORIES.find((c) => c.key === e.category)?.label ?? e.category
+      const cause = CAUSAS.find((c) => c.key === e.cause)?.label ?? e.cause
+      return [
+        e.date,
+        `"${category}"`,
+        `"${cause}"`,
+        e.amountKg.toFixed(2),
+        e.costPerKg.toFixed(2),
+        (e.amountKg * e.costPerKg).toFixed(2),
+        `"${(e.itemName ?? "").replace(/"/g, '""')}"`,
+        `"${(e.note ?? "").replace(/"/g, '""')}"`,
+      ].join(",")
+    })
+    const csv = [header, ...rows].join("\n")
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `mermas-${dateFilter}-${slug || "panel"}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast("Mermas exportadas a CSV", "success")
   }
 
   // Keyboard shortcuts
@@ -186,12 +276,27 @@ export default function MermasPage() {
     <div>
       <MermaHeader collectionName={selectedCollection.name} />
 
-      <DateFilter
-        dateFilter={dateFilter}
-        onFilterChange={setDateFilter}
-        filteredCount={filteredEntries.length}
-        totalCount={entries.length}
-      />
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <DateFilter
+            dateFilter={dateFilter}
+            onFilterChange={setDateFilter}
+            filteredCount={filteredEntries.length}
+            totalCount={entries.length}
+          />
+        </div>
+        {filteredEntries.length > 0 && (
+          <button
+            onClick={exportMermasCsv}
+            title="Exportar mermas a CSV"
+            aria-label="Exportar mermas a CSV"
+            className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-xl transition-colors whitespace-nowrap"
+          >
+            <Download className="w-3.5 h-3.5" />
+            CSV
+          </button>
+        )}
+      </div>
 
       <TotalLossBanner totalLoss={totalLoss} entryCount={filteredEntries.length} />
 
@@ -216,6 +321,9 @@ export default function MermasPage() {
         onNoteChange={setNote}
         selectedCause={selectedCause}
         onCauseChange={setSelectedCause}
+        inventoryItems={inventarioItems}
+        selectedItemId={selectedItemId}
+        onItemChange={setSelectedItemId}
         onSave={addEntry}
         onCancel={cancelForm}
         onOpenForm={() => setShowForm(true)}

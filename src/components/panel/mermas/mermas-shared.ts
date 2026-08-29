@@ -74,6 +74,9 @@ export interface WasteEntry {
   date: string // ISO date
   note?: string
   cause: string // key from CAUSAS
+  itemId?: string // item de inventario vinculado (descuento de stock opcional)
+  itemName?: string
+  stockDeducted?: boolean // true si la merma descontó stock (para revertir al borrar)
 }
 
 let wasteId = 0

@@ -160,8 +160,20 @@ La infraestructura durable de rate limiting existe (tabla `rate_limits` + RPC `c
 
 ---
 
+## 7. Persistencia del panel del restaurantero (`panel_entries`)
+
+Las herramientas de `/panel` (ventas, mermas, inventario, comanda, temporada, planificador, apertura, clientes) persisten en la tabla genérica **`panel_entries`** (migración `00055`), una fila por `(tool, collection_slug, owner)`:
+
+- **Dueño**: `user_id` (sesión) o `guest_token` (UUID v4 capability, header `x-guest-token`); CHECK exige exactamente uno.
+- **Payload**: JSONB `{ value }` — valor completo de la clave localStorage; sync replace-all con debounce de 800 ms.
+- **API**: `GET /api/panel/entries?tool=&collection=` → `{ found, value }` (60/min); `PUT` reemplaza el valor (30/min, límite 256 KB → 413). Service client + RLS (`user_id = auth.uid()`), `REVOKE ALL FROM anon`.
+- **Hook**: `useSyncedStorage<T>(key, initialValue, collectionSlug?)` en `src/hooks/use-synced-storage.ts` — drop-in de `useLocalStorage`: localStorage es caché inmediato, GET una vez por clave por sesión, gana el servidor si `found`, si no sube el local cuando difiere del valor inicial.
+- **Claim**: al iniciar sesión, `/api/addresses/claim` reasigna las filas guest (`guest_token` → `user_id`) de `panel_entries` y `panel_dishes`.
+
+---
+
 ## Referencias
 
 - `vercel.json` (crons + headers de seguridad), `src/app/api/cron/*`, `src/app/api/workflows/*`, `src/app/api/foodos/campaigns/run`.
-- Migraciones: `supabase/migrations/00039_rate_limits.sql`, `00042_cleanup_guest_addresses.sql`, `00043_pg_cron_cleanup_guest_addresses.sql`, `00044_pg_cron_purge_rate_limits.sql`.
+- Migraciones: `supabase/migrations/00039_rate_limits.sql`, `00042_cleanup_guest_addresses.sql`, `00043_pg_cron_cleanup_guest_addresses.sql`, `00044_pg_cron_purge_rate_limits.sql`, `00055_panel_entries.sql`.
 - Relacionado: `docs/MOCKS.md` (contrato de fallback), `REPORTE.md`, `supabase/ESQUEMA.md`.

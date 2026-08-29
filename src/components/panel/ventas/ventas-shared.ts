@@ -17,6 +17,7 @@ export interface SaleEntry {
   mesaId?: string
   modificadores?: { nombre: string; precio: number }[]
   createdAt?: string // ISO timestamp, set on addEntry
+  stockDeducted?: boolean // true si la venta descontó insumos del inventario (para revertir al borrar)
 }
 
 export interface Cliente {

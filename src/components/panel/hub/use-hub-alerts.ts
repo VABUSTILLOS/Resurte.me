@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { foodCostStatus, type PanelConfig } from "@/lib/panel-config"
 import { isCurrentMonth, isLowStock, isOutOfStock } from "@/lib/panel-utils"
+import { normalizeName } from "@/lib/normalize"
 import { hubEntryTotal, type HubAlert, type HubCollection, type HubComandas, type HubMesasInfo, type HubTodaySales, type HubVenta } from "./hub-data"
 import type { SharedDish } from "@/hooks/use-local-storage"
 import type { WasteEntry } from "@/components/panel/mermas/mermas-shared"
@@ -82,6 +83,51 @@ export function useHubAlerts({
     })
     if (highCostDishes.length > 0) {
       result.push({ id: "high-foodcost", type: "danger", icon: AlertTriangle, title: `${highCostDishes.length} platillo(s) con food cost > ${panelCfg.foodCostRedAbove}%`, detail: `${highCostDishes.map((d) => d.name).join(", ")}`, href: "/panel/rentabilidad" })
+    }
+
+    // 2b. Red food-cost dish with high sales volume (margin bleed amplified)
+    if (highCostDishes.length > 0 && ventasEntries.length > 0) {
+      const monthEntries = ventasEntries.filter((e) => isCurrentMonth(e.date))
+      const unitsByDish = new Map<string, number>()
+      monthEntries.forEach((e) => {
+        const key = normalizeName(e.dishName)
+        unitsByDish.set(key, (unitsByDish.get(key) || 0) + e.quantity)
+      })
+      const bleeding = highCostDishes
+        .map((d) => ({ name: d.name, units: unitsByDish.get(normalizeName(d.name)) || 0 }))
+        .filter((d) => d.units >= 10)
+        .sort((a, b) => b.units - a.units)
+      if (bleeding.length > 0) {
+        result.push({
+          id: "high-foodcost-volume",
+          type: "danger",
+          icon: AlertTriangle,
+          title: `${bleeding.length} platillo(s) con margen rojo y alto volumen de ventas`,
+          detail: `${bleeding.slice(0, 2).map((d) => `${d.name} (${d.units} vendidos este mes)`).join(", ")}${bleeding.length > 2 ? ` +${bleeding.length - 2} más` : ""} — cada venta agranda la pérdida de margen`,
+          href: "/panel/rentabilidad",
+        })
+      }
+    }
+
+    // 2c. Low/out stock of an ingredient used in an active dish recipe
+    if (sharedDishes.length > 0 && inventarioItems.length > 0) {
+      const ingredientNames = new Set(
+        sharedDishes.flatMap((d) => d.ingredients.map((i) => normalizeName(i.ingredientName))).filter(Boolean),
+      )
+      const critical = inventarioItems.filter(
+        (i) => ingredientNames.has(normalizeName(i.name)) && (isOutOfStock(i.stock) || isLowStock(i.stock, i.minStock)),
+      )
+      if (critical.length > 0) {
+        const out = critical.filter((i) => isOutOfStock(i.stock))
+        result.push({
+          id: "stock-ingredient-in-menu",
+          type: out.length > 0 ? "danger" : "warning",
+          icon: AlertCircle,
+          title: `${critical.length} ingrediente(s) de tu menú con stock ${out.length > 0 ? "agotado" : "bajo"}`,
+          detail: `${critical.slice(0, 2).map((i) => i.name).join(", ")}${critical.length > 2 ? ` +${critical.length - 2} más` : ""} — se usan en platillos de tu menú costeado`,
+          href: "/panel/inventario",
+        })
+      }
     }
 
     // 3. Merma close to/exceeding goal

@@ -10,13 +10,13 @@ import { rateLimited, rateLimitResponse, clientIp } from "@/lib/rate-limit"
  * Vincula al usuario autenticado las direcciones creadas durante checkouts
  * anónimos (las que tienen user_id NULL y el mismo guest_token). Se llama tras
  * iniciar sesión / registrarse desde el navegador que hizo la compra anónima.
- * También reclama los platillos del panel guardados con el mismo guest_token
- * (panel_dishes).
+ * También reclama los platillos del panel (panel_dishes) y los datos de las
+ * herramientas del panel (panel_entries) guardados con el mismo guest_token.
  *
  * Body: { guest_token: string }
  * Auth: requiere sesión activa (auth.uid()).
  *
- * Respuesta: { claimed: number, dishesClaimed: number }.
+ * Respuesta: { claimed: number, dishesClaimed: number, entriesClaimed: number }.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -76,7 +76,22 @@ export async function POST(request: NextRequest) {
       dishesClaimed = dishes?.length ?? 0
     }
 
-    return NextResponse.json({ claimed: data?.length ?? 0, dishesClaimed })
+    // Mismo reclamo para las herramientas del panel (panel_entries).
+    // Best-effort: un fallo aquí no impide reclamar las direcciones.
+    let entriesClaimed = 0
+    const { data: entries, error: entriesError } = await supabase
+      .from("panel_entries")
+      .update({ user_id: user.id, guest_token: null })
+      .eq("guest_token", token)
+      .is("user_id", null)
+      .select("id")
+    if (entriesError) {
+      logger.error("Panel entries claim error:", entriesError)
+    } else {
+      entriesClaimed = entries?.length ?? 0
+    }
+
+    return NextResponse.json({ claimed: data?.length ?? 0, dishesClaimed, entriesClaimed })
   } catch (err) {
     logger.error("Claim address error:", err)
     return NextResponse.json(

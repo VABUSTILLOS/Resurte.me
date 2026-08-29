@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
-import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
+import { useSharedDishes } from "@/hooks/use-local-storage"
+import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { getCatalogProducts } from "@/lib/catalog"
@@ -29,13 +30,13 @@ export default function PlanificadorPage() {
   const { toast } = useToast()
   const [sharedDishes] = useSharedDishes(slug)
 
-  const [covers, setCovers] = useLocalStorage<number>("planner-covers", 50, slug)
-  const [ventasEntries] = useLocalStorage<SaleEntry[]>("ventas-entries", [], slug)
-  const [wastePcts, setWastePcts] = useLocalStorage<Record<string, number>>("planner-waste-pcts", {}, slug)
+  const [covers, setCovers] = useSyncedStorage<number>("planner-covers", 50, slug)
+  const [ventasEntries] = useSyncedStorage<SaleEntry[]>("ventas-entries", [], slug)
+  const [wastePcts, setWastePcts] = useSyncedStorage<Record<string, number>>("planner-waste-pcts", {}, slug)
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
   const [showOrder, setShowOrder] = useState(false)
-  const [manualQtysRaw, setManualQtysRaw] = useLocalStorage<Record<string, number | ManualQty>>("planner-manual-qtys", {}, slug)
-  const [transfers, setTransfers] = useLocalStorage<TransferItem[]>("temporada-transfer", [], slug)
+  const [manualQtysRaw, setManualQtysRaw] = useSyncedStorage<Record<string, number | ManualQty>>("planner-manual-qtys", {}, slug)
+  const [transfers, setTransfers] = useSyncedStorage<TransferItem[]>("temporada-transfer", [], slug)
 
   // Real catalog prices (Supabase): refresh price/unit of matching products.
   const [catalogPrices, setCatalogPrices] = useState<Record<string, { price: number; unit?: string }>>({})

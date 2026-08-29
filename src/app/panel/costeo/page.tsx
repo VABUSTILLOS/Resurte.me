@@ -5,6 +5,7 @@ import { getCatalogProducts, mergeWithCatalog, type CatalogProduct } from "@/lib
 import { usePanelConfig } from "@/lib/panel-config"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
+import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
 import { toNonNegativeNumber } from "@/lib/panel-utils"
@@ -64,7 +65,7 @@ export default function CosteoPage() {
   )
 
   // Persist dishes per collection
-  const [dishes, setDishes] = useLocalStorage<Dish[]>("costeo-dishes", [], slug)
+  const [dishes, setDishes] = useSyncedStorage<Dish[]>("costeo-dishes", [], slug)
   // Sync with shared cross-tool store
   const [, setSharedDishes] = useSharedDishes(slug)
   const [showForm, setShowForm] = useState(false)
@@ -74,7 +75,7 @@ export default function CosteoPage() {
   const [newDishIngredients, setNewDishIngredients] = useState<DishIngredient[]>([
     { ingredientName: ingredients[0]?.name || "", quantity: 0, unit: ingredients[0]?.unit || "", unitPrice: ingredients[0]?.price || 0 },
   ])
-  const [targetFoodCost, setTargetFoodCost] = useLocalStorage<number>("costeo-target-fc", 30, slug)
+  const [targetFoodCost, setTargetFoodCost] = useSyncedStorage<number>("costeo-target-fc", 30, slug)
   // Custom ingredient mode
   const [customName, setCustomName] = useState("")
   const [customUnit, setCustomUnit] = useState("kg")
@@ -89,19 +90,19 @@ export default function CosteoPage() {
   const [newDishModifiers, setNewDishModifiers] = useState<{ id: string; nombre: string; precio: number }[]>([])
   const [modName, setModName] = useState("")
   const [modPrice, setModPrice] = useState("")
-  const [inventarioItems] = useLocalStorage<InventoryItem[]>("inventario-items", [], slug)
+  const [inventarioItems] = useSyncedStorage<InventoryItem[]>("inventario-items", [], slug)
   const panelCfg = usePanelConfig(slug)
   const [undoStack, setUndoStack] = useState<Dish[][]>([])
   const [undoIndex, setUndoIndex] = useState(-1)
   const [selectedDishes, setSelectedDishes] = useState<Set<string>>(new Set())
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false)
   // Recetas guardadas + selector
-  const [savedRecipes, setSavedRecipes] = useLocalStorage<Recipe[]>("costeo-recetas", [], slug)
+  const [savedRecipes, setSavedRecipes] = useSyncedStorage<Recipe[]>("costeo-recetas", [], slug)
   const [showRecipes, setShowRecipes] = useState(false)
   const [recipeSearch, setRecipeSearch] = useState("")
   const [recipeConfirmDelete, setRecipeConfirmDelete] = useState<string | null>(null)
   // Combos y promociones
-  const [combos, setCombos] = useLocalStorage<Combo[]>("costeo-combos", [], slug)
+  const [combos, setCombos] = useSyncedStorage<Combo[]>("costeo-combos", [], slug)
   const [showComboForm, setShowComboForm] = useState(false)
   const [newComboName, setNewComboName] = useState("")
   const [newComboItems, setNewComboItems] = useState<ComboItem[]>([])

@@ -35,6 +35,7 @@ import {
   Banknote,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
+import { t } from "@/lib/i18n/es"
 
 const STATUS_FLOW: FoodosOrderStatus[] = [
   "pending",
@@ -48,24 +49,24 @@ const STATUS_META: Record<
   FoodosOrderStatus,
   { label: string; badge: string; icon: React.ReactNode }
 > = {
-  pending: { label: "Pendiente", badge: "bg-amber-100 text-amber-800", icon: <Clock className="w-3.5 h-3.5" /> },
-  confirmed: { label: "Confirmado", badge: "bg-blue-100 text-blue-700", icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-  preparing: { label: "En preparación", badge: "bg-purple-100 text-purple-700", icon: <ChefHat className="w-3.5 h-3.5" /> },
-  out_for_delivery: { label: "En camino", badge: "bg-orange-100 text-orange-700", icon: <Bike className="w-3.5 h-3.5" /> },
-  delivered: { label: "Entregado", badge: "bg-emerald-100 text-emerald-700", icon: <PackageCheck className="w-3.5 h-3.5" /> },
-  cancelled: { label: "Cancelado", badge: "bg-red-100 text-red-700", icon: <XCircle className="w-3.5 h-3.5" /> },
+  pending: { label: t("foodos.common.statusPending"), badge: "bg-amber-100 text-amber-800", icon: <Clock className="w-3.5 h-3.5" /> },
+  confirmed: { label: t("foodos.common.statusConfirmed"), badge: "bg-blue-100 text-blue-700", icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
+  preparing: { label: t("foodos.common.statusPreparing"), badge: "bg-purple-100 text-purple-700", icon: <ChefHat className="w-3.5 h-3.5" /> },
+  out_for_delivery: { label: t("foodos.common.statusOutForDelivery"), badge: "bg-orange-100 text-orange-700", icon: <Bike className="w-3.5 h-3.5" /> },
+  delivered: { label: t("foodos.common.statusDelivered"), badge: "bg-emerald-100 text-emerald-700", icon: <PackageCheck className="w-3.5 h-3.5" /> },
+  cancelled: { label: t("foodos.common.statusCancelled"), badge: "bg-red-100 text-red-700", icon: <XCircle className="w-3.5 h-3.5" /> },
 }
 
 const FULFILLMENT_LABEL: Record<FoodosFulfillment, string> = {
-  delivery: "A domicilio",
-  pickup: "Para llevar",
-  dine_in: "En sucursal",
+  delivery: t("foodos.common.fulfillmentDelivery"),
+  pickup: t("foodos.common.fulfillmentPickup"),
+  dine_in: t("foodos.common.fulfillmentDineIn"),
 }
 
 const PAID: FoodosPaymentStatus = "paid"
 
 const CHANNEL_OPTIONS: { id: FoodosOrderChannel | "all"; label: string }[] = [
-  { id: "all", label: "Todos los canales" },
+  { id: "all", label: t("foodos.common.allChannels") },
   { id: "web", label: "Web" },
   { id: "qr", label: "QR" },
   { id: "whatsapp", label: "WhatsApp" },
@@ -88,7 +89,7 @@ export default function PedidosPage() {
       setOrders(os)
       setBranches(bs)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar pedidos")
+      setError(e instanceof Error ? e.message : t("foodos.common.loadError"))
     } finally {
       setLoading(false)
     }
@@ -169,20 +170,20 @@ export default function PedidosPage() {
       }
       await load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al actualizar el pedido")
+      setError(e instanceof Error ? e.message : t("foodos.common.updateError"))
     } finally {
       setSaving(null)
     }
   }
 
   async function cancel(order: FoodosOrder) {
-    if (!confirm(`¿Cancelar el pedido #${order.id.slice(0, 8).toUpperCase()}?`)) return
+    if (!confirm(t("foodos.common.cancelConfirm", { id: order.id.slice(0, 8).toUpperCase() }))) return
     setSaving(order.id)
     try {
       await updateOrderStatus(order.id, "cancelled")
       await load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cancelar")
+      setError(e instanceof Error ? e.message : t("foodos.common.cancelError"))
     } finally {
       setSaving(null)
     }
@@ -192,14 +193,14 @@ export default function PedidosPage() {
     if (loading) {
       return (
         <div className="flex items-center justify-center py-24 text-stone-500">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Cargando...
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> {t("foodos.common.loading")}
         </div>
       )
     }
     return (
       <div className="max-w-2xl mx-auto mt-16 bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
-        <h1 className="text-xl font-black text-stone-900">Primero configura tu restaurante</h1>
-        <p className="text-stone-600 mt-2">Registra tu perfil en el módulo &ldquo;Mi restaurante&rdquo; para recibir pedidos.</p>
+        <h1 className="text-xl font-black text-stone-900">{t("foodos.common.setupTitle")}</h1>
+        <p className="text-stone-600 mt-2">{t("foodos.common.setupBody")}</p>
       </div>
     )
   }
@@ -208,15 +209,15 @@ export default function PedidosPage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-black text-stone-900">Pedidos</h1>
-          <p className="text-sm text-stone-500">Comanda en vivo: atiende los pedidos de tu menú digital.</p>
+          <h1 className="text-2xl font-black text-stone-900">{t("foodos.pedidos.title")}</h1>
+          <p className="text-sm text-stone-500">{t("foodos.pedidos.subtitle")}</p>
         </div>
         <button
           onClick={handleRetry}
           disabled={loading}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-stone-200 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Actualizar
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> {t("foodos.common.retry")}
         </button>
       </div>
 
@@ -234,7 +235,7 @@ export default function PedidosPage() {
               filter === s ? "bg-stone-900 text-white" : "bg-white text-stone-600 border border-stone-200"
             }`}
           >
-            {s === "all" ? `Todos (${counts.all ?? 0})` : `${STATUS_META[s as FoodosOrderStatus].label} (${counts[s] ?? 0})`}
+            {s === "all" ? t("foodos.pedidos.all", { count: counts.all ?? 0 }) : `${STATUS_META[s as FoodosOrderStatus].label} (${counts[s] ?? 0})`}
           </button>
         ))}
       </div>
@@ -256,7 +257,7 @@ export default function PedidosPage() {
 
       {filtered.length === 0 ? (
         <div className="bg-white border border-dashed border-stone-300 rounded-2xl p-12 text-center text-stone-400">
-          No hay pedidos {filter !== "all" ? "en este estado" : "todavía"}.
+          {filter !== "all" ? t("foodos.pedidos.emptyFiltered") : t("foodos.pedidos.emptyAll")}
         </div>
       ) : (
         <div className="grid gap-4">
@@ -283,7 +284,7 @@ export default function PedidosPage() {
                   </p>
                   {(order.customer_name || order.customer_phone) && (
                     <p className="text-sm text-stone-600 mt-1">
-                      {order.customer_name ?? "Cliente"} · {order.customer_phone}
+                      {order.customer_name ?? t("foodos.common.customer")} · {order.customer_phone}
                     </p>
                   )}
                 </div>
@@ -291,15 +292,15 @@ export default function PedidosPage() {
                   <p className="text-lg font-black text-stone-900">{formatMoney(order.total)}</p>
                   <p className="flex items-center justify-end gap-1 text-xs text-stone-500 mt-1">
                     {order.payment_method === "card" ? (
-                      <><CreditCard className="w-3 h-3" /> Tarjeta</>
+                      <><CreditCard className="w-3 h-3" /> {t("foodos.common.card")}</>
                     ) : (
-                      <><Banknote className="w-3 h-3" /> En sucursal</>
+                      <><Banknote className="w-3 h-3" /> {t("foodos.common.atBranch")}</>
                     )}
                     {order.payment_status === PAID && (
-                      <span className="ml-1 text-emerald-600 font-bold">· Pagado</span>
+                      <span className="ml-1 text-emerald-600 font-bold">· {t("foodos.common.paid")}</span>
                     )}
                   </p>
-                  <p className="text-[11px] text-stone-400 uppercase tracking-wide mt-1">Canal: {order.channel}</p>
+                  <p className="text-[11px] text-stone-400 uppercase tracking-wide mt-1">{t("foodos.common.channel", { channel: order.channel })}</p>
                 </div>
               </div>
 
@@ -315,7 +316,7 @@ export default function PedidosPage() {
                 ))}
                 {order.note && (
                   <p className="text-sm text-amber-700 bg-amber-50 rounded-lg p-2 mt-1">
-                    <strong>Nota:</strong> {order.note}
+                    <strong>{t("foodos.common.note")}</strong> {order.note}
                   </p>
                 )}
               </div>
@@ -329,17 +330,17 @@ export default function PedidosPage() {
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"
                   >
                     {saving === order.id && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {order.status === "pending" && "Confirmar pedido"}
-                    {order.status === "confirmed" && "Empezar a preparar"}
-                    {order.status === "preparing" && (order.fulfillment === "delivery" ? "Enviar a domicilio" : "Marcar entregado")}
-                    {order.status === "out_for_delivery" && "Marcar entregado"}
+                    {order.status === "pending" && t("foodos.pedidos.confirmOrder")}
+                    {order.status === "confirmed" && t("foodos.pedidos.startPreparing")}
+                    {order.status === "preparing" && (order.fulfillment === "delivery" ? t("foodos.pedidos.sendDelivery") : t("foodos.pedidos.markDelivered"))}
+                    {order.status === "out_for_delivery" && t("foodos.pedidos.markDelivered")}
                   </button>
                   <button
                     onClick={() => cancel(order)}
                     disabled={saving === order.id}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 disabled:opacity-50"
                   >
-                    <XCircle className="w-4 h-4" /> Cancelar
+                    <XCircle className="w-4 h-4" /> {t("common.cancel")}
                   </button>
                 </div>
               )}
@@ -347,7 +348,7 @@ export default function PedidosPage() {
           ))}
         </div>
       )}
-      <ToolGuideHost toolKey="pedidos" pathname="/panel/foodos/pedidos" slug={null} icon="🧋" title="Pedidos en vivo" />
+      <ToolGuideHost toolKey="pedidos" pathname="/panel/foodos/pedidos" slug={null} icon="🧋" title={t("foodos.pedidos.guideTitle")} />
     </div>
   )
 }

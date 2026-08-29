@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react"
 import { WASTE_CATEGORIES, CAUSAS } from "./mermas-shared"
+import type { InventoryItem } from "@/components/panel/inventario/inventario-shared"
 import { t } from "@/lib/i18n/es"
 
 interface MermaFormProps {
@@ -15,6 +16,9 @@ interface MermaFormProps {
   onNoteChange: (v: string) => void
   selectedCause: string
   onCauseChange: (v: string) => void
+  inventoryItems?: InventoryItem[]
+  selectedItemId?: string
+  onItemChange?: (v: string) => void
   onSave: () => void
   onCancel: () => void
   onOpenForm: () => void
@@ -23,6 +27,7 @@ interface MermaFormProps {
 export default function MermaForm({
   showForm, editingId, selectedCategory, onCategoryChange, amountKg, onAmountKgChange,
   costPerKg, onCostPerKgChange, note, onNoteChange, selectedCause, onCauseChange,
+  inventoryItems = [], selectedItemId = "", onItemChange,
   onSave, onCancel, onOpenForm,
 }: MermaFormProps) {
   if (!showForm) {
@@ -107,6 +112,26 @@ export default function MermaForm({
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E]"
           />
         </div>
+        {!editingId && inventoryItems.length > 0 && (
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">Descontar de inventario (opcional)</label>
+            <select
+              value={selectedItemId}
+              onChange={(e) => onItemChange?.(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#0E7A0E] bg-white"
+            >
+              <option value="">No descontar stock</option>
+              {inventoryItems.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} · {item.stock} {item.unit}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              La merma se restará del stock del producto elegido y quedará en movimientos.
+            </p>
+          </div>
+        )}
       </div>
       <div className="flex gap-3 mt-4">
         <button onClick={onSave} className="flex-1 bg-red-600 text-white font-semibold py-2.5 rounded-xl hover:bg-red-700 transition-colors">

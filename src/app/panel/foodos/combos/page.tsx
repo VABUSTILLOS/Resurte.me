@@ -29,6 +29,7 @@ import {
   Sparkles, Plus, Trash2, Percent, Trophy, Loader2, Check, Wand2,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
+import { t } from "@/lib/i18n/es"
 
 interface ComboForm {
   id?: string
@@ -87,7 +88,7 @@ export default function CombosPage() {
       setCombos(cs)
       setRules(rs)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar combos")
+      setError(e instanceof Error ? e.message : t("foodos.combos.loadError"))
     } finally {
       setLoading(false)
     }
@@ -174,8 +175,8 @@ export default function CombosPage() {
     return (
       <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
         <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-        <h2 className="font-semibold text-gray-900">Primero crea tu restaurante</h2>
-        <p className="text-sm text-gray-500 mt-1">Ve a <Link href="/panel/foodos/restaurante" className="text-[#0E7A0E] font-semibold hover:underline">Mi restaurante</Link>.</p>
+        <h2 className="font-semibold text-gray-900">{t("foodos.menu.setupTitle")}</h2>
+        <p className="text-sm text-gray-500 mt-1">{t("foodos.menu.setupPre")} <Link href="/panel/foodos/restaurante" className="text-[#0E7A0E] font-semibold hover:underline">{t("foodos.menu.setupLink")}</Link>.</p>
       </div>
     )
   }
@@ -185,9 +186,9 @@ export default function CombosPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Combos y cross-sell</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t("foodos.combos.title")}</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Sube el ticket promedio: combos, y reglas de venta adicional que el micrositio aplica al hacer checkout.
+          {t("foodos.combos.subtitle")}
         </p>
       </div>
 
@@ -198,13 +199,13 @@ export default function CombosPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-amber-500" />
-            <h2 className="font-semibold text-gray-900">Combos</h2>
+            <h2 className="font-semibold text-gray-900">{t("foodos.combos.combosTitle")}</h2>
           </div>
           <button
             onClick={() => { setComboForm(EMPTY_COMBO); setShowComboForm(true) }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e]"
           >
-            <Plus className="w-4 h-4" /> Nuevo combo
+            <Plus className="w-4 h-4" /> {t("foodos.combos.newCombo")}
           </button>
         </div>
 
@@ -217,7 +218,7 @@ export default function CombosPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-semibold text-gray-900">{c.name}</h3>
-                    {c.highlight && <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full mt-1 inline-block">Destacado</span>}
+                    {c.highlight && <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full mt-1 inline-block">{t("foodos.combos.featured")}</span>}
                   </div>
                   <button onClick={() => handleDeleteCombo(c.id)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                 </div>
@@ -230,7 +231,7 @@ export default function CombosPage() {
                   <div>
                     <span className="text-lg font-bold text-gray-900">{formatMoney(c.price)}</span>
                     {savings > 0 && (
-                      <span className="ml-2 text-xs text-emerald-600 font-semibold">Ahorras {formatMoney(savings)}</span>
+                      <span className="ml-2 text-xs text-emerald-600 font-semibold">{t("foodos.combos.savings", { amount: formatMoney(savings) })}</span>
                     )}
                   </div>
                   {c.discount_pct > 0 && (
@@ -243,7 +244,7 @@ export default function CombosPage() {
             )
           })}
           {combos.length === 0 && (
-            <p className="text-sm text-gray-400 col-span-full py-4">Aún no tienes combos. Crea uno para que el micrositio lo sugiera cuando el ticket es bajo.</p>
+            <p className="text-sm text-gray-400 col-span-full py-4">{t("foodos.combos.emptyCombos")}</p>
           )}
         </div>
       </section>
@@ -253,13 +254,13 @@ export default function CombosPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Wand2 className="w-5 h-5 text-[#0E7A0E]" />
-            <h2 className="font-semibold text-gray-900">Reglas de cross-sell</h2>
+            <h2 className="font-semibold text-gray-900">{t("foodos.combos.rulesTitle")}</h2>
           </div>
           <button
             onClick={() => { setRuleForm(EMPTY_RULE); setShowRuleForm(true) }}
             className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#0E7A0E]/30 text-[#0E7A0E] text-sm font-semibold hover:bg-[#F0FDF4]"
           >
-            <Plus className="w-4 h-4" /> Nueva regla
+            <Plus className="w-4 h-4" /> {t("foodos.combos.newRule")}
           </button>
         </div>
 
@@ -270,17 +271,17 @@ export default function CombosPage() {
                 <div>
                   <h3 className="font-medium text-gray-900 text-sm">{r.name}</h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {r.trigger_type === "product" && `Si pide "${itemLabel(r.trigger_value?.item_id ?? "")}"`}
-                    {r.trigger_type === "category" && `Si pide de la categoría "${categories.find((c) => c.id === r.trigger_value?.category_id)?.name ?? ""}"`}
-                    {r.trigger_type === "min_ticket" && `Si el ticket es menor a ${formatMoney(r.trigger_value?.min_ticket ?? 0)}`}
-                    {" → "}sugiere: {r.suggested_items.map((s) => itemLabel(s)).join(", ")}
+                    {r.trigger_type === "product" && t("foodos.combos.triggerProduct", { item: itemLabel(r.trigger_value?.item_id ?? "") })}
+                    {r.trigger_type === "category" && t("foodos.combos.triggerCategory", { category: categories.find((c) => c.id === r.trigger_value?.category_id)?.name ?? "" })}
+                    {r.trigger_type === "min_ticket" && t("foodos.combos.triggerMinTicket", { amount: formatMoney(r.trigger_value?.min_ticket ?? 0) })}
+                    {" → "}{t("foodos.combos.suggests")}: {r.suggested_items.map((s) => itemLabel(s)).join(", ")}
                   </p>
                   {r.offer_text && <p className="text-xs text-[#0E7A0E] font-medium mt-1">💬 {r.offer_text}</p>}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {r.boost_amount > 0 && (
                     <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                      +{formatMoney(r.boost_amount)} en venta
+                      {t("foodos.combos.boost", { amount: formatMoney(r.boost_amount) })}
                     </span>
                   )}
                   <button onClick={() => handleDeleteRule(r.id)} className="p-1.5 rounded-md text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
@@ -290,7 +291,7 @@ export default function CombosPage() {
           ))}
           {rules.length === 0 && (
             <p className="text-sm text-gray-400 py-4">
-              Crea reglas tipo &ldquo;Si pide papas fritas, sugiere refresco por solo $25&rdquo; y el micrositio las aplicará en el checkout.
+              {t("foodos.combos.emptyRules")}
             </p>
           )}
         </div>
@@ -300,30 +301,30 @@ export default function CombosPage() {
       {showComboForm && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setShowComboForm(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-amber-500" /> Nuevo combo</h3>
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-amber-500" /> {t("foodos.combos.newCombo")}</h3>
             <form onSubmit={handleSaveCombo} className="space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-3">
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Nombre *</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">{t("foodos.combos.nameLabel")}</label>
                   <input value={comboForm.name} onChange={(e) => setComboForm({ ...comboForm, name: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Precio combo *</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">{t("foodos.combos.priceLabel")}</label>
                   <input type="number" min="0" step="0.01" value={comboForm.price} onChange={(e) => setComboForm({ ...comboForm, price: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">% descuento</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">{t("foodos.combos.discountLabel")}</label>
                   <input type="number" min="0" max="100" value={comboForm.discount_pct} onChange={(e) => setComboForm({ ...comboForm, discount_pct: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]" />
                 </div>
                 <div className="flex items-end">
                   <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer pb-2.5">
                     <input type="checkbox" checked={comboForm.highlight} onChange={(e) => setComboForm({ ...comboForm, highlight: e.target.checked })} className="accent-amber-500" />
-                    Destacado
+                    {t("foodos.combos.featured")}
                   </label>
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Platillos que incluye *</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t("foodos.combos.includesLabel")}</label>
                 <div className="max-h-52 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-50">
                   {menuItems.map((m) => (
                     <button type="button" key={m.id} onClick={() => toggleComboItem(m.id)} className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 ${comboForm.item_ids.includes(m.id) ? "bg-[#F0FDF4] text-[#0E7A0E]" : "text-gray-700"}`}>
@@ -334,12 +335,12 @@ export default function CombosPage() {
                       </span>
                     </button>
                   ))}
-                  {menuItems.length === 0 && <p className="text-xs text-gray-400 px-3 py-3">Agrega platillos en el módulo Menú primero.</p>}
+                  {menuItems.length === 0 && <p className="text-xs text-gray-400 px-3 py-3">{t("foodos.combos.noMenuItems")}</p>}
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowComboForm(false)} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50">Cancelar</button>
-                <button type="submit" disabled={!comboForm.name.trim() || comboForm.item_ids.length === 0} className="px-5 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50">Guardar</button>
+                <button type="button" onClick={() => setShowComboForm(false)} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50">{t("common.cancel")}</button>
+                <button type="submit" disabled={!comboForm.name.trim() || comboForm.item_ids.length === 0} className="px-5 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50">{t("common.save")}</button>
               </div>
             </form>
           </div>
@@ -350,50 +351,50 @@ export default function CombosPage() {
       {showRuleForm && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setShowRuleForm(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><Wand2 className="w-5 h-5 text-[#0E7A0E]" /> Nueva regla de cross-sell</h3>
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><Wand2 className="w-5 h-5 text-[#0E7A0E]" /> {t("foodos.combos.newRuleTitle")}</h3>
             <form onSubmit={handleSaveRule} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Nombre *</label>
-                <input value={ruleForm.name} onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })} placeholder="Ej. Papas + refresco" className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]" />
+                <label className="block text-xs font-semibold text-gray-500 mb-1">{t("foodos.combos.nameLabel")}</label>
+                <input value={ruleForm.name} onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })} placeholder={t("foodos.combos.ruleNamePlaceholder")} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Se activa cuando…</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">{t("foodos.combos.activatesWhen")}</label>
                 <select
                   value={ruleForm.trigger_type}
                   onChange={(e) => setRuleForm({ ...ruleForm, trigger_type: e.target.value as RuleForm["trigger_type"] })}
                   className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm"
                 >
-                  <option value="product">El cliente pide un platillo</option>
-                  <option value="category">El cliente pide de una categoría</option>
-                  <option value="min_ticket">El ticket es menor a un monto</option>
+                  <option value="product">{t("foodos.combos.triggerProductOption")}</option>
+                  <option value="category">{t("foodos.combos.triggerCategoryOption")}</option>
+                  <option value="min_ticket">{t("foodos.combos.triggerMinTicketOption")}</option>
                 </select>
               </div>
               {ruleForm.trigger_type === "product" && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Platillo disparador</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">{t("foodos.combos.triggerItemLabel")}</label>
                   <select value={ruleForm.trigger_item_id} onChange={(e) => setRuleForm({ ...ruleForm, trigger_item_id: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm">
-                    <option value="">Selecciona…</option>
+                    <option value="">{t("foodos.combos.selectPlaceholder")}</option>
                     {menuItems.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                 </div>
               )}
               {ruleForm.trigger_type === "category" && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Categoría disparadora</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">{t("foodos.combos.triggerCategoryLabel")}</label>
                   <select value={ruleForm.trigger_category_id} onChange={(e) => setRuleForm({ ...ruleForm, trigger_category_id: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm">
-                    <option value="">Selecciona…</option>
+                    <option value="">{t("foodos.combos.selectPlaceholder")}</option>
                     {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
               )}
               {ruleForm.trigger_type === "min_ticket" && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Ticket menor a $</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">{t("foodos.combos.minTicketLabel")}</label>
                   <input type="number" min="0" value={ruleForm.min_ticket} onChange={(e) => setRuleForm({ ...ruleForm, min_ticket: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm" />
                 </div>
               )}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Sugerir estos platillos *</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t("foodos.combos.suggestItemsLabel")}</label>
                 <div className="max-h-44 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-50">
                   {menuItems.map((m) => (
                     <button type="button" key={m.id} onClick={() => toggleRuleSuggested(m.id)} className={`w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 ${ruleForm.suggested_items.includes(m.id) ? "bg-[#F0FDF4] text-[#0E7A0E]" : "text-gray-700"}`}>
@@ -405,23 +406,23 @@ export default function CombosPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Mensaje de oferta</label>
-                  <input value={ruleForm.offer_text} onChange={(e) => setRuleForm({ ...ruleForm, offer_text: e.target.value })} placeholder="Añade un refresco por solo $25" className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]" />
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">{t("foodos.combos.offerTextLabel")}</label>
+                  <input value={ruleForm.offer_text} onChange={(e) => setRuleForm({ ...ruleForm, offer_text: e.target.value })} placeholder={t("foodos.combos.offerTextPlaceholder")} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Ganancia extra estimada $</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">{t("foodos.combos.boostLabel")}</label>
                   <input type="number" min="0" value={ruleForm.boost_amount} onChange={(e) => setRuleForm({ ...ruleForm, boost_amount: e.target.value })} className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm" />
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowRuleForm(false)} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50">Cancelar</button>
-                <button type="submit" disabled={!ruleForm.name.trim() || ruleForm.suggested_items.length === 0} className="px-5 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50">Guardar</button>
+                <button type="button" onClick={() => setShowRuleForm(false)} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50">{t("common.cancel")}</button>
+                <button type="submit" disabled={!ruleForm.name.trim() || ruleForm.suggested_items.length === 0} className="px-5 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50">{t("common.save")}</button>
               </div>
             </form>
           </div>
         </div>
       )}
-      <ToolGuideHost toolKey="combos" pathname="/panel/foodos/combos" slug={null} icon="🎁" title="Combos y cross-sell" />
+      <ToolGuideHost toolKey="combos" pathname="/panel/foodos/combos" slug={null} icon="🎁" title={t("foodos.combos.guideTitle")} />
     </div>
   )
 }
