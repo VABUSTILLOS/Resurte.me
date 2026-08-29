@@ -1,6 +1,7 @@
 "use client"
 
 import { AlertTriangle } from "lucide-react"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 
 interface ServerRestoreModalProps {
   backup: { entries: unknown[]; rows: unknown[]; dishes: unknown[] } | null
@@ -23,6 +24,8 @@ function countsByTool(backup: { entries: unknown[]; rows: unknown[]; dishes: unk
 }
 
 export default function ServerRestoreModal({ backup, restoring, onCancel, onConfirm }: ServerRestoreModalProps) {
+  useEscapeKey(onCancel, !!backup && !restoring)
+
   if (!backup) return null
   const counts = countsByTool(backup)
   const total = backup.entries.length + backup.rows.length + backup.dishes.length

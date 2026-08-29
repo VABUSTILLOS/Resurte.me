@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
 import { useMediaQuery } from "@/hooks/use-media-query"
@@ -18,6 +18,7 @@ import { AnalyticsEvents } from "@/lib/analytics"
 import { CHECKOUT_DRAWER_EVENT } from "@/components/checkout/CheckoutDrawer"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
 import { calcCheckoutTotals, DELIVERY_FEE_FLAT, freeShippingProgress } from "@/lib/checkout-config"
 
@@ -60,6 +61,8 @@ export function CartDrawer() {
     return () => { document.body.style.overflow = "" }
   }, [isOpen])
 
+  useEscapeKey(useCallback(() => setIsOpen(false), []), isOpen)
+
   const handleCheckout = () => {
     AnalyticsEvents.beginCheckout(
       subtotal,
@@ -92,7 +95,12 @@ export function CartDrawer() {
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 z-[70] w-full max-w-md sm:max-w-2xl bg-white shadow-2xl flex flex-col animate-slide-in-right">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mi Carrito"
+        className="fixed right-0 top-0 bottom-0 z-[70] w-full max-w-md sm:max-w-2xl bg-white shadow-2xl flex flex-col animate-slide-in-right"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E9EB]">
           <div className="flex items-center gap-2">

@@ -54,6 +54,71 @@ test.describe("accesibilidad navegación por teclado", () => {
     })
   }
 
+  test("Escape cierra el selector de ciudad", async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+    const trigger = page
+      .locator('button[aria-label="Cambiar ciudad"]:visible')
+      .first()
+    test.skip(
+      (await trigger.count()) === 0,
+      "no hay trigger de cambiar ciudad visible en este viewport",
+    )
+    const dialog = page.getByRole("dialog", { name: "Seleccionar ciudad" })
+    // Reintenta el clic hasta que React hidrate y el onClick abra el diálogo
+    await expect(async () => {
+      if (!(await dialog.isVisible())) {
+        await trigger.click({ timeout: 2_000 })
+      }
+      await expect(dialog).toBeVisible({ timeout: 2_000 })
+    }).toPass({ timeout: 30_000 })
+    await page.keyboard.press("Escape")
+    await expect(dialog).toBeHidden()
+  })
+
+  // El drawer del carrito es flujo móvil: en desktop el icono enlaza a /cart.
+  test("Escape cierra el drawer del carrito", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "networkidle" })
+    await page.waitForSelector("main#main-content")
+    const opener = page
+      .locator('button[aria-label*="Abrir carrito"]:visible')
+      .first()
+    test.skip(
+      (await opener.count()) === 0,
+      "el drawer del carrito solo se abre en viewport móvil",
+    )
+    await opener.click()
+    const drawer = page.getByRole("dialog", { name: "Mi Carrito" })
+    await expect(drawer).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(drawer).toBeHidden()
+  })
+
+  test("Escape cierra el drawer de checkout", async ({ page }) => {
+    await page.goto("/cdmx", { waitUntil: "networkidle" })
+    const addButton = page
+      .locator('button[aria-label^="Agregar"][aria-label$="al carrito"]:visible')
+      .first()
+    test.skip(
+      (await addButton.count()) === 0,
+      "no hay productos con botón de agregar en /cdmx",
+    )
+    await addButton.click()
+    const opener = page
+      .locator('button[aria-label*="Abrir carrito"]:visible')
+      .first()
+    test.skip(
+      (await opener.count()) === 0,
+      "el flujo de drawers solo existe en viewport móvil",
+    )
+    await opener.click()
+    await page.getByRole("button", { name: "Ir a Checkout" }).click()
+    const drawer = page.getByRole("dialog", { name: "Checkout" })
+    await expect(drawer).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(drawer).toBeHidden()
+  })
+
   test("los elementos interactivos muestran un anillo de foco visible", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" })
     await page.keyboard.press("Tab")

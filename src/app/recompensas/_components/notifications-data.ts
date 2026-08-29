@@ -21,7 +21,7 @@ export interface DeriveNotificationsInput {
 const MAX_NOTIFICATIONS = 8;
 
 /** "Ahora", "hace 5 min", "hace 3 h", "ayer", "hace 4 días" o fecha corta. */
-export function formatRelativeTime(date: Date, now: Date = new Date()): string {
+function formatRelativeTime(date: Date, now: Date = new Date()): string {
   const diffMs = now.getTime() - date.getTime();
   const minutes = Math.floor(diffMs / 60000);
   if (minutes < 1) return "Ahora";

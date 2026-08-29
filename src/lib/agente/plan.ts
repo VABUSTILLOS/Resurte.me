@@ -54,10 +54,6 @@ export const ZONE_LABEL: Record<string, string> = Object.fromEntries(
   ZONES.map((z) => [z.id, z.label])
 )
 
-/** Viernes = seguimiento (llamadas, demos, WhatsApp masivo). */
-export const FRIDAY_NOTE =
-  "Viernes de seguimiento: WhatsApp masivo, llamadas, demos virtuales y revisión de métricas."
-
 export function zoneOfDay(date = new Date()): Zone | null {
   const weekday = Number(
     new Intl.DateTimeFormat("en-US", {
@@ -80,12 +76,6 @@ export const TIER_LABEL: Record<number, string> = {
   3: "Tier 3 · Long Tail",
 }
 
-export const TIER_VOLUME: Record<number, string> = {
-  1: "$8,000 – $25,000 MXN/sem",
-  2: "$3,000 – $8,000 MXN/sem",
-  3: "$500 – $3,000 MXN/sem",
-}
-
 /** Mínimos diarios no negociables del agente (defaults del plan). */
 export const DEFAULT_GOALS = {
   daily_visitas: 8,
@@ -103,10 +93,6 @@ export const MONTH_TARGETS = [
   { month: 2, registrados: 60, activos: 40, ventas: 350_000, conversion: 0.2 },
   { month: 3, registrados: 120, activos: 85, ventas: 700_000, conversion: 0.25 },
 ] as const
-
-/** Oferta de lanzamiento usada en los guiones. */
-export const LAUNCH_OFFER =
-  "Envío gratis en tu primer pedido + crédito a 7 días desde el día 1 + 500 puntos de bienvenida del Club del Chef."
 
 /** Propuesta de valor (contexto para la IA y las plantillas). */
 export const VALUE_PROPS = [

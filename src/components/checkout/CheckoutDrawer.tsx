@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
@@ -29,6 +29,7 @@ import { readStoredBumps } from "@/hooks/use-selected-bumps"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
 import { useCheckoutOrder, type CheckoutPaidInfo } from "@/components/checkout/use-checkout-order"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { RepurchaseCouponInfo } from "@/types"
 
 // Evento global para abrir el checkout del drawer (misma mecánica que
@@ -231,7 +232,7 @@ export function CheckoutDrawer() {
     return () => window.removeEventListener(CHECKOUT_DRAWER_EVENT, handler)
   }, [setStep, setCheckoutError, setShowStripeForm, setStripeClientSecret, setSelectedBumps, setSaveAsDefault])
 
-
+  useEscapeKey(useCallback(() => setIsOpen(false), []), isOpen)
 
   if (!isOpen || !city) return null
 

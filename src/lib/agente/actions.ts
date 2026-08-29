@@ -7,7 +7,6 @@ import { getWeekBounds, getMonthBounds, getTodayBounds } from "../comercializaci
 import {
   ZONES,
   TIER_LABEL,
-  ZONE_LABEL,
   MONTH_TARGETS,
   DEFAULT_GOALS,
   VALUE_PROPS,
@@ -458,11 +457,12 @@ export async function registerAgentTouch(
   await supabase.from("crm_prospects").update(patch).eq("id", prospectId)
 }
 
+
 // ============================================================
 // METAS CONFIGURABLES
 // ============================================================
 
-export async function getAgentGoals(): Promise<AgentGoals> {
+async function getAgentGoals(): Promise<AgentGoals> {
   const { userId } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
   const { data } = await supabase
@@ -479,26 +479,6 @@ export async function getAgentGoals(): Promise<AgentGoals> {
     monthlyRegistros: Number(data?.monthly_registros ?? DEFAULT_GOALS.monthly_registros),
     monthlyActivos: Number(data?.monthly_activos ?? DEFAULT_GOALS.monthly_activos),
     monthlyVentas: Number(data?.monthly_ventas ?? DEFAULT_GOALS.monthly_ventas),
-  }
-}
-
-export async function updateAgentGoals(goals: AgentGoals): Promise<void> {
-  const { userId } = await requireSellerOrAdminAction()
-  const supabase = await createServiceClient()
-  const { error } = await supabase.from("crm_agent_goals").upsert({
-    seller_id: userId,
-    daily_visitas: goals.dailyVisitas,
-    daily_whatsapp: goals.dailyWhatsapp,
-    daily_llamadas: goals.dailyLlamadas,
-    daily_demos: goals.dailyDemos,
-    monthly_registros: goals.monthlyRegistros,
-    monthly_activos: goals.monthlyActivos,
-    monthly_ventas: goals.monthlyVentas,
-    updated_at: new Date().toISOString(),
-  })
-  if (error) {
-    logger.error("[AgenteIA] updateAgentGoals error:", error)
-    throw new Error("Error al guardar las metas")
   }
 }
 

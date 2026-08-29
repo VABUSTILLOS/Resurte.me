@@ -1,6 +1,7 @@
 "use client"
 
 import { AlertTriangle } from "lucide-react"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 
 interface RestoreConfirmModalProps {
   open: boolean
@@ -10,6 +11,8 @@ interface RestoreConfirmModalProps {
 }
 
 export default function RestoreConfirmModal({ open, pendingBackup, onCancel, onConfirm }: RestoreConfirmModalProps) {
+  useEscapeKey(onCancel, open)
+
   if (!open) return null
 
   return (

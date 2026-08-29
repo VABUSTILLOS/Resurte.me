@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Search, MapPin, X } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import { CITIES_BY_STATE } from "@/lib/cities"
 
 interface CitySelectorProps {
@@ -14,6 +15,8 @@ export function CitySelector({ onClose }: CitySelectorProps) {
   const { city: currentCity, setCity } = useCity()
   const [search, setSearch] = useState("")
   const router = useRouter()
+
+  useEscapeKey(onClose)
 
   const filtered = search
     ? Object.entries(CITIES_BY_STATE).reduce(
@@ -45,7 +48,12 @@ export function CitySelector({ onClose }: CitySelectorProps) {
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[70vh] overflow-hidden flex flex-col">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Seleccionar ciudad"
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[70vh] overflow-hidden flex flex-col"
+      >
         {/* Header */}
         <div className="p-4 border-b border-[#E8E9EB] flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[#242529]">

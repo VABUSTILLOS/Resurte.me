@@ -181,7 +181,7 @@ export interface ClientAddress {
   references: string | null
 }
 
-export interface LastOrderItem {
+interface LastOrderItem {
   productId: number
   name: string
   quantity: number
@@ -205,7 +205,7 @@ export interface SellerClientSummary {
   status: ProspectStatus
 }
 
-export interface WeeklyTrend {
+interface WeeklyTrend {
   /** Inicio de semana (lunes CDMX) en ISO. */
   weekStart: string
   /** Etiqueta corta, p. ej. "5 may". */

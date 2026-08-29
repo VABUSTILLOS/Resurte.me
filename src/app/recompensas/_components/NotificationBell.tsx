@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bell, TrendingUp, Star, Megaphone, Gift, Sparkles, BellOff } from "lucide-react";
 import type { Notification, Tier } from "./types";
 import { getWalletHistory, getMonthlyCashbackProgress } from "@/lib/wallet-actions";
+import { useEscapeKey } from "@/hooks/use-escape-key";
 import { deriveNotifications, type WalletMovement } from "./notifications-data";
 
 const READ_IDS_KEY = "rewards-notifications-read";
@@ -66,6 +67,8 @@ export function NotificationBell() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEscapeKey(() => setIsOpen(false), isOpen);
 
   useEffect(() => {
     let cancelled = false;

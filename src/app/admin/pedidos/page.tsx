@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import {
   getAdminOrders,
   type AdminOrder,
@@ -14,6 +14,7 @@ import {
 import { Search, RefreshCw, X } from "lucide-react"
 import type { OrderStatus } from "@/types"
 import { ToastProvider, useToast } from "@/components/toast"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 
 function formatAdminAddress(a: NonNullable<AdminOrder["address"]>): string {
   const parts = [
@@ -57,6 +58,8 @@ function AdminOrdersContent() {
   const [updatingId, setUpdatingId] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null)
+
+  useEscapeKey(useCallback(() => setSelectedOrder(null), []), !!selectedOrder)
 
   useEffect(() => {
     let cancelled = false

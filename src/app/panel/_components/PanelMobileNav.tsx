@@ -5,6 +5,7 @@ import { Fragment } from "react"
 import { usePathname } from "next/navigation"
 import { LayoutGrid, Lock, X } from "lucide-react"
 import { TOOLS, TOOL_AREAS } from "@/components/panel/hub/hub-data"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { RestaurantCollection } from "@/types"
 import { t } from "@/lib/i18n/es"
 
@@ -16,6 +17,8 @@ interface PanelMobileNavProps {
 
 export function PanelMobileNav({ open, onClose, selectedCollection }: PanelMobileNavProps) {
   const pathname = usePathname()
+
+  useEscapeKey(onClose, open)
 
   if (!open) return null
 

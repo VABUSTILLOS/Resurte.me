@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger"
 // cupón personal (un solo uso, vigencia corta) para su siguiente pedido.
 // El cron de reactivación usa el mismo mecanismo con origin reactivation.
 
-export const REPURCHASE_COUPON = {
+const REPURCHASE_COUPON = {
   /** Descuento del cupón post-compra (porcentaje). */
   DISCOUNT_PERCENT: 5,
   /** Pedido mínimo para aplicar el cupón. */

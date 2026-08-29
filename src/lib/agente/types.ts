@@ -21,13 +21,6 @@ export type AgentMessageStatus = "borrador" | "aprobado" | "enviado" | "descarta
 
 export type TouchChannel = "visita" | "whatsapp" | "llamada" | "demo"
 
-export const TOUCH_LABEL: Record<TouchChannel, string> = {
-  visita: "Visita",
-  whatsapp: "WhatsApp",
-  llamada: "Llamada",
-  demo: "Demo",
-}
-
 export interface AgentQueueItem {
   prospectId: number
   name: string
@@ -72,7 +65,7 @@ export interface AgentGoals {
   monthlyVentas: number
 }
 
-export interface ActivityProgress {
+interface ActivityProgress {
   label: string
   today: number
   todayGoal: number
@@ -80,13 +73,13 @@ export interface ActivityProgress {
   weekGoal: number
 }
 
-export interface FunnelStep {
+interface FunnelStep {
   status: string
   label: string
   count: number
 }
 
-export interface SegmentConversion {
+interface SegmentConversion {
   segment: string
   total: number
   activos: number

@@ -2,6 +2,7 @@
 
 import { useToolGuide } from "@/hooks/use-tool-guide"
 import { useToolDemo } from "@/hooks/use-tool-demo"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import { getToolGuide } from "./tool-guides"
 import { getToolDemo } from "./tool-demo"
 import ToolGuide from "./tool-guide"
@@ -41,6 +42,9 @@ export default function ToolGuideHost({
   const guideConfig = getToolGuide(pathname)
   const demoData = getToolDemo(pathname)
   const showDemo = !hideDemo && !!demoData
+
+  // Escape sale del modo demo (la guía se cierra con su propio handler).
+  useEscapeKey(demo.disableDemo, showDemo && demo.demoOn && !guide.open)
 
   return (
     <>

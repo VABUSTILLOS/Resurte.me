@@ -107,13 +107,21 @@ export function QuickActions({ onViewOrders, onBrowseStore, onScanInvoice }: Qui
     `;
     document.body.appendChild(dialog);
 
-    dialog.querySelector("#invite-close")?.addEventListener("click", () => dialog.remove());
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeDialog();
+    };
+    const closeDialog = () => {
+      dialog.remove();
+      document.removeEventListener("keydown", onKeyDown);
+    };
+    dialog.querySelector("#invite-close")?.addEventListener("click", closeDialog);
     dialog.addEventListener("click", (e) => {
-      if (e.target === dialog) dialog.remove();
+      if (e.target === dialog) closeDialog();
     });
+    document.addEventListener("keydown", onKeyDown);
     dialog.querySelector("#invite-copy-link")?.addEventListener("click", async () => {
       await navigator.clipboard.writeText(INVITE_MESSAGE);
-      dialog.remove();
+      closeDialog();
       // Brief toast
       const toast = document.createElement("div");
       toast.className =

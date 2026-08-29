@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useCity } from "@/contexts/city-context"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import { useRouter } from "next/navigation"
 import {
   Package,
@@ -66,6 +67,7 @@ export function DashboardSidebar() {
   const [orders, setOrders] = useState<OrderSummary[]>([])
   const [cashback] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
+  useEscapeKey(() => setMobileOpen(false), mobileOpen)
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === "undefined") return false
     return localStorage.getItem("sidebar-collapsed") === "true"

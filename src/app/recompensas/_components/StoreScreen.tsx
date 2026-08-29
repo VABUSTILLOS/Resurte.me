@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import type { ServiceItem, Tier } from "./types";
 import { useLoyaltyTier } from "./LoyaltyTierCard";
+import { useEscapeKey } from "@/hooks/use-escape-key";
 import { SERVICES } from "./services-data";
 import { formatNumber } from "@/lib/money";
 
@@ -350,6 +351,8 @@ function ServiceDetailSheet({
   const monthsToUnlock =
     monthlyCashback > 0 ? Math.ceil(service.cost / monthlyCashback) : 1;
   const tier = tierConfig[service.tier];
+
+  useEscapeKey(onClose);
 
   return (
     <>

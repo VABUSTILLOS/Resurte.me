@@ -11,6 +11,7 @@ import { LanguageToggle } from "@/components/panel/language-toggle"
 import { useLocale } from "@/lib/i18n/use-locale"
 import { usePanelRealtimeSync } from "@/hooks/use-panel-realtime-sync"
 import { usePanelRole } from "@/hooks/use-panel-role"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import { canAccessTool, toolKeyForPath } from "@/lib/panel-roles"
 import { PanelMobileNav } from "./_components/PanelMobileNav"
 import { PanelQuickNav } from "./_components/PanelQuickNav"
@@ -53,6 +54,7 @@ function PanelContent({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [showPicker, setShowPicker] = useState(false)
   const [showMobileNav, setShowMobileNav] = useState(false)
+  useEscapeKey(() => setShowPicker(false), showPicker)
   const { locale, setLocale } = useLocale()
   usePanelRealtimeSync()
 

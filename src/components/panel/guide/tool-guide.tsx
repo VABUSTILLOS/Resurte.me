@@ -6,6 +6,7 @@ import {
   ChevronLeft, ChevronRight, X, HelpCircle, FlaskConical, Check,
 } from "lucide-react"
 import ExampleMock from "./example-mock"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { ToolGuideConfig } from "./tool-guides"
 import { DEMO_BANNER_TEXT } from "./tool-demo"
 
@@ -53,6 +54,8 @@ export default function ToolGuide({
   const handleDismiss = useCallback(() => {
     onClose()
   }, [onClose])
+
+  useEscapeKey(handleDismiss, open)
 
   const handleToggleDemo = useCallback(() => {
     onToggleDemo?.()

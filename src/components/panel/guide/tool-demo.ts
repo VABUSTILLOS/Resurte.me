@@ -7,13 +7,13 @@
  * campo `_demo` que es data de ejemplo.
  */
 
-export interface DemoStat {
+interface DemoStat {
   label: string
   value: string
   tone?: "default" | "positive" | "warning" | "danger"
 }
 
-export interface DemoListItem {
+interface DemoListItem {
   id: string
   emoji?: string
   title: string
@@ -21,7 +21,7 @@ export interface DemoListItem {
   tone?: "default" | "positive" | "warning" | "danger"
 }
 
-export interface DemoFormField {
+interface DemoFormField {
   label: string
   value: string
 }
@@ -38,7 +38,7 @@ export interface ToolDemoConfig {
 /**
  * Registro de datasets demo por ruta de herramienta.
  */
-export const TOOL_DEMOS: Record<string, ToolDemoConfig> = {
+const TOOL_DEMOS: Record<string, ToolDemoConfig> = {
   "/panel": {
     stats: [
       { label: "Costo promedio del menú", value: "38% (food cost)", tone: "positive" },

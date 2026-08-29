@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Gift, Mail, Tag } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { AppliedCoupon } from "@/types"
 import {
   isExitMouseEvent,
@@ -54,6 +55,8 @@ export function ExitIntentCoupon() {
     }
     setVisible(true)
   }, [canShow])
+
+  useEscapeKey(useCallback(() => setVisible(false), []), visible)
 
   // ── Exit intent: mouseleave superior (desktop) + visibilitychange (móvil) ──
   useEffect(() => {

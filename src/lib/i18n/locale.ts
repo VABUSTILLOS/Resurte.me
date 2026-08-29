@@ -13,8 +13,6 @@
 
 export type Locale = "es" | "en"
 
-export const LOCALES: readonly Locale[] = ["es", "en"]
-
 type Dict = Record<string, unknown>
 
 const dictionaries: Partial<Record<Locale, Dict>> = {}

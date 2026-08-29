@@ -1,7 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
 import matter from "gray-matter"
-import { searchPosts as filterPostsByQuery } from "./blog-search"
 
 // ============================================================
 // BLOG DE RESURTE.ME — lectura de posts MDX locales
@@ -358,11 +357,6 @@ export function getBlogIndexCta(): ResolvedPostCta {
     collectionSlug: "comida-mexicana-corrida",
     collectionName: "Comida mexicana corrida",
   }
-}
-
-/** Filtro por texto (título, descripción y tags). Server-side: usa la lista completa de posts. */
-export function searchPosts(query: string): BlogPostMeta[] {
-  return filterPostsByQuery(getAllPosts(), query)
 }
 
 /** URL canónica de un post. */

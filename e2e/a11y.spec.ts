@@ -67,6 +67,36 @@ test.describe("accesibilidad WCAG (axe-core)", () => {
     })
   }
 
+  test("storefront de restaurante no tiene violaciones serias", async ({ page }) => {
+    await page.goto("/comer", { waitUntil: "domcontentloaded" })
+    // Descubre un restaurante real desde el directorio del marketplace.
+    const href = await page.getByRole("link").evaluateAll((links) => {
+      const l = links.map((a) => (a as HTMLAnchorElement).href)
+      return (
+        l.find((h) => {
+          try {
+            return /^\/r\/[^/]+\/?$/.test(new URL(h).pathname)
+          } catch {
+            return false
+          }
+        }) ?? null
+      )
+    })
+    if (!href) {
+      console.log("SKIP storefront: no se encontró enlace /r/ en /comer")
+      return
+    }
+    await page.goto(href, { waitUntil: "networkidle" })
+    const results = await runAxe(page)
+    const critical = results.violations.filter(
+      (v) => v.impact === "critical" || v.impact === "serious",
+    )
+    if (critical.length > 0) {
+      console.log(`VIOLACIONES storefront (${href}):\n${summarize(critical)}`)
+    }
+    expect(critical, `violaciones serias/críticas en storefront:\n${summarize(critical)}`).toEqual([])
+  })
+
   test("categoría y producto no tienen violaciones serias", async ({ page }) => {
     await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
     // Descubre enlaces reales de categoría y producto desde la ciudad.

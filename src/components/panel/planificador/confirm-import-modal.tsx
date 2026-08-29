@@ -2,6 +2,7 @@
 
 import type { ImportConfirm } from "./planificador-shared"
 import { t } from "@/lib/i18n/es"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 
 interface ConfirmImportModalProps {
   confirmImport: ImportConfirm
@@ -11,6 +12,8 @@ interface ConfirmImportModalProps {
 
 // Modal: sobrescribir cantidades manuales al importar un platillo del Costeador.
 export default function ConfirmImportModal({ confirmImport, onCancel, onConfirm }: ConfirmImportModalProps) {
+  useEscapeKey(onCancel)
+
   return (
     <div
       className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"

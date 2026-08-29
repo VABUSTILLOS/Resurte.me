@@ -203,9 +203,9 @@ export function OnboardingScreen({ onComplete, isAuthenticated }: OnboardingScre
                       <div className="h-5 w-px bg-cream-300"></div>
                     </div>
                     {/* Right box: Marketing */}
-                    <div className="flex-1 rounded-xl bg-cream-100 border border-cream-300 p-3 text-center opacity-50">
-                      <span className="text-2xl">📣</span>
-                      <p className="text-[#6e737b] text-[10px] mt-1.5 leading-tight">Invertir en<br/>marketing</p>
+                    <div className="flex-1 rounded-xl bg-cream-100 border border-dashed border-cream-300 p-3 text-center">
+                      <span className="text-2xl opacity-50">📣</span>
+                      <p className="text-[#5c6069] text-[10px] mt-1.5 leading-tight">Invertir en<br/>marketing</p>
                     </div>
                   </div>
                   <p className="text-[#6e737b] text-[10px] text-center mt-3">Tenías que elegir uno</p>

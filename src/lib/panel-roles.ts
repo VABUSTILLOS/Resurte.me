@@ -71,7 +71,7 @@ export function canReadRows(role: PanelRole, tool: string): boolean {
 }
 
 /** Config del panel (umbrales, metas): solo el dueño la modifica. */
-export function isConfigKey(key: string): boolean {
+function isConfigKey(key: string): boolean {
   return key === "panel-config" || key.startsWith("panel-config-")
 }
 

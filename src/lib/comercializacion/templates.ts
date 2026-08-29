@@ -58,11 +58,6 @@ export function saveTemplates(templates: WhatsappTemplate[]) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(templates))
 }
 
-export function resetTemplates(): WhatsappTemplate[] {
-  saveTemplates(DEFAULT_TEMPLATES)
-  return DEFAULT_TEMPLATES
-}
-
 /** Reemplaza placeholders; si un dato falta, limpia el placeholder. */
 export function renderTemplate(body: string, vars: TemplateVars): string {
   const nombre = vars.nombre?.split(" ")[0] || ""

@@ -30,7 +30,7 @@ export const BUMPS_STORAGE_KEY = "resurte:selected-bumps"
  * depurar en producción por qué un usuario no ve los order bumps.
  * Es aditivo y no altera el render ni el flujo del checkout.
  */
-export interface BumpCardsDebug {
+interface BumpCardsDebug {
   /** true cuando este componente está montado; false = la sonda global lo
    *  inicializó desde el layout (BumpCards no se renderiza en esta vista). */
   mounted?: boolean

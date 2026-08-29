@@ -179,7 +179,7 @@ export interface AdminMetricsParams {
   to?: string // ISO date
 }
 
-export interface AdminMetricsPoint {
+interface AdminMetricsPoint {
   period: string
   revenue: number
   orders: number

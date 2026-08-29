@@ -9,6 +9,7 @@ import { searchProducts } from "@/app/[slug]/buscar/actions"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { useCart } from "@/contexts/cart-context"
 import { useToast } from "@/components/toast"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { Product } from "@/types"
 
 /** Evento global para abrir el overlay de búsqueda móvil desde cualquier
@@ -49,13 +50,7 @@ export function MobileSearchOverlay({ citySlug, onClose }: MobileSearchOverlayPr
   }, [])
 
   // Cerrar con Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose()
-    }
-    window.addEventListener("keydown", handler)
-    return () => window.removeEventListener("keydown", handler)
-  }, [onClose])
+  useEscapeKey(onClose)
 
   // Búsqueda en vivo con debounce. Los setState ocurren en el handler del
   // input o en el callback del timeout (no síncronos en el effect).

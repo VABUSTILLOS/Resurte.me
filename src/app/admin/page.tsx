@@ -12,7 +12,7 @@ import {
   ArrowDownRight,
   type LucideIcon,
 } from "lucide-react"
-import { getAdminOrders, getActiveStoresCount, type AdminOrder } from "./actions"
+import { type AdminOrder } from "./actions"
 import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/order-labels"
 import { MetricsCharts } from "./components/MetricsCharts"
 

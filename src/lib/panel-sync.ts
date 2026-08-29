@@ -21,7 +21,7 @@ import { ensureGuestToken } from "@/lib/guest-address"
  *    localStorage y notifica a los hooks montados vía evento "storage".
  */
 
-export type PanelSyncState = "idle" | "saving" | "saved" | "error"
+type PanelSyncState = "idle" | "saving" | "saved" | "error"
 
 export interface PanelSyncSnapshot {
   status: PanelSyncState

@@ -38,6 +38,7 @@ import {
   CalendarClock,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import { t } from "@/lib/i18n/es"
 
 const AUTOMATION_TYPES: { id: FoodosAutomationType; label: string; hint: string }[] = [
@@ -88,6 +89,8 @@ export default function ClientesPage() {
   const [autoForm, setAutoForm] = useState<AutomationForm>(EMPTY_AUTO)
   const [saving, setSaving] = useState(false)
   const [sendingCampaign, setSendingCampaign] = useState<string | null>(null)
+
+  useEscapeKey(useCallback(() => setShowAutoForm(false), []), showAutoForm)
 
   const load = useCallback(async () => {
     try {

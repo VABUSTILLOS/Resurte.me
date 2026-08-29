@@ -13,7 +13,7 @@ export interface ExampleField {
   value: string
 }
 
-export interface ToolGuideStep {
+interface ToolGuideStep {
   id: string
   title: string
   description: string
@@ -36,7 +36,7 @@ export const GUIDE_NOTICE =
 /**
  * Registro de guías por ruta de la herramienta (pathname).
  */
-export const TOOL_GUIDES: Record<string, ToolGuideConfig> = {
+const TOOL_GUIDES: Record<string, ToolGuideConfig> = {
   "/panel": {
     tool: "Panel de herramientas",
     icon: "🏠",
