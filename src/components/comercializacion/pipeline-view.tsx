@@ -39,6 +39,8 @@ export function PipelineView({
 }) {
   const { toast } = useToast()
   const [updating, setUpdating] = useState<number | null>(null)
+  const [draggingId, setDraggingId] = useState<number | null>(null)
+  const [dropTarget, setDropTarget] = useState<ProspectStatus | null>(null)
 
   async function moveStatus(p: Prospect, next: ProspectStatus) {
     if (next === p.status) return
@@ -52,6 +54,14 @@ export function PipelineView({
     } finally {
       setUpdating(null)
     }
+  }
+
+  function handleDrop(col: ProspectStatus) {
+    setDropTarget(null)
+    if (draggingId === null) return
+    const prospect = prospects.find((p) => p.id === draggingId)
+    setDraggingId(null)
+    if (prospect) void moveStatus(prospect, col)
   }
 
   if (prospects.length === 0) {
@@ -74,7 +84,24 @@ export function PipelineView({
         return (
           <div
             key={col}
-            className={`bg-gray-50 rounded-2xl border border-gray-100 border-t-4 ${COLUMN_ACCENT[col]} p-2 min-h-[120px]`}
+            onDragOver={(e) => {
+              if (draggingId !== null) {
+                e.preventDefault()
+                if (dropTarget !== col) setDropTarget(col)
+              }
+            }}
+            onDragLeave={() => {
+              if (dropTarget === col) setDropTarget(null)
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              handleDrop(col)
+            }}
+            className={`bg-gray-50 rounded-2xl border border-t-4 ${COLUMN_ACCENT[col]} p-2 min-h-[120px] transition-colors ${
+              dropTarget === col
+                ? "border-[#0E7A0E] bg-[#0E7A0E]/5"
+                : "border-gray-100"
+            }`}
           >
             <div className="flex items-center justify-between px-1.5 py-1">
               <p className="text-xs font-bold text-gray-700">
@@ -88,7 +115,19 @@ export function PipelineView({
               {items.map((p) => (
                 <li
                   key={p.id}
-                  className="bg-white rounded-xl border border-gray-100 shadow-sm p-2.5"
+                  draggable
+                  onDragStart={(e) => {
+                    setDraggingId(p.id)
+                    e.dataTransfer.effectAllowed = "move"
+                    e.dataTransfer.setData("text/plain", String(p.id))
+                  }}
+                  onDragEnd={() => {
+                    setDraggingId(null)
+                    setDropTarget(null)
+                  }}
+                  className={`bg-white rounded-xl border border-gray-100 shadow-sm p-2.5 cursor-grab active:cursor-grabbing ${
+                    draggingId === p.id ? "opacity-40" : ""
+                  }`}
                 >
                   <Link
                     href={`/comercializacion/prospectos/${p.id}`}

@@ -13,27 +13,27 @@ export { SERVICES };
 const tierConfig: Record<Tier, { label: string; bg: string; text: string; border: string }> = {
   verde: {
     label: "Verde",
-    bg: "bg-emerald-600/20",
-    text: "text-emerald-400",
-    border: "border-emerald-500/30",
+    bg: "bg-emerald-50",
+    text: "text-emerald-700",
+    border: "border-emerald-700/30",
   },
   plata: {
     label: "Plata",
-    bg: "bg-slate-500/20",
-    text: "text-slate-300",
-    border: "border-slate-400/30",
+    bg: "bg-slate-50",
+    text: "text-slate-600",
+    border: "border-slate-600/30",
   },
   oro: {
     label: "Oro",
-    bg: "bg-amber-600/20",
-    text: "text-amber-400",
-    border: "border-amber-500/30",
+    bg: "bg-amber-50",
+    text: "text-amber-700",
+    border: "border-amber-700/30",
   },
   diamante: {
     label: "Diamante",
-    bg: "bg-violet-600/20",
-    text: "text-violet-400",
-    border: "border-violet-500/30",
+    bg: "bg-violet-50",
+    text: "text-violet-700",
+    border: "border-violet-700/30",
   },
 };
 
@@ -73,31 +73,46 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator, balance = 0 }: 
         className="mb-4"
       >
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-emerald-400" />
-          <h1 className="text-white text-lg font-bold">Tienda de Crecimiento</h1>
+          <Sparkles className="h-4 w-4 text-brand-500" />
+          <h1 className="text-warm-700 text-lg font-bold">Tienda de Crecimiento</h1>
         </div>
-        <p className="text-gray-400 text-[13px] mt-0.5">
+        <p className="text-[#5c6069] text-[13px] mt-0.5">
           Convierte tus recompensas en clientes nuevos. Tus recompensas ya son tuyas.
         </p>
       </motion.div>
 
       {/* Category filter chips */}
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide scroll-fade-x snap-x snap-mandatory mb-3">
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setActiveCategory(cat.id)}
-            className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium 
-              whitespace-nowrap transition-all snap-start touch-target ${
-                activeCategory === cat.id
-                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/30"
-                  : "bg-white/5 text-gray-400 hover:bg-white/10"
-              }`}
-          >
-            <span>{cat.icon}</span>
-            {cat.label}
-          </button>
-        ))}
+        {categories.map((cat) => {
+          const count =
+            cat.id === "all"
+              ? SERVICES.length
+              : SERVICES.filter((s) => s.category === cat.id).length;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id)}
+              className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium 
+                whitespace-nowrap transition-all snap-start touch-target ${
+                  activeCategory === cat.id
+                   ? "bg-brand-500 text-white shadow-sm"
+                   : "bg-white border border-cream-300 text-[#5c6069] hover:bg-cream-100"
+                }`}
+            >
+              <span>{cat.icon}</span>
+              {cat.label}
+              <span
+                className={`rounded-full px-1.5 py-px text-[10px] font-bold tabular-nums ${
+                  activeCategory === cat.id
+                    ? "bg-white/20 text-white"
+                    : "bg-cream-100 text-[#6e737b]"
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Service Grid */}
@@ -132,6 +147,20 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator, balance = 0 }: 
           })}
         </AnimatePresence>
       </div>
+
+      {/* Empty state */}
+      {filtered.length === 0 && (
+        <div className="mt-4 rounded-2xl border border-cream-300 bg-white p-8 text-center shadow-sm">
+          <p className="text-3xl">🛍️</p>
+          <p className="mt-2 text-sm font-bold text-warm-700">
+            No hay servicios en esta categoría todavía
+          </p>
+          <p className="mt-1 text-xs text-[#5c6069]">
+            Estamos preparando más servicios. Mientras tanto, explora las demás
+            categorías.
+          </p>
+        </div>
+      )}
 
       {/* Detail Bottom Sheet */}
       <AnimatePresence>
@@ -191,14 +220,14 @@ function ServiceCard({
       className={`group relative overflow-hidden rounded-2xl border transition-all 
         active:scale-[0.98] cursor-pointer ${
           isUnlocked
-            ? "border-emerald-500/40 bg-white/5 hover:border-emerald-400/60"
-            : "border-white/10 bg-white/5 hover:border-white/20"
+            ? "border-brand-200 bg-white shadow-sm hover:border-brand-500"
+            : "border-cream-300 bg-white shadow-sm hover:border-warm-300"
         }`}
     >
       {/* Unlocked glow */}
       {isUnlocked && (
         <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent"
+          className="absolute inset-0 bg-gradient-to-r from-brand-50 to-transparent"
           animate={{ opacity: [0.3, 0.6, 0.3] }}
           transition={{ duration: 2, repeat: Infinity }}
         />
@@ -222,7 +251,7 @@ function ServiceCard({
           transition={{ type: "spring", stiffness: 300 }}
           className="absolute top-3 right-3 z-10"
         >
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 px-2.5 py-0.5 text-[10px] font-bold">
+          <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 text-brand-500 border border-brand-200 px-2.5 py-0.5 text-[10px] font-bold">
             <CheckCircle className="h-3 w-3" /> Disponible
           </span>
         </motion.div>
@@ -232,29 +261,29 @@ function ServiceCard({
         {/* Icon + Name */}
         <div className="flex items-start gap-3">
           <motion.div
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-xl"
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-cream-100 text-xl"
             whileHover={{ scale: 1.1, rotate: -5 }}
           >
             {service.icon}
           </motion.div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-white font-bold text-sm leading-tight">{service.name}</h3>
-            <p className="text-gray-400 text-xs mt-0.5 line-clamp-2">{service.description}</p>
+            <h3 className="text-warm-700 font-bold text-sm leading-tight">{service.name}</h3>
+            <p className="text-[#5c6069] text-xs mt-0.5 line-clamp-2">{service.description}</p>
           </div>
         </div>
 
         {/* Impact Badge */}
-        <div className="mt-2.5 flex items-center gap-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/10 px-2.5 py-1">
-          <TrendingUp className="h-3 w-3 text-emerald-400 flex-shrink-0" />
-          <p className="text-emerald-400 text-[10px] font-medium leading-tight">
+        <div className="mt-2.5 flex items-center gap-1.5 rounded-lg bg-brand-50 border border-brand-200 px-2.5 py-1">
+          <TrendingUp className="h-3 w-3 text-brand-500 flex-shrink-0" />
+          <p className="text-brand-500 text-[10px] font-medium leading-tight">
             {service.estimatedImpact}
           </p>
         </div>
 
         {/* Social Proof */}
         <div className="mt-1.5 flex items-center gap-1.5">
-          <Users className="h-3 w-3 text-gray-600" />
-          <span className="text-gray-600 text-[10px]">
+          <Users className="h-3 w-3 text-[#6e737b]" />
+          <span className="text-[#6e737b] text-[10px]">
             {socialProofCounts[service.id] || "0 restaurantes"} ya lo canjearon
           </span>
         </div>
@@ -262,8 +291,8 @@ function ServiceCard({
         {/* Cost + CTA */}
         <div className="mt-2.5 flex items-center justify-between">
           <div>
-            <p className="text-gray-500 text-[10px] uppercase tracking-wider">Costo en recompensas</p>
-            <p className="text-white font-bold text-lg tabular-nums">
+            <p className="text-[#6e737b] text-[10px] uppercase tracking-wider">Costo en recompensas</p>
+            <p className="text-brand-500 font-bold text-lg tabular-nums">
               ${formatNumber(service.cost)}
             </p>
           </div>
@@ -276,8 +305,8 @@ function ServiceCard({
                 e.stopPropagation();
                 onRedeem();
               }}
-              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white 
-                shadow-lg shadow-emerald-900/30 transition-all hover:bg-emerald-500 touch-target"
+              className="rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-bold text-white 
+                shadow-sm transition-all hover:bg-brand-600 touch-target"
             >
               Canjear ahora
             </motion.button>
@@ -288,11 +317,11 @@ function ServiceCard({
                   e.stopPropagation();
                   onCalculator();
                 }}
-                className="text-amber-400 text-[10px] font-medium hover:underline"
+                className="text-amber-700 text-[10px] font-medium hover:underline"
               >
                 Te faltan ${formatNumber(remaining)}
               </button>
-              <p className="text-gray-600 text-[10px] mt-0.5">
+              <p className="text-[#6e737b] text-[10px] mt-0.5">
                 ~{monthsToUnlock} {monthsToUnlock === 1 ? "mes" : "meses"}
               </p>
             </div>
@@ -329,7 +358,7 @@ function ServiceDetailSheet({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
 
@@ -339,23 +368,23 @@ function ServiceDetailSheet({
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md rounded-t-3xl bg-gray-900 
-          border border-white/10 px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-h-[80vh] overflow-y-auto"
+        className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-md rounded-t-3xl bg-white shadow-lg 
+          border border-cream-300 px-6 pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-h-[80vh] overflow-y-auto"
       >
         {/* Handle */}
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-700" />
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-cream-300" />
 
         {/* Close */}
         <button
           onClick={onClose}
           aria-label="Cerrar"
-          className="absolute top-4 right-4 rounded-full bg-white/10 p-3 text-gray-400 hover:text-white touch-target"
+          className="absolute top-4 right-4 rounded-full bg-cream-100 p-3 text-[#5c6069] hover:text-warm-700 touch-target"
         >
           <X className="h-4 w-4" />
         </button>
 
         {/* Icon */}
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-3xl mb-4">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-cream-100 text-3xl mb-4">
           {service.icon}
         </div>
 
@@ -364,18 +393,18 @@ function ServiceDetailSheet({
           <span className={`rounded-full ${tier.bg} ${tier.text} border ${tier.border} px-2 py-0.5 text-xs font-bold`}>
             {tier.label}
           </span>
-          <span className="text-gray-500 text-xs">• {service.category === "presencia" ? "Presencia" : service.category === "trafico" ? "Tráfico" : "Infraestructura"}</span>
+          <span className="text-[#6e737b] text-xs">• {service.category === "presencia" ? "Presencia" : service.category === "trafico" ? "Tráfico" : "Infraestructura"}</span>
         </div>
-        <h2 className="text-white text-xl font-bold">{service.name}</h2>
-        <p className="text-gray-400 text-sm mt-2">{service.description}</p>
+        <h2 className="text-warm-700 text-xl font-bold">{service.name}</h2>
+        <p className="text-[#5c6069] text-sm mt-2">{service.description}</p>
 
         {/* Deliverables */}
-        <div className="mt-4 rounded-xl bg-white/5 p-4">
-          <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-2">Entregables</p>
+        <div className="mt-4 rounded-xl bg-cream-100 border border-cream-300 p-4">
+          <p className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2">Entregables</p>
           <ul className="space-y-1.5">
             {service.deliverables.map((d, i) => (
-              <li key={i} className="flex items-center gap-2 text-sm text-white">
-                <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+              <li key={i} className="flex items-center gap-2 text-sm text-warm-700">
+                <CheckCircle className="h-4 w-4 text-brand-500 flex-shrink-0" />
                 {d}
               </li>
             ))}
@@ -383,39 +412,39 @@ function ServiceDetailSheet({
         </div>
 
         {/* Impact */}
-        <div className="mt-3 rounded-xl bg-emerald-500/10 border border-emerald-500/15 p-3">
-          <p className="text-emerald-400 text-sm font-medium">{service.estimatedImpact}</p>
+        <div className="mt-3 rounded-xl bg-brand-50 border border-brand-200 p-3">
+          <p className="text-brand-500 text-sm font-medium">{service.estimatedImpact}</p>
         </div>
 
         {/* Testimonial */}
         {service.testimonials && (
-          <div className="mt-3 rounded-xl bg-purple-500/10 border border-purple-500/15 p-3">
-            <p className="text-purple-300 text-xs italic">💬 &ldquo;{service.testimonials}&rdquo;</p>
+          <div className="mt-3 rounded-xl bg-violet-50 border border-violet-700/30 p-3">
+            <p className="text-violet-700 text-xs italic">💬 &ldquo;{service.testimonials}&rdquo;</p>
           </div>
         )}
 
         {/* Bottom CTA */}
-        <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4">
+        <div className="mt-5 flex items-center justify-between border-t border-cream-300 pt-4">
           <div>
-            <p className="text-gray-500 text-xs">Costo en recompensas</p>
-            <p className="text-white font-bold text-xl tabular-nums">
+            <p className="text-[#6e737b] text-xs">Costo en recompensas</p>
+            <p className="text-brand-500 font-bold text-xl tabular-nums">
               ${formatNumber(service.cost)}
             </p>
           </div>
           {isUnlocked ? (
             <button
               onClick={onRedeem}
-              className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white 
-                shadow-lg shadow-emerald-900/30 active:scale-95 transition-transform"
+              className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-bold text-white 
+                shadow-sm hover:bg-brand-600 active:scale-95 transition-all"
             >
               Canjear ahora
             </button>
           ) : (
             <div className="text-right">
-              <p className="text-amber-400 text-xs font-medium">
+              <p className="text-amber-700 text-xs font-medium">
                 Te faltan ${formatNumber(remaining)}
               </p>
-              <p className="text-gray-500 text-xs mt-0.5">
+              <p className="text-[#6e737b] text-xs mt-0.5">
                 ~{monthsToUnlock} {monthsToUnlock === 1 ? "mes" : "meses"} con tu consumo actual
               </p>
             </div>

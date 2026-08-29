@@ -19,7 +19,7 @@ const quickActions: QuickAction[] = [
     ),
     label: "Mis\nPedidos",
     id: "orders",
-    accent: "from-blue-600 to-blue-500",
+    accent: "text-blue-600",
   },
   {
     icon: (
@@ -29,7 +29,7 @@ const quickActions: QuickAction[] = [
     ),
     label: "Tienda de\nCrecimiento",
     id: "store",
-    accent: "from-amber-600 to-amber-500",
+    accent: "text-amber-600",
   },
   {
     icon: (
@@ -39,7 +39,7 @@ const quickActions: QuickAction[] = [
     ),
     label: "Invitar\nAmigo",
     id: "invite",
-    accent: "from-purple-600 to-purple-500",
+    accent: "text-purple-600",
   },
 ];
 
@@ -77,20 +77,20 @@ export function QuickActions({ onViewOrders, onBrowseStore }: QuickActionsProps)
     dialog.className =
       "fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm p-4";
     dialog.innerHTML = `
-      <div class="w-full max-w-sm rounded-2xl bg-gray-900 border border-white/10 p-5 mb-[calc(1rem+env(safe-area-inset-bottom))]">
-        <p class="text-white text-sm font-bold mb-4">Compartir con otro restaurantero</p>
+      <div class="w-full max-w-sm rounded-2xl bg-white border border-cream-300 shadow-lg p-5 mb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <p class="text-warm-700 text-sm font-bold mb-4">Compartir con otro restaurantero</p>
         <div class="space-y-2">
-          <a href="${waUrl}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-xl bg-green-600/20 border border-green-500/30 p-3 text-white text-sm font-medium hover:bg-green-600/30 transition-colors">
+          <a href="${waUrl}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-xl bg-brand-50 border border-brand-200 p-3 text-brand-600 text-sm font-medium hover:bg-brand-100 transition-colors">
             <span class="text-xl">💬</span> Compartir por WhatsApp
           </a>
-          <a href="${messengerUrl}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-xl bg-blue-600/20 border border-blue-500/30 p-3 text-white text-sm font-medium hover:bg-blue-600/30 transition-colors">
+          <a href="${messengerUrl}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-xl bg-blue-50 border border-blue-200 p-3 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors">
             <span class="text-xl">💬</span> Compartir por Messenger
           </a>
-          <button id="invite-copy-link" class="w-full flex items-center gap-3 rounded-xl bg-white/5 border border-white/10 p-3 text-white text-sm font-medium hover:bg-white/10 transition-colors">
+          <button id="invite-copy-link" class="w-full flex items-center gap-3 rounded-xl bg-cream-100 border border-cream-300 p-3 text-warm-700 text-sm font-medium hover:bg-cream-200 transition-colors">
             <span class="text-xl">🔗</span> Copiar enlace de invitación
           </button>
         </div>
-        <button id="invite-close" class="mt-4 w-full text-gray-500 text-sm py-2 hover:text-gray-400 transition-colors touch-target">Cancelar</button>
+        <button id="invite-close" class="mt-4 w-full text-[#5c6069] text-sm py-2 hover:text-warm-700 transition-colors touch-target">Cancelar</button>
       </div>
     `;
     document.body.appendChild(dialog);
@@ -105,7 +105,7 @@ export function QuickActions({ onViewOrders, onBrowseStore }: QuickActionsProps)
       // Brief toast
       const toast = document.createElement("div");
       toast.className =
-        "fixed top-6 left-1/2 -translate-x-1/2 z-50 rounded-full bg-emerald-600 px-5 py-2.5 text-white text-sm font-bold shadow-lg";
+        "fixed top-6 left-1/2 -translate-x-1/2 z-50 rounded-full bg-brand-500 px-5 py-2.5 text-white text-sm font-bold shadow-lg";
       toast.textContent = "✅ Enlace copiado";
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 2000);
@@ -127,12 +127,12 @@ export function QuickActions({ onViewOrders, onBrowseStore }: QuickActionsProps)
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 * quickActions.indexOf(action) + 0.3, duration: 0.4 }}
           onClick={handlers[action.id]}
-        className={`flex flex-col items-center gap-1.5 rounded-2xl bg-gradient-to-b ${action.accent} 
-          bg-opacity-15 p-3 backdrop-blur-sm transition-all active:scale-95 
-            border border-white/10 hover:border-white/20`}
+        className="flex flex-col items-center gap-1.5 rounded-2xl bg-white
+          p-3 shadow-sm transition-all active:scale-95
+            border border-cream-300 hover:bg-cream-100"
         >
-          <div className="text-white">{action.icon}</div>
-          <span className="text-[10px] font-medium text-white text-center leading-tight whitespace-pre-line">
+          <div className={action.accent}>{action.icon}</div>
+          <span className="text-[10px] font-medium text-warm-700 text-center leading-tight whitespace-pre-line">
             {action.label}
           </span>
         </motion.button>

@@ -39,6 +39,31 @@ export function ProspectFormModal({
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null)
+
+  // Advertencia de duplicado por teléfono/WhatsApp al crear (no al editar).
+  useEffect(() => {
+    if (!open || prospect) return
+    const phone = form.phone.replace(/\D/g, "")
+    const whatsapp = form.whatsapp.replace(/\D/g, "")
+    const candidates = [phone, whatsapp].filter((d) => d.length >= 8)
+    if (candidates.length === 0) return
+    const timeout = setTimeout(async () => {
+      try {
+        const { findDuplicatesByPhone } = await import("@/lib/comercializacion/actions")
+        const matches = await findDuplicatesByPhone(candidates)
+        if (matches.length > 0) {
+          const names = [...new Set(matches.map((m) => m.prospectName))].join(", ")
+          setDuplicateWarning(`Ya existe un prospecto con este teléfono: ${names}`)
+        } else {
+          setDuplicateWarning(null)
+        }
+      } catch {
+        // Silencioso: es solo una advertencia.
+      }
+    }, 500)
+    return () => clearTimeout(timeout)
+  }, [open, prospect, form.phone, form.whatsapp])
 
   useEffect(() => {
     if (!open) return
@@ -46,6 +71,7 @@ export function ProspectFormModal({
     // (evita renders en cascada; ver react-hooks/set-state-in-effect).
     const timeout = setTimeout(() => {
       setError(null)
+      setDuplicateWarning(null)
       setForm({
         name: prospect?.name ?? "",
         restaurant_name: prospect?.restaurant_name ?? "",
@@ -113,6 +139,11 @@ export function ProspectFormModal({
         {error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-xl">
             {error}
+          </div>
+        ) : null}
+        {duplicateWarning ? (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-2 rounded-xl">
+            ⚠️ {duplicateWarning}
           </div>
         ) : null}
 

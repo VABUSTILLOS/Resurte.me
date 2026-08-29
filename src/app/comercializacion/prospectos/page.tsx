@@ -1,9 +1,12 @@
 import { getProspects } from "@/lib/comercializacion/actions"
 import { getCities } from "@/lib/data"
-import { ProspectosPage } from "@/components/comercializacion/prospectos-page"
+import { ProspectosPage, PAGE_SIZE } from "@/components/comercializacion/prospectos-page"
 
 export default async function ProspectosPageServer() {
-  const [prospects, cities] = await Promise.all([getProspects(), getCities()])
+  const [prospects, cities] = await Promise.all([
+    getProspects({ limit: PAGE_SIZE }),
+    getCities(),
+  ])
   return (
     <ProspectosPage
       initialProspects={prospects}

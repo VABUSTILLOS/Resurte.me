@@ -19,7 +19,7 @@ import { CHECKOUT_DRAWER_EVENT } from "@/components/checkout/CheckoutDrawer"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
-import { calcCheckoutTotals, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT, freeShippingProgress } from "@/lib/checkout-config"
 
 // Global event bus to control drawer from header
 export const CART_DRAWER_EVENT = "resurte:toggle-cart-drawer"
@@ -400,6 +400,7 @@ export function MobileCartBar() {
     DELIVERY_FEE_FLAT
   )
   const barTotal = totals.total
+  const fsBar = freeShippingProgress(totals.payableSubtotal)
   const isMobile = useMediaQuery("(max-width: 640px)", true)
 
   if (!mounted || itemCount === 0) return null
@@ -426,12 +427,29 @@ export function MobileCartBar() {
 
   return (
     <div ref={barRef} className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
+      <div className={barClass}>
+      {/* Tira compacta de progreso hacia envío gratis: visible en todo momento
+          mientras el carrito tiene items, para empujar el ticket hacia el
+          umbral sin abrir el drawer. */}
+      <div className="px-4 pt-2">
+        <div className="flex items-center gap-2">
+          <div className="h-1 flex-1 rounded-full bg-[#EDEAE4] overflow-hidden">
+            <div
+              className="h-full bg-[#0E7A0E] transition-all duration-300"
+              style={{ width: `${fsBar.percent}%` }}
+            />
+          </div>
+          <p className={`text-[11px] font-medium whitespace-nowrap ${fsBar.isFree ? "text-[#0E7A0E]" : "text-[var(--text-secondary)]"}`}>
+            {fsBar.message}
+          </p>
+        </div>
+      </div>
       {isMobile ? (
         /* Mobile (<640px): una sola fila — carrito + checkout. El botón
            "Ver más productos" se elimina en móvil: redundante con el
            StickyCatalogButton ("Ver todos") y los links "Ver todo" por
            categoría; se gana espacio vertical. sm+ sí lo conserva. */
-        <div className={`${barClass} flex items-center gap-3 px-4 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))]`}>
+        <div className="flex items-center gap-3 px-4 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))]">
           {/* Tap to open drawer — flex-1 + truncate absorbe el texto largo a 320px */}
           <button
             onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
@@ -454,7 +472,7 @@ export function MobileCartBar() {
         </div>
       ) : (
         /* sm+: single row — current layout */
-        <div className={`${barClass} flex items-center gap-3 px-4 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))]`}>
+        <div className="flex items-center gap-3 px-4 pt-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))]">
           {/* Tap to open drawer — always visible */}
           <button
             onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
@@ -489,6 +507,7 @@ export function MobileCartBar() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

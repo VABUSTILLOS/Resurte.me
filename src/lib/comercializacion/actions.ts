@@ -21,6 +21,7 @@ import {
   type SellerClientSummary,
   type ProspectStatus,
   type LastOrderSummary,
+  type WeeklyTrendsReport,
 } from "./types"
 
 /**
@@ -1200,4 +1201,86 @@ export async function getAssistedOrders(): Promise<AssistedOrderSummary[]> {
     item_count: Array.isArray(o.order_items) ? o.order_items.length : 0,
     created_at: String(o.created_at),
   }))
+}
+
+/**
+ * Tendencias de las últimas 8 semanas: actividades registradas y ventas
+ * pagadas de clientes vinculados, más la distribución actual del pipeline.
+ */
+export async function getWeeklyTrends(): Promise<WeeklyTrendsReport> {
+  const { userId, role } = await requireSellerOrAdminAction()
+  const supabase = await createServiceClient()
+
+  // Límites de las últimas 8 semanas (la actual primero).
+  const now = Date.now()
+  const weekBounds: { startISO: string; endISO: string }[] = []
+  for (let i = 0; i < 8; i++) {
+    weekBounds.push(getWeekBounds(new Date(now - i * 7 * 86_400_000)))
+  }
+  const oldestStart = weekBounds[weekBounds.length - 1]?.startISO
+  if (!oldestStart) throw new Error("Error al calcular las semanas")
+
+  const activitiesQuery = supabase
+    .from("crm_activities")
+    .select("occurred_at")
+    .gte("occurred_at", oldestStart)
+  const prospectsQuery = supabase.from("crm_prospects").select("status, user_id")
+  if (role !== "admin") {
+    activitiesQuery.eq("seller_id", userId)
+    prospectsQuery.eq("seller_id", userId)
+  }
+
+  const [activitiesRes, prospectsRes] = await Promise.all([activitiesQuery, prospectsQuery])
+  if (activitiesRes.error || prospectsRes.error) {
+    logger.error("[CRM] getWeeklyTrends error")
+    throw new Error("Error al cargar las tendencias")
+  }
+
+  // Ventas de clientes vinculados en el mismo rango.
+  const linked = (prospectsRes.data ?? [])
+    .map((p) => p.user_id as string | null)
+    .filter((v): v is string => !!v)
+  let orders: { total: number; created_at: string }[] = []
+  if (linked.length > 0) {
+    const { data } = await supabase
+      .from("orders")
+      .select("total, created_at")
+      .in("user_id", linked)
+      .eq("payment_status", "paid")
+      .neq("status", "cancelled")
+      .gte("created_at", oldestStart)
+    orders = (data ?? []) as { total: number; created_at: string }[]
+  }
+
+  const labelFmt = new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City",
+    day: "numeric",
+    month: "short",
+  })
+
+  // Orden cronológico ascendente para graficar.
+  const weeks = weekBounds
+    .slice()
+    .reverse()
+    .map((b) => {
+      const activities = (activitiesRes.data ?? []).filter(
+        (a) => a.occurred_at >= b.startISO && a.occurred_at <= b.endISO
+      ).length
+      const sales = orders
+        .filter((o) => o.created_at >= b.startISO && o.created_at <= b.endISO)
+        .reduce((sum, o) => sum + Number(o.total), 0)
+      return {
+        weekStart: b.startISO,
+        label: labelFmt.format(new Date(b.startISO)),
+        activities,
+        sales,
+      }
+    })
+
+  const pipeline = PROSPECT_STATUSES.map((status) => ({
+    status,
+    count: (prospectsRes.data ?? []).filter((p) => p.status === status).length,
+  })).filter((p) => p.count > 0)
+
+  return { weeks, pipeline }
 }

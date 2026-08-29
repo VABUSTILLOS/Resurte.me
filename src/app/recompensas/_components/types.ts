@@ -32,10 +32,45 @@ export interface TierConfig {
 }
 
 export const TIER_CONFIGS: Record<Tier, Omit<TierConfig, 'tier'>> = {
-  verde: { name: CASHBACK_TIERS[TIER_INDEX.verde]!.name, rate: CASHBACK_TIERS[TIER_INDEX.verde]!.pct, color: "emerald", borderColor: "border-emerald-500/20", textColor: "text-emerald-400", bgColor: "bg-emerald-500/10" },
-  plata: { name: CASHBACK_TIERS[TIER_INDEX.plata]!.name, rate: CASHBACK_TIERS[TIER_INDEX.plata]!.pct, color: "slate", borderColor: "border-slate-400/30", textColor: "text-slate-300", bgColor: "bg-slate-500/10" },
-  oro: { name: CASHBACK_TIERS[TIER_INDEX.oro]!.name, rate: CASHBACK_TIERS[TIER_INDEX.oro]!.pct, color: "amber", borderColor: "border-amber-500/30", textColor: "text-amber-400", bgColor: "bg-amber-500/10" },
-  diamante: { name: CASHBACK_TIERS[TIER_INDEX.diamante]!.name, rate: CASHBACK_TIERS[TIER_INDEX.diamante]!.pct, color: "violet", borderColor: "border-violet-400/30", textColor: "text-violet-300", bgColor: "bg-violet-500/10" },
+  verde: { name: CASHBACK_TIERS[TIER_INDEX.verde]!.name, rate: CASHBACK_TIERS[TIER_INDEX.verde]!.pct, color: "emerald", borderColor: "border-emerald-200", textColor: "text-emerald-700", bgColor: "bg-emerald-50" },
+  plata: { name: CASHBACK_TIERS[TIER_INDEX.plata]!.name, rate: CASHBACK_TIERS[TIER_INDEX.plata]!.pct, color: "slate", borderColor: "border-slate-300", textColor: "text-slate-600", bgColor: "bg-slate-50" },
+  oro: { name: CASHBACK_TIERS[TIER_INDEX.oro]!.name, rate: CASHBACK_TIERS[TIER_INDEX.oro]!.pct, color: "amber", borderColor: "border-amber-300", textColor: "text-amber-700", bgColor: "bg-amber-50" },
+  diamante: { name: CASHBACK_TIERS[TIER_INDEX.diamante]!.name, rate: CASHBACK_TIERS[TIER_INDEX.diamante]!.pct, color: "violet", borderColor: "border-violet-300", textColor: "text-violet-700", bgColor: "bg-violet-50" },
+};
+
+/** Beneficios completos por nivel — fuente única usada por LoyaltyTierCard y la comparativa de niveles. */
+export const TIER_BENEFITS: Record<Tier, string[]> = {
+  verde: [
+    "5% de cashback en todas tus compras",
+    "Acceso a monedero digital",
+    "Soporte por WhatsApp",
+  ],
+  plata: [
+    "10% de cashback en todas tus compras",
+    "Prioridad en entregas programadas",
+    "Acceso a herramientas de costeo",
+  ],
+  oro: [
+    "15% de cashback en todas tus compras",
+    "Envío gratis en pedidos desde $1,500",
+    "Asesor de cuenta dedicado",
+    "Acceso anticipado a nuevos productos",
+  ],
+  diamante: [
+    "20% de cashback en todas tus compras",
+    "Envío gratis sin mínimo",
+    "Asesor de cuenta VIP 24/7",
+    "Productos exclusivos por mayoreo",
+    "Invitación a eventos de la industria",
+  ],
+};
+
+/** Semanas calificadas (compra semanal ≥ QUALIFYING_WEEK_MIN) necesarias para alcanzar cada nivel. */
+export const TIER_REQUIREMENTS: Record<Tier, number> = {
+  verde: 1,
+  plata: 2,
+  oro: 3,
+  diamante: 4,
 };
 
 export interface ServiceItem {

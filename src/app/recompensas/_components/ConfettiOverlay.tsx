@@ -95,10 +95,10 @@ export function ConfettiOverlay() {
             >
               🎉
             </motion.div>
-            <p className="text-white text-xl font-black drop-shadow-lg">
+            <p className="text-warm-700 text-xl font-black drop-shadow-lg">
               ¡Servicio Solicitado!
             </p>
-            <p className="text-emerald-300 text-sm mt-1 drop-shadow-lg">
+            <p className="text-brand-500 text-sm mt-1 drop-shadow-lg">
               Tu restaurante está creciendo
             </p>
           </motion.div>

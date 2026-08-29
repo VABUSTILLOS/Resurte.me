@@ -11,6 +11,7 @@ import { ImpactStories } from "./ImpactStories";
 import { SERVICES } from "./StoreScreen";
 import { TIER_CONFIGS } from "./types";
 import { LoyaltyTierBanner, useLoyaltyTier, TIER_ORDER } from "./LoyaltyTierCard";
+import { TierBenefitsSection } from "./TierBenefitsSection";
 import { ReferralDashboard } from "@/components/referral-dashboard";
 import { useOnboardingCompleted } from "@/components/onboarding-wizard";
 import { createClient } from "@/lib/supabase/client";
@@ -68,7 +69,7 @@ export function DashboardScreen({
       {/* Top Header with Notifications */}
       <div className="flex items-center justify-between px-4 mb-2 md:px-6 lg:px-8">
         <div>
-          <p className="text-gray-400 text-[11px]">Buenos días</p>
+          <p className="text-[#6e737b] text-[11px]">Buenos días</p>
           <BusinessName />
         </div>
         <NotificationBell />
@@ -77,9 +78,9 @@ export function DashboardScreen({
       {/* Welcome banner — visible after completing el onboarding */}
       {onboardingCompleted && (
         <div className="px-4 mb-3 md:px-6 lg:px-8">
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 flex items-start gap-3">
-            <CheckCircle className="h-4 w-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-            <p className="text-white text-xs leading-relaxed">
+          <div className="rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 flex items-start gap-3">
+            <CheckCircle className="h-4 w-4 text-brand-500 flex-shrink-0 mt-0.5" />
+            <p className="text-warm-700 text-xs leading-relaxed">
               <span className="font-semibold">¡Bienvenido a Resurte!</span> Ya completaste tu
               onboarding. Explora tus recompensas y el catálogo de servicios para hacer crecer tu
               negocio.
@@ -106,14 +107,18 @@ export function DashboardScreen({
 
           <QuickActions onViewOrders={onViewOrders} onBrowseStore={onNavigateStore} />
 
+          <div className="px-0 md:px-6 lg:px-0">
+            <TierBenefitsSection />
+          </div>
+
           {/* Cashback Disclaimer */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.3 }}
-            className="mx-4 mt-2.5 rounded-xl bg-amber-500/5 border border-amber-500/10 px-4 py-2 md:mx-6 lg:mx-0"
+            className="mx-4 mt-2.5 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 md:mx-6 lg:mx-0"
           >
-            <p className="text-amber-400/60 text-[11px] leading-relaxed">
+            <p className="text-amber-700 text-[11px] leading-relaxed">
               ⓘ Tus Créditos solo pueden canjearse por servicios en la Tienda de Crecimiento. No son canjeables por dinero en efectivo.
             </p>
           </motion.div>
@@ -126,10 +131,10 @@ export function DashboardScreen({
             className="mx-4 mt-4 md:mx-6 lg:mx-0"
           >
             <div className="flex items-center justify-between mb-2">
-              <p className="text-white text-[13px] font-bold">Tienda de Crecimiento</p>
+              <p className="text-warm-700 text-[13px] font-bold">Tienda de Crecimiento</p>
               <button
                 onClick={onNavigateStore}
-                className="flex items-center gap-1 text-emerald-400 text-xs font-medium hover:underline"
+                className="flex items-center gap-1 text-brand-500 text-xs font-medium hover:underline"
               >
                 Ver todo <ArrowRight className="h-3 w-3" />
               </button>
@@ -140,13 +145,13 @@ export function DashboardScreen({
                   key={svc.id}
                   whileTap={{ scale: 0.95 }}
                   onClick={onNavigateStore}
-                  className="flex flex-col items-center gap-1.5 rounded-xl bg-white/5 border border-white/10 p-3 text-center hover:border-white/20 transition-colors"
+                  className="flex flex-col items-center gap-1.5 rounded-xl bg-white border border-cream-300 shadow-sm p-3 text-center hover:border-brand-200 transition-colors"
                 >
                   <span className="text-2xl">{svc.icon}</span>
-                  <p className="text-white text-[10px] font-medium leading-tight line-clamp-2">
+                  <p className="text-warm-700 text-[10px] font-medium leading-tight line-clamp-2">
                     {svc.name}
                   </p>
-                  <p className="text-emerald-400 text-[10px] font-bold">
+                  <p className="text-brand-500 text-[10px] font-bold">
                     ${formatNumber(svc.cost)}
                   </p>
                 </motion.button>
@@ -159,22 +164,22 @@ export function DashboardScreen({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8, duration: 0.4 }}
-            className="mx-4 mt-4 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 
-              border border-emerald-500/15 p-3 md:mx-6 lg:mx-0"
+            className="mx-4 mt-4 rounded-xl bg-brand-50
+              border border-brand-200 p-3 md:mx-6 lg:mx-0"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20">
-                <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-100">
+                <svg className="h-5 w-5 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 0 1 5.814-5.519l2.74-1.22m0 0-5.94-2.28m5.94 2.28-2.28 5.941" />
                 </svg>
               </div>
               <div className="flex-1">
-                <p className="text-white text-[13px] font-semibold">
+                <p className="text-warm-700 text-[13px] font-semibold">
                   Con tu consumo actual, en 3 meses desbloqueas tu Campaña Meta Ads
                 </p>
                 <button
                   onClick={() => onOpenCalculator()}
-                  className="mt-1.5 text-emerald-400 text-xs font-medium hover:underline"
+                  className="mt-1.5 text-brand-500 text-xs font-medium hover:underline"
                 >
                   Calcular proyección exacta →
                 </button>
@@ -221,7 +226,7 @@ function BusinessName() {
   }, [supabase]);
 
   return (
-    <p className="text-white text-base font-bold">{name} 🌅</p>
+    <p className="text-warm-700 text-base font-bold">{name} 🌅</p>
   );
 }
 
@@ -258,19 +263,19 @@ function WalletView() {
 
   return (
     <div className="px-4 pt-6 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
-      <h1 className="text-white text-xl font-bold mb-5">Mis Pedidos</h1>
+      <h1 className="text-warm-700 text-xl font-bold mb-5">Mis Pedidos</h1>
 
       {/* Cashback rate banner */}
-      <div className="rounded-2xl bg-gradient-to-br from-emerald-900/40 to-teal-900/40 border border-emerald-500/20 p-5 mb-4">
+      <div className="rounded-2xl bg-brand-50 border border-brand-200 p-5 mb-4">
         <div className="flex items-start gap-3">
           <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-${currentTierConfig.color}-500/20 flex-shrink-0`}>
             <Star className={`h-5 w-5 text-${currentTierConfig.color}-400`} />
           </div>
           <div className="flex-1">
-            <p className="text-white text-sm font-semibold">
+            <p className="text-warm-700 text-sm font-semibold">
               Tus recompensas: <span className={currentTierConfig.textColor}>5% a 20% según nivel</span>
             </p>
-            <p className="text-gray-400 text-xs mt-1">
+            <p className="text-[#5c6069] text-xs mt-1">
               Actualmente estás en nivel{" "}
               <span className={`font-bold ${currentTierConfig.textColor}`}>{currentTierConfig.name}</span>{" "}
               recibiendo <span className={`font-bold ${currentTierConfig.textColor}`}>{currentTierConfig.rate}%</span> de recompensas.
@@ -281,20 +286,20 @@ function WalletView() {
       </div>
 
       {/* Balance Card */}
-      <div className="rounded-2xl bg-white/5 border border-white/10 p-5 mb-4">
-        <p className="text-gray-400 text-xs uppercase tracking-wider">Saldo Total</p>
-        <p className="text-white text-4xl font-black tabular-nums mt-1">
-          ${formatNumber(balance)} <span className="text-xl text-gray-400">Créditos</span>
+      <div className="rounded-2xl bg-white border border-cream-300 shadow-sm p-5 mb-4">
+        <p className="text-[#5c6069] text-xs uppercase tracking-wider">Saldo Total</p>
+        <p className="text-warm-700 text-4xl font-black tabular-nums mt-1">
+          ${formatNumber(balance)} <span className="text-xl text-[#5c6069]">Créditos</span>
         </p>
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/15 p-3">
-            <p className="text-gray-400 text-[10px] uppercase tracking-wider">Recompensas este mes</p>
-            <p className="text-emerald-400 text-lg font-bold tabular-nums mt-0.5">
+          <div className="rounded-xl bg-brand-50 border border-brand-200 p-3">
+            <p className="text-[#5c6069] text-[10px] uppercase tracking-wider">Recompensas este mes</p>
+            <p className="text-brand-500 text-lg font-bold tabular-nums mt-0.5">
               +${formatNumber(monthlyCashback)}
             </p>
           </div>
-          <div className="rounded-xl bg-amber-500/10 border border-amber-500/15 p-3">
-            <p className="text-gray-400 text-[10px] uppercase tracking-wider">% Actual</p>
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
+            <p className="text-[#5c6069] text-[10px] uppercase tracking-wider">% Actual</p>
             <p className={`text-lg font-bold tabular-nums mt-0.5 ${currentTierConfig.textColor}`}>
               {currentTierConfig.rate}%
             </p>
@@ -304,10 +309,10 @@ function WalletView() {
 
       {/* Recent Transactions */}
       <div className="mb-4">
-        <p className="text-white text-sm font-bold mb-3">Movimientos recientes</p>
+        <p className="text-warm-700 text-sm font-bold mb-3">Movimientos recientes</p>
         {transactions.length === 0 ? (
-          <div className="rounded-xl bg-white/5 border border-white/5 p-6 text-center">
-            <p className="text-gray-500 text-sm">
+          <div className="rounded-xl bg-white border border-cream-300 p-6 text-center">
+            <p className="text-[#6e737b] text-sm">
               Aún no tienes movimientos. ¡Haz tu primera compra y empieza a generar créditos!
             </p>
           </div>
@@ -318,18 +323,18 @@ function WalletView() {
                 key={tx.id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/5 p-3"
+                className="flex items-center gap-3 rounded-xl bg-white border border-cream-300 p-3"
               >
                 <div className={`flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0 ${
-                  Number(tx.amount) > 0 ? "bg-emerald-500/15" : "bg-red-500/15"
+                  Number(tx.amount) > 0 ? "bg-brand-50" : "bg-red-50"
                 }`}>
-                  <TrendingUp className={`h-4 w-4 ${Number(tx.amount) > 0 ? "text-emerald-400" : "text-red-400"}`} />
+                  <TrendingUp className={`h-4 w-4 ${Number(tx.amount) > 0 ? "text-brand-500" : "text-red-600"}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">
+                  <p className="text-warm-700 text-sm font-medium truncate">
                     {tx.order_id ? `Pedido #${tx.order_id}` : tx.concept}
                   </p>
-                  <p className="text-gray-500 text-[10px]">
+                  <p className="text-[#6e737b] text-[10px]">
                     {new Date(tx.created_at).toLocaleDateString("es-MX", {
                       day: "numeric",
                       month: "short",
@@ -338,7 +343,7 @@ function WalletView() {
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className={`text-sm font-bold tabular-nums ${Number(tx.amount) > 0 ? "text-emerald-400" : "text-red-400"}`}>
+                  <p className={`text-sm font-bold tabular-nums ${Number(tx.amount) > 0 ? "text-brand-500" : "text-red-600"}`}>
                     {Number(tx.amount) > 0 ? "+" : ""}${formatNumber(Math.abs(Number(tx.amount)))}
                   </p>
                 </div>
@@ -428,16 +433,16 @@ function ProfileView() {
 
   return (
     <div className="px-4 pt-6 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
-      <h1 className="text-white text-xl font-bold mb-5">Mi Perfil</h1>
+      <h1 className="text-warm-700 text-xl font-bold mb-5">Mi Perfil</h1>
 
-      <div className="rounded-2xl bg-white/5 border border-white/10 p-5 mb-4">
+      <div className="rounded-2xl bg-white border border-cream-300 shadow-sm p-5 mb-4">
         <div className="flex items-center gap-3">
-          <div className="h-14 w-14 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xl font-bold">
+          <div className="h-14 w-14 rounded-full bg-brand-500 flex items-center justify-center text-white text-xl font-bold">
             {fullName.charAt(0).toUpperCase()}
           </div>
           <div>
-            <p className="text-white font-bold text-lg">{fullName}</p>
-            <p className="text-gray-400 text-sm">Socio Resurte</p>
+            <p className="text-warm-700 font-bold text-lg">{fullName}</p>
+            <p className="text-[#5c6069] text-sm">Socio Resurte</p>
           </div>
         </div>
       </div>
@@ -450,7 +455,7 @@ function ProfileView() {
 
       {/* Tier Progression Ladder */}
       <div className="mb-6">
-        <h2 className="text-white text-sm font-bold mb-4">Tu progreso de niveles</h2>
+        <h2 className="text-warm-700 text-sm font-bold mb-4">Tu progreso de niveles</h2>
         <div className="space-y-3">
           {TIER_ORDER.map((tier, idx) => {
             const cfg = TIER_CONFIGS[tier];
@@ -468,33 +473,33 @@ function ProfileView() {
                 className={`relative rounded-xl border p-4 ${
                   isUnlocked
                     ? `${cfg.bgColor} ${cfg.borderColor}`
-                    : "bg-white/5 border-white/10 opacity-60"
+                    : "bg-cream-100 border-cream-300 opacity-60"
                 }`}
               >
                 <div className="flex items-center gap-3">
                   {/* Tier badge */}
                   <div className={`flex h-10 w-10 items-center justify-center rounded-xl flex-shrink-0 ${
-                    isUnlocked ? `bg-${cfg.color}-500/20` : "bg-gray-800"
+                    isUnlocked ? `bg-${cfg.color}-500/20` : "bg-cream-300"
                   }`}>
                     {isUnlocked ? (
                       <CheckCircle className={`h-5 w-5 ${cfg.textColor}`} />
                     ) : (
-                      <Lock className="h-5 w-5 text-gray-600" />
+                      <Lock className="h-5 w-5 text-[#6e737b]" />
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className={`text-sm font-bold ${isUnlocked ? cfg.textColor : "text-gray-500"}`}>
+                      <p className={`text-sm font-bold ${isUnlocked ? cfg.textColor : "text-[#6e737b]"}`}>
                         {cfg.name}
                       </p>
                       {isCurrent && (
-                        <span className="rounded-full bg-emerald-600/30 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                       <span className="rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-[10px] font-bold text-brand-500">
                           Actual
                         </span>
                       )}
                     </div>
-                    <p className="text-gray-400 text-[10px] mt-0.5">
+                    <p className="text-[#5c6069] text-[10px] mt-0.5">
                       {cfg.rate}% recompensas · {cond.label}
                     </p>
 
@@ -502,14 +507,14 @@ function ProfileView() {
                     {isNext && (
                       <div className="mt-2">
                         <div className="flex justify-between text-[10px] mb-1">
-                          <span className="text-gray-500">
+                          <span className="text-[#5c6069]">
                           {weekCount} de {cond.weeks} semanas este mes
                           </span>
                           <span className={cfg.textColor}>
                           {cond.weeks > 0 ? Math.round((weekCount / cond.weeks) * 100) : 100}%
                           </span>
                         </div>
-                        <div className="h-1.5 rounded-full bg-gray-800 overflow-hidden">
+                        <div className="h-1.5 rounded-full bg-cream-300 overflow-hidden">
                           <motion.div
                             className={`h-full rounded-full bg-${cfg.color}-500`}
                             initial={{ width: 0 }}
@@ -517,7 +522,7 @@ function ProfileView() {
                             transition={{ duration: 0.8, delay: 0.3 }}
                           />
                         </div>
-                        <p className="text-gray-600 text-[9px] mt-1">
+                        <p className="text-[#6e737b] text-[9px] mt-1">
                           Semana calificada: ${formatNumber(cond.minWeekly)} o más acumulados
                         </p>
                       </div>
@@ -531,9 +536,9 @@ function ProfileView() {
       </div>
 
       {/* Invite */}
-      <div className="rounded-2xl bg-gradient-to-br from-purple-600/20 to-purple-800/20 border border-purple-500/15 p-4">
-        <p className="text-white text-sm font-semibold">🎁 Crecer juntos sabe mejor</p>
-        <p className="text-gray-400 text-xs mt-1">
+      <div className="rounded-2xl bg-violet-50 border border-violet-200 p-4">
+        <p className="text-warm-700 text-sm font-semibold">🎁 Crecer juntos sabe mejor</p>
+        <p className="text-[#5c6069] text-xs mt-1">
           Invita a otro restaurantero y ambos ganan $100 Créditos en recompensas.
         </p>
         <button
@@ -549,9 +554,9 @@ function ProfileView() {
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-xl bg-white/5 border border-white/5 p-4">
-      <span className="text-gray-400 text-sm">{label}</span>
-      <span className="text-white font-semibold">{value}</span>
+    <div className="flex items-center justify-between rounded-xl bg-white border border-cream-300 p-4">
+      <span className="text-[#5c6069] text-sm">{label}</span>
+      <span className="text-warm-700 font-semibold">{value}</span>
     </div>
   );
 }

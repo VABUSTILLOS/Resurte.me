@@ -32,12 +32,12 @@ export function GrowthWalletBanner({ balance, nextUnlock, monthlyEarnings }: Gro
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 0.61, 0.36, 1] }}
-      className="relative mx-4 mt-3 overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 p-4 shadow-2xl shadow-emerald-900/40 md:mx-0"
+      className="relative mx-4 mt-3 overflow-hidden rounded-2xl bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800 p-4 shadow-lg md:mx-0"
     >
       {/* Animated background glows */}
-      <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-emerald-400 opacity-10 blur-3xl" />
+      <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-brand-300 opacity-10 blur-3xl" />
       <motion.div
-        className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-teal-300 opacity-10 blur-3xl"
+        className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-brand-200 opacity-10 blur-3xl"
         animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.15, 0.1] }}
         transition={{ duration: 4, repeat: Infinity }}
       />
@@ -57,9 +57,9 @@ export function GrowthWalletBanner({ balance, nextUnlock, monthlyEarnings }: Gro
             animate={isNearUnlock ? { rotate: [0, 8, -8, 0], scale: [1, 1.2, 1] } : { rotate: [0, 5, -5, 0] }}
             transition={{ duration: isNearUnlock ? 1 : 2, repeat: Infinity, repeatDelay: isNearUnlock ? 0 : 3 }}
           >
-            <Sparkles className={`h-4 w-4 ${isNearUnlock ? "text-amber-300" : "text-emerald-300"}`} />
+            <Sparkles className={`h-4 w-4 ${isNearUnlock ? "text-amber-300" : "text-brand-200"}`} />
           </motion.div>
-          <p className={`text-sm font-medium tracking-wide uppercase ${isNearUnlock ? "text-amber-200" : "text-emerald-200"}`}>
+          <p className={`text-sm font-medium tracking-wide uppercase ${isNearUnlock ? "text-amber-200" : "text-brand-100"}`}>
             Tu Cartera de Crecimiento
           </p>
           {/* Milestone badge */}
@@ -78,8 +78,8 @@ export function GrowthWalletBanner({ balance, nextUnlock, monthlyEarnings }: Gro
         <div className="mt-1">
           <AnimatedBalance target={balance} isNearUnlock={isNearUnlock} />
           <div className="mt-0.5 flex items-center gap-1.5">
-            <TrendingUp className="h-3 w-3 text-emerald-300" />
-            <span className="text-emerald-300 text-[11px] font-medium">
+            <TrendingUp className="h-3 w-3 text-brand-200" />
+            <span className="text-brand-200 text-[11px] font-medium">
               +12% vs mes pasado
             </span>
           </div>
@@ -90,7 +90,7 @@ export function GrowthWalletBanner({ balance, nextUnlock, monthlyEarnings }: Gro
           <ProgressRing percent={nextUnlock.progressPercent} size={52} isNearUnlock={isNearUnlock} />
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <p className={`text-[10px] uppercase tracking-wider font-medium ${isNearUnlock ? "text-amber-200" : "text-emerald-200"}`}>
+              <p className={`text-[10px] uppercase tracking-wider font-medium ${isNearUnlock ? "text-amber-200" : "text-brand-100"}`}>
                 Próximo desbloqueo
               </p>
               {isAlmostThere && (
@@ -98,14 +98,14 @@ export function GrowthWalletBanner({ balance, nextUnlock, monthlyEarnings }: Gro
                   animate={{ opacity: [0.5, 1, 0.5] }}
                   transition={{ duration: 1.5, repeat: Infinity }}
                 >
-                  <Gift className={`h-3 w-3 ${isNearUnlock ? "text-amber-300" : "text-emerald-300"}`} />
+                  <Gift className={`h-3 w-3 ${isNearUnlock ? "text-amber-300" : "text-brand-200"}`} />
                 </motion.div>
               )}
             </div>
             <p className={`font-semibold text-[13px] leading-tight mt-0.5 ${isNearUnlock ? "text-amber-200" : "text-white"}`}>
               {nextUnlock.name}
             </p>
-            <p className={`text-[11px] mt-0.5 ${isNearUnlock ? "text-amber-300 font-medium" : "text-emerald-300"}`}>
+            <p className={`text-[11px] mt-0.5 ${isNearUnlock ? "text-amber-300 font-medium" : "text-brand-200"}`}>
               {isNearUnlock
                 ? `⚡ ¡Solo te faltan $${formatNumber(Math.round(remaining))}!`
                 : `Te faltan $${formatNumber(Math.round(remaining))} para desbloquearlo`}
@@ -160,7 +160,7 @@ function AnimatedBalance({ target, isNearUnlock }: { target: number; isNearUnloc
       transition={{ type: "spring", stiffness: 200, damping: 15 }}
     >
       ${formatNumber(displayed)}
-      <span className="ml-1 text-lg font-semibold text-emerald-200">Créditos</span>
+      <span className="ml-1 text-lg font-semibold text-brand-200">Créditos</span>
     </motion.h1>
   );
 }
@@ -196,7 +196,7 @@ function ProgressRing({
           r={radius}
           fill="none"
           strokeWidth="5"
-          className="stroke-emerald-800/60"
+          className="stroke-white/25"
         />
         {/* Progress ring */}
         <motion.circle
@@ -210,7 +210,7 @@ function ProgressRing({
           initial={{ strokeDashoffset: circumference }}
           animate={{ strokeDashoffset: offset }}
           transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
-          className={isNearUnlock ? "stroke-amber-400" : "stroke-emerald-300"}
+          className={isNearUnlock ? "stroke-amber-400" : "stroke-brand-200"}
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center z-10">

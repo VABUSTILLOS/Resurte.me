@@ -34,7 +34,7 @@ export function BottomTabBar({
       {/* Mobile: fixed bottom bar. Usa --floating-bottom-offset (globals.css):
           cuando el carrito tiene items sube por encima del MobileCartBar. */}
       <nav className="fixed bottom-[var(--floating-bottom-offset)] left-1/2 -translate-x-1/2 w-full max-w-md z-50 md:hidden">
-        <div className="mx-3 rounded-2xl border border-white/10 bg-gray-900/80 backdrop-blur-xl px-2 py-2 shadow-2xl shadow-black/40">
+        <div className="mx-3 rounded-2xl border border-cream-300 bg-white/90 backdrop-blur-xl px-2 py-2 shadow-lg">
           <div className="flex items-center justify-around">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
@@ -47,19 +47,19 @@ export function BottomTabBar({
                   {isActive && (
                     <motion.div
                       layoutId="tab-indicator-mobile"
-                      className="absolute inset-0 rounded-xl bg-emerald-500/20 border border-emerald-500/30"
+                      className="absolute inset-0 rounded-xl bg-brand-50 border border-brand-200"
                       transition={{ type: "spring", stiffness: 400, damping: 30 }}
                     />
                   )}
                   <tab.icon
                     className={`relative z-10 h-5 w-5 transition-colors ${
-                      isActive ? "text-emerald-400" : "text-gray-500"
+                      isActive ? "text-brand-500" : "text-[#5c6069]"
                     }`}
                     strokeWidth={isActive ? 2.5 : 2}
                   />
                   <span
                     className={`relative z-10 text-[10px] font-medium transition-colors ${
-                      isActive ? "text-emerald-400" : "text-gray-500"
+                      isActive ? "text-brand-500" : "text-[#5c6069]"
                     }`}
                   >
                     {tab.label}
@@ -74,8 +74,8 @@ export function BottomTabBar({
       {/* Desktop: vertical sidebar */}
       <nav className="hidden md:flex md:flex-col md:h-full md:justify-start md:pt-8 md:gap-1 md:px-3">
         <div className="hidden lg:block mb-8 px-3">
-          <span className="text-lg font-bold text-emerald-400 tracking-tight">Resurte</span>
-          <span className="text-lg font-bold text-white tracking-tight">.me</span>
+          <span className="text-lg font-bold text-brand-500 tracking-tight">Resurte</span>
+          <span className="text-lg font-bold text-warm-700 tracking-tight">.me</span>
         </div>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -85,26 +85,26 @@ export function BottomTabBar({
               onClick={() => onTabChange(tab.id)}
               className={`relative flex items-center gap-3 px-3 py-3 rounded-xl transition-all group ${
                 isActive
-                  ? "bg-emerald-500/10 border border-emerald-500/20"
-                  : "hover:bg-white/5 border border-transparent"
+                  ? "bg-brand-50 border border-brand-200"
+                  : "hover:bg-cream-100 border border-transparent"
               }`}
             >
               {isActive && (
                 <motion.div
                   layoutId="tab-indicator-desktop"
-                  className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-emerald-400"
+                  className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-brand-500"
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
               )}
               <tab.icon
                 className={`h-5 w-5 transition-colors shrink-0 ${
-                  isActive ? "text-emerald-400" : "text-gray-500 group-hover:text-gray-300"
+                  isActive ? "text-brand-500" : "text-[#5c6069] group-hover:text-warm-700"
                 }`}
                 strokeWidth={isActive ? 2.5 : 2}
               />
               <span
                 className={`hidden lg:block text-sm font-medium transition-colors ${
-                  isActive ? "text-emerald-400" : "text-gray-500 group-hover:text-gray-300"
+                  isActive ? "text-brand-500" : "text-[#5c6069] group-hover:text-warm-700"
                 }`}
               >
                 {tab.label}

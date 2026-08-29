@@ -84,12 +84,12 @@ export function ImpactStories() {
       {/* Section Header */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-white text-[15px] font-bold">Historias de Crecimiento</h2>
-          <p className="text-gray-500 text-[10px] mt-0.5">
+          <h2 className="text-warm-700 text-[15px] font-bold">Historias de Crecimiento</h2>
+          <p className="text-[#6e737b] text-[10px] mt-0.5">
             Restaurantes como el tuyo ya están creciendo
           </p>
         </div>
-        <button className="text-emerald-400 text-xs font-medium flex items-center gap-1 hover:underline">
+        <button className="text-brand-500 text-xs font-medium flex items-center gap-1 hover:underline">
           Ver más <ArrowRight className="h-3 w-3" />
         </button>
       </div>
@@ -106,12 +106,12 @@ export function ImpactStories() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.08 * i }}
-            className="flex-shrink-0 w-[85%] snap-center rounded-2xl bg-white/5 border border-white/10 
-              overflow-hidden hover:border-white/20 transition-colors"
+            className="flex-shrink-0 w-[85%] snap-center rounded-2xl bg-white border border-cream-300 shadow-sm
+              overflow-hidden hover:border-brand-200 transition-colors"
           >
             {/* Photo placeholder */}
-            <div className="relative h-28 bg-gradient-to-br from-emerald-900/60 to-teal-900/60 flex items-center justify-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 text-3xl">
+            <div className="relative h-28 bg-gradient-to-br from-brand-50 to-cream-100 flex items-center justify-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white border border-cream-300 text-3xl">
                 {["🌮", "🦐", "☕", "🍕"][i]}
               </div>
               {/* Play button overlay */}
@@ -124,46 +124,46 @@ export function ImpactStories() {
             <div className="p-3">
               {/* Restaurant info */}
               <div className="flex items-center gap-2 mb-2.5">
-                <span className="text-white font-bold text-[13px]">{story.restaurantName}</span>
-                <span className="text-gray-600 text-xs">•</span>
-                <span className="text-gray-500 text-xs">{story.ownerName}</span>
+                <span className="text-warm-700 font-bold text-[13px]">{story.restaurantName}</span>
+                <span className="text-[#6e737b] text-xs">•</span>
+                <span className="text-[#5c6069] text-xs">{story.ownerName}</span>
               </div>
 
               {/* Before → After */}
-              <div className="flex items-center gap-3 rounded-xl bg-emerald-500/10 border border-emerald-500/15 p-2.5 mb-2.5">
+              <div className="flex items-center gap-3 rounded-xl bg-brand-50 border border-brand-200 p-2.5 mb-2.5">
                 <div className="text-center">
-                  <p className="text-gray-500 text-[10px] uppercase tracking-wider">Antes</p>
-                  <p className="text-gray-400 text-xl font-black tabular-nums">{story.beforeMetric}</p>
+                  <p className="text-[#6e737b] text-[10px] uppercase tracking-wider">Antes</p>
+                  <p className="text-[#5c6069] text-xl font-black tabular-nums">{story.beforeMetric}</p>
                 </div>
                 <div className="flex-1 flex items-center">
-                  <div className="flex-1 h-px bg-emerald-500/20" />
-                  <TrendingUp className="h-4 w-4 text-emerald-400 mx-1" />
-                  <div className="flex-1 h-px bg-emerald-500/20" />
+                  <div className="flex-1 h-px bg-brand-200" />
+                  <TrendingUp className="h-4 w-4 text-brand-500 mx-1" />
+                  <div className="flex-1 h-px bg-brand-200" />
                 </div>
                 <div className="text-center">
-                  <p className="text-emerald-400 text-[10px] uppercase tracking-wider">Ahora</p>
-                  <p className="text-emerald-400 text-xl font-black tabular-nums">{story.afterMetric}</p>
+                  <p className="text-brand-500 text-[10px] uppercase tracking-wider">Ahora</p>
+                  <p className="text-brand-500 text-xl font-black tabular-nums">{story.afterMetric}</p>
                 </div>
               </div>
 
-              <p className="text-gray-500 text-[10px] uppercase tracking-wider font-semibold mb-1">
+              <p className="text-[#6e737b] text-[10px] uppercase tracking-wider font-semibold mb-1">
                 {story.metricLabel}
               </p>
 
               {/* Quote */}
               <div className="mt-2.5 flex gap-2">
-                <Quote className="h-4 w-4 text-purple-400 flex-shrink-0 mt-0.5" />
-                <p className="text-gray-400 text-xs italic leading-relaxed">
+                <Quote className="h-4 w-4 text-violet-700 flex-shrink-0 mt-0.5" />
+                <p className="text-[#5c6069] text-xs italic leading-relaxed">
                   &ldquo;{story.quote}&rdquo;
                 </p>
               </div>
 
               {/* Service tag */}
               <div className="mt-2.5 flex items-center gap-2">
-                <span className="rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold px-2.5 py-0.5">
+                <span className="rounded-full bg-amber-50 border border-amber-700/30 text-amber-700 text-[10px] font-bold px-2.5 py-0.5">
                   {story.serviceUsed}
                 </span>
-                <span className="text-gray-600 text-[10px]">
+                <span className="text-[#6e737b] text-[10px]">
                   En {story.months} {story.months === 1 ? "mes" : "meses"}
                 </span>
               </div>
@@ -180,7 +180,7 @@ export function ImpactStories() {
             className="h-1.5 rounded-full transition-all"
             animate={{
               width: i === activeIndex ? 16 : 6,
-              backgroundColor: i === activeIndex ? "#10B981" : "#374151",
+              backgroundColor: i === activeIndex ? "#0E7A0E" : "#e0dbd2",
             }}
           />
         ))}

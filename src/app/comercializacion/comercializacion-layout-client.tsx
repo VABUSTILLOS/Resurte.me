@@ -8,7 +8,7 @@ import { useState, useEffect } from "react"
 import type { User } from "@supabase/supabase-js"
 
 const NAV_ITEMS = [
-  { href: "/comercializacion", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/comercializacion", label: "Dashboard", icon: LayoutDashboard, exact: true, badge: true },
   { href: "/comercializacion/prospectos", label: "Prospectos", icon: Users },
   { href: "/comercializacion/agente", label: "Agente IA", icon: Bot },
   { href: "/comercializacion/pedidos", label: "Pedidos", icon: ShoppingCart },
@@ -21,6 +21,7 @@ export function ComercializacionLayoutClient({
 }) {
   const pathname = usePathname()
   const [user, setUser] = useState<User | null>(null)
+  const [overdueCount, setOverdueCount] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -36,6 +37,20 @@ export function ComercializacionLayoutClient({
       cancelled = true
     }
   }, [])
+
+  // Conteo de seguimientos vencidos para el badge del Dashboard.
+  useEffect(() => {
+    let cancelled = false
+    import("@/lib/comercializacion/actions")
+      .then(({ getOverdueFollowUpCount }) => getOverdueFollowUpCount())
+      .then((count) => {
+        if (!cancelled) setOverdueCount(count)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [pathname])
 
   const displayName =
     user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Vendedor"
@@ -73,6 +88,11 @@ export function ComercializacionLayoutClient({
                   >
                     <item.icon className="w-4 h-4" />
                     {item.label}
+                    {"badge" in item && item.badge && overdueCount > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-red-100 text-red-700 text-[11px] font-bold">
+                        {overdueCount}
+                      </span>
+                    )}
                   </Link>
                 )
               })}
@@ -100,7 +120,14 @@ export function ComercializacionLayoutClient({
                 active ? "text-[#0E7A0E]" : "text-gray-500"
               }`}
             >
-              <item.icon className="w-5 h-5" />
+              <span className="relative">
+                <item.icon className="w-5 h-5" />
+                {"badge" in item && item.badge && overdueCount > 0 && (
+                  <span className="absolute -top-1 -right-1.5 inline-flex items-center justify-center min-w-4 h-4 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold">
+                    {overdueCount}
+                  </span>
+                )}
+              </span>
               {item.label}
             </Link>
           )

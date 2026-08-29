@@ -13,6 +13,7 @@ import {
   Wallet,
   CalendarClock,
   Download,
+  BarChart3,
 } from "lucide-react"
 import {
   StatCard,
@@ -27,11 +28,13 @@ import type {
   DashboardKpis,
   FollowUp,
   ClientToReorder,
+  WeeklyTrendsReport,
 } from "@/lib/comercializacion/types"
+import { PROSPECT_STATUS_LABEL, type ProspectStatus } from "@/lib/comercializacion/types"
 import type { WeeklyGoals } from "@/lib/comercializacion/goals"
 import { formatMoney } from "@/lib/comercializacion/commissions"
 import { toCsv, downloadCsv } from "@/lib/comercializacion/csv"
-import { formatDateTime } from "@/lib/comercializacion/dates"
+import { formatDateTime, getTodayBounds } from "@/lib/comercializacion/dates"
 import { weeklyReminderMessage, buildWhatsappLink } from "@/lib/comercializacion/whatsapp"
 import { addActivity } from "@/lib/comercializacion/actions"
 import { useToast } from "@/components/toast"
@@ -131,22 +134,105 @@ function GoalBar({
   )
 }
 
+function TrendBars({
+  title,
+  values,
+  colorClass,
+  format,
+}: {
+  title: string
+  values: { label: string; value: number }[]
+  colorClass: string
+  format: (v: number) => string
+}) {
+  const max = Math.max(...values.map((v) => v.value), 1)
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-500 mb-2">{title}</p>
+      <div className="space-y-1.5">
+        {values.map((v) => (
+          <div key={v.label} className="flex items-center gap-2">
+            <span className="w-14 shrink-0 text-[11px] text-gray-400 text-right">
+              {v.label}
+            </span>
+            <div className="flex-1 h-4 bg-gray-50 rounded-md overflow-hidden">
+              <div
+                className={`h-full rounded-md ${colorClass}`}
+                style={{ width: `${Math.max((v.value / max) * 100, v.value > 0 ? 3 : 0)}%` }}
+              />
+            </div>
+            <span className="w-16 shrink-0 text-[11px] font-semibold text-gray-700">
+              {format(v.value)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PipelineDistribution({
+  pipeline,
+}: {
+  pipeline: { status: ProspectStatus; count: number }[]
+}) {
+  const total = pipeline.reduce((s, p) => s + p.count, 0)
+  if (total === 0) return null
+  const barColor: Record<ProspectStatus, string> = {
+    nuevo: "bg-blue-400",
+    contactado: "bg-purple-400",
+    en_seguimiento: "bg-amber-400",
+    cliente_activo: "bg-[#0E7A0E]",
+    inactivo: "bg-gray-300",
+    perdido: "bg-red-300",
+  }
+  return (
+    <div>
+      <div className="flex h-4 rounded-md overflow-hidden bg-gray-50">
+        {pipeline.map((p) => (
+          <div
+            key={p.status}
+            className={barColor[p.status]}
+            style={{ width: `${(p.count / total) * 100}%` }}
+            title={`${PROSPECT_STATUS_LABEL[p.status]}: ${p.count}`}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+        {pipeline.map((p) => (
+          <span key={p.status} className="inline-flex items-center gap-1.5 text-[11px] text-gray-600">
+            <span className={`w-2.5 h-2.5 rounded-sm ${barColor[p.status]}`} />
+            {PROSPECT_STATUS_LABEL[p.status]} ({p.count})
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function DashboardPage({
   kpis,
   followUps,
   clientsToReorder,
   sellerName,
   goals,
+  trends,
 }: {
   kpis: DashboardKpis
   followUps: FollowUp[]
   clientsToReorder: ClientToReorder[]
   sellerName: string
   goals: WeeklyGoals
+  trends: WeeklyTrendsReport
 }) {
   const router = useRouter()
   const { toast } = useToast()
   const [activityFor, setActivityFor] = useState<FollowUp | null>(null)
+  // Límite de "hoy" en CDMX para distinguir seguimientos vencidos.
+  const todayStart = getTodayBounds().startISO
+  const overdueCount = followUps.filter(
+    (f) => !!f.next_follow_up_at && f.next_follow_up_at < todayStart
+  ).length
 
   function exportCommissionCsv() {
     const hoy = new Date().toISOString().slice(0, 10)
@@ -312,7 +398,10 @@ export function DashboardPage({
         title={
           <span className="inline-flex items-center gap-2">
             <CalendarClock className="w-4 h-4 text-amber-500" />
-            Seguimientos pendientes (hoy)
+            Seguimientos pendientes
+            {overdueCount > 0 && (
+              <Badge color="red">{overdueCount} vencidos</Badge>
+            )}
           </span>
         }
         action={
@@ -325,17 +414,23 @@ export function DashboardPage({
       >
         {followUps.length === 0 ? (
           <EmptyState
-            title="Sin seguimientos vencidos"
+            title="Sin seguimientos pendientes"
             subtitle="Programa un próximo contacto en tus prospectos para verlo aquí."
           />
         ) : (
           <ul className="divide-y divide-gray-50">
-            {followUps.map((f) => (
+            {followUps.map((f) => {
+              const overdue =
+                !!f.next_follow_up_at && f.next_follow_up_at < todayStart
+              return (
               <li key={f.id} className="py-3 flex items-center justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-gray-900 truncate">{f.name}</p>
                     <StatusBadge status={f.status} />
+                    <Badge color={overdue ? "red" : "amber"}>
+                      {overdue ? "Vencido" : "Hoy"}
+                    </Badge>
                   </div>
                   <p className="text-xs text-gray-500">
                     {f.restaurant_name ? `${f.restaurant_name} · ` : ""}
@@ -359,8 +454,42 @@ export function DashboardPage({
                   </Link>
                 </div>
               </li>
-            ))}
+              )
+            })}
           </ul>
+        )}
+      </SectionCard>
+
+      {/* Tendencias de las últimas 8 semanas */}
+      <SectionCard
+        title={
+          <span className="inline-flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-[#0E7A0E]" />
+            Tendencias (últimas 8 semanas)
+          </span>
+        }
+      >
+        <div className="grid sm:grid-cols-2 gap-6">
+          <TrendBars
+            title="Actividades registradas"
+            values={trends.weeks.map((w) => ({ label: w.label, value: w.activities }))}
+            colorClass="bg-[#0E7A0E]/70"
+            format={(v) => String(v)}
+          />
+          <TrendBars
+            title="Ventas de clientes"
+            values={trends.weeks.map((w) => ({ label: w.label, value: w.sales }))}
+            colorClass="bg-emerald-500/70"
+            format={(v) => formatMoney(v)}
+          />
+        </div>
+        {trends.pipeline.length > 0 && (
+          <div className="mt-6">
+            <p className="text-xs font-semibold text-gray-500 mb-2">
+              Distribución del pipeline
+            </p>
+            <PipelineDistribution pipeline={trends.pipeline} />
+          </div>
         )}
       </SectionCard>
 

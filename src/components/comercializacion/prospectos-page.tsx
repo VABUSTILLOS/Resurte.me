@@ -8,7 +8,6 @@ import {
   Plus,
   MoreVertical,
   PhoneCall,
-  MessageCircle,
   Link2,
   Trash2,
   ExternalLink,
@@ -34,9 +33,11 @@ import { useToast } from "@/components/toast"
 import type { Prospect, ProspectStatus } from "@/lib/comercializacion/types"
 import { PROSPECT_STATUS_LABEL } from "@/lib/comercializacion/types"
 import { formatDateTime } from "@/lib/comercializacion/dates"
-import { buildWhatsappLink } from "@/lib/comercializacion/whatsapp"
+import { WhatsappTemplateMenu } from "./whatsapp-templates"
 import { getProspects, deleteProspect } from "@/lib/comercializacion/actions"
 import { toCsv, downloadCsv } from "@/lib/comercializacion/csv"
+
+export const PAGE_SIZE = 50
 
 interface CityOption {
   id: number
@@ -56,6 +57,8 @@ export function ProspectosPage({
 
   const [prospects, setProspects] = useState<Prospect[]>(initialProspects)
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(initialProspects.length === PAGE_SIZE)
   const [q, setQ] = useState("")
   const [status, setStatus] = useState<ProspectStatus | "todos">("todos")
   const [view, setView] = useState<"todos" | "por_contactar" | "contactados">("todos")
@@ -95,15 +98,42 @@ export function ProspectosPage({
   async function reload() {
     setLoading(true)
     try {
-      const data = await getProspects({ q, status, onlyPending: view === "por_contactar" })
-      setProspects(data)
-      if (view === "contactados") {
-        setProspects(data.filter((p) => p.status !== "nuevo"))
-      }
+      const data = await getProspects({
+        q,
+        status,
+        onlyPending: view === "por_contactar",
+        limit: PAGE_SIZE,
+      })
+      setProspects(view === "contactados" ? data.filter((p) => p.status !== "nuevo") : data)
+      setHasMore(data.length === PAGE_SIZE)
     } catch (e) {
       toast(e instanceof Error ? e.message : "Error al cargar", "error")
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const data = await getProspects({
+        q,
+        status,
+        onlyPending: view === "por_contactar",
+        limit: PAGE_SIZE,
+        offset: prospects.length,
+      })
+      const more = view === "contactados" ? data.filter((p) => p.status !== "nuevo") : data
+      setProspects((prev) => {
+        const seen = new Set(prev.map((p) => p.id))
+        return [...prev, ...more.filter((p) => !seen.has(p.id))]
+      })
+      setHasMore(data.length === PAGE_SIZE)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error al cargar más", "error")
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -317,7 +347,7 @@ export function ProspectosPage({
         ) : (
           <ul className="divide-y divide-gray-50">
             {filtered.map((p) => {
-              const waLink = buildWhatsappLink(p.whatsapp ?? p.phone, `¡Hola ${p.name.split(" ")[0]}! 👋 Te escribo de Resurte.me.`)
+              const waPhone = p.whatsapp ?? p.phone
               return (
                 <li key={p.id} className="relative">
                   <div className="px-4 py-3 flex items-center justify-between gap-3">
@@ -346,23 +376,14 @@ export function ProspectosPage({
                     </Link>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {waLink ? (
-                        <a
-                          href={waLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() =>
-                            setActivityFor({
-                              ...p,
-                              whatsapp: p.whatsapp,
-                            } as Prospect)
-                          }
-                          className="p-2 rounded-xl text-[#128C4A] hover:bg-[#25D366]/10 transition-colors"
-                          title="WhatsApp"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                        </a>
-                      ) : null}
+                      <WhatsappTemplateMenu
+                        phone={waPhone}
+                        vars={{
+                          nombre: p.name,
+                          restaurante: p.restaurant_name,
+                        }}
+                        onUsed={() => setActivityFor(p)}
+                      />
                       <button
                         onClick={() => setActivityFor(p)}
                         className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors"
@@ -436,6 +457,14 @@ export function ProspectosPage({
             })}
           </ul>
         )}
+        {!loading && filtered.length > 0 && hasMore ? (
+          <div className="border-t border-gray-100 px-4 py-3 flex justify-center">
+            <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? <Spinner className="w-4 h-4" /> : null}
+              Cargar más
+            </Button>
+          </div>
+        ) : null}
       </div>
       )}
 

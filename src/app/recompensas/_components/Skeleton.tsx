@@ -14,9 +14,9 @@ function Skeleton({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay }}
-      className={`relative overflow-hidden rounded-xl bg-white/5 ${className}`}
+      className={`relative overflow-hidden rounded-xl bg-cream-100 ${className}`}
     >
-      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/70 to-transparent" />
     </motion.div>
   );
 }

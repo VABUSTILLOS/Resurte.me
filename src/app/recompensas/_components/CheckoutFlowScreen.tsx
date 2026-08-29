@@ -78,24 +78,24 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-950">
+    <div className="flex flex-col min-h-screen bg-transparent">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-white/10">
+      <div className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-cream-300">
         <button
           onClick={step === 3 ? onBack : step === 1 ? onBack : () => setStep(step - 1)}
           aria-label="Volver"
-          className="rounded-xl bg-white/5 p-2 text-gray-400 hover:text-white transition-colors touch-target"
+          className="rounded-xl bg-white border border-cream-300 p-2 text-[#5c6069] hover:text-warm-700 transition-colors touch-target"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex-1">
-          <h1 className="text-white text-lg font-bold">
+          <h1 className="text-warm-700 text-lg font-bold">
             {step === 3 ? "¡Listo!" : "Canjear Servicio"}
           </h1>
         </div>
         {/* Step indicator */}
         {step < 3 && (
-          <span className="text-gray-500 text-sm">
+          <span className="text-[#6e737b] text-sm">
             Paso {step}/{totalSteps}
           </span>
         )}
@@ -108,7 +108,7 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
             <div key={i} className="flex items-center">
               <motion.div
                 className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                  i + 1 <= step ? "bg-emerald-600 text-white" : "bg-gray-800 text-gray-600"
+                  i + 1 <= step ? "bg-brand-500 text-white" : "bg-cream-100 text-[#6e737b]"
                 }`}
                 animate={i + 1 < step ? { scale: [1, 1.2, 1] } : {}}
               >
@@ -117,7 +117,7 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
               {i < totalSteps - 1 && (
                 <div
                   className={`h-0.5 w-6 transition-colors ${
-                    i + 1 < step ? "bg-emerald-600" : "bg-gray-800"
+                    i + 1 < step ? "bg-brand-500" : "bg-cream-300"
                   }`}
                 />
               )}
@@ -176,28 +176,28 @@ function Step1Confirm({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
     >
-      <p className="text-gray-400 text-sm">
-        Tu <strong className="text-white">{service.name}</strong> está listo. Solo confírmalo.
+      <p className="text-[#5c6069] text-sm">
+        Tu <strong className="text-warm-700">{service.name}</strong> está listo. Solo confírmalo.
       </p>
 
       {/* Service Summary */}
-      <div className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-5">
+      <div className="mt-4 rounded-2xl bg-white border border-cream-300 shadow-sm p-5">
         <div className="flex items-center gap-3 mb-3">
           <span className="text-2xl">{service.icon}</span>
           <div>
-            <h2 className="text-white font-bold">{service.name}</h2>
-            <p className="text-gray-400 text-xs mt-0.5">{service.description.slice(0, 80)}...</p>
+            <h2 className="text-warm-700 font-bold">{service.name}</h2>
+            <p className="text-[#5c6069] text-xs mt-0.5">{service.description.slice(0, 80)}...</p>
           </div>
         </div>
 
-        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/15 p-3">
-          <p className="text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-2">
+        <div className="rounded-xl bg-brand-50 border border-brand-200 p-3">
+          <p className="text-brand-500 text-xs font-semibold uppercase tracking-wider mb-2">
             Entregables incluidos
           </p>
           <ul className="space-y-1">
             {service.deliverables.map((d, i) => (
-              <li key={i} className="flex items-center gap-2 text-sm text-white">
-                <CheckCircle className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" /> {d}
+              <li key={i} className="flex items-center gap-2 text-sm text-warm-700">
+                <CheckCircle className="h-3.5 w-3.5 text-brand-500 flex-shrink-0" /> {d}
               </li>
             ))}
           </ul>
@@ -205,23 +205,23 @@ function Step1Confirm({
       </div>
 
       {/* Balance Check */}
-      <div className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-5">
+      <div className="mt-4 rounded-2xl bg-white border border-cream-300 shadow-sm p-5">
         <div className="flex justify-between items-center">
-          <span className="text-gray-400 text-sm">Tu saldo actual</span>
-          <span className="text-white font-bold tabular-nums">
+          <span className="text-[#5c6069] text-sm">Tu saldo actual</span>
+          <span className="text-warm-700 font-bold tabular-nums">
             ${formatNumber(balance)} Créditos
           </span>
         </div>
         <div className="flex justify-between items-center mt-2">
-          <span className="text-gray-400 text-sm">Costo del servicio</span>
-          <span className="text-white font-bold tabular-nums">
+          <span className="text-[#5c6069] text-sm">Costo del servicio</span>
+          <span className="text-warm-700 font-bold tabular-nums">
             - ${formatNumber(service.cost)} Créditos
           </span>
         </div>
-        <hr className="my-3 border-gray-800" />
+        <hr className="my-3 border-cream-300" />
         <div className="flex justify-between items-center">
-          <span className="text-gray-400 text-sm">Te quedaría</span>
-          <span className={`font-bold tabular-nums text-lg ${remainingAfter >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+          <span className="text-[#5c6069] text-sm">Te quedaría</span>
+          <span className={`font-bold tabular-nums text-lg ${remainingAfter >= 0 ? "text-brand-500" : "text-red-600"}`}>
             ${formatNumber(remainingAfter)} Créditos
           </span>
         </div>
@@ -230,9 +230,9 @@ function Step1Confirm({
       <button
         onClick={onNext}
         disabled={remainingAfter < 0}
-        className="mt-5 w-full rounded-2xl bg-emerald-600 py-4 text-base font-bold text-white 
-          shadow-lg shadow-emerald-900/40 transition-all active:scale-[0.98] 
-          hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+        className="mt-5 w-full rounded-2xl bg-brand-500 py-4 text-base font-bold text-white 
+          shadow-lg transition-all active:scale-[0.98] 
+          hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
       >
         {remainingAfter < 0 ? "Saldo insuficiente" : "Continuar"}
       </button>
@@ -264,13 +264,13 @@ function Step2Context({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
     >
-      <p className="text-gray-400 text-sm">
-        Cuéntanos de tu restaurante para que el servicio <strong className="text-white">realmente funcione</strong>.
+      <p className="text-[#5c6069] text-sm">
+        Cuéntanos de tu restaurante para que el servicio <strong className="text-warm-700">realmente funcione</strong>.
       </p>
 
       <div className="mt-4 space-y-4">
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-          <label className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-2 block">
+        <div className="rounded-2xl bg-white border border-cream-300 shadow-sm p-4">
+          <label className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2 block">
             Nombre de tu restaurante
           </label>
           <input
@@ -278,13 +278,13 @@ function Step2Context({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Nombre de tu restaurante"
-            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white text-sm 
-              focus:outline-none focus:border-emerald-500/50 placeholder:text-gray-600"
+            className="w-full rounded-xl bg-white border border-cream-300 px-4 py-3 text-warm-700 text-sm 
+              focus:outline-none focus:border-brand-500 placeholder:text-warm-400"
           />
         </div>
 
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-          <label className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-2 block">
+        <div className="rounded-2xl bg-white border border-cream-300 shadow-sm p-4">
+          <label className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2 block">
             Link de Google Maps
           </label>
           <input
@@ -292,13 +292,13 @@ function Step2Context({
             value={mapsLink}
             onChange={(e) => setMapsLink(e.target.value)}
             placeholder="https://maps.google.com/..."
-            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white text-sm 
-              focus:outline-none focus:border-emerald-500/50 placeholder:text-gray-600"
+            className="w-full rounded-xl bg-white border border-cream-300 px-4 py-3 text-warm-700 text-sm 
+              focus:outline-none focus:border-brand-500 placeholder:text-warm-400"
           />
         </div>
 
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-          <label className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-2 block">
+        <div className="rounded-2xl bg-white border border-cream-300 shadow-sm p-4">
+          <label className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2 block">
             Instagram / Facebook
           </label>
           <input
@@ -306,13 +306,13 @@ function Step2Context({
             value={social}
             onChange={(e) => setSocial(e.target.value)}
             placeholder="@taqueriaelpariente"
-            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white text-sm 
-              focus:outline-none focus:border-emerald-500/50 placeholder:text-gray-600"
+            className="w-full rounded-xl bg-white border border-cream-300 px-4 py-3 text-warm-700 text-sm 
+              focus:outline-none focus:border-brand-500 placeholder:text-warm-400"
           />
         </div>
 
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-          <label className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-2 block">
+        <div className="rounded-2xl bg-white border border-cream-300 shadow-sm p-4">
+          <label className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2 block">
             Notas para el equipo
           </label>
           <textarea
@@ -320,8 +320,8 @@ function Step2Context({
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Ej. Quiero atraer más clientes en horario de comida (2-5pm)..."
             rows={3}
-            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white text-sm 
-              focus:outline-none focus:border-emerald-500/50 placeholder:text-gray-600 resize-none"
+            className="w-full rounded-xl bg-white border border-cream-300 px-4 py-3 text-warm-700 text-sm 
+              focus:outline-none focus:border-brand-500 placeholder:text-warm-400 resize-none"
           />
         </div>
       </div>
@@ -329,16 +329,16 @@ function Step2Context({
       <button
         onClick={onNext}
         disabled={isRedeeming}
-        className="mt-5 w-full rounded-2xl bg-emerald-600 py-4 text-base font-bold text-white 
-          shadow-lg shadow-emerald-900/40 transition-all active:scale-[0.98] 
-          hover:bg-emerald-500 disabled:opacity-60 disabled:active:scale-100 flex items-center justify-center gap-2"
+        className="mt-5 w-full rounded-2xl bg-brand-500 py-4 text-base font-bold text-white 
+          shadow-lg transition-all active:scale-[0.98] 
+          hover:bg-brand-600 disabled:opacity-60 disabled:active:scale-100 flex items-center justify-center gap-2"
       >
         <Sparkles className="h-4 w-4" />
         {isRedeeming ? "Canjeando..." : "Solicitar Servicio"}
       </button>
 
       {redeemError && (
-        <p className="mt-3 text-center text-sm font-semibold text-red-400">
+        <p className="mt-3 text-center text-sm font-semibold text-red-600">
           {redeemError}
         </p>
       )}
@@ -355,7 +355,7 @@ function Step3Confirmation({ service }: { service: ServiceItem }) {
     >
       {/* Success animation */}
       <motion.div
-        className="flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500/20 mb-6"
+        className="flex h-24 w-24 items-center justify-center rounded-full bg-emerald-50 border border-emerald-200 mb-6"
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 15 }}
@@ -365,12 +365,12 @@ function Step3Confirmation({ service }: { service: ServiceItem }) {
           animate={{ scale: 1, rotate: 0 }}
           transition={{ delay: 0.2, type: "spring", stiffness: 300 }}
         >
-          <Check className="h-12 w-12 text-emerald-400" strokeWidth={3} />
+          <Check className="h-12 w-12 text-emerald-600" strokeWidth={3} />
         </motion.div>
       </motion.div>
 
       <motion.h2
-        className="text-white text-2xl font-black"
+        className="text-warm-700 text-2xl font-black"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
@@ -379,22 +379,22 @@ function Step3Confirmation({ service }: { service: ServiceItem }) {
       </motion.h2>
 
       <motion.p
-        className="text-gray-400 text-sm mt-2 max-w-xs"
+        className="text-[#5c6069] text-sm mt-2 max-w-xs"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
       >
-        Tu <strong className="text-white">{service.name}</strong> está en marcha. Te avisaremos en cada paso del proceso.
+        Tu <strong className="text-warm-700">{service.name}</strong> está en marcha. Te avisaremos en cada paso del proceso.
       </motion.p>
 
       {/* Timeline preview */}
       <motion.div
-        className="mt-8 w-full rounded-2xl bg-white/5 border border-white/10 p-5 text-left"
+        className="mt-8 w-full rounded-2xl bg-white border border-cream-300 shadow-sm p-5 text-left"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
       >
-        <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-3">¿Qué sigue?</p>
+        <p className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-3">¿Qué sigue?</p>
         <div className="space-y-3">
           {[
             { step: "Revisión de datos", status: "completed", time: "Hoy" },
@@ -406,14 +406,14 @@ function Step3Confirmation({ service }: { service: ServiceItem }) {
               <div
                 className={`h-2.5 w-2.5 rounded-full ${
                   s.status === "completed"
-                    ? "bg-emerald-500"
+                    ? "bg-brand-500"
                     : s.status === "in-progress"
                       ? "bg-amber-500 animate-pulse"
-                      : "bg-gray-700"
+                      : "bg-cream-300"
                 }`}
               />
-              <span className="text-white text-sm flex-1">{s.step}</span>
-              <span className="text-gray-500 text-xs">{s.time}</span>
+              <span className="text-warm-700 text-sm flex-1">{s.step}</span>
+              <span className="text-[#6e737b] text-xs">{s.time}</span>
             </div>
           ))}
         </div>

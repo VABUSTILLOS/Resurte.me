@@ -4,6 +4,8 @@ import { useState, useMemo, useCallback } from "react"
 import { Search, ShoppingBag } from "lucide-react"
 import { ProductCard } from "@/components/product/product-card"
 import { MarqueePlaceholder } from "@/components/ui/marquee-placeholder"
+import { ReorderSection } from "@/components/shop/reorder-section"
+import { ShopGreeting } from "@/components/shop/shop-greeting"
 import { getCategoryIcon } from "@/lib/utils"
 import type { Category, Product } from "@/types"
 
@@ -166,8 +168,9 @@ export function UserShopView({ categories, products, citySlug }: Props) {
       </div>
 
       {/* Results header */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">
-        <div className="flex items-center justify-between py-4">
+      <ShopGreeting />
+      <ReorderSection products={products} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full">        <div className="flex items-center justify-between py-4">
           <div>
             <h2 className="text-lg font-bold text-[#242529]">
               {activeCategoryName ?? "Todos los productos"}

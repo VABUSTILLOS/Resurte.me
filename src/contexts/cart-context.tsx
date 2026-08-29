@@ -23,6 +23,7 @@ interface CartState {
 
 type CartAction =
   | { type: "ADD_ITEM"; payload: CartItem }
+  | { type: "ADD_ITEMS"; payload: CartItem[] }
   | { type: "REMOVE_ITEM"; payload: { product_id: number } }
   | { type: "UPDATE_QUANTITY"; payload: { product_id: number; quantity: number } }
   | { type: "CLEAR_CART" }
@@ -32,6 +33,7 @@ type CartAction =
 
 interface CartContextValue extends CartState {
   addItem: (item: CartItem) => void
+  addOrderItems: (items: CartItem[]) => void
   removeItem: (productId: number) => void
   updateQuantity: (productId: number, quantity: number) => void
   clearCart: () => void
@@ -65,6 +67,26 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         items.push(newItem)
       }
 
+      return {
+        ...state,
+        cart: { items },
+      }
+    }
+
+    case "ADD_ITEMS": {
+      // Batch add (ej. "repetir pedido"): una sola actualización de estado.
+      const items = [...state.cart.items]
+      for (const newItem of action.payload) {
+        const existing = items.findIndex((i) => i.product_id === newItem.product_id)
+        if (existing >= 0) {
+          items[existing] = {
+            ...items[existing]!,
+            quantity: items[existing]!.quantity + newItem.quantity,
+          }
+        } else {
+          items.push(newItem)
+        }
+      }
       return {
         ...state,
         cart: { items },
@@ -212,6 +234,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "ADD_ITEM", payload: item })
   }, [])
 
+  const addOrderItems = useCallback((items: CartItem[]) => {
+    dispatch({ type: "ADD_ITEMS", payload: items })
+  }, [])
+
   const removeItem = useCallback((productId: number) => {
     dispatch({ type: "REMOVE_ITEM", payload: { product_id: productId } })
   }, [])
@@ -257,6 +283,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       value={useMemo(() => ({
         ...state,
         addItem,
+        addOrderItems,
         removeItem,
         updateQuantity,
         clearCart,
@@ -266,7 +293,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         subtotal,
         discount,
         total,
-      }), [state, addItem, removeItem, updateQuantity, clearCart, applyCoupon, removeCoupon, itemCount, subtotal, discount, total])}
+      }), [state, addItem, addOrderItems, removeItem, updateQuantity, clearCart, applyCoupon, removeCoupon, itemCount, subtotal, discount, total])}
     >
       {children}
     </CartContext.Provider>

@@ -7,6 +7,7 @@ import {
   ACTIVITY_TYPE_LABEL,
   ACTIVITY_OUTCOMES,
   ACTIVITY_OUTCOME_LABEL,
+  type Activity,
   type ActivityType,
   type ActivityDirection,
 } from "@/lib/comercializacion/types"
@@ -16,12 +17,15 @@ export function ActivityFormModal({
   onClose,
   prospectId,
   defaultType,
+  activity,
   onSaved,
 }: {
   open: boolean
   onClose: () => void
   prospectId: number
   defaultType?: ActivityType
+  /** Si se pasa, el modal edita esa actividad en lugar de crear una nueva. */
+  activity?: Activity | null
   onSaved: () => void
 }) {
   const [type, setType] = useState<ActivityType>(defaultType ?? "llamada")
@@ -38,38 +42,49 @@ export function ActivityFormModal({
     // (evita renders en cascada; ver react-hooks/set-state-in-effect).
     const timeout = setTimeout(() => {
       setError(null)
-      setType(defaultType ?? "llamada")
-      setDirection("saliente")
-      setOutcome("")
-      setDuration("")
-      setSummary("")
+      setType(activity?.type ?? defaultType ?? "llamada")
+      setDirection(activity?.direction ?? "saliente")
+      setOutcome(activity?.outcome ?? "")
+      setDuration(
+        activity?.duration_seconds ? String(Math.round(activity.duration_seconds / 60)) : ""
+      )
+      setSummary(activity?.summary ?? "")
     }, 0)
     return () => clearTimeout(timeout)
-  }, [open, defaultType])
+  }, [open, defaultType, activity])
 
   async function handleSubmit() {
     setSaving(true)
     setError(null)
     try {
-      const { addActivity } = await import("@/lib/comercializacion/actions")
-      await addActivity(prospectId, {
+      const payload = {
         type,
         direction,
         outcome: outcome || null,
         duration_seconds: duration ? Math.max(1, Math.round(Number(duration) * 60)) : null,
         summary: summary || null,
-      })
+      }
+      const actions = await import("@/lib/comercializacion/actions")
+      if (activity) {
+        await actions.updateActivity(activity.id, payload)
+      } else {
+        await actions.addActivity(prospectId, payload)
+      }
       onSaved()
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al registrar")
+      setError(e instanceof Error ? e.message : "Error al guardar")
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Registrar actividad">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={activity ? "Editar actividad" : "Registrar actividad"}
+    >
       <div className="space-y-4">
         {error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-xl">

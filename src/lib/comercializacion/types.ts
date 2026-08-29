@@ -204,3 +204,17 @@ export interface SellerClientSummary {
   phone: string | null
   status: ProspectStatus
 }
+
+export interface WeeklyTrend {
+  /** Inicio de semana (lunes CDMX) en ISO. */
+  weekStart: string
+  /** Etiqueta corta, p. ej. "5 may". */
+  label: string
+  activities: number
+  sales: number
+}
+
+export interface WeeklyTrendsReport {
+  weeks: WeeklyTrend[]
+  pipeline: { status: ProspectStatus; count: number }[]
+}

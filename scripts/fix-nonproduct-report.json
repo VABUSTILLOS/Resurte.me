@@ -1,0 +1,1475 @@
+[
+  {
+    "slug": "hero-grocery",
+    "group": "hero",
+    "status": "ok",
+    "query": "fresh fruits vegetables market stall",
+    "title": "File:DSCF1116 Fresh root vegetables piled at a bustling market stall with fruits and produce blurred in the colorful background.jpg"
+  },
+  {
+    "slug": "crema-mexicana",
+    "group": "products",
+    "status": "ok-off",
+    "src": "https://images.openfoodfacts.org/images/products/081/939/302/1284/front_en.24.400.jpg"
+  },
+  {
+    "slug": "burger",
+    "group": "collections",
+    "status": "ok",
+    "query": "gourmet hamburger",
+    "title": "File:Gourmet Hamburger (Unsplash).jpg"
+  },
+  {
+    "slug": "taqueria",
+    "group": "collections",
+    "status": "ok",
+    "query": "tacos al pastor",
+    "title": "File:Al pastor tacos - 8425427339.jpg"
+  },
+  {
+    "slug": "sushi",
+    "group": "collections",
+    "status": "ok",
+    "query": "sushi",
+    "title": "File:Sushi (14927932561).jpg"
+  },
+  {
+    "slug": "pizza",
+    "group": "collections",
+    "status": "ok",
+    "query": "pizza",
+    "title": "File:Pizza 33.jpg"
+  },
+  {
+    "slug": "pollo",
+    "group": "collections",
+    "status": "ok",
+    "query": "roast chicken",
+    "title": "File:Roast Chicken with Potato Wedges.jpg"
+  },
+  {
+    "slug": "fonda",
+    "group": "collections",
+    "status": "ok",
+    "query": "traditional mexican food",
+    "title": "File:Traditional mexican food.jpg"
+  },
+  {
+    "slug": "mariscos",
+    "group": "collections",
+    "status": "ok",
+    "query": "seafood",
+    "title": "File:Seafood shop in Cat Ba town, Vietnam, 20240130 1704 4488.jpg"
+  },
+  {
+    "slug": "cortes",
+    "group": "collections",
+    "status": "ok",
+    "query": "raw beef steak cuts butcher",
+    "title": "File:Fresh Bio Range Land Filet Beef (164927627).jpeg"
+  },
+  {
+    "slug": "cafe",
+    "group": "collections",
+    "status": "ok",
+    "query": "cup of coffee coffee shop",
+    "title": "File:Lucky Cup Coffee - late and ice coffee - from Shandong Laoling Debai shop.jpg"
+  },
+  {
+    "slug": "saludable",
+    "group": "collections",
+    "status": "ok",
+    "query": "healthy salad bowl",
+    "title": "File:Healthy salad bowl (42231145040).jpg"
+  },
+  {
+    "slug": "postres",
+    "group": "collections",
+    "status": "ok",
+    "query": "desserts cakes",
+    "title": "File:Cakes and Other Desserts on Display At Ferguson Plarre's Bakehouse of Southland.jpg"
+  },
+  {
+    "slug": "arabe",
+    "group": "collections",
+    "status": "ok",
+    "query": "middle eastern food shawarma",
+    "title": "File:DZ6 1758 A street food vendor slicing tender spit-roasted doner kebab meat from a towering vertical rotisserie as passersby stroll by on a bustling night-lit sidewalk.jpg"
+  },
+  {
+    "slug": "latina",
+    "group": "collections",
+    "status": "not-found",
+    "query": "latin american food arepas"
+  },
+  {
+    "slug": "bebidas",
+    "group": "collections",
+    "status": "ok",
+    "query": "assorted beverages drinks",
+    "title": "File:Best Drinks (30811096625).jpg"
+  },
+  {
+    "slug": "panel-herramientas-restaurante-guia",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "precios-mayoreo-restaurantes",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "como-reducir-merma-cocina",
+    "group": "blog",
+    "status": "ok",
+    "query": "commercial kitchen",
+    "title": "File:Commercial Style Kitchen Island from May 2015.jpg"
+  },
+  {
+    "slug": "guia-food-cost-restaurante-2026",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "economia-restaurantes-2027",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "renta-local-restaurante-costo",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant facade",
+    "title": "File:Famiglia Mancini restaurant facade in São Paulo downtown, Brazil.jpg"
+  },
+  {
+    "slug": "sostenibilidad-restaurantes",
+    "group": "blog",
+    "status": "ok",
+    "query": "organic vegetables",
+    "title": "File:Organic - Vegetables at Farmers Market (30297519628).jpg"
+  },
+  {
+    "slug": "tendencias-cocina-mexicana",
+    "group": "blog",
+    "status": "ok",
+    "query": "mexican tacos",
+    "title": "File:Taco plate with lengua (left) and pastor. -Mexican -tacos -oalland -lengua -pastor (15848356933).jpg"
+  },
+  {
+    "slug": "estadisticas-delivery-mexico",
+    "group": "blog",
+    "status": "ok",
+    "query": "food delivery scooter",
+    "title": "File:Food delivery by scooter in France (1).jpg"
+  },
+  {
+    "slug": "legislacion-laboral-restaurantes",
+    "group": "blog",
+    "status": "not-found",
+    "query": "business documents desk"
+  },
+  {
+    "slug": "food-trucks-costos-regulacion",
+    "group": "blog",
+    "status": "ok",
+    "query": "food truck",
+    "title": "File:Food truck on Claiborne Avenue, New Orleans 3 Dec 2024.jpg"
+  },
+  {
+    "slug": "franquicias-restaurantes-mexico",
+    "group": "blog",
+    "status": "ok",
+    "query": "fast food restaurant interior",
+    "title": "File:A Chick-fil-A fast food restaurant interior in Cornelia, Georgia 03.jpg"
+  },
+  {
+    "slug": "cuanto-cuesta-abrir-restaurante-mexico",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "burger-smash",
+    "group": "recipes",
+    "status": "ok",
+    "query": "smash burger",
+    "title": "File:C N Cheese burger and \"smash browns\" at BurgerFuel (Courtenay Place).jpg"
+  },
+  {
+    "slug": "hotdog-chicago",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Chicago-style hot dog",
+    "title": "File:Chicago-style Hot Dog.jpg"
+  },
+  {
+    "slug": "papas-gourmet",
+    "group": "recipes",
+    "status": "ok",
+    "query": "french fries",
+    "title": "File:Truffle oil french fries (33024792848).jpg"
+  },
+  {
+    "slug": "hamburguesa-bbq-bacon",
+    "group": "recipes",
+    "status": "ok",
+    "query": "bacon cheeseburger barbecue",
+    "title": "File:Double bacon barbecue cheeseburger.jpg"
+  },
+  {
+    "slug": "hotdog-sonora",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Sonoran hot dog",
+    "title": "File:Sonoran-hot-dog-02.jpg"
+  },
+  {
+    "slug": "queso-americano",
+    "group": "products",
+    "status": "ok",
+    "query": "american cheese slices",
+    "title": "File:2019-02-06 21 06 39 Two single slices of Kraft Singles White American cheese still in their wrappers in Dunn Loring, Fairfax County, Virginia.jpg"
+  },
+  {
+    "slug": "queso-cheddar",
+    "group": "products",
+    "status": "ok",
+    "query": "cheddar cheese slices",
+    "title": "File:White cheddar cheese sliced CNE.jpg"
+  },
+  {
+    "slug": "tacos-pastor",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Tacos al Pastor",
+    "title": "File:Al pastor tacos - 8425427339.jpg"
+  },
+  {
+    "slug": "sopes-pollo",
+    "group": "recipes",
+    "status": "ok",
+    "query": "sopes mexican food",
+    "title": "File:Sopes gorditas memelas mexican food.jpg"
+  },
+  {
+    "slug": "tacos-carnitas",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Tacos de Carnitas",
+    "title": "File:001 Tacos de carnitas, carne asada y al pastor.jpg"
+  },
+  {
+    "slug": "quesadillas-flor-calabaza",
+    "group": "recipes",
+    "status": "not-found",
+    "query": "squash blossom quesadilla"
+  },
+  {
+    "slug": "tostadas-tinga",
+    "group": "recipes",
+    "status": "ok",
+    "query": "chicken tinga tostada",
+    "title": "File:Tostada de tinga de pollo.jpg"
+  },
+  {
+    "slug": "california-roll",
+    "group": "recipes",
+    "status": "ok",
+    "query": "California Roll",
+    "title": "File:Teriyaki chicken meal (with extra chicken) with white rice and vegetables, and a side order of California roll with wasabi and ginger, at Sarku Japan.jpg"
+  },
+  {
+    "slug": "ramen-tonkotsu",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Ramen Tonkotsu",
+    "title": "File:Tonkotsu ramen (M) - Goemon Ramen Bar 2025-09-01.jpg"
+  },
+  {
+    "slug": "pollo-teriyaki",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Pollo Teriyaki",
+    "title": "File:Pollo teriyaki de Sarku Japan (Colombia).jpg"
+  },
+  {
+    "slug": "gyozas-cerdo",
+    "group": "recipes",
+    "status": "not-found",
+    "query": "Gyozas de Cerdo"
+  },
+  {
+    "slug": "sushi-dragon",
+    "group": "recipes",
+    "status": "ok",
+    "query": "dragon roll sushi",
+    "title": "File:Golden Maki Vegetarian Dragon sushi roll.jpg"
+  },
+  {
+    "slug": "1565557623262-b51c2513a641",
+    "group": "story",
+    "status": "ok",
+    "query": "seafood restaurant",
+    "title": "File:McCormick & Schmick's Seafood Restaurant interior in Philadelphia, Pennsylvania 05.jpg"
+  },
+  {
+    "slug": "ceviche-camaron",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Ceviche de Camarón",
+    "title": "File:Tostada de ceviche de camarón.jpg"
+  },
+  {
+    "slug": "pescado-empanizado",
+    "group": "recipes",
+    "status": "ok",
+    "query": "breaded fried fish fillet",
+    "title": "File:Fish fillet in aluminum tray.jpg"
+  },
+  {
+    "slug": "coctel-camaron",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Cóctel de Camarón",
+    "title": "File:Copa del cóctel de camarón más grande del mundo en 2011 07.jpg"
+  },
+  {
+    "slug": "aguachile-verde",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Aguachile Verde",
+    "title": "File:Aguachile verde.jpg"
+  },
+  {
+    "slug": "camarones-mojo-ajo",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Camarones al Mojo de Ajo",
+    "title": "File:Camarones al mojo de ajo.JPG"
+  },
+  {
+    "slug": "1513104890138-7c749659a591",
+    "group": "story",
+    "status": "ok",
+    "query": "pizza wood fired oven",
+    "title": "File:Pizza baking in Wood-fired oven.jpg"
+  },
+  {
+    "slug": "pizza-margherita",
+    "group": "recipes",
+    "status": "not-found",
+    "query": "Pizza Margherita Clásica"
+  },
+  {
+    "slug": "pizza-pepperoni",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Pizza Pepperoni Supreme",
+    "title": "File:Super Supreme Pizza, Pizza Hut Perth, 2026 (01).jpg"
+  },
+  {
+    "slug": "pasta-alfredo",
+    "group": "recipes",
+    "status": "ok",
+    "query": "fettuccine alfredo",
+    "title": "File:Chicken fettuccine alfredo.JPG"
+  },
+  {
+    "slug": "pizza-cuatro-quesos",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Pizza Cuatro Quesos",
+    "title": "File:Pizza Fugazzeta y Cuatro Quesos.jpg"
+  },
+  {
+    "slug": "lasana-bolonesa",
+    "group": "recipes",
+    "status": "ok",
+    "query": "lasagna bolognese",
+    "title": "File:Lasagna Bolognese.jpg"
+  },
+  {
+    "slug": "tiramisu",
+    "group": "recipes",
+    "status": "not-found",
+    "query": "Tiramisú Clásico"
+  },
+  {
+    "slug": "mozzarella",
+    "group": "products",
+    "status": "not-found",
+    "query": "Queso Mozzarella Rallado 1kg"
+  },
+  {
+    "slug": "alitas-buffalo",
+    "group": "recipes",
+    "status": "ok",
+    "query": "buffalo wings",
+    "title": "File:Buffalo Wild Wings – New Caney, Texas.jpg"
+  },
+  {
+    "slug": "boneless-bbq",
+    "group": "recipes",
+    "status": "ok",
+    "query": "barbecue boneless chicken wings",
+    "title": "File:Boneless chicken wings and fries.jpg"
+  },
+  {
+    "slug": "pollo-rostizado",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Pollo Rostizado",
+    "title": "File:Madrid - Fiestas de San Isidro - Pollo rostizado - 20070515-59.jpg"
+  },
+  {
+    "slug": "alitas-mango-habanero",
+    "group": "recipes",
+    "status": "ok",
+    "query": "glazed chicken wings",
+    "title": "File:Hot Bourbon Honey Glazed Chicken Wings, Spiced Pecans and NC Apple (15976924136).jpg"
+  },
+  {
+    "slug": "alitas-ajillo",
+    "group": "recipes",
+    "status": "ok",
+    "query": "garlic chicken wings",
+    "title": "File:Peking style garlic chicken wings 北京蒜香雞翅.png"
+  },
+  {
+    "slug": "tenders-pollo",
+    "group": "recipes",
+    "status": "ok",
+    "query": "chicken tenders",
+    "title": "File:Chicken tenders (8884884960).jpg"
+  },
+  {
+    "slug": "1504674900247-0877df9cc836",
+    "group": "story",
+    "status": "ok",
+    "query": "mexican restaurant kitchen",
+    "title": "File:Salsa Shop (Fresh Mexican Kitchen), Rotterdam-Centrum, Rotterdam (2021) 02.jpg"
+  },
+  {
+    "slug": "chiles-rellenos",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Chiles Rellenos",
+    "title": "File:Chiles Xalapeños rellenos.jpg"
+  },
+  {
+    "slug": "mole-poblano",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Mole Poblano",
+    "title": "File:Mole poblano, México.JPG"
+  },
+  {
+    "slug": "enchiladas-verdes",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Enchiladas Verdes",
+    "title": "File:Enchiladas verdes en Tonatico.jpg"
+  },
+  {
+    "slug": "pozole-rojo",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Pozole Rojo",
+    "title": "File:Pozole Rojo.jpg"
+  },
+  {
+    "slug": "chile-nogada",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Chile en Nogada",
+    "title": "File:Chile en nogada preparado..JPG"
+  },
+  {
+    "slug": "tamales-verdes",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Tamales Verdes",
+    "title": "File:Pavo con chifles y tamales verdes.jpg"
+  },
+  {
+    "slug": "ribeye-parrilla",
+    "group": "recipes",
+    "status": "ok",
+    "query": "grilled ribeye steak",
+    "title": "File:Ribeye steak, hot off the grill.jpg"
+  },
+  {
+    "slug": "arrachera",
+    "group": "recipes",
+    "status": "ok",
+    "query": "grilled skirt steak arrachera",
+    "title": "File:Skirt steak grilled arrachera style.jpg"
+  },
+  {
+    "slug": "queso-fundido",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Queso Fundido con Chorizo",
+    "title": "File:Queso fundido con chorizo - Puebla.jpg"
+  },
+  {
+    "slug": "t-bone",
+    "group": "recipes",
+    "status": "ok",
+    "query": "T-bone steak grilled",
+    "title": "File:US Navy 050823-N-5134J-039 Culinary Specialist Seaman Shaun Lucas and Culinary Specialist Seaman Jaime Pablo prepare for lunch at the galley by grilling T-bone steaks.jpg"
+  },
+  {
+    "slug": "costillas-bbq",
+    "group": "recipes",
+    "status": "ok",
+    "query": "barbecue pork ribs",
+    "title": "File:Barbecue pork ribs spiced.jpg"
+  },
+  {
+    "slug": "tacos-suadero",
+    "group": "recipes",
+    "status": "ok",
+    "query": "suadero tacos",
+    "title": "File:Tacos de suadero en Tacos Charly.jpg"
+  },
+  {
+    "slug": "1509042239860-f550ce710b93",
+    "group": "story",
+    "status": "ok",
+    "query": "barista coffee",
+    "title": "File:Barista prepares espresso at coffee shop.jpg"
+  },
+  {
+    "slug": "crepa-nutella",
+    "group": "recipes",
+    "status": "ok",
+    "query": "crepe strawberries chocolate",
+    "title": "File:Crepe with strawberries and banana and chocolate in it.jpg"
+  },
+  {
+    "slug": "huevos-rancheros",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Huevos Rancheros",
+    "title": "File:Huevos Rancheros (11494813583).jpg"
+  },
+  {
+    "slug": "hotcakes",
+    "group": "recipes",
+    "status": "ok",
+    "query": "pancakes",
+    "title": "File:Potato pancakes - December 2023 - Sarah Stierch 02.jpg"
+  },
+  {
+    "slug": "cafe-latte",
+    "group": "recipes",
+    "status": "ok",
+    "query": "cafe latte",
+    "title": "File:Carrot cake slice and latte - Saltmarsh Farmhouse & Cafe 2024-12-19.jpg"
+  },
+  {
+    "slug": "chilaquiles-verdes",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Chilaquiles Verdes",
+    "title": "File:Chilaquiles verdes de arrachera con aguacate.jpg"
+  },
+  {
+    "slug": "1512621776951-a57141f2eefd",
+    "group": "story",
+    "status": "ok",
+    "query": "fresh vegetables cooking",
+    "title": "File:Outdoor cooking preparations with fresh vegetables.jpg"
+  },
+  {
+    "slug": "poke-atun",
+    "group": "recipes",
+    "status": "ok",
+    "query": "poke bowl tuna",
+    "title": "File:Salmon & Tuna Poke Bowl (M) with Spicy Mayo sauce - Kitokito 2025-04-25.jpg"
+  },
+  {
+    "slug": "ensalada-cesar",
+    "group": "recipes",
+    "status": "ok",
+    "query": "caesar salad chicken",
+    "title": "File:Chicken Caesar Salad - Amo 2026-04-11.jpg"
+  },
+  {
+    "slug": "smoothie-verde",
+    "group": "recipes",
+    "status": "ok",
+    "query": "green smoothie",
+    "title": "File:Tropical Smoothie Cafe - Island Green smoothie, June 2018.jpg"
+  },
+  {
+    "slug": "poke-salon",
+    "group": "recipes",
+    "status": "ok",
+    "query": "salmon poke bowl",
+    "title": "File:Salmon & Tuna Poke Bowl (M) with Spicy Mayo sauce - Kitokito 2025-04-25.jpg"
+  },
+  {
+    "slug": "ensalada-mediterranea",
+    "group": "recipes",
+    "status": "not-found",
+    "query": "quinoa salad mediterranean"
+  },
+  {
+    "slug": "wrap-pollo",
+    "group": "recipes",
+    "status": "ok",
+    "query": "chicken wrap",
+    "title": "File:Crunchy Korean Chicken Wrap - Leon 2025-10-27.jpg"
+  },
+  {
+    "slug": "1488477181946-6428a0291777",
+    "group": "story",
+    "status": "ok",
+    "query": "ice cream dessert",
+    "title": "File:Ice cream as dessert.jpg"
+  },
+  {
+    "slug": "pastel-chocolate",
+    "group": "recipes",
+    "status": "ok",
+    "query": "chocolate cake slice",
+    "title": "File:Slice of chocolate cake at the office.jpg"
+  },
+  {
+    "slug": "conchas",
+    "group": "recipes",
+    "status": "ok",
+    "query": "concha pan dulce mexicano",
+    "title": "File:Concha (pan dulce mexicano) 02.JPG"
+  },
+  {
+    "slug": "helado-vainilla",
+    "group": "recipes",
+    "status": "ok",
+    "query": "vanilla ice cream scoop",
+    "title": "File:DFC 1678 Warm vanilla crème brûlée with a scoop of vanilla ice cream diced caramelized bananas and a drizzle of chocolate - a sweet trio on a white platter.jpg"
+  },
+  {
+    "slug": "flan-napolitano",
+    "group": "recipes",
+    "status": "ok",
+    "query": "flan custard",
+    "title": "File:Flan aux abricots.jpg"
+  },
+  {
+    "slug": "pay-limon",
+    "group": "recipes",
+    "status": "ok",
+    "query": "key lime pie",
+    "title": "File:Key Lime Pie Making (1 of 8).jpg"
+  },
+  {
+    "slug": "churros-cajeta",
+    "group": "recipes",
+    "status": "ok",
+    "query": "churros",
+    "title": "File:Churros de lazo.jpg"
+  },
+  {
+    "slug": "1544025162-d76694265947",
+    "group": "story",
+    "status": "ok",
+    "query": "grilled meat restaurant",
+    "title": "File:Grilled meat in local restaurant.jpg"
+  },
+  {
+    "slug": "shawarma-pollo",
+    "group": "recipes",
+    "status": "ok",
+    "query": "chicken shawarma",
+    "title": "File:Chicken Shawarma preparation in Thiruvananthapuram.jpeg"
+  },
+  {
+    "slug": "gyro-cerdo",
+    "group": "recipes",
+    "status": "ok",
+    "query": "gyro pita",
+    "title": "File:Pita gyro.JPG"
+  },
+  {
+    "slug": "hummus",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Hummus Casero",
+    "title": "File:Tostada de hummus de aguacate.jpg"
+  },
+  {
+    "slug": "falafel",
+    "group": "recipes",
+    "status": "not-found",
+    "query": "Falafel Frito"
+  },
+  {
+    "slug": "ensalada-griega",
+    "group": "recipes",
+    "status": "ok",
+    "query": "greek salad",
+    "title": "File:Greek Salad in Le Menu.jpg"
+  },
+  {
+    "slug": "baklava",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Baklava",
+    "title": "File:Baklava sunumu.jpg"
+  },
+  {
+    "slug": "arepas",
+    "group": "recipes",
+    "status": "ok",
+    "query": "arepa venezuelan",
+    "title": "File:Venezuelan Arepa in Barcelona (October 2023).jpg"
+  },
+  {
+    "slug": "patacones",
+    "group": "recipes",
+    "status": "ok",
+    "query": "patacones tostones",
+    "title": "File:Parrilla con patacones y ensalada, plato Venezolano.jpg"
+  },
+  {
+    "slug": "empanadas-colombianas",
+    "group": "recipes",
+    "status": "ok",
+    "query": "colombian empanadas",
+    "title": "File:Colombian empanadas with ají.jpg"
+  },
+  {
+    "slug": "cachapas",
+    "group": "recipes",
+    "status": "ok",
+    "query": "cachapa",
+    "title": "File:Cachapa .2022.12.03.jpg"
+  },
+  {
+    "slug": "tequenos",
+    "group": "recipes",
+    "status": "ok",
+    "query": "tequeños",
+    "title": "File:Tequeños empaquetados.jpg"
+  },
+  {
+    "slug": "bandeja-paisa",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Bandeja Paisa",
+    "title": "File:Bandeja paisa, plato Colombiano.jpg"
+  },
+  {
+    "slug": "michelada",
+    "group": "recipes",
+    "status": "ok",
+    "query": "michelada",
+    "title": "File:Michelada Heaven - Atlixco - Puebla - Mexico (52188430972).jpg"
+  },
+  {
+    "slug": "nachos",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Nachos Supreme",
+    "title": "File:Nachos supreme.jpg"
+  },
+  {
+    "slug": "limonada",
+    "group": "recipes",
+    "status": "ok",
+    "query": "lemonade glass",
+    "title": "File:Lemonade pitcher and glass.jpg"
+  },
+  {
+    "slug": "margarita",
+    "group": "recipes",
+    "status": "ok",
+    "query": "margarita cocktail",
+    "title": "File:Margarita cocktail ingredients.png"
+  },
+  {
+    "slug": "guacamole",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Guacamole Tradicional",
+    "title": "File:Guacamole tradicional.jpg"
+  },
+  {
+    "slug": "mojito",
+    "group": "recipes",
+    "status": "ok",
+    "query": "Mojito Cubano",
+    "title": "File:MelissA Mojito.jpg"
+  },
+  {
+    "slug": "sector-restaurantero-2027-preview",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "inflacion-alimentos-menu-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "renegociar-precios-inflacion",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "costos-fijos-vs-variables-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "punto-de-equilibrio-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "stock-seguridad-inventario",
+    "group": "blog",
+    "status": "not-found",
+    "query": "warehouse shelves food"
+  },
+  {
+    "slug": "almacenamiento-alimentos-temperatura",
+    "group": "blog",
+    "status": "not-found",
+    "query": "warehouse shelves food"
+  },
+  {
+    "slug": "desperdicio-preparacion-porciones",
+    "group": "blog",
+    "status": "ok",
+    "query": "kitchen ingredient preparation cutting board",
+    "title": "File:Preparing ingredients on a kitchen counter with a cutting board and mushrooms.jpg"
+  },
+  {
+    "slug": "tendencias-consumo-restaurantes",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "horarios-consumo-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "tecnologia-delivery-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "food delivery scooter",
+    "title": "File:Food delivery by scooter in France (1).jpg"
+  },
+  {
+    "slug": "margenes-delivery-vs-local",
+    "group": "blog",
+    "status": "ok",
+    "query": "food delivery scooter",
+    "title": "File:Food delivery by scooter in France (1).jpg"
+  },
+  {
+    "slug": "comisiones-delivery-apps-2026",
+    "group": "blog",
+    "status": "ok",
+    "query": "food delivery scooter",
+    "title": "File:Food delivery by scooter in France (1).jpg"
+  },
+  {
+    "slug": "salarios-personal-restaurantes",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "turnos-costo-laboral-restaurante",
+    "group": "blog",
+    "status": "not-found",
+    "query": "business documents desk"
+  },
+  {
+    "slug": "datos-restaurante-para-decidir",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "dashboard-restaurante-un-dia",
+    "group": "blog",
+    "status": "not-found",
+    "query": "tablet computer business charts"
+  },
+  {
+    "slug": "errores-gestion-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "digitalizar-restaurante-panel",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "inteligencia-artificial-restaurantes",
+    "group": "blog",
+    "status": "ok",
+    "query": "robot kitchen technology",
+    "title": "File:Posha, Your Family's Private Robot Chef at SXSW 2025.jpg"
+  },
+  {
+    "slug": "seguridad-datos-restaurante",
+    "group": "blog",
+    "status": "not-found",
+    "query": "padlock cyber security"
+  },
+  {
+    "slug": "punto-venta-restaurante-guia",
+    "group": "blog",
+    "status": "ok",
+    "query": "cash register restaurant",
+    "title": "File:Burroughs Cash Register, Crystal Restaurant, Watertown, New York.jpg"
+  },
+  {
+    "slug": "kpi-financieros-restaurante-mes",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "plan-rentabilidad-mensual-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "automatizar-procesos-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "planificador-pedidos-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "apps-gestion-inventario-movil",
+    "group": "blog",
+    "status": "ok",
+    "query": "smartphone food",
+    "title": "File:SZ 深圳 Shenzhen 羅湖 Luohu 羅芳路 Luofang Road shop 茶精靈 小食店 Tea Elves food payment drive n smartphone April 2023 Px3.jpg"
+  },
+  {
+    "slug": "hojas-calculo-vs-panel",
+    "group": "blog",
+    "status": "not-found",
+    "query": "laptop spreadsheet coffee"
+  },
+  {
+    "slug": "rentabilidad-panel-calculadora",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "control-de-merma-sin-hojas",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "encuestas-satisfaccion-clientes",
+    "group": "blog",
+    "status": "ok",
+    "query": "people dining restaurant table",
+    "title": "File:Eiffel Tower people dining (Unsplash).jpg"
+  },
+  {
+    "slug": "plan-marketing-restaurante-plantilla",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "loyalty-recompensas-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "people dining restaurant table",
+    "title": "File:Eiffel Tower people dining (Unsplash).jpg"
+  },
+  {
+    "slug": "pedir-resenas-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "historia-marca-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "cross-selling-upselling-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "marketing-estacional-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "club-clientes-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "people dining restaurant table",
+    "title": "File:Eiffel Tower people dining (Unsplash).jpg"
+  },
+  {
+    "slug": "email-sms-restaurantes-fidelizacion",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "fotografia-comida-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "food photography camera",
+    "title": "File:Food Photography - geograph.org.uk - 4375077.jpg"
+  },
+  {
+    "slug": "campanas-redes-sociales-comida",
+    "group": "blog",
+    "status": "ok",
+    "query": "food photography camera",
+    "title": "File:Food Photography - geograph.org.uk - 4375077.jpg"
+  },
+  {
+    "slug": "instagram-restaurantes-contenido",
+    "group": "blog",
+    "status": "ok",
+    "query": "food photography camera",
+    "title": "File:Food Photography - geograph.org.uk - 4375077.jpg"
+  },
+  {
+    "slug": "menu-digital-restaurante-guia",
+    "group": "blog",
+    "status": "ok",
+    "query": "QR code on restaurant table",
+    "title": "File:HK TST 尖沙咀 Tsim Sha Tsui 嘉蘭圍 Granville Circuit 百樂酒店集團 Park Hotel Cafe buffet restaurant November 2021 SS2 005.jpg"
+  },
+  {
+    "slug": "eventos-colaboraciones-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "banquet decorated table",
+    "title": "File:View of a banquet set in honor of the incorporation of South Abington, tables set, room decorated with streamers, by Jr. A. D..jpg"
+  },
+  {
+    "slug": "google-business-restaurante-guia",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant facade",
+    "title": "File:Famiglia Mancini restaurant facade in São Paulo downtown, Brazil.jpg"
+  },
+  {
+    "slug": "responder-resenas-google-restaurantes",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "google-maps-restaurantes-2026",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant facade",
+    "title": "File:Famiglia Mancini restaurant facade in São Paulo downtown, Brazil.jpg"
+  },
+  {
+    "slug": "entregas-programadas-proveedores",
+    "group": "blog",
+    "status": "ok",
+    "query": "food delivery boxes",
+    "title": "File:Gordon Food Service Delivery Truck.JPG"
+  },
+  {
+    "slug": "proveedores-cumplen-plazos",
+    "group": "blog",
+    "status": "ok",
+    "query": "food delivery boxes",
+    "title": "File:Gordon Food Service Delivery Truck.JPG"
+  },
+  {
+    "slug": "comprar-mercado-vs-mayoreo",
+    "group": "blog",
+    "status": "ok",
+    "query": "vegetable market stall",
+    "title": "File:Outdoor market fruit and vegetable stall Market Place Romford London 01.jpg"
+  },
+  {
+    "slug": "mayoreo-vs-menudeo-precios",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "negociacion-proveedores-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "calendario-compras-mensual-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "compra-mayoreo-15-septiembre",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "proveeduria-mayoreo-restaurantes",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "proveedores-directos-vs-distribuidores",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "cotizaciones-comparar-proveedores",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "elegir-proveedor-mayorista",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "criterios-calidad-insumos",
+    "group": "blog",
+    "status": "ok",
+    "query": "fresh vegetables market",
+    "title": "File:Fresh Vegetables display in Iloilo Terminal Public Market 01.jpg"
+  },
+  {
+    "slug": "proveeduria-abc-insumos",
+    "group": "blog",
+    "status": "ok",
+    "query": "fresh vegetables market",
+    "title": "File:Fresh Vegetables display in Iloilo Terminal Public Market 01.jpg"
+  },
+  {
+    "slug": "recepcion-mercancia-verificacion",
+    "group": "blog",
+    "status": "ok",
+    "query": "food delivery boxes",
+    "title": "File:Gordon Food Service Delivery Truck.JPG"
+  },
+  {
+    "slug": "compra-estacional-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "capacitacion-equipo-cocina",
+    "group": "blog",
+    "status": "ok",
+    "query": "chef commercial kitchen",
+    "title": "File:Chef cuts a piece of grilled meat on a wooden board in a kitchen setting.jpg"
+  },
+  {
+    "slug": "menu-operativo-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "chalkboard menu restaurant",
+    "title": "File:Chalkboard menu in a stone walled restaurant, Vieux-Québec.jpg"
+  },
+  {
+    "slug": "limpieza-profunda-cocina-rutina",
+    "group": "blog",
+    "status": "ok",
+    "query": "kitchen cleaning gloves",
+    "title": "File:Kitchen I.jpg"
+  },
+  {
+    "slug": "mise-en-place-cocina-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "kitchen ingredient preparation cutting board",
+    "title": "File:Preparing ingredients on a kitchen counter with a cutting board and mushrooms.jpg"
+  },
+  {
+    "slug": "inventario-inicial-final-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "menu-fiestas-patrias-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "mexican tacos",
+    "title": "File:Taco plate with lengua (left) and pastor. -Mexican -tacos -oalland -lengua -pastor (15848356933).jpg"
+  },
+  {
+    "slug": "errores-inventario-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "higiene-cocina-nom251",
+    "group": "blog",
+    "status": "ok",
+    "query": "kitchen cleaning gloves",
+    "title": "File:Kitchen I.jpg"
+  },
+  {
+    "slug": "nom-251-higiene-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "kitchen cleaning gloves",
+    "title": "File:Kitchen I.jpg"
+  },
+  {
+    "slug": "inventario-conteo-ciclico-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "recetas-estandar-cocina-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "organizar-cocina-por-estaciones",
+    "group": "blog",
+    "status": "ok",
+    "query": "commercial kitchen",
+    "title": "File:Commercial Style Kitchen Island from May 2015.jpg"
+  },
+  {
+    "slug": "utilidad-bruta-vs-neta-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "impuestos-utilidad-restaurante-mexico",
+    "group": "blog",
+    "status": "not-found",
+    "query": "business documents desk"
+  },
+  {
+    "slug": "facturacion-cfdi-restaurantes",
+    "group": "blog",
+    "status": "not-found",
+    "query": "business documents desk"
+  },
+  {
+    "slug": "descuentos-combos-promociones-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "precio-por-gramo-rendimiento-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "costeo-menu-completo-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "costeo-semanal-panel",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "costo-bebidas-alcohol-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "bar bottles",
+    "title": "File:Valley Bar - Sonoma - 7.9.26.jpg"
+  },
+  {
+    "slug": "food-cost-tipo-cocina-mexico",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "como-calcular-precio-venta-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "subir-precios-menu-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "credito-financiamiento-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "coffee business meeting",
+    "title": "File:Business man walks through a modern coffee shop while people chat and relax in the background.jpg"
+  },
+  {
+    "slug": "margenes-restaurantes-mexico",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "costo-oportunidad-desperdicio",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "calculadora-food-cost-gratis",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "sector-restaurantero-mexico-2026",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "rotacion-inventario-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant interior",
+    "title": "File:The interior of an Olive Garden restaurant 04.jpg"
+  },
+  {
+    "slug": "caso-google-maps-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "restaurant facade",
+    "title": "File:Famiglia Mancini restaurant facade in São Paulo downtown, Brazil.jpg"
+  },
+  {
+    "slug": "temporada-alta-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "busy restaurant dining room",
+    "title": "File:Boulevard Bar and Dining Room, Soho, W1 (2711026237).jpg"
+  },
+  {
+    "slug": "costeo-platillo-nuevo-restaurante",
+    "group": "blog",
+    "status": "ok",
+    "query": "gourmet plated dish restaurant",
+    "title": "File:Delicious gourmet dish served at a restaurant highlighting tender meat undefined.jpg"
+  },
+  {
+    "slug": "delivery-insumos-restaurantes",
+    "group": "blog",
+    "status": "ok",
+    "query": "food delivery boxes",
+    "title": "File:US Navy 071201-M-7696M-086 Victims of Tropical Cyclone Sidr move boxes of food after delivery by a 22nd Marine Expeditionary Unit (MEU) Special Operations Capable (SOC) CH-46E Sea Knight helicopter.jpg"
+  }
+]

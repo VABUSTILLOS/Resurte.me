@@ -20,7 +20,7 @@ interface OrderWithItems extends OrderWithCashback {
 
 export default function OrderHistoryPage() {
   const { city } = useCity()
-  const { addItem } = useCart()
+  const { addOrderItems } = useCart()
   const [orders, setOrders] = useState<OrderWithItems[]>([])
   const [loading, setLoading] = useState(true)
   const [reorderingId, setReorderingId] = useState<number | null>(null)
@@ -59,8 +59,8 @@ export default function OrderHistoryPage() {
     setReorderingId(order.id)
 
     // Add all items from the order to the cart
-    order.items.forEach((item) => {
-      addItem({
+    addOrderItems(
+      order.items.map((item) => ({
         product_id: item.product_id,
         name: item.product_name || `Producto #${item.product_id}`,
         slug: `producto-${item.product_id}`,
@@ -69,9 +69,9 @@ export default function OrderHistoryPage() {
         price: item.unit_price,
         sale_price: null,
         quantity: item.quantity,
-        stock_status: "in_stock",
-      })
-    })
+        stock_status: "in_stock" as const,
+      }))
+    )
 
     AnalyticsEvents.repeatOrder(order.id, order.items.length)
 

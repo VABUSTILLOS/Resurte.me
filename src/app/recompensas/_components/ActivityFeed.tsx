@@ -53,9 +53,9 @@ export function ActivityFeed() {
   if (activities.length === 0) {
     return (
       <div className="mx-4 mt-4 md:mx-0">
-        <h2 className="text-white text-[15px] font-bold mb-2">Actividad Reciente</h2>
-        <div className="rounded-xl bg-white/5 border border-white/5 p-4">
-          <p className="text-gray-500 text-xs">
+        <h2 className="text-warm-700 text-[15px] font-bold mb-2">Actividad Reciente</h2>
+        <div className="rounded-xl bg-white border border-cream-300 shadow-sm p-4">
+          <p className="text-[#6e737b] text-xs">
             Aún no tienes movimientos. Tus cashbacks y canjes aparecerán aquí.
           </p>
         </div>
@@ -66,7 +66,7 @@ export function ActivityFeed() {
   return (
     <div className="mx-4 mt-4 md:mx-0">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-white text-[15px] font-bold">Actividad Reciente</h2>
+        <h2 className="text-warm-700 text-[15px] font-bold">Actividad Reciente</h2>
       </div>
 
       <div className="space-y-2">
@@ -76,40 +76,40 @@ export function ActivityFeed() {
             initial={{ opacity: 0, x: -15 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.08 * i + 0.5, duration: 0.35 }}
-            className="flex items-center gap-2.5 rounded-xl bg-white/5 border border-white/5 p-2.5"
+            className="flex items-center gap-2.5 rounded-xl bg-white border border-cream-300 shadow-sm p-2.5"
           >
             {/* Icon */}
             <div
               className={`flex h-8 w-8 items-center justify-center rounded-lg ${
                 activity.status === "pending"
-                  ? "bg-amber-500/15"
+                  ? "bg-amber-50"
                   : activity.type === "milestone"
-                    ? "bg-purple-500/15"
-                    : "bg-emerald-500/15"
+                    ? "bg-violet-50"
+                    : "bg-brand-50"
               }`}
             >
               {activity.type === "milestone" ? (
                 <span className="text-lg">🎉</span>
               ) : activity.status === "pending" ? (
-                <Clock className="h-4 w-4 text-amber-400" />
+                <Clock className="h-4 w-4 text-amber-700" />
               ) : activity.type === "redemption" ? (
-                <CheckCircle className="h-4 w-4 text-emerald-400" />
+                <CheckCircle className="h-4 w-4 text-brand-500" />
               ) : (
-                <TrendingUp className="h-4 w-4 text-emerald-400" />
+                <TrendingUp className="h-4 w-4 text-brand-500" />
               )}
             </div>
 
             {/* Content */}
             <div className="flex-1 min-w-0">
-              <p className="text-white text-[13px] font-medium truncate">{activity.title}</p>
-              <p className="text-gray-500 text-[10px]">{activity.date}</p>
+              <p className="text-warm-700 text-[13px] font-medium truncate">{activity.title}</p>
+              <p className="text-[#6e737b] text-[10px]">{activity.date}</p>
             </div>
 
             {/* Amount */}
             {activity.amount !== 0 && (
               <span
                 className={`text-[13px] font-bold tabular-nums ${
-                  activity.amount > 0 ? "text-emerald-400" : "text-red-400"
+                  activity.amount > 0 ? "text-brand-500" : "text-red-600"
                 }`}
               >
                 {activity.amount > 0 ? "+" : ""}

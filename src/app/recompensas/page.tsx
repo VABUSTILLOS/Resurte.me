@@ -97,8 +97,8 @@ export default function CashbackPage() {
   // Show nothing while checking auth state
   if (isAuthenticated === null) {
     return (
-      <div className="relative mx-auto flex min-h-screen max-w-md items-center justify-center bg-gray-950">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+      <div className="relative mx-auto flex min-h-screen max-w-md items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
       </div>
     );
   }
@@ -108,10 +108,10 @@ export default function CashbackPage() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="relative mx-auto flex min-h-screen max-w-md flex-col bg-gray-950 sm:max-w-2xl md:max-w-4xl md:flex-row">
+    <div className="relative mx-auto flex min-h-screen max-w-md flex-col sm:max-w-2xl md:max-w-5xl md:flex-row">
       {/* Sidebar Navigation (Tablet/Desktop) */}
       {showShell && (
-        <div className="hidden md:flex md:w-20 lg:w-64 md:flex-col md:border-r md:border-white/5 md:bg-gray-900/50 md:shrink-0">
+        <div className="hidden md:flex md:w-20 lg:w-64 md:flex-col md:border-r md:border-cream-300 md:bg-white/60 md:shrink-0">
           <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
         </div>
       )}

@@ -4,7 +4,6 @@ import { useState } from "react"
 import Link from "next/link"
 import {
   ArrowLeft,
-  MessageCircle,
   PhoneCall,
   Link2,
   Search,
@@ -15,6 +14,7 @@ import {
   Phone,
   Wallet,
   Pencil,
+  Trash2,
 } from "lucide-react"
 import {
   Button,
@@ -24,22 +24,26 @@ import {
   Input,
   Modal,
   Spinner,
+  Select,
+  ConfirmDialog,
 } from "./ui"
 import { ActivityFormModal } from "./activity-form"
 import { ProspectFormModal } from "./prospect-form"
 import { useToast } from "@/components/toast"
 import {
+  ACTIVITY_TYPES,
   ACTIVITY_TYPE_LABEL,
   ACTIVITY_OUTCOME_LABEL,
   type ActivityType,
 } from "@/lib/comercializacion/types"
 import { formatDateTime, formatDate } from "@/lib/comercializacion/dates"
 import { formatMoney } from "@/lib/comercializacion/commissions"
-import { buildWhatsappLink, firstContactMessage } from "@/lib/comercializacion/whatsapp"
+import { WhatsappTemplateMenu } from "./whatsapp-templates"
 import {
   searchUsersForLinking,
   linkProspectAccount,
   updateProspect,
+  deleteActivity,
 } from "@/lib/comercializacion/actions"
 import type { Prospect, Activity } from "@/lib/comercializacion/types"
 
@@ -158,14 +162,39 @@ export function ProspectoDetail({
   const [showLink, setShowLink] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [refreshed, setRefreshed] = useState(0)
+  const [activityFilter, setActivityFilter] = useState<ActivityType | "todos">("todos")
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
+  const [deletingActivity, setDeletingActivity] = useState<Activity | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
+  const visibleActivities =
+    activityFilter === "todos"
+      ? activities
+      : activities.filter((a) => a.type === activityFilter)
+
+  function reloadPage() {
+    setRefreshed((r) => r + 1)
+    window.location.reload()
+  }
+
+  async function confirmDeleteActivity() {
+    if (!deletingActivity) return
+    setDeleteLoading(true)
+    try {
+      await deleteActivity(deletingActivity.id)
+      toast("Actividad eliminada")
+      setDeletingActivity(null)
+      reloadPage()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error al eliminar", "error")
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
   // El refresco tras guardar remonta el componente vía key={refreshed},
   // así que "current" siempre es igual a "prospect" (derivado, no state).
   const current = prospect
 
-  const waLink = buildWhatsappLink(
-    current.whatsapp ?? current.phone,
-    firstContactMessage("tu asesor", current.name, current.restaurant_name)
-  )
   const regLink = current.referral_code
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/auth/register?ref=${current.referral_code}`
     : null
@@ -259,17 +288,14 @@ export function ProspectoDetail({
         ) : null}
 
         <div className="flex flex-wrap gap-2 pt-1">
-          {waLink ? (
-            <a
-              href={waLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#25D366]/15 text-[#128C4A] px-3 py-1.5 rounded-xl hover:bg-[#25D366]/25 transition-colors"
-            >
-              <MessageCircle className="w-3.5 h-3.5" />
-              WhatsApp
-            </a>
-          ) : null}
+          <WhatsappTemplateMenu
+            phone={current.whatsapp ?? current.phone}
+            vars={{
+              nombre: current.name,
+              restaurante: current.restaurant_name,
+            }}
+            variant="button"
+          />
           <Button variant="secondary" size="sm" onClick={() => setShowActivity(true)}>
             <PhoneCall className="w-3.5 h-3.5" />
             Registrar llamada
@@ -349,22 +375,43 @@ export function ProspectoDetail({
 
       {/* Timeline de actividades */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
           <h3 className="text-sm font-semibold text-gray-900">Bitácora de contacto</h3>
-          <Button variant="secondary" size="sm" onClick={() => setShowActivity(true)}>
-            <PhoneCall className="w-3.5 h-3.5" />
-            Registrar
-          </Button>
+          <div className="flex items-center gap-2">
+            {activities.length > 0 ? (
+              <Select
+                value={activityFilter}
+                onChange={(e) => setActivityFilter(e.target.value as ActivityType | "todos")}
+                className="!w-auto text-xs"
+              >
+                <option value="todos">Todas</option>
+                {ACTIVITY_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {ACTIVITY_TYPE_LABEL[t]}
+                  </option>
+                ))}
+              </Select>
+            ) : null}
+            <Button variant="secondary" size="sm" onClick={() => setShowActivity(true)}>
+              <PhoneCall className="w-3.5 h-3.5" />
+              Registrar
+            </Button>
+          </div>
         </div>
         {activities.length === 0 ? (
           <EmptyState
             title="Aún no hay actividades"
             subtitle="Registra tu primera llamada o WhatsApp para empezar el seguimiento."
           />
+        ) : visibleActivities.length === 0 ? (
+          <EmptyState
+            title="Sin actividades de este tipo"
+            subtitle="Cambia el filtro para ver el resto de la bitácora."
+          />
         ) : (
           <ol className="relative space-y-4 before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
-            {activities.map((a) => (
-              <li key={a.id} className="relative pl-10">
+            {visibleActivities.map((a) => (
+              <li key={a.id} className="relative pl-10 group/activity">
                 <span className="absolute left-0 top-0 w-8 h-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-sm">
                   {ACTIVITY_ICON[a.type]}
                 </span>
@@ -382,6 +429,22 @@ export function ProspectoDetail({
                         {Math.round(a.duration_seconds / 60)} min
                       </span>
                     ) : null}
+                    <span className="ml-auto flex items-center gap-1 opacity-0 group-hover/activity:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => setEditingActivity(a)}
+                        className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                        title="Editar actividad"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingActivity(a)}
+                        className="p-1 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600"
+                        title="Eliminar actividad"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </span>
                   </div>
                   {a.summary ? (
                     <p className="text-sm text-gray-600 mt-0.5">{a.summary}</p>
@@ -403,9 +466,29 @@ export function ProspectoDetail({
         onSaved={() => {
           toast("Actividad registrada ✅")
           setShowActivity(false)
-          setRefreshed((r) => r + 1)
-          window.location.reload()
+          reloadPage()
         }}
+      />
+
+      <ActivityFormModal
+        open={!!editingActivity}
+        onClose={() => setEditingActivity(null)}
+        prospectId={current.id}
+        activity={editingActivity}
+        onSaved={() => {
+          toast("Actividad actualizada")
+          setEditingActivity(null)
+          reloadPage()
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!deletingActivity}
+        onClose={() => setDeletingActivity(null)}
+        onConfirm={confirmDeleteActivity}
+        loading={deleteLoading}
+        title="Eliminar actividad"
+        message={`¿Eliminar esta actividad (${deletingActivity ? ACTIVITY_TYPE_LABEL[deletingActivity.type] : ""})? Esta acción no se puede deshacer.`}
       />
 
       <ProspectFormModal
