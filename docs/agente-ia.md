@@ -16,6 +16,7 @@ Basado en el *Plan Completo de Prospección Chihuahua* (agosto 2026).
 
 1. **Migración**: ejecutar `supabase/migrations/00059_agente_ia.sql` en el SQL Editor de Supabase (idempotente).
 2. **IA (opcional)**: definir `OPENAI_API_KEY` (+ `OPENAI_BASE_URL`/`AGENT_MODEL`) o usar OmniRoute (`OMNIROUTE_BASE_URL`/`OMNIROUTE_API_KEY`). Sin esto, el agente funciona con plantillas.
+   - **DeepSeek** (más barato, buen español): `OPENAI_BASE_URL=https://api.deepseek.com/v1`, `AGENT_MODEL=deepseek-chat` y tu `OPENAI_API_KEY` de platform.deepseek.com.
 3. **Segmentar prospectos**: asignar `tier` (1/2/3) y `zone` (`centro`, `distrito_uno`, `paseo_central`, `periferico`) en `crm_prospects` para activar la priorización y los análisis por segmento.
 
 ## Rutas de la semana (del plan)

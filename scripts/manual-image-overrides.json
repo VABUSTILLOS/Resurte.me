@@ -1,0 +1,15 @@
+{
+  "pierna-muslo-pollo": { "engine": "wikimedia", "query": "raw chicken leg quarters" },
+  "diezmillo-de-res": { "engine": "wikimedia", "query": "raw beef chuck steak" },
+  "camaron-pacotilla": { "engine": "wikimedia", "query": "raw shrimp peeled" },
+  "camaron-u12-u15": { "engine": "wikimedia", "query": "jumbo shrimp raw" },
+  "huachinango-entero": { "engine": "wikimedia", "query": "red snapper fish" },
+  "sabritas-clasicas-170g": { "engine": "wikimedia", "query": "Sabritas potato chips" },
+  "cloro-1l": { "engine": "wikimedia", "query": "bleach bottle" },
+  "cloro-5l": { "engine": "wikimedia", "query": "Cloro bleach" },
+  "jabon-lavaplatos-750ml": { "engine": "wikimedia", "query": "dishwashing liquid bottle" },
+  "germinado-de-soya": { "engine": "wikimedia", "query": "mung bean sprouts" },
+  "pan-para-crutones": { "engine": "wikimedia", "query": "croutons" },
+  "pure-de-tomate-enlatado": { "engine": "off", "query": "puré de tomate" },
+  "yogur-griego": { "engine": "off", "query": "yogur griego natural" }
+}
