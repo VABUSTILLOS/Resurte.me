@@ -84,6 +84,8 @@ export interface Prospect {
   email: string | null
   city_id: number | null
   city_name: string | null
+  tier: number | null
+  zone: string | null
   status: ProspectStatus
   user_id: string | null
   referral_code: string | null

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Modal, Button, Input, Select, TextArea, FieldLabel, Spinner } from "./ui"
 import { PROSPECT_STATUSES, PROSPECT_STATUS_LABEL, type Prospect, type ProspectStatus } from "@/lib/comercializacion/types"
+import { TIER_LABEL, ZONES } from "@/lib/agente/plan"
 
 interface CityOption {
   id: number
@@ -30,6 +31,8 @@ export function ProspectFormModal({
     whatsapp: "",
     email: "",
     city_id: "",
+    tier: "",
+    zone: "",
     status: "nuevo" as ProspectStatus,
     next_follow_up_at: "",
     notes: "",
@@ -50,6 +53,8 @@ export function ProspectFormModal({
         whatsapp: prospect?.whatsapp ?? "",
         email: prospect?.email ?? "",
         city_id: prospect?.city_id ? String(prospect.city_id) : "",
+        tier: prospect?.tier ? String(prospect.tier) : "",
+        zone: prospect?.zone ?? "",
         status: prospect?.status ?? "nuevo",
         next_follow_up_at: prospect?.next_follow_up_at
           ? new Date(prospect.next_follow_up_at).toISOString().slice(0, 16)
@@ -76,6 +81,8 @@ export function ProspectFormModal({
         whatsapp: form.whatsapp || null,
         email: form.email || null,
         city_id: form.city_id ? Number(form.city_id) : null,
+        tier: form.tier ? Number(form.tier) : null,
+        zone: form.zone || null,
         status: form.status,
         next_follow_up_at: form.next_follow_up_at
           ? new Date(form.next_follow_up_at).toISOString()
@@ -182,6 +189,37 @@ export function ProspectFormModal({
               {PROSPECT_STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {PROSPECT_STATUS_LABEL[s]}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <FieldLabel>Tier (segmento)</FieldLabel>
+            <Select
+              value={form.tier}
+              onChange={(e) => setForm({ ...form, tier: e.target.value })}
+            >
+              <option value="">— Sin asignar —</option>
+              {[1, 2, 3].map((t) => (
+                <option key={t} value={t}>
+                  {TIER_LABEL[t]}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <FieldLabel>Zona de ruta</FieldLabel>
+            <Select
+              value={form.zone}
+              onChange={(e) => setForm({ ...form, zone: e.target.value })}
+            >
+              <option value="">— Sin asignar —</option>
+              {ZONES.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.label}
                 </option>
               ))}
             </Select>
