@@ -20,22 +20,33 @@ export default function ToolSwitcher() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 overflow-x-auto">
         <div className="flex items-center gap-1.5 min-w-max">
-          {PANEL_NAV.map((item) => {
+          {PANEL_NAV.map((item, idx) => {
             const active = pathname === item.pathname
+            // Separador visual al cambiar de familia (operación → costos →
+            // planeación → sistema): misma agrupación que el hub de /panel.
+            const prev = idx > 0 ? PANEL_NAV[idx - 1] : undefined
+            const showDivider = item.area !== undefined && item.area !== prev?.area
             return (
-              <Link
-                key={item.pathname}
-                href={item.pathname}
-                aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
-                  active
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                <span aria-hidden>{item.icon}</span>
-                {item.label}
-              </Link>
+              <span key={item.pathname} className="flex items-center gap-1.5">
+                {showDivider && (
+                  <span
+                    aria-hidden="true"
+                    className="mx-1 h-4 w-px bg-gray-200 shrink-0"
+                  />
+                )}
+                <Link
+                  href={item.pathname}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+                    active
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <span aria-hidden>{item.icon}</span>
+                  {item.label}
+                </Link>
+              </span>
             )
           })}
         </div>

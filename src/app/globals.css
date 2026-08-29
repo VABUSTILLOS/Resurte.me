@@ -120,11 +120,13 @@ body.cart-bar-active {
 }
 
 /* Cookie banner visible: la franja ancha (z-60) cubriría WhatsApp,
-   StickyCatalogButton y el sticky ATC; mientras está visible se ocultan para
-   que el usuario no pueda tocar accidentalmente un botón que queda bajo el
-   banner. Al aceptar/desechar el banner, la clase se quita y reaparecen. */
+   StickyCatalogButton, el botón de detección de ciudad y el sticky ATC;
+   mientras está visible se ocultan para que el usuario no pueda tocar
+   accidentalmente un botón que queda bajo el banner. Al aceptar/desechar el
+   banner, la clase se quita y reaparecen. */
 body.cookie-consent-visible .whatsapp-floating,
-body.cookie-consent-visible .sticky-catalog-button {
+body.cookie-consent-visible .sticky-catalog-button,
+body.cookie-consent-visible .city-detector {
   display: none;
 }
 

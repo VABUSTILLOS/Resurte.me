@@ -24,7 +24,7 @@ export function CityDetector() {
   if (city || isDetecting || isLoading) return null
 
   return (
-    <div className="fixed bottom-6 inset-x-0 flex flex-col items-center gap-2 z-40 px-4 pointer-events-none">
+    <div className="city-detector fixed bottom-6 inset-x-0 flex flex-col items-center gap-2 z-40 px-4 pointer-events-none">
       {detectionError && (
         <div className="pointer-events-auto max-w-sm rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-center shadow-lg">
           <p className="text-xs font-medium text-red-700 leading-snug">{detectionError}</p>

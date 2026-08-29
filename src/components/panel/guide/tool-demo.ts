@@ -309,27 +309,31 @@ export interface PanelNavItem {
   toolKey: string
   icon: string
   label: string
+  /** Familia de la herramienta (misma agrupación que TOOL_AREAS del hub) */
+  area?: "operacion" | "costos" | "planeacion" | "sistema"
 }
 
 /**
  * Herramientas disponibles en la barra de navegación del panel.
- * Todas tienen dataset demo en `TOOL_DEMOS`.
+ * Todas tienen dataset demo en `TOOL_DEMOS`. Ordenadas por familia
+ * (operación → costos → planeación → sistema) igual que el hub, para que
+ * la barra persistente refleje la misma agrupación que /panel.
  */
 export const PANEL_NAV: PanelNavItem[] = [
   { pathname: "/panel", toolKey: "panel", icon: "🏠", label: "Inicio" },
-  { pathname: "/panel/ventas", toolKey: "ventas", icon: "🧾", label: "Ventas" },
-  { pathname: "/panel/costeo", toolKey: "costeo", icon: "🧮", label: "Costeo" },
-  { pathname: "/panel/mermas", toolKey: "mermas", icon: "🗑️", label: "Mermas" },
-  { pathname: "/panel/inventario", toolKey: "inventario", icon: "📦", label: "Inventario" },
-  { pathname: "/panel/planificador", toolKey: "planificador", icon: "📋", label: "Planificador" },
-  { pathname: "/panel/rentabilidad", toolKey: "rentabilidad", icon: "📈", label: "Rentabilidad" },
-  { pathname: "/panel/temporada", toolKey: "temporada", icon: "🗓️", label: "Temporada" },
-  { pathname: "/panel/apertura", toolKey: "apertura", icon: "🚀", label: "Apertura" },
-  { pathname: "/panel/comanda", toolKey: "comanda", icon: "👨‍🍳", label: "Comandas" },
-  { pathname: "/panel/foodos/restaurante", toolKey: "restaurante", icon: "🏪", label: "Restaurante" },
-  { pathname: "/panel/foodos/menu", toolKey: "menu", icon: "🍽️", label: "Menú digital" },
-  { pathname: "/panel/foodos/combos", toolKey: "combos", icon: "🎁", label: "Combos" },
-  { pathname: "/panel/foodos/clientes", toolKey: "clientes", icon: "👥", label: "Clientes" },
-  { pathname: "/panel/foodos/tablero", toolKey: "tablero", icon: "📊", label: "Tablero" },
-  { pathname: "/panel/foodos/pedidos", toolKey: "pedidos", icon: "🧾", label: "Pedidos" },
+  { pathname: "/panel/ventas", toolKey: "ventas", icon: "🧾", label: "Ventas", area: "operacion" },
+  { pathname: "/panel/comanda", toolKey: "comanda", icon: "👨‍🍳", label: "Comandas", area: "operacion" },
+  { pathname: "/panel/apertura", toolKey: "apertura", icon: "🚀", label: "Apertura", area: "operacion" },
+  { pathname: "/panel/costeo", toolKey: "costeo", icon: "🧮", label: "Costeo", area: "costos" },
+  { pathname: "/panel/mermas", toolKey: "mermas", icon: "🗑️", label: "Mermas", area: "costos" },
+  { pathname: "/panel/rentabilidad", toolKey: "rentabilidad", icon: "📈", label: "Rentabilidad", area: "costos" },
+  { pathname: "/panel/planificador", toolKey: "planificador", icon: "📋", label: "Planificador", area: "planeacion" },
+  { pathname: "/panel/inventario", toolKey: "inventario", icon: "📦", label: "Inventario", area: "planeacion" },
+  { pathname: "/panel/temporada", toolKey: "temporada", icon: "🗓️", label: "Temporada", area: "planeacion" },
+  { pathname: "/panel/foodos/restaurante", toolKey: "restaurante", icon: "🏪", label: "Restaurante", area: "sistema" },
+  { pathname: "/panel/foodos/menu", toolKey: "menu", icon: "🍽️", label: "Menú digital", area: "sistema" },
+  { pathname: "/panel/foodos/combos", toolKey: "combos", icon: "🎁", label: "Combos", area: "sistema" },
+  { pathname: "/panel/foodos/clientes", toolKey: "clientes", icon: "👥", label: "Clientes", area: "sistema" },
+  { pathname: "/panel/foodos/tablero", toolKey: "tablero", icon: "📊", label: "Tablero", area: "sistema" },
+  { pathname: "/panel/foodos/pedidos", toolKey: "pedidos", icon: "🧾", label: "Pedidos", area: "sistema" },
 ]
