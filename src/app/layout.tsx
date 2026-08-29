@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { CityProvider } from "@/contexts/city-context"
 import { CartProvider } from "@/contexts/cart-context"
+import { UtmCapture } from "@/components/utm-capture"
 import { Header } from "@/components/layout/header"
 import { FooterForRoute } from "@/components/layout/FooterForRoute"
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
@@ -158,6 +159,7 @@ export default async function RootLayout({
               <main id="main-content" tabIndex={-1} className="flex-1 outline-none"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
               <FooterForRoute />
               <CityDetector />
+              <UtmCapture />
               <CartDrawer />
               <CheckoutOverlays />
               <BumpsDebugProbe />

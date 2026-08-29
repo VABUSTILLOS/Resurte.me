@@ -85,7 +85,27 @@ export function abandonedCartEmailHtml(cartSummary: {
   itemCount: number
   itemsPreview: string
   cartUrl: string
+  couponCode?: string
+  couponDiscountPct?: number
+  couponExpiresAt?: string
+  finalNotice?: boolean
 }): string {
+  const couponBlock = cartSummary.couponCode
+    ? `
+  <p style="background:#FFF8E1;border:1px dashed #F9A825;padding:16px;border-radius:8px;color:#242529;font-size:15px;line-height:1.6">
+    🎁 Para que completes tu pedido, aquí tienes un cupón de
+    <strong>${cartSummary.couponDiscountPct ?? 0}% de descuento</strong>:<br>
+    <strong style="font-size:20px;letter-spacing:1px">${cartSummary.couponCode}</strong><br>
+    <span style="color:#72767E;font-size:13px">
+      Válido hasta ${cartSummary.couponExpiresAt ?? "su fecha de expiración"} · Un solo uso
+    </span>
+  </p>`
+    : ""
+  const urgencyLine = cartSummary.finalNotice
+    ? `<p style="color:#C62828;font-size:14px;font-weight:600">
+    ⏳ Último aviso: tu cupón y los productos apartados expiran pronto.
+  </p>`
+    : ""
   return `<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="utf-8"></head>
@@ -97,7 +117,7 @@ export function abandonedCartEmailHtml(cartSummary: {
   </p>
   <p style="background:#F7F5F0;padding:16px;border-radius:8px;color:#5C6068;font-size:14px">
     ${cartSummary.itemsPreview}
-  </p>
+  </p>${couponBlock}${urgencyLine}
   <p style="color:#242529;font-size:16px;line-height:1.6">
     ¿Todavía los necesitas? No te preocupes, tu carrito sigue guardado.
   </p>

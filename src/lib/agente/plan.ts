@@ -99,7 +99,7 @@ export const VALUE_PROPS = [
   "Entrega en menos de 24 horas (pides antes de las 10 AM y llega el mismo día)",
   "Precios de central de abastos",
   "Crédito a 7/15/30 días sin aval, según historial",
-  "Club del Chef: cada peso gastado regresa como puntos canjeables por descuentos",
+  "Programa de Recompensas: cashback del 5% al 20% según tu nivel, canjeable por servicios de marketing, fotografía y web — somos tu socio de crecimiento",
   "Facturación CFDI 4.0 automática",
   "Pedido mínimo de $500 MXN y envío gratis desde $3,000 MXN",
 ]

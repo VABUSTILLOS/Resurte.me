@@ -53,6 +53,14 @@ interface CreateOrderBody {
   total: number
   coupon_code?: string
   items: OrderItemInput[]
+  /** Atribución UTM de la campaña de origen (persistida en orders.utm_*). */
+  utm?: {
+    utm_source?: string
+    utm_medium?: string
+    utm_campaign?: string
+    utm_term?: string
+    utm_content?: string
+  }
 }
 
 /**
@@ -84,6 +92,7 @@ export async function POST(request: NextRequest) {
       coupon_code,
       items,
       save_default,
+      utm,
     } = body
 
     // Validate required fields
@@ -246,7 +255,7 @@ export async function POST(request: NextRequest) {
 
     // ── Validación server-side del cupón (si viene) ──
     // El descuento se recalcula contra la BD con la misma fórmula del cliente
-    // (calcDiscount en cart-context) para que el total coincida exactamente.
+    // (calcCouponDiscount en checkout-config) para que el total coincida exactamente.
     let discountAmount = 0
     let coupon: CouponRow | null = null
     const code = coupon_code?.trim()
@@ -501,11 +510,39 @@ export async function POST(request: NextRequest) {
     if (storeId !== null) {
       insertOrder.store_id = storeId
     }
-    const { data: order, error: orderError } = await supabase
+    // ── Atribución UTM (migración 00061) ──
+    // Best-effort: si el esquema desplegado aún no tiene las columnas utm_*,
+    // se reintenta sin ellas en lugar de fallar el checkout (mismo patrón
+    // que insertAddressResilient).
+    const utmEntries = utm
+      ? (Object.entries(utm) as Array<[string, unknown]>)
+          .filter(
+            ([key, value]) =>
+              key.startsWith("utm_") && typeof value === "string" && value.trim().length > 0
+          )
+          .map(([key, value]) => [key, (value as string).trim().slice(0, 200)] as const)
+      : []
+    const withUtm = { ...insertOrder, ...Object.fromEntries(utmEntries) }
+
+    const firstTry = await supabase
       .from("orders")
-      .insert(insertOrder)
+      .insert(utmEntries.length > 0 ? withUtm : insertOrder)
       .select("id, cashback_credits, cashback_tier, total")
       .single()
+
+    // 42703 = undefined_column: la migración 00061 aún no está aplicada →
+    // reintento sin atribución UTM en lugar de fallar el checkout.
+    const { data: order, error: orderError } =
+      firstTry.error && utmEntries.length > 0 && firstTry.error.code === "42703"
+        ? await (async () => {
+            logger.warn("orders.utm_* no existe; insertando sin atribución UTM")
+            return supabase
+              .from("orders")
+              .insert(insertOrder)
+              .select("id, cashback_credits, cashback_tier, total")
+              .single()
+          })()
+        : firstTry
 
     if (orderError) {
       logger.error("Order creation error:", orderError)

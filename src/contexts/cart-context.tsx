@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react"
 import type { Cart, CartItem, AppliedCoupon } from "@/types"
+import { calcCouponDiscount } from "@/lib/checkout-config"
 
 // ============================================================
 // Types
@@ -192,15 +193,8 @@ function calcSubtotal(items: CartItem[]): number {
   }, 0)
 }
 
-function calcDiscount(subtotal: number, coupon: AppliedCoupon | null): number {
-  if (!coupon) return 0
-  if (subtotal < coupon.min_order) return 0
-
-  if (coupon.discount_type === "percentage") {
-    return Math.round((subtotal * coupon.discount_value) / 100 * 100) / 100
-  }
-  return Math.min(coupon.discount_value, subtotal)
-}
+// El descuento del cupón usa la fuente única `calcCouponDiscount`
+// (checkout-config.ts), la misma fórmula que el servidor en POST /api/orders.
 
 // ============================================================
 // Provider
@@ -269,7 +263,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [itemCount])
 
   const subtotal = calcSubtotal(state.cart.items)
-  const discount = calcDiscount(subtotal, state.coupon)
+  const discount = calcCouponDiscount(subtotal, state.coupon)
 
   const total = useCallback(
     (deliveryFee = 0) => {

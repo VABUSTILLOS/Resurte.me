@@ -11,6 +11,7 @@ import {
   saveLastAddress,
   claimGuestAddresses,
 } from "@/lib/guest-address"
+import { getStoredUtm } from "@/lib/utm"
 import type { AddressForm, ScheduleForm } from "@/components/checkout/checkout-shared"
 import type { SelectedBump } from "@/components/checkout/BumpCards"
 
@@ -347,6 +348,9 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
             delivery_fee: deliveryFee,
             total,
             coupon_code: coupon?.code,
+            // Atribución UTM de la campaña de origen (migración 00061). El
+            // servidor la persiste en orders.utm_* para medir conversión.
+            utm: getStoredUtm() ?? undefined,
             items: [
               ...cartItems.map((item) => ({
                 product_id: item.product_id,

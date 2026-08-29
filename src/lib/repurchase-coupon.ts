@@ -17,6 +17,8 @@ const REPURCHASE_COUPON = {
   VALIDITY_DAYS: 14,
   /** Días de vigencia del cupón de reactivación ("te extrañamos"). */
   REACTIVATION_VALIDITY_DAYS: 10,
+  /** Días de vigencia del cupón de recuperación de carrito (urgencia corta). */
+  ABANDONED_CART_VALIDITY_DAYS: 3,
 } as const
 
 type ServiceSupabase = Awaited<ReturnType<typeof createServiceClient>>
@@ -41,13 +43,16 @@ function generateCode(prefix: string): string {
 export async function issuePersonalCoupon(
   supabase: ServiceSupabase,
   userId: string,
-  origin: "post_purchase" | "reactivation",
+  origin: "post_purchase" | "reactivation" | "abandoned_cart",
 ): Promise<IssuedCoupon | null> {
-  const prefix = origin === "post_purchase" ? "VUELVE" : "EXTRA"
+  const prefix =
+    origin === "post_purchase" ? "VUELVE" : origin === "reactivation" ? "EXTRA" : "RECUPERA"
   const validityDays =
     origin === "post_purchase"
       ? REPURCHASE_COUPON.VALIDITY_DAYS
-      : REPURCHASE_COUPON.REACTIVATION_VALIDITY_DAYS
+      : origin === "reactivation"
+        ? REPURCHASE_COUPON.REACTIVATION_VALIDITY_DAYS
+        : REPURCHASE_COUPON.ABANDONED_CART_VALIDITY_DAYS
   const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000)
 
   // Reintenta ante colisión de código UNIQUE (probabilidad mínima).
