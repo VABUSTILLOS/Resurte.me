@@ -249,6 +249,22 @@ export const AnalyticsEvents = {
       itemCount != null ? { order_id: orderId, item_count: itemCount } : { order_id: orderId }
     ),
 
+  /** Quick-add desde la sección "Volver a pedir" del home */
+  reorderQuickAdd: (productId: number) =>
+    trackEvent("reorder_quick_add", { product_id: productId }),
+
+  /** Cupón de recompra/reactivación aplicado en el carrito */
+  repurchaseCouponApplied: (code: string, origin: "post_purchase" | "reactivation") =>
+    trackEvent("repurchase_coupon_applied", { coupon_code: code, origin }),
+
+  /** Recordatorio de recompra enviado (cron) */
+  reorderReminderSent: (userId: string, channel: "whatsapp" | "email") =>
+    trackEvent("reorder_reminder_sent", { user_id: userId, channel }),
+
+  /** Cliente llegó al sitio desde un recordatorio de recompra */
+  reorderReminderClicked: (source: string) =>
+    trackEvent("reorder_reminder_clicked", { source }),
+
   /** WhatsApp share tapped */
   shareReferral: () =>
     trackEvent("share", { method: "whatsapp", content_type: "referral" }),
