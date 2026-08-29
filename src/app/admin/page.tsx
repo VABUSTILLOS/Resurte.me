@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { Suspense } from "react"
 import Link from "next/link"
 import {
   ShoppingBag,
@@ -13,11 +14,23 @@ import {
 } from "lucide-react"
 import { getAdminOrders, getActiveStoresCount, type AdminOrder } from "./actions"
 import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/order-labels"
+import { MetricsCharts } from "./components/MetricsCharts"
 
 export default function AdminDashboardPage() {
+  const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("daily")
+  const [metrics, setMetrics] = useState<{
+    points: Array<{ period: string; revenue: number; orders: number; aov: number; conversion: number }>
+    totalRevenue: number
+    totalOrders: number
+    avgAov: number
+    avgConversion: number
+  } | null>(null)
+  const [metricsLoading, setMetricsLoading] = useState(true)
+  const [metricsError, setMetricsError] = useState<string | null>(null)
+
   const [orders, setOrders] = useState<AdminOrder[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [ordersLoading, setOrdersLoading] = useState(true)
+  const [ordersError, setOrdersError] = useState<string | null>(null)
   const [stats, setStats] = useState({
     ordersToday: 0,
     revenueToday: 0,
@@ -25,52 +38,61 @@ export default function AdminDashboardPage() {
     cancellations: 0,
   })
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function fetchDashboard() {
-      try {
-        const [allOrders, activeStores] = await Promise.all([
-          getAdminOrders(50),
-          getActiveStoresCount(),
-        ])
-        if (cancelled) return
-        const orderList = allOrders.orders
-        setOrders(orderList)
-
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        const todaysOrders = orderList.filter(
-          (o) => new Date(o.created_at) >= today
-        )
-        const revenueToday = todaysOrders
-          .filter((o) => o.payment_status === "paid")
-          .reduce((sum, o) => sum + Number(o.total), 0)
-        const cancellations = todaysOrders.filter(
-          (o) => o.status === "cancelled"
-        ).length
-
-        setStats({
-          ordersToday: todaysOrders.length,
-          revenueToday,
-          activeStores,
-          cancellations,
-        })
-        setError(null)
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Error al cargar el dashboard")
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
+  const fetchMetrics = useCallback(async () => {
+    setMetricsLoading(true)
+    setMetricsError(null)
+    try {
+      const res = await fetch(`/api/admin/metrics?period=${period}`)
+      if (!res.ok) throw new Error("Error al cargar métricas")
+      const data = await res.json()
+      setMetrics(data)
+    } catch (e) {
+      setMetricsError(e instanceof Error ? e.message : "Error al cargar métricas")
+    } finally {
+      setMetricsLoading(false)
     }
+  }, [period])
 
-    fetchDashboard()
-    return () => {
-      cancelled = true
+  const fetchOrders = useCallback(async () => {
+    setOrdersLoading(true)
+    setOrdersError(null)
+    try {
+      const res = await fetch("/api/admin/orders?limit=50")
+      if (!res.ok) throw new Error("Error al cargar pedidos")
+      const data = await res.json()
+      setOrders(data.orders)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const todaysOrders = data.orders.filter(
+        (o: AdminOrder) => new Date(o.created_at) >= today
+      )
+      const revenueToday = todaysOrders
+        .filter((o: AdminOrder) => o.payment_status === "paid")
+        .reduce((sum: number, o: AdminOrder) => sum + Number(o.total), 0)
+      const cancellations = todaysOrders.filter(
+        (o: AdminOrder) => o.status === "cancelled"
+      ).length
+      setStats({
+        ordersToday: todaysOrders.length,
+        revenueToday,
+        activeStores: data.activeStores,
+        cancellations,
+      })
+    } catch (e) {
+      setOrdersError(e instanceof Error ? e.message : "Error al cargar pedidos")
+    } finally {
+      setOrdersLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    fetchMetrics()
+  }, [fetchMetrics])
+
+  // Carga inicial de pedidos (una sola vez)
+  useEffect(() => {
+    fetchOrders()
+  }, [fetchOrders])
 
   const recentOrders = orders.slice(0, 5)
   const statCards: {
@@ -115,7 +137,7 @@ export default function AdminDashboardPage() {
     },
   ]
 
-  if (loading) {
+  if (ordersLoading || metricsLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-brand-600" />
@@ -123,11 +145,15 @@ export default function AdminDashboardPage() {
     )
   }
 
-  if (error) {
+  if (ordersError || metricsError) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <p className="text-red-600 text-sm font-medium">{error}</p>
-        <p className="text-gray-400 text-xs mt-1">Verifica que estés autenticado como administrador.</p>
+        <p className="text-red-600 text-sm font-medium">
+          {ordersError || metricsError}
+        </p>
+        <p className="text-gray-400 text-xs mt-1">
+          Verifica que estés autenticado como administrador.
+        </p>
       </div>
     )
   }
@@ -169,8 +195,19 @@ export default function AdminDashboardPage() {
         ))}
       </div>
 
+      {/* Metrics Charts */}
+      {metrics && (
+        <Suspense fallback={<div className="h-64 animate-pulse bg-gray-50 rounded-lg" />}>
+          <MetricsCharts
+            data={metrics.points}
+            period={period}
+            onPeriodChange={setPeriod}
+          />
+        </Suspense>
+      )}
+
       {/* Recent orders */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mt-8">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Pedidos recientes</h2>
           <Link

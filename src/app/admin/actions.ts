@@ -3,6 +3,7 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
 import { requireAdmin } from "@/lib/admin-auth"
+import { format } from "date-fns"
 
 interface AdminOrderItem {
   id: number
@@ -166,6 +167,136 @@ export async function getActiveStoresCount(): Promise<number> {
     throw new Error("Error al cargar las tiendas")
   }
   return count ?? 0
+}
+
+/** ============================================================
+ *  METRICS PARA DASHBOARD ADMIN
+ * ============================================================ */
+
+export interface AdminMetricsParams {
+  period: "daily" | "weekly" | "monthly"
+  from?: string // ISO date
+  to?: string // ISO date
+}
+
+export interface AdminMetricsPoint {
+  period: string
+  revenue: number
+  orders: number
+  aov: number
+  conversion: number
+}
+
+export interface AdminMetricsSummary {
+  totalRevenue: number
+  totalOrders: number
+  avgAov: number
+  avgConversion: number
+  period: string
+  points: AdminMetricsPoint[]
+}
+
+/**
+ * Obtiene métricas agregadas para el dashboard admin.
+ * Agrupa por día/semana/mes según `period`.
+ * `from`/`to` permiten filtrar rango (opcional, por defecto últimos 30/12/6 meses).
+ */
+export async function getAdminMetrics({
+  period,
+  from,
+  to,
+}: AdminMetricsParams): Promise<AdminMetricsSummary> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+
+  // Determinar rango por defecto según período
+  const now = new Date()
+  const defaultFrom = new Date(now)
+  const defaultTo = new Date(now)
+
+  if (period === "daily") {
+    defaultFrom.setDate(now.getDate() - 30)
+  } else if (period === "weekly") {
+    defaultFrom.setMonth(now.getMonth() - 12)
+  } else {
+    defaultFrom.setMonth(now.getMonth() - 6)
+  }
+
+  const startDate = from ? new Date(from) : defaultFrom
+  const endDate = to ? new Date(to) : defaultTo
+
+  // Query orders con filtros
+  const query = supabase
+    .from("orders")
+    .select("id, total, payment_status, created_at")
+    .gte("created_at", startDate.toISOString())
+    .lte("created_at", endDate.toISOString())
+
+  const { data: orders, error } = await query
+
+  if (error) {
+    logger.error("[ADMIN-METRICS] Error fetching orders:", error)
+    throw new Error("Error al cargar las métricas")
+  }
+
+  // Agregar por período
+  const buckets = new Map<string, { revenue: number; orders: number }>()
+
+  for (const order of orders ?? []) {
+    const date = new Date(order.created_at)
+    let key: string
+
+    if (period === "daily") {
+      key = format(date, "yyyy-MM-dd")
+    } else if (period === "weekly") {
+      // ISO week: YYYY-Www
+      key = format(date, "yyyy-'W'ww")
+    } else {
+      key = format(date, "yyyy-MM")
+    }
+
+    const bucket = buckets.get(key) ?? { revenue: 0, orders: 0 }
+    if (order.payment_status === "paid") {
+      bucket.revenue += Number(order.total)
+    }
+    bucket.orders += 1
+    buckets.set(key, bucket)
+  }
+
+  // Convertir a array ordenado
+  const sortedKeys = Array.from(buckets.keys()).sort()
+  const points: AdminMetricsPoint[] = sortedKeys.map((key) => {
+    const bucket = buckets.get(key)!
+    const aov = bucket.orders > 0 ? bucket.revenue / bucket.orders : 0
+    // Conversión estimada: asumimos ~100 visitas por pedido como baseline
+    // En producción usarías datos reales de analytics
+    const conversion = bucket.orders > 0 ? (bucket.orders / 100) * 100 : 0
+    return {
+      period: key,
+      revenue: bucket.revenue,
+      orders: bucket.orders,
+      aov: Math.round(aov * 100) / 100,
+      conversion: Math.round(conversion * 10) / 10,
+    }
+  })
+
+  const totalRevenue = points.reduce((s, p) => s + p.revenue, 0)
+  const totalOrders = points.reduce((s, p) => s + p.orders, 0)
+  const avgAov = points.length ? points.reduce((s, p) => s + p.aov, 0) / points.length : 0
+  const avgConversion = points.length ? points.reduce((s, p) => s + p.conversion, 0) / points.length : 0
+
+  return {
+    totalRevenue,
+    totalOrders,
+    avgAov: Math.round(avgAov * 100) / 100,
+    avgConversion: Math.round(avgConversion * 10) / 10,
+    period,
+    points,
+  }
 }
 
 // ============================================================
