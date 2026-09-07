@@ -177,3 +177,81 @@ y responde `400` con mensaje claro si no hay ninguno — así lo hace la ruta
   (`OMNIROUTE_*` / `OPENAI_*`). No hay conflicto de nombres: Kie.ai vive en el
   namespace `src/lib/ai/`, se configura con `KIE_AI_API_KEY` y no modifica el
   comportamiento del agente.
+
+## Invocar desde tu código (server-side)
+
+Las rutas admin exigen sesión admin (cookie). Para llamarlas desde el servidor
+de la propia app —Server Actions, Route Handlers o Server Components— usa el
+cliente `src/lib/ai/kie-ai-admin.ts`: reenvía automáticamente la cookie del
+usuario que dispara la petición, así que `requireAdmin()` valida como si fuera
+un request del navegador.
+
+> ⚠️ **Server-only.** `kie-ai-admin.ts` usa `cookies()` de `next/headers`, por
+> lo que **nunca** debe importarse desde un componente cliente. No maneja la
+> API key (esa vive en `src/lib/ai/kie-ai.ts` y se queda en el servidor);
+> solo habla con las rutas admin propias del sitio.
+
+Funciones exportadas (tipos compatibles con `src/lib/ai/kie-ai.ts`):
+
+- `kieChat(messages, model?)` → `{ content, raw }` (chat síncrono).
+- `kieImage(prompt, size = "1:1")` → `{ taskId }`.
+- `kieVideo(prompt, model = "veo3_fast", aspectRatio = "16:9")` → `{ taskId }`
+  (el campo wire es `aspect_ratio`).
+- `kieMusic(prompt, { model?, callBackUrl?, customMode?, instrumental?, style?, title? })`
+  → `{ taskId }`. `callBackUrl` sigue siendo obligatorio: envíalo en las
+  opciones o define `KIEAI_CALLBACK_URL` en el entorno.
+- `kieStatus(taskId)` → `{ record }` (estado actual de la tarea).
+- `kieWaitForTask(taskId, timeoutMs = 120_000)` → consulta cada 2 s hasta un
+  estado terminal (`success`/`fail`/`failed`/`error`, case-insensitive) o lanza
+  un `Error` en español al agotar el timeout.
+
+`BASE_URL` se resuelve con `process.env.NEXT_PUBLIC_APP_URL` (fallback
+`http://localhost:3000`). Si la ruta admin responde con error, el helper lanza
+un `Error` cuyo mensaje es el campo `error` en español de la respuesta.
+
+Ejemplo de **Server Action** (chat síncrono + generación de imagen con espera
+de resultado):
+
+```ts
+"use server"
+
+import { kieChat, kieImage, kieWaitForTask } from "@/lib/ai/kie-ai-admin"
+
+export async function generarImagenConKie(prompt: string) {
+  // 1) Chat de apoyo (síncrono) — opcional.
+  const { content } = await kieChat([
+    { role: "user", content: `Mejora este prompt: ${prompt}` },
+  ])
+
+  // 2) Inicia la generación de imagen y espera el resultado (máx 120 s).
+  const { taskId } = await kieImage(content, "1:1")
+  const record = await kieWaitForTask(taskId)
+  return { taskId, record }
+}
+```
+
+> Si el usuario no está autenticado o no es admin, las rutas responden
+> `401`/`403` y el helper lanza un `Error` con el mensaje en español. Maneja
+> ese caso en la Server Action (try/catch) para devolver un mensaje claro.
+
+### Script de pruebas manuales
+
+`scripts/test-kie-ai.sh` ejecuta un smoke test contra el sitio en ejecución
+(`npm run dev` o un deploy): 1) chat síncrono, 2) imagen asíncrona y
+3) polling de estado hasta `success` imprimiendo el record final.
+
+Para obtener la cookie de sesión admin:
+
+1. Entra al sitio con tu cuenta de administrador.
+2. DevTools → Application → Cookies → copia la cookie
+   `sb-<ref>-auth-token` como `nombre=valor`.
+3. Guárdala en un archivo (default `/tmp/kie-cookie.txt`):
+   `echo 'sb-xxxx-auth-token=<valor>' > /tmp/kie-cookie.txt`.
+
+Uso:
+
+```bash
+BASE=http://localhost:3000 COOKIE_FILE=/tmp/kie-cookie.txt ./scripts/test-kie-ai.sh
+# o contra un entorno remoto:
+BASE=https://tu-dominio.com COOKIE_FILE=/tmp/kie-cookie.txt ./scripts/test-kie-ai.sh
+```
