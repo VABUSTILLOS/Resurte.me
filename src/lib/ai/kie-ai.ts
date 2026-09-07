@@ -82,21 +82,6 @@ async function kieFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return json as T
 }
 
-// ─── Modelos ───────────────────────────────────────────────────────────────
-
-export interface KieAiModel {
-  id: string
-  name?: string
-  type?: string
-  [key: string]: unknown
-}
-
-/** GET /api/v1/models — lista los modelos disponibles (imagen/video/música/LLM). */
-export async function listModels(): Promise<KieAiModel[]> {
-  const data = await kieFetch<{ data?: KieAiModel[]; models?: KieAiModel[] }>("/api/v1/models")
-  return data.data ?? data.models ?? []
-}
-
 // ─── Tareas de generación asíncronas (imagen / video / música) ─────────────
 
 export interface CreateTaskResponse {
@@ -124,26 +109,42 @@ export async function createGenerationTask(
   return { ...data.data, taskId }
 }
 
-/** Inicia una tarea de generación de imagen. `modelPath` apunta al endpoint de imagen por defecto. */
+/**
+ * Inicia una tarea de generación de imagen (GPT-4o Image).
+ * Endpoint real: POST /api/v1/gpt4o-image/generate (validado contra docs.kie.ai).
+ * El body requiere `prompt` y `size` ("1:1" | "3:2" | "2:3"); `model` NO forma
+ * parte del schema y se ignora.
+ */
 export function createImageTask(
-  input: { prompt: string; model?: string; [key: string]: unknown },
+  input: { prompt: string; size?: string; [key: string]: unknown },
   modelPath = "/api/v1/gpt4o-image/generate"
 ) {
   return createGenerationTask(modelPath, input)
 }
 
-/** Inicia una tarea de generación de video. `modelPath` apunta al endpoint de video por defecto. */
+/**
+ * Inicia una tarea de generación de video (Veo).
+ * Endpoint real: POST /api/v1/veo/generate (validado contra docs.kie.ai).
+ * El body requiere `prompt`, `model` (default "veo3_fast"; acepta veo3,
+ * veo3_fast, veo3_lite) y `aspect_ratio` (default "16:9"; acepta 16:9, 9:16, Auto).
+ */
 export function createVideoTask(
-  input: { prompt: string; model?: string; [key: string]: unknown },
+  input: { prompt: string; model?: string; aspect_ratio?: string; [key: string]: unknown },
   modelPath = "/api/v1/veo/generate"
 ) {
   return createGenerationTask(modelPath, input)
 }
 
-/** Inicia una tarea de generación de música. `modelPath` apunta al endpoint de música por defecto. */
+/**
+ * Inicia una tarea de generación de música (Suno).
+ * Endpoint real: POST /api/v1/generate — NO /api/v1/suno/generate (404, validado).
+ * El body requiere { prompt, customMode, instrumental, model, callBackUrl }; sin
+ * esos campos la API responde 422. `callBackUrl` se resuelve en la ruta de API:
+ * body → process.env.KIEAI_CALLBACK_URL → 400 si no hay ninguna.
+ */
 export function createMusicTask(
-  input: { prompt: string; model?: string; [key: string]: unknown },
-  modelPath = "/api/v1/suno/generate"
+  input: { prompt: string; customMode?: boolean; instrumental?: boolean; model?: string; [key: string]: unknown },
+  modelPath = "/api/v1/generate"
 ) {
   return createGenerationTask(modelPath, input)
 }
@@ -153,7 +154,10 @@ export type KieAiTaskState = "waiting" | "queuing" | "generating" | "success" | 
 export interface KieAiTaskRecord {
   taskId: string
   state: KieAiTaskState
+  /** Resultado en crudo (JSON string). Para música/imagen los URLs finales suelen venir en resultUrls/resultJson. */
   resultJson?: string
+  /** Campos de resultado alternativos reportados por recordInfo (p.ej. resultUrls con URLs de assets). */
+  resultUrls?: unknown
   failMsg?: string
   [key: string]: unknown
 }
@@ -204,7 +208,11 @@ export interface KieAiChatResult {
   raw: unknown
 }
 
-/** POST /api/v1/chat/completions — llamada síncrona compatible con OpenAI Chat Completions. */
+/**
+ * POST /v1/chat/completions — llamada síncrona compatible con OpenAI Chat
+ * Completions. OJO: el path real es `/v1/chat/completions` (no `/api/v1/...`,
+ * que responde 404). El `model` va en el body.
+ */
 export async function chatCompletion(params: {
   model: string
   messages: KieAiChatMessage[]
@@ -212,7 +220,7 @@ export async function chatCompletion(params: {
 }): Promise<KieAiChatResult> {
   const data = await kieFetch<{
     choices?: { message?: { content?: string } }[]
-  }>("/api/v1/chat/completions", {
+  }>("/v1/chat/completions", {
     method: "POST",
     body: JSON.stringify(params),
   })
