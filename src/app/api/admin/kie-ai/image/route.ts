@@ -6,10 +6,15 @@ import {
   isKieAiConfigured,
 } from "@/lib/ai/kie-ai"
 
+const ALLOWED_SIZES = ["1:1", "3:2", "2:3"]
+const DEFAULT_SIZE = "1:1"
+
 /**
  * POST /api/admin/kie-ai/image
- * Inicia una tarea de generación de imagen asíncrona en Kie.ai.
- * Body: { prompt, model? } → responde { taskId }.
+ * Inicia una tarea de generación de imagen asíncrona en Kie.ai (GPT-4o Image).
+ * Body: { prompt, size? } → responde { taskId }. `size` por defecto "1:1"
+ * (valores aceptados por el schema de la API: "1:1" | "3:2" | "2:3").
+ * Nota: `model` NO forma parte del schema de /gpt4o-image/generate y se ignora.
  * Consulta el resultado en GET /api/admin/kie-ai/status?taskId=...
  */
 export async function POST(request: Request) {
@@ -41,12 +46,21 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
-    const model =
-      typeof (json as { model?: unknown }).model === "string"
-        ? (json as { model: string }).model
-        : undefined
 
-    const task = await createImageTask({ prompt, ...(model ? { model } : {}) })
+    const size =
+      typeof (json as { size?: unknown }).size === "string"
+        ? (json as { size: string }).size
+        : DEFAULT_SIZE
+    if (!ALLOWED_SIZES.includes(size)) {
+      return NextResponse.json(
+        {
+          error: `size debe ser uno de: ${ALLOWED_SIZES.join(", ")} (default "${DEFAULT_SIZE}")`,
+        },
+        { status: 400 }
+      )
+    }
+
+    const task = await createImageTask({ prompt, size })
     return NextResponse.json({ taskId: task.taskId })
   } catch (error) {
     if (error instanceof KieAiError) {
