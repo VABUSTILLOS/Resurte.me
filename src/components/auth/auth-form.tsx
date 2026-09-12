@@ -3,12 +3,41 @@
 import { useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+import { supabaseConfigError } from "@/lib/supabase/env"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { claimGuestAddresses } from "@/lib/guest-address"
 
 interface AuthFormProps {
   mode: "login" | "register"
+}
+
+/** Traduce errores de Supabase Auth a mensajes claros para el usuario. */
+function mapAuthError(err: unknown, isLogin: boolean): string {
+  const raw = err instanceof Error ? err.message : ""
+  const message = raw.toLowerCase()
+
+  if (message.includes("invalid login credentials")) {
+    return "Correo o contraseña incorrectos. Si no recuerdas tu contraseña, usa «¿Olvidaste tu contraseña?»."
+  }
+  if (message.includes("email not confirmed")) {
+    return "Aún no confirmas tu correo. Revisa tu bandeja de entrada (y spam) o usa el enlace mágico."
+  }
+  if (message.includes("user already registered") || message.includes("already been registered")) {
+    return "Este correo ya tiene una cuenta. Inicia sesión o restablece tu contraseña."
+  }
+  if (message.includes("rate limit") || message.includes("too many requests")) {
+    return "Demasiados intentos o correos enviados. Espera unos minutos e inténtalo de nuevo."
+  }
+  if (message.includes("password") && (message.includes("weak") || message.includes("least"))) {
+    return "La contraseña es demasiado débil. Usa al menos 6 caracteres."
+  }
+  if (message.includes("unable to validate email") || message.includes("invalid email")) {
+    return "El correo no parece válido. Revísalo e inténtalo de nuevo."
+  }
+  return isLogin
+    ? raw || "No pudimos iniciar sesión. Inténtalo de nuevo."
+    : raw || "No pudimos crear tu cuenta. Inténtalo de nuevo."
 }
 
 export function AuthForm({ mode }: AuthFormProps) {
@@ -21,6 +50,12 @@ export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const referralCode = searchParams.get("ref")
+  // Destino post-login (p.ej. /auth/login?next=/admin desde el guard de admin)
+  const nextPath = searchParams.get("next")
+  const safeNext =
+    nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
+      ? nextPath
+      : "/"
   // Lazy browser-only client: creating it during SSR would throw when
   // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
   const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
@@ -29,7 +64,10 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!supabase) return
+    if (!supabase) {
+      setError(supabaseConfigError())
+      return
+    }
     setLoading(true)
     setError(null)
     setSuccessMessage(null)
@@ -41,7 +79,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         // Vincula las direcciones de compras anónimas hechas en este navegador
         await claimGuestAddresses()
         router.refresh()
-        router.push("/")
+        router.push(safeNext)
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -93,7 +131,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           // Vincula las direcciones de compras anónimas hechas en este navegador
           await claimGuestAddresses()
           router.refresh()
-          router.push("/")
+          router.push(safeNext)
         } else {
           // Email confirmation required — show message to user
           setSuccessMessage(
@@ -102,14 +140,76 @@ export function AuthForm({ mode }: AuthFormProps) {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error de autenticación")
+      setError(mapAuthError(err, isLogin))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleMagicLink() {
+    if (!email) {
+      setError("Escribe tu correo electrónico para enviarte el enlace.")
+      return
+    }
+    if (!supabase) {
+      setError(supabaseConfigError())
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
+        },
+      })
+      if (error) throw error
+      setSuccessMessage(
+        `Te enviamos un enlace de acceso a ${email}. Ábrelo para entrar sin contraseña.`
+      )
+    } catch (err) {
+      setError(mapAuthError(err, true))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleForgotPassword() {
+    if (!email) {
+      setError("Escribe tu correo electrónico para restablecer tu contraseña.")
+      return
+    }
+    if (!supabase) {
+      setError(supabaseConfigError())
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
+      })
+      if (error) throw error
+      setSuccessMessage(
+        `Te enviamos un enlace a ${email} para restablecer tu contraseña.`
+      )
+    } catch (err) {
+      setError(mapAuthError(err, true))
     } finally {
       setLoading(false)
     }
   }
 
   async function handleGoogleSignIn() {
-    if (!supabase) return
+    if (!supabase) {
+      setError(supabaseConfigError())
+      return
+    }
     setLoading(true)
     setError(null)
 
@@ -203,6 +303,27 @@ export function AuthForm({ mode }: AuthFormProps) {
         >
           {loading ? "Cargando..." : isLogin ? "Iniciar Sesión" : "Crear Cuenta"}
         </button>
+
+        {isLogin && (
+          <div className="flex items-center justify-between text-sm">
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={loading}
+              className="text-emerald-600 hover:text-emerald-500 font-medium disabled:opacity-50"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+            <button
+              type="button"
+              onClick={handleMagicLink}
+              disabled={loading}
+              className="text-emerald-600 hover:text-emerald-500 font-medium disabled:opacity-50"
+            >
+              Enlace mágico
+            </button>
+          </div>
+        )}
       </form>
 
       <div className="relative my-6">
