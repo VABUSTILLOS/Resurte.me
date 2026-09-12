@@ -86,6 +86,9 @@
       "src/lib/orders-address.ts": [
         "exports"
       ],
+      "src/lib/order-emails.ts": [
+        "exports"
+      ],
       "src/hooks/use-ventas-page.ts": [
         "exports"
       ],
