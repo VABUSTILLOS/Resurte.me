@@ -1,6 +1,6 @@
 "use client"
 
-import { Plus, Check, Heart, MessageCircle } from "lucide-react"
+import { Plus, Check, Minus, Heart, MessageCircle } from "lucide-react"
 import Image from "next/image"
 import type { Product } from "@/types"
 import { useCart } from "@/contexts/cart-context"
@@ -41,7 +41,7 @@ export const ProductCard = memo(function ProductCard({
   onAddToCart,
   priority = false,
 }: ProductCardProps) {
-  const { addItem } = useCart()
+  const { addItem, cart, updateQuantity } = useCart()
   const { toast } = useToast()
   const { toggle: toggleFavorite, isFavorite } = useFavorites()
   const [added, setAdded] = useState(false)
@@ -54,6 +54,12 @@ export const ProductCard = memo(function ProductCard({
     : 0
   const outOfStock = product.stock_status === "out_of_stock"
   const lowStock = product.stock_status === "low_stock"
+
+  // ¿El producto ya está en el carrito? Entonces mostramos stepper (− N +)
+  // en lugar del botón Agregar: ajustar la cantidad de un pedido grande (30+
+  // insumos) sin abrir el drawer es la interacción más repetida del usuario
+  // B2B en móvil.
+  const cartItem = cart.items.find((i) => i.product_id === product.id)
 
   // Second image for hover swap effect
   const secondaryImage = product.images?.[1]
@@ -104,6 +110,15 @@ export const ProductCard = memo(function ProductCard({
     toast(`${product.name} agregado al carrito`)
     setAdded(true)
     setTimeout(() => setAdded(false), 1200)
+  }
+
+  const handleStep = (e: React.MouseEvent, delta: 1 | -1) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!cartItem) return
+    haptic(8)
+    // quantity 0 elimina el item (lo maneja el reducer del contexto)
+    updateQuantity(product.id, cartItem.quantity + delta)
   }
 
   return (
@@ -220,6 +235,7 @@ export const ProductCard = memo(function ProductCard({
         </div>
       </Link>
 
+<<<<<<< HEAD
       {/* Favorito (lista de resurtido) — fuera del Link para no anidar
           interactivos; posicionado sobre la esquina de la imagen. */}
       <button
@@ -240,6 +256,39 @@ export const ProductCard = memo(function ProductCard({
       {/* Quick-add button — mobile: inline dentro del card (sin saliente que
           pise la fila siguiente). ≥sm: Erewhon-style, flota bajo el card. */}
       {!outOfStock ? (
+=======
+      {/* Acción principal del card:
+          1) ya en carrito → stepper − N + (siempre visible, comunica el estado)
+          2) disponible    → quick-add
+          3) agotado       → "Avísame" por WhatsApp o spacer */}
+      {cartItem && !outOfStock ? (
+        <div
+          role="group"
+          aria-label={`${product.name}: ${cartItem.quantity} en el carrito`}
+          className="flex items-center justify-between w-[calc(100%-1.75rem)] mx-auto mt-2 mb-3 sm:mb-0 sm:w-auto sm:absolute sm:-bottom-2 sm:left-1/2 sm:-translate-x-1/2 sm:z-10 sm:min-w-[7.5rem] rounded-full bg-[#0E7A0E] text-white shadow-lg"
+        >
+          <button
+            type="button"
+            onClick={(e) => handleStep(e, -1)}
+            aria-label={cartItem.quantity === 1 ? `Quitar ${product.name} del carrito` : `Quitar una unidad de ${product.name}`}
+            className="p-2 sm:p-1.5 rounded-full hover:bg-white/15 transition-colors touch-target"
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+          <span aria-live="polite" className="min-w-[1.5rem] text-center text-sm font-bold tabular-nums">
+            {cartItem.quantity}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => handleStep(e, 1)}
+            aria-label={`Agregar otra unidad de ${product.name}`}
+            className="p-2 sm:p-1.5 rounded-full hover:bg-white/15 transition-colors touch-target"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : !outOfStock ? (
+>>>>>>> 25e9cb9 (feat(catalogo): fase C11 — stepper − N + en la card cuando el producto ya está en el carrito (ajuste rápido sin abrir el drawer))
         <button
           onClick={handleAdd}
           aria-label={`Agregar ${product.name} al carrito`}
