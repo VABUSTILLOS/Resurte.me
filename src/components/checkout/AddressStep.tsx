@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { MapPin, ArrowRight } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { MapPin, ArrowRight, History } from "lucide-react"
 import Link from "next/link"
 import type { City, Address } from "@/types"
 import type { AddressForm } from "./checkout-shared"
@@ -33,6 +33,11 @@ interface AddressStepProps {
   saveAsDefault?: boolean
   onSaveAsDefaultChange?: (value: boolean) => void
 }
+
+/** Última dirección usada (guests): el cliente B2B pide cada semana a la
+    misma cocina; no debe reescribirla en cada checkout. Mismo patrón que
+    guest-address.ts (direcciones anónimas del navegador). */
+const LAST_ADDRESS_KEY = "resurte-last-address"
 
 export function AddressStep({
   address,
@@ -80,6 +85,47 @@ export function AddressStep({
     }
   }, [address.zip_code])
 
+  // ── Última dirección usada (autoguardado local) ──
+  const [lastSaved, setLastSaved] = useState<(AddressForm & { phone?: string }) | null>(null)
+  const hydrated = useRef(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LAST_ADDRESS_KEY)
+      if (raw) setLastSaved(JSON.parse(raw))
+    } catch {
+      /* datos corruptos o storage no disponible */
+    }
+    hydrated.current = true
+  }, [])
+
+  // Autoguardar cada cambio (solo cuando hay algo que valga la pena guardar).
+  useEffect(() => {
+    if (!hydrated.current) return
+    if (!address.street.trim()) return
+    try {
+      localStorage.setItem(LAST_ADDRESS_KEY, JSON.stringify({ ...address, phone }))
+    } catch {
+      /* storage lleno */
+    }
+  }, [address, phone])
+
+  const applyLastAddress = () => {
+    if (!lastSaved) return
+    const fields = ["label", "street", "number", "interior", "neighborhood", "zip_code", "references"] as const
+    for (const f of fields) {
+      const v = lastSaved[f]
+      if (typeof v === "string") onUpdateAddress(f, v)
+    }
+    if (typeof lastSaved.phone === "string" && lastSaved.phone && !phone) {
+      onPhoneChange(lastSaved.phone)
+    }
+    setLastSaved(null)
+  }
+
+  const showApplyLast =
+    !address.street.trim() && !selectedAddressId && lastSaved !== null
+
   return (
     <div>
       <h2 className="text-xl font-bold text-gray-900 mb-1">
@@ -89,6 +135,18 @@ export function AddressStep({
       <p className="text-gray-500 text-sm mb-6">
         Selecciona o agrega una dirección en {city.name}, {city.state}.
       </p>
+
+      {/* Rellenar con la última dirección usada (guests recurrentes) */}
+      {showApplyLast && (
+        <button
+          type="button"
+          onClick={applyLastAddress}
+          className="mb-5 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-50 text-brand-700 text-xs font-semibold hover:bg-brand-100 transition-colors"
+        >
+          <History className="w-3.5 h-3.5" aria-hidden="true" />
+          Usar mi última dirección: {lastSaved.street} {lastSaved.number}
+        </button>
+      )}
 
       {/* Direcciones guardadas (solo usuarios con sesión) */}
       {isLoggedIn && savedAddresses.length > 0 && (
