@@ -81,6 +81,18 @@ export async function checkReorderReminders(): Promise<CronResult> {
     if (prev === undefined || t > prev) lastReminderAt.set(log.user_id as string, t)
   }
 
+  // Batch: todos los perfiles de candidatos en UNA query (antes era una
+  // query por candidato dentro del loop → N+1 sobre la tabla profiles).
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", candidates.map((c) => c.userId))
+  const nameByUser = new Map<string, string>()
+  for (const p of profiles ?? []) {
+    const first = (p.full_name as string | null)?.split(" ")[0]
+    if (p.id && first) nameByUser.set(String(p.id), first)
+  }
+
   let sent = 0
   let failed = 0
   let processed = 0
@@ -99,12 +111,7 @@ export async function checkReorderReminders(): Promise<CronResult> {
         continue
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", userId)
-        .maybeSingle()
-      const name = profile?.full_name?.split(" ")[0] ?? "chef"
+      const name = nameByUser.get(userId) ?? "chef"
 
       const result = await sendEmail({
         to: email,

@@ -10,6 +10,22 @@ export function escapeIlike(raw: string): string {
   return raw.replace(/[\\%_,()."]/g, (c) => `\\${c}`)
 }
 
+/**
+ * Prepara un término de búsqueda para interpolarlo dentro de un `.or()` de
+ * PostgREST, donde el valor se envuelve en comillas dobles:
+ *   .or(`name.ilike."%${escapeOrTerm(q)}%"`)
+ *
+ * El backslash NO es un escape reconocido por el parser de filtros de
+ * PostgREST: los caracteres reservados (`,()`) solo son seguros dentro de
+ * un valor entre comillas dobles. La comilla doble no puede representarse
+ * dentro de un valor citado, así que se elimina (un término de búsqueda
+ * nunca la necesita). Los comodines LIKE (% _) siguen escapados con
+ * backslash, que sí es el escape de LIKE en PostgreSQL.
+ */
+export function escapeOrTerm(raw: string): string {
+  return escapeIlike(raw.replace(/"/g, ""))
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function digitsOf(value: string | null | undefined): string {
@@ -65,4 +81,3 @@ export function mapProspect(row: Record<string, unknown>): Prospect {
     updated_at: String(row.updated_at),
   }
 }
-

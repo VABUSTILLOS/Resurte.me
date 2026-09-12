@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { requireSellerOrAdminAction } from "@/lib/roles"
 import { logger } from "@/lib/logger"
 import { getCommissionRate } from "../commissions"
-import { escapeIlike } from "./helpers"
+import { escapeOrTerm } from "./helpers"
 
 // ============================================================
 // VINCULACIÓN DE CUENTA
@@ -66,14 +66,16 @@ export async function searchUsersForLinking(
   await requireSellerOrAdminAction()
   if (!query.trim()) return []
   const supabase = await createServiceClient()
-  const q = escapeIlike(query.trim())
+  const q = escapeOrTerm(query.trim())
 
   // Buscar por email o nombre del perfil (el RLS no permite leer emails
   // de auth.users; usamos profiles.phone / auth emails vía join a users).
   const { data, error } = await supabase
     .from("profiles")
     .select("id, full_name, phone, email")
-    .or(`full_name.ilike.%${q}%,phone.ilike.%${q}%`)
+    // Valores entre comillas dobles: el parser de PostgREST solo trata como
+    // literales los caracteres reservados (`,()`) dentro de un valor citado.
+    .or(`full_name.ilike."%${q}%",phone.ilike."%${q}%"`)
     .limit(10)
 
   if (error) {
@@ -123,4 +125,3 @@ export async function linkProspectAccount(
     throw new Error("Error al vincular la cuenta")
   }
 }
-
