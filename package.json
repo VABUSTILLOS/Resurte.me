@@ -128,6 +128,12 @@
       ],
       "src/types/index.ts": [
         "types"
+      ],
+      "src/lib/panel/foodos-sync.ts": [
+        "exports"
+      ],
+      "src/lib/search-terms.ts": [
+        "exports"
       ]
     }
   }
