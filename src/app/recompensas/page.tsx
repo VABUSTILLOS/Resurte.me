@@ -40,7 +40,8 @@ export default function CashbackPage() {
 
   // Cambio de tab: además del estado local, sincroniza ?tab= en la URL
   // (replaceState) para que un reload o compartir el link conserve la
-  // sección — la app solo leía el param en el primer render.
+  // sección — la app solo leía el param en el primer render. Además sube el
+  // scroll al inicio (patrón de app: cada sección empieza desde arriba).
   const handleTabChange = useCallback((tab: Tab) => {
     setActiveTab(tab);
     const url =
@@ -48,6 +49,7 @@ export default function CashbackPage() {
         ? window.location.pathname
         : `${window.location.pathname}?tab=${tab}`;
     window.history.replaceState(null, "", url);
+    window.scrollTo({ top: 0 });
   }, []);
 
   // Título del documento por sección: con varias pestañas abiertas (o en el
