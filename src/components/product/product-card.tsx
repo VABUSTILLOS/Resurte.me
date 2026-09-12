@@ -1,12 +1,13 @@
 "use client"
 
-import { Plus, Check, Heart } from "lucide-react"
+import { Plus, Check, Heart, MessageCircle } from "lucide-react"
 import Image from "next/image"
 import type { Product } from "@/types"
 import { useCart } from "@/contexts/cart-context"
 import { useFavorites } from "@/contexts/favorites-context"
 import { useToast } from "@/components/toast"
 import { cn, getProductTagline } from "@/lib/utils"
+import { haptic } from "@/lib/haptics"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { useState, memo } from "react"
 import Link from "next/link"
@@ -35,6 +36,7 @@ interface ProductCardProps {
 
 export const ProductCard = memo(function ProductCard({
   product,
+  whatsappNumber,
   citySlug,
   onAddToCart,
   priority = false,
@@ -60,6 +62,15 @@ export const ProductCard = memo(function ProductCard({
   // Fallback: use the raw description (truncated by line-clamp) or a neutral
   // line so cards with little text stay visually full (Fase 10).
   const tagline = getProductTagline(product.description) ?? product.description?.trim() ?? null
+
+  // CTA "Avísame" para productos agotados: convierte una venta perdida en
+  // conversación de WhatsApp (y en lead para recompra cuando vuelva el stock).
+  const notifyMeUrl =
+    outOfStock && whatsappNumber
+      ? `https://wa.me/${whatsappNumber.replace(/\D/g, "")}?text=${encodeURIComponent(
+          `Hola, ¿me avisan cuando vuelva a haber *${product.name}*?`
+        )}`
+      : null
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -87,6 +98,9 @@ export const ProductCard = memo(function ProductCard({
       price,
     })
 
+    // Micro-vibración táctil: confirma el agregado en móvil aunque el usuario
+    // no esté viendo el toast (pantalla grande, pulgar sobre el toast).
+    haptic(10)
     toast(`${product.name} agregado al carrito`)
     setAdded(true)
     setTimeout(() => setAdded(false), 1200)
@@ -246,6 +260,20 @@ export const ProductCard = memo(function ProductCard({
             </span>
           )}
         </button>
+      ) : notifyMeUrl ? (
+        /* Producto agotado con canal de WhatsApp: CTA "Avísame" para capturar
+           la demanda en lugar de perder la venta. Ocupa el mismo slot que el
+           quick-add para que el grid no se desacomode. */}
+        <a
+          href={notifyMeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Avísame por WhatsApp cuando haya ${product.name}`}
+          className="flex items-center justify-center gap-1.5 w-[calc(100%-1.75rem)] mx-auto mt-2 mb-3 sm:mb-0 sm:w-auto sm:absolute sm:-bottom-2 sm:left-1/2 sm:-translate-x-1/2 sm:z-10 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-semibold border-[1.5px] border-[#0E7A0E] text-[#0E7A0E] bg-white hover:bg-[#F0FDF4] transition-all shadow-lg touch-target whitespace-nowrap"
+        >
+          <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" /> Avísame
+        </a>
       ) : (
         /* Cards agotadas: reservar la misma altura del botón en móvil para
            que las filas del grid 2-col no queden desparejas. ≥sm el botón
