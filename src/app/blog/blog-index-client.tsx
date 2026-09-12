@@ -133,6 +133,17 @@ export function BlogIndexClient({
     setCurrentPage(1)
   }
 
+  // Limpia búsqueda + categoría + tipo de una vez (recuperación rápida
+  // cuando un filtro combinado deja la vista vacía).
+  const hasActiveFilters =
+    query.trim() !== "" || activeCategory !== "all" || activeContentType !== "all"
+  const clearFilters = () => {
+    setQuery("")
+    setActiveCategory("all")
+    setActiveContentType("all")
+    setCurrentPage(1)
+  }
+
   // Al cambiar de página, sube el scroll al inicio de los resultados (si no,
   // en móvil el usuario queda viendo el pie de la página anterior).
   const goToPage = (page: number) => {
@@ -307,6 +318,16 @@ export function BlogIndexClient({
               {filtered.length} {filtered.length === 1 ? "artículo" : "artículos"}
             </p>
           </div>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-200 transition-colors"
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
+              Limpiar filtros
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -396,6 +417,16 @@ export function BlogIndexClient({
               ? `No hay artículos de tipo «${activeContentTypeInfo.label}». Prueba con otra palabra o explora todas las categorías.`
               : "Prueba con otra palabra o explora todas las categorías."}
           </p>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 transition-colors"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+              Limpiar filtros y ver todo
+            </button>
+          )}
         </div>
       )}
 
