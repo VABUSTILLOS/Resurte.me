@@ -5,12 +5,14 @@ import { logger } from "@/lib/logger"
  * Updates an order's status and triggers WhatsApp workflow notifications.
  * Used by the admin panel when changing order status.
  * 
- * Body: { status?: OrderStatus, payment_status?: PaymentStatus }
+ * Body: { status?: OrderStatus, payment_status?: PaymentStatus, driver_id?: number | null }
  *   - status: nuevo estado del pedido (opcional).
  *   - payment_status: confirmación manual de pago para métodos sin cobro
  *     en línea (COD, SPEI, OXXO, Mercado Pago). El único valor permitido
  *     aquí es "paid"; al aplicarlo, el trigger trg_credit_cashback_on_payment
  *     abona el cashback a la wallet del usuario.
+ *   - driver_id: repartidor asignado (delivery_drivers, migración 00076);
+ *     null explícito lo desasigna. Se valida que exista y esté activo.
  * Authentication: Requires service role (admin only)
  */
 
@@ -46,13 +48,29 @@ export async function PATCH(
 
     const body = await req.json()
     const { status, payment_status } = body
+    // driver_id: undefined = no tocar; null = desasignar; número = asignar.
+    const hasDriverField = "driver_id" in body
+    const driverId: number | null | undefined = hasDriverField
+      ? body.driver_id === null
+        ? null
+        : Number(body.driver_id)
+      : undefined
 
-    // Se requiere al menos uno de los dos campos
-    if (!status && !payment_status) {
+    // Se requiere al menos uno de los campos
+    if (!status && !payment_status && !hasDriverField) {
       return NextResponse.json(
-        { error: "Se requiere status o payment_status" },
+        { error: "Se requiere status, payment_status o driver_id" },
         { status: 400 }
       )
+    }
+
+    if (
+      hasDriverField &&
+      driverId !== null &&
+      driverId !== undefined &&
+      (!Number.isInteger(driverId) || driverId <= 0)
+    ) {
+      return NextResponse.json({ error: "driver_id inválido" }, { status: 400 })
     }
 
     if (status && !VALID_STATUSES.includes(status)) {
@@ -90,7 +108,11 @@ export async function PATCH(
     const oldPaymentStatus = currentOrder.payment_status as PaymentStatus
 
     // Don't update if nothing changed
-    if ((!status || oldStatus === status) && (!payment_status || oldPaymentStatus === payment_status)) {
+    if (
+      (!status || oldStatus === status) &&
+      (!payment_status || oldPaymentStatus === payment_status) &&
+      !hasDriverField
+    ) {
       return NextResponse.json({
         success: true,
         order: {
@@ -102,12 +124,28 @@ export async function PATCH(
       })
     }
 
+    // Validar el repartidor (existencia + activo) antes de asignar.
+    if (hasDriverField && driverId !== null && driverId !== undefined) {
+      const { data: driver } = await supabase
+        .from("delivery_drivers")
+        .select("id, is_active")
+        .eq("id", driverId)
+        .maybeSingle()
+      if (!driver) {
+        return NextResponse.json({ error: "Repartidor no encontrado" }, { status: 404 })
+      }
+      if (!driver.is_active) {
+        return NextResponse.json({ error: "El repartidor está inactivo" }, { status: 400 })
+      }
+    }
+
     const updatePayload = {
       updated_at: new Date().toISOString(),
       ...(status ? { status } : {}),
       // If cancelling, set payment to failed if pending
       ...(status === "cancelled" && currentOrder.payment_status === "pending" ? { payment_status: "failed" as const } : {}),
       ...(payment_status === "paid" ? { payment_status: "paid" as const } : {}),
+      ...(hasDriverField ? { driver_id: driverId ?? null } : {}),
     }
 
     // Update the order
@@ -119,6 +157,13 @@ export async function PATCH(
       .single()
 
     if (updateError) {
+      // 42703 = columna driver_id inexistente (migración 00076 sin aplicar)
+      if (updateError.code === "42703" && hasDriverField) {
+        return NextResponse.json(
+          { error: "La asignación de repartidor requiere aplicar la migración 00076" },
+          { status: 409 }
+        )
+      }
       return NextResponse.json(
         { error: "Failed to update order", details: updateError.message },
         { status: 500 }

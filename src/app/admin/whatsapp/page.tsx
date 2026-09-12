@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+import Image from "next/image"
 import { Search, MessageCircle, Check, Eye, EyeOff, RefreshCw, ImageIcon } from "lucide-react"
 import { getCategoryIcon } from "@/lib/utils"
 import {
@@ -107,21 +108,21 @@ export default function AdminWhatsAppPage() {
     setSyncResult(null)
     setError(null)
     try {
-      const selected = products.filter((p) => p.show_in_whatsapp)
+      const selected = products
+        .filter((p) => p.show_in_whatsapp && (p.sale_price ?? p.price ?? 0) > 0)
+        .map((p) => ({
+          id: String(p.id),
+          name: p.name,
+          description: [p.brand, p.unit].filter(Boolean).join(" · ") || undefined,
+          image_url: p.image_url ?? undefined,
+          price: p.price ?? p.sale_price ?? 0,
+          currency: "MXN",
+          sale_price: p.sale_price ?? null,
+        }))
       const res = await fetch("/api/whatsapp/catalog/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          products: selected.map((p) => ({
-            id: String(p.id),
-            name: p.name,
-            description: p.description ?? undefined,
-            image_url: p.image_url ?? undefined,
-            price: p.price,
-            currency: "MXN",
-            sale_price: p.sale_price ?? null,
-          })),
-        }),
+        body: JSON.stringify({ products: selected }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail ?? data.error ?? "Error al sincronizar")
@@ -290,10 +291,9 @@ export default function AdminWhatsAppPage() {
               {/* Product image */}
               <div className="w-12 h-12 rounded-lg bg-[#F7F5F0] flex items-center justify-center overflow-hidden shrink-0">
                 {product.image_url ? (
-                  <img
+                  <Image
                     src={product.image_url}
                     alt={product.name}
-                    loading="lazy"
                     width={48}
                     height={48}
                     className="w-full h-full object-contain p-1"

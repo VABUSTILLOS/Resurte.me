@@ -210,15 +210,17 @@ export function useHubAlerts({
     if (clientes.length > 0) {
       const frecuentes = clientes.filter((c) => c.visitas >= 10 || c.puntos >= 500)
       if (frecuentes.length > 0) {
-        const top = [...frecuentes].sort((a, b) => (b.puntos + b.visitas * 10) - (a.puntos + a.visitas * 10))[0]!
-        result.push({
-          id: "clientes-frecuentes",
-          type: "success",
-          icon: Gift,
-          title: `${frecuentes.length} cliente${frecuentes.length !== 1 ? "s" : ""} frecuente${frecuentes.length !== 1 ? "s" : ""} para premiar`,
-          detail: `${top.nombre} tiene ${top.puntos} pts y ${top.visitas} visitas — ofrécele un descuento por fidelidad`,
-          href: "/panel/ventas",
-        })
+        const top = [...frecuentes].sort((a, b) => (b.puntos + b.visitas * 10) - (a.puntos + a.visitas * 10))[0]
+        if (top) {
+          result.push({
+            id: "clientes-frecuentes",
+            type: "success",
+            icon: Gift,
+            title: `${frecuentes.length} cliente${frecuentes.length !== 1 ? "s" : ""} frecuente${frecuentes.length !== 1 ? "s" : ""} para premiar`,
+            detail: `${top.nombre} tiene ${top.puntos} pts y ${top.visitas} visitas — ofrécele un descuento por fidelidad`,
+            href: "/panel/ventas",
+          })
+        }
       }
     }
 

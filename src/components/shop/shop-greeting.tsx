@@ -22,7 +22,7 @@ export function ShopGreeting() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (cancelled || !session) return
       const fullName = (session.user.user_metadata?.full_name as string | undefined) ?? null
-      setName(fullName ? fullName.split(" ")[0]! : null)
+      setName(fullName ? (fullName.split(" ")[0] ?? null) : null)
       getWalletBalance().then((wallet) => {
         if (!cancelled && wallet) setCredits(Number(wallet.balance_credits) || 0)
       })

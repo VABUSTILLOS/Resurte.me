@@ -21,14 +21,21 @@ export function FavoritosClient() {
   const [resolving, setResolving] = useState(false)
 
   // Resolver ids → productos del catálogo (visible solamente).
+  // El reset de `resolving` al cambiar ids se hace durante el render
+  // (patrón "adjust state during render") en vez de un setState síncrono
+  // dentro del efecto.
+  const idsKey = ids.join(",")
+  const [prevFetchKey, setPrevFetchKey] = useState<string | null>(null)
+  const fetchKey = loaded && ids.length > 0 ? idsKey : null
+  if (fetchKey !== prevFetchKey) {
+    setPrevFetchKey(fetchKey)
+    if (fetchKey !== null) setResolving(true)
+  }
+
   useEffect(() => {
     if (!loaded) return
-    if (ids.length === 0) {
-      setProducts([])
-      return
-    }
+    if (ids.length === 0) return
     let cancelled = false
-    setResolving(true)
     fetch("/api/favorites/resolve", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -53,7 +60,9 @@ export function FavoritosClient() {
     return <PageSkeleton titleWidth="w-56" cards={3} />
   }
 
-  const addable = products.filter((p) => p.stock_status !== "out_of_stock")
+  // Con ids vacíos no hay nada que mostrar aunque products tenga datos viejos.
+  const visibleProducts = ids.length === 0 ? [] : products
+  const addable = visibleProducts.filter((p) => p.stock_status !== "out_of_stock")
 
   const handleAddAll = () => {
     if (addable.length === 0) return
@@ -128,14 +137,14 @@ export function FavoritosClient() {
                 <ShoppingCart className="w-4 h-4" />
                 Agregar todo al carrito ({addable.length})
               </button>
-              {products.length !== addable.length && (
+              {visibleProducts.length !== addable.length && (
                 <p className="text-xs text-[var(--text-secondary)]">
-                  {products.length - addable.length} agotado{products.length - addable.length !== 1 ? "s" : ""} se omitirá
+                  {visibleProducts.length - addable.length} agotado{visibleProducts.length - addable.length !== 1 ? "s" : ""} se omitirá
                 </p>
               )}
             </div>
           )}
-          <ProductCardGrid products={products} citySlug={city.slug} />
+          <ProductCardGrid products={visibleProducts} citySlug={city.slug} />
         </>
       )}
     </div>

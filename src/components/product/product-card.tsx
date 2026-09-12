@@ -44,7 +44,9 @@ export const ProductCard = memo(function ProductCard({
 
   const price = product.sale_price ?? product.price
   const hasDiscount = product.sale_price && product.sale_price < product.price
-  const discountPercent = hasDiscount ? Math.round((1 - product.sale_price! / product.price) * 100) : 0
+  const discountPercent = product.sale_price && product.sale_price < product.price
+    ? Math.round((1 - product.sale_price / product.price) * 100)
+    : 0
   const outOfStock = product.stock_status === "out_of_stock"
   const lowStock = product.stock_status === "low_stock"
 
@@ -185,9 +187,9 @@ export const ProductCard = memo(function ProductCard({
             )}
           </div>
 
-          {hasDiscount && (
+          {hasDiscount && product.sale_price != null && (
             <p className="text-[10px] sm:text-[11px] text-[#0E7A0E] font-medium mt-0.5">
-              Ahorras ${(product.price - product.sale_price!).toFixed(2)}
+              Ahorras ${(product.price - product.sale_price).toFixed(2)}
             </p>
           )}
 

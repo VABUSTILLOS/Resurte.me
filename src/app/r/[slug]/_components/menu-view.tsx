@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import Image from "next/image"
 import { ArrowRight, Plus } from "lucide-react"
 import { formatMoney } from "@/lib/foodos"
 import type { FoodosMenuCategory, FoodosMenuItem, FoodosCombo } from "@/types/foodos"
@@ -187,7 +188,7 @@ function ItemCard({ item, onAdd }: { item: FoodosMenuItem; onAdd: () => void }) 
       </div>
       {item.image_url ? (
         <div className="relative shrink-0">
-          <img src={item.image_url} alt={item.name} width={80} height={80} className="w-20 h-20 rounded-xl object-cover" />
+          <Image src={item.image_url} alt={item.name} width={80} height={80} className="w-20 h-20 rounded-xl object-cover" />
           <button
             onClick={onAdd}
             className="absolute -bottom-2 -right-2 w-11 h-11 rounded-full bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 shadow touch-target"

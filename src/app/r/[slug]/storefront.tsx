@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Image from "next/image"
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { Compass, ShoppingBag } from "lucide-react"
@@ -241,7 +242,7 @@ export function FoodosStorefront({
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {restaurant.logo_url ? (
-              <img src={restaurant.logo_url} alt={restaurant.name} width={44} height={44} className="w-11 h-11 rounded-full object-cover" />
+              <Image src={restaurant.logo_url} alt={restaurant.name} width={44} height={44} className="w-11 h-11 rounded-full object-cover" />
             ) : (
               <div className="w-11 h-11 rounded-full bg-amber-500 text-amber-950 flex items-center justify-center font-black text-lg">
                 {restaurant.name.charAt(0).toUpperCase()}

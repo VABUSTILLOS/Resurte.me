@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import Image from "next/image"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
 import { useMediaQuery } from "@/hooks/use-media-query"
@@ -148,10 +149,9 @@ export function CartDrawer() {
                     {/* Product image placeholder */}
                     <div className="w-16 h-16 rounded-[10px] bg-[#F7F5F0] flex items-center justify-center shrink-0">
                       {item.image_url ? (
-                        <img
+                        <Image
                           src={item.image_url}
                           alt={item.name}
-                          loading="lazy"
                           width={64}
                           height={64}
                           className="w-full h-full object-contain p-1 rounded-[10px]"

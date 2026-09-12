@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import Link from "next/link"
 import {
   Search,
@@ -12,6 +12,8 @@ import {
   X,
   MapPin,
   Globe,
+  ImagePlus,
+  RefreshCw,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -89,6 +91,47 @@ export default function AdminProductsPage() {
   }, [search])
   const [editingPrice, setEditingPrice] = useState<number | null>(null)
   const [draftPrice, setDraftPrice] = useState<string>("")
+
+  // Upload de imagen de producto (bucket público `productos`, 00076).
+  const [uploadingImageId, setUploadingImageId] = useState<number | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const imageTargetRef = useRef<number | null>(null)
+
+  const startImageUpload = (productId: number) => {
+    imageTargetRef.current = productId
+    imageInputRef.current?.click()
+  }
+
+  const handleImageFile = async (file: File | undefined | null) => {
+    const productId = imageTargetRef.current
+    if (!file || !productId) return
+    setUploadingImageId(productId)
+    setError(null)
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      const up = await fetch("/api/admin/products/upload-image", { method: "POST", body: form })
+      const upData = await up.json()
+      if (!up.ok) throw new Error(upData.detail ?? upData.error ?? "Error al subir la imagen")
+
+      const res = await fetch("/api/admin/products/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId, image_url: upData.url }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "Error al guardar la imagen")
+      setProducts((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, image_url: upData.url } : p))
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al subir la imagen")
+    } finally {
+      setUploadingImageId(null)
+      imageTargetRef.current = null
+      if (imageInputRef.current) imageInputRef.current.value = ""
+    }
+  }
 
   // Selección múltiple y asignación de ciudades (bulk).
   const [selected, setSelected] = useState<Set<number>>(new Set())
@@ -471,9 +514,27 @@ export default function AdminProductsPage() {
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center">
-                          <Package className="w-4 h-4 text-gray-400" />
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => startImageUpload(product.id)}
+                          disabled={uploadingImageId === product.id}
+                          title={product.image_url ? "Cambiar imagen" : "Subir imagen"}
+                          aria-label={product.image_url ? `Cambiar imagen de ${product.name}` : `Subir imagen para ${product.name}`}
+                          className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-brand-300 transition-shadow disabled:opacity-50"
+                        >
+                          {uploadingImageId === product.id ? (
+                            <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />
+                          ) : product.image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- thumb admin, URL dinámica de Storage
+                            <img
+                              src={product.image_url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <ImagePlus className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
                         <div>
                           <p className="font-medium text-gray-900">{product.name}</p>
                           <p className="text-xs text-gray-400">{product.brand ?? "—"}</p>
@@ -616,6 +677,15 @@ export default function AdminProductsPage() {
           )}
         </div>
       </div>
+
+      {/* Input oculto para subir imagen de producto */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/avif"
+        className="hidden"
+        onChange={(e) => void handleImageFile(e.target.files?.[0])}
+      />
 
       {/* Modal: elegir ciudades para la selección */}
       {cityModalOpen && (

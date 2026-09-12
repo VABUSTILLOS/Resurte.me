@@ -53,7 +53,8 @@ export function ReorderSection({ products }: Props) {
     getUserPurchaseHistory(0, 1)
       .then(({ orders }) => {
         if (cancelled || orders.length === 0) return
-        const last = orders[0]!
+        const last = orders[0]
+        if (!last) return
         setOrderId(last.id)
         setItems(
           last.items.map((item) => {

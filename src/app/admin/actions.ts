@@ -29,6 +29,7 @@ export interface AdminOrder {
   payment_status: string
   source: string
   created_at: string
+  driver_id?: number | null
   address: {
     street: string
     number: string
@@ -83,12 +84,14 @@ export async function getAdminOrders(
 
   // Solo las columnas que el panel mapea (la tabla orders es ancha:
   // utm, tokens, ids de Stripe, etc. no se usan aquí).
-  let query = supabase
-    .from("orders")
-    .select(
-      "id, user_id, status, subtotal, delivery_fee, discount, coupon_code, total, payment_method, payment_status, source, created_at, profiles(full_name), addresses(street, number, interior, neighborhood, city, state, zip_code, references)"
-    )
-    .order("created_at", { ascending: false })
+  const SELECT_BASE =
+    "id, user_id, status, subtotal, delivery_fee, discount, coupon_code, total, payment_method, payment_status, source, created_at, profiles(full_name), addresses(street, number, interior, neighborhood, city, state, zip_code, references)"
+  const SELECT_WITH_DRIVER = `${SELECT_BASE}, driver_id`
+
+  const buildQuery = <S extends string>(select: S) =>
+    supabase.from("orders").select(select).order("created_at", { ascending: false })
+
+  let query = buildQuery(SELECT_WITH_DRIVER)
 
   if (before) {
     // Pedidos creados ANTES del cursor (página anterior, de más viejo a más nuevo se
@@ -126,7 +129,31 @@ export async function getAdminOrders(
   }
 
   // Traer limit+1 para saber si hay más páginas
-  const { data: orders, error } = await query.limit(limit + 1)
+  let ordersResult = await query.limit(limit + 1)
+
+  // 42703 = orders.driver_id aún no existe (migración 00076 sin aplicar):
+  // reintenta sin la columna en lugar de romper el panel de pedidos.
+  if (ordersResult.error?.code === "42703") {
+    let fallback = buildQuery(SELECT_BASE)
+    if (before) fallback = fallback.lt("created_at", before)
+    if (status && status !== "all") fallback = fallback.eq("status", status)
+    if (search) {
+      const conditions: string[] = []
+      if (/^\d+$/.test(search)) conditions.push(`id.eq.${search}`)
+      const { data: matchedProfiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("full_name", `%${search}%`)
+        .limit(50)
+      const matchedIds = (matchedProfiles ?? []).map((p) => p.id as string)
+      if (matchedIds.length > 0) conditions.push(`user_id.in.(${matchedIds.join(",")})`)
+      if (conditions.length === 0) return { orders: [], hasMore: false }
+      fallback = fallback.or(conditions.join(","))
+    }
+    ordersResult = (await fallback.limit(limit + 1)) as typeof ordersResult
+  }
+
+  const { data: orders, error } = ordersResult
 
   if (error) {
     logger.error("[ADMIN-ORDERS] Error fetching orders:", error)
@@ -200,6 +227,7 @@ export async function getAdminOrders(
         payment_status: o.payment_status,
         source: o.source,
         created_at: o.created_at,
+        driver_id: (o as { driver_id?: number | null }).driver_id ?? null,
         address: addr
           ? {
               street: addr.street,

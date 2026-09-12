@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { useCart } from "@/contexts/cart-context"
 import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { AnalyticsEvents } from "@/lib/analytics"
@@ -319,14 +320,13 @@ export function CheckoutDrawer() {
                     <li key={item.product_id} className="py-3 flex items-center gap-3">
                       <div className="w-12 h-12 rounded-[10px] bg-[#F7F5F0] flex items-center justify-center shrink-0 overflow-hidden">
                         {item.image_url ? (
-                          <img
+                          <Image
                             src={item.image_url}
                             alt={item.name}
-                            loading="lazy"
                             width={48}
                             height={48}
                             className="w-full h-full object-contain p-1"
-                          />
+                            />
                         ) : (
                           <ShoppingBag className="w-5 h-5 text-[#C7C8CD]" />
                         )}
@@ -513,14 +513,13 @@ export function CheckoutDrawer() {
                     <li key={item.product_id} className="py-3 flex items-center gap-3">
                       <div className="w-12 h-12 rounded-[10px] bg-[#F7F5F0] flex items-center justify-center shrink-0 overflow-hidden">
                         {item.image_url ? (
-                          <img
+                          <Image
                             src={item.image_url}
                             alt={item.name}
-                            loading="lazy"
                             width={48}
                             height={48}
                             className="w-full h-full object-contain p-1"
-                          />
+                            />
                         ) : (
                           <ShoppingBag className="w-5 h-5 text-[#C7C8CD]" />
                         )}
@@ -542,10 +541,9 @@ export function CheckoutDrawer() {
                     <li key={`bump-${b.productId}`} className="py-3 flex items-center gap-3">
                       <div className="w-12 h-12 rounded-[10px] bg-[#FDF3E3] flex items-center justify-center shrink-0 overflow-hidden">
                         {b.imageUrl ? (
-                          <img
+                          <Image
                             src={b.imageUrl}
                             alt={b.name ?? `Artículo especial #${b.productId}`}
-                            loading="lazy"
                             width={48}
                             height={48}
                             className="w-full h-full object-contain p-1"

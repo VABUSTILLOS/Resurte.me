@@ -9,10 +9,12 @@ const ADMIN_NAV = [
   { href: "/admin/conversion", label: "Conversión", exact: false },
   { href: "/admin/marketing", label: "Marketing", exact: false },
   { href: "/admin/pedidos", label: "Pedidos", exact: false },
+  { href: "/admin/repartidores", label: "Repartidores", exact: false },
   { href: "/admin/productos", label: "Productos", exact: false },
   { href: "/admin/usuarios", label: "Usuarios", exact: false },
   { href: "/admin/facturas", label: "Facturas", exact: false },
   { href: "/admin/recompensas", label: "Recompensas", exact: false },
+  { href: "/admin/emails", label: "Emails", exact: false },
   { href: "/admin/visibilidad", label: "Visibilidad", exact: false },
   { href: "/admin/disponibilidad", label: "Por ciudad", exact: false },
   { href: "/admin/proveedores", label: "Proveedores", exact: false },
@@ -30,7 +32,7 @@ export function AdminSubNav() {
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
 
   return (
-    <div className="sticky top-[var(--header-top-offset)] z-40 bg-white/90 backdrop-blur-md border-b border-gray-200">
+    <div className="sticky top-[var(--header-top-offset)] z-40 bg-white/90 backdrop-blur-md border-b border-gray-200 print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-3 overflow-x-auto">
         <span className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-gray-900 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
           <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />

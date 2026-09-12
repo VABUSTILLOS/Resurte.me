@@ -281,6 +281,7 @@ export default function RestaurantePage() {
             <>
               <div className="bg-white rounded-2xl border border-gray-200 p-3 shadow-sm">
                 {qrUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- QR generado en cliente como data URL (qrcode.toDataURL); next/image no optimiza data URLs
                   <img src={qrUrl} alt={t("foodos.restaurante.qrAlt", { name: restaurant.name })} width={208} height={208} className="w-52 h-52" />
                 ) : (
                   <div className="w-52 h-52 flex items-center justify-center text-gray-300">

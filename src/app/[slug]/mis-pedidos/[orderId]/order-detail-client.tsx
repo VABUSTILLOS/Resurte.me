@@ -71,15 +71,18 @@ export function OrderDetailClient() {
   const orderId = Number(params.orderId)
 
   const [order, setOrder] = useState<OrderDetail | null>(null)
-  const [loading, setLoading] = useState(true)
   const [supabase] = useState(() =>
     typeof window === "undefined" ? null : createClient()
   )
-
-  useEffect(() => {
-    // sin sesión o sin id no hay nada que consultar: loading fuera de una vez
-    if (!supabase || !orderId) setLoading(false)
-  }, [supabase, orderId])
+  // loading arranca en false si no hay sesión/id (antes lo hacía un efecto);
+  // si los params cambian tras el mount se ajusta durante el render.
+  const [loading, setLoading] = useState(() => Boolean(supabase && orderId))
+  const canQuery = Boolean(supabase && orderId)
+  const [prevCanQuery, setPrevCanQuery] = useState(canQuery)
+  if (canQuery !== prevCanQuery) {
+    setPrevCanQuery(canQuery)
+    if (!canQuery) setLoading(false)
+  }
 
   // Actualización en vivo: mientras el pedido no llegue a un estado final,
   // re-consulta cada 25s para mover el stepper sin recargar. Ante un error

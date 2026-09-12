@@ -29,8 +29,6 @@ export default function AdminFacturasPage() {
   const [creditsInput, setCreditsInput] = useState<Record<number, string>>({})
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
       const res = await fetch("/api/admin/facturas", { cache: "no-store" })
       const data = await res.json()
@@ -45,6 +43,14 @@ export default function AdminFacturasPage() {
 
   useEffect(() => {
     void load()
+  }, [load])
+
+  // Para event handlers (botón Actualizar / tras revisar): el reset de
+  // loading/error va fuera del efecto para cumplir react-hooks/set-state-in-effect.
+  const reload = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    return load()
   }, [load])
 
   const review = async (id: number, action: "approve" | "reject") => {
@@ -64,7 +70,7 @@ export default function AdminFacturasPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Error al revisar")
-      await load()
+      await reload()
     } catch (err) {
       alert(err instanceof Error ? err.message : "Error al revisar")
     } finally {
@@ -86,7 +92,7 @@ export default function AdminFacturasPage() {
           </p>
         </div>
         <button
-          onClick={() => void load()}
+          onClick={() => void reload()}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg"
         >
           <RefreshCcw className="w-3.5 h-3.5" />

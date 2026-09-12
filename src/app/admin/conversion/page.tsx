@@ -37,8 +37,6 @@ export default function ConversionDashboardPage() {
   const [error, setError] = useState<string | null>(null)
 
   const fetchFunnel = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
       const res = await fetch(`/api/admin/funnel?days=${days}`)
       if (!res.ok) throw new Error("Error al cargar el funnel")
@@ -63,7 +61,12 @@ export default function ConversionDashboardPage() {
         </h1>
         <select
           value={days}
-          onChange={(e) => setDays(Number(e.target.value))}
+          onChange={(e) => {
+            // El reset de loading/error va en el event handler, no en el efecto.
+            setLoading(true)
+            setError(null)
+            setDays(Number(e.target.value))
+          }}
           className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white"
           aria-label="Período"
         >

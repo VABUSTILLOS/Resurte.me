@@ -35,7 +35,9 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
   const displayPrice = product.sale_price ?? product.price ?? 0
   const originalPrice = product.price ?? 0
   const hasDiscount = !!product.sale_price && product.sale_price < (product.price ?? 0)
-  const discountPercent = hasDiscount ? Math.round((1 - product.sale_price! / product.price!) * 100) : 0
+  const discountPercent = product.sale_price != null && hasDiscount
+    ? Math.round((1 - product.sale_price / originalPrice) * 100)
+    : 0
   const outOfStock = product.stock_status === "out_of_stock"
   const lowStock = product.stock_status === "low_stock"
 
@@ -184,7 +186,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                         : "border-[#ede8df] hover:border-[#0E7A0E]/40"
                     }`}
                   >
-                    <img src={img} alt={`${product.name} ${idx + 1}`} loading="lazy" width={80} height={80} className="w-full h-full object-contain p-1.5 sm:p-1" />
+                    <Image src={img} alt={`${product.name} ${idx + 1}`} width={80} height={80} className="w-full h-full object-contain p-1.5 sm:p-1" />
                   </button>
                 ))}
               </div>

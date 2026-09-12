@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
@@ -62,6 +62,7 @@ interface TrackedOrder {
   scheduled_for: string | null
   created_at: string
   city: { slug: string; name: string } | null
+  driver_name: string | null
   items: { quantity: number; unit_price: number; name: string; image_url: string; slug: string }[]
 }
 
@@ -73,22 +74,28 @@ export function TrackingClient() {
   const token = searchParams.get("t")
 
   const [order, setOrder] = useState<TrackedOrder | null>(null)
-  const [notFound, setNotFound] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(() => !orderId || !token)
+  const [loading, setLoading] = useState(() => Boolean(orderId && token))
 
-  useEffect(() => {
-    if (!orderId || !token) {
+  // Ajuste de estado durante el render (patrón oficial de React) cuando los
+  // params desaparecen después del mount — equivale al antiguo useEffect.
+  const missingParams = !orderId || !token
+  const [prevMissing, setPrevMissing] = useState(missingParams)
+  if (missingParams !== prevMissing) {
+    setPrevMissing(missingParams)
+    if (missingParams) {
       setNotFound(true)
       setLoading(false)
     }
-  }, [orderId, token])
+  }
 
   // Sigue actualizando mientras el pedido no llegue a un estado final;
   // ante error de red reintenta con backoff (2×) vía usePolling.
   usePolling(
     async () => {
+      if (!token) return true
       try {
-        const res = await fetch(`/api/orders/${orderId}/track?t=${encodeURIComponent(token!)}`, {
+        const res = await fetch(`/api/orders/${orderId}/track?t=${encodeURIComponent(token)}`, {
           cache: "no-store",
         })
         if (res.status === 404) {
@@ -196,7 +203,11 @@ export function TrackingClient() {
                     >
                       {STATUS_LABEL[status]}
                     </p>
-                    <p className="text-xs text-gray-400 mt-0.5">{STEP_HINTS[i]}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {i === 3 && order.driver_name
+                        ? `${order.driver_name} va en camino con tu pedido`
+                        : STEP_HINTS[i]}
+                    </p>
                   </div>
                 </div>
               )

@@ -29,11 +29,18 @@ export async function PATCH(request: Request) {
     }
 
     // Whitelist de campos actualizables
-    const allowed = ["price", "sale_price", "stock_status", "is_visible", "show_in_whatsapp"] as const
+    const allowed = ["price", "sale_price", "stock_status", "is_visible", "show_in_whatsapp", "image_url"] as const
     type AllowedField = (typeof allowed)[number]
     const updates: Partial<Record<AllowedField, unknown>> = {}
     for (const field of allowed) {
       if (field in fields) updates[field] = fields[field]
+    }
+    // image_url: solo URLs https públicas (o rutas locales del sitio).
+    if ("image_url" in updates) {
+      const url = updates.image_url
+      if (typeof url !== "string" || (!url.startsWith("https://") && !url.startsWith("/"))) {
+        return NextResponse.json({ error: "image_url debe ser una URL https o ruta local" }, { status: 400 })
+      }
     }
     if (Object.keys(updates).length === 0) {
       return NextResponse.json(

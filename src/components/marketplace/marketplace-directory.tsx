@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import {
   Search,
@@ -193,7 +194,7 @@ function RestaurantCard({ entry }: { entry: PublicMarketplaceEntry }) {
       {/* Cover */}
       <div className="h-32 bg-gradient-to-br from-gray-100 to-gray-200 relative flex items-center justify-center overflow-hidden">
         {restaurant.logo_url ? (
-          <img
+          <Image
             src={restaurant.logo_url}
             alt={restaurant.name}
             width={256}

@@ -80,6 +80,8 @@ export function Analytics({ nonce }: { nonce?: string | null }) {
             `}
           </Script>
           <noscript>
+            {/* Pixel de Meta: debe ser <img> 1x1 dentro de <noscript>; next/image no aplica para tracking pixels */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               height="1"
               width="1"

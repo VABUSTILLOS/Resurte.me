@@ -76,6 +76,8 @@ export default function CombosSection({
             const fc = combo.price > 0 ? (cost / combo.price) * 100 : 0
             const isGood = fc <= 32
             const isOk = fc <= 38
+            const missing = comboMissingDishes(combo.items)
+            const firstMissing = missing[0]
             return (
               <div key={combo.id} className="bg-white rounded-2xl border border-gray-100 p-5">
                 <div className="flex items-center justify-between mb-3">
@@ -99,12 +101,12 @@ export default function CombosSection({
                     </span>
                   ))}
                 </div>
-                {comboMissingDishes(combo.items).length > 0 && (
+                {missing.length > 0 && (
                   <div className="mb-3 flex items-center gap-2 text-[11px] font-medium text-red-600 bg-red-50 rounded-lg px-3 py-2">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    {comboMissingDishes(combo.items).length === 1
-                      ? `El platillo "${comboMissingDishes(combo.items)[0]!.dishName}" ya no existe — su costo cuenta como $0.`
-                      : `${comboMissingDishes(combo.items).length} platillos de este combo ya no existen — su costo cuenta como $0.`}
+                    {missing.length === 1
+                      ? `El platillo "${firstMissing?.dishName ?? ""}" ya no existe — su costo cuenta como $0.`
+                      : `${missing.length} platillos de este combo ya no existen — su costo cuenta como $0.`}
                   </div>
                 )}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">

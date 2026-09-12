@@ -50,11 +50,10 @@ export default function MarketingAdminPage() {
   const [newType, setNewType] = useState<"percentage" | "fixed_amount">("percentage")
   const [newValue, setNewValue] = useState("10")
   const [newMinOrder, setNewMinOrder] = useState("0")
-  const [newMaxUses, setNewMaxUses] = useState("0")
+  const [newMaxUses] = useState("0")
   const [newExpires, setNewExpires] = useState("")
 
   const load = useCallback(async () => {
-    setError(null)
     try {
       const [r, c] = await Promise.all([
         fetch("/api/admin/bump-rules"),
@@ -70,6 +69,12 @@ export default function MarketingAdminPage() {
 
   useEffect(() => {
     void load()
+  }, [load])
+
+  // Para event handlers: el reset de error va fuera del efecto.
+  const reload = useCallback(async () => {
+    setError(null)
+    await load()
   }, [load])
 
   const toggleRule = async (rule: BumpRule) => {
@@ -131,7 +136,7 @@ export default function MarketingAdminPage() {
       const data = (await res.json()) as { error?: string }
       if (!res.ok) throw new Error(data.error ?? "Error al crear el cupón")
       setNewCode("")
-      await load()
+      await reload()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear el cupón")
     } finally {
@@ -146,7 +151,7 @@ export default function MarketingAdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ expires_at: new Date().toISOString() }),
     })
-    if (res.ok) await load()
+    if (res.ok) await reload()
   }
 
   const isExpired = (c: Coupon) => c.expires_at !== null && new Date(c.expires_at) < new Date()

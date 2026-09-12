@@ -1,6 +1,7 @@
 "use client"
 
 import { ArrowLeft, ShoppingCart, Trash2, Minus, Plus, Package, RefreshCw } from "lucide-react"
+import Image from "next/image"
 import { useCart } from "@/contexts/cart-context"
 import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { createClient } from "@/lib/supabase/client"
@@ -287,10 +288,9 @@ export default function CartPage() {
                 className="w-20 h-20 rounded-lg bg-[#faf8f5] flex items-center justify-center overflow-hidden shrink-0"
               >
                 {item.image_url ? (
-                  <img
+                  <Image
                     src={item.image_url}
                     alt={item.name}
-                    loading="lazy"
                     width={80}
                     height={80}
                     className="w-full h-full object-contain p-1.5"

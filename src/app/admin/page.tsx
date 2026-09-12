@@ -50,8 +50,6 @@ export default function AdminDashboardPage() {
   })
 
   const fetchMetrics = useCallback(async () => {
-    setMetricsLoading(true)
-    setMetricsError(null)
     try {
       const res = await fetch(`/api/admin/metrics?period=${period}`)
       if (!res.ok) throw new Error("Error al cargar métricas")
@@ -65,8 +63,6 @@ export default function AdminDashboardPage() {
   }, [period])
 
   const fetchOrders = useCallback(async () => {
-    setOrdersLoading(true)
-    setOrdersError(null)
     try {
       const res = await fetch("/api/admin/orders?limit=50")
       if (!res.ok) throw new Error("Error al cargar pedidos")
@@ -212,7 +208,12 @@ export default function AdminDashboardPage() {
           <MetricsCharts
             data={metrics.points}
             period={period}
-            onPeriodChange={setPeriod}
+            onPeriodChange={(p) => {
+              // El reset de loading/error va en el event handler, no en el efecto.
+              setMetricsLoading(true)
+              setMetricsError(null)
+              setPeriod(p)
+            }}
           />
         </Suspense>
       )}

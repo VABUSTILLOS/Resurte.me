@@ -107,7 +107,7 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-50 glass-header"
+      className="sticky top-0 z-50 glass-header print:hidden"
       style={{ paddingTop: "var(--header-inset-top)" }}
     >
       <div className="max-w-7xl mx-auto px-3 sm:px-6">

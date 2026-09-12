@@ -31,14 +31,28 @@ export async function GET(
   try {
     const supabase = await createServiceClient()
 
-    const { data: order, error } = await supabase
+    const SELECT_WITH_DRIVER =
+      "id, status, payment_status, payment_method, subtotal, discount, delivery_fee, total, scheduled_for, created_at, restore_token, cities(slug, name), delivery_drivers(name), order_items(quantity, unit_price, products(id, name, image_url, slug))"
+    const SELECT_BASE =
+      "id, status, payment_status, payment_method, subtotal, discount, delivery_fee, total, scheduled_for, created_at, restore_token, cities(slug, name), order_items(quantity, unit_price, products(id, name, image_url, slug))"
+
+    // Repartidor (migración 00076): si la columna/relación aún no existe en
+    // producción, reintenta sin ella en lugar de fallar el rastreo.
+    let { data: order, error } = await supabase
       .from("orders")
-      .select(
-        "id, status, payment_status, payment_method, subtotal, discount, delivery_fee, total, scheduled_for, created_at, restore_token, cities(slug, name), order_items(quantity, unit_price, products(id, name, image_url, slug))"
-      )
+      .select(SELECT_WITH_DRIVER)
       .eq("id", orderId)
       .eq("restore_token", token)
       .maybeSingle()
+
+    if (error?.code === "42703") {
+      ;({ data: order, error } = await supabase
+        .from("orders")
+        .select(SELECT_BASE)
+        .eq("id", orderId)
+        .eq("restore_token", token)
+        .maybeSingle())
+    }
 
     if (error) {
       logger.error("[ORDER-TRACK] query error:", error)
@@ -50,6 +64,14 @@ export async function GET(
     }
 
     const city = Array.isArray(order.cities) ? order.cities[0] : order.cities
+    // Repartidor: solo el primer nombre y solo cuando va en camino.
+    const driverRow = Array.isArray(order.delivery_drivers)
+      ? order.delivery_drivers[0]
+      : order.delivery_drivers
+    const driverFirstName =
+      order.status === "out_for_delivery" && driverRow?.name
+        ? String(driverRow.name).split(" ")[0]
+        : null
     const items = ((order.order_items ?? []) as unknown as Array<{
       quantity: number
       unit_price: number
@@ -76,6 +98,7 @@ export async function GET(
           scheduled_for: order.scheduled_for,
           created_at: order.created_at,
           city: city ?? null,
+          driver_name: driverFirstName,
           items,
         },
       },

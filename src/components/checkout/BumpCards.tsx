@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Image from "next/image"
 import { motion } from "framer-motion"
 import { Sparkles, Check } from "lucide-react"
 import { MAX_BUMPS } from "@/lib/checkout-config"
@@ -289,10 +290,9 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
             >
               <div className="w-14 h-14 rounded-lg bg-[#F7F5F0] flex items-center justify-center shrink-0 overflow-hidden">
                 {bump.product.image_url ? (
-                  <img
+                  <Image
                     src={bump.product.image_url}
                     alt={bump.product.name}
-                    loading="lazy"
                     width={56}
                     height={56}
                     className="w-full h-full object-contain p-1"

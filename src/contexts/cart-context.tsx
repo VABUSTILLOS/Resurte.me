@@ -64,9 +64,12 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       const existing = items.findIndex((i) => i.product_id === newItem.product_id)
 
       if (existing >= 0) {
-        items[existing] = {
-          ...items[existing]!,
-          quantity: items[existing]!.quantity + newItem.quantity,
+        const current = items[existing]
+        if (current) {
+          items[existing] = {
+            ...current,
+            quantity: current.quantity + newItem.quantity,
+          }
         }
       } else {
         items.push(newItem)
@@ -84,9 +87,11 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       for (const newItem of action.payload) {
         const existing = items.findIndex((i) => i.product_id === newItem.product_id)
         if (existing >= 0) {
+          const current = items[existing]
+          if (!current) continue
           items[existing] = {
-            ...items[existing]!,
-            quantity: items[existing]!.quantity + newItem.quantity,
+            ...current,
+            quantity: current.quantity + newItem.quantity,
           }
         } else {
           items.push(newItem)

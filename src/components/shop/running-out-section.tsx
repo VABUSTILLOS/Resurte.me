@@ -52,7 +52,10 @@ export function RunningOutSection({ products }: Props) {
 
   const items = suggestions
     .map((s) => ({ ...s, product: productById.get(s.product_id) }))
-    .filter((s) => s.product && s.product.stock_status !== "out_of_stock")
+    .filter(
+      (s): s is typeof s & { product: Product } =>
+        !!s.product && s.product.stock_status !== "out_of_stock"
+    )
 
   if (loading || items.length === 0) return null
 
@@ -88,7 +91,7 @@ export function RunningOutSection({ products }: Props) {
       <div className="-mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto scrollbar-hide scroll-fade-x snap-x">
         <div className="flex gap-3 min-w-max pb-1">
           {items.map(({ product, daysSinceLast }) => {
-            const p = product!
+            const p = product
             const price = p.sale_price ?? p.price
             return (
               <div

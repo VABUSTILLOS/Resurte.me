@@ -39,8 +39,6 @@ export default function AdminRecompensasPage() {
   })
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
       const res = await fetch("/api/admin/reward-services", { cache: "no-store" })
       const data = await res.json()
@@ -57,6 +55,13 @@ export default function AdminRecompensasPage() {
     void load()
   }, [load])
 
+  // Para event handlers: el reset de loading/error va fuera del efecto.
+  const reload = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    return load()
+  }, [load])
+
   const save = async (payload: Record<string, unknown>) => {
     const res = await fetch("/api/admin/reward-services", {
       method: "POST",
@@ -65,7 +70,7 @@ export default function AdminRecompensasPage() {
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error ?? "Error al guardar")
-    await load()
+    await reload()
   }
 
   const toggleActive = async (s: RewardService) => {
@@ -127,7 +132,7 @@ export default function AdminRecompensasPage() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => void load()}
+            onClick={() => void reload()}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg"
           >
             <RefreshCcw className="w-3.5 h-3.5" />

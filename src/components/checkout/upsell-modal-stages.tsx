@@ -7,6 +7,7 @@
  */
 
 import { AlertCircle, CheckCircle2, Sparkles } from "lucide-react"
+import Image from "next/image"
 import type { UpsellOffer } from "@/lib/upsell-offers"
 
 export interface OfferStageProps {
@@ -24,7 +25,7 @@ export function OfferStage({ offer, isDownsell, error, onAccept, onDecline }: Of
       <div className="flex items-center gap-3">
         <div className="w-20 h-20 rounded-xl bg-[#F7F5F0] flex items-center justify-center overflow-hidden shrink-0">
           {offer.product.image_url ? (
-            <img
+            <Image
               src={offer.product.image_url}
               alt={offer.product.name}
               width={80}
