@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   title: "Mi Restaurante | Resurte",
   description:
     "Herramientas inteligentes para restauranteros: costea tu menú, planifica pedidos, calcula mermas y más.",
+  // Área privada (requiere sesión): fuera del índice de buscadores.
+  robots: { index: false, follow: false },
 }
 
 // Must be dynamic — all panel tools are interactive client components

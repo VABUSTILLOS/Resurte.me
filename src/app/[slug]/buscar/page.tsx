@@ -26,7 +26,11 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const city = MEXICO_CITIES.find((c) => c.slug === slug)
-  if (!city) return { title: "Búsqueda — Resurte.me" }
+  if (!city)
+    return {
+      title: "Búsqueda — Resurte.me",
+      robots: { index: false, follow: false },
+    }
 
   const title = `Buscar productos en ${city.name} — Resurte.me`
   const description = `Busca productos por mayoreo en ${city.name}, ${city.state}. Encuentra frutas, verduras, carnes, abarrotes y más.`
@@ -34,6 +38,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    // Resultados de búsqueda interna: noindex (directriz de Google para
+    // search pages) pero follow para que el crawler llegue a los productos.
+    robots: { index: false, follow: true },
     alternates: {
       canonical: `https://resurte.me/${city.slug}/buscar`,
     },
