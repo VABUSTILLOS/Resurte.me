@@ -35,7 +35,7 @@ function seedCart(page: Page) {
   }, CART_STORAGE_KEY)
 }
 
-test.describe("checkout público", () => {
+test.describe("checkout público", { tag: "@ci" }, () => {
   test("recorre los 4 pasos y muestra breadcrumb + step indicator", async ({ page }) => {
     seedCart(page)
 

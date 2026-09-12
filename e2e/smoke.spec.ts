@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test"
 
-test.describe("smoke: páginas públicas", () => {
+test.describe("smoke: páginas públicas", { tag: "@ci" }, () => {
   test("home responde y renderiza la landing", async ({ page }) => {
     const response = await page.goto("/", { waitUntil: "domcontentloaded" })
     expect(response?.status()).toBe(200)
