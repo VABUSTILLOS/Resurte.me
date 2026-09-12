@@ -340,7 +340,7 @@ export async function getAdminMetrics({
   // Convertir a array ordenado
   const sortedKeys = Array.from(buckets.keys()).sort()
   const points: AdminMetricsPoint[] = sortedKeys.map((key) => {
-    const bucket = buckets.get(key)!
+    const bucket = buckets.get(key) ?? { revenue: 0, orders: 0 }
     const aov = bucket.orders > 0 ? bucket.revenue / bucket.orders : 0
     // Conversión estimada: asumimos ~100 visitas por pedido como baseline
     // En producción usarías datos reales de analytics

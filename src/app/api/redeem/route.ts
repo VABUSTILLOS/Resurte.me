@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(1)
 
-    if (existing && existing.length > 0) {
-      const redemption = existing[0]!
+    const redemption = existing?.[0]
+    if (redemption) {
       return NextResponse.json({
         success: true,
         already_redeemed: true,

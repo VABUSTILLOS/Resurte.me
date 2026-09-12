@@ -144,10 +144,10 @@ export async function processUpsellForOrder(
     .limit(1)
     .maybeSingle()
 
-  if (existingUpsell?.status === "paid") {
+  if (existingUpsell?.status === "paid" && existingUpsell.stripe_payment_intent_id) {
     return {
       status: "succeeded",
-      paymentIntentId: existingUpsell.stripe_payment_intent_id!,
+      paymentIntentId: existingUpsell.stripe_payment_intent_id,
       orderUpsellId: existingUpsell.id,
       amount: Number(existingUpsell.amount),
     }
@@ -705,8 +705,11 @@ export async function createPaymentIntentForOrder(params: {
       )
     }
 
+    if (!paymentIntent.client_secret) {
+      throw new PaymentIntentError("Stripe no devolvió client_secret", 500)
+    }
     return {
-      clientSecret: paymentIntent.client_secret!,
+      clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
       saveCardEnabled,
     }
@@ -748,8 +751,11 @@ export async function createPaymentIntentForOrder(params: {
     .update({ stripe_payment_intent_id: paymentIntent.id })
     .eq("id", order.id)
 
+  if (!paymentIntent.client_secret) {
+    throw new PaymentIntentError("Stripe no devolvió client_secret", 500)
+  }
   return {
-    clientSecret: paymentIntent.client_secret!,
+    clientSecret: paymentIntent.client_secret,
     paymentIntentId: paymentIntent.id,
     saveCardEnabled: false, // FoodOS no ofrece upsells off-session
   }

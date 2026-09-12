@@ -173,7 +173,7 @@ export function buildCorteLines({
     ...(comisionesHoy > 0 ? [`Comisiones por canal: -$${comisionesHoy.toFixed(0)}`] : []),
     ...(mesasOcupadas > 0 ? [`Mesas ocupadas: ${mesasOcupadas}`] : []),
     ...(tipoCambio !== 1 ? [`Aprox. USD: $${(stats.revenue / tipoCambio).toFixed(2)}`] : []),
-    ...(entries.some((e) => e.modificadores?.length) ? ["", "Con modificadores:", ...entries.filter((e) => e.modificadores?.length).map((e) => `${e.dishName} [+${e.modificadores!.map((m) => m.nombre).join(", ")}] ×${e.quantity}`)] : []),
+    ...(entries.some((e) => e.modificadores?.length) ? ["", "Con modificadores:", ...entries.filter((e) => e.modificadores?.length).map((e) => `${e.dishName} [+${(e.modificadores ?? []).map((m) => m.nombre).join(", ")}] ×${e.quantity}`)] : []),
     "",
     `Total: $${stats.revenue.toFixed(0)} · ${stats.units} platillos`,
     "",

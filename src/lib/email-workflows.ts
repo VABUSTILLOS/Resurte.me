@@ -112,8 +112,9 @@ export async function checkAbandonedCarts(): Promise<CronResult> {
   const supabase = await createServiceClient()
 
   const now = new Date()
-  const firstTouch = ABANDONED_CART_TOUCHES[0]!
-  const lastTouch = ABANDONED_CART_TOUCHES[ABANDONED_CART_TOUCHES.length - 1]!
+  const firstTouch = ABANDONED_CART_TOUCHES[0]
+  const lastTouch = ABANDONED_CART_TOUCHES[ABANDONED_CART_TOUCHES.length - 1]
+  if (!lastTouch) throw new Error("ABANDONED_CART_TOUCHES no puede estar vacío")
   const oldestWindowStart = new Date(
     now.getTime() - lastTouch.maxHours * 60 * 60 * 1000,
   ).toISOString()
@@ -355,10 +356,11 @@ export async function checkInactiveUsers(): Promise<CronResult> {
   const users = inactiveUsers?.users ?? []
 
   // Candidatos por ventana: último sign-in hace ~window.days días (±2).
-  const candidatesByWindow = new Map<(typeof REACTIVATION_WINDOWS)[number], typeof users>()
+  type CandidateUser = (typeof users)[number] & { email: string }
+  const candidatesByWindow = new Map<(typeof REACTIVATION_WINDOWS)[number], CandidateUser[]>()
   const allCandidateIds = new Set<string>()
   for (const window of REACTIVATION_WINDOWS) {
-    const candidates = users.filter((u) => {
+    const candidates = users.filter((u): u is CandidateUser => {
       if (!u.email) return false
       const lastSignIn = u.last_sign_in_at
       if (!lastSignIn) return false
@@ -439,7 +441,7 @@ export async function checkInactiveUsers(): Promise<CronResult> {
           (await issuePersonalCoupon(supabase, user.id, "reactivation"))
 
         const result = await sendEmail({
-          to: user.email!,
+          to: user.email,
           subject: window.subject,
           html: reactivationEmailHtml({
             name,
@@ -463,7 +465,7 @@ export async function checkInactiveUsers(): Promise<CronResult> {
 
         logRows.push({
           user_id: user.id,
-          email_to: user.email!,
+          email_to: user.email,
           email_type: window.type,
           status: result.ok ? "sent" : "failed",
           error: result.error ?? null,

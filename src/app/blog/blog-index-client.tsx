@@ -249,7 +249,7 @@ export function BlogIndexClient({
       </div>
 
       {/* Artículos destacados */}
-      {showFeatured && (
+      {showFeatured && featured[0] && (
         <div className="mt-14">
           <div className="flex items-center gap-3">
             <span className="h-8 w-1.5 rounded-full bg-brand-500" aria-hidden="true" />
@@ -264,7 +264,7 @@ export function BlogIndexClient({
           </div>
           <div className="mt-6 flex flex-col gap-6">
             <FeaturedBlogCard
-              post={featured[0]!}
+              post={featured[0]}
               size="large"
               priority
             />

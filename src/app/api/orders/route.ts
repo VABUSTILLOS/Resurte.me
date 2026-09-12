@@ -230,6 +230,13 @@ export async function POST(request: NextRequest) {
     for (const p of dbProducts ?? []) {
       priceByProduct.set(p.id, p)
     }
+    // Los items ya se validan contra este mapa más abajo; esta helper es
+    // defensiva para que TS no necesite non-null assertions.
+    const getDbProduct = (productId: number) => {
+      const db = priceByProduct.get(productId)
+      if (!db) throw new Error(`Producto ${productId} no está en el mapa de precios`)
+      return db
+    }
 
     // Items inexistentes en la BD
     for (const item of items) {
@@ -243,7 +250,7 @@ export async function POST(request: NextRequest) {
 
     // Items agotados
     for (const item of items) {
-      const db = priceByProduct.get(item.product_id)!
+      const db = getDbProduct(item.product_id)
       if (db.stock_status === "out_of_stock") {
         return NextResponse.json(
           { error: `El producto ${item.product_id} está agotado` },
@@ -281,7 +288,7 @@ export async function POST(request: NextRequest) {
 
       const basePriceByProduct = new Map<number, number>()
       for (const item of bumpItems) {
-        const db = priceByProduct.get(item.product_id)!
+        const db = getDbProduct(item.product_id)
         basePriceByProduct.set(item.product_id, db.sale_price ?? db.price)
       }
 
@@ -304,7 +311,7 @@ export async function POST(request: NextRequest) {
     // Recalcular subtotal con precios reales (sale_price gana si existe;
     // bump usa el precio con descuento de bump_rules)
     const realSubtotal = items.reduce((sum, item) => {
-      const db = priceByProduct.get(item.product_id)!
+      const db = getDbProduct(item.product_id)
       const unitPrice =
         item.item_type === "bump"
           ? (bumpPriceByProduct.get(item.product_id) ?? db.sale_price ?? db.price)
@@ -640,7 +647,7 @@ export async function POST(request: NextRequest) {
 
     // 4. Create order items (unit_price real de la BD, no el del cliente)
     const orderItems = items.map((item) => {
-      const db = priceByProduct.get(item.product_id)!
+      const db = getDbProduct(item.product_id)
       return {
         order_id: order.id,
         product_id: item.product_id,

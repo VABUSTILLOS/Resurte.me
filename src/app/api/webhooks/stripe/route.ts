@@ -29,10 +29,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const stripe = getStripe()
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+    if (!webhookSecret) throw new Error("STRIPE_WEBHOOK_SECRET no está configurado")
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      webhookSecret
     )
   } catch (err) {
     const message = err instanceof Error ? err.message : "Invalid signature"

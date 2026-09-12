@@ -180,7 +180,8 @@ export default function ComandaPage() {
     setStatuses((prev) => {
       const next: Record<string, ComandaStatus> = {}
       Object.keys(prev).forEach((k) => {
-        const entry = prev[k]!
+        const entry = prev[k]
+        if (!entry) return
         next[k] = ids.has(k) && entry.status === "listo" ? { ...entry, hidden: true } : entry
       })
       return next
@@ -203,7 +204,7 @@ export default function ComandaPage() {
         ? ["", t("comanda.reportTimes"), ...dishAvgTimes.map((g) => t("comanda.reportTimeLine", { name: g.dishName, min: g.avgMin.toFixed(0), count: g.count }))]
         : []),
       ...(filtered.some((f) => f.entry.modificadores?.length)
-        ? ["", t("comanda.reportModifiers"), ...filtered.filter((f) => f.entry.modificadores?.length).map((f) => t("comanda.reportModifierLine", { name: f.entry.dishName, mods: f.entry.modificadores!.map((m) => m.nombre).join(", "), qty: f.entry.quantity }))]
+        ? ["", t("comanda.reportModifiers"), ...filtered.filter((f) => f.entry.modificadores?.length).map((f) => t("comanda.reportModifierLine", { name: f.entry.dishName, mods: (f.entry.modificadores ?? []).map((m) => m.nombre).join(", "), qty: f.entry.quantity }))]
         : []),
       "",
       ...CHANNELS.filter((c) => filtered.some((f) => (f.entry.channel || "comedor") === c.key))

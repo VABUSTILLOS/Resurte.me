@@ -144,16 +144,20 @@ export default function CosteoPage() {
   function undo() {
     if (undoIndex > 0) {
       const newIdx = undoIndex - 1
+      const snapshot = undoStack[newIdx]
+      if (!snapshot) return
       setUndoIndex(newIdx)
-      setDishes(undoStack[newIdx]!)
+      setDishes(snapshot)
     }
   }
 
   function redo() {
     if (undoIndex < undoStack.length - 1) {
       const newIdx = undoIndex + 1
+      const snapshot = undoStack[newIdx]
+      if (!snapshot) return
       setUndoIndex(newIdx)
-      setDishes(undoStack[newIdx]!)
+      setDishes(snapshot)
     }
   }
 
@@ -282,7 +286,7 @@ export default function CosteoPage() {
       const catKey = d.category && d.category !== "todas" ? d.category : "plato-fuerte"
       const label = DISH_CATEGORIES.find((c) => c.key === catKey)?.label || "Plato fuerte"
       if (!sections.has(label)) sections.set(label, [])
-      sections.get(label)!.push(`  ${d.name} .................................. $${d.sellingPrice.toFixed(0)}`)
+      sections.get(label)?.push(`  ${d.name} .................................. $${d.sellingPrice.toFixed(0)}`)
     })
     const lines: string[] = [`📋 Carta — ${selectedCollection?.name || "Mi menú"}`]
     sections.forEach((items, label) => {

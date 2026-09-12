@@ -226,11 +226,15 @@ export function PedidosPage({
       return
     }
     const client = clients.find((c) => c.userId === selectedClient)
+    if (!client) {
+      toast("Cliente no encontrado", "error")
+      return
+    }
     setSubmitting(true)
     try {
       const { createAssistedOrder } = await import("@/lib/comercializacion/actions")
       const result = await createAssistedOrder({
-        prospectId: client!.prospectId,
+        prospectId: client.prospectId,
         addressId: Number(selectedAddress),
         items: cart.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
         paymentMethod,

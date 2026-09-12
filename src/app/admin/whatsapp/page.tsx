@@ -98,10 +98,41 @@ export default function AdminWhatsAppPage() {
     }
   }
 
-  const syncCatalog = () => {
-    alert(
-      `Catálogo listo para sincronizar con WhatsApp.\n\n${totalInCatalog} productos serán publicados en el catálogo de WhatsApp Business.\n\nConecta tu WhatsApp Cloud API para completar la sincronización.`
-    )
+  const [syncingCatalog, setSyncingCatalog] = useState(false)
+  const [syncResult, setSyncResult] = useState<string | null>(null)
+
+  const syncCatalog = async () => {
+    if (syncingCatalog) return
+    setSyncingCatalog(true)
+    setSyncResult(null)
+    setError(null)
+    try {
+      const selected = products.filter((p) => p.show_in_whatsapp)
+      const res = await fetch("/api/whatsapp/catalog/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          products: selected.map((p) => ({
+            id: String(p.id),
+            name: p.name,
+            description: p.description ?? undefined,
+            image_url: p.image_url ?? undefined,
+            price: p.price,
+            currency: "MXN",
+            sale_price: p.sale_price ?? null,
+          })),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail ?? data.error ?? "Error al sincronizar")
+      setSyncResult(
+        `Catálogo sincronizado: ${data.total_in_catalog} productos en WhatsApp (${data.added} agregados/actualizados, ${data.removed} removidos).`
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al sincronizar el catálogo")
+    } finally {
+      setSyncingCatalog(false)
+    }
   }
 
   return (
@@ -118,12 +149,19 @@ export default function AdminWhatsAppPage() {
         </div>
         <button
           onClick={syncCatalog}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0F7A3D] text-white font-semibold rounded-full hover:bg-[#0F6B3A] transition-colors text-sm shadow-sm"
+          disabled={syncingCatalog}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0F7A3D] text-white font-semibold rounded-full hover:bg-[#0F6B3A] transition-colors text-sm shadow-sm disabled:opacity-60"
         >
-          <RefreshCw className="w-4 h-4" />
-          Sincronizar catálogo
+          <RefreshCw className={`w-4 h-4 ${syncingCatalog ? "animate-spin" : ""}`} />
+          {syncingCatalog ? "Sincronizando…" : "Sincronizar catálogo"}
         </button>
       </div>
+
+      {syncResult && (
+        <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800">
+          {syncResult}
+        </div>
+      )}
 
       {/* Info banner — Take App "Official Partner" style */}
       <div className="bg-gradient-to-r from-[#E7F8EE] to-[#DCF5E6] border border-[#25D366]/20 rounded-2xl p-5 mb-6 flex items-start gap-4">

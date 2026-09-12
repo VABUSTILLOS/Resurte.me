@@ -65,7 +65,7 @@ export default function MermasPage() {
     setAmountKg("")
     setCostPerKg("")
     setNote("")
-    setSelectedCause(CAUSAS[0]!.key)
+    setSelectedCause(CAUSAS[0].key)
     setSelectedItemId("")
     setEditingId(null)
   }
@@ -146,7 +146,7 @@ export default function MermasPage() {
   function startEditEntry(entry: WasteEntry) {
     setEditingId(entry.id)
     setSelectedCategory(entry.category)
-    setSelectedCause(entry.cause || CAUSAS[0]!.key)
+    setSelectedCause(entry.cause || CAUSAS[0].key)
     setAmountKg(String(entry.amountKg))
     setCostPerKg(String(entry.costPerKg))
     setNote(entry.note || "")
@@ -232,7 +232,7 @@ export default function MermasPage() {
         setAmountKg("")
         setCostPerKg("")
         setNote("")
-        setSelectedCause(CAUSAS[0]!.key)
+        setSelectedCause(CAUSAS[0].key)
       }
       if (e.key === "Escape") {
         if (deleteConfirmId) setDeleteConfirmId(null)

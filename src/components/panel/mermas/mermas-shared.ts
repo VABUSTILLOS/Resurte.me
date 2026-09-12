@@ -23,7 +23,7 @@ export interface WasteCause {
   icon: string
 }
 
-export const CAUSAS: WasteCause[] = [
+export const CAUSAS: [WasteCause, ...WasteCause[]] = [
   { key: "preparacion", label: "Preparación", icon: "🔪" },
   { key: "caducidad", label: "Caducidad", icon: "📅" },
   { key: "sobreproduccion", label: "Sobreproducción", icon: "📦" },

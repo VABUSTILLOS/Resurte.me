@@ -353,7 +353,7 @@ export default function InventarioPage() {
       if (!groups.has(id)) {
         groups.set(id, { proveedorId: id, nombre: id ? proveedorName(id) : "Sin proveedor", items: [] })
       }
-      groups.get(id)!.items.push(item)
+      groups.get(id)?.items.push(item)
     })
     return [...groups.values()]
   }, [projectedOrder, proveedorName])

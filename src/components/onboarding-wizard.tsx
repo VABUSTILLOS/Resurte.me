@@ -64,8 +64,10 @@ interface OnboardingData {
   completedAt: string | null
 }
 
+const FIRST_STEP = { id: "business", title: "¿Qué tipo de negocio tienes?", subtitle: "Selecciona la opción que mejor describa tu restaurante" }
+
 const STEPS = [
-  { id: "business", title: "¿Qué tipo de negocio tienes?", subtitle: "Selecciona la opción que mejor describa tu restaurante" },
+  FIRST_STEP,
   { id: "budget", title: "¿Cuánto gastas al mes en insumos?", subtitle: "Esto nos ayuda a recomendarte productos adecuados" },
   { id: "categories", title: "¿Qué productos compras más?", subtitle: "Selecciona tus categorías principales" },
   { id: "done", title: "¡Todo listo!", subtitle: "Estamos listos para ayudarte a crecer" },
@@ -94,6 +96,7 @@ export function OnboardingWizard({
   // Check if onboarding is needed
   useEffect(() => {
     if (!supabase) return
+    const sb = supabase
 
     // El gate ya verificó sesión+localStorage; solo falta el trackEvent.
     if (startVisible) {
@@ -110,7 +113,7 @@ export function OnboardingWizard({
       }
 
       // Check if user is authenticated
-      const { data: { session } } = await supabase!.auth.getSession()
+      const { data: { session } } = await sb.auth.getSession()
       if (!session?.user?.id) {
         setVisible(false)
         return
@@ -126,7 +129,7 @@ export function OnboardingWizard({
     return () => clearTimeout(timer)
   }, [supabase, startVisible])
 
-  const currentStep = STEPS[step] ?? STEPS[0]!
+  const currentStep = STEPS[step] ?? FIRST_STEP
   const isLast = step === STEPS.length - 1
 
   const handleNext = () => {

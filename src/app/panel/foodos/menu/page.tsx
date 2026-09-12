@@ -99,7 +99,7 @@ export default function MenuPage() {
     for (const item of items) {
       const key = item.category_id ?? "sin-categoria"
       if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(item)
+      map.get(key)?.push(item)
     }
     return map
   }, [items])
@@ -129,8 +129,9 @@ export default function MenuPage() {
   }
 
   async function handleDeleteCategory(id: string) {
+    if (!restaurant) return
     await deleteCategory(id)
-    setCategories(await listCategories(restaurant!.id))
+    setCategories(await listCategories(restaurant.id))
   }
 
   async function handleSaveItem(e: React.FormEvent) {
@@ -155,8 +156,9 @@ export default function MenuPage() {
   }
 
   async function handleDeleteItem(id: string) {
+    if (!restaurant) return
     await deleteMenuItem(id)
-    setItems(await listMenuItems(restaurant!.id))
+    setItems(await listMenuItems(restaurant.id))
   }
 
   async function handleImportFromCosteo() {
@@ -350,11 +352,14 @@ export default function MenuPage() {
                     <div className="flex items-center justify-between mt-3">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-gray-900">{formatMoney(item.price)}</span>
-                        {item.cost > 0 && itemMargin(item) != null && (
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${itemMargin(item)! >= 0.3 ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-                            {t("foodos.menu.margin", { pct: (itemMargin(item)! * 100).toFixed(0) })}
-                          </span>
-                        )}
+                        {item.cost > 0 && itemMargin(item) != null && (() => {
+                          const margin = itemMargin(item) ?? 0
+                          return (
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${margin >= 0.3 ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                              {t("foodos.menu.margin", { pct: (margin * 100).toFixed(0) })}
+                            </span>
+                          )
+                        })()}
                       </div>
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${item.is_available ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
                         {item.is_available ? t("foodos.menu.available") : t("foodos.menu.unavailable")}

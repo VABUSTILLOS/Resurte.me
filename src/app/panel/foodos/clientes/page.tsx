@@ -205,8 +205,9 @@ export default function ClientesPage() {
 
   async function removeCampaign(id: string) {
     if (!confirm(t("foodos.clientes.deleteCampaignConfirm"))) return
+    if (!restaurant) return
     await deleteCampaign(id)
-    setCampaigns(await listCampaigns(restaurant!.id))
+    setCampaigns(await listCampaigns(restaurant.id))
   }
 
   async function toggleAuto(a: FoodosAutomation) {

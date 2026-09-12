@@ -128,8 +128,9 @@ export default function CombosPage() {
   }
 
   async function handleDeleteCombo(id: string) {
+    if (!restaurant) return
     await deleteCombo(id)
-    setCombos(await listCombos(restaurant!.id))
+    setCombos(await listCombos(restaurant.id))
   }
 
   function toggleComboItem(id: string) {
@@ -162,8 +163,9 @@ export default function CombosPage() {
   }
 
   async function handleDeleteRule(id: string) {
+    if (!restaurant) return
     await deleteUpsellRule(id)
-    setRules(await listUpsellRules(restaurant!.id))
+    setRules(await listUpsellRules(restaurant.id))
   }
 
   function toggleRuleSuggested(id: string) {

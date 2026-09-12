@@ -207,10 +207,13 @@ export default function PlanificadorPage() {
     if (willOverwrite.length > 0) {
       setConfirmImport({
         dishName: dish.name,
-        ingredients: willOverwrite.map((o) => ({
-          name: o.name,
-          existing: manualQtys[o.existing]!.qty + " " + (manualQtys[o.existing]!.unit || ""),
-        })),
+        ingredients: willOverwrite.map((o) => {
+          const manual = manualQtys[o.existing]
+          return {
+            name: o.name,
+            existing: manual ? manual.qty + " " + (manual.unit || "") : "",
+          }
+        }),
       })
       return
     }

@@ -99,10 +99,11 @@ function AdminOrdersContent() {
   }, [refreshKey, statusFilter, debouncedSearch])
 
   async function loadOlder() {
-    if (!orders.length || loadingMore) return
+    const lastOrder = orders[orders.length - 1]
+    if (!lastOrder || loadingMore) return
     setLoadingMore(true)
     try {
-      const cursor = orders[orders.length - 1]!.created_at
+      const cursor = lastOrder.created_at
       const { orders: older, hasMore: more } = await getAdminOrders(100, cursor, {
         status: statusFilter,
         search: debouncedSearch,
