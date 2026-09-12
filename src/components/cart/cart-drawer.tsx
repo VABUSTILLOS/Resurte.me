@@ -174,17 +174,6 @@ export function CartDrawer() {
               <X className="w-5 h-5 text-[var(--text-secondary)]" />
             </button>
           </div>
-<<<<<<< HEAD
-=======
-          <button
-            ref={closeBtnRef}
-            onClick={() => setIsOpen(false)}
-            aria-label="Cerrar carrito"
-            className="p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
-          >
-            <X className="w-5 h-5 text-[var(--text-secondary)]" />
-          </button>
->>>>>>> b7c0fc8 (feat(carrito): fases K1-K5 — foco inicial en drawer, overscroll-contain, aria-live en total/cantidad, haptic en checkout, aria-labels)
         </div>
 
         {/* Items — overscroll-contain: el scroll de la lista no arrastra la
