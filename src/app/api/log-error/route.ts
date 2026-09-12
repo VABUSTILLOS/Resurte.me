@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
+import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
+
+// Endpoint público de ingesta de logs del cliente: sin rate limit ni tope
+// de tamaño era un vector de abuso (escrituras ilimitadas en error_logs →
+// costo y ruido). Se defiende igual que /api/csp-report:
+//   · Tope de body (los reportes legítimos son << 64 KB).
+//   · Rate limit durable por IP (helper compartido, ver src/lib/rate-limit.ts).
+const MAX_BODY_BYTES = 64 * 1024
+const RATE_LIMIT_MAX = 30
+const RATE_LIMIT_WINDOW_SECONDS = 60
 
 interface LogErrorBody {
   message: string
@@ -17,13 +27,30 @@ interface LogErrorBody {
 
 export async function POST(request: NextRequest) {
   try {
+    // Tope de tamaño ANTES de parsear: un body gigante solo sirve para abusar.
+    const contentLength = Number(request.headers.get("content-length") ?? 0)
+    if (contentLength > MAX_BODY_BYTES) {
+      return NextResponse.json({ error: "Payload demasiado grande" }, { status: 413 })
+    }
+
+    const supabase = await createServiceClient()
+
+    // Rate limit durable por IP: frena el spam de escrituras en error_logs.
+    const rate = await rateLimited(
+      supabase,
+      `log-error:${clientIp(request)}`,
+      RATE_LIMIT_MAX,
+      RATE_LIMIT_WINDOW_SECONDS
+    )
+    if (!rate.allowed) {
+      return rateLimitResponse(rate)
+    }
+
     const body = (await request.json()) as LogErrorBody
 
     if (!body.message || typeof body.message !== "string") {
       return NextResponse.json({ error: "message es requerido" }, { status: 400 })
     }
-
-    const supabase = await createServiceClient()
 
     const { error } = await supabase.from("error_logs").insert({
       message: body.message.slice(0, 5000),
