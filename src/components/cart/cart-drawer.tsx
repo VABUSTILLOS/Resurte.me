@@ -27,6 +27,9 @@ import { calcCheckoutTotals, DELIVERY_FEE_FLAT, freeShippingProgress } from "@/l
 // Global event bus to control drawer from header
 export const CART_DRAWER_EVENT = "resurte:toggle-cart-drawer"
 
+/** Distancia de arrastre hacia abajo que confirma el cierre del drawer. */
+const SWIPE_CLOSE_THRESHOLD = 80
+
 export function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false)
   const { cart, itemCount, subtotal, coupon, removeItem, updateQuantity, clearCart } = useCart()
@@ -36,6 +39,30 @@ export function CartDrawer() {
   // con /cart y /{ciudad}/carrito vía sessionStorage + evento global.
   const { selectedBumps, setSelectedBumps } = useSelectedBumps()
   const closeBtnRef = useRef<HTMLButtonElement>(null)
+
+  // Swipe-to-close (móvil, patrón app nativa): arrastrar el handle/header
+  // hacia abajo desliza el drawer; al soltar por encima del umbral se cierra.
+  const [dragY, setDragY] = useState(0)
+  const dragStartY = useRef<number | null>(null)
+
+  const onHandleTouchStart = (e: React.TouchEvent) => {
+    dragStartY.current = e.touches[0]?.clientY ?? null
+  }
+  const onHandleTouchMove = (e: React.TouchEvent) => {
+    if (dragStartY.current === null) return
+    const currentY = e.touches[0]?.clientY
+    if (currentY === undefined) return
+    const dy = currentY - dragStartY.current
+    if (dy > 0) setDragY(dy)
+  }
+  const onHandleTouchEnd = () => {
+    if (dragY > SWIPE_CLOSE_THRESHOLD) {
+      haptic(12)
+      setIsOpen(false)
+    }
+    setDragY(0)
+    dragStartY.current = null
+  }
 
   // Totales en tiempo real (fuente única calcCheckoutTotals): el descuento de
   // cupón se aplica sobre subtotal + bumps, igual que el checkout y el servidor.
@@ -110,28 +137,44 @@ export function CartDrawer() {
         aria-modal="true"
         aria-label="Mi Carrito"
         className="fixed right-0 top-0 bottom-0 z-[70] w-full max-w-md sm:max-w-2xl bg-white shadow-2xl flex flex-col animate-slide-in-right"
+        style={{
+          transform: dragY > 0 ? `translateY(${dragY}px)` : undefined,
+          transition: dragY > 0 ? "none" : "transform 0.2s ease",
+        }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E9EB]">
-          <div className="flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-[#0E7A0E]" />
-            <h2 className="text-lg font-bold text-[#242529]">
-              Mi Carrito
-            </h2>
-            {itemCount > 0 && (
-              <span className="text-sm text-[var(--text-secondary)]">
-                ({itemCount} {itemCount === 1 ? "producto" : "productos"})
-              </span>
-            )}
+        {/* Zona de arrastre (handle + header): en móvil comunica y ejecuta el
+            cierre por gesto de deslizamiento hacia abajo. */}
+        <div
+          onTouchStart={onHandleTouchStart}
+          onTouchMove={onHandleTouchMove}
+          onTouchEnd={onHandleTouchEnd}
+        >
+          <div className="sm:hidden flex justify-center pt-2" aria-hidden="true">
+            <div className="w-10 h-1 rounded-full bg-[#E8E9EB]" />
           </div>
-          <button
-            ref={closeBtnRef}
-            onClick={() => setIsOpen(false)}
-            aria-label="Cerrar carrito"
-            className="p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
-          >
-            <X className="w-5 h-5 text-[var(--text-secondary)]" />
-          </button>
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E9EB]">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-[#0E7A0E]" />
+              <h2 className="text-lg font-bold text-[#242529]">
+                Mi Carrito
+              </h2>
+              {itemCount > 0 && (
+                <span className="text-sm text-[var(--text-secondary)]">
+                  ({itemCount} {itemCount === 1 ? "producto" : "productos"})
+                </span>
+              )}
+            </div>
+            <button
+              ref={closeBtnRef}
+              onClick={() => setIsOpen(false)}
+              aria-label="Cerrar carrito"
+              className="p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
+            >
+              <X className="w-5 h-5 text-[var(--text-secondary)]" />
+            </button>
+          </div>
         </div>
 
         {/* Items — overscroll-contain: el scroll de la lista no arrastra la
