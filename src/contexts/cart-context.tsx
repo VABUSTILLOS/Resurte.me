@@ -7,10 +7,14 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
+  useState,
   type ReactNode,
 } from "react"
 import type { Cart, CartItem, AppliedCoupon } from "@/types"
 import { calcCouponDiscount } from "@/lib/checkout-config"
+import { createClient } from "@/lib/supabase/client"
+import { mergeCarts, type ServerCartSnapshot } from "@/lib/cart-sync"
 
 // ============================================================
 // Types
@@ -151,9 +155,9 @@ const CartContext = createContext<CartContextValue | null>(null)
 
 const CART_STORAGE_KEY = "resurte_cart"
 
-function loadFromStorage(): CartState {
+function loadFromStorage(): CartState & { updatedAt: number | null } {
   if (typeof window === "undefined") {
-    return { cart: { ...EMPTY_CART }, coupon: null, isLoaded: false }
+    return { cart: { ...EMPTY_CART }, coupon: null, isLoaded: false, updatedAt: null }
   }
 
   try {
@@ -164,19 +168,23 @@ function loadFromStorage(): CartState {
         cart: parsed.cart ?? { ...EMPTY_CART },
         coupon: parsed.coupon ?? null,
         isLoaded: false,
+        updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : null,
       }
     }
   } catch {
     // corrupted data, reset
   }
 
-  return { cart: { ...EMPTY_CART }, coupon: null, isLoaded: false }
+  return { cart: { ...EMPTY_CART }, coupon: null, isLoaded: false, updatedAt: null }
 }
 
 function saveToStorage(cart: Cart, coupon: AppliedCoupon | null) {
   if (typeof window === "undefined") return
   try {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify({ cart, coupon }))
+    localStorage.setItem(
+      CART_STORAGE_KEY,
+      JSON.stringify({ cart, coupon, updatedAt: Date.now() })
+    )
   } catch {
     // storage full or unavailable
   }
@@ -185,6 +193,19 @@ function saveToStorage(cart: Cart, coupon: AppliedCoupon | null) {
 // ============================================================
 // Helpers
 // ============================================================
+
+/** PUT best-effort del carrito completo al servidor (usuario con sesión). */
+async function pushCartToServer(items: CartItem[], coupon: AppliedCoupon | null): Promise<void> {
+  try {
+    await fetch("/api/cart", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items, coupon }),
+    })
+  } catch {
+    // Offline: el carrito local (localStorage) sigue siendo la fuente visible.
+  }
+}
 
 function calcSubtotal(items: CartItem[]): number {
   return items.reduce((sum, item) => {
@@ -223,6 +244,80 @@ export function CartProvider({ children }: { children: ReactNode }) {
       saveToStorage(state.cart, state.coupon)
     }
   }, [state.cart, state.coupon, state.isLoaded])
+
+  // ── Sync con el carrito del servidor (usuarios con sesión) ──
+  // El carrito local sigue funcionando offline y para invitados; al iniciar
+  // sesión se hace merge last-write-wins con user_carts (ver cart-sync.ts).
+  const [userId, setUserId] = useState<string | null>(null)
+  const [serverSynced, setServerSynced] = useState(false)
+  const skipNextPush = useRef(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+    if (!supabase) return // Supabase no configurado: solo carrito local
+    let active = true
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active) setUserId(data.session?.user?.id ?? null)
+    })
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null)
+      if (!session?.user) setServerSynced(false)
+    })
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  // Merge inicial al detectar sesión.
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/cart", { cache: "no-store" })
+        if (!res.ok) return
+        const server = (await res.json()) as ServerCartSnapshot
+        if (cancelled) return
+        const local = loadFromStorage()
+        const decision = mergeCarts(
+          { cart: local.cart, coupon: local.coupon, updatedAt: local.updatedAt },
+          server
+        )
+        if (decision.action === "use-server") {
+          skipNextPush.current = true
+          dispatch({
+            type: "LOAD_CART",
+            payload: { cart: decision.cart, coupon: decision.coupon, isLoaded: true },
+          })
+        } else if (decision.action === "upload-local") {
+          void pushCartToServer(local.cart.items, local.coupon)
+        }
+      } catch {
+        // Offline o sin API: el carrito local sigue funcionando.
+      } finally {
+        if (!cancelled) setServerSynced(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
+  // Push debounced de cambios (solo tras el merge inicial).
+  useEffect(() => {
+    if (!userId || !state.isLoaded || !serverSynced) return
+    if (skipNextPush.current) {
+      skipNextPush.current = false
+      return
+    }
+    const timer = setTimeout(() => {
+      void pushCartToServer(state.cart.items, state.coupon)
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [userId, state.cart, state.coupon, state.isLoaded, serverSynced])
 
   const addItem = useCallback((item: CartItem) => {
     dispatch({ type: "ADD_ITEM", payload: item })
