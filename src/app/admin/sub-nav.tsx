@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ShieldCheck } from "lucide-react"
+import { PendingOrdersBadge } from "./components/PendingOrdersBadge"
 
 const ADMIN_NAV = [
   { href: "/admin", label: "Dashboard", exact: true },
@@ -53,6 +54,8 @@ export function AdminSubNav() {
                 }`}
               >
                 {item.label}
+                {/* Fase 3 — badge de pedidos pendientes (polling 30 s) */}
+                {item.href === "/admin/pedidos" && <PendingOrdersBadge />}
               </Link>
             )
           })}
