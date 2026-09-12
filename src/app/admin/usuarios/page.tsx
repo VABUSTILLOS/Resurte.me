@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Search, Loader2, ShieldCheck, Store, User } from "lucide-react"
+import { MANAGED_ROLES } from "@/lib/admin-roles"
 import {
   listUsers,
   setUserRole,
@@ -182,9 +183,11 @@ export default function AdminUsuariosPage() {
                           aria-label={`Cambiar rol de ${user.email ?? "usuario"}`}
                           className="rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-700 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
                         >
-                          <option value="cliente">Cliente</option>
-                          <option value="vendedor">Vendedor</option>
-                          <option value="admin">Admin</option>
+                          {MANAGED_ROLES.map((role) => (
+                            <option key={role} value={role}>
+                              {ROLE_META[role].label}
+                            </option>
+                          ))}
                         </select>
                         {updating === user.id && (
                           <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
