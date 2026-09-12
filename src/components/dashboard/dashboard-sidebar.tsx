@@ -65,7 +65,11 @@ export function DashboardSidebar() {
     }
   }, [])
   const [orders, setOrders] = useState<OrderSummary[]>([])
-  const [cashback] = useState(0)
+  // (M2) Total real de pedidos del usuario: la lista de abajo está limitada a
+  // 10, así que orders.length no sirve como contador.
+  const [totalOrders, setTotalOrders] = useState(0)
+  // (M1) Saldo real de Créditos Resurte (antes era un 0 fijo).
+  const [cashback, setCashback] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
   useEscapeKey(() => setMobileOpen(false), mobileOpen)
   const [collapsed, setCollapsed] = useState(() => {
@@ -117,10 +121,35 @@ export function DashboardSidebar() {
           }))
         )
       })
+    // (M2) Conteo exacto de pedidos para la tarjeta "Pedidos" (head-only).
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .then(({ count, error }) => {
+        if (!cancelled && !error && count !== null) setTotalOrders(count)
+      })
     return () => {
       cancelled = true
     }
   }, [supabase, user])
+
+  // (M1) Saldo del monedero vía server action (mismo patrón que getMyRole:
+  // import dinámico para no cargar el módulo en el bundle inicial).
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    import("@/lib/wallet-actions")
+      .then(({ getWalletBalance }) => getWalletBalance())
+      .then((wallet) => {
+        if (!cancelled && wallet) setCashback(Number(wallet.balance_credits ?? 0))
+      })
+      .catch(() => {
+        // Sin monedero o sin permisos: se queda en 0.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [user])
 
   async function handleSignOut() {
     if (!supabase) return
@@ -249,14 +278,14 @@ export function DashboardSidebar() {
                   <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                   <span className="font-medium leading-tight">Pedidos</span>
                 </div>
-                <p className="text-xl font-bold text-gray-900">{orders.length}</p>
+                <p className="text-xl font-bold text-gray-900">{totalOrders > 0 ? totalOrders : orders.length}</p>
               </div>
               <div className="flex-1 bg-amber-50 rounded-xl px-3 py-2.5 flex flex-col justify-between min-h-[68px]">
                 <div className="flex items-start gap-1.5 text-xs text-amber-700">
                   <Coins className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   <span className="font-medium leading-tight">Puntos de Recompensa</span>
                 </div>
-                <p className="text-xl font-bold text-gray-900">${cashback}</p>
+                <p className="text-xl font-bold text-gray-900">${cashback.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</p>
               </div>
             </div>
           </div>
@@ -438,19 +467,19 @@ export function DashboardSidebar() {
 
             <div className="p-4 space-y-3">
               <div className="flex gap-3">
-                <div className="flex-1 bg-[#F0FDF4] rounded-xl p-3 flex flex-col justify-between min-h-[68px]">
+                <div className="flex-1 bg-[#F0DF4] rounded-xl p-3 flex flex-col justify-between min-h-[68px]">
                   <div className="flex items-center gap-1.5 text-xs text-[#0E7A0E]">
                     <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                     <span className="font-medium leading-tight">Pedidos</span>
                   </div>
-                  <p className="text-xl font-bold text-gray-900">{orders.length}</p>
+                  <p className="text-xl font-bold text-gray-900">{totalOrders > 0 ? totalOrders : orders.length}</p>
                 </div>
                 <div className="flex-1 bg-amber-50 rounded-xl p-3 flex flex-col justify-between min-h-[68px]">
                   <div className="flex items-start gap-1.5 text-xs text-amber-700">
                     <Coins className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     <span className="font-medium leading-tight">Puntos de Recompensa</span>
                   </div>
-                  <p className="text-xl font-bold text-gray-900">${cashback}</p>
+                  <p className="text-xl font-bold text-gray-900">${cashback.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</p>
                 </div>
               </div>
 

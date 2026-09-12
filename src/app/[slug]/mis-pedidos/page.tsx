@@ -53,29 +53,79 @@ export default function OrderHistoryPage() {
     }
   }, [])
 
-  const handleRepeatOrder = (order: OrderWithItems, e: React.MouseEvent) => {
+  const handleRepeatOrder = async (order: OrderWithItems, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    if (reorderingId !== null) return
     setReorderingId(order.id)
 
-    // Add all items from the order to the cart
-    addOrderItems(
-      order.items.map((item) => ({
-        product_id: item.product_id,
-        name: item.product_name || `Producto #${item.product_id}`,
-        slug: `producto-${item.product_id}`,
-        image_url: item.product_image || "",
-        brand: "",
-        price: item.unit_price,
-        sale_price: null,
-        quantity: item.quantity,
-        stock_status: "in_stock" as const,
-      }))
-    )
+    // Fallback al snapshot histórico del pedido (precios de aquel momento).
+    const addSnapshotItems = () => {
+      addOrderItems(
+        order.items.map((item) => ({
+          product_id: item.product_id,
+          name: item.product_name || `Producto #${item.product_id}`,
+          slug: `producto-${item.product_id}`,
+          image_url: item.product_image || "",
+          brand: "",
+          price: item.unit_price,
+          sale_price: null,
+          quantity: item.quantity,
+          stock_status: "in_stock" as const,
+        }))
+      )
+      AnalyticsEvents.repeatOrder(order.id, order.items.length)
+    }
 
-    AnalyticsEvents.repeatOrder(order.id, order.items.length)
+    try {
+      // (C3) Rehidratar con el catálogo actual: el snapshot histórico puede
+      // traer precios viejos o productos que hoy están agotados. Se consultan
+      // los precios/stock vigentes y solo se agregan los disponibles.
+      const ids = order.items.map((item) => item.product_id).join(",")
+      const res = await fetch(`/api/products/lookup?ids=${encodeURIComponent(ids)}`)
+      if (!res.ok) throw new Error(`lookup ${res.status}`)
+      const { products } = (await res.json()) as {
+        products: {
+          id: number
+          name: string
+          slug: string
+          image_url: string | null
+          price: number
+          sale_price: number | null
+          stock_status: string
+        }[]
+      }
+      const byId = new Map(products.map((prod) => [prod.id, prod]))
+      const items = order.items
+        .map((item) => {
+          const current = byId.get(item.product_id)
+          if (!current || current.stock_status === "out_of_stock") return null
+          return {
+            product_id: item.product_id,
+            name: current.name || item.product_name || `Producto #${item.product_id}`,
+            slug: current.slug || `producto-${item.product_id}`,
+            image_url: current.image_url || item.product_image || "",
+            brand: "",
+            price: current.price,
+            sale_price: current.sale_price,
+            quantity: item.quantity,
+            stock_status: "in_stock" as const,
+          }
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
 
-    setTimeout(() => setReorderingId(null), 1500)
+      if (items.length === 0) {
+        // Nada disponible hoy: no ensuciar el carrito con precios obsoletos.
+        return
+      }
+      addOrderItems(items)
+      AnalyticsEvents.repeatOrder(order.id, items.length)
+    } catch {
+      // Si el lookup falla (offline, error 5xx), mejor el snapshot que nada.
+      addSnapshotItems()
+    } finally {
+      setTimeout(() => setReorderingId(null), 1500)
+    }
   }
 
   if (!city) {
@@ -152,7 +202,7 @@ export default function OrderHistoryPage() {
                 <div className="flex items-center gap-3">
                   {/* Repeat Order button */}
                   <button
-                    onClick={(e) => handleRepeatOrder(order, e)}
+                    onClick={(e) => void handleRepeatOrder(order, e)}
                     disabled={reorderingId === order.id}
                     className="flex items-center gap-1.5 px-3.5 py-2 sm:px-2.5 sm:py-1.5 sm:text-xs text-sm font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors disabled:opacity-50 touch-target"
                   >
