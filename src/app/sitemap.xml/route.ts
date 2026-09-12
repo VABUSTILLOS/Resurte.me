@@ -14,8 +14,19 @@ export async function GET() {
 
   const entries: SitemapEntry[] = [
     { url: BASE_URL, changeFrequency: "daily", priority: 1.0 },
-    { url: `${BASE_URL}/auth/login`, changeFrequency: "monthly", priority: 0.3 },
-    { url: `${BASE_URL}/auth/register`, changeFrequency: "monthly", priority: 0.3 },
+    // Páginas institucionales públicas (indexables). /auth/* se excluye:
+    // llevan noindex y antes aparecían en el sitemap pese a estar
+    // bloqueadas en robots.txt — señales contradictorias para Google.
+    { url: `${BASE_URL}/about`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${BASE_URL}/contact`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${BASE_URL}/faq`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${BASE_URL}/ciudades`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${BASE_URL}/comercializacion`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${BASE_URL}/recompensas`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${BASE_URL}/negocio`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${BASE_URL}/careers`, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${BASE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${BASE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
   ]
 
   // Fetch categories and collections from Supabase for URL generation
@@ -48,8 +59,8 @@ export async function GET() {
   for (const city of MEXICO_CITIES) {
     if (activeCitySlugs.length > 0 && !activeCitySlugs.includes(city.slug)) continue
     entries.push({ url: `${BASE_URL}/${city.slug}`, changeFrequency: "daily", priority: 0.9 })
-    entries.push({ url: `${BASE_URL}/${city.slug}/buscar`, changeFrequency: "daily", priority: 0.7 })
-    entries.push({ url: `${BASE_URL}/${city.slug}/carrito`, changeFrequency: "weekly", priority: 0.5 })
+    // /buscar y /carrito llevan noindex (páginas transaccionales / resultados
+    // de búsqueda interna) y no deben estar en el sitemap.
 
     // Category pages per city
     for (const catSlug of categorySlugs) {

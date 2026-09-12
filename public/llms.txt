@@ -1,0 +1,44 @@
+# Resurte.me
+
+> Central de abastos digital para restaurantes, fondas y negocios de comida en México. Venta por mayoreo de abarrotes, frutas, verduras, carnes, lácteos, bebidas, desechables y más, con entrega a domicilio. Sin membresía. Pedido mínimo $500 MXN. Facturación CFDI 4.0 automática. Crédito a 7, 15 o 30 días para clientes frecuentes.
+
+Resurte.me es un marketplace B2B de proveeduría para la industria restaurantera mexicana, con catálogo en línea por ciudad y una suite gratuita de herramientas de gestión ("Mi Restaurante"): costeo de menú, control de mermas, inventario, planificador de pedidos y analítica.
+
+## Cobertura
+
+Ciudad de México, Guadalajara, Monterrey, Puebla, Toluca, Querétaro, León, Tijuana, Mérida, San Luis Potosí, Aguascalientes, Hermosillo, Saltillo, Culiacán, Morelia, Chihuahua, Veracruz, Villahermosa, Cancún y Torreón.
+
+## Sitio
+
+- [Inicio](https://resurte.me): Central de abastos digital para negocios de comida
+- [Zonas de entrega](https://resurte.me/ciudades): Ciudades con cobertura de entrega
+- [Blog](https://resurte.me/blog): Guías prácticas de costos, proveeduría, mermas y operación para restaurantes en México
+- [Preguntas frecuentes](https://resurte.me/faq): Pedidos, entregas, pagos, crédito y facturación
+- [Contacto](https://resurte.me/contact): Atención y cotizaciones por volumen
+- [Hoy Qué Comemos](https://resurte.me/comer): Marketplace B2C para pedir directo a restaurantes
+
+## Catálogo por ciudad (ejemplo CDMX)
+
+- [Frutas y verduras por mayoreo](https://resurte.me/cdmx/categoria/frutas-verduras)
+- [Abarrotes por mayoreo](https://resurte.me/cdmx/categoria/abarrotes)
+- [Carnes, aves y pescados](https://resurte.me/cdmx/categoria/carnes-aves-pescados)
+- [Lácteos y huevos](https://resurte.me/cdmx/categoria/lacteos-huevos)
+- [Bebidas](https://resurte.me/cdmx/categoria/bebidas)
+- [Desechables y empaques](https://resurte.me/cdmx/categoria/desechables)
+
+El mismo catálogo existe para cada ciudad con el patrón `https://resurte.me/{ciudad}/categoria/{categoria}`.
+
+## Guías destacadas del blog
+
+- [Guía del food cost para restaurantes](https://resurte.me/blog/guia-food-cost-restaurante-2026)
+- [Cómo reducir la merma en cocina](https://resurte.me/blog/como-reducir-merma-cocina)
+- [Cómo elegir proveedor mayorista](https://resurte.me/blog/elegir-proveedor-mayorista)
+- [Precios de mayoreo para restaurantes](https://resurte.me/blog/precios-mayoreo-restaurantes)
+- [Central de Abastos vs comprar en línea](https://resurte.me/blog/central-de-abastos-vs-comprar-en-linea)
+- [Cuánto cuesta surtir un restaurante al mes](https://resurte.me/blog/cuanto-cuesta-surtir-restaurante-mes)
+- [Mejores proveedores de mayoreo para restaurantes](https://resurte.me/blog/mejores-proveedores-mayoreo-restaurantes)
+
+## Contacto
+
+- WhatsApp: +52 1 614 533 7486
+- Redes: [Facebook](https://www.facebook.com/resurteme) · [Instagram](https://www.instagram.com/resurteme)

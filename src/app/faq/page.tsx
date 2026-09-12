@@ -19,7 +19,7 @@ const FAQS = [
   },
   {
     q: "¿Hay pedido mínimo?",
-    a: "El mínimo son $500 MXN. Y si tu pedido supera los $3,000 MXN, el envío va por nuestra cuenta.",
+    a: "El mínimo son $500 MXN. Y si tu pedido supera los $2,500 MXN, el envío va por nuestra cuenta.",
   },
   {
     q: "¿Qué pasa si algo llega mal?",
@@ -47,13 +47,29 @@ const FAQS = [
   },
   {
     q: "¿En qué ciudades entregan?",
-    a: "CDMX, Monterrey, Guadalajara, Puebla, Querétaro y Mérida. Y cada mes sumamos colonias nuevas. Si tu zona aún no aparece, avísanos y te notificamos cuando lleguemos.",
+    a: "Estamos en 20 ciudades: CDMX, Guadalajara, Monterrey, Puebla, Toluca, Querétaro, León, Tijuana, Mérida, San Luis Potosí, Aguascalientes, Hermosillo, Saltillo, Culiacán, Morelia, Chihuahua, Veracruz, Villahermosa, Cancún y Torreón. Y cada mes sumamos zonas nuevas. Si la tuya aún no aparece, avísanos y te notificamos cuando lleguemos.",
   },
 ]
+
+// Datos estructurados FAQPage: ayuda a los buscadores y a los motores de IA
+// (AI Overviews, ChatGPT, Perplexity) a entender y citar estas respuestas.
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map(({ q, a }) => ({
+    "@type": "Question",
+    name: q,
+    acceptedAnswer: { "@type": "Answer", text: a },
+  })),
+}
 
 export default function FaqPage() {
   return (
     <div className="min-h-screen bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#242529] mb-4">

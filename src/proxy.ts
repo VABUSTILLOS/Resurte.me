@@ -153,6 +153,15 @@ export async function proxy(request: NextRequest) {
     )
   }
 
+  // ── /admin: noindex/nofollow ──
+  // El layout de /admin es un client component y no puede exportar metadata;
+  // el header X-Robots-Tag cubre todas las subrutas de /admin, presentes y
+  // futuras. /admin está en SKIP_PATHS, así que siempre sale por
+  // `supabaseResponse` y basta fijar el header sobre esa respuesta.
+  if (pathname.startsWith("/admin")) {
+    supabaseResponse.headers.set("X-Robots-Tag", "noindex, nofollow")
+  }
+
   // ── City detection & routing ──
 
   // Skip public paths — still return supabaseResponse with auth cookies
