@@ -1,3 +1,4 @@
+import { z } from "zod"
 import { after, NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
@@ -9,6 +10,64 @@ import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { validDeliveryFee } from "@/lib/checkout-config"
 import { resolveBumpPricing } from "@/lib/order-bumps"
 import { insertAddressResilient } from "@/lib/orders-address"
+
+// Esquema zod del body (espejo de CreateOrderBody/OrderItemInput). Claves
+// desconocidas se descartan; los montos siguen sin ser de confianza — se
+// recalculan server-side contra la BD más abajo.
+const orderItemSchema = z.object({
+  product_id: z.number().int().positive(),
+  quantity: z.number().int().positive(),
+  unit_price: z.number().nonnegative(),
+  name: z.string(),
+  item_type: z.enum(["standard", "bump"]).optional(),
+})
+
+const createOrderSchema = z.object({
+  city_id: z.number().int().positive(),
+  address: z.object({
+    label: z.string(),
+    street: z.string(),
+    number: z.string(),
+    interior: z.string(),
+    neighborhood: z.string(),
+    zip_code: z.string(),
+    references: z.string(),
+  }),
+  address_id: z.number().int().positive().optional(),
+  save_default: z.boolean().optional(),
+  guest_token: z.string().optional(),
+  schedule: z.object({
+    date: z.string(),
+    time: z.string(),
+  }),
+  payment_method: z.string(),
+  phone: z.string().optional(),
+  email: z.string().optional(),
+  subtotal: z.number().nonnegative(),
+  delivery_fee: z.number().nonnegative(),
+  total: z.number().positive(),
+  coupon_code: z.string().optional(),
+  items: z.array(orderItemSchema).min(1),
+  utm: z
+    .object({
+      utm_source: z.string().optional(),
+      utm_medium: z.string().optional(),
+      utm_campaign: z.string().optional(),
+      utm_term: z.string().optional(),
+      utm_content: z.string().optional(),
+    })
+    .optional(),
+})
+
+/** Aplana los issues de zod a { "campo.anidado": "mensaje" } para el 400. */
+function fieldErrors(error: z.ZodError): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const issue of error.issues) {
+    const path = issue.path.join(".") || "_"
+    if (!out[path]) out[path] = issue.message
+  }
+  return out
+}
 
 interface OrderItemInput {
   product_id: number
@@ -76,7 +135,16 @@ interface CreateOrderBody {
  */
 export async function POST(request: NextRequest) {
   try {
-    const body: CreateOrderBody = await request.json()
+    const rawBody: unknown = await request.json()
+    const parsed = createOrderSchema.safeParse(rawBody)
+    if (!parsed.success) {
+      logger.warn("Order validation failed - schema:", { fields: Object.keys(fieldErrors(parsed.error)) })
+      return NextResponse.json(
+        { error: "Cuerpo de la petición inválido", fields: fieldErrors(parsed.error) },
+        { status: 400 }
+      )
+    }
+    const body: CreateOrderBody = parsed.data
     const {
       city_id,
       address,

@@ -8,6 +8,7 @@ import {
   getCityAvailabilityForSlug,
 } from "@/lib/catalog-cache"
 import { Metadata } from "next"
+import { CATEGORY_FIRST_PAGE_SIZE } from "@/lib/catalog-preview"
 import { CategoryPageClient } from "./category-page-client"
 
 // ISR: catálogo revalidado cada 5 min (alineado con src/lib/catalog-cache.ts).
@@ -67,12 +68,16 @@ export default async function CategoryPage({ params }: Props) {
   ])
   const products = filterByCityAvailability(categoryProducts, availableIds)
 
+  // Pre-render de la primera página; el resto se carga en cliente con
+  // loadMoreCategoryProducts para no serializar categorías grandes
+  // (abarrotes supera los 500 KB de HTML) en el payload inicial.
   return (
     <CategoryPageClient
       citySlug={slug}
       cityName={city.name}
       category={category}
-      products={products}
+      products={products.slice(0, CATEGORY_FIRST_PAGE_SIZE)}
+      totalCount={products.length}
     />
   )
 }

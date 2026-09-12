@@ -293,10 +293,12 @@ INSERT INTO products (name, slug, description, image_url, images, brand, categor
   ('Deditos de Pescado 1kg', 'deditos-de-pescado-1kg', 'Deditos de pescado empanizados. Para freír u hornear. Rinden para menú infantil.', '/images/products/generic/deditos-de-pescado-1kg.webp', jsonb_build_array('/images/products/generic/deditos-de-pescado-1kg.webp'), 'Del Pacífico', 9, false, '1 kg');
 
 -- ============================================================
+-- PRECIOS Y STOCK EN products (fuente de verdad)
 -- ============================================================
--- PRECIOS POR TIENDA (product_stores)
--- ============================================================
--- Resurte.me (store_id 1): Precios de mayoreo / central de abastos
+-- Precios de mayoreo / central de abastos.
+-- NOTA: antes se escribían en la tabla legado `product_stores`; desde la
+-- reconciliación de drift (00071) el seed escribe directo en `products`,
+-- que es lo que leen la tienda pública y el checkout.
 --
 -- Cat 1 (Frutas y Verduras):       IDs 1-50 (50 productos)
 -- Cat 2 (Abarrotes):                IDs 51-88 (38 productos)
@@ -320,8 +322,9 @@ BEGIN
     -- Resurte.me
     pr := CASE pid WHEN 1 THEN 38 WHEN 2 THEN 45 WHEN 3 THEN 60 WHEN 4 THEN 28 WHEN 5 THEN 32 WHEN 6 THEN 20 WHEN 7 THEN 22 WHEN 8 THEN 48 WHEN 9 THEN 38 WHEN 10 THEN 25 WHEN 11 THEN 22 WHEN 12 THEN 14 WHEN 13 THEN 35 WHEN 14 THEN 32 WHEN 15 THEN 28 WHEN 16 THEN 58 WHEN 17 THEN 65 WHEN 18 THEN 35 WHEN 19 THEN 30 WHEN 20 THEN 24 WHEN 21 THEN 26 WHEN 22 THEN 28 WHEN 23 THEN 20 WHEN 24 THEN 25 WHEN 25 THEN 22 WHEN 26 THEN 28 WHEN 27 THEN 16 WHEN 28 THEN 25 WHEN 29 THEN 28 WHEN 30 THEN 26 WHEN 31 THEN 18 WHEN 32 THEN 8 WHEN 33 THEN 10 WHEN 34 THEN 12 WHEN 35 THEN 25 WHEN 36 THEN 22 WHEN 37 THEN 28 WHEN 38 THEN 15 WHEN 39 THEN 12 WHEN 40 THEN 18 WHEN 41 THEN 22 WHEN 42 THEN 8 WHEN 43 THEN 32 WHEN 44 THEN 28 WHEN 45 THEN 22 WHEN 46 THEN 45 WHEN 47 THEN 15 WHEN 48 THEN 55 WHEN 49 THEN 85 WHEN 50 THEN 58 END;
     sp := CASE pid WHEN 1 THEN 32 WHEN 5 THEN 28 WHEN 6 THEN 18 WHEN 20 THEN 20 WHEN 23 THEN 18 WHEN 32 THEN 6 ELSE NULL END;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status)
-    VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products
+    SET price = pr, sale_price = sp, stock_status = 'in_stock'
+    WHERE id = pid;
 
   END LOOP;
 
@@ -330,8 +333,9 @@ BEGIN
     -- Resurte.me
     pr := CASE pid WHEN 51 THEN 26 WHEN 52 THEN 105 WHEN 53 THEN 35 WHEN 54 THEN 155 WHEN 55 THEN 38 WHEN 56 THEN 42 WHEN 57 THEN 28 WHEN 58 THEN 32 WHEN 59 THEN 40 WHEN 60 THEN 185 WHEN 61 THEN 52 WHEN 62 THEN 120 WHEN 63 THEN 45 WHEN 64 THEN 16 WHEN 65 THEN 14 WHEN 66 THEN 14 WHEN 67 THEN 19 WHEN 68 THEN 24 WHEN 69 THEN 24 WHEN 70 THEN 36 WHEN 71 THEN 12 WHEN 72 THEN 15 WHEN 73 THEN 28 WHEN 74 THEN 14 WHEN 75 THEN 16 WHEN 76 THEN 25 WHEN 77 THEN 42 WHEN 78 THEN 35 WHEN 79 THEN 55 WHEN 80 THEN 65 WHEN 81 THEN 35 WHEN 82 THEN 32 WHEN 83 THEN 45 WHEN 84 THEN 28 WHEN 85 THEN 22 WHEN 86 THEN 18 WHEN 87 THEN 48 WHEN 88 THEN 24 END;
     sp := CASE pid WHEN 51 THEN 22 WHEN 53 THEN 30 WHEN 55 THEN 34 WHEN 73 THEN 24 WHEN 81 THEN 28 ELSE NULL END;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status)
-    VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products
+    SET price = pr, sale_price = sp, stock_status = 'in_stock'
+    WHERE id = pid;
 
   END LOOP;
 
@@ -340,8 +344,9 @@ BEGIN
     -- Resurte.me
     pr := CASE pid WHEN 89 THEN 26 WHEN 90 THEN 24 WHEN 91 THEN 18 WHEN 92 THEN 16 WHEN 93 THEN 28 WHEN 94 THEN 52 WHEN 95 THEN 85 WHEN 96 THEN 58 WHEN 97 THEN 58 WHEN 98 THEN 45 WHEN 99 THEN 42 WHEN 100 THEN 68 WHEN 101 THEN 35 WHEN 102 THEN 35 WHEN 103 THEN 48 WHEN 104 THEN 28 END;
     sp := CASE pid WHEN 89 THEN 22 WHEN 94 THEN 48 WHEN 97 THEN 52 WHEN 102 THEN 30 ELSE NULL END;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status)
-    VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products
+    SET price = pr, sale_price = sp, stock_status = 'in_stock'
+    WHERE id = pid;
 
   END LOOP;
 
@@ -350,8 +355,10 @@ BEGIN
     -- Resurte.me
     pr := CASE pid WHEN 105 THEN 115 WHEN 106 THEN 125 WHEN 107 THEN 85 WHEN 108 THEN 95 WHEN 109 THEN 88 WHEN 110 THEN 165 WHEN 111 THEN 155 WHEN 112 THEN 135 WHEN 113 THEN 148 WHEN 114 THEN 142 WHEN 115 THEN 155 WHEN 116 THEN 240 WHEN 117 THEN 280 WHEN 118 THEN 260 WHEN 119 THEN 128 WHEN 120 THEN 155 WHEN 121 THEN 142 WHEN 122 THEN 58 WHEN 123 THEN 55 WHEN 124 THEN 85 WHEN 125 THEN 95 WHEN 126 THEN 138 WHEN 127 THEN 128 WHEN 128 THEN 310 WHEN 129 THEN 480 WHEN 130 THEN 260 WHEN 131 THEN 195 WHEN 132 THEN 68 WHEN 133 THEN 195 WHEN 134 THEN 165 END;
     sp := CASE pid WHEN 105 THEN 108 WHEN 110 THEN 150 WHEN 112 THEN 128 WHEN 114 THEN 135 WHEN 133 THEN 175 ELSE NULL END;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status)
-    VALUES (pid, 1, pr, sp, (CASE pid WHEN 129 THEN 'out_of_stock' WHEN 132 THEN 'low_stock' WHEN 134 THEN 'low_stock' ELSE 'in_stock' END)::stock_status);
+    UPDATE products
+    SET price = pr, sale_price = sp,
+        stock_status = (CASE pid WHEN 129 THEN 'out_of_stock' WHEN 132 THEN 'low_stock' WHEN 134 THEN 'low_stock' ELSE 'in_stock' END)::stock_status
+    WHERE id = pid;
 
   END LOOP;
 
@@ -360,8 +367,9 @@ BEGIN
     -- Resurte.me
     pr := CASE pid WHEN 135 THEN 38 WHEN 136 THEN 40 WHEN 137 THEN 32 WHEN 138 THEN 35 WHEN 139 THEN 20 WHEN 140 THEN 35 WHEN 141 THEN 28 WHEN 142 THEN 5 WHEN 143 THEN 6 WHEN 144 THEN 22 END;
     sp := CASE pid WHEN 135 THEN 34 WHEN 139 THEN 18 WHEN 142 THEN 4 ELSE NULL END;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status)
-    VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products
+    SET price = pr, sale_price = sp, stock_status = 'in_stock'
+    WHERE id = pid;
 
   END LOOP;
 
@@ -370,8 +378,9 @@ BEGIN
     -- Resurte.me
     pr := CASE pid WHEN 145 THEN 36 WHEN 146 THEN 34 WHEN 147 THEN 30 WHEN 148 THEN 28 WHEN 149 THEN 28 WHEN 150 THEN 14 WHEN 151 THEN 16 WHEN 152 THEN 16 WHEN 153 THEN 26 WHEN 154 THEN 42 WHEN 155 THEN 38 WHEN 156 THEN 20 WHEN 157 THEN 22 WHEN 158 THEN 22 WHEN 159 THEN 20 END;
     sp := CASE pid WHEN 145 THEN 32 WHEN 150 THEN 12 ELSE NULL END;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status)
-    VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products
+    SET price = pr, sale_price = sp, stock_status = 'in_stock'
+    WHERE id = pid;
 
   END LOOP;
 
@@ -380,8 +389,9 @@ BEGIN
     -- Resurte.me
     pr := CASE pid WHEN 160 THEN 36 WHEN 161 THEN 25 WHEN 162 THEN 22 WHEN 163 THEN 20 WHEN 164 THEN 18 WHEN 165 THEN 16 END;
     sp := NULL;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status)
-    VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products
+    SET price = pr, sale_price = sp, stock_status = 'in_stock'
+    WHERE id = pid;
 
   END LOOP;
 
@@ -390,8 +400,9 @@ BEGIN
     -- Resurte.me
     pr := CASE pid WHEN 166 THEN 20 WHEN 167 THEN 78 WHEN 168 THEN 16 WHEN 169 THEN 30 WHEN 170 THEN 28 WHEN 171 THEN 28 WHEN 172 THEN 26 WHEN 173 THEN 32 WHEN 174 THEN 28 WHEN 175 THEN 18 WHEN 176 THEN 35 WHEN 177 THEN 28 WHEN 178 THEN 24 WHEN 179 THEN 85 END;
     sp := CASE pid WHEN 166 THEN 18 WHEN 168 THEN 14 WHEN 174 THEN 24 ELSE NULL END;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status)
-    VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products
+    SET price = pr, sale_price = sp, stock_status = 'in_stock'
+    WHERE id = pid;
 
   END LOOP;
 
@@ -400,8 +411,9 @@ BEGIN
     -- Resurte.me
     pr := CASE pid WHEN 180 THEN 42 WHEN 181 THEN 58 WHEN 182 THEN 52 WHEN 183 THEN 45 WHEN 184 THEN 125 WHEN 185 THEN 220 WHEN 186 THEN 85 WHEN 187 THEN 78 END;
     sp := CASE pid WHEN 181 THEN 52 WHEN 185 THEN 200 ELSE NULL END;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status)
-    VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products
+    SET price = pr, sale_price = sp, stock_status = 'in_stock'
+    WHERE id = pid;
 
   END LOOP;
 END $$;
@@ -540,6 +552,7 @@ INSERT INTO products (name, slug, description, image_url, images, brand, categor
 
 -- ============================================================
 -- PRECIOS PARA PRODUCTOS ADICIONALES (IDs 188-311)
+-- (directo en products; ver nota del bloque de precios anterior)
 -- ============================================================
 DO $$
 DECLARE
@@ -554,7 +567,7 @@ BEGIN
     pid := 188 + i;
     pr := CASE i WHEN 0 THEN 38 WHEN 1 THEN 45 WHEN 2 THEN 32 WHEN 3 THEN 42 WHEN 4 THEN 35 WHEN 5 THEN 28 WHEN 6 THEN 35 WHEN 7 THEN 30 WHEN 8 THEN 32 WHEN 9 THEN 28 WHEN 10 THEN 38 WHEN 11 THEN 28 WHEN 12 THEN 25 WHEN 13 THEN 22 WHEN 14 THEN 35 WHEN 15 THEN 30 WHEN 16 THEN 42 WHEN 17 THEN 28 WHEN 18 THEN 32 WHEN 19 THEN 35 WHEN 20 THEN 28 WHEN 21 THEN 32 WHEN 22 THEN 30 END;
     sp := NULL;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products SET price = pr, sale_price = sp, stock_status = 'in_stock' WHERE id = pid;
   END LOOP;
 
   -- Categoría 2 (IDs 211-245, 35 productos)
@@ -562,7 +575,7 @@ BEGIN
     pid := 211 + i;
     pr := CASE i WHEN 0 THEN 26 WHEN 1 THEN 32 WHEN 2 THEN 22 WHEN 3 THEN 28 WHEN 4 THEN 24 WHEN 5 THEN 28 WHEN 6 THEN 25 WHEN 7 THEN 18 WHEN 8 THEN 25 WHEN 9 THEN 26 WHEN 10 THEN 22 WHEN 11 THEN 28 WHEN 12 THEN 32 WHEN 13 THEN 42 WHEN 14 THEN 35 WHEN 15 THEN 28 WHEN 16 THEN 26 WHEN 17 THEN 28 WHEN 18 THEN 35 WHEN 19 THEN 38 WHEN 20 THEN 35 WHEN 21 THEN 32 WHEN 22 THEN 28 WHEN 23 THEN 30 WHEN 24 THEN 25 WHEN 25 THEN 22 WHEN 26 THEN 35 WHEN 27 THEN 28 WHEN 28 THEN 26 WHEN 29 THEN 32 WHEN 30 THEN 30 WHEN 31 THEN 28 WHEN 32 THEN 22 WHEN 33 THEN 28 WHEN 34 THEN 25 END;
     sp := NULL;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products SET price = pr, sale_price = sp, stock_status = 'in_stock' WHERE id = pid;
   END LOOP;
 
   -- Categoría 3 (IDs 246-262, 17 productos)
@@ -570,7 +583,7 @@ BEGIN
     pid := 246 + i;
     pr := CASE i WHEN 0 THEN 52 WHEN 1 THEN 28 WHEN 2 THEN 48 WHEN 3 THEN 68 WHEN 4 THEN 65 WHEN 5 THEN 58 WHEN 6 THEN 42 WHEN 7 THEN 72 WHEN 8 THEN 68 WHEN 9 THEN 62 WHEN 10 THEN 42 WHEN 11 THEN 35 WHEN 12 THEN 48 WHEN 13 THEN 42 WHEN 14 THEN 55 WHEN 15 THEN 48 WHEN 16 THEN 32 END;
     sp := NULL;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products SET price = pr, sale_price = sp, stock_status = 'in_stock' WHERE id = pid;
   END LOOP;
 
   -- Categoría 4 (IDs 263-273, 11 productos)
@@ -578,7 +591,7 @@ BEGIN
     pid := 263 + i;
     pr := CASE i WHEN 0 THEN 95 WHEN 1 THEN 88 WHEN 2 THEN 72 WHEN 3 THEN 85 WHEN 4 THEN 68 WHEN 5 THEN 95 WHEN 6 THEN 125 WHEN 7 THEN 88 WHEN 8 THEN 78 WHEN 9 THEN 85 WHEN 10 THEN 68 END;
     sp := NULL;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products SET price = pr, sale_price = sp, stock_status = 'in_stock' WHERE id = pid;
   END LOOP;
 
   -- Categoría 5 (IDs 274-284, 11 productos)
@@ -586,7 +599,7 @@ BEGIN
     pid := 274 + i;
     pr := CASE i WHEN 0 THEN 42 WHEN 1 THEN 28 WHEN 2 THEN 32 WHEN 3 THEN 18 WHEN 4 THEN 36 WHEN 5 THEN 32 WHEN 6 THEN 28 WHEN 7 THEN 25 WHEN 8 THEN 28 WHEN 9 THEN 38 WHEN 10 THEN 35 END;
     sp := NULL;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products SET price = pr, sale_price = sp, stock_status = 'in_stock' WHERE id = pid;
   END LOOP;
 
   -- Categoría 6 (IDs 285-291, 7 productos)
@@ -594,7 +607,7 @@ BEGIN
     pid := 285 + i;
     pr := CASE i WHEN 0 THEN 185 WHEN 1 THEN 22 WHEN 2 THEN 195 WHEN 3 THEN 285 WHEN 4 THEN 36 WHEN 5 THEN 185 WHEN 6 THEN 165 END;
     sp := NULL;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products SET price = pr, sale_price = sp, stock_status = 'in_stock' WHERE id = pid;
   END LOOP;
 
   -- Categoría 7 (IDs 292-309, 18 productos)
@@ -602,7 +615,7 @@ BEGIN
     pid := 292 + i;
     pr := CASE i WHEN 0 THEN 35 WHEN 1 THEN 18 WHEN 2 THEN 65 WHEN 3 THEN 38 WHEN 4 THEN 32 WHEN 5 THEN 35 WHEN 6 THEN 25 WHEN 7 THEN 28 WHEN 8 THEN 22 WHEN 9 THEN 48 WHEN 10 THEN 28 WHEN 11 THEN 35 WHEN 12 THEN 32 WHEN 13 THEN 28 WHEN 14 THEN 42 WHEN 15 THEN 35 WHEN 16 THEN 28 WHEN 17 THEN 32 END;
     sp := NULL;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products SET price = pr, sale_price = sp, stock_status = 'in_stock' WHERE id = pid;
   END LOOP;
 
   -- Categoría 9 (IDs 310-311, 2 productos)
@@ -610,7 +623,7 @@ BEGIN
     pid := 310 + i;
     pr := CASE i WHEN 0 THEN 62 WHEN 1 THEN 55 END;
     sp := NULL;
-    INSERT INTO product_stores (product_id, store_id, price, sale_price, stock_status) VALUES (pid, 1, pr, sp, 'in_stock');
+    UPDATE products SET price = pr, sale_price = sp, stock_status = 'in_stock' WHERE id = pid;
   END LOOP;
 
 END $$;

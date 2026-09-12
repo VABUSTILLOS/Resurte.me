@@ -1,10 +1,12 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, ShoppingBag } from "lucide-react"
 import { ProductCard } from "@/components/product/product-card"
 import { SearchBar } from "@/components/search/search-bar"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
+import { loadMoreCategoryProducts } from "@/app/[slug]/catalog-actions"
 import type { Product } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
 
@@ -13,10 +15,29 @@ interface CategoryPageClientProps {
   cityName: string
   category: { id: number; name: string; slug: string; icon: string; description?: string | null; parent_id?: number | null }
   products: Product[]
+  totalCount: number
 }
 
-export function CategoryPageClient({ citySlug, cityName, category, products }: CategoryPageClientProps) {
+export function CategoryPageClient({ citySlug, cityName, category, products: initialProducts, totalCount }: CategoryPageClientProps) {
   // Products now have price/sale_price/stock_status directly
+  const [products, setProducts] = useState(initialProducts)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(initialProducts.length < totalCount)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    const nextPage = page + 1
+    loadMoreCategoryProducts(category.id, nextPage, citySlug)
+      .then(({ products: newProducts, hasMore: more }) => {
+        setProducts((prev) => [...prev, ...newProducts])
+        setPage(nextPage)
+        setHasMore(more)
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMore(false))
+  }
 
   return (
     <div className="min-h-screen bg-[#faf8f5]">
@@ -59,11 +80,11 @@ export function CategoryPageClient({ citySlug, cityName, category, products }: C
         <div className="flex items-center gap-2 mb-6">
           <ShoppingBag className="w-5 h-5 text-[#0E7A0E]" />
           <h2 className="text-lg font-semibold text-[#1a1a1a]">
-            {products.length} producto{products.length !== 1 ? "s" : ""}
+            {totalCount} producto{totalCount !== 1 ? "s" : ""}
           </h2>
         </div>
 
-        {products.length === 0 ? (
+        {totalCount === 0 ? (
           <div className="text-center py-16">
             <p className="text-[var(--text-secondary)]">No hay productos en esta categoría por el momento.</p>
             <Link
@@ -75,16 +96,32 @@ export function CategoryPageClient({ citySlug, cityName, category, products }: C
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-            {products.map((product, idx) => (
-              <ScrollReveal key={product.id} direction="scale" delay={idx * 0.04} className="h-full">
-                <ProductCard
-                  product={product}
-                  citySlug={citySlug}
-                />
-              </ScrollReveal>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              {products.map((product, idx) => (
+                <ScrollReveal key={product.id} direction="scale" delay={idx * 0.04} className="h-full">
+                  <ProductCard
+                    product={product}
+                    citySlug={citySlug}
+                  />
+                </ScrollReveal>
+              ))}
+            </div>
+
+            {hasMore && (
+              <div className="mt-8 text-center">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="btn-pill btn-pill-outline inline-flex items-center gap-2 disabled:opacity-50"
+                >
+                  {loadingMore
+                    ? "Cargando…"
+                    : `Cargar más (${totalCount - products.length} restantes)`}
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {/* Back link */}

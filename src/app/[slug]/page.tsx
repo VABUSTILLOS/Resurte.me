@@ -12,6 +12,7 @@ import {
 } from "@/lib/catalog-cache"
 import { getCityLandingSchema } from "@/lib/structured-data"
 import { getCityBySlug } from "@/lib/data"
+import { buildLandingPreview } from "@/lib/catalog-preview"
 import type { Category, Product, RestaurantCollection, City } from "@/types"
 
 // ISR: la página se genera en build y se revalida cada 5 minutos (alineado con
@@ -124,10 +125,14 @@ export default async function CityPage({ params }: Props) {
           __html: JSON.stringify(getCityLandingSchema(city.name, city.state, city.lat, city.lng)),
         }}
       />
+      {/* Solo se serializa lo que la landing renderiza (conteos + las
+          primeras tarjetas de categorías destacadas). El catálogo completo
+          lo carga el cliente solo para usuarios logueados (UserShopView). */}
       <CityLanding
         citySlug={slug}
         categories={categories}
-        products={products}
+        preview={buildLandingPreview(products, categories)}
+        totalCount={products.length}
         collections={collections}
       />
     </>

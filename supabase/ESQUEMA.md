@@ -3,7 +3,32 @@
 > **Documento de referencia para la tienda.** Explica el drift histórico entre
 > el esquema versionado y la base de datos real.
 
-## 🔴 Drift histórico: `products` vs `product_stores`
+## ✅ Drift reconciliado (migración 00071)
+
+El drift histórico descrito abajo ya está **completamente versionado**: cada
+cambio hecho a mano en producción tiene migración (00028, 00031, 00032, 00033,
+00052, 00053), las migraciones con guardas faltantes se endurecieron, y
+`00071_reconcile_prod_drift.sql` re-afirma de forma idempotente los DEFAULTs,
+NOT NULLs, CHECKs, índices, RLS y policies que pudieron quedar incompletos en
+prod. Reproducir `00001–00071` desde cero deja el esquema tal como está
+documentado aquí.
+
+Los scripts ad-hoc de `supabase/manual/` fueron **eliminados** por estar
+cubiertos por las migraciones versionadas (detalle en
+`supabase/manual/README.md`).
+
+**Reglas vigentes (desde la reconciliación):**
+
+1. Todo cambio de esquema se hace con `npx supabase migration new <nombre>`,
+   se commitea y se aplica con `npx supabase db push`. **Prohibido** editar la
+   BD a mano en el SQL Editor del dashboard.
+2. Las migraciones deben ser **idempotentes** (`IF NOT EXISTS`,
+   `DROP ... IF EXISTS`, `CREATE OR REPLACE`, `DO $$ ... $$` con guardas).
+3. Ante la duda sobre el estado real de prod, hacer un pull **de solo lectura**
+   (`npx supabase db pull`) y comparar contra `supabase/migrations/` — nunca
+   `db reset --linked` ni escrituras directas.
+
+## 🔴 Drift histórico (ya versionado): `products` vs `product_stores`
 
 Las migraciones originales (00001–00027) definían precio/stock **por tienda** en
 `product_stores` (`store_id`, `price`, `sale_price`, `is_available`,
@@ -38,16 +63,18 @@ los datos ya existentes.
 
 - **`products.price` / `products.sale_price` / `products.stock_status` /
   `products.is_visible`** → fuente de verdad para la tienda pública y checkout.
-- **`product_stores`** → tabla **legado**. El seed la escribe, pero **nadie la
-  lee** en el flujo público. Se conserva para compatibilidad.
+- **`product_stores`** → tabla **legado**. Nadie la lee en el flujo público y
+  el seed **ya no la escribe** (escribe directo en `products`). Se conserva en
+  el esquema por compatibilidad y porque `00028` la usa como fuente de
+  backfill histórico.
 
 ## Reglas al tocar este esquema
 
 1. **Nunca** cambiar la fuente de verdad de `products` a `product_stores`: la
    tienda pública y el checkout dependen de `products`.
 2. Las migraciones deben ser **idempotentes** (`ADD COLUMN IF NOT EXISTS`,
-   `UPDATE` con `WHERE NOT EXISTS` o `COALESCE`) porque se aplican a mano en el
-   SQL Editor de Supabase.
+   `UPDATE` con `WHERE NOT EXISTS` o `COALESCE`) y aplicarse con el CLI
+   (`npx supabase db push`), nunca a mano en el SQL Editor.
 3. El catálogo usa `unstable_cache` (TTL 300–3600s): los cambios de precio/
    stock tardan hasta 5 minutos en reflejarse en la tienda.
 4. `stock_status` es un ENUM `in_stock | low_stock | out_of_stock`. No hay

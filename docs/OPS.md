@@ -241,13 +241,57 @@ Fuentes de verdad para admin (`isAdminUser()` en `src/lib/admin-auth.ts`, cualqu
 **Bootstrap del primer master admin** (una sola vez):
 
 ```bash
-# 1. Aplicar la migración 00067 en el SQL Editor de Supabase
+# 1. Aplicar la migración 00067 (ver §9: npx supabase db push)
 # 2. Registrar el usuario en /auth/register (o con Google)
 # 3. Promoverlo:
 node scripts/make-admin.mjs tu-email@dominio.com
 ```
 
 **Gestión continua**: desde `/admin/usuarios` cualquier admin puede listar usuarios, buscarlos y asignar/quitar roles (admin / vendedor / cliente). Reglas: un admin no puede quitarse su propio rol y el sistema siempre conserva al menos un admin. El área `/admin` tiene guard server-side (layout) — sin sesión redirige a `/auth/login?next=/admin` y sin rol admin redirige a `/`.
+
+---
+
+## 9. Migraciones de base de datos (workflow)
+
+Desde la reconciliación de drift (migración `00071_reconcile_prod_drift.sql`),
+el esquema se gestiona **exclusivamente con migraciones versionadas** en
+`supabase/migrations/` (00001–00071). Los scripts ad-hoc de `supabase/manual/`
+fueron eliminados por estar cubiertos por migraciones versionadas.
+
+### Crear y aplicar un cambio de esquema
+
+```bash
+# 1. Crear la migración (archivo vacío numerado en supabase/migrations/)
+npx supabase migration new nombre_descriptivo
+
+# 2. Escribir el SQL — DEBE ser idempotente:
+#    ADD COLUMN IF NOT EXISTS, CREATE TABLE IF NOT EXISTS,
+#    CREATE OR REPLACE FUNCTION, DROP POLICY IF EXISTS + CREATE POLICY, etc.
+
+# 3. Commit de la migración junto con el código que la usa
+
+# 4. Aplicar a la BD vinculada (requiere login: npx supabase login)
+npx supabase db push
+```
+
+**Prohibido:** editar el esquema de producción a mano en el SQL Editor del
+dashboard. Eso fue la causa del drift histórico (ver `supabase/ESQUEMA.md`).
+
+### Reglas
+
+1. **Idempotencia obligatoria** — cada migración debe poder re-ejecutarse sin
+   error (convención del repo).
+2. **Solo lectura contra producción** desde el CLI local: `npx supabase db pull`
+   o `npx supabase migration diff` para auditar drift. **Nunca** correr
+   `supabase db reset --linked` ni comandos que escriban en la BD vinculada
+   desde una máquina local; `db push` se reserva para CI o la consola con
+   autorización explícita.
+3. Ante drift sospechado: documentar en `supabase/ESQUEMA.md`, versionar el
+   cambio real como migración nueva y reconciliar — no repetir ediciones
+   manuales.
+4. El seed (`supabase/seed.sql`) escribe precios/stock directo en `products`;
+   la tabla legado `product_stores` ya no se escribe ni se lee (la ruta admin
+   `seed-products` aún hace upsert histórico — pendiente de limpieza).
 
 ---
 

@@ -76,7 +76,9 @@ export default async function CollectionPage({ params }: Props) {
     // Selector por ciudad (migración 00065): null = sin filtro.
     getCityAvailabilityForSlug(slug),
   ])
-  const allProducts = filterByCityAvailability(visibleProducts, availableIds)
+  // El catálogo completo solo alimenta el matching ingrediente → producto de
+  // las recetas: se serializa la proyección mínima (ver MatchableProduct).
+  const allProducts = filterByCityAvailability(visibleProducts, availableIds).map(toMatchableProduct)
   if (tags.length > 0) {
     products = filterByCityAvailability(
       await getCachedProductsByCollection(collectionSlug),

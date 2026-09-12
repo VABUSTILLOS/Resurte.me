@@ -1,3 +1,4 @@
+import { z } from "zod"
 import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
@@ -24,14 +25,33 @@ import { rateLimited, rateLimitResponse, clientIp } from "@/lib/rate-limit"
  *  · pedidos main anónimos → opcional guest_token (coincide con la dirección);
  *  · pedidos foodos → sin sesión (monto validado contra la BD + webhook).
  */
+// Esquema del body. `type` queda como string libre para preservar el
+// comportamiento previo (cualquier valor distinto de "foodos" → "main").
+// El monto NUNCA viene del body: se deriva del total del pedido en la BD.
+const createIntentSchema = z.object({
+  order_id: z.union([z.number(), z.string()]),
+  type: z.string().optional(),
+  guest_token: z.string().optional(),
+  save_card: z.boolean().optional(),
+  customer_email: z.string().optional(),
+})
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { order_id, type = "main", guest_token, save_card, customer_email } = body
-
-    if (order_id === undefined || order_id === null) {
-      return NextResponse.json({ error: "order_id es requerido" }, { status: 400 })
+    const rawBody: unknown = await request.json()
+    const parsed = createIntentSchema.safeParse(rawBody)
+    if (!parsed.success) {
+      const fields: Record<string, string> = {}
+      for (const issue of parsed.error.issues) {
+        const path = issue.path.join(".") || "_"
+        if (!fields[path]) fields[path] = issue.message
+      }
+      return NextResponse.json(
+        { error: "Cuerpo de la petición inválido", fields },
+        { status: 400 }
+      )
     }
+    const { order_id, type = "main", guest_token, save_card, customer_email } = parsed.data
 
     const supabaseClient = await createClient()
     const {

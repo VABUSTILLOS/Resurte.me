@@ -9,8 +9,9 @@
 -- When the user signs in, POST /api/addresses/claim links the rows to their
 -- account and clears the token.
 
+-- Idempotente (convención del repo): seguro de re-aplicar.
 ALTER TABLE public.addresses
-  ADD COLUMN guest_token TEXT;
+  ADD COLUMN IF NOT EXISTS guest_token TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_addresses_guest_token
   ON public.addresses (guest_token);

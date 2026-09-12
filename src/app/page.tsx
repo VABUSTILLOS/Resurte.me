@@ -4,6 +4,7 @@ import {
   getCachedCategories,
   getCachedVisibleProducts,
 } from "@/lib/catalog-cache"
+import { buildLandingPreview } from "@/lib/catalog-preview"
 import type { Category, Product } from "@/types"
 import type { Metadata } from "next"
 
@@ -46,7 +47,8 @@ export default async function Home() {
     <CityLanding
       citySlug={undefined}
       categories={categories}
-      products={products}
+      preview={buildLandingPreview(products, categories)}
+      totalCount={products.length}
     />
   )
 }

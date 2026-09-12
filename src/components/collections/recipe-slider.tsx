@@ -7,7 +7,7 @@ import Link from "next/link"
 import { useCart } from "@/contexts/cart-context"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { CollectionRecipe } from "@/types"
-import type { Product } from "@/types"
+import type { MatchableProduct } from "@/lib/catalog-preview"
 
 // ── Fuzzy ingredient → product matcher ──────────────────────
 interface MatchedProduct {
@@ -53,7 +53,7 @@ const INGREDIENT_ALIASES: Record<string, string> = {
 
 function matchIngredient(
   ingredient: string,
-  products: (Product & { price: number; sale_price: number | null; stock_status: string })[]
+  products: MatchableProduct[]
 ): MatchedProduct | null {
   const normalized = normalize(ingredient)
   const alias = INGREDIENT_ALIASES[normalized]
@@ -96,7 +96,7 @@ function RecipeIngredient({
   citySlug,
 }: {
   name: string
-  products: (Product & { price: number; sale_price: number | null; stock_status: string })[]
+  products: MatchableProduct[]
   citySlug: string
 }) {
   const [open, setOpen] = useState(false)
@@ -196,7 +196,7 @@ function RecipeIngredients({
   citySlug,
 }: {
   ingredients: string[]
-  products: (Product & { price: number; sale_price: number | null; stock_status: string })[]
+  products: MatchableProduct[]
   citySlug: string
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -228,7 +228,7 @@ function RecipeIngredients({
 // ── Recipe Slider ─────────────────────────────────────────────
 interface RecipeSliderProps {
   recipes: CollectionRecipe[]
-  products: (Product & { price: number; sale_price: number | null; stock_status: string })[]
+  products: MatchableProduct[]
   citySlug: string
 }
 

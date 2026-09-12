@@ -467,8 +467,8 @@ export async function resolveBumps(
     collectionSlugsInCart
   )
   // Estado interno del motor: captura SIEMPRE (no solo al fallar) para que el
-  // log "[BUMPS] served" y el _debug de /diagnostico-bumps revelen en qué
-  // etapa el resultado quedó vacío (reglas, colecciones, tags, triggers).
+  // log "[BUMPS] served" y el _debug (?debug=1 en /api/cart/bumps) revelen
+  // en qué etapa el resultado quedó vacío (reglas, colecciones, tags, triggers).
   if (diagnostics) {
     const productTagsByCart: Record<number, string[] | null> = {}
     for (const p of cartProducts) {

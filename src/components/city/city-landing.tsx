@@ -5,12 +5,13 @@ import { CitySelector } from "@/components/city/city-selector"
 import { useState, useEffect, useMemo } from "react"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { StickyCatalogButton } from "@/components/ui/sticky-catalog-button"
-import { UserShopView } from "@/components/shop/user-shop-view"
 import { useRouter } from "next/navigation"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { MobileSearchOverlay } from "@/components/search/mobile-search-overlay"
 import { createClient } from "@/lib/supabase/client"
 import type { Category, Product, RestaurantCollection } from "@/types"
+import { FEATURED_CATEGORY_SLUGS } from "@/lib/catalog-preview"
+import { UserShopLoader } from "@/components/shop/user-shop-loader"
 import { CollectionSlider } from "@/components/collections/collection-slider"
 import { PromoBanner } from "@/components/ui/promo-banner"
 import { HeroSection } from "./landing/hero"
@@ -27,24 +28,17 @@ import { TestimonialsSection } from "./landing/testimonials"
 import { NewsletterCta } from "./landing/newsletter-cta"
 import { DeliveryZones } from "./landing/delivery-zones"
 
-// Restaurant-essential categories shown on the homepage — ordered by priority
-const FEATURED_CATEGORY_SLUGS = [
-  "frutas-verduras",
-  "carnes-pescados",
-  "lacteos-huevos",
-  "despensa",
-  "bebidas",
-]
-
 export function CityLanding({
   citySlug,
   categories,
-  products,
+  preview,
+  totalCount,
   collections,
 }: {
   citySlug?: string
   categories: Category[]
-  products: Product[]
+  preview: { previewProducts: Product[]; categoryCounts: [number, number][] }
+  totalCount: number
   collections?: RestaurantCollection[]
 }) {
   const { city, setCity } = useCity()
@@ -93,24 +87,27 @@ export function CityLanding({
 
   // Products now have price/sale_price/stock_status directly
 
-  // Group by category — memoized
+  // Conteos reales por categoría (el preview solo trae N por categoría).
+  const countByCategory = useMemo(
+    () => new Map(preview.categoryCounts),
+    [preview.categoryCounts]
+  )
+
+  // Group preview products by category — memoized
   const productsByCategory = useMemo(() => {
-    const map = new Map<number, typeof products>()
-    products.forEach((p) => {
+    const map = new Map<number, Product[]>()
+    preview.previewProducts.forEach((p) => {
       const list = map.get(p.category_id) || []
       list.push(p)
       map.set(p.category_id, list)
     })
     return map
-  }, [products])
+  }, [preview.previewProducts])
 
   // Only show categories that have products — memoized
   const activeCategories = useMemo(() =>
-    categories.filter((c) => {
-      const catProducts = productsByCategory.get(c.id)
-      return catProducts && catProducts.length > 0
-    }),
-    [categories, productsByCategory]
+    categories.filter((c) => (countByCategory.get(c.id) ?? 0) > 0),
+    [categories, countByCategory]
   )
 
   // Featured categories for the product grid (only 4 restaurant-essential) — memoized
@@ -141,11 +138,11 @@ export function CityLanding({
   }
 
   // ── Logged-in user: dynamic shop experience ──
+  // El catálogo completo se carga en el cliente (no viaja en el HTML).
   if (isLoggedIn) {
     return (
-      <UserShopView
+      <UserShopLoader
         categories={categories}
-        products={products}
         citySlug={currentCity?.slug || DEFAULT_CITY_SLUG}
       />
     )
@@ -178,7 +175,7 @@ export function CityLanding({
 
       <CategoryGrid
         activeCategories={activeCategories}
-        productsByCategory={productsByCategory}
+        countByCategory={countByCategory}
         citySlug={currentCity?.slug || DEFAULT_CITY_SLUG}
       />
 
@@ -191,7 +188,8 @@ export function CityLanding({
         featuredCategories={featuredCategories}
         activeCategories={activeCategories}
         productsByCategory={productsByCategory}
-        productsCount={products.length}
+        countByCategory={countByCategory}
+        productsCount={totalCount}
         citySlug={currentCity?.slug || DEFAULT_CITY_SLUG}
       />
 

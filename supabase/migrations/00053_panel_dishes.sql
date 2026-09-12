@@ -14,7 +14,8 @@
 -- que el merge con los mocks del panel siga funcionando por id estable.
 -- ============================================================
 
-CREATE TABLE public.panel_dishes (
+-- Idempotente (convención del repo): seguro de re-aplicar.
+CREATE TABLE IF NOT EXISTS public.panel_dishes (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id         TEXT NOT NULL,
   collection_slug   TEXT NOT NULL DEFAULT 'default',
@@ -30,14 +31,15 @@ CREATE TABLE public.panel_dishes (
   CONSTRAINT panel_dishes_owner_chk CHECK (user_id IS NOT NULL OR guest_token IS NOT NULL)
 );
 
-CREATE INDEX idx_panel_dishes_user ON public.panel_dishes(user_id, collection_slug);
-CREATE INDEX idx_panel_dishes_guest ON public.panel_dishes(guest_token, collection_slug);
+CREATE INDEX IF NOT EXISTS idx_panel_dishes_user ON public.panel_dishes(user_id, collection_slug);
+CREATE INDEX IF NOT EXISTS idx_panel_dishes_guest ON public.panel_dishes(guest_token, collection_slug);
 
 ALTER TABLE public.panel_dishes ENABLE ROW LEVEL SECURITY;
 
 -- Lecturas/escrituras públicas pasan por /api/panel/dishes (service role,
 -- que bypasea RLS y valida el guest_token como capability). El usuario
 -- autenticado puede operar sus propias filas directamente.
+DROP POLICY IF EXISTS "Users manage own panel dishes" ON public.panel_dishes;
 CREATE POLICY "Users manage own panel dishes" ON public.panel_dishes
   FOR ALL TO authenticated
   USING (user_id = auth.uid())

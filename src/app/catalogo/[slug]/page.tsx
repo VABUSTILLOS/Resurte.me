@@ -10,6 +10,7 @@ import {
   getCityAvailabilityForSlug,
 } from "@/lib/catalog-cache"
 import { getCityBySlug } from "@/lib/data"
+import { buildCatalogPreview } from "@/lib/catalog-preview"
 import type { Category, Product, City } from "@/types"
 
 // ISR: catálogo revalidado cada 5 min (alineado con src/lib/catalog-cache.ts).
@@ -92,7 +93,14 @@ export default async function CatalogPage({ params }: Props) {
     }
   }
 
+  // Solo se serializa un preview por categoría; el catálogo completo se
+  // carga en el cliente cuando el usuario busca o filtra (ver CityPageClient).
   return (
-    <CityPageClient slug={slug} categories={categories} products={products} />
+    <CityPageClient
+      slug={slug}
+      categories={categories}
+      preview={buildCatalogPreview(products)}
+      totalCount={products.length}
+    />
   )
 }

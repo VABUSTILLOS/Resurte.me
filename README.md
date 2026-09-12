@@ -40,6 +40,9 @@ Abre [http://localhost:3000](http://localhost:3000).
 | `npx tsc --noEmit` | Typecheck |
 | `npm test` | Tests unitarios (Vitest) |
 | `npm run test:e2e` | Tests e2e (Playwright) |
+| `npx supabase migration new <nombre>` | Crear migración de BD (idempotente) |
+| `npx supabase db push` | Aplicar migraciones a la BD vinculada |
+| `npx supabase db pull` | Auditar drift de la BD remota (solo lectura) |
 
 ## Variables de entorno
 
@@ -47,7 +50,8 @@ Todas están documentadas en [`.env.local.example`](.env.local.example): Supabas
 
 ## Documentación
 
-- [`docs/OPS.md`](docs/OPS.md) — operación
+- [`docs/OPS.md`](docs/OPS.md) — operación (§9: workflow de migraciones de BD)
+- [`supabase/ESQUEMA.md`](supabase/ESQUEMA.md) — esquema de productos y drift reconciliado
 - [`docs/MOCKS.md`](docs/MOCKS.md) — mocks y datos de prueba
 - [`docs/agente-ia.md`](docs/agente-ia.md) — guía del agente IA
 - [`docs/guia-captura-campo.md`](docs/guia-captura-campo.md) — captura en campo

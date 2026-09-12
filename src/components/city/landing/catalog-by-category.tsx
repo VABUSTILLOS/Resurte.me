@@ -12,12 +12,13 @@ interface CatalogByCategoryProps {
   featuredCategories: Category[]
   activeCategories: Category[]
   productsByCategory: Map<number, Product[]>
+  countByCategory: Map<number, number>
   productsCount: number
   citySlug: string
 }
 
 export function CatalogByCategory({
-  featuredCategories, activeCategories, productsByCategory, productsCount, citySlug,
+  featuredCategories, activeCategories, productsByCategory, countByCategory, productsCount, citySlug,
 }: CatalogByCategoryProps) {
   return (
       <section className="bg-white py-10 sm:py-16">
@@ -36,8 +37,9 @@ export function CatalogByCategory({
 
           {featuredCategories.map((cat) => {
             const catProducts = productsByCategory.get(cat.id) || []
+            const total = countByCategory.get(cat.id) ?? catProducts.length
             const preview = catProducts.slice(0, PREVIEW_COUNT)
-            const remaining = catProducts.length - PREVIEW_COUNT
+            const remaining = total - preview.length
 
             return (
               <div key={cat.id} className="mb-10 sm:mb-14 last:mb-0 product-grid-section">
@@ -49,7 +51,7 @@ export function CatalogByCategory({
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-[#242529]">{cat.name}</h3>
-                      <p className="text-sm text-[var(--text-secondary)]">{catProducts.length} productos</p>
+                      <p className="text-sm text-[var(--text-secondary)]">{total} productos</p>
                     </div>
                   </div>
                   <Link

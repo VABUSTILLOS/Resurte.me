@@ -12,6 +12,7 @@ import { getCollectionContent } from "@/lib/collection-content"
 import { getCollectionRecipes } from "@/lib/recipes"
 import { getCollectionCover } from "@/lib/collection-images"
 import RecipeSlider from "@/components/collections/recipe-slider"
+import type { MatchableProduct } from "@/lib/catalog-preview"
 import type { Product, CollectionRecipe } from "@/types"
 
 const COLLECTION_ICONS: Record<string, string> = {
@@ -36,7 +37,7 @@ interface CollectionPageClientProps {
     tags: string[]
   }
   products: Product[]
-  allProducts?: Product[]
+  allProducts?: MatchableProduct[]
 }
 
 /**

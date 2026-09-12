@@ -1,15 +1,15 @@
 import Link from "next/link"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import { getCategoryIcon } from "@/lib/utils"
-import type { Category, Product } from "@/types"
+import type { Category } from "@/types"
 
 interface CategoryGridProps {
   activeCategories: Category[]
-  productsByCategory: Map<number, Product[]>
+  countByCategory: Map<number, number>
   citySlug: string
 }
 
-export function CategoryGrid({ activeCategories, productsByCategory, citySlug }: CategoryGridProps) {
+export function CategoryGrid({ activeCategories, countByCategory, citySlug }: CategoryGridProps) {
   return (
       <section className="bg-white py-10 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -23,7 +23,7 @@ export function CategoryGrid({ activeCategories, productsByCategory, citySlug }:
           </ScrollReveal>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {activeCategories.map((cat, idx) => {
-              const count = productsByCategory.get(cat.id)?.length ?? 0
+              const count = countByCategory.get(cat.id) ?? 0
               return (
                 <ScrollReveal key={cat.id} direction="scale" delay={idx * 0.06}>
                   <Link

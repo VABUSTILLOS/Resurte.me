@@ -13,6 +13,7 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { sendEmail, orderConfirmationEmailHtml, orderStatusEmailHtml, escapeHtml } from "@/lib/email"
 import { PAYMENT_METHOD_LABEL } from "@/lib/order-labels"
+import { notifyUser } from "@/lib/notifications"
 import { logger } from "@/lib/logger"
 import type { OrderStatus } from "@/types"
 
@@ -143,8 +144,24 @@ export async function sendOrderConfirmationEmail(orderId: number): Promise<void>
     if (!order) return
     if (await alreadySent(supabase, orderId, "order_confirmation")) return
 
+    // Notificación persistente para la campana (dedupe order_id+type).
+    const slug0 = citySlugOf(order)
+    if (order.user_id) {
+      void notifyUser({
+        userId: order.user_id,
+        type: "order_confirmation",
+        title: `Pedido #${orderId} recibido`,
+        body: `Total $${Number(order.total).toFixed(2)} MXN · te avisaremos cada avance`,
+        actionUrl:
+          slug0 && order.restore_token
+            ? buildTrackingUrl(slug0, orderId, order.restore_token).replace(/^https?:\/\/[^/]+/, "")
+            : undefined,
+        orderId,
+      })
+    }
+
     const to = await resolveRecipient(supabase, order)
-    const slug = citySlugOf(order)
+    const slug = slug0
     if (!to || !slug || !order.restore_token) {
       logger.warn("order-emails.confirmation.skip", {
         orderId,

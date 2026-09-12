@@ -15,9 +15,9 @@ import { logger } from "@/lib/logger"
  * falla devuelve bumps vacíos para no bloquear el checkout.
  */
 export async function POST(request: NextRequest) {
-  // ?debug=1: página /diagnostico-bumps agrega el motivo real del fail-open
-  // (o de un resultado vacío) al JSON, para cerrar el misterio "0 bumps
-  // logueado". El contrato normal NO cambia (sin query param, sin campo extra).
+  // ?debug=1: agrega el motivo real del fail-open (o de un resultado vacío)
+  // al JSON, para diagnosticar "0 bumps" en logs. El contrato normal NO
+  // cambia (sin query param, sin campo extra).
   const debug = request.nextUrl.searchParams.get("debug") === "1"
   const debugResult = { reason: "" as string, detail: null as unknown }
 
