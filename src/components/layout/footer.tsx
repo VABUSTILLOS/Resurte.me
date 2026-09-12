@@ -1,5 +1,7 @@
 import Link from "next/link"
-import { Heart } from "lucide-react"
+import { Heart, MessageCircle, Mail } from "lucide-react"
+
+const WHATSAPP_NUMBER = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486").replace(/\D/g, "")
 
 export const FOOTER_LINKS = {
   Compañía: [
@@ -39,6 +41,25 @@ export function Footer() {
             <p className="text-[13px] sm:text-sm text-[#8F939B]">
               Central de Abastos Digital. Tu aliado en proveeduría para negocio.
             </p>
+            {/* Contacto directo: los dos canales que más usa un restaurantero */}
+            <div className="mt-3 flex flex-col gap-2">
+              <a
+                href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("¡Hola! Necesito ayuda con Resurte.me")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-[13px] text-[#3CC73C] hover:text-[#7ADE7A] transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" aria-hidden="true" />
+                WhatsApp directo
+              </a>
+              <a
+                href="/contact"
+                className="inline-flex items-center gap-2 text-[13px] text-[#8F939B] hover:text-[#E8E9EB] transition-colors"
+              >
+                <Mail className="w-4 h-4" aria-hidden="true" />
+                Escríbenos
+              </a>
+            </div>
           </div>
 
           {/* Link sections */}
@@ -52,7 +73,7 @@ export function Footer() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-[13px] sm:text-sm leading-snug text-[#8F939B] hover:text-[#0E7A0E] transition-colors"
+                      className="inline-block text-[13px] sm:text-sm leading-snug text-[#8F939B] hover:text-[#0E7A0E] hover:underline underline-offset-4 decoration-[#0E7A0E]/40 transition-colors py-1 sm:py-0"
                     >
                       {link.label}
                     </Link>
