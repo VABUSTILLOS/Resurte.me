@@ -62,8 +62,9 @@ export function computeRunningOutProducts(
   for (const [product_id, times] of byProduct) {
     if (times.length < minPurchases) continue
     times.sort((a, b) => a - b)
-    const first = times[0]!
-    const last = times[times.length - 1]!
+    const first = times[0]
+    const last = times[times.length - 1]
+    if (first === undefined || last === undefined) continue
     const avgIntervalDays = (last - first) / (times.length - 1) / DAY_MS
     if (avgIntervalDays < 1) continue // compras el mismo día: sin cadencia útil
     const daysSinceLast = (now.getTime() - last) / DAY_MS
@@ -93,5 +94,8 @@ export function computeReorderIntervalDays(orderDates: string[]): number | null 
     .filter((t) => !Number.isNaN(t))
     .sort((a, b) => a - b)
   if (times.length < 2) return null
-  return (times[times.length - 1]! - times[0]!) / (times.length - 1) / DAY_MS
+  const first = times[0]
+  const last = times[times.length - 1]
+  if (first === undefined || last === undefined) return null
+  return (last - first) / (times.length - 1) / DAY_MS
 }

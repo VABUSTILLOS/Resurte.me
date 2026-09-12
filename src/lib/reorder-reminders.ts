@@ -55,7 +55,9 @@ export async function checkReorderReminders(): Promise<CronResult> {
   for (const [userId, dates] of byUser) {
     const interval = computeReorderIntervalDays(dates)
     if (interval === null) continue
-    const lastOrderAt = new Date(dates[0]!).getTime()
+    const firstDate = dates[0]
+    if (firstDate === undefined) continue
+    const lastOrderAt = new Date(firstDate).getTime()
     const daysSince = (now - lastOrderAt) / DAY_MS
     if (daysSince >= interval && daysSince <= interval + WINDOW_DAYS) {
       candidates.push({ userId, daysSince: Math.floor(daysSince) })
@@ -83,7 +85,9 @@ export async function checkReorderReminders(): Promise<CronResult> {
 
   // Batch: emails de auth y nombres de perfil (2 queries en vez de 2 por usuario).
   const pendingCandidates = candidates.filter(({ userId }) => {
-    const lastOrderAt = new Date(byUser.get(userId)![0]!).getTime()
+    const firstDate = byUser.get(userId)?.[0]
+    if (firstDate === undefined) return true
+    const lastOrderAt = new Date(firstDate).getTime()
     const remindedAt = lastReminderAt.get(userId)
     return !(remindedAt !== undefined && remindedAt > lastOrderAt)
   })

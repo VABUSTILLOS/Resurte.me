@@ -20,10 +20,13 @@ export function ROICalculatorScreen({ preselectedService, onClose }: ROICalculat
   const [monthlySpend, setMonthlySpend] = useState(32000);
   const [growthMode, setGrowthMode] = useState(false);
 
-  const selectedService = useMemo(
-    () => SERVICES.find((s) => s.id === targetServiceId) || SERVICES[0]!,
-    [targetServiceId]
-  );
+  const selectedService = useMemo(() => {
+    const found = SERVICES.find((s) => s.id === targetServiceId);
+    if (found) return found;
+    const first = SERVICES[0];
+    if (!first) throw new Error("SERVICES no puede estar vacío");
+    return first;
+  }, [targetServiceId]);
 
   const cashbackRate = CASHBACK_RATE;
   // In growth mode, simulate a 40% spend increase

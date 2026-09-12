@@ -21,6 +21,12 @@ const TIER_INDEX: Record<Tier, number> = {
   diamante: 4,
 };
 
+function tierDef(tier: Tier) {
+  const def = CASHBACK_TIERS[TIER_INDEX[tier]];
+  if (!def) throw new Error(`CASHBACK_TIERS no tiene entrada para el tier "${tier}"`);
+  return def;
+}
+
 export interface TierConfig {
   tier: Tier;
   name: string;
@@ -32,10 +38,10 @@ export interface TierConfig {
 }
 
 export const TIER_CONFIGS: Record<Tier, Omit<TierConfig, 'tier'>> = {
-  verde: { name: CASHBACK_TIERS[TIER_INDEX.verde]!.name, rate: CASHBACK_TIERS[TIER_INDEX.verde]!.pct, color: "emerald", borderColor: "border-emerald-200", textColor: "text-emerald-700", bgColor: "bg-emerald-50" },
-  plata: { name: CASHBACK_TIERS[TIER_INDEX.plata]!.name, rate: CASHBACK_TIERS[TIER_INDEX.plata]!.pct, color: "slate", borderColor: "border-slate-300", textColor: "text-slate-600", bgColor: "bg-slate-50" },
-  oro: { name: CASHBACK_TIERS[TIER_INDEX.oro]!.name, rate: CASHBACK_TIERS[TIER_INDEX.oro]!.pct, color: "amber", borderColor: "border-amber-300", textColor: "text-amber-700", bgColor: "bg-amber-50" },
-  diamante: { name: CASHBACK_TIERS[TIER_INDEX.diamante]!.name, rate: CASHBACK_TIERS[TIER_INDEX.diamante]!.pct, color: "violet", borderColor: "border-violet-300", textColor: "text-violet-700", bgColor: "bg-violet-50" },
+  verde: { name: tierDef("verde").name, rate: tierDef("verde").pct, color: "emerald", borderColor: "border-emerald-200", textColor: "text-emerald-700", bgColor: "bg-emerald-50" },
+  plata: { name: tierDef("plata").name, rate: tierDef("plata").pct, color: "slate", borderColor: "border-slate-300", textColor: "text-slate-600", bgColor: "bg-slate-50" },
+  oro: { name: tierDef("oro").name, rate: tierDef("oro").pct, color: "amber", borderColor: "border-amber-300", textColor: "text-amber-700", bgColor: "bg-amber-50" },
+  diamante: { name: tierDef("diamante").name, rate: tierDef("diamante").pct, color: "violet", borderColor: "border-violet-300", textColor: "text-violet-700", bgColor: "bg-violet-50" },
 };
 
 /** Beneficios completos por nivel — fuente única usada por LoyaltyTierCard y la comparativa de niveles. */

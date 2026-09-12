@@ -232,9 +232,9 @@ function BusinessName() {
     if (!supabase) return;
     (async () => {
       try {
-        const { data: { session } } = await supabase!.auth.getSession();
+        const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user?.id) return;
-        const { data: profile } = await supabase!
+        const { data: profile } = await supabase
           .from("profiles")
           .select("full_name")
           .eq("id", session.user.id)
@@ -391,14 +391,15 @@ function ProfileView({ onShowOnboarding }: { onShowOnboarding?: () => void }) {
 
   useEffect(() => {
     if (!supabase) return
+    const sb = supabase
 
     async function fetchProfile() {
       try {
-        const { data: { session } } = await supabase!.auth.getSession()
+        const { data: { session } } = await sb.auth.getSession()
         if (!session?.user?.id) return
         const userId = session.user.id
 
-        const { data: profile } = await supabase!
+        const { data: profile } = await sb
           .from("profiles")
           .select("full_name, created_at")
           .eq("id", userId)
@@ -418,7 +419,7 @@ function ProfileView({ onShowOnboarding }: { onShowOnboarding?: () => void }) {
         }
 
         const monthYear = localMonthYear()
-        const { count: monthCount } = await supabase!
+        const { count: monthCount } = await sb
           .from("orders")
           .select("id", { count: "exact", head: true })
           .eq("user_id", userId)

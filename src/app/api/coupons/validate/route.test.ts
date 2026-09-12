@@ -146,6 +146,21 @@ describe("POST /api/coupons/validate", () => {
     expect(res.status).toBe(200)
   })
 
+  it("200 con cupón de monto fijo (fixed_amount)", async () => {
+    couponsTable({
+      data: { ...VALID_COUPON, discount_type: "fixed_amount", discount_value: 50, min_order: 0 },
+      error: null,
+    })
+    const res = await POST(req({ code: "BIENVENIDO", subtotal: 100 }))
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toEqual({
+      code: "BIENVENIDO",
+      discount_type: "fixed_amount",
+      discount_value: 50,
+      min_order: 0,
+    })
+  })
+
   it("happy path devuelve el AppliedCoupon sin consumir el cupón", async () => {
     const builder = couponsTable({ data: VALID_COUPON, error: null })
     const res = await POST(req({ code: "BIENVENIDO", subtotal: 500 }))

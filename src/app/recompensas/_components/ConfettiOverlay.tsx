@@ -15,7 +15,7 @@ interface Particle {
   fallDuration: number;
 }
 
-const colors = [
+const colors: readonly [string, ...string[]] = [
   "#10B981", // emerald
   "#14B8A6", // teal
   "#06B6D4", // cyan
@@ -30,7 +30,7 @@ export function ConfettiOverlay() {
       id: i,
       x: Math.random() * 100,
       y: -10 - Math.random() * 20,
-      color: colors[Math.floor(Math.random() * colors.length)]!,
+      color: colors[Math.floor(Math.random() * colors.length)] ?? colors[0],
       rotation: Math.random() * 360,
       size: 6 + Math.random() * 10,
       delay: Math.random() * 0.5,

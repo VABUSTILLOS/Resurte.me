@@ -54,6 +54,15 @@ export async function GET(req: NextRequest) {
     ],
     ["retry-order-emails", () => retryFailedOrderEmails()],
     ["foodos-campaigns", () => runDueFoodosCampaigns()],
+    // Reconciliación de pagos Stripe (antes cron */15 — Hobby solo permite
+    // crons diarios; queda como job del consolidado + endpoint manual).
+    [
+      "reconcile-payments",
+      async () => {
+        const { reconcileStalePayments } = await import("@/lib/reconcile-payments")
+        return reconcileStalePayments()
+      },
+    ],
   ]
 
   // Secuencial e independiente: un job que falla no detiene a los demás.

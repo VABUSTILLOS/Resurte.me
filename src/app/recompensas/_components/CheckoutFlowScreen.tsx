@@ -29,12 +29,13 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
 
   useEffect(() => {
     if (!supabase) return;
+    const sb = supabase;
 
     async function loadName() {
       try {
-        const { data: { session } } = await supabase!.auth.getSession();
+        const { data: { session } } = await sb.auth.getSession();
         if (!session?.user?.id) return;
-        const { data: profile } = await supabase!
+        const { data: profile } = await sb
           .from("profiles")
           .select("full_name")
           .eq("id", session.user.id)

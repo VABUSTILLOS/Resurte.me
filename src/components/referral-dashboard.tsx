@@ -40,12 +40,13 @@ export function ReferralDashboard() {
     if (!supabase) {
       return
     }
+    const sb = supabase
 
     async function fetchData() {
       try {
         const {
           data: { session },
-        } = await supabase!.auth.getSession()
+        } = await sb.auth.getSession()
         if (!session?.user?.id) {
           setLoading(false)
           return
@@ -53,7 +54,7 @@ export function ReferralDashboard() {
         const userId = session.user.id
 
         // Fetch referral code
-        const { data: profile } = await supabase!
+        const { data: profile } = await sb
           .from("profiles")
           .select("referral_code")
           .eq("id", userId)
@@ -64,7 +65,7 @@ export function ReferralDashboard() {
         }
 
         // Fetch referred users
-        const { data: referred } = await supabase!
+        const { data: referred } = await sb
           .from("profiles")
           .select("id, full_name, created_at")
           .eq("referred_by", userId)
@@ -73,7 +74,7 @@ export function ReferralDashboard() {
         if (referred?.length) {
           // Una sola query para saber qué usuarios referidos ya ordenaron,
           // en lugar de un count por usuario (N+1).
-          const { data: orderedRows } = await supabase!
+          const { data: orderedRows } = await sb
             .from("orders")
             .select("user_id")
             .in(
@@ -93,14 +94,14 @@ export function ReferralDashboard() {
         }
 
         // Fetch total referral rewards
-        const { data: wallet } = await supabase!
+        const { data: wallet } = await sb
           .from("wallets")
           .select("id")
           .eq("user_id", userId)
           .single()
 
         if (wallet) {
-          const { data: txs } = await supabase!
+          const { data: txs } = await sb
             .from("wallet_transactions")
             .select("amount")
             .eq("wallet_id", wallet.id)

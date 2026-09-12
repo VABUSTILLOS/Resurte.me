@@ -23,7 +23,7 @@ const AVATAR_COLORS = [
   "bg-rose-100 text-rose-700",
   "bg-sky-100 text-sky-700",
   "bg-teal-100 text-teal-700",
-]
+] as const
 
 const TESTIMONIALS: Testimonial[] = [
   {
@@ -34,7 +34,7 @@ const TESTIMONIALS: Testimonial[] = [
     city: "Chihuahua",
     rating: 5,
     avatarInitial: "R",
-    avatarColor: AVATAR_COLORS[0]!,
+    avatarColor: AVATAR_COLORS[0],
   },
   {
     id: "2",
@@ -44,7 +44,7 @@ const TESTIMONIALS: Testimonial[] = [
     city: "Chihuahua",
     rating: 5,
     avatarInitial: "M",
-    avatarColor: AVATAR_COLORS[1]!,
+    avatarColor: AVATAR_COLORS[1],
   },
   {
     id: "3",
@@ -54,7 +54,7 @@ const TESTIMONIALS: Testimonial[] = [
     city: "Chihuahua",
     rating: 5,
     avatarInitial: "C",
-    avatarColor: AVATAR_COLORS[2]!,
+    avatarColor: AVATAR_COLORS[2],
   },
   {
     id: "4",
@@ -64,7 +64,7 @@ const TESTIMONIALS: Testimonial[] = [
     city: "Chihuahua",
     rating: 5,
     avatarInitial: "F",
-    avatarColor: AVATAR_COLORS[3]!,
+    avatarColor: AVATAR_COLORS[3],
   },
   {
     id: "5",
@@ -74,7 +74,7 @@ const TESTIMONIALS: Testimonial[] = [
     city: "Chihuahua",
     rating: 4,
     avatarInitial: "P",
-    avatarColor: AVATAR_COLORS[4]!,
+    avatarColor: AVATAR_COLORS[4],
   },
   {
     id: "6",
@@ -84,7 +84,7 @@ const TESTIMONIALS: Testimonial[] = [
     city: "Chihuahua",
     rating: 5,
     avatarInitial: "L",
-    avatarColor: AVATAR_COLORS[5]!,
+    avatarColor: AVATAR_COLORS[5],
   },
 ]
 
