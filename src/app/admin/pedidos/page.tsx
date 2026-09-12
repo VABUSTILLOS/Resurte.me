@@ -55,18 +55,29 @@ function AdminOrdersContent() {
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all")
   const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [updatingId, setUpdatingId] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null)
 
   useEscapeKey(useCallback(() => setSelectedOrder(null), []), !!selectedOrder)
 
+  // Debounce: el filtro se aplica en SQL, no sobre la página cargada.
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(id)
+  }, [search])
+
   useEffect(() => {
     let cancelled = false
 
     async function fetchOrders() {
+      setLoading(true)
       try {
-        const { orders: data, hasMore: more } = await getAdminOrders()
+        const { orders: data, hasMore: more } = await getAdminOrders(100, undefined, {
+          status: statusFilter,
+          search: debouncedSearch,
+        })
         if (!cancelled) {
           setOrders(data)
           setHasMore(more)
@@ -85,14 +96,17 @@ function AdminOrdersContent() {
     return () => {
       cancelled = true
     }
-  }, [refreshKey])
+  }, [refreshKey, statusFilter, debouncedSearch])
 
   async function loadOlder() {
     if (!orders.length || loadingMore) return
     setLoadingMore(true)
     try {
       const cursor = orders[orders.length - 1]!.created_at
-      const { orders: older, hasMore: more } = await getAdminOrders(100, cursor)
+      const { orders: older, hasMore: more } = await getAdminOrders(100, cursor, {
+        status: statusFilter,
+        search: debouncedSearch,
+      })
       setOrders((prev) => [...prev, ...older])
       setHasMore(more)
     } catch (e) {
@@ -103,23 +117,11 @@ function AdminOrdersContent() {
   }
 
   function refresh() {
-    setLoading(true)
     setRefreshKey((k) => k + 1)
   }
 
-  const filtered = orders.filter((o) => {
-    if (statusFilter !== "all" && o.status !== statusFilter) return false
-    if (search) {
-      const q = search.toLowerCase()
-      if (
-        !String(o.id).includes(q) &&
-        !(o.customer_name ?? "").toLowerCase().includes(q)
-      ) {
-        return false
-      }
-    }
-    return true
-  })
+  // El filtrado por estatus y la búsqueda ya se aplicaron en SQL.
+  const filtered = orders
 
   async function updatePayment(id: number) {
     setUpdatingId(id)

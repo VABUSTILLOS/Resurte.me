@@ -16,28 +16,40 @@ import { createClient } from "@/lib/supabase/server"
 /**
  * Determina si un usuario autenticado es admin.
  *
- * Fuente de verdad: ADMIN_EMAILS (env var) primero; si está vacía, se
- * consulta la tabla `admin_users` (migración 00030).
+ * Fuentes de verdad (cualquiera basta):
+ * 1. ADMIN_EMAILS (env var) — bootstrap/emergencia.
+ * 2. profiles.role = 'admin' (migración 00067) — gestionable desde /admin/usuarios.
+ * 3. Tabla `admin_users` (migración 00030) — legado, se mantiene sincronizada.
  */
 export async function isAdminUser(user: {
   id: string
   email?: string | null
 }): Promise<boolean> {
-  if (!user?.email) return false
+  if (!user?.id) return false
 
-  // 1) Env var ADMIN_EMAILS (fuente primaria)
+  // 1) Env var ADMIN_EMAILS (bootstrap/emergencia)
   const adminEmails = (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean)
 
-  if (adminEmails.length > 0) {
-    return adminEmails.includes(user.email.toLowerCase())
+  if (user.email && adminEmails.length > 0) {
+    if (adminEmails.includes(user.email.toLowerCase())) return true
   }
 
-  // 2) Tabla admin_users (opcional, si existe la migración)
   try {
     const supabase = await createClient()
+
+    // 2) profiles.role = 'admin' (fuente principal gestionable desde la UI)
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle()
+
+    if (profile?.role === "admin") return true
+
+    // 3) Tabla admin_users (legado, migración 00030)
     const { data: adminRow, error } = await supabase
       .from("admin_users")
       .select("id")

@@ -25,9 +25,11 @@ export async function GET(request: Request) {
       100
     )
     const before = searchParams.get("before") ?? undefined
+    const status = searchParams.get("status") ?? undefined
+    const search = searchParams.get("search") ?? undefined
 
     const [{ orders, hasMore }, activeStores] = await Promise.all([
-      getAdminOrders(limit, before),
+      getAdminOrders(limit, before, { status, search }),
       getActiveStoresCount(),
     ])
 

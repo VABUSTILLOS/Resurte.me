@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import {
   Search,
@@ -80,6 +80,13 @@ export default function AdminProductsPage() {
   const [saving, setSaving] = useState<Set<number>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  // Debounce: filtrar cientos de filas en cada tecla re-renderiza toda la tabla.
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(id)
+  }, [search])
   const [editingPrice, setEditingPrice] = useState<number | null>(null)
   const [draftPrice, setDraftPrice] = useState<string>("")
 
@@ -122,13 +129,18 @@ export default function AdminProductsPage() {
   const categoryName = (id: number | null) =>
     categories.find((c) => c.id === id)?.name ?? "Sin categoría"
 
-  const filtered = products.filter(
-    (p) =>
-      !search ||
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      (p.brand ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      categoryName(p.category_id).toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = useMemo(() => {
+    const q = debouncedSearch.toLowerCase()
+    if (!q) return products
+    const categoryName = (id: number | null) =>
+      categories.find((c) => c.id === id)?.name ?? "Sin categoría"
+    return products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.brand ?? "").toLowerCase().includes(q) ||
+        categoryName(p.category_id).toLowerCase().includes(q)
+    )
+  }, [products, debouncedSearch, categories])
 
   // ---------- Disponibilidad por ciudad ----------
   // Sin filas en product_city_availability = "Global" (todas las ciudades).

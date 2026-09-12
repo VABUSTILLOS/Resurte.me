@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Suspense } from "react"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import {
   ShoppingBag,
@@ -14,7 +15,17 @@ import {
 } from "lucide-react"
 import { type AdminOrder } from "./actions"
 import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/order-labels"
-import { MetricsCharts } from "./components/MetricsCharts"
+
+// recharts is ~100 KB gz; load charts on demand with a skeleton.
+const MetricsCharts = dynamic(
+  () => import("./components/MetricsCharts").then((m) => m.MetricsCharts),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-64 animate-pulse rounded-xl bg-gray-100" />
+    ),
+  },
+)
 
 export default function AdminDashboardPage() {
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("daily")

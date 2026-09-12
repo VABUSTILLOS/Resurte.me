@@ -51,9 +51,28 @@ export interface AdminOrder {
  * visible) para obtener la página anterior; devuelve `hasMore` para saber
  * si existen pedidos más viejos.
  */
+export interface AdminOrderFilters {
+  status?: string
+  search?: string
+}
+
+/**
+ * Server action para el panel admin de pedidos.
+ * Requiere sesión de admin (requireAdmin) y usa service_role para leer
+ * TODOS los pedidos (el RLS del client SDK solo devolvería los propios).
+ *
+ * Paginación por cursor: pasa `before` (ISO created_at del último pedido
+ * visible) para obtener la página anterior; devuelve `hasMore` para saber
+ * si existen pedidos más viejos.
+ *
+ * `filters.status` y `filters.search` (id o nombre de cliente) se aplican
+ * en SQL para que la página devuelta cubra TODO el dataset, no solo los
+ * últimos N pedidos cargados.
+ */
 export async function getAdminOrders(
   limit = 100,
-  before?: string
+  before?: string,
+  filters?: AdminOrderFilters
 ): Promise<{ orders: AdminOrder[]; hasMore: boolean }> {
   const { response: adminDenied } = await requireAdmin()
   if (adminDenied) {
@@ -62,15 +81,48 @@ export async function getAdminOrders(
 
   const supabase = await createServiceClient()
 
+  // Solo las columnas que el panel mapea (la tabla orders es ancha:
+  // utm, tokens, ids de Stripe, etc. no se usan aquí).
   let query = supabase
     .from("orders")
-    .select("*, profiles(full_name), addresses(*)")
+    .select(
+      "id, user_id, status, subtotal, delivery_fee, discount, coupon_code, total, payment_method, payment_status, source, created_at, profiles(full_name), addresses(street, number, interior, neighborhood, city, state, zip_code, references)"
+    )
     .order("created_at", { ascending: false })
 
   if (before) {
     // Pedidos creados ANTES del cursor (página anterior, de más viejo a más nuevo se
     // recorre hacia abajo: el cursor es la fila más antigua ya visible).
     query = query.lt("created_at", before)
+  }
+
+  const status = filters?.status
+  if (status && status !== "all") {
+    query = query.eq("status", status)
+  }
+
+  const search = filters?.search?.trim()
+  if (search) {
+    const conditions: string[] = []
+    if (/^\d+$/.test(search)) {
+      conditions.push(`id.eq.${search}`)
+    }
+    // Nombre de cliente: resolver ids de profiles primero (un join con
+    // filtro !inner excluiría pedidos de invitados).
+    const { data: matchedProfiles } = await supabase
+      .from("profiles")
+      .select("id")
+      .ilike("full_name", `%${search}%`)
+      .limit(50)
+    const matchedIds = (matchedProfiles ?? []).map((p) => p.id as string)
+    if (matchedIds.length > 0) {
+      conditions.push(`user_id.in.(${matchedIds.join(",")})`)
+    }
+    if (conditions.length === 0) {
+      // Búsqueda de texto sin coincidencias de nombre ni id numérico.
+      return { orders: [], hasMore: false }
+    }
+    query = query.or(conditions.join(","))
   }
 
   // Traer limit+1 para saber si hay más páginas
@@ -117,34 +169,52 @@ export async function getAdminOrders(
   }
 
   return {
-    orders: pageOrders.map((o) => ({
-      id: o.id,
-      user_id: o.user_id,
-      customer_name: o.profiles?.full_name ?? null,
-      status: o.status,
-      subtotal: Number(o.subtotal),
-      delivery_fee: Number(o.delivery_fee),
-      discount: o.discount != null ? Number(o.discount) : undefined,
-      coupon_code: o.coupon_code ?? null,
-      total: Number(o.total),
-      payment_method: o.payment_method,
-      payment_status: o.payment_status,
-      source: o.source,
-      created_at: o.created_at,
-      address: o.addresses
-        ? {
-            street: o.addresses.street,
-            number: o.addresses.number,
-            interior: o.addresses.interior ?? null,
-            neighborhood: o.addresses.neighborhood,
-            city: o.addresses.city,
-            state: o.addresses.state,
-            zip_code: o.addresses.zip_code,
-            references: o.addresses.references ?? null,
-          }
-        : null,
-      items: itemsByOrder.get(o.id) ?? [],
-    })),
+    orders: pageOrders.map((o) => {
+      // supabase-js tipa las relaciones embebidas como array; en runtime
+      // orders→profiles/addresses es many-to-one (objeto único).
+      const unwrap = <T,>(v: T | T[] | null): T | null =>
+        Array.isArray(v) ? (v[0] ?? null) : v
+      const profile = unwrap(o.profiles as { full_name: string | null } | { full_name: string | null }[] | null)
+      type Address = {
+        street: string
+        number: string
+        interior: string | null
+        neighborhood: string
+        city: string
+        state: string
+        zip_code: string
+        references: string | null
+      }
+      const addr = unwrap(o.addresses as Address | Address[] | null)
+      return {
+        id: o.id,
+        user_id: o.user_id,
+        customer_name: profile?.full_name ?? null,
+        status: o.status,
+        subtotal: Number(o.subtotal),
+        delivery_fee: Number(o.delivery_fee),
+        discount: o.discount != null ? Number(o.discount) : undefined,
+        coupon_code: o.coupon_code ?? null,
+        total: Number(o.total),
+        payment_method: o.payment_method,
+        payment_status: o.payment_status,
+        source: o.source,
+        created_at: o.created_at,
+        address: addr
+          ? {
+              street: addr.street,
+              number: addr.number,
+              interior: addr.interior ?? null,
+              neighborhood: addr.neighborhood,
+              city: addr.city,
+              state: addr.state,
+              zip_code: addr.zip_code,
+              references: addr.references ?? null,
+            }
+          : null,
+        items: itemsByOrder.get(o.id) ?? [],
+      }
+    }),
     hasMore,
   }
 }
