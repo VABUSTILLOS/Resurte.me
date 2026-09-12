@@ -229,8 +229,24 @@ export async function sendOrderStatusEmail(orderId: number, status: OrderStatus)
     if (!order) return
     if (await alreadySent(supabase, orderId, emailType)) return
 
-    const to = await resolveRecipient(supabase, order)
+    // Notificación persistente (independiente del email: llega aunque el
+    // usuario no haya dejado correo).
     const slug = citySlugOf(order)
+    if (order.user_id) {
+      void notifyUser({
+        userId: order.user_id,
+        type: emailType,
+        title: `Pedido #${orderId}: ${content.label}`,
+        body: content.headline,
+        actionUrl:
+          slug && order.restore_token
+            ? buildTrackingUrl(slug, orderId, order.restore_token).replace(/^https?:\/\/[^/]+/, "")
+            : undefined,
+        orderId,
+      })
+    }
+
+    const to = await resolveRecipient(supabase, order)
     if (!to || !slug || !order.restore_token) return
 
     const result = await sendEmail({

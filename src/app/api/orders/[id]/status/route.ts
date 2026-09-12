@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { onOrderStatusChange } from "@/lib/workflows"
+import { notifyUser } from "@/lib/notifications"
 import type { OrderStatus, PaymentStatus } from "@/types"
 
 const VALID_STATUSES: OrderStatus[] = [
@@ -132,6 +133,24 @@ export async function PATCH(
       } catch (workflowErr) {
         logger.error("[API] Workflow error (non-blocking):", workflowErr)
       }
+    }
+
+    // Cashback abonado (trigger trg_credit_cashback_on_payment): notificar
+    // al usuario en su campana persistente.
+    if (
+      payment_status === "paid" &&
+      oldPaymentStatus !== "paid" &&
+      updatedOrder.user_id &&
+      Number(updatedOrder.cashback_credits ?? 0) > 0
+    ) {
+      void notifyUser({
+        userId: updatedOrder.user_id,
+        type: "cashback_credited",
+        title: `Cashback abonado: +$${Number(updatedOrder.cashback_credits).toFixed(2)}`,
+        body: `Pedido #${orderId}${updatedOrder.cashback_tier ? ` · Nivel ${updatedOrder.cashback_tier}` : ""} — ya está en tu monedero`,
+        actionUrl: "/recompensas",
+        orderId,
+      })
     }
 
     // Revertir la reserva del cupón si la orden se cancela.

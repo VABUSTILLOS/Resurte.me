@@ -93,6 +93,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Notificación persistente del canje (best-effort).
+    void notifyUser({
+      userId: user.id,
+      type: "redemption",
+      title: `Canjeaste: ${service.name}`,
+      body: `-${service.cost.toLocaleString("es-MX")} créditos · nuestro equipo se pondrá en contacto contigo`,
+      actionUrl: "/recompensas",
+    })
+
     return NextResponse.json({
       success: true,
       newBalance: result.newBalance,

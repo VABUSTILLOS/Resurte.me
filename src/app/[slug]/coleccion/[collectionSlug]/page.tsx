@@ -9,6 +9,7 @@ import {
   getCityAvailabilityForSlug,
 } from "@/lib/catalog-cache"
 import { Metadata } from "next"
+import { toMatchableProduct } from "@/lib/catalog-preview"
 import { CollectionPageClient } from "./collection-page-client"
 import type { Product } from "@/types"
 
