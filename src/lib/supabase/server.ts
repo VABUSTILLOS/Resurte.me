@@ -8,15 +8,17 @@ import {
 } from "@/lib/supabase/env"
 
 export async function createClient() {
-  if (!isSupabaseConfigured()) {
+  const url = supabaseUrl()
+  const anonKey = supabaseAnonKey()
+  if (!isSupabaseConfigured() || !url || !anonKey) {
     throw new Error(supabaseConfigError())
   }
 
   const cookieStore = await cookies()
 
   return createServerClient(
-    supabaseUrl()!,
-    supabaseAnonKey()!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {

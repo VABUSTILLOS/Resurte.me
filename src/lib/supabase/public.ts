@@ -10,8 +10,10 @@ import { isSupabaseConfigured, supabaseUrl, supabaseAnonKey } from "@/lib/supaba
  * restaurant_collections, foodos_*) donde RLS expone la misma data a todos.
  */
 export function createPublicClient() {
-  if (!isSupabaseConfigured()) return null
-  return createSupabaseJsClient(supabaseUrl()!, supabaseAnonKey()!, {
+  const url = supabaseUrl()
+  const anonKey = supabaseAnonKey()
+  if (!isSupabaseConfigured() || !url || !anonKey) return null
+  return createSupabaseJsClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 }

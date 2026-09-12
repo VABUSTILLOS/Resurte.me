@@ -4,6 +4,8 @@ import { isSupabaseConfigured, supabaseUrl, supabaseAnonKey } from "@/lib/supaba
 export function createClient() {
   // Sin secrets configurados devolvemos null para que la UI degrade con
   // gracia (los consumidores ya hacen `if (!supabase) return`).
-  if (!isSupabaseConfigured()) return null
-  return createBrowserClient(supabaseUrl()!, supabaseAnonKey()!)
+  const url = supabaseUrl()
+  const anonKey = supabaseAnonKey()
+  if (!isSupabaseConfigured() || !url || !anonKey) return null
+  return createBrowserClient(url, anonKey)
 }

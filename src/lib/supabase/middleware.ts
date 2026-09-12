@@ -1,6 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr"
 import { type NextRequest, NextResponse } from "next/server"
-import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { supabaseUrl, supabaseAnonKey } from "@/lib/supabase/env"
 
 const STATIC_PATHS = [
   "/_next",
@@ -60,7 +60,9 @@ export async function updateSession(request: NextRequest) {
     return { supabaseResponse: NextResponse.next({ request }), user: null }
   }
 
-  if (!isSupabaseConfigured()) {
+  const url = supabaseUrl()
+  const anonKey = supabaseAnonKey()
+  if (!url || !anonKey) {
     return { supabaseResponse: NextResponse.next({ request }), user: null }
   }
 
@@ -92,8 +94,8 @@ export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {
