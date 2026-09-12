@@ -1,10 +1,12 @@
 import { revalidateTag, unstable_cache } from "next/cache"
 import type { Category, City, Product, RestaurantCollection } from "@/types"
 import {
+  getAvailableProductIds,
   getCategories,
   getCategoryById,
   getCategoryBySlug,
   getCities,
+  getCityBySlug,
   getProductBySlug,
   getProducts,
   getProductsByCollection,
@@ -25,7 +27,7 @@ import {
 // y se revalida por TTL.
 //
 // Tags disponibles para revalidación manual con revalidateTag():
-//   "catalog", "categories", "products", "collections"
+//   "catalog", "categories", "products", "collections", "availability"
 // ============================================================
 
 export const getCachedCategories = unstable_cache(
@@ -99,6 +101,52 @@ export interface CachedPaginatedProducts {
   products: Product[]
   total: number
   hasMore: boolean
+}
+
+/**
+ * IDs de productos disponibles en una ciudad (selector por ciudad,
+ * migración 00065). TTL corto: los toggles del admin deben reflejarse
+ * casi en vivo; la ruta /api/admin/products/city-availability además
+ * invalida el tag "availability" en cada escritura.
+ *
+ * null = RPC no disponible -> tratar como "sin filtro de ciudad".
+ */
+export const getCachedAvailableProductIds = unstable_cache(
+  async (cityId: number): Promise<number[] | null> => getAvailableProductIds(cityId),
+  ["city-availability"],
+  { revalidate: 60, tags: ["availability", "catalog"] }
+)
+
+/**
+ * Filtra una lista de productos según la disponibilidad de una ciudad.
+ * availableIds null (RPC ausente) devuelve la lista intacta.
+ */
+export function filterByCityAvailability<T extends { id: number }>(
+  products: T[],
+  availableIds: number[] | null
+): T[] {
+  if (!availableIds) return products
+  const allowed = new Set(availableIds)
+  return products.filter((p) => allowed.has(p.id))
+}
+
+/**
+ * Resuelve la disponibilidad de catálogo para una página de ciudad a
+ * partir del slug de la URL. Devuelve null (= sin filtro) cuando la
+ * ciudad no existe en la tabla `cities`, no hay Supabase o el RPC de
+ * la migración 00065 aún no está aplicado: la tienda nunca se vacía
+ * por una dependencia faltante.
+ */
+export async function getCityAvailabilityForSlug(
+  slug: string
+): Promise<number[] | null> {
+  try {
+    const city = await getCityBySlug(slug)
+    if (!city) return null
+    return await getCachedAvailableProductIds(city.id)
+  } catch {
+    return null
+  }
 }
 
 export const getCachedProductsPaginated = unstable_cache(

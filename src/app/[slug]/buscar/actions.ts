@@ -1,6 +1,11 @@
 "use server"
 
-import { getCachedProductsPaginated } from "@/lib/catalog-cache"
+import {
+  filterByCityAvailability,
+  getCachedProductsPaginated,
+  getCachedVisibleProducts,
+  getCityAvailabilityForSlug,
+} from "@/lib/catalog-cache"
 import { searchAll } from "@/lib/data"
 import type { Product } from "@/types"
 
@@ -10,11 +15,33 @@ function isSupabaseUnconfigured(error: unknown): boolean {
   return error instanceof Error && error.message.includes("Supabase no está configurado")
 }
 
-export async function loadMoreProducts(page: number): Promise<{
+export async function loadMoreProducts(
+  page: number,
+  citySlug?: string
+): Promise<{
   products: Product[]
   hasMore: boolean
 }> {
   try {
+    // Selector por ciudad (migración 00065): con filtro activo se
+    // pagina en memoria sobre el catálogo disponible para que ninguna
+    // página intermedia salga vacía por productos restringidos.
+    const availableIds = citySlug
+      ? await getCityAvailabilityForSlug(citySlug)
+      : null
+
+    if (availableIds) {
+      const all = filterByCityAvailability(
+        await getCachedVisibleProducts(),
+        availableIds
+      )
+      const from = page * PAGE_SIZE
+      return {
+        products: all.slice(from, from + PAGE_SIZE),
+        hasMore: from + PAGE_SIZE < all.length,
+      }
+    }
+
     const { products, hasMore } = await getCachedProductsPaginated(page, PAGE_SIZE)
     return { products, hasMore }
   } catch (error) {
@@ -36,11 +63,18 @@ export async function loadMoreProducts(page: number): Promise<{
  * (ilike sobre name, límite 20), para que productos fuera de la página
  * actual también aparezcan al buscar.
  */
-export async function searchProducts(query: string): Promise<Product[]> {
+export async function searchProducts(
+  query: string,
+  citySlug?: string
+): Promise<Product[]> {
   if (!query.trim() || query.trim().length < 2) return []
   try {
     const { products } = await searchAll(query.trim())
-    return products
+    // Selector por ciudad: la búsqueda respeta la disponibilidad local.
+    const availableIds = citySlug
+      ? await getCityAvailabilityForSlug(citySlug)
+      : null
+    return filterByCityAvailability(products, availableIds)
   } catch (error) {
     if (isSupabaseUnconfigured(error)) return []
     throw error

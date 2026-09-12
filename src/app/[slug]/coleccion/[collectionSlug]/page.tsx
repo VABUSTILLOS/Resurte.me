@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
 import {
+  filterByCityAvailability,
   getCachedActiveCollections,
   getCachedCollectionBySlug,
   getCachedProductsByCollection,
   getCachedVisibleProducts,
+  getCityAvailabilityForSlug,
 } from "@/lib/catalog-cache"
 import { Metadata } from "next"
 import { CollectionPageClient } from "./collection-page-client"
@@ -69,9 +71,17 @@ export default async function CollectionPage({ params }: Props) {
   // Ingredients like "Sal", "Aceite vegetal" or "Pan brioche" may not be tagged
   // with this collection, so we match against the whole store, not just the
   // collection-filtered grid.
-  const allProducts = await getCachedVisibleProducts()
+  const [visibleProducts, availableIds] = await Promise.all([
+    getCachedVisibleProducts(),
+    // Selector por ciudad (migración 00065): null = sin filtro.
+    getCityAvailabilityForSlug(slug),
+  ])
+  const allProducts = filterByCityAvailability(visibleProducts, availableIds)
   if (tags.length > 0) {
-    products = await getCachedProductsByCollection(collectionSlug)
+    products = filterByCityAvailability(
+      await getCachedProductsByCollection(collectionSlug),
+      availableIds
+    )
   }
 
   return (

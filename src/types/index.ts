@@ -17,6 +17,20 @@ export interface Category {
   description?: string
 }
 
+/**
+ * Disponibilidad de un producto en una ciudad (migración 00065).
+ * Un producto sin filas está disponible en todas las ciudades;
+ * con filas, solo donde is_available = true.
+ */
+export interface ProductCityAvailability {
+  id: number
+  product_id: number
+  city_id: number
+  is_available: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface RestaurantCollection {
   id: number
   name: string

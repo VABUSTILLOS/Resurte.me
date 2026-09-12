@@ -53,7 +53,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
         return
       }
       setSearchingServer(true)
-      searchProducts(term)
+      searchProducts(term, citySlug)
         .then((products) => {
           if (!cancelled) setServerResults(products)
         })
@@ -68,7 +68,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
       cancelled = true
       clearTimeout(timeout)
     }
-  }, [query])
+  }, [query, citySlug])
 
   // Build category-product count map for chip badges
   const categoryCounts = useMemo(() => {
@@ -162,7 +162,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
       ([entry]) => {
         if (!entry?.isIntersecting) return
         setLoadingMore(true)
-        loadMoreProducts(page).then(({ products: newProducts, hasMore: more }) => {
+        loadMoreProducts(page, citySlug).then(({ products: newProducts, hasMore: more }) => {
           setAllProducts((prev) => [...prev, ...newProducts])
           setPage((p) => p + 1)
           setHasMore(more)
@@ -178,7 +178,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
 
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [page, hasMore, loadingMore])
+  }, [page, hasMore, loadingMore, citySlug])
 
   const handleCategoryToggle = (catId: number) => {
     setSelectedCategory(prev => prev === catId ? null : catId)

@@ -4,8 +4,10 @@ import { MEXICO_CITIES } from "@/lib/cities"
 import { CityPageClient } from "@/components/city/city-page-client"
 import { logger } from "@/lib/logger"
 import {
+  filterByCityAvailability,
   getCachedCategories,
   getCachedVisibleProducts,
+  getCityAvailabilityForSlug,
 } from "@/lib/catalog-cache"
 import { getCityBySlug } from "@/lib/data"
 import type { Category, Product, City } from "@/types"
@@ -74,12 +76,14 @@ export default async function CatalogPage({ params }: Props) {
   let products: Product[] = []
 
   try {
-    const [cats, prods] = await Promise.all([
+    const [cats, prods, availableIds] = await Promise.all([
       getCachedCategories(),
       getCachedVisibleProducts(),
+      // Selector por ciudad (migración 00065): null = sin filtro.
+      getCityAvailabilityForSlug(slug),
     ])
     categories = cats
-    products = prods
+    products = filterByCityAvailability(prods, availableIds)
   } catch (error) {
     if (error instanceof Error && error.message.includes("Supabase no está configurado")) {
       logger.warn(`CatalogPage(${slug}) renderizó sin Supabase (env no configurado).`)
