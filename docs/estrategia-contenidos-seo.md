@@ -36,16 +36,18 @@ Ya cubiertas por los 108 posts: food cost, merma, inventario, NOM-251, CFDI, cos
 
 Reorganizar el blog plano en 6 hubs. Cada hub: 1 página pilar (guía madre enlazada desde el home/nav) + posts existentes enlazados hacia ella + ella enlazando a los posts.
 
-| Hub | Página pilar (nueva) | Posts existentes que alimenta |
+| Hub | Página pilar | Posts existentes que alimenta |
 |---|---|---|
 | 💰 Costos y rentabilidad | `/blog/guia-costos-restaurante` ✅ creada (fase 3) | food cost, costeo, márgenes, punto de equilibrio, utilidad, KPIs (~25 posts) |
 | 📦 Proveeduría y mayoreo | `/blog/guia-proveeduria-restaurantes` ✅ creada (fase 3) | elegir proveedor, negociación, mayoreo vs menudeo, ABC insumos, recepción (~18 posts) |
-| 🍳 Operación de cocina | `/blog/guia-operacion-cocina` | mermas, inventario, mise en place, NOM-251, almacenamiento (~15 posts) |
-| 📣 Marketing y clientes | `/blog/guia-marketing-restaurantes` | Google Maps, Instagram, reseñas, loyalty, delivery (~20 posts) |
-| 📋 Legal y finanzas | `/blog/guia-legal-finanzas-restaurante` | CFDI, impuestos, crédito, salarios, legislación (~12 posts) |
-| 🚀 Crecimiento | `/blog/guia-crecer-restaurante` | franquicias, food trucks, apertura, temporada (~12 posts) |
+| 🍳 Operación de cocina | `/blog/guia-operacion-cocina` ✅ creada (fase 4) | mermas, inventario, mise en place, NOM-251, almacenamiento (~15 posts) |
+| 📣 Marketing y clientes | `/blog/guia-marketing-restaurantes` ✅ creada (fase 4) | Google Maps, Instagram, reseñas, loyalty, delivery (~20 posts) |
+| 📋 Legal y finanzas | `/blog/guia-legal-finanzas-restaurante` ✅ creada (fase 4) | CFDI, impuestos, crédito, salarios, legislación (~12 posts) |
+| 🚀 Crecimiento | `/blog/guia-crecer-restaurante` ✅ creada (fase 4) | franquicias, food trucks, apertura, temporada (~12 posts) |
 
 **Por qué:** los clusters consolidan PageRank temático — Google posiciona mejor "sitios sobre X" que "páginas sueltas sobre X". Con 108 posts ya tienen la materia prima; solo falta la estructura.
+
+**Estado:** 6/6 pilares creadas (fases 3-4) con interlinking desde 8 posts existentes hacia las guías nuevas. Pendiente: enlazar las pilares desde home/nav (requiere cambio de UI — evaluar en el PR de mejoras de sitio).
 
 ---
 
