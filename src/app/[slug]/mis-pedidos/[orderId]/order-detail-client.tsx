@@ -76,6 +76,7 @@ export function OrderDetailClient() {
 
   useEffect(() => {
     let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
 
     async function fetchOrder() {
       if (!supabase || !orderId) {
@@ -119,6 +120,13 @@ export function OrderDetailClient() {
           product_image: item.products?.image_url || "",
         }))
         setOrder({ ...row, address: addresses ?? null, items })
+
+        // Actualización en vivo: mientras el pedido no llegue a un estado
+        // final, re-consulta cada 25s para mover el stepper sin recargar.
+        const final = row.status === "delivered" || row.status === "cancelled"
+        if (!final && !cancelled) {
+          timer = setTimeout(fetchOrder, 25_000)
+        }
       } catch {
         // Keep defaults
       } finally {
@@ -130,6 +138,7 @@ export function OrderDetailClient() {
 
     return () => {
       cancelled = true
+      if (timer) clearTimeout(timer)
     }
   }, [supabase, orderId])
 

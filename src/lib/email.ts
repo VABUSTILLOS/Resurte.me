@@ -165,6 +165,69 @@ export function reorderReminderEmailHtml(params: {
 </html>`
 }
 
+export function orderConfirmationEmailHtml(params: {
+  orderId: number
+  itemsPreview: string
+  total: string
+  paymentMethod: string
+  scheduledFor: string
+  trackingUrl: string
+}): string {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"></head>
+<body style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
+  <h1 style="color:#0E7A0E;font-size:24px">✅ ¡Recibimos tu pedido #${params.orderId}!</h1>
+  <p style="color:#242529;font-size:16px;line-height:1.6">
+    Tu pedido está registrado y la tienda lo está confirmando. Esto es lo que pediste:
+  </p>
+  <p style="background:#F7F5F0;padding:16px;border-radius:8px;color:#5C6068;font-size:14px">
+    ${params.itemsPreview}
+  </p>
+  <p style="color:#242529;font-size:15px;line-height:1.6">
+    <strong>Total:</strong> ${params.total} MXN · <strong>Pago:</strong> ${params.paymentMethod}<br>
+    <strong>Entrega:</strong> ${params.scheduledFor}
+  </p>
+  <a href="${params.trackingUrl}"
+     style="display:inline-block;background:#0E7A0E;color:#fff;padding:14px 32px;
+            border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
+    Rastrear mi pedido en vivo →
+  </a>
+  <p style="color:#72767E;font-size:13px;line-height:1.6">
+    Guarda este correo: el enlace de rastreo funciona sin iniciar sesión.
+  </p>
+  <p style="color:#72767E;font-size:13px;margin-top:32px;border-top:1px solid #E8E9EB;padding-top:16px">
+    Resurte.me — Central de abastos digital
+  </p>
+</body>
+</html>`
+}
+
+export function orderStatusEmailHtml(params: {
+  orderId: number
+  statusEmoji: string
+  statusLabel: string
+  headline: string
+  trackingUrl: string
+}): string {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"></head>
+<body style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
+  <h1 style="color:#0E7A0E;font-size:24px">${params.statusEmoji} Pedido #${params.orderId}: ${params.statusLabel}</h1>
+  <p style="color:#242529;font-size:16px;line-height:1.6">${params.headline}</p>
+  <a href="${params.trackingUrl}"
+     style="display:inline-block;background:#0E7A0E;color:#fff;padding:14px 32px;
+            border-radius:8px;text-decoration:none;font-weight:600;margin:8px 0">
+    Ver seguimiento →
+  </a>
+  <p style="color:#72767E;font-size:13px;margin-top:32px;border-top:1px solid #E8E9EB;padding-top:16px">
+    Resurte.me — Central de abastos digital
+  </p>
+</body>
+</html>`
+}
+
 export function reactivationEmailHtml(params: {
   name: string
   daysInactive: number

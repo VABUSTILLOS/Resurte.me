@@ -20,6 +20,7 @@
 
 import { sendTextMessage } from "@/lib/whatsapp"
 import { createServiceClient } from "@/lib/supabase/service"
+import { sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/order-emails"
 import type { OrderStatus, PaymentStatus } from "@/types"
 import { logger } from "@/lib/logger"
 
@@ -650,6 +651,9 @@ export async function runNewOrderWorkflows(orderId: number): Promise<{
     confirmOrderToCustomer(orderId),
   ])
 
+  // Email transaccional de confirmación (best-effort, con dedupe).
+  await sendOrderConfirmationEmail(orderId)
+
   return { staff, customer }
 }
 
@@ -675,6 +679,9 @@ export async function onOrderStatusChange(
   // Always notify customer of status change
   const statusResult = await notifyCustomerStatusUpdate(orderId, newStatus)
   if (statusResult) results.push(statusResult)
+
+  // Email transaccional del hito (confirmed / out_for_delivery / delivered).
+  await sendOrderStatusEmail(orderId, newStatus)
 
   // If newly confirmed, check if payment is pending and schedule reminder
   if (newStatus === "confirmed") {

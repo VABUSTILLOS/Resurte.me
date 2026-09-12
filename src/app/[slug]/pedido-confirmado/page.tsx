@@ -9,62 +9,50 @@ import { trackActiveExperimentsConversion } from "@/lib/checkout-experiments"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 import type { RepurchaseCouponInfo } from "@/types"
 
-function generateOrderId(): string {
-  const prefix = "RT"
-  const random = Math.random().toString(36).substring(2, 7).toUpperCase()
-  const timestamp = Date.now().toString(36).substring(-4).toUpperCase()
-  return `${prefix}-${random}${timestamp}`
+interface LastOrderSnapshot {
+  orderId: number | null
+  trackingToken: string | null
+  cashback: { credits: number; tier: string | null } | null
+  repurchaseCoupon: RepurchaseCouponInfo | null
+}
+
+function readLastOrder(): LastOrderSnapshot {
+  const empty: LastOrderSnapshot = {
+    orderId: null,
+    trackingToken: null,
+    cashback: null,
+    repurchaseCoupon: null,
+  }
+  try {
+    const raw = sessionStorage.getItem("last_order")
+    if (!raw) return empty
+    const parsed = JSON.parse(raw)
+    return {
+      orderId: typeof parsed?.orderId === "number" ? parsed.orderId : null,
+      trackingToken: typeof parsed?.trackingToken === "string" ? parsed.trackingToken : null,
+      cashback:
+        parsed?.cashbackCredits > 0
+          ? { credits: parsed.cashbackCredits, tier: parsed.cashbackTier ?? null }
+          : null,
+      repurchaseCoupon: parsed?.repurchaseCoupon?.code ? parsed.repurchaseCoupon : null,
+    }
+  } catch {
+    return empty
+  }
 }
 
 export default function OrderConfirmedPage() {
   const { city } = useCity()
-  // Prefer the real DB order id saved by the checkout page; fall back to a
-  // generated reference if it's not available (e.g. direct visit).
-  const [orderId] = useState(() => {
-    try {
-      const raw = sessionStorage.getItem("last_order")
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed?.orderId) return `#${parsed.orderId}`
-      }
-    } catch {
-      // Ignore malformed session data
-    }
-    return generateOrderId()
-  })
-
-  // Cashback estimado devuelto por POST /api/orders y guardado en last_order
-  const [cashback] = useState<{ credits: number; tier: string | null } | null>(() => {
-    try {
-      const raw = sessionStorage.getItem("last_order")
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed?.cashbackCredits && parsed.cashbackCredits > 0) {
-          return {
-            credits: parsed.cashbackCredits,
-            tier: parsed.cashbackTier ?? null,
-          }
-        }
-      }
-    } catch {
-      // Ignore malformed session data
-    }
-    return null
-  })
-
-  // Cupón de recompra emitido con este pedido (solo usuarios logueados)
-  const [repurchaseCoupon] = useState<RepurchaseCouponInfo | null>(() => {
-    try {
-      const raw = sessionStorage.getItem("last_order")
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (parsed?.repurchaseCoupon?.code) return parsed.repurchaseCoupon
-      }
-    } catch {
-      // Ignore malformed session data
-    }
-    return null
-  })
+  // Datos reales del pedido guardados por el checkout. En visita directa (sin
+  // sessionStorage) se muestra la confirmación genérica SIN inventar un ID.
+  const [lastOrder] = useState<LastOrderSnapshot>(() => readLastOrder())
+  const orderId = lastOrder.orderId ? `#${lastOrder.orderId}` : null
+  const cashback = lastOrder.cashback
+  const repurchaseCoupon = lastOrder.repurchaseCoupon
+  const trackingUrl =
+    lastOrder.orderId && lastOrder.trackingToken
+      ? `/${city?.slug ?? ""}/pedido/${lastOrder.orderId}?t=${lastOrder.trackingToken}`
+      : null
 
   // Track purchase on page mount (total/items come from sessionStorage,
   // set right before the cart was cleared on the checkout page)
@@ -87,7 +75,7 @@ export default function OrderConfirmedPage() {
     }
 
     AnalyticsEvents.purchase(
-      orderId,
+      orderId ?? "direct-visit",
       value,
       undefined,
       items?.map((i) => ({
@@ -116,8 +104,14 @@ export default function OrderConfirmedPage() {
           ¡Pedido confirmado!
         </h1>
         <p className="text-gray-500 text-sm sm:text-base">
-          Tu pedido <span className="font-mono font-bold text-brand-600">{orderId}</span> ha sido
-          registrado exitosamente.
+          {orderId ? (
+            <>
+              Tu pedido <span className="font-mono font-bold text-brand-600">{orderId}</span> ha sido
+              registrado exitosamente.
+            </>
+          ) : (
+            "Tu pedido ha sido registrado exitosamente."
+          )}
         </p>
       </div>
 
@@ -205,6 +199,15 @@ export default function OrderConfirmedPage() {
 
       {/* CTA buttons */}
       <div className="space-y-3">
+        {trackingUrl && (
+          <Link
+            href={trackingUrl}
+            className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-colors"
+          >
+            <Package className="w-4 h-4" />
+            Rastrear mi pedido en vivo
+          </Link>
+        )}
         <Link
           href={`/${city.slug}`}
           className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 transition-colors"
