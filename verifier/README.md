@@ -14,3 +14,4 @@
 |---|---|---|
 | 2026-09-12T06:15Z | verifier/runs/2026-09-12T0615Z-final.md | ✅ Todos los criterios v2 cumplidos; PR #9 mergeable; preview Vercel SUCCESS en `6487b21` |
 | 2026-09-12T1230Z | verifier/runs/2026-09-12T1230Z-fase2.md | ✅ Todos los criterios v3 cumplidos; preview Vercel SUCCESS en `8f4af8b` (último commit con contenido de app); head final `2d52be4` pendiente solo por cuota Vercel 24 h (re-verificación programada) |
+| 2026-09-13T1400Z | verifier/runs/2026-09-13T1400Z-reverificacion.md | ✅ Re-verificación post rate limit: preview Vercel SUCCESS en head final `437e17e` (17:34:39Z) y en `381b378`; fase 3 verde; PR #9 fusionado a `main` (2026-09-12T17:40:21Z); pendiente v3 cerrado |
