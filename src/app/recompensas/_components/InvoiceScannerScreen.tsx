@@ -225,7 +225,7 @@ export function InvoiceScannerScreen({ onClose }: InvoiceScannerScreenProps) {
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <h1 className="text-warm-700 text-lg font-bold">Escanear Factura</h1>
+        <h1 className="text-warm-700 text-lg font-bold">Subir factura</h1>
         <div className="w-9" />
       </div>
 
@@ -728,21 +728,15 @@ function ExtractingState() {
 }
 
 function SuccessState({
-  supplier,
+  fileName,
   amount,
-  date,
-  folio,
-  cashback,
-  newBalance,
+  estimatedCredits,
   onClose,
   onScanAnother,
 }: {
-  supplier: string;
-  amount: number;
-  date: string;
-  folio: string;
-  cashback: number;
-  newBalance: number;
+  fileName: string;
+  amount: number | null;
+  estimatedCredits: number | null;
   onClose: () => void;
   onScanAnother: () => void;
 }) {
@@ -768,39 +762,32 @@ function SuccessState({
         </motion.div>
       </motion.div>
 
-      <h2 className="text-warm-700 text-2xl font-black">¡Factura registrada!</h2>
-      <p className="text-[#5c6069] text-sm mt-1">
-        Recompensas simuladas (demo — no acreditadas a tu saldo)
+      <h2 className="text-warm-700 text-2xl font-black">¡Factura recibida!</h2>
+      <p className="text-[#5c6069] text-sm mt-1 text-center max-w-xs">
+        Nuestro equipo la revisará en aproximadamente 24 horas. Al aprobarla,
+        los créditos se abonan a tu Cartera de Crecimiento y te llega una
+        notificación.
       </p>
-
-      <div className="mt-4 w-full rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
-        <p className="text-[10px] text-amber-800 leading-relaxed">
-          ⓘ Esta es una vista previa. Los créditos mostrados abajo son simulados y
-          no han sido depositados en tu Cartera de Crecimiento.
-        </p>
-      </div>
 
       {/* Invoice details */}
       <div className="mt-6 w-full rounded-2xl bg-white border border-cream-300 p-5 shadow-sm">
         <div className="space-y-3">
-          <DetailRow label="Proveedor" value={supplier} />
-          <DetailRow label="Folio" value={folio} />
-          <DetailRow label="Fecha" value={date} />
-          <DetailRow
-            label="Monto factura"
-            value={`$${formatNumber(amount)} Créditos`}
-          />
+          <DetailRow label="Archivo" value={fileName} />
+          {amount != null && (
+            <DetailRow
+              label="Monto capturado"
+              value={`$${formatNumber(amount)} MXN`}
+            />
+          )}
           <hr className="border-cream-300" />
-          <DetailRow
-            label="Recompensas generadas"
-            value={`+$${formatNumber(cashback)} Créditos`}
-            highlight
-          />
-          <DetailRow
-            label="Nuevo saldo"
-            value={`$${formatNumber(newBalance)} Créditos`}
-            highlight
-          />
+          {estimatedCredits != null && (
+            <DetailRow
+              label="Créditos estimados (5%)"
+              value={`+$${formatNumber(estimatedCredits)} al aprobar`}
+              highlight
+            />
+          )}
+          <DetailRow label="Estado" value="En revisión" />
         </div>
       </div>
 
@@ -809,7 +796,7 @@ function SuccessState({
         <div className="flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-brand-500" />
           <p className="text-brand-500 text-xs font-medium">
-            Con estas recompensas estás más cerca de tu próxima campaña publicitaria
+            Te avisaremos en tu campana de notificaciones cuando se apruebe
           </p>
         </div>
       </div>
@@ -830,14 +817,20 @@ function SuccessState({
             hover:bg-cream-100 transition-colors active:scale-[0.98]"
         >
           <RefreshCcw className="h-4 w-4" />
-          Escanear otra factura
+          Subir otra factura
         </button>
       </div>
     </motion.div>
   );
 }
 
-function ErrorState({ onRetry }: { onRetry: () => void }) {
+function ErrorState({
+  message,
+  onRetry,
+}: {
+  message?: string;
+  onRetry: () => void;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
@@ -847,9 +840,10 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
       <div className="flex h-20 w-20 items-center justify-center rounded-full bg-red-50 border border-red-200 mb-4">
         <X className="h-10 w-10 text-red-700" />
       </div>
-      <h2 className="text-warm-700 text-lg font-bold">No se pudo leer la factura</h2>
+      <h2 className="text-warm-700 text-lg font-bold">No se pudo enviar la factura</h2>
       <p className="text-[#5c6069] text-sm mt-1 text-center max-w-xs">
-        Asegúrate de que la imagen sea clara y que el folio fiscal sea visible.
+        {message ??
+          "Asegúrate de que la imagen sea clara y que el folio fiscal sea visible."}
       </p>
       <button
         onClick={onRetry}

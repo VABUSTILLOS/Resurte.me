@@ -11,6 +11,8 @@ const ADMIN_NAV = [
   { href: "/admin/pedidos", label: "Pedidos", exact: false },
   { href: "/admin/productos", label: "Productos", exact: false },
   { href: "/admin/usuarios", label: "Usuarios", exact: false },
+  { href: "/admin/facturas", label: "Facturas", exact: false },
+  { href: "/admin/recompensas", label: "Recompensas", exact: false },
   { href: "/admin/visibilidad", label: "Visibilidad", exact: false },
   { href: "/admin/disponibilidad", label: "Por ciudad", exact: false },
   { href: "/admin/proveedores", label: "Proveedores", exact: false },
