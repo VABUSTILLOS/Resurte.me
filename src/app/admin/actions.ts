@@ -55,6 +55,10 @@ export interface AdminOrder {
 export interface AdminOrderFilters {
   status?: string
   search?: string
+  /** ISO timestamptz inclusive (inicio del rango de fechas) */
+  from?: string
+  /** ISO timestamptz EXCLUSIVE (fin del rango; ver normalizeDateRange) */
+  toExclusive?: string
 }
 
 /**
@@ -104,18 +108,27 @@ export async function getAdminOrders(
     query = query.eq("status", status)
   }
 
+  // Fase 9 — rango de fechas (día calendario; el límite superior ya viene
+  // exclusivo desde normalizeDateRange).
+  if (filters?.from) {
+    query = query.gte("created_at", filters.from)
+  }
+  if (filters?.toExclusive) {
+    query = query.lt("created_at", filters.toExclusive)
+  }
+
   const search = filters?.search?.trim()
   if (search) {
     const conditions: string[] = []
     if (/^\d+$/.test(search)) {
       conditions.push(`id.eq.${search}`)
     }
-    // Nombre de cliente: resolver ids de profiles primero (un join con
-    // filtro !inner excluiría pedidos de invitados).
+    // Nombre o teléfono de cliente: resolver ids de profiles primero (un
+    // join con filtro !inner excluiría pedidos de invitados).
     const { data: matchedProfiles } = await supabase
       .from("profiles")
       .select("id")
-      .ilike("full_name", `%${search}%`)
+      .or(`full_name.ilike.%${search}%,phone.ilike.%${search}%`)
       .limit(50)
     const matchedIds = (matchedProfiles ?? []).map((p) => p.id as string)
     if (matchedIds.length > 0) {
