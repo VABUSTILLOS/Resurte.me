@@ -1,148 +1,178 @@
 ---
 title: "Horarios de mayor consumo en restaurantes: los datos y cómo explotarlos"
-description: "Los datos de horarios pico en restaurantes de México: cuándo llega la gente, cómo se distribuye tu ticket y cómo explotar horas valle con datos."
-category: industria
+description: "Análisis de horarios pico por tipo de restaurante en México: desayunos, comidas, cenas y fines de semana. Cómo ajustar personal, insumos y promociones según la demanda real."
+category: operacion
 contentType: datos
-date: "2026-10-16"
-updatedAt: "2026-10-16"
+date: "2026-09-02"
+updatedAt: "2026-09-02"
 author: "Equipo Resurte.me"
 authorRole: "Especialistas en restaurantes"
-tags: ["horarios", "consumo", "temporada", "datos", "pico", "industria"]
+tags: ["horarios", "demanda", "operación", "personal", "datos", "ventas"]
 featured: false
 coverImage: "/images/blog/horarios-consumo-restaurante.webp"
-coverAlt: "Restaurante en pleno servicio con comensales en sus mesas"
-cta:
-  variant: herramienta
-  href: "/panel/temporada"
-  title: "Detecta tus horas pico y valle con la herramienta de temporada del Panel de Resurte.me y arma tu plan de ocupación."
-  cta: "Explorar mi temporada"
+coverAlt: "Restaurante lleno de clientes en hora pico de comida"
 faq:
-  - question: "¿Cuáles son las horas de mayor consumo en los restaurantes de México?"
-    answer: "En general, el almuerzo (14:00-16:00) y la cena (20:00-22:00) concentran los picos, con el almuerzo ganando en formato familiar y ejecutivo, y la cena en formatos casuales y de barra. El fin de semana cambia el patrón: los desayunos se llenan entre 10:00-13:00 (brunch) y la cena se adelanta. Pero el dato que importa no es el promedio nacional: es TU horario. Revisa tus ventas por hora de los últimos 2-3 meses: el pico de una taquería es nocturno, el de una cafetería es matutino."
-  - question: "¿Por qué me conviene conocer mis horas pico?"
-    answer: "Porque la capacidad de tu restaurante es tu activo más caro: cada mesa vacía en hora valle es ingreso perdido que ya pagaste (renta, nómina, luz). Conocer tus picos te permite: (1) programar personal donde se necesita (nadie atiende solo en el pico, ni paga horas de más en el valle), (2) diseñar promociones para llenar horas valle, (3) preparar producción para el pico (mise en place) y evitar saturación, y (4) decidir si abrir más temprano o más tarde tiene sentido. Los datos de horario son el punto de partida de casi toda decisión operativa."
-  - question: "¿Cómo registro y analizo mis ventas por hora?"
-    answer: "Necesitas el dato por hora, no solo el total del día. Tu punto de venta (TPV) normalmente lo tiene: busca el reporte de ventas por hora o por franja. Si no lo tienes, empieza manual: cada 30-60 minutos registra el número de mesas ocupadas o tickets en una hoja, durante 2-3 semanas representativas (incluye un fin de semana). Con esos datos: agrupa por franja (10-11, 11-12...), calcula el promedio por franja y separa entre semana vs fin de semana. Esos son tus horarios pico y valle reales."
-  - question: "¿Cómo lleno mis horas valle?"
-    answer: "Con ofertas que agregan valor sin devaluar tu marca: promoción de 'hora feliz' en el momento muerto, menú de precios ligeros (combo de mediodía entre 15:00-17:00), alianza con oficinas cercanas (menú de ejecutivo a descuento), o eventos (degustación, catas, taller de cocina) en el valle. La regla: la promoción debe ser específica de la hora valle, no general, para no acostumbrar al cliente a pagar menos en hora pico. Mide cada promoción: si no sube el tráfico del valle, ajusta o elimina."
-  - question: "¿Cómo programo mi personal según los picos?"
-    answer: "Crea tu 'mapa de personal' por franja: para cada franja horaria define cuántos meseros, cocineros y cajeros necesitas según la ocupación esperada. El pico exige máxima dotación (una mesa sin atención es un cliente que no vuelve); el valle exige la mínima que cubra el servicio. El objetivo: que la dotación siga a la curva de demanda, no que la planta fija sea para el pico todo el día. Programas con horarios escalonados (entradas y salidas a media jornada) para cubrir el pico sin pagar horas muertas."
+  - question: "¿Cuál es el horario de mayor consumo en restaurantes en México?"
+    answer: "Depende del giro: fondas y cocinas económicas tienen su pico entre 1:30 y 3:30 PM (la comida corrida), restaurantes de cena entre 8 y 10 PM, y cafeterías entre 8-10 AM y 5-7 PM. El fin de semana mueve los picos: el desayuno se extiende hasta mediodía y la comida se vuelve más larga y social."
+  - question: "¿Cómo uso los horarios pico para vender más?"
+    answer: "Tres palancas: personal (más gente en los picos, menos en valle), insumos (compra y prep escalada a la demanda real) y promociones (happy hour en horas valle para llenar mesas vacías). El error más común es tener el mismo personal y la misma prep todo el día: pagas horas muertas y te falta gente en el pico."
+  - question: "¿Vale la pena abrir en horarios de baja demanda?"
+    answer: "Depende del costo de operar esas horas. Calcula: ventas promedio de esa franja menos costo de personal, luz, gas e insumos. Si el margen es negativo 3 meses seguidos, considera cerrar esa franja o reducirla. Muchas fondas descubren que abrir a las 7 AM les cuesta más de lo que venden antes de las 9."
+  - question: "¿Cómo mido mis horarios pico si no tengo sistema?"
+    answer: "Una semana de registro manual basta: anota cada hora cuántos clientes entraron y cuánto vendiste (el ticket promedio te lo da tu caja). 7 días de datos te muestran el patrón. Repite cada 3 meses porque los patrones cambian con temporadas, clima y eventos locales."
+  - question: "¿El delivery tiene los mismos horarios pico que el local?"
+    answer: "No. El delivery pica más tarde: entre 7 y 10 PM de lunes a viernes, y se extiende hasta medianoche los fines de semana. Además tiene picos de lluvia y de eventos (fútbol, series). Si operas ambos canales, planifica personal e insumos por canal, no como un solo negocio."
 ---
 
-**El restaurante promedio de México tiene 2 horas pico y 5 horas valle al día — y la diferencia entre quien lo sabe y quien no es la diferencia entre margen y merma de capacidad.** Una mesa vacía en hora valle ya está pagada: renta, nómina y luz siguen corriendo. Conocer tus horarios de mayor consumo, y explotar los de menor, es una de las palancas operativas más subestimadas. Esta guía te da los patrones generales, cómo medir los tuyos y cómo convertir horas muertas en ingresos.
+**La mayoría de los restaurantes en México opera con el personal equivocado en las horas equivocadas: gente de más cuando no hay clientes y gente de menos cuando se forma la fila.** La diferencia entre un restaurante rentable y uno que sobrevive está en entender cuándo come la gente — y organizar todo alrededor de esa respuesta. Estos son los datos reales de consumo por horario y cómo explotarlos.
 
-## Los patrones generales (y por qué no te sirven solos)
+## Los 3 picos de consumo en México (y qué significan para ti)
 
-| Franja | Patrón típico | Quién lo concentra |
-|---|---|---|
-| Desayuno 8:00-11:00 | Pico en cafeterías y fondas | Trabajadores, estudiantes |
-| Brunch 10:00-13:00 | Pico de fin de semana | Familias, grupos |
-| Almuerzo 14:00-16:00 | Pico general (día laboral) | Ejecutivos, familias |
-| Merienda 16:00-19:00 | Valle en casi todos | Nadie |
-| Cena 20:00-22:00 | Pico en casual y barra | Parejas, grupos |
-| Madrugada 22:00+ | Pico solo en nocturnos | Antojos, vida nocturna |
+El consumo en restaurantes en México sigue un patrón de tres olas, con variaciones según el giro:
 
-<BlogCallout variant="warning" title="El promedio nacional no llena tu restaurante: tus datos sí">
-Una cafetería no debe planear alrededor del 'pico de cena 20:00-22:00' — su pico es el desayuno. Una taquería no debe preocuparse por el 'valle de la merienda' — su negocio vive en la noche. Los patrones generales sirven para entender el mercado, pero cada restaurante tiene su propia curva por formato, zona y clientela. Si tomas decisiones con promedios ajenos, llenarás el horario equivocado. Tus datos por hora de 2-3 meses son los únicos que cuentan.
-</BlogCallout>
-
-## Cómo medir tus ventas por hora (incluso sin TPV)
-
-| Fuente del dato | Cómo obtenerlo |
-|---|---|
-| TPV con reporte por hora | Reporte de ventas por franja |
-| TPV sin reporte | Tickets con hora de emisión |
-| Manual | Registro de mesas ocupadas cada 30-60 min |
-| App de delivery | Reporte de pedidos por hora |
-
-**El método manual de 3 semanas:** en 3 semanas representativas (incluye 2 fines de semana), cada 30 minutos anota el número de mesas ocupadas o tickets. Al final: agrupa por franja, saca el promedio por franja, separa entre semana y fin de semana. Con eso tienes tu mapa de ocupación — el mismo que un sistema caro te daría.
-
-## El mapa de ocupación y las 3 decisiones que desbloquea
-
-| Dato de tu mapa | Decisión que permite |
-|---|---|
-| Horas pico identificadas | Programar personal a la curva |
-| Horas valle detectadas | Promociones para llenarlas |
-| Curva entre semana vs fin de semana | Menú y ofertas por día |
-
-**Ejemplo:** una taquería descubre que su pico es 21:00-23:00 (fines de semana) y su valle 15:00-18:00 (días laborales). Decisiones: (1) el jueves y viernes programa un cocinero extra a las 20:00; (2) entre 15:00-18:00 lanza un combo de 'almuerzo tardío' a $99; (3) el lunes (día más flojo) ofrece 2x1 en bebidas para atraer grupos. Cada decisión sale de un dato de su propia operación.
-
-<BlogCallout variant="tip" title="La regla de la promoción en hora valle">
-Las promociones de valle deben ser específicas de esa franja — no descuentos generales que acostumbren al cliente a pagar menos en hora pico. Un 'combo de 15:00 a 17:00' llena el valle sin canibalizar tu cena. Y siempre mide: si la promoción no sube el tráfico del valle en 3-4 semanas, ajusta el precio, el horario o elimina. Una promoción que no llena el valle es solo margen que regalas. El dato de ocupación antes y después de la promoción es tu veredicto.
-</BlogCallout>
-
-## Plan de 30 días para explotar tus horarios
-
-| Semana | Acción |
-|---|---|
-| Semana 1 | Mide tus ventas/mesas por hora |
-| Semana 2 | Identifica picos, valles y curvas por día |
-| Semana 3 | Programa personal a la curva (escalonado) |
-| Semana 4 | Lanza 1 promoción de valle y mide |
-
-## Ejemplo: el valle que se volvió caja
-
-Una taquería de barrio mide sus ventas por hora durante 3 semanas. Su pico es 21:00-23:00 (80% de la venta del día) y tiene un valle muerto de 15:00-18:00 donde solo vende bebidas. Con el mapa de ocupación decide: en lugar de cerrar en el valle, lanza un combo de 'tarde' (3 tacos + agua de jamaica a precio de menú) para los trabajadores de la zona industrial cercana, y programa a su ayudante a medio tiempo solo de 18:00-23:00. Resultado en 4 semanas: el valle pasa de 5% a 18% de la venta del día y el costo laboral por hora baja, porque el personal ahora trabaja donde hay demanda. Los datos por hora no 'arreglaron' nada por sí solos — pero convirtieron un horario muerto en una decisión con número, no en una corazonada.
-
-## Checklist de horarios y ocupación
-
-- [ ] Registré ventas/mesas por hora (3 semanas)
-- [ ] Identifiqué mis horas pico y valle
-- [ ] Separé la curva entre semana vs fin de semana
-- [ ] Programé personal a la curva (no planta fija)
-- [ ] Preparo producción para el pico (mise en place)
-- [ ] Definí 1 promoción de valle específica
-- [ ] Medí el impacto de la promoción (4 semanas)
-- [ ] Revisé si abrir/cerrar más temprano tiene sentido
-- [ ] Documenté los horarios en la rutina semanal
-- [ ] Agenda de re-medición (cada temporada)
-
-## Comparativa por tipo de establecimiento: horarios pico según formato
-
-No todos los restaurantes viven la misma curva horaria. Esta tabla resume patrones típicos por formato, útil como punto de partida antes de medir tus propios datos:
-
-| Formato | Pico principal | Pico secundario | Valle más profundo |
+| Pico | Horario típico | Qué se consume | Ticket promedio |
 |---|---|---|---|
-| Cafetería / desayunos | 7:30-10:00 | 12:00-13:30 (comida ligera) | 15:00-17:00 |
-| Taquería / antojitos | 20:30-23:00 | 14:00-15:30 | 16:00-19:00 |
-| Restaurante familiar / comida corrida | 13:30-15:30 | 20:00-21:30 | 16:00-18:00 |
-| Bar con cocina | 19:00-23:00 (jueves-sábado) | 14:00-16:00 (viernes) | Lunes-miércoles tarde |
-| Comida rápida en zona de oficinas | 13:00-14:30 | 8:00-9:00 (café) | 16:00-19:00 |
+| Desayuno | 8:00–11:00 AM | Café, pan, huevos, antojitos | $80–$150 |
+| Comida | 1:30–3:30 PM | Menú del día, comida corrida, platillos fuertes | $120–$250 |
+| Cena | 8:00–10:30 PM | Cena ligera, antojos, bebidas | $150–$350 |
 
-Si tu restaurante encaja en uno de estos formatos pero tus datos reales muestran un patrón distinto, confía en tus propios números. La tabla es un punto de partida, no una regla — cada zona, clientela y ubicación específica modifica la curva.
+**Las variaciones por giro:**
 
-<BlogCallout variant="info" title="La ubicación cambia todo, incluso dentro del mismo formato">
-Una taquería junto a una zona de oficinas puede tener un pico fuerte al mediodía que no aparece en la tabla general de taquerías. La curva de tu restaurante depende de quién vive, trabaja o transita cerca de tu local — no solo de tu tipo de menú.
+- **Fondas y cocinas económicas:** el pico de comida es brutal — 60-70% de las ventas del día se concentran en 2 horas (1:30-3:30 PM). Fuera de ahí, el local está casi vacío.
+- **Cafeterías:** doble pico (8-10 AM y 5-7 PM) con valle profundo entre 2-4 PM.
+- **Restaurantes de cena / bar:** el pico empieza a las 8 PM y el fin de semana se extiende hasta medianoche.
+- **Taquerías:** pico nocturno (8 PM-12 AM), especialmente jueves a sábado.
+
+<BlogCallout variant="warning" title="Tu patrón no es el de la tabla: es el de tu caja">
+Estos rangos son el promedio nacional. Tu restaurante tiene su propio patrón según tu zona (oficinas, escuelas, residencial), tu giro y tu ticket. La tabla te da la hipótesis; tu registro de ventas te da la verdad.
 </BlogCallout>
 
-## El costo real de operar con planta fija todo el día
+## El fin de semana cambia todo
 
-Para dimensionar cuánto dinero se pierde por no ajustar personal a la curva horaria, veamos un ejemplo con pesos mexicanos. Un restaurante casual con 4 meseros de planta fija de 12:00 a 22:00 (10 horas cada uno) tiene un costo laboral de meseros de aproximadamente $4,800/día (a $120/hora por mesero, con costo real incluido). Si su curva real muestra que solo necesita 4 meseros en las franjas de pico (14:00-16:00 y 20:00-22:00, 4 horas) y 2 en el resto (6 horas), el costo ajustado sería:
+Los sábados y domingos no son "dos días más": son un negocio distinto.
 
-| Escenario | Horas-mesero pagadas | Costo diario aproximado |
+| Día | Comportamiento | Implicación operativa |
 |---|---|---|
-| Planta fija (4 meseros × 10h) | 40 horas | $4,800 |
-| Programación por curva (pico 4×4h + valle 2×6h) | 28 horas | $3,360 |
+| Viernes | Cena se extiende, más bebidas, ticket +20-30% | Refuerza cocina y barra desde las 7 PM |
+| Sábado | Desayuno-comida largo (10 AM-4 PM), cena fuerte | El día de mayor venta para la mayoría: máxima prep |
+| Domingo | Comida familiar larga (1-5 PM), cena débil | Refuerza comida, reduce personal de cena |
+| Lunes | El día más flojo de la semana en la mayoría de giros | Candidato a cierre o menú reducido |
 
-**El ahorro diario es de $1,440**, o cerca de **$43,200 al mes** solo en el puesto de meseros, sin reducir la calidad del servicio en las horas donde realmente hay demanda. Este tipo de ajuste conecta directamente con el control de tu [costo laboral](/blog/salarios-personal-restaurantes): los horarios y la nómina son, en la práctica, la misma decisión vista desde dos ángulos.
+El error clásico: programar el mismo personal los 7 días. Un restaurante típico necesita 40-50% más gente el sábado que el lunes.
 
-## Cómo la temporada del año modifica tus horarios pico
+## Cómo medir tus propios horarios pico en 7 días
 
-Además de la hora del día, la temporada del año desplaza tus picos de consumo. Diciembre, por ejemplo, suele mover la cena más temprano (posadas y cenas de fin de año a las 19:00-21:00 en lugar de 21:00-23:00), mientras que el verano en zonas de clima cálido puede retrasar el pico de comida hacia las 15:00-16:00 por el calor de mediodía. Si tu restaurante recibe un fuerte impulso en fechas como fiestas patrias, revisa también nuestra guía de [menú de fiestas patrias](/blog/menu-fiestas-patrias-restaurante) para anticipar cómo cambia tanto tu menú como tu curva de horarios en esas fechas específicas.
+No necesitas software: necesitas una hoja con 3 columnas durante una semana.
 
-| Temporada | Cómo cambia el horario pico | Ajuste recomendado |
+**El registro mínimo (cada hora):**
+
+| Hora | Clientes | Venta | Ticket promedio |
+|---|---|---|---|
+| 8-9 AM | 12 | $1,140 | $95 |
+| 9-10 AM | 28 | $2,800 | $100 |
+| 10-11 AM | 15 | $1,425 | $95 |
+| ... | ... | ... | ... |
+| 1-2 PM | 45 | $8,100 | $180 |
+| 2-3 PM | 62 | $11,780 | $190 |
+
+Al final de la semana, suma por franja y divide entre 7. Las 3 franjas con más venta son tus picos; las 3 con menos, tus valles. Repite cada 3 meses: los patrones cambian con la temporada escolar, el clima y la quincena.
+
+<BlogCallout variant="tip" title="La quincena es un horario más">
+Los días 1, 15 y 30-31 (pago de nómina) suben el consumo 15-25% en la mayoría de las zonas. Marca esas fechas en tu planificación de insumos y personal igual que marcas los sábados.
+</BlogCallout>
+
+## Palanca 1: Personal escalonado (el ahorro más rápido)
+
+Con tus picos identificados, reestructura los turnos:
+
+| Estrategia | Antes | Después | Ahorro típico |
+|---|---|---|---|
+| Turnos iguales todo el día | 6 meseros todo el día | 3 base + 3 solo en picos | 15-20% de nómina |
+| Prep escalada | Todo se prepara en la mañana | Prep por oleadas según demanda | Menos merma, mejor calidad |
+| Cierre inteligente | Abierto hasta las 11 PM "por si acaso" | Cierre ajustado al último pico real | Luz, gas y horas extra |
+
+**La regla:** el personal de apoyo entra 30 minutos antes del pico y sale 30 minutos después. No necesitas 8 meseros a las 5 PM si tu pico de cena empieza a las 8.
+
+## Palanca 2: Insumos y prep ajustados a la demanda
+
+El desperdicio de insumos casi siempre es un problema de horarios, no de recetas:
+
+- **Sobre-prep matutina:** preparar para todo el día genera merma en la cena (el guiso de las 10 AM no es el mismo a las 8 PM).
+- **Compra sin patrón:** compras lo mismo todos los días aunque el lunes vendes la mitad del sábado.
+
+**La solución:** escala tu compra y tu prep a tu curva de demanda:
+
+| Día | % de la compra semanal | Prep |
 |---|---|---|
-| Diciembre (posadas, fin de año) | Cena se adelanta 1-2 horas | Programa personal desde las 18:00 |
-| Verano en zonas cálidas | Comida se retrasa hacia media tarde | Ajusta turno de comida hasta las 16:30 |
-| Cuaresma / Semana Santa | Aumenta consumo de mariscos y pescado en horario de comida | Refuerza cocina en el turno de mediodía |
-| Fiestas patrias | Pico de cena se extiende y crece en volumen | Personal extra 19:00-23:00 |
+| Lunes | 10% | Mínima (menú reducido) |
+| Martes-Jueves | 12-13% c/u | Estándar |
+| Viernes | 16% | Estándar + refuerzo de cena |
+| Sábado | 20% | Máxima |
+| Domingo | 16% | Refuerzo de comida |
 
-## Checklist adicional: ajuste de horarios por temporada
+Con [el planificador de pedidos de Resurte.me](/blog/planificador-pedidos-restaurante) puedes programar compras diferenciadas por día según este patrón, sin recalcular cada semana.
 
-- [ ] Identifiqué cómo cambia mi curva horaria en diciembre vs el resto del año
-- [ ] Ajusté mi programación de personal para la temporada actual
-- [ ] Revisé si mi menú necesita ajustes de producción para el pico estacional
-- [ ] Comparé mis datos de horario del mismo mes del año pasado
-- [ ] Documenté los ajustes de temporada para repetirlos el próximo año sin reinventar el proceso
+## Palanca 3: Llenar los valles con promociones inteligentes
 
- Mide tu ocupación por hora, identifica tu pico y tu valle reales, programa tu personal a la curva, y llena las horas muertas con promociones específicas y medibles. Una mesa ocupada en el valle es ingreso que ya tenías pagado en costos fijos. Los datos de horario te dicen exactamente dónde recuperar capacidad — y cuándo.
+Las horas valle no son un problema: son inventario vacío que puedes vender con descuento sin canibalizar tus picos.
+
+| Valle típico | Promoción que funciona | Por qué funciona |
+|---|---|---|
+| 3-5 PM (post-comida) | Café + postre a precio especial | Captura la sobremesa y el trabajo remoto |
+| 5-7 PM (pre-cena) | Happy hour de bebidas + botana | Llena mesas antes del pico de cena |
+| Lunes completo | 2x1 o menú especial de lunes | Convierte el día flojo en día de tráfico |
+| Martes | Tema del día (tacos, alitas) | Crea hábito semanal |
+
+<BlogCallout variant="warning" title="Nunca descuentes en tus picos">
+La promoción en hora pico solo regala margen a clientes que ya venían. El descuento es para llenar sillas vacías, no para premiar sillas llenas.
+</BlogCallout>
+
+## Delivery: el segundo negocio con otros horarios
+
+Si vendes por apps o propio, tu curva de delivery es distinta a la del local:
+
+- **Pico principal:** 7-10 PM (desplaza la cena del local)
+- **Fin de semana:** se extiende hasta medianoche
+- **Picos de clima:** lluvia fuerte = +30-50% de pedidos
+- **Picos de eventos:** fútbol, peleas, estrenos de series
+
+**Implicación operativa:** la cocina que cierra a las 9:30 PM pierde el pico de delivery. Si tu delivery es significativo, considera un turno de cocina "largo" que cubra hasta las 10:30 PM, o un menú de delivery con tiempos de prep rápidos para el cierre.
+
+## Casos por tipo de zona
+
+| Tu zona | Tu patrón probable | Tu estrategia |
+|---|---|---|
+| Oficinas | Pico de comida brutal, valles mañana/noche, fin de semana muerto | Maximiza la comida, evalúa cerrar fines |
+| Residencial | Picos suaves, cena familiar, fin de semana fuerte | Invierte en fin de semana y delivery nocturno |
+| Escuelas | Picos a la salida (1-3 PM), muerto en vacaciones | Menú escolar, plan B para julio-agosto |
+| Turística | Patrón por temporada alta/baja, no por día | Compra y personal por temporada |
+| Avenida/transporte | Flujo constante con mini-picos | Servicio rápido, menú ejecutable en 10 min |
+
+## Errores comunes al gestionar horarios
+
+- ❌ **Mismo personal los 7 días** — pagas horas muertas de lunes y pierdes ventas de sábado por falta de manos.
+- ❌ **Prep única matutina** — la comida de la cena sale con 8 horas de antigüedad y la merma crece.
+- ❌ **Descuentos en hora pico** — regalas margen a quien ya venía.
+- ❌ **Abrir "porque siempre hemos abierto a esa hora"** — sin medir si esa franja deja dinero.
+- ❌ **Ignorar la quincena** — te quedas sin insumos los días de pago y con excedente los días flojos.
+- ❌ **Tratar el delivery como extensión del local** — tiene otros horarios, otro menú ideal y otros picos.
+
+## Plantilla: tu calendario semanal de operación
+
+| Franja | Lun | Mar | Mié | Jue | Vie | Sáb | Dom |
+|---|---|---|---|---|---|---|---|
+| Personal base | 3 | 3 | 3 | 3 | 4 | 4 | 4 |
+| Refuerzo pico | +1 | +1 | +1 | +1 | +2 | +3 | +2 |
+| % prep del día | 60% | 70% | 70% | 75% | 90% | 100% | 85% |
+| Promoción activa | 2x1 | Tema | — | — | — | — | Familiar |
+
+(Ajusta los números a tu registro real de 7 días.)
+
+## Resumen: de la intuición a los datos en 2 semanas
+
+1. **Esta semana:** registra clientes y ventas por hora, los 7 días. Una hoja, 3 columnas.
+2. **Semana 2:** identifica tus 3 picos y 3 valles. Reestructura turnos y prep según esa curva.
+3. **Semana 3:** lanza 1 promoción en tu peor valle y mide el resultado.
+4. **Cada 3 meses:** repite el registro. Los patrones se mueven; tu operación debe moverse con ellos.
+
+**El restaurante que conoce sus horarios no adivina: decide.** Sabe cuánta gente necesita el sábado, cuánto preparar el lunes y cuándo promocionar sin regalar margen. Una semana de registro te da el mapa; la disciplina de revisarlo cada trimestre te da el timón.
