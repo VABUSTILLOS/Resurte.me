@@ -65,7 +65,8 @@ export function DashboardSidebar() {
     }
   }, [])
   const [orders, setOrders] = useState<OrderSummary[]>([])
-  const [cashback] = useState(0)
+  const [ordersTotal, setOrdersTotal] = useState(0)
+  const [cashback, setCashback] = useState(0)
   const [mobileOpen, setMobileOpen] = useState(false)
   useEscapeKey(() => setMobileOpen(false), mobileOpen)
   const [collapsed, setCollapsed] = useState(() => {
@@ -102,11 +103,13 @@ export function DashboardSidebar() {
     let cancelled = false
     supabase
       .from("orders")
-      .select("id, total, status, created_at, order_items(id)")
+      .select("id, total, status, created_at, order_items(id)", { count: "exact" })
       .order("created_at", { ascending: false })
       .limit(10)
-      .then(({ data, error }) => {
+      .then(({ data, error, count }) => {
         if (cancelled || error || !data) return
+        // Total real de pedidos (no solo los 10 cargados para la lista).
+        setOrdersTotal(count ?? data.length)
         setOrders(
           data.map((o) => ({
             id: o.id,
@@ -121,6 +124,20 @@ export function DashboardSidebar() {
       cancelled = true
     }
   }, [supabase, user])
+
+  // Saldo real de Créditos Resurte (server action; antes mostraba $0 siempre).
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    import("@/lib/wallet-actions").then(({ getWalletBalance }) =>
+      getWalletBalance().then((wallet) => {
+        if (!cancelled) setCashback(Number(wallet?.balance_credits ?? 0))
+      }).catch(() => {})
+    ).catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [user])
 
   async function handleSignOut() {
     if (!supabase) return
@@ -249,7 +266,7 @@ export function DashboardSidebar() {
                   <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                   <span className="font-medium leading-tight">Pedidos</span>
                 </div>
-                <p className="text-xl font-bold text-gray-900">{orders.length}</p>
+                <p className="text-xl font-bold text-gray-900">{ordersTotal}</p>
               </div>
               <div className="flex-1 bg-amber-50 rounded-xl px-3 py-2.5 flex flex-col justify-between min-h-[68px]">
                 <div className="flex items-start gap-1.5 text-xs text-amber-700">
@@ -406,7 +423,6 @@ export function DashboardSidebar() {
           onClick={toggleCollapsed}
           className={`lg:hidden fixed bottom-[var(--floating-bottom-offset)] left-3 z-[60] w-11 h-11 rounded-full bg-white shadow-[0_4px_24px_rgba(0,0,0,0.15)] ring-1 ring-gray-200 flex items-center justify-center hover:shadow-[0_6px_28px_rgba(0,0,0,0.2)] active:scale-95 transition-all`}
           aria-label="Mostrar panel"
-          style={{ touchAction: "manipulation" }}
         >
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0E7A0E] to-[#16a34a] flex items-center justify-center text-white font-bold text-xs">
             {initial}
@@ -443,7 +459,7 @@ export function DashboardSidebar() {
                     <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                     <span className="font-medium leading-tight">Pedidos</span>
                   </div>
-                  <p className="text-xl font-bold text-gray-900">{orders.length}</p>
+                  <p className="text-xl font-bold text-gray-900">{ordersTotal}</p>
                 </div>
                 <div className="flex-1 bg-amber-50 rounded-xl p-3 flex flex-col justify-between min-h-[68px]">
                   <div className="flex items-start gap-1.5 text-xs text-amber-700">
