@@ -147,19 +147,12 @@ export function TestimonialCarousel() {
     [next, prev],
   )
 
-  // Auto-play
-  useEffect(() => {
-    const interval = setInterval(next, 5000)
-    return () => clearInterval(interval)
-  }, [next])
-
-  // Pause on hover
+  // Auto-play, paused on hover
   const [isPaused, setIsPaused] = useState(false)
   useEffect(() => {
-    if (isPaused) {
-      const interval = setInterval(next, 5000)
-      return () => clearInterval(interval)
-    }
+    if (isPaused) return
+    const interval = setInterval(next, 5000)
+    return () => clearInterval(interval)
   }, [isPaused, next])
 
   const t = TESTIMONIALS[current]

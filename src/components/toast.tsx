@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { createContext, useContext } from "react"
 import { CheckCircle2, XCircle, AlertCircle, X } from "lucide-react"
 
@@ -39,8 +39,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }
 
+  // Valor estable: sin memo, cada toast re-renderizaría a TODOS los
+  // consumidores de useToast() de la app (el provider está en el root layout).
+  const contextValue = useMemo(() => ({ toast: addToast }), [addToast])
+
   return (
-    <ToastCtx.Provider value={{ toast: addToast }}>
+    <ToastCtx.Provider value={contextValue}>
       {children}
       {/* Toast container — mobile: centrado arriba de las barras flotantes
           (MobileCartBar z-50 / sticky ATC z-40). Desktop: esquina inferior. */}

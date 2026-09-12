@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { useSyncedRows } from "@/hooks/use-synced-rows"
+import { useNow } from "@/hooks/use-now"
 import { useToast } from "@/components/toast"
 import { t } from "@/lib/i18n/es"
 import { todayStr, dateLabel } from "@/lib/panel-utils"
@@ -34,13 +35,10 @@ export default function ComandaPage() {
   const [mesaFilter, setMesaFilter] = useState<string>("todas")
   const [viewMode, setViewMode] = useState<"board" | "list">("board")
   const [sortNewest, setSortNewest] = useState(false)
-  const [now, setNow] = useState(() => Date.now())
-
-  // Live tick so ages / elapsed production times refresh
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30000)
-    return () => clearInterval(t)
-  }, [])
+  // Reloj compartido (30s) para los promedios de producción. El board y la
+  // lista están memoizados y sus etiquetas de tiempo usan ElapsedText, así
+  // que el tick no re-renderiza el árbol completo.
+  const now = useNow()
 
   const dayEntries = useMemo(
     () => entries.filter((e) => e.date === selectedDate),
@@ -71,7 +69,10 @@ export default function ComandaPage() {
     return mesas.filter((m) => usedIds.has(m.id)).map((m) => ({ id: m.id, nombre: m.nombre }))
   }, [dayEntries, mesas])
 
-  const mesaNombre = (id?: string) => (id ? mesas.find((m) => m.id === id)?.nombre || id : "")
+  const mesaNombre = useCallback(
+    (id?: string) => (id ? mesas.find((m) => m.id === id)?.nombre || id : ""),
+    [mesas],
+  )
 
   const byStatus = useMemo(() => {
     const map: Record<StatusKey, typeof filtered> = {
@@ -140,27 +141,39 @@ export default function ComandaPage() {
       .slice(0, 5)
   }, [dayEntries, statuses, now])
 
-  const setComandaStatus = (id: string, patch: Partial<ComandaStatus> & { status: ComandaStatus["status"] }) => {
-    setStatuses((prev) => {
-      const base = prev[id] || { status: "pendiente" as const }
-      return { ...prev, [id]: { ...base, ...patch } }
-    })
-  }
+  const setComandaStatus = useCallback(
+    (id: string, patch: Partial<ComandaStatus> & { status: ComandaStatus["status"] }) => {
+      setStatuses((prev) => {
+        const base = prev[id] || { status: "pendiente" as const }
+        return { ...prev, [id]: { ...base, ...patch } }
+      })
+    },
+    [setStatuses],
+  )
 
-  const iniciar = (id: string, name: string) => {
-    setComandaStatus(id, { status: "en-cocina", startedAt: nowMs() })
-    toast(t("comanda.toastInKitchen", { name }), "success")
-  }
+  const iniciar = useCallback(
+    (id: string, name: string) => {
+      setComandaStatus(id, { status: "en-cocina", startedAt: nowMs() })
+      toast(t("comanda.toastInKitchen", { name }), "success")
+    },
+    [setComandaStatus, toast],
+  )
 
-  const listo = (id: string, name: string) => {
-    setComandaStatus(id, { status: "listo", readyAt: nowMs() })
-    toast(t("comanda.toastReady", { name }), "success")
-  }
+  const listo = useCallback(
+    (id: string, name: string) => {
+      setComandaStatus(id, { status: "listo", readyAt: nowMs() })
+      toast(t("comanda.toastReady", { name }), "success")
+    },
+    [setComandaStatus, toast],
+  )
 
-  const revertir = (id: string) => {
-    setComandaStatus(id, { status: "pendiente", startedAt: undefined, readyAt: undefined })
-    toast(t("comanda.toastReverted"), "warning")
-  }
+  const revertir = useCallback(
+    (id: string) => {
+      setComandaStatus(id, { status: "pendiente", startedAt: undefined, readyAt: undefined })
+      toast(t("comanda.toastReverted"), "warning")
+    },
+    [setComandaStatus, toast],
+  )
 
   const limpiarListos = () => {
     const ids = new Set(dayEntries.map((e) => e.id))
@@ -269,7 +282,6 @@ export default function ComandaPage() {
       ) : viewMode === "board" ? (
         <KitchenBoard
           byStatus={byStatus}
-          now={now}
           onIniciar={iniciar}
           onListo={listo}
           onRevertir={revertir}
@@ -278,7 +290,6 @@ export default function ComandaPage() {
       ) : (
         <ComandaList
           filtered={filtered}
-          now={now}
           onIniciar={iniciar}
           onListo={listo}
           onRevertir={revertir}

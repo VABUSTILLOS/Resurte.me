@@ -9,7 +9,7 @@ import { logger } from "@/lib/logger"
 import { createServiceClient } from "@/lib/supabase/service"
 import { sendEmail, reorderReminderEmailHtml } from "@/lib/email"
 import { computeReorderIntervalDays } from "@/lib/reorder-heuristics"
-import type { CronResult } from "@/lib/email-workflows"
+import { resolveAuthEmails, type CronResult } from "@/lib/email-workflows"
 
 const DAY_MS = 24 * 60 * 60 * 1000
 /** Solo se consideran pedidos de los últimos 120 días para la cadencia. */
@@ -81,30 +81,39 @@ export async function checkReorderReminders(): Promise<CronResult> {
     if (prev === undefined || t > prev) lastReminderAt.set(log.user_id as string, t)
   }
 
+  // Batch: emails de auth y nombres de perfil (2 queries en vez de 2 por usuario).
+  const pendingCandidates = candidates.filter(({ userId }) => {
+    const lastOrderAt = new Date(byUser.get(userId)![0]!).getTime()
+    const remindedAt = lastReminderAt.get(userId)
+    return !(remindedAt !== undefined && remindedAt > lastOrderAt)
+  })
+
+  const [authEmails, { data: profiles }] = await Promise.all([
+    resolveAuthEmails(supabase, pendingCandidates.map((c) => c.userId)),
+    supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", pendingCandidates.map((c) => c.userId)),
+  ])
+  const nameByUser = new Map(
+    (profiles ?? []).map((p: { id: string; full_name: string | null }) => [p.id, p.full_name]),
+  )
+
   let sent = 0
   let failed = 0
   let processed = 0
+  const logRows: Record<string, unknown>[] = []
 
-  for (const { userId, daysSince } of candidates) {
-    const lastOrderAt = new Date(byUser.get(userId)![0]!).getTime()
-    const remindedAt = lastReminderAt.get(userId)
-    if (remindedAt !== undefined && remindedAt > lastOrderAt) continue
-
+  for (const { userId, daysSince } of pendingCandidates) {
     processed++
     try {
-      const { data: authUser } = await supabase.auth.admin.getUserById(userId)
-      const email = authUser?.user?.email
+      const email = authEmails.get(userId)
       if (!email) {
         failed++
         continue
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", userId)
-        .maybeSingle()
-      const name = profile?.full_name?.split(" ")[0] ?? "chef"
+      const name = nameByUser.get(userId)?.split(" ")[0] ?? "chef"
 
       const result = await sendEmail({
         to: email,
@@ -117,7 +126,7 @@ export async function checkReorderReminders(): Promise<CronResult> {
         tag: "reorder-reminder",
       })
 
-      await supabase.from("email_logs").insert({
+      logRows.push({
         user_id: userId,
         email_to: email,
         email_type: "reorder_reminder",
@@ -132,6 +141,11 @@ export async function checkReorderReminders(): Promise<CronResult> {
       logger.error(`[REORDER-REMINDER] Error for user ${userId}:`, err)
       failed++
     }
+  }
+
+  if (logRows.length > 0) {
+    const { error: logErr } = await supabase.from("email_logs").insert(logRows)
+    if (logErr) logger.error("[REORDER-REMINDER] Error inserting email_logs:", logErr)
   }
 
   return { success: true, sent, failed, total: processed }

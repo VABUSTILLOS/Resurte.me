@@ -1,4 +1,4 @@
-import { TestimonialCarousel } from "@/components/ui/testimonial-carousel"
+import { TestimonialCarouselLazy as TestimonialCarousel } from "@/components/ui/testimonial-carousel-lazy"
 
 export function TestimonialsSection() {
   return (

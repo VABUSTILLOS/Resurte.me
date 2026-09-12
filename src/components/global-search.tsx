@@ -63,129 +63,128 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
     }
   }
 
+  // Parsea todas las fuentes de localStorage UNA sola vez por apertura del
+  // diálogo (antes: se re-leían y re-parseaban en cada tecla).
+  const index = useMemo(() => {
+    if (!open) return null
+    const safe = <T,>(key: string, fallback: T): T => {
+      try {
+        return readStored(key, fallback, slug)
+      } catch {
+        return fallback
+      }
+    }
+    return {
+      dishes: [...safe<Dish[]>("costeo-dishes", []), ...safe<Dish[]>("shared-dishes", [])],
+      inventory: safe<InventarioItem[]>("inventario-items", []),
+      qtys: safe<Record<string, { qty: number; unit?: string }>>("planner-manual-qtys", {}),
+      sales: safe<{ dishName: string; quantity: number; date: string; unitPrice: number }[]>("ventas-entries", []),
+      wastes: safe<WasteEntry[]>("mermas-entries", []),
+      shopping: safe<ShoppingItem[]>("temporada-shopping-list", []),
+    }
+  }, [open, slug])
+
   const results = useMemo((): SearchResult[] => {
-    if (!query.trim()) return []
+    if (!index || !query.trim()) return []
     const q = query.toLowerCase()
-    // Misma validación que useLocalStorage: readStored aplica el schema registrado.
     const items: SearchResult[] = []
 
     // Index dishes from costeo (datos reales de shared-dishes)
-    try {
-      const dishes: Dish[] = readStored("costeo-dishes", [], slug)
-      const shared: Dish[] = readStored("shared-dishes", [], slug)
-      const allDishes = [...dishes, ...shared]
-      const seenDishes = new Set<string>()
-      allDishes.forEach((d) => {
-        if (!d.name || seenDishes.has(d.name)) return
-        const hit =
-          d.name.toLowerCase().includes(q) ||
-          d.category?.toLowerCase().includes(q) ||
-          d.ingredients?.some((i) => i.ingredientName.toLowerCase().includes(q))
-        if (!hit) return
-        seenDishes.add(d.name)
-        items.push({
-          id: `dish-${d.name}`,
-          label: d.name,
-          subtitle: `${d.category || "Sin categoría"} · ${d.ingredients?.length || 0} ingredientes`,
-          tool: "costeo",
-          toolLabel: "Costeo de Menú",
-          url: "/panel/costeo",
-          emoji: "🍽️",
-        })
+    const seenDishes = new Set<string>()
+    index.dishes.forEach((d) => {
+      if (!d.name || seenDishes.has(d.name)) return
+      const hit =
+        d.name.toLowerCase().includes(q) ||
+        d.category?.toLowerCase().includes(q) ||
+        d.ingredients?.some((i) => i.ingredientName.toLowerCase().includes(q))
+      if (!hit) return
+      seenDishes.add(d.name)
+      items.push({
+        id: `dish-${d.name}`,
+        label: d.name,
+        subtitle: `${d.category || "Sin categoría"} · ${d.ingredients?.length || 0} ingredientes`,
+        tool: "costeo",
+        toolLabel: "Costeo de Menú",
+        url: "/panel/costeo",
+        emoji: "🍽️",
       })
-    } catch {}
+    })
 
     // Index inventario
-    try {
-      const inv: InventarioItem[] = readStored("inventario-items", [], slug)
-      inv.forEach((i) => {
-        if (i.name.toLowerCase().includes(q)) {
-          const status = i.stock <= 0 ? "Agotado" : i.stock <= i.minStock ? "Bajo" : "OK"
-          items.push({
-            id: `inv-${i.name}`,
-            label: i.name,
-            subtitle: `Stock: ${i.stock} ${i.unit} · ${status} · $${i.pricePerUnit}/${i.unit}`,
-            tool: "inventario",
-            toolLabel: "Mi Inventario",
-            url: "/panel/inventario",
-            emoji: "📦",
-          })
-        }
-      })
-    } catch {}
+    index.inventory.forEach((i) => {
+      if (i.name.toLowerCase().includes(q)) {
+        const status = i.stock <= 0 ? "Agotado" : i.stock <= i.minStock ? "Bajo" : "OK"
+        items.push({
+          id: `inv-${i.name}`,
+          label: i.name,
+          subtitle: `Stock: ${i.stock} ${i.unit} · ${status} · $${i.pricePerUnit}/${i.unit}`,
+          tool: "inventario",
+          toolLabel: "Mi Inventario",
+          url: "/panel/inventario",
+          emoji: "📦",
+        })
+      }
+    })
 
     // Index planificador: cantidades manuales reales (productos del pedido).
-    // readStored aplica readManualQtys: los números legacy ya vienen como {qty, unit}.
-    try {
-      const qtys: Record<string, { qty: number; unit?: string }> = readStored("planner-manual-qtys", {}, slug)
-      Object.entries(qtys).forEach(([name, v]) => {
-        if (!name.toLowerCase().includes(q)) return
-        if (v && typeof v === "object" && typeof v.qty === "number") {
-          items.push({ id: `prod-${name}`, label: name, subtitle: `Cantidad: ${v.qty} ${v.unit || "kg"} (pedido actual)`, tool: "planificador", toolLabel: "Planificador", url: "/panel/planificador", emoji: "📋" })
-        }
-      })
-    } catch {}
+    Object.entries(index.qtys).forEach(([name, v]) => {
+      if (!name.toLowerCase().includes(q)) return
+      if (v && typeof v === "object" && typeof v.qty === "number") {
+        items.push({ id: `prod-${name}`, label: name, subtitle: `Cantidad: ${v.qty} ${v.unit || "kg"} (pedido actual)`, tool: "planificador", toolLabel: "Planificador", url: "/panel/planificador", emoji: "📋" })
+      }
+    })
 
     // Index ventas entries
-    try {
-      const sales: { dishName: string; quantity: number; date: string; unitPrice: number }[] = readStored("ventas-entries", [], slug)
-      const seen = new Set<string>()
-      sales.forEach((s) => {
-        if (s.dishName && s.dishName.toLowerCase().includes(q) && !seen.has(s.dishName)) {
-          seen.add(s.dishName)
-          items.push({
-            id: `venta-${s.dishName}`,
-            label: s.dishName,
-            subtitle: `${s.quantity} vendidos · $${s.unitPrice} · ${s.date || "fecha pendiente"}`,
-            tool: "ventas",
-            toolLabel: "Ventas del día",
-            url: "/panel/ventas",
-            emoji: "💰",
-          })
-        }
-      })
-    } catch {}
+    const seenSales = new Set<string>()
+    index.sales.forEach((s) => {
+      if (s.dishName && s.dishName.toLowerCase().includes(q) && !seenSales.has(s.dishName)) {
+        seenSales.add(s.dishName)
+        items.push({
+          id: `venta-${s.dishName}`,
+          label: s.dishName,
+          subtitle: `${s.quantity} vendidos · $${s.unitPrice} · ${s.date || "fecha pendiente"}`,
+          tool: "ventas",
+          toolLabel: "Ventas del día",
+          url: "/panel/ventas",
+          emoji: "💰",
+        })
+      }
+    })
 
     // Index mermas entries
-    try {
-      const wastes: WasteEntry[] = readStored("mermas-entries", [], slug)
-      wastes.forEach((w) => {
-        const haystack = `${w.category} ${w.cause || ""} ${w.note || ""}`
-        if (haystack.toLowerCase().includes(q)) {
-          items.push({
-            id: `merma-${w.id || w.date}`,
-            label: `${w.category} — ${w.amountKg} kg`,
-            subtitle: `Costo: $${w.costPerKg}/kg · ${w.date}${w.cause ? ` · ${w.cause}` : ""}`,
-            tool: "mermas",
-            toolLabel: "Mermas",
-            url: "/panel/mermas",
-            emoji: "♻️",
-          })
-        }
-      })
-    } catch {}
+    index.wastes.forEach((w) => {
+      const haystack = `${w.category} ${w.cause || ""} ${w.note || ""}`
+      if (haystack.toLowerCase().includes(q)) {
+        items.push({
+          id: `merma-${w.id || w.date}`,
+          label: `${w.category} — ${w.amountKg} kg`,
+          subtitle: `Costo: $${w.costPerKg}/kg · ${w.date}${w.cause ? ` · ${w.cause}` : ""}`,
+          tool: "mermas",
+          toolLabel: "Mermas",
+          url: "/panel/mermas",
+          emoji: "♻️",
+        })
+      }
+    })
 
     // Index temporada: lista de compras estacional
-    try {
-      const list: ShoppingItem[] = readStored("temporada-shopping-list", [], slug)
-      list.forEach((s) => {
-        if (s.name.toLowerCase().includes(q)) {
-          items.push({
-            id: `temporada-${s.key || s.name}`,
-            label: `${s.icon || ""} ${s.name}`.trim(),
-            subtitle: `${s.quantityKg ?? 1} kg · $${s.pricePerKg ?? 0}/kg`,
-            tool: "temporada",
-            toolLabel: "Temporada",
-            url: "/panel/temporada",
-            emoji: "🌱",
-          })
-        }
-      })
-    } catch {}
+    index.shopping.forEach((s) => {
+      if (s.name.toLowerCase().includes(q)) {
+        items.push({
+          id: `temporada-${s.key || s.name}`,
+          label: `${s.icon || ""} ${s.name}`.trim(),
+          subtitle: `${s.quantityKg ?? 1} kg · $${s.pricePerKg ?? 0}/kg`,
+          tool: "temporada",
+          toolLabel: "Temporada",
+          url: "/panel/temporada",
+          emoji: "🌱",
+        })
+      }
+    })
 
     // Limit to 8 results max
     return items.slice(0, 8)
-  }, [query, slug])
+  }, [index, query])
 
   const goTo = useCallback((url: string) => {
     onClose()

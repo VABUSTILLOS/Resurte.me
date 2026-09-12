@@ -1,6 +1,8 @@
+import { memo } from "react"
 import { Play, Check, Undo2 } from "lucide-react"
 import { STATUS_META, CHANNELS, fmtTime } from "./comanda-shared"
 import type { StatusKey, ComandaRow } from "./comanda-shared"
+import { ElapsedText } from "./elapsed-text"
 import { t } from "@/lib/i18n/es"
 
 function statusLabel(status: StatusKey): string {
@@ -11,14 +13,15 @@ function statusLabel(status: StatusKey): string {
 
 interface KitchenBoardProps {
   byStatus: Record<StatusKey, ComandaRow[]>
-  now: number
   onIniciar: (id: string, name: string) => void
   onListo: (id: string, name: string) => void
   onRevertir: (id: string) => void
   mesaNombre: (id?: string) => string
 }
 
-export default function KitchenBoard({ byStatus, now, onIniciar, onListo, onRevertir, mesaNombre }: KitchenBoardProps) {
+// Memoizado: el tick de 30s de la página no debe re-renderizar todo el board;
+// las etiquetas de tiempo se actualizan solas vía ElapsedText.
+const KitchenBoard = memo(function KitchenBoard({ byStatus, onIniciar, onListo, onRevertir, mesaNombre }: KitchenBoardProps) {
   return (
     <div className="grid md:grid-cols-3 gap-4">
       {(Object.keys(STATUS_META) as StatusKey[]).map((status) => {
@@ -38,7 +41,6 @@ export default function KitchenBoard({ byStatus, now, onIniciar, onListo, onReve
               ) : (
                 cards.map((c) => {
                   const chan = CHANNELS.find((ch) => ch.key === (c.entry.channel || "comedor"))
-                  const elapsedMin = Math.max(1, Math.round((now - c.time) / 60000))
                   const prodMin =
                     c.status === "listo" && c.readyAt
                       ? Math.max(0, Math.round((c.readyAt - (c.startedAt || c.time)) / 60000))
@@ -76,7 +78,7 @@ export default function KitchenBoard({ byStatus, now, onIniciar, onListo, onReve
                         <span>
                           {c.status === "listo"
                             ? prodMin != null && t("comanda.production", { min: prodMin })
-                            : t("comanda.waiting", { min: elapsedMin })}
+                            : <ElapsedText since={c.time} variant="waiting" />}
                         </span>
                       </div>
                       <div className="flex gap-1.5">
@@ -134,4 +136,6 @@ export default function KitchenBoard({ byStatus, now, onIniciar, onListo, onReve
       })}
     </div>
   )
-}
+})
+
+export default KitchenBoard

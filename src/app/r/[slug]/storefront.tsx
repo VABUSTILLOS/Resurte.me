@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import { Compass, ShoppingBag } from "lucide-react"
 import {
@@ -18,8 +19,16 @@ import type {
 } from "@/types/foodos"
 import { MenuView } from "./_components/menu-view"
 import { CheckoutView } from "./_components/checkout-view"
-import { CardPaymentOverlay } from "./_components/card-payment-overlay"
 import { SuccessScreen } from "./_components/success-screen"
+
+// Stripe libs are heavy and only needed when the customer pays by card.
+const CardPaymentOverlay = dynamic(
+  () =>
+    import("./_components/card-payment-overlay").then(
+      (m) => m.CardPaymentOverlay,
+    ),
+  { ssr: false },
+)
 
 type View = "menu" | "checkout" | "success"
 

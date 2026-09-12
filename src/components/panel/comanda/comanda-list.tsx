@@ -1,5 +1,7 @@
+import { memo } from "react"
 import { CHANNELS, STATUS_META, fmtTime } from "./comanda-shared"
 import type { ComandaRow } from "./comanda-shared"
+import { ElapsedText } from "./elapsed-text"
 import { t } from "@/lib/i18n/es"
 
 function statusShortLabel(status: keyof typeof STATUS_META): string {
@@ -10,14 +12,15 @@ function statusShortLabel(status: keyof typeof STATUS_META): string {
 
 interface ComandaListProps {
   filtered: ComandaRow[]
-  now: number
   onIniciar: (id: string, name: string) => void
   onListo: (id: string, name: string) => void
   onRevertir: (id: string) => void
   mesaNombre: (id?: string) => string
 }
 
-export default function ComandaList({ filtered, now, onIniciar, onListo, onRevertir, mesaNombre }: ComandaListProps) {
+// Memoizado: el tick de 30s de la página no debe re-renderizar toda la tabla;
+// la columna de antigüedad se actualiza sola vía ElapsedText.
+const ComandaList = memo(function ComandaList({ filtered, onIniciar, onListo, onRevertir, mesaNombre }: ComandaListProps) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
       <div className="overflow-x-auto">
@@ -35,7 +38,6 @@ export default function ComandaList({ filtered, now, onIniciar, onListo, onRever
           <tbody>
             {filtered.map((c) => {
               const chan = CHANNELS.find((ch) => ch.key === (c.entry.channel || "comedor"))
-              const elapsedMin = Math.max(1, Math.round((now - c.time) / 60000))
               return (
                 <tr key={c.entry.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                   <td className="px-4 py-3">
@@ -56,7 +58,7 @@ export default function ComandaList({ filtered, now, onIniciar, onListo, onRever
                   <td className="px-4 py-3 text-right font-bold text-gray-800">×{c.entry.quantity}</td>
                   <td className="px-4 py-3 text-center text-gray-500">{chan?.icon} {chan?.label}</td>
                   <td className="px-4 py-3 text-center text-gray-500 whitespace-nowrap">{fmtTime(c.time)}</td>
-                  <td className="px-4 py-3 text-center text-gray-500 whitespace-nowrap">{t("comanda.age", { min: elapsedMin })}</td>
+                  <td className="px-4 py-3 text-center text-gray-500 whitespace-nowrap"><ElapsedText since={c.time} variant="age" /></td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1">
                       {(Object.keys(STATUS_META) as (keyof typeof STATUS_META)[]).map((s) => (
@@ -87,4 +89,6 @@ export default function ComandaList({ filtered, now, onIniciar, onListo, onRever
       </div>
     </div>
   )
-}
+})
+
+export default ComandaList

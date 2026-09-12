@@ -73,6 +73,41 @@ export function abandonedCartTouchForAge(ageHours: number): AbandonedCartTouch |
   )
 }
 
+type ServiceClient = Awaited<ReturnType<typeof createServiceClient>>
+
+/**
+ * Batch-resuelve emails de auth para un conjunto de usuarios.
+ * Una llamada paginada a listUsers en vez de un getUserById por usuario;
+ * cae a getUserById solo para ids no presentes en el listado (p. ej. borrados).
+ */
+export async function resolveAuthEmails(
+  supabase: ServiceClient,
+  userIds: string[],
+): Promise<Map<string, string>> {
+  const wanted = new Set(userIds)
+  const emails = new Map<string, string>()
+  if (wanted.size === 0) return emails
+
+  let page = 1
+  for (;;) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 })
+    if (error || !data) break
+    for (const u of data.users) {
+      if (u.email && wanted.has(u.id)) emails.set(u.id, u.email)
+    }
+    if (data.users.length < 1000 || emails.size === wanted.size) break
+    page++
+  }
+
+  for (const id of wanted) {
+    if (emails.has(id)) continue
+    const { data } = await supabase.auth.admin.getUserById(id)
+    const email = data?.user?.email
+    if (email) emails.set(id, email)
+  }
+  return emails
+}
+
 export async function checkAbandonedCarts(): Promise<CronResult> {
   const supabase = await createServiceClient()
 
@@ -174,22 +209,50 @@ export async function checkAbandonedCarts(): Promise<CronResult> {
   let failed = 0
   let total = 0
 
+  // Aplana los pedidos a procesar de todos los toques para precargar en batch.
+  const processable = new Map<AbandonedCartTouch, AbandonedOrder[]>()
+  const allToProcess: AbandonedOrder[] = []
   for (const [touch, touchOrders] of byTouch) {
     const toProcess = touchOrders.filter((o) => !sentKeys.has(`${touch.type}:${o.id}`))
     total += toProcess.length
+    processable.set(touch, toProcess)
+    allToProcess.push(...toProcess)
+  }
 
+  // Batch: emails de auth (1 listado paginado en vez de 1 query por pedido).
+  const authEmails = await resolveAuthEmails(
+    supabase,
+    [...new Set(allToProcess.map((o) => o.user_id).filter((id): id is string => !!id))],
+  )
+
+  // Batch: conteo de items por pedido (1 query en vez de 1 por pedido).
+  const itemCountByOrder = new Map<number, number>()
+  if (allToProcess.length > 0) {
+    const { data: allItems } = await supabase
+      .from("order_items")
+      .select("order_id")
+      .in("order_id", allToProcess.map((o) => o.id))
+    for (const it of (allItems ?? []) as { order_id: number }[]) {
+      // El preview original leía con limit(5) por pedido.
+      itemCountByOrder.set(it.order_id, Math.min((itemCountByOrder.get(it.order_id) ?? 0) + 1, 5))
+    }
+  }
+
+  // Los logs se acumulan y se insertan en una sola query al final.
+  const logRows: Record<string, unknown>[] = []
+
+  for (const [touch, toProcess] of processable) {
     for (const order of toProcess) {
       try {
         // Email: cuenta auth si existe; si es guest, el capturado en checkout
         let email: string | null = null
         if (order.user_id) {
-          const { data: authUser } = await supabase.auth.admin.getUserById(order.user_id)
-          email = authUser?.user?.email ?? null
+          email = authEmails.get(order.user_id) ?? null
         }
         if (!email) email = order.customer_email ?? null
 
         if (!email) {
-          await supabase.from("email_logs").insert({
+          logRows.push({
             user_id: order.user_id,
             email_to: "unknown",
             email_type: touch.type,
@@ -208,13 +271,7 @@ export async function checkAbandonedCarts(): Promise<CronResult> {
             ? await issuePersonalCoupon(supabase, order.user_id, "abandoned_cart")
             : null
 
-        const { data: items } = await supabase
-          .from("order_items")
-          .select("quantity, unit_price")
-          .eq("order_id", order.id)
-          .limit(5)
-
-        const itemCount = items?.length ?? 0
+        const itemCount = itemCountByOrder.get(order.id) ?? 0
         const itemsPreview = `${itemCount} producto(s) · Total: $${(order.total ?? 0).toFixed(2)} MXN`
         // Con restore_token el enlace funciona también para invitados;
         // sin él (migración 00063 pendiente) solo restaura con sesión.
@@ -242,7 +299,7 @@ export async function checkAbandonedCarts(): Promise<CronResult> {
           tag: "abandoned-cart",
         })
 
-        await supabase.from("email_logs").insert({
+        logRows.push({
           user_id: order.user_id,
           email_to: email,
           email_type: touch.type,
@@ -266,6 +323,11 @@ export async function checkAbandonedCarts(): Promise<CronResult> {
     }
   }
 
+  if (logRows.length > 0) {
+    const { error: logErr } = await supabase.from("email_logs").insert(logRows)
+    if (logErr) logger.error("[ABANDONED-CART] Error inserting email_logs:", logErr)
+  }
+
   return { success: true, sent, failed, total }
 }
 
@@ -280,74 +342,95 @@ const REACTIVATION_WINDOWS = [
 export async function checkInactiveUsers(): Promise<CronResult> {
   const supabase = await createServiceClient()
 
-  let totalSent = 0
-  let totalFailed = 0
-  let totalProcessed = 0
+  // Un solo listado de usuarios para las 3 ventanas (antes: 1 query por ventana).
+  const { data: inactiveUsers, error: userErr } = await supabase.auth.admin.listUsers({
+    perPage: 1000,
+  })
 
+  if (userErr) {
+    logger.error("[REACTIVATION] Error listing users:", userErr)
+    return { success: false, sent: 0, failed: 0, total: 0, message: String(userErr) }
+  }
+
+  const users = inactiveUsers?.users ?? []
+
+  // Candidatos por ventana: último sign-in hace ~window.days días (±2).
+  const candidatesByWindow = new Map<(typeof REACTIVATION_WINDOWS)[number], typeof users>()
+  const allCandidateIds = new Set<string>()
   for (const window of REACTIVATION_WINDOWS) {
-    // Find users whose last sign-in was around `window.days` ago
-    // Using auth.users.last_sign_in_at from Supabase Auth
-    const { data: inactiveUsers, error: userErr } = await supabase.auth.admin.listUsers({
-      perPage: 100,
-    })
-
-    if (userErr) {
-      logger.error(`[REACTIVATION-${window.days}] Error listing users:`, userErr)
-      totalFailed++
-      continue
-    }
-
-    const candidates = (inactiveUsers?.users ?? []).filter((u) => {
+    const candidates = users.filter((u) => {
       if (!u.email) return false
       const lastSignIn = u.last_sign_in_at
       if (!lastSignIn) return false
-      // User last signed in roughly `window.days` ago (±2 day tolerance)
-      const lastDate = new Date(lastSignIn)
-      const diffDays = (Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
+      const diffDays = (Date.now() - new Date(lastSignIn).getTime()) / (1000 * 60 * 60 * 24)
       return diffDays >= window.days - 2 && diffDays <= window.days + 2
     })
+    candidatesByWindow.set(window, candidates)
+    for (const u of candidates) allCandidateIds.add(u.id)
+  }
 
-    for (const user of candidates) {
+  if (allCandidateIds.size === 0) {
+    return { success: true, sent: 0, failed: 0, total: 0 }
+  }
+
+  const candidateIds = [...allCandidateIds]
+
+  // Batch: dedupe de los 3 tipos para todos los candidatos (1 query).
+  const { data: alreadySent } = await supabase
+    .from("email_logs")
+    .select("user_id, email_type")
+    .in("email_type", REACTIVATION_WINDOWS.map((w) => w.type))
+    .in("user_id", candidateIds)
+
+  const sentKeys = new Set(
+    (alreadySent ?? []).map(
+      (e: { user_id: string; email_type: string }) => `${e.email_type}:${e.user_id}`,
+    ),
+  )
+
+  // Batch: profiles, wallets y último tier de cashback (3 queries totales,
+  // antes eran 3 por usuario).
+  const [{ data: profiles }, { data: wallets }, { data: tierOrders }] = await Promise.all([
+    supabase.from("profiles").select("id, full_name").in("id", candidateIds),
+    supabase.from("wallets").select("user_id, balance_credits").in("user_id", candidateIds),
+    supabase
+      .from("orders")
+      .select("user_id, cashback_tier, created_at")
+      .in("user_id", candidateIds)
+      .not("cashback_tier", "is", null)
+      .order("created_at", { ascending: false }),
+  ])
+
+  const nameByUser = new Map(
+    (profiles ?? []).map((p: { id: string; full_name: string | null }) => [p.id, p.full_name]),
+  )
+  const balanceByUser = new Map(
+    (wallets ?? []).map((w: { user_id: string; balance_credits: number }) => [
+      w.user_id,
+      w.balance_credits,
+    ]),
+  )
+  const tierByUser = new Map<string, string>()
+  for (const o of (tierOrders ?? []) as { user_id: string; cashback_tier: string }[]) {
+    // Ya vienen ordenados desc: el primero por usuario es el más reciente.
+    if (!tierByUser.has(o.user_id)) tierByUser.set(o.user_id, o.cashback_tier)
+  }
+
+  let totalSent = 0
+  let totalFailed = 0
+  let totalProcessed = 0
+  const logRows: Record<string, unknown>[] = []
+
+  for (const window of REACTIVATION_WINDOWS) {
+    for (const user of candidatesByWindow.get(window) ?? []) {
       totalProcessed++
 
       try {
-        // Check if already sent this type
-        const { data: existing } = await supabase
-          .from("email_logs")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("email_type", window.type)
-          .limit(1)
+        if (sentKeys.has(`${window.type}:${user.id}`)) continue // Already sent
 
-        if (existing && existing.length > 0) continue // Already sent
-
-        // Get profile info
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", user.id)
-          .single()
-
-        // Get cashback balance
-        const { data: wallet } = await supabase
-          .from("wallets")
-          .select("balance_credits")
-          .eq("user_id", user.id)
-          .single()
-
-        // Get loyalty tier from most recent order
-        const { data: lastOrder } = await supabase
-          .from("orders")
-          .select("cashback_tier")
-          .eq("user_id", user.id)
-          .not("cashback_tier", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        const name = profile?.full_name?.split(" ")[0] ?? "chef"
-        const cashbackBalance = wallet?.balance_credits ?? 0
-        const tier = lastOrder?.cashback_tier ?? "Verde"
+        const name = nameByUser.get(user.id)?.split(" ")[0] ?? "chef"
+        const cashbackBalance = balanceByUser.get(user.id) ?? 0
+        const tier = tierByUser.get(user.id) ?? "Verde"
 
         // Cupón personal de reactivación ("te extrañamos"): reutiliza uno
         // vigente si ya existe para no acumular cupones por usuario.
@@ -378,7 +461,7 @@ export async function checkInactiveUsers(): Promise<CronResult> {
           tag: `reactivation-${window.days}d`,
         })
 
-        await supabase.from("email_logs").insert({
+        logRows.push({
           user_id: user.id,
           email_to: user.email!,
           email_type: window.type,
@@ -399,6 +482,11 @@ export async function checkInactiveUsers(): Promise<CronResult> {
         totalFailed++
       }
     }
+  }
+
+  if (logRows.length > 0) {
+    const { error: logErr } = await supabase.from("email_logs").insert(logRows)
+    if (logErr) logger.error("[REACTIVATION] Error inserting email_logs:", logErr)
   }
 
   return {

@@ -1,6 +1,6 @@
 "use client"
 
-import { loadStripe, type Stripe } from "@stripe/stripe-js"
+import type { Stripe } from "@stripe/stripe-js"
 import { Elements } from "@stripe/react-stripe-js"
 import { useState, useEffect, type ReactNode } from "react"
 import { logger } from "@/lib/logger"
@@ -14,7 +14,7 @@ function getStripePromise() {
       logger.error("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set")
       return Promise.resolve(null)
     }
-    stripePromise = loadStripe(key)
+    stripePromise = import("@stripe/stripe-js").then((m) => m.loadStripe(key))
   }
   return stripePromise
 }
