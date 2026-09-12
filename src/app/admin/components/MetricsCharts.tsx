@@ -59,6 +59,18 @@ function formatValue(value: number, type: keyof Omit<ChartDataPoint, "period">):
   }
 }
 
+/** Resumen textual de la serie para lectores de pantalla (las gráficas de
+    recharts son SVG sin semántica; sin esto el dashboard móvil con VoiceOver
+   /TalkBack queda mudo). */
+function describeSeries(data: ChartDataPoint[], key: keyof Omit<ChartDataPoint, "period">, label: string): string {
+  if (data.length === 0) return `${label}: sin datos en el período`
+  const first = data[0]![key]
+  const last = data[data.length - 1]![key]
+  const total = data.reduce((s, d) => s + d[key], 0)
+  const trend = last > first ? "al alza" : last < first ? "a la baja" : "estable"
+  return `${label}: ${data.length} puntos, total ${formatValue(total, key)}, tendencia ${trend} (último: ${formatValue(last, key)})`
+}
+
 function MetricCard({
   label,
   value,
@@ -126,7 +138,11 @@ function RevenueChart({ data }: { data: ChartDataPoint[] }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <h3 className="font-semibold text-gray-900 mb-4">Ingresos</h3>
-      <div className="h-64">
+      <div
+        className="h-64"
+        role="img"
+        aria-label={describeSeries(data, "revenue", "Gráfica de ingresos")}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
             <defs>
@@ -183,7 +199,11 @@ function OrdersChart({ data }: { data: ChartDataPoint[] }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <h3 className="font-semibold text-gray-900 mb-4">Pedidos</h3>
-      <div className="h-64">
+      <div
+        className="h-64"
+        role="img"
+        aria-label={describeSeries(data, "orders", "Gráfica de pedidos")}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
@@ -230,7 +250,11 @@ function AOVConversionChart({ data }: { data: ChartDataPoint[] }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <h3 className="font-semibold text-gray-900 mb-4">Ticket promedio & Conversión</h3>
-      <div className="h-64">
+      <div
+        className="h-64"
+        role="img"
+        aria-label={`${describeSeries(data, "aov", "Ticket promedio")}. ${describeSeries(data, "conversion", "Conversión")}`}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -305,8 +329,8 @@ export function MetricsCharts({ data, period, onPeriodChange }: MetricsChartsPro
     <div className="space-y-6">
       {/* Period Selector */}
       <div className="flex items-center gap-4">
-        <span className="text-sm font-medium text-gray-700">Período:</span>
-        <div className="flex bg-gray-100 rounded-lg p-1" role="radiogroup">
+        <span className="text-sm font-medium text-gray-700" id="metrics-period-label">Período:</span>
+        <div className="flex bg-gray-100 rounded-lg p-1" role="radiogroup" aria-labelledby="metrics-period-label">
           {(["daily", "weekly", "monthly"] as Period[]).map((p) => (
             <button
               key={p}
