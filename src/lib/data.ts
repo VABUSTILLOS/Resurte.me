@@ -196,6 +196,39 @@ export async function searchAll(
 }
 
 // ============================================================
+// DISPONIBILIDAD POR CIUDAD (migración 00065)
+// ============================================================
+
+/**
+ * IDs de productos visibles y disponibles en una ciudad.
+ *
+ * Semántica: un producto sin filas en product_city_availability está
+ * disponible en todas las ciudades; con filas, solo donde
+ * is_available = true (ver migración 00065).
+ *
+ * Devuelve null cuando el RPC no está disponible (migración sin
+ * aplicar, schema cache de PostgREST sin la función): los consumidores
+ * deben tratar null como "sin filtro" para no vaciar la tienda.
+ */
+export async function getAvailableProductIds(
+  cityId: number
+): Promise<number[] | null> {
+  const supabase = await tryCreateClient()
+  if (!supabase) return null
+  const { data, error } = await supabase.rpc("get_available_product_ids", {
+    p_city_id: cityId,
+  })
+  if (error) {
+    logger.warn(
+      "getAvailableProductIds: RPC no disponible, catálogo sin filtro de ciudad",
+      { message: error.message, cityId }
+    )
+    return null
+  }
+  return (data ?? []) as number[]
+}
+
+// ============================================================
 // COLECCIONES DE RESTAURANTE
 // ============================================================
 
