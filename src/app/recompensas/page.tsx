@@ -15,6 +15,14 @@ import { OnboardingScreen } from "./_components/OnboardingScreen";
 import { getWalletBalance, getRewardsOnboarded, markRewardsOnboarded } from "@/lib/wallet-actions";
 import type { Tab, ServiceItem } from "./_components/types";
 
+const TAB_TITLES: Record<Tab, string> = {
+  home: "Inicio",
+  wallet: "Cartera",
+  store: "Tienda",
+  referidos: "Referidos",
+  profile: "Perfil",
+};
+
 export default function CashbackPage() {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") as Tab) || "home";
@@ -41,6 +49,17 @@ export default function CashbackPage() {
         : `${window.location.pathname}?tab=${tab}`;
     window.history.replaceState(null, "", url);
   }, []);
+
+  // Título del documento por sección: con varias pestañas abiertas (o en el
+  // historial del navegador) el usuario distingue en qué parte de
+  // Recompensas estaba.
+  useEffect(() => {
+    const prev = document.title;
+    document.title = `${TAB_TITLES[activeTab]} · Recompensas — Resurte.me`;
+    return () => {
+      document.title = prev;
+    };
+  }, [activeTab]);
 
   // Check auth state on mount
   useEffect(() => {
@@ -196,7 +215,7 @@ export default function CashbackPage() {
               balance={balance}
             />
           ) : (
-            <div key="main" className="flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+            <div key="main" className="flex-1 overflow-y-auto overscroll-contain pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
               {activeTab === "home" && (
                 <DashboardScreen
                   onOpenCalculator={handleOpenCalculator}
