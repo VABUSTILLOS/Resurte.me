@@ -1,6 +1,6 @@
 # Auditoría SEO completa — Resurte.me (2026-09-12)
 
-**Alcance:** auditoría técnica, on-page, contenido y visibilidad en motores de IA (GEO) sobre el sitio en producción y el código fuente. Cambios implementados en el PR #9 (`seo/auditoria-2026-09`).
+**Alcance:** auditoría técnica, on-page, contenido y visibilidad en motores de IA (GEO) sobre el sitio en producción y el código fuente. Cambios implementados en el PR #9 (`seo/auditoria-2026-09`). **Fase 2 (misma rama, mismo día):** cierre del backlog de metadatos (31 menores), 3 guías "money" nuevas de alta intención comercial y sincronización de `llms.txt`.
 
 ---
 
@@ -19,9 +19,11 @@
 | 5 | Sin `llms.txt` | Medio para GEO | ✅ Creado |
 | 6 | `/faq` sin FAQPage schema | Medio — respuestas no citables | ✅ JSON-LD agregado |
 | 7 | Sitemap sin páginas institucionales (/about, /contact, /faq, /ciudades…) | Bajo-medio | ✅ Agregadas |
-| 8 | 39 títulos >60c y 25 descriptions >160c en blog | Medio — truncamiento en SERP | ✅ 13 graves corregidos; 31 menores en Anexo A |
+| 8 | 39 títulos >60c y 25 descriptions >160c en blog | Medio — truncamiento en SERP | ✅ 44 corregidos (13 graves + 31 menores) |
 | 9 | Copy inconsistente (envío gratis $3,000 vs $2,500; 6 vs 20 ciudades) | Bajo — confianza/E-E-A-T | ✅ Corregido en /faq |
 | 10 | HTML SSR pesado (396–573 KB por página) | Medio — LCP/INP en móvil | 📋 Recomendación |
+| 11 | Sin contenido "money" de comparación | Alto — keywords de alta intención sin cubrir | ✅ 3 guías creadas en fase 2 |
+| 12 | Cover 404 en `tendencias-consumo-restaurantes` (typo en nombre de imagen) | Bajo — og:image rota | ✅ Corregido en fase 2 |
 
 ---
 
@@ -88,7 +90,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
   | responder-resenas-google-restaurantes | 52c / 152c |
   | inventario-conteo-ciclico-restaurante | 54c / 149c |
 
-- **Backlog restante:** 31 casos menores (títulos 61–79c / descriptions 161–194c) con reemplazos ya redactados en el Anexo A. Google los trunca con "…" — no es penalización, pero baja el CTR.
+- **Menores (31):** ✅ aplicados en fase 2 con los valores exactos del Anexo A. Los cuerpos de los 31 archivos quedaron byte a byte idénticos a `main` (verificado por re-fetch desde la rama).
 
 ### 3.2 Lo que está bien (no tocar)
 - Títulos únicos con keyword al frente y marca al final en ciudades/categorías.
@@ -100,6 +102,9 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 ### 3.3 Copy inconsistente — corregido
 - `/faq` decía envío gratis desde $3,000 (el resto del sitio: $2,500) y listaba 6 ciudades (son 20). Inconsistencias así erosionan E-E-A-T y confunden a los motores de IA que citan el sitio.
 
+### 3.4 Cover 404 en tendencias-consumo-restaurantes — corregido (fase 2)
+- El frontmatter apuntaba a `/images/blog/tendencias-consumo-restaurantes.webp`, pero el archivo real en `public/images/blog/` se llama `tendeencias-consumo-restaurantes.webp` (typo con "ee"). Resultado: imagen de portada y `og:image` rotas (404). Corregido el frontmatter al nombre real del archivo.
+
 ---
 
 ## 4. Contenido y E-E-A-T
@@ -108,7 +113,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 
 **Brechas (ver estrategia de contenidos para el plan completo):**
 1. **Sin páginas de autor** — "Equipo Resurte.me" no es una entidad verificable. Crear `/about#equipo` con autores reales, credenciales y foto; enlazar desde cada post (mejora E-E-A-T directa).
-2. **Sin contenido "money" de comparación** — faltan páginas tipo "Resurte.me vs ir a la Central de Abastos", "alternativas a [competidor]", "cuánto cuesta surtir un restaurante al mes". Alto intent comercial, competencia baja.
+2. ~~**Sin contenido "money" de comparación**~~ — ✅ **cubierto en fase 2** con 3 guías de alta intención comercial: `central-de-abastos-vs-comprar-en-linea`, `cuanto-cuesta-surtir-restaurante-mes` y `mejores-proveedores-mayoreo-restaurantes`. Todas con FAQ schema, tablas comparativas con números en MXN e interlinking al clúster de proveeduría.
 3. **Sin páginas hub temáticas** — 108 posts planos bajo /blog. Agrupar en 6 hubs (costos, proveeduría, operaciones, marketing, legal, crecimiento) con página pilar cada uno.
 4. **Fechas de actualización** — los posts tienen `updatedAt`; verificar que se muestre visible en la página (señal de frescura).
 
@@ -119,7 +124,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 | Táctica | Antes | Ahora |
 |---|---|---|
 | Crawlers IA en robots.txt | GPTBot bloqueado | 12 permitidos: GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-User, PerplexityBot, Perplexity-User, Google-Extended, Applebot-Extended, Meta-ExternalAgent, Amazonbot, CCBot |
-| `llms.txt` | No existía | Creado: qué es Resurte.me, cobertura, URLs clave, guías top, contacto |
+| `llms.txt` | No existía | Creado + actualizado en fase 2 con las 3 guías money (qué es Resurte.me, cobertura, URLs clave, guías top, contacto) |
 | FAQPage schema | Solo en posts | También en /faq (respuestas citables por AI Overviews) |
 | Datos consistentes | $3,000/$2,500, 6/20 ciudades | Unificados (clave: las IA amplifican contradicciones) |
 
@@ -139,10 +144,10 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 3. ⬜ Reenviar `sitemap.xml` en Google Search Console; verificar en Cobertura que carritos/checkouts salen del índice (usar "Eliminaciones" si alguna ya está indexada).
 
 ### Alto (semanas 2–4)
-4. 🔶 Metadatos del blog: los 13 casos graves ya se aplicaron en este PR; quedan 31 menores (Anexo A — reemplazos listos).
+4. ✅ Metadatos del blog: 44/44 aplicados (13 graves en fase 1 + 31 menores en fase 2, Anexo A).
 5. ⬜ PageSpeed Insights en home, /cdmx y /blog tras el deploy; si LCP móvil > 2.5 s, atacar payload RSC y bundles.
 6. ⬜ Páginas de autor reales + `/about#equipo`.
-7. ⬜ 4 páginas de comparación/alternativas (ver estrategia).
+7. 🔶 3 de 4 páginas de comparación/alternativas creadas en fase 2 (Central de Abastos vs en línea, costo mensual de surtido, mejores proveedores). Pendiente: "alternativas a [competidor]".
 
 ### Medio (meses 2–3)
 8. ⬜ 6 hubs temáticos con página pilar + interlinking.
@@ -152,6 +157,31 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 ### Largo plazo
 11. ⬜ Datos propios publicados ("Índice Resurte.me de precios de insumos") — imán de enlaces y citas de IA.
 12. ⬜ Programa de reseñas de clientes B2B (testimonios con nombre y negocio en home).
+
+---
+
+## Fase 2 (2026-09-12) — cierre del backlog y contenido money
+
+### Metadatos: 31/31 menores aplicados
+Los 31 archivos del Anexo A se actualizaron en la rama con exactamente los valores redactados en la fase 1. Metodología: cada archivo se obtuvo fresco desde `main` vía API y se re-subió con **solo** los cambios de frontmatter; los cuerpos quedaron byte a byte idénticos a `main`. Verificación por muestreo con re-fetch desde la rama (guia-food-cost-restaurante-2026, google-maps-restaurantes-2026, calculadora-food-cost-gratis): frontmatter nuevo presente y cuerpo intacto en los tres.
+
+**Nota de integridad (transparente):** durante la fase 2 se detectó que 15 de estos archivos habían quedado con cuerpos incorrectos en commits intermedios de la rama (contenido reconstruido en lugar del original). Se restauraron los 15 desde `main` byte a byte y se re-aplicaron únicamente las ediciones de frontmatter del Anexo A. El estado final del árbol es correcto; los commits de restauración (`d9ddbce`…`d027eff`) lo documentan.
+
+### Contenido money creado (3 guías nuevas)
+
+| Slug | Keyword objetivo | Intención |
+|---|---|---|
+| central-de-abastos-vs-comprar-en-linea | "central de abastos vs comprar en línea", "alternativa central de abastos" | Comparativa/comercial |
+| cuanto-cuesta-surtir-restaurante-mes | "cuánto cuesta surtir un restaurante al mes", "gasto mensual insumos restaurante" | Costo/comercial |
+| mejores-proveedores-mayoreo-restaurantes | "mejores proveedores de mayoreo para restaurantes", "proveedores alimentos mayoreo México" | Comparativa/comercial |
+
+Las 3 siguen el patrón editorial del blog: respuesta directa en el primer párrafo (citable por IA), tablas con números en MXN, FAQ schema (5 Q&A), casos con números, checklist accionable e interlinking al clúster de proveeduría. Aparecen automáticamente en el índice del blog, el sitemap dinámico y el RSS (el blog se lee del filesystem).
+
+### GEO: llms.txt sincronizado
+`public/llms.txt` ahora lista las 3 guías money en "Guías destacadas del blog", para que los asistentes de IA que lo consumen descubran el contenido de comparación.
+
+### Fix adicional
+Cover 404 de `tendencias-consumo-restaurantes` (ver 3.4).
 
 ---
 
@@ -178,8 +208,11 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 | inventario-conteo-ciclico-restaurante | title | Conteo cíclico de inventario en 30 minutos a la semana |
 | inventario-conteo-ciclico-restaurante | description | Método de conteo cíclico para restaurantes: qué contar, cuándo, cómo calcular tu merma real y por qué media hora semanal te ahorra miles. |
 
-### Menores (61–79c / 161–194c) — pendientes, reemplazos listos
-| Slug | Campo | Nuevo valor |
+### Menores (61–79c / 161–194c) — ✅ aplicados en fase 2 (2026-09-12)
+
+Los 31 archivos se actualizaron en la rama con exactamente estos valores; los cuerpos quedaron byte a byte idénticos a `main` (verificado por re-fetch de muestra).
+
+| Slug | Campo | Valor aplicado |
 |---|---|---|
 | calculadora-food-cost-gratis | title | Calculadora de food cost gratis: cómo usarla paso a paso |
 | calculadora-food-cost-gratis | description | Calcula el food cost de tu restaurante gratis: qué datos necesitas, cómo interpretar el resultado y convertirlo en más margen. |
