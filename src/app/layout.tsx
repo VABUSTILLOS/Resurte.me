@@ -14,8 +14,6 @@ import { BumpsDebugProbe } from "@/components/checkout/BumpsDebugProbe"
 import { WhatsAppButton } from "@/components/whatsapp/whatsapp-button"
 import { BackToTop } from "@/components/layout/back-to-top"
 import { OfflineBanner } from "@/components/layout/offline-banner"
-import { InstallPrompt } from "@/components/pwa/install-prompt"
-import { RegisterSW } from "@/components/pwa/register-sw"
 import { Analytics } from "@/lib/analytics"
 import { CookieConsent } from "@/components/ui/cookie-consent"
 import { ToastProvider } from "@/components/toast"
@@ -176,7 +174,10 @@ export default async function RootLayout({
               <MobileCartBar />
               <OfflineBanner />
               <BackToTop />
+<<<<<<< HEAD
               <InstallPrompt />
+=======
+>>>>>>> c5d07b7 (feat(ux): fase G6 — cablear BackToTop y OfflineBanner en el layout raíz)
               <WhatsAppButton
                 phoneNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}
                 message="¡Hola! Quiero hacer un pedido en Resurte.me"
