@@ -93,12 +93,14 @@ export default function AdminDashboardPage() {
   }, [])
 
   useEffect(() => {
-    fetchMetrics()
+    // Diferido a microtask: ningún setState corre síncrono en el efecto.
+    void Promise.resolve().then(fetchMetrics)
   }, [fetchMetrics])
 
   // Carga inicial de pedidos (una sola vez)
   useEffect(() => {
-    fetchOrders()
+    // Diferido a microtask: ningún setState corre síncrono en el efecto.
+    void Promise.resolve().then(fetchOrders)
   }, [fetchOrders])
 
   const recentOrders = orders.slice(0, 5)

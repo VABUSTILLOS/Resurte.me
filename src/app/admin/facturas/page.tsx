@@ -42,7 +42,8 @@ export default function AdminFacturasPage() {
   }, [])
 
   useEffect(() => {
-    void load()
+    // Diferido a microtask: ningún setState de load corre síncrono en el efecto.
+    void Promise.resolve().then(load)
   }, [load])
 
   // Para event handlers (botón Actualizar / tras revisar): el reset de

@@ -49,7 +49,8 @@ export default function AdminEmailsPage() {
   }, [])
 
   useEffect(() => {
-    void load()
+    // Diferido a microtask: ningún setState de load corre síncrono en el efecto.
+    void Promise.resolve().then(load)
   }, [load])
 
   // Botón reintentar/actualizar: el reset de loading/error va en el handler.

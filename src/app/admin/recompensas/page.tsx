@@ -52,7 +52,8 @@ export default function AdminRecompensasPage() {
   }, [])
 
   useEffect(() => {
-    void load()
+    // Diferido a microtask: ningún setState de load corre síncrono en el efecto.
+    void Promise.resolve().then(load)
   }, [load])
 
   // Para event handlers: el reset de loading/error va fuera del efecto.

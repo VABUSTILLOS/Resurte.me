@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useCity } from "@/contexts/city-context"
 import {
   STATUS_LABEL,

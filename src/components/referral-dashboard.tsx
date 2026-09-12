@@ -12,6 +12,7 @@ import {
   ArrowLeft,
   Check,
   Zap,
+  QrCode,
 } from "lucide-react"
 import Link from "next/link"
 import { trackEvent } from "@/lib/analytics"
@@ -33,6 +34,8 @@ export function ReferralDashboard() {
   const [referredUsers, setReferredUsers] = useState<ReferredUser[]>([])
   const [totalRewards, setTotalRewards] = useState(0)
   const [copied, setCopied] = useState(false)
+  const [qrUrl, setQrUrl] = useState<string | null>(null)
+  const [showQr, setShowQr] = useState(false)
   // Sin cliente de Supabase (SSR), no hay nada que cargar.
   const [loading, setLoading] = useState(() => supabase != null)
 
@@ -123,6 +126,25 @@ export function ReferralDashboard() {
   }, [supabase])
 
   const referralLink = `https://resurte.me/auth/register?ref=${referralCode}`
+
+  // QR del link de referido para compartir en persona (impreso o mostrando la
+  // pantalla). `qrcode` se carga bajo demanda para no inflar el bundle.
+  useEffect(() => {
+    if (!referralCode) return
+    let cancelled = false
+    import("qrcode")
+      .then(({ toDataURL }) =>
+        toDataURL(referralLink, { width: 320, margin: 2 }).then((dataUrl) => {
+          if (!cancelled) setQrUrl(dataUrl)
+        })
+      )
+      .catch(() => {
+        if (!cancelled) setQrUrl(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [referralCode, referralLink])
 
   const handleCopy = async () => {
     try {
@@ -250,7 +272,39 @@ export function ReferralDashboard() {
             <Share2 className="w-4 h-4" />
             Compartir
           </button>
+          <button
+            onClick={() => {
+              setShowQr((v) => !v)
+              trackEvent("share", { channel: "qr_referral" })
+            }}
+            aria-expanded={showQr}
+            className="flex items-center justify-center gap-2 rounded-xl bg-white/20 hover:bg-white/30 px-4 py-2.5 text-sm font-semibold transition-colors touch-target"
+          >
+            <QrCode className="w-4 h-4" />
+            QR
+          </button>
         </div>
+
+        {/* QR del link: para compartir en persona mostrando la pantalla */}
+        {showQr && (
+          <div className="mt-4 rounded-xl bg-white p-4 text-center">
+            {qrUrl ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element -- QR generado en cliente como data URL (qrcode.toDataURL); next/image no optimiza data URLs */}
+                <img
+                  src={qrUrl}
+                  alt={`Código QR de tu link de invitación: ${referralLink}`}
+                  className="mx-auto w-48 h-48"
+                />
+                <p className="text-gray-500 text-xs mt-2">
+                  Que tu invitado escanee el código para registrarse con tu referido
+                </p>
+              </>
+            ) : (
+              <p className="text-gray-400 text-xs py-8">Generando QR…</p>
+            )}
+          </div>
+        )}
       </motion.div>
 
       {/* Stats */}

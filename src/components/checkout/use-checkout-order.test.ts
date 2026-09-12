@@ -1,3 +1,7 @@
+/* eslint-disable react-hooks/rules-of-hooks, react-hooks/immutability --
+   Harness de hooks mockeado: este archivo de test re-invocA el hook con un
+   mini-React síncrono (no hay @testing-library/react en el proyecto), así
+   que las reglas de componentes reales no aplican. */
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 /**
@@ -148,8 +152,8 @@ function makeOptions(overrides: Partial<CheckoutOrderOptions> = {}): CheckoutOrd
   }
 }
 
-/** "Render": re-invoca el hook con el estado persistido en los slots. */
-function render(opts: CheckoutOrderOptions) {
+/** Re-invoca el hook con el estado persistido en los slots (nombre use* por react-hooks/rules-of-hooks). */
+function useRenderHook(opts: CheckoutOrderOptions) {
   hooks.stateIdx = 0
   hooks.refIdx = 0
   return useCheckoutOrder(opts)
@@ -158,9 +162,9 @@ function render(opts: CheckoutOrderOptions) {
 /** Primer render corre los efectos (sesión); se flushean microtasks (getUser)
  * y el segundo render expone callbacks frescos con isLoggedIn ya resuelto. */
 async function mount(opts: CheckoutOrderOptions) {
-  render(opts)
+  useRenderHook(opts)
   await new Promise((r) => setImmediate(r))
-  return render(opts)
+  return useRenderHook(opts)
 }
 
 function lastOrdersCall() {
@@ -183,7 +187,7 @@ describe("useCheckoutOrder · createOrder", () => {
     const result = await r.createOrder()
     expect(result).toBeNull()
     expect(fetchMock).not.toHaveBeenCalled()
-    expect(render(opts).checkoutError).toBe(
+    expect(useRenderHook(opts).checkoutError).toBe(
       "No se pudo determinar tu ciudad. Recarga la página."
     )
   })
@@ -264,7 +268,7 @@ describe("useCheckoutOrder · createOrder", () => {
     )
     expect(opts.onAfterOrderCreated).toHaveBeenCalledTimes(1)
     // El estado del hook conserva el cupón y el token para el post-pago
-    const fresh = render(opts)
+    const fresh = useRenderHook(opts)
     expect(fresh.checkoutError).toBeNull()
   })
 
@@ -288,7 +292,7 @@ describe("useCheckoutOrder · createOrder", () => {
     const opts = makeOptions()
     const created = await (await mount(opts)).createOrder()
     expect(created).toBeNull()
-    expect(render(opts).checkoutError).toBe(
+    expect(useRenderHook(opts).checkoutError).toBe(
       "Error al crear el pedido — columna utm_source no existe"
     )
     expect(opts.onAfterOrderCreated).not.toHaveBeenCalled()
@@ -298,7 +302,7 @@ describe("useCheckoutOrder · createOrder", () => {
     fetchMock.mockResolvedValue(jsonResponse({ error: "Cupón inválido" }, false))
     const opts = makeOptions()
     await (await mount(opts)).createOrder()
-    expect(render(opts).checkoutError).toBe("Cupón inválido")
+    expect(useRenderHook(opts).checkoutError).toBe("Cupón inválido")
   })
 
   it("respuesta ok sin orderId: error genérico de creación", async () => {
@@ -306,7 +310,7 @@ describe("useCheckoutOrder · createOrder", () => {
     const opts = makeOptions()
     const created = await (await mount(opts)).createOrder()
     expect(created).toBeNull()
-    expect(render(opts).checkoutError).toBe("No se pudo crear el pedido. Intenta de nuevo.")
+    expect(useRenderHook(opts).checkoutError).toBe("No se pudo crear el pedido. Intenta de nuevo.")
   })
 
   it("fetch rechaza: checkoutError con el mensaje de la excepción", async () => {
@@ -314,11 +318,11 @@ describe("useCheckoutOrder · createOrder", () => {
     const opts = makeOptions()
     const created = await (await mount(opts)).createOrder()
     expect(created).toBeNull()
-    expect(render(opts).checkoutError).toBe("network down")
+    expect(useRenderHook(opts).checkoutError).toBe("network down")
 
     fetchMock.mockRejectedValue("boom")
-    await render(opts).createOrder()
-    expect(render(opts).checkoutError).toBe("Error de conexión. Intenta de nuevo.")
+    await useRenderHook(opts).createOrder()
+    expect(useRenderHook(opts).checkoutError).toBe("Error de conexión. Intenta de nuevo.")
   })
 })
 
@@ -336,7 +340,7 @@ describe("useCheckoutOrder · flujo onPaid", () => {
     const created = await (await mount(opts)).createOrder()
     expect(created).not.toBeNull()
 
-    render(opts).handleStripeSuccess("pi_123", {
+    useRenderHook(opts).handleStripeSuccess("pi_123", {
       orderId: created!.orderId,
       cashback: created!.cashback,
     })
@@ -370,6 +374,6 @@ describe("useCheckoutOrder · flujo onPaid", () => {
     const opts = makeOptions()
     await (await mount(opts)).handlePlaceOrder("spei")
     expect(opts.onPaid).not.toHaveBeenCalled()
-    expect(render(opts).checkoutError).toBe("sin stock")
+    expect(useRenderHook(opts).checkoutError).toBe("sin stock")
   })
 })

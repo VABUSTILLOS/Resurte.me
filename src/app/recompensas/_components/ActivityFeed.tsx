@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle, Clock, TrendingUp } from "lucide-react";
+import { CheckCircle, Clock, TrendingUp, Download, Loader2 } from "lucide-react";
 import type { ActivityItem } from "./types";
 import { getWalletHistory } from "@/lib/wallet-actions";
 import { formatNumber } from "@/lib/money";
+import { toCsv, downloadCsv } from "@/lib/csv";
 
 // Mapea los movimientos reales del monedero a items de actividad.
 // amount > 0 = cashback (invoice), amount < 0 = canje de servicio (redemption).
@@ -30,6 +31,7 @@ function toActivityItem(tx: {
 
 export function ActivityFeed() {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,6 +52,36 @@ export function ActivityFeed() {
     };
   }, []);
 
+  // Exporta el historial COMPLETO del monedero (paginado) a CSV, no solo los
+  // 5 movimientos visibles. Tope de 50 páginas × 100 como salvaguarda.
+  async function exportHistory() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const all: { amount: number; concept: string; created_at: string }[] = [];
+      for (let page = 0; page < 50; page++) {
+        const { transactions, hasMore } = await getWalletHistory(page, 100);
+        all.push(...transactions);
+        if (!hasMore) break;
+      }
+      const csv = toCsv(
+        ["Fecha", "Concepto", "Tipo", "Monto (Créditos)"],
+        all.map((tx) => [
+          new Date(tx.created_at).toLocaleString("es-MX"),
+          tx.concept,
+          tx.amount > 0 ? "Cashback" : "Canje",
+          tx.amount,
+        ])
+      );
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadCsv(`mis-creditos-${stamp}.csv`, csv);
+    } catch {
+      // Error de red/sesión: no interrumpir la vista por la exportación
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (activities.length === 0) {
     return (
       <div className="mx-4 mt-4 md:mx-0">
@@ -67,6 +99,19 @@ export function ActivityFeed() {
     <div className="mx-4 mt-4 md:mx-0">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-warm-700 text-[15px] font-bold">Actividad Reciente</h2>
+        <button
+          type="button"
+          onClick={exportHistory}
+          disabled={exporting}
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-warm-700 bg-white border border-cream-300 shadow-sm hover:bg-cream-50 transition-colors disabled:opacity-50"
+        >
+          {exporting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Download className="h-3.5 w-3.5" />
+          )}
+          Exportar CSV
+        </button>
       </div>
 
       <div className="space-y-2">

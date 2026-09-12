@@ -43,7 +43,8 @@ export default function PersonalPage() {
   }, [])
 
   useEffect(() => {
-    void load()
+    // Diferido a microtask: ningún setState de load corre síncrono en el efecto.
+    void Promise.resolve().then(load)
   }, [load])
 
   async function invite(e: React.FormEvent) {

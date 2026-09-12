@@ -112,3 +112,10 @@ Marketplace mayorista B2B de insumos para restaurantes (México) + suite SaaS de
 - **P1 (retención/ventas)**: A3 recompensas proactivas, B2 agente transaccional, B3 alertas de reorden, C6 reportes.
 - **P2 (operación/escala)**: C2 logística, C5 auditoría, D1 realtime, D3 pagos FoodOS.
 - **P3 (crecimiento)**: A4 listas recurrentes, B4 comisiones, E4 i18n.
+
+## Avance implementado (2026-09-12, sin credenciales externas)
+- ✅ **E1**: `e2e/money-flows.spec.ts` — 10 tests e2e de flujos de dinero (validación zod de `/api/orders` y `create-intent`, whitelist de métodos de pago, rechazo de `amount` del cliente, cupón UI inválido/válido/quitar).
+- ✅ **C6 (parcial)**: botón "Exportar CSV" en `/admin/pedidos` (respeta filtro/búsqueda; helper `src/lib/csv.ts` con BOM UTF-8 + tests).
+- ✅ **A3 (parcial)**: QR del link de referido en `ReferralDashboard` (compartir en persona) y exportación CSV del historial completo del monedero en `ActivityFeed`.
+- Nota: la whitelist de `/api/orders` ya admite `spei`, `oxxo`, `mercado_pago` y `codi`; A1 requiere habilitar esos métodos en la cuenta de Stripe y la UI de confirmación.
+- Pendientes con credenciales externas: C1 (PAC para timbrado CFDI), A1 (Stripe MX para OXXO/SPEI).

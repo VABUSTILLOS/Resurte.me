@@ -49,7 +49,8 @@ export default function ConversionDashboardPage() {
   }, [days])
 
   useEffect(() => {
-    void fetchFunnel()
+    // Diferido a microtask: ningún setState de fetchFunnel corre síncrono en el efecto.
+    void Promise.resolve().then(fetchFunnel)
   }, [fetchFunnel])
 
   return (
