@@ -20,7 +20,7 @@ ALTER TABLE stock_adjustments ENABLE ROW LEVEL SECURITY;
 
 -- Solo administradores leen/escriben la bitácora (mismo patrón que otras
 -- tablas admin: el chequeo fino lo hace requireAdmin en el server action;
--- aquí se exige rol admin/master_admin vía profiles).
+-- aquí se exige profiles.role = 'admin', único rol admin según 00067).
 CREATE POLICY "Admins can read stock adjustments" ON stock_adjustments
   FOR SELECT USING (
     EXISTS (
