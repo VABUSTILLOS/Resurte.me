@@ -261,6 +261,15 @@ export function Header() {
                     </Link>
                     <Link
                       role="menuitem"
+                      href={city ? `/${city.slug}/favoritos` : "/auth/login"}
+                      onClick={() => setShowUserMenu(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#343538] hover:bg-[#F7F5F0] transition-colors"
+                    >
+                      <Heart className="w-4 h-4" aria-hidden="true" />
+                      Mi lista de resurtido
+                    </Link>
+                    <Link
+                      role="menuitem"
                       href={city ? `/${city.slug}/mis-direcciones` : "/auth/login"}
                       onClick={() => setShowUserMenu(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#343538] hover:bg-[#F7F5F0] transition-colors"
