@@ -4,9 +4,11 @@ import { Metadata } from "next"
 import { CityLanding } from "@/components/city/city-landing"
 import { logger } from "@/lib/logger"
 import {
+  filterByCityAvailability,
   getCachedActiveCollections,
   getCachedCategories,
   getCachedVisibleProducts,
+  getCityAvailabilityForSlug,
 } from "@/lib/catalog-cache"
 import { getCityLandingSchema } from "@/lib/structured-data"
 import { getCityBySlug } from "@/lib/data"
@@ -96,13 +98,15 @@ export default async function CityPage({ params }: Props) {
   let collections: RestaurantCollection[] = []
 
   try {
-    const [cats, prods, colls] = await Promise.all([
+    const [cats, prods, colls, availableIds] = await Promise.all([
       getCachedCategories(),
       getCachedVisibleProducts(),
       getCachedActiveCollections(),
+      // Selector por ciudad (migración 00065): null = sin filtro.
+      getCityAvailabilityForSlug(slug),
     ])
     categories = cats
-    products = prods
+    products = filterByCityAvailability(prods, availableIds)
     collections = colls
   } catch (error) {
     if (error instanceof Error && error.message.includes("Supabase no está configurado")) {

@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
 import {
+  filterByCityAvailability,
   getCachedCategories,
   getCachedCategoryBySlug,
   getCachedProductsByCategory,
+  getCityAvailabilityForSlug,
 } from "@/lib/catalog-cache"
 import { Metadata } from "next"
 import { CategoryPageClient } from "./category-page-client"
@@ -57,8 +59,13 @@ export default async function CategoryPage({ params }: Props) {
 
   if (!category) notFound()
 
-  // Fetch products in this category (cached)
-  const products = await getCachedProductsByCategory(category.id)
+  // Fetch products in this category (cached), filtrados por la
+  // disponibilidad de la ciudad (selector por ciudad, migración 00065).
+  const [categoryProducts, availableIds] = await Promise.all([
+    getCachedProductsByCategory(category.id),
+    getCityAvailabilityForSlug(slug),
+  ])
+  const products = filterByCityAvailability(categoryProducts, availableIds)
 
   return (
     <CategoryPageClient

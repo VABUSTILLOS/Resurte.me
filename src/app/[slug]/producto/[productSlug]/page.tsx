@@ -2,10 +2,12 @@ import { notFound } from "next/navigation"
 import { MEXICO_CITIES } from "@/lib/cities"
 import { Metadata } from "next"
 import {
+  filterByCityAvailability,
   getCachedCategoryById,
   getCachedProductBySlug,
   getCachedProductsByCategory,
   getCachedVisibleProducts,
+  getCityAvailabilityForSlug,
 } from "@/lib/catalog-cache"
 import { ProductDetailClient } from "./product-detail-client"
 import { getBreadcrumbSchema, getProductSchema } from "@/lib/structured-data"
@@ -72,11 +74,20 @@ export default async function ProductPage({ params }: Props) {
 
   if (!product) notFound()
 
+  // Selector por ciudad (migración 00065): si el producto no está
+  // disponible en esta ciudad, la página no existe para ese mercado.
+  const availableIds = await getCityAvailabilityForSlug(slug)
+  if (availableIds && !availableIds.includes(product.id)) notFound()
+
   // Fetch category info (cached)
   const category = await getCachedCategoryById(product.category_id)
 
-  // Fetch related products (same category, excluding current)
-  const relatedSameCategory = (await getCachedProductsByCategory(product.category_id)).filter(
+  // Fetch related products (same category, excluding current),
+  // filtrados por disponibilidad de la ciudad.
+  const relatedSameCategory = filterByCityAvailability(
+    await getCachedProductsByCategory(product.category_id),
+    availableIds
+  ).filter(
     (p) => p.id !== product.id
   )
 
@@ -85,7 +96,10 @@ export default async function ProductPage({ params }: Props) {
   // If fewer than 4 from same category, fill with products from other categories
   if (related.length < 4) {
     const existingIds = new Set([product.id, ...related.map((p) => p.id)])
-    const otherProducts = (await getCachedVisibleProducts()).filter(
+    const otherProducts = filterByCityAvailability(
+      await getCachedVisibleProducts(),
+      availableIds
+    ).filter(
       (p) => p.id !== product.id && !existingIds.has(p.id)
     )
 
