@@ -120,6 +120,13 @@ export function DashboardSidebar() {
           }))
         )
       })
+    // (M2) Conteo exacto de pedidos para la tarjeta "Pedidos" (head-only).
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .then(({ count, error }) => {
+        if (!cancelled && !error && count !== null) setTotalOrders(count)
+      })
     return () => {
       cancelled = true
     }
@@ -273,7 +280,7 @@ export function DashboardSidebar() {
                   <Coins className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   <span className="font-medium leading-tight">Puntos de Recompensa</span>
                 </div>
-                <p className="text-xl font-bold text-gray-900">${cashback}</p>
+                <p className="text-xl font-bold text-gray-900">${cashback.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</p>
               </div>
             </div>
           </div>
@@ -455,7 +462,7 @@ export function DashboardSidebar() {
 
             <div className="p-4 space-y-3">
               <div className="flex gap-3">
-                <div className="flex-1 bg-[#F0FDF4] rounded-xl p-3 flex flex-col justify-between min-h-[68px]">
+                <div className="flex-1 bg-[#F0DF4] rounded-xl p-3 flex flex-col justify-between min-h-[68px]">
                   <div className="flex items-center gap-1.5 text-xs text-[#0E7A0E]">
                     <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                     <span className="font-medium leading-tight">Pedidos</span>
@@ -467,7 +474,7 @@ export function DashboardSidebar() {
                     <Coins className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     <span className="font-medium leading-tight">Puntos de Recompensa</span>
                   </div>
-                  <p className="text-xl font-bold text-gray-900">${cashback}</p>
+                  <p className="text-xl font-bold text-gray-900">${cashback.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</p>
                 </div>
               </div>
 
