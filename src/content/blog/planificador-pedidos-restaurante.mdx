@@ -1,206 +1,215 @@
 ---
-title: "Planificador de pedidos para restaurante: cómo funciona y a quién le ahorra"
-description: "Cómo planificar tus pedidos a proveedores sin quedarte corto ni sobreinventariar: cálculo de demanda, coberturas, frecuencia de compra y plantilla de pedido."
+title: "Planificador de pedidos: cómo funciona y a quién le ahorra"
+description: "Qué es un planificador de pedidos para restaurantes, cómo funciona paso a paso y cuánto ahorra en tiempo y dinero. Guía con ejemplos reales."
 category: herramientas
 contentType: guia
-date: "2026-09-16"
-updatedAt: "2026-09-16"
+date: "2026-09-10"
+updatedAt: "2026-09-10"
 author: "Equipo Resurte.me"
 authorRole: "Especialistas en restaurantes"
-tags: ["planificador", "pedidos", "inventario", "compras", "proveedores", "herramientas"]
+tags: ["planificador", "pedidos", "herramientas", "compras", "inventario", "ahorro"]
 featured: false
 coverImage: "/images/blog/planificador-pedidos-restaurante.webp"
-coverAlt: "Desayuno de trabajo en la mesa de un restaurante con ingredientes"
-cta:
-  variant: herramienta
-  eyebrow: "Herramienta Resurte.me"
-  title: "Deja de calcular pedidos a mano: el Planificador de pedidos del Panel proyecta cuánto comprar según tu consumo real."
-  cta: "Probar el Planificador de pedidos"
-  href: "/panel/planificador"
+coverAlt: "Encargado de restaurante revisando lista de pedidos en tablet"
 faq:
   - question: "¿Qué es un planificador de pedidos para restaurantes?"
-    answer: "Es una herramienta que convierte tu consumo real de insumos en órdenes de compra exactas: proyecta cuánto vas a necesitar según tu venta esperada, calcula la cobertura por insumo y te dice qué comprar, cuánto y cuándo. Reemplaza el cálculo a mano ('pido más o menos lo de la semana pasada') por un método basado en datos. Los restaurantes que planifican pedidos con método reducen su inventario y su merma entre 10% y 20% sin quedarse cortos."
-  - question: "¿Cómo calculo cuánto pedir a mi proveedor?"
-    answer: "La fórmula básica es: consumo promedio diario de cada insumo × días de cobertura que quieres (2-4 según la vida útil) menos lo que te queda en inventario. Si consumes 2 kg de cebolla al día, quieres 3 días de cobertura y te quedan 1.5 kg, pides: (2 × 3) - 1.5 = 4.5 kg. Para pedidos de temporada alta, multiplica tu consumo promedio por el factor del período (1.5x-3x). El planificador automatiza esto por insumo y te evita el cálculo repetitivo."
-  - question: "¿A quién le conviene usar un planificador de pedidos?"
-    answer: "A todo restaurante que haga pedidos a proveedores, pero especialmente a los que: compran más de 20 insumos, tienen merma por sobreinventario, se quedan cortos en horas pico, o negocian con varios proveedores. El planificador rinde más en negocios con venta variable (fines de semana, temporadas) donde 'lo de la semana pasada' no sirve. Si compras 5 insumos y nunca te sobra ni te falta, un cuaderno funciona; si no es tu caso, el planificador te ahorra dinero real."
-  - question: "¿Cuánto se puede ahorrar planificando los pedidos?"
-    answer: "Los restaurantes que planifican pedidos con método reportan entre 10% y 20% menos de merma e inventario inmovilizado, y menos compras de emergencia (las más caras, porque compras a precio de menudeo y sin negociar). En un restaurante que compra $80,000 mensuales, un 12% de reducción de merma e inventario equivale a $9,600 al mes liberados de caja. Además, planificar te da el dato de consumo real para negociar mejor con proveedores."
-  - question: "¿Cada cuánto debo hacer mi pedido a proveedores?"
-    answer: "Depende del insumo y de tu volumen: lo perecedero (carnes, verduras, lácteos) se pide 2-3 veces por semana; lo seco y congelado 1 vez por semana o cada 2. La regla: mientras más corta la vida útil, más frecuente la compra y menor la cobertura. Un planificador te dice la frecuencia óptima por insumo en vez de imponer un solo calendario. El objetivo no es pedir menos veces: es pedir la cantidad justa cada vez."
+    answer: "Es una herramienta que te dice cuánto comprar de cada insumo según tu consumo real, tus días de venta y tu inventario actual. En vez de pedir 'lo de siempre' o 'lo que se me ocurre', el planificador calcula: lo que vas a vender esta semana × las recetas de tu menú − lo que ya tienes en almacén = tu pedido exacto. Elimina las compras de pánico y el excedente que se echa a perder."
+  - question: "¿Cuánto tiempo ahorra un planificador de pedidos?"
+    answer: "Entre 3 y 6 horas por semana. El proceso manual (revisar alacena, recordar qué falta, calcular cantidades, llamar a proveedores, anotar en libreta) toma 4-7 horas semanales. Con planificador, revisas la sugerencia, ajustas y confirmas en 20-30 minutos. Esas horas se van a cocina, servicio o descanso."
+  - question: "¿Cuánto dinero ahorra planificar pedidos vs comprar a ojo?"
+    answer: "Los restaurantes que planifican reducen sus compras totales 8-15% por dos vías: eliminan el excedente que se echa a perder (merma por sobrecompra) y eliminan las compras de emergencia a precio de menudeo (que cuestan 30-50% más). En un restaurante que compra $100,000 al mes, son $8,000-$15,000 de ahorro mensual."
+  - question: "¿Necesito un sistema caro para planificar pedidos?"
+    answer: "No. Puedes empezar con una hoja de cálculo simple: tu menú, las recetas con cantidades, tu promedio de ventas por platillo y tu inventario actual. Con esas 4 cosas calculas tu pedido semanal en 30 minutos. Herramientas como el planificador de Resurte.me lo automatizan, pero la disciplina de planificar funciona hasta en papel."
+  - question: "¿Qué pasa si planifico y me quedo corto?"
+    answer: "Es el miedo más común y el menos frecuente. Si planificas con tu promedio de ventas + 10% de colchón, quedarte corto es raro. Y si pasa, una compra de emergencia ocasional cuesta menos que el excedente semanal que se echaba a perder. La regla: es mejor una emergencia al mes que desperdicio todas las semanas."
 ---
 
-**Planificar tus pedidos no es adivinar cantidades: es convertir tu consumo real en órdenes de compra exactas.** El restaurante que pide 'más o menos lo de la semana pasada' tiene dos problemas: se queda corto cuando la venta sube (y compra de emergencia al precio más caro) o sobreinventaria cuando baja (y tira merma de producto vencido). Un planificador de pedidos resuelve ambos con un método simple: consumo real × cobertura − inventario disponible. Esta guía te explica cómo funciona y cuánto puede ahorrarte.
+**La mayoría de los restaurantes en México compra sus insumos de una de estas dos formas: 'lo de siempre' o 'lo que falta cuando se acaba'.** Ambas cuestan caro: la primera genera excedentes que se echan a perder; la segunda genera compras de pánico al doble de precio. El planificador de pedidos existe para eliminar esas dos fugas con una sola disciplina: comprar exactamente lo que vas a vender. Esta guía te muestra cómo funciona y cuánto te ahorra.
 
-## El problema que resuelve el planificador
+## El problema: cómo compras hoy (y cuánto te cuesta)
 
-Sin planificación, los pedidos se deciden con dos métodos igualmente caros:
+Los 3 patrones de compra que vacían la caja de los restaurantes:
 
-- **Pedir de más:** "por si acaso" → inventario inmovilizado, merma por caducidad, caja atorada en producto que no se vende.
-- **Pedir de menos:** "para no arriesgar" → te quedas corto en el pico, compras de emergencia a menudeo y sin negociar, y pierdes ventas.
+### Patrón 1: "Lo de siempre"
 
-| Método de pedido | Resultado típico | Costo escondido |
-|---|---|---|
-| "Lo de la semana pasada" | No refleja variación de venta | Sobra o falta según la semana |
-| "Por si acaso" | Sobreinventario | 10-20% de merma por caducidad |
-| Compras de emergencia | Precio de menudeo | 5-15% más caro por compra |
-| Planificado con datos | Pedido exacto | Mínimo inventario, mínima merma |
+Compras lo mismo cada semana porque 'así se ha hecho siempre'. El problema: tu menú cambió, tus ventas cambiaron, la temporada cambió — pero tu pedido no. Resultado: 10-20% de tu compra se echa a perder cada semana.
 
-## Cómo funciona: la fórmula del pedido exacto
+### Patrón 2: "Lo que falta"
 
-El planificador se basa en una fórmula que se repite por cada insumo:
+Compras cuando algo se acaba. El problema: cuando se acaba el aguacate el sábado a las 2 PM, compras en la tienda de la esquina al 40-60% más caro que tu proveedor. Resultado: 5-10% de tu gasto mensual son compras de emergencia infladas.
 
-**Cantidad a pedir = (consumo promedio diario × días de cobertura) − inventario disponible**
+### Patrón 3: "Lo que se me ocurre"
 
-| Concepto | Qué es | Ejemplo (cebolla) |
-|---|---|---|
-| Consumo promedio diario | Lo que usas al día (venta promedio × porción) | 2 kg/día |
-| Días de cobertura | Cuántos días quieres tener de reserva | 3 días |
-| Inventario disponible | Lo que te queda en la cámara | 1.5 kg |
-| **Cantidad a pedir** | (2 × 3) − 1.5 | **4.5 kg** |
+El encargado pide según su memoria: 'creo que necesitamos jitomate'. A veces acierta, a veces compra doble, a veces olvida. Resultado: inventario impredecible y merma invisible.
 
-<BlogCallout variant="tip" title="La cobertura no es igual para todos los insumos">
-La cobertura depende de la vida útil: las carnes y verduras se cubren 2-3 días (se piden 2-3 veces por semana), lo seco y enlatado 7-14 días (1 pedido semanal o quincenal), lo congelado hasta 30 días. Un planificador maneja coberturas distintas por insumo — eso es lo que lo vuelve útil. El que cubre todo con la misma regla sigue teniendo merma o quiebres de stock."
+<BlogCallout variant="warning" title="La sobrecompra es más cara que la falta ocasional">
+Los dueños le temen a quedarse cortos, pero el desperdicio por exceso cuesta 5 veces más que la compra de emergencia ocasional. Un restaurante que tira $800 de verdura pasada cada semana pierde $41,600 al año; una emergencia mensual de $1,500 cuesta $18,000 al año. Planificar elimina la primera y reduce la segunda.
 </BlogCallout>
 
-## Los datos que necesita tu planificador
+## Cómo funciona un planificador de pedidos: la lógica en 4 pasos
 
-Para que la fórmula funcione, necesitas tres fuentes de datos:
+La fórmula es simple. El planificador la ejecuta sin errores de memoria ni cálculo:
 
-1. **Consumo real por insumo:** de tu inventario (compras − existencias). Si no lo registras, empieza por medirlo 2 semanas.
-2. **Proyección de venta:** tu ticket promedio por día y el factor del período (1x en temporada normal, 1.5-3x en picos).
-3. **Inventario disponible:** tu conteo actual (o el último conteo confiable ajustado por lo que entró y salió).
+**Paso 1: ¿Qué vas a vender?**
 
-| Fuente de datos | Cómo obtenerla | Frecuencia |
+Tu promedio de ventas por platillo por día. Ejemplo: vendes 25 comidas corridas los lunes, 40 los viernes, 60 los sábados.
+
+**Paso 2: ¿Qué lleva cada platillo?**
+
+Tus recetas con cantidades exactas. Ejemplo: cada comida corrida lleva 150g de pollo, 50g de arroz, 80g de verdura.
+
+**Paso 3: ¿Qué tienes en almacén?**
+
+Tu inventario actual. Ejemplo: te quedan 3 kg de pollo.
+
+**Paso 4: El cálculo**
+
+```
+(Ventas esperadas × cantidad por platillo) − inventario actual = pedido exacto
+```
+
+Ejemplo: 200 comidas corridas esta semana × 150g de pollo = 30 kg necesarios − 3 kg en almacén = **pedir 27 kg de pollo**. Ni 35 'por si acaso' ni 20 'para que alcance'.
+
+## Ejemplo completo: la semana de una fonda
+
+| Insumo | Ventas esperadas | Por platillo | Necesidad | En almacén | Pedido |
+|---|---|---|---|---|---|
+| Pollo | 200 comidas | 150g | 30 kg | 3 kg | 27 kg |
+| Arroz | 200 comidas | 50g | 10 kg | 6 kg | 4 kg |
+| Jitomate | 200 comidas | 80g | 16 kg | 2 kg | 14 kg |
+| Tortillas | 200 comidas | 3 pzas | 600 pzas | 100 | 500 |
+| Aceite | 200 comidas | 20ml | 4 L | 3 L | 1 L |
+
+**Sin planificador:** el encargado pide 40 kg de pollo ('por si acaso'), 15 kg de arroz ('que no falte'), 25 kg de jitomate ('estaba barato') — y tira 8 kg de jitomate pasado y 4 kg de pollo congelado de más.
+
+**Con planificador:** compra exacta, merma casi cero, cero emergencias.
+
+## Cuánto ahorra: los números reales
+
+| Fuente de ahorro | Cuánto | Por qué |
 |---|---|---|
-| Consumo real | Inventario: compras − existencias | Semanal |
-| Proyección de venta | Historial de ventas + factor estacional | Semanal |
-| Inventario disponible | Conteo de cámara y despensa | Diario (lo perecedero), semanal (lo seco) |
+| Eliminación de sobrecompra | 5-10% de compras | Compras lo que vendes, no lo que imaginas |
+| Eliminación de emergencias | 3-5% de compras | No más compras al 40-60% extra en menudeo |
+| Menos merma por caducidad | 2-4% de compras | El excedente no se echa a perder |
+| Mejor negociación | 2-5% de compras | Pedidos planeados = volumen predecible para negociar |
+| **Total** | **8-15% de tu gasto en insumos** | |
 
-## Frecuencia de pedido óptima por tipo de insumo
+En un restaurante que compra $100,000 al mes: **$8,000-$15,000 de ahorro mensual = $96,000-$180,000 al año**.
 
-| Tipo de insumo | Cobertura | Frecuencia de pedido | Riesgo si fallas |
+## A quién le ahorra más (y a quién menos)
+
+### Le ahorra MUCHO si...
+
+- Tu menú tiene más de 15 platillos (más insumos = más fugas)
+- Tus ventas varían mucho por día (fonda con pico de fin de semana)
+- Tienes más de 1 persona haciendo pedidos (descoordinación garantizada)
+- Compras a más de 2 proveedores (consolidación de pedidos)
+- Tu merma supera el 3% de tus compras (hay excedente escondido)
+
+### Le ahorra MENOS si...
+
+- Menú de 3-5 platillos con demanda estable (taquería de un solo producto)
+- Ventas idénticas todos los días (comedor industrial con contrato fijo)
+- Ya tienes un sistema de inventario funcionando bien
+
+<BlogCallout variant="tip" title="El planificador no reemplaza tu criterio: lo informa">
+La sugerencia del planificador es tu punto de partida, no tu orden final. Si sabes que el sábado hay un evento en la plaza o que el lunes es puente, ajusta la sugerencia. El planificador te da el 90% correcto; tu conocimiento local ajusta el 10% restante.
+</BlogCallout>
+
+## Cómo empezar sin sistema (la versión en hoja de cálculo)
+
+No necesitas software para empezar hoy. Necesitas una hoja con 4 pestañas:
+
+**Pestaña 1: Menú y recetas**
+
+| Platillo | Insumo | Cantidad |
+|---|---|---|
+| Comida corrida | Pollo | 150g |
+| Comida corrida | Arroz | 50g |
+| Comida corrida | Jitomate | 80g |
+| ... | ... | ... |
+
+**Pestaña 2: Ventas promedio por día**
+
+| Platillo | Lun | Mar | Mié | Jue | Vie | Sáb | Dom |
+|---|---|---|---|---|---|---|---|
+| Comida corrida | 25 | 28 | 30 | 32 | 40 | 55 | 40 |
+| ... | | | | | | | |
+
+**Pestaña 3: Inventario actual** (actualiza cada semana)
+
+| Insumo | Cantidad actual | Unidad |
+|---|---|---|
+| Pollo | 3 | kg |
+| Arroz | 6 | kg |
+
+**Pestaña 4: Pedido calculado** (la fórmula automática)
+
+| Insumo | Necesidad semanal | Inventario | A pedir |
 |---|---|---|---|
-| Carnes y pescados | 2-3 días | 2-3 veces/semana | Quiebre en el pico |
-| Verduras y frutas | 1-3 días | 2-3 veces/semana | Merma rápida |
-| Lácteos y huevo | 2-4 días | 2 veces/semana | Caducidad |
-| Secos y enlatados | 7-14 días | 1 vez/semana | Capital inmovilizado |
-| Congelados | 14-30 días | Quincenal | Espacio y caja |
-| Bebidas y empaques | 7-14 días | Semanal | Poco riesgo |
+| Pollo | 30 kg | 3 kg | 27 kg |
 
-<BlogCallout variant="warning" title="El pedido de emergencia es el más caro de todos">
-Cuando te quedas sin un insumo en pleno servicio, no negocias: compras a menudeo, al precio que sea, en la tienda que esté abierta. Esa compra sale 5-15% más cara y muchas veces de menor calidad. Un restaurante hace en promedio 1-3 compras de emergencia por semana; cada una cuesta más caro. El planificador ataca justo esto: con cobertura correcta, no hay emergencias."
-</BlogCallout>
+30 minutos por semana. Cero inversión. Los mismos ahorros del 80% del beneficio.
 
-## A quién le ahorra más el planificador
+## El planificador de Resurte.me: la versión automatizada
 
-El planificador no es para todos — pero si te reconoces en alguno de estos perfiles, es tu herramienta:
+Si la hoja de cálculo te queda corta, el [planificador de pedidos de Resurte.me](/blog/planificador-pedidos-restaurante) hace el cálculo por ti:
 
-- **El que sobreinventaria:** cámara llena, mucho producto que caduca, merma del 10-20%.
-- **El que se queda corto:** quiebres en el pico, compras de emergencia, meseros diciendo "ya no hay".
-- **El que tiene venta variable:** fines de semana fuertes, temporadas, puentes — donde "lo de la semana pasada" no aplica.
-- **El que maneja muchos insumos:** más de 20 SKUs hace imposible calcular a mano con precisión.
-- **El que negocia con proveedores:** con tu consumo real en la mano, llegas a la mesa con datos.
+1. Registra tus platillos y recetas una sola vez
+2. Registra tus ventas (o conecta tu TPV)
+3. Cada semana te sugiere el pedido exacto por proveedor
+4. Ajustas con tu criterio local y confirmas
+5. El pedido llega consolidado con precio de mayoreo
 
-| Perfil | Sin planificador | Con planificador |
+**El bonus:** al comprar a través de la plataforma, tus pedidos se acumulan con los de otros restaurantes para darte precio de mayoreo sin pedidos mínimos gigantes.
+
+## Errores al planificar pedidos
+
+- ❌ **Planificar con el mejor día, no con el promedio** — si planificas para tu sábado récord, sobran insumos 6 días de la semana
+- ❌ **No actualizar el inventario** — la fórmula sin inventario real es inútil: 5 minutos de conteo semanal
+- ❌ **Ignorar la temporada** — tu promedio de diciembre no es tu promedio de febrero: revisa cada mes
+- ❌ **No incluir un colchón del 5-10%** — la vida real tiene variaciones; el colchón absorbe sin desperdicio
+- ❌ **Planificar pero no cumplir** — si planificas 27 kg pero pides 35 'por si acaso', volviste al patrón 1
+- ❌ **Cambiar el menú sin actualizar las recetas** — el planificador calcula con recetas viejas
+
+## Caso real: de $6,200 de merma semanal a $900
+
+Un restaurante familiar en Puebla con ventas de $95,000 semanales tenía un problema: el papá compraba los lunes 'lo de siempre' y el hijo complementaba los jueves 'lo que faltaba'. Doble compra, cero coordinación.
+
+**Antes del planificador:**
+
+| Métrica | Valor |
+|---|---|
+| Compras semanales | $38,000 |
+| Merma semanal (tirado) | $6,200 (16%) |
+| Compras de emergencia | $3,500/semana (precio inflado) |
+| Horas en pedidos | 6-7 horas (papá + hijo) |
+
+**Después de 4 semanas con planificador (hoja de cálculo):**
+
+| Métrica | Valor | Cambio |
 |---|---|---|
-| Sobreinventario | 15% de merma mensual | 5-8% de merma |
-| Quiebres de stock | 2-3 emergencias/semana | Casi cero |
-| Caja inmovilizada | $15,000 en inventario muerto | $8,000-10,000 en inventario óptimo |
-| Negociación con proveedores | Sin datos, pide descuento | Con consumo real, negocia volumen |
+| Compras semanales | $31,400 | -17% |
+| Merma semanal | $900 (2.9%) | -85% |
+| Compras de emergencia | $400/semana | -89% |
+| Horas en pedidos | 45 minutos | -88% |
 
-## Cómo implementarlo en tu restaurante
+**Ahorro anual proyectado: $310,000.** Solo con una hoja de cálculo y la disciplina de usarla cada lunes.
 
-### Semana 1: Mide tu consumo real
+## Plantilla: tu primera semana con planificador
 
-- Registra todo lo que entra y sale de la cámara (o usa tu sistema de inventario)
-- Haz un conteo inicial de todas tus existencias
-- Identifica tus 20 insumos de mayor gasto (el 80/20 de tu compra)
+- [ ] **Lunes:** lista tus 10 platillos más vendidos con sus recetas (cantidades por insumo)
+- [ ] **Martes:** anota tus ventas promedio de cada platillo por día de la semana
+- [ ] **Miércoles:** cuenta tu inventario actual de los 10 insumos principales
+- [ ] **Jueves:** calcula tu pedido con la fórmula (ventas × receta − inventario)
+- [ ] **Viernes:** haz tu pedido con un colchón del 10% máximo
+- [ ] **Semana siguiente:** compara lo que compraste vs lo que usaste. Ajusta.
 
-### Semana 2: Configura tus coberturas
+## Resumen: del caos al control en 30 minutos semanales
 
-- Define días de cobertura por tipo de insumo (tabla de arriba)
-- Establece tu frecuencia de pedido por proveedor
-- Ajusta la cobertura con tu factor estacional (temporada alta = más días)
+1. **Esta semana:** haz tu primera hoja con menú, ventas, inventario y pedido calculado
+2. **Próximas 4 semanas:** úsala cada lunes, ajusta los números con la realidad
+3. **Mes 2:** mide tu merma y tus compras de emergencia — verás la diferencia
+4. **Cuando la hoja te quede corta:** prueba el planificador automatizado de Resurte.me
 
-### Semana 3: Arranca el ciclo de pedido
-
-- Cada día de pedido: corre la fórmula por insumo
-- Pide la cantidad exacta (consumo × cobertura − inventario)
-- Registra lo que llegó y actualiza inventario
-- Revisa semanalmente: ¿te sobró? ¿te faltó? Ajusta la cobertura
-
-<BlogCallout variant="note" title="El planificador se ajusta con tus datos, no al revés">
-En las primeras 2-3 semanas vas a ajustar coberturas: si te sobra, baja la cobertura; si te falta, súbela. El método funciona mejor cuando lo alimentas con tus datos reales. No abandones el planificador porque la primera semana no fue perfecta: es un ciclo de mejora, no una receta mágica. A la cuarta semana, los pedidos ya salen casi exactos."
-</BlogCallout>
-
-## Checklist de planificación de pedidos
-
-- [ ] Consumo real por insumo medido (2 semanas de datos como mínimo)
-- [ ] Inventario inicial completo contado
-- [ ] 20 insumos de mayor gasto identificados (80/20)
-- [ ] Cobertura definida por tipo de insumo
-- [ ] Frecuencia de pedido por proveedor establecida
-- [ ] Factor estacional aplicado (temporada alta y baja)
-- [ ] Ciclo de pedido en marcha: fórmula por insumo cada día de pedido
-- [ ] Inventario actualizado en cada recepción
-- [ ] Revisión semanal: sobrantes y faltantes → ajustar cobertura
-- [ ] Compras de emergencia rastreadas (meta: reducirlas a casi cero)
-
-## Ejemplo completo: el pedido de un martes normal
-
-Pongamos un restaurante casual que cierra el conteo el lunes y pide cada martes. Estos son los datos de su cámara:
-
-| Insumo | Consumo diario | Cobertura deseada | Inventario actual | Pedido |
-|---|---|---|---|---|
-| Pechuga de pollo | 8 kg | 3 días | 11 kg | (8×3) − 11 = 13 kg |
-| Cebolla blanca | 2 kg | 3 días | 1.5 kg | (2×3) − 1.5 = 4.5 kg |
-| Jitomate | 3 kg | 2 días | 4 kg | (3×2) − 4 = 2 kg |
-| Arroz | 1.5 kg | 7 días | 8 kg | (1.5×7) − 8 = 2.5 kg |
-| Aceite | 0.5 L | 7 días | 3 L | (0.5×7) − 3 = 0.5 L |
-
-Observa que el jitomate, siendo de los más consumidos, se pide poco porque ya tienes 4 kg en cámara (2 días de cobertura para producto fresco). Sin el conteo habrías pedido "igual que siempre" y el excedente habría caducado. Esa es la diferencia entre comprar por hábito y comprar por dato.
-
-<BlogCallout variant="tip" title="Si no tienes conteo, el primer pedido es una estimación — y está bien">
-El primer ciclo con datos incompletos saldrá imperfecto, pero ya te obliga a registrar: anota cuánto pediste, cuánto consumiste y qué sobró o faltó. Con 3 semanas de ese registro, tu consumo diario se vuelve preciso y el planificador empieza a pedir casi exacto. La precisión no es el punto de partida: es el resultado del método.
-</BlogCallout>
-
-## Cuánto dinero liberas de tu caja al planificar
-
-La inversión en inventario es dinero congelado: compraste producto que aún no vendes. El planificador reduce ese congelamiento al mínimo necesario:
-
-| Situación | Inventario inmovilizado | Merma mensual |
-|---|---|---|
-| Sin planificar ("por si acaso") | $15,000 | 12-15% |
-| Planificando con datos | $8,000-9,000 | 5-8% |
-| Ahorro mensual | $6,000-7,000 libres | 5-7 puntos menos |
-
-En un restaurante con $80,000 de compras mensuales, bajar la merma de 13% a 7% son $4,800 al mes recuperados — y liberar $6,000 de inventario muerto te da efectivo para pagar nómina o renegociar con proveedores. Es dinero que ya estaba en tu negocio: solo estaba atrapado en la cámara.
-
-## El planificador de pedidos en temporada alta
-
-La temporada alta (diciembre, fiestas patrias, puentes) es donde el planificador más brilla — y donde más dueños se quedan cortos. El ajuste es simple: multiplica tu consumo diario promedio por el factor del período.
-
-| Período | Factor típico | Ejemplo: pollo (8 kg/día) |
-|---|---|---|
-| Temporada normal | 1x | 8 kg/día |
-| Fin de semana | 1.5x | 12 kg/día |
-| Puente | 1.75x | 14 kg/día |
-| Fiestas patrias | 2x | 16 kg/día |
-| Diciembre | 2.5-3x | 20-24 kg/día |
-
-<BlogCallout variant="warning" title="El factor de temporada se calcula con tu histórico, no con tu deseo">
-Si el año pasado en diciembre vendiste 2.2x tu promedio y este año planeas 2.5x, ese extra es optimismo, no dato. Usa tu factor real del período anterior como base y ajusta máximo 10% arriba si cambió tu aforo o promociones. Pedir de más en temporada alta multiplica la merma en el peor momento: el producto se echa a perder justo cuando pagaste más caro.
-</BlogCallout>
-
-También cambia la frecuencia: en picos, lo perecedero se pide casi a diario y la cobertura baja a 1-2 días para maximizar frescura. El planificador maneja esos cambios de frecuencia sin que tú recalculas todo a mano.
-
-## Los 5 errores al planificar pedidos
-
-- **Copiar la cobertura de otro restaurante:** tu vida útil, tu rotación y tu venta son tuyas; ajusta con tus datos.
-- **No actualizar inventario:** la fórmula funciona con inventario real; si no registras lo que entra y sale, estás planeando sobre números falsos.
-- **Ignorar la estacionalidad:** el mismo pedido en temporada alta y baja te deja corto o te sobra. Aplica tu factor.
-- **Planificar solo lo perecedero:** lo seco y congelado también inmoviliza caja; planifica todo.
-- **Abandonar a las 2 semanas:** los primeros ciclos son de ajuste; la precisión llega con tus datos acumulados.
-
-**Un planificador de pedidos convierte tu compra de proveeduría en una operación exacta: ni te sobra, ni te falta, ni pagas emergencias.** Con la fórmula consumo × cobertura − inventario, coberturas por tipo de insumo y un ciclo de revisión semanal, reduces merma e inventario inmovilizado entre 10% y 20% y llegas a negociar con proveedores con datos reales. Planifica con método y tu caja lo nota desde el primer mes.
+**Comprar bien no es cuestión de memoria: es cuestión de método.** El restaurante que planifica sus pedidos compra menos, tira menos, gasta menos en emergencias y gana horas cada semana. Empieza hoy con tu hoja de cálculo: 30 minutos que te ahorran $8,000 al mes.
