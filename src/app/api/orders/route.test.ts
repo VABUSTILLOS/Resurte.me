@@ -279,7 +279,8 @@ describe("/api/orders POST sesión, cupón y fallbacks", () => {
     const coupons = tableBuilder({ data: couponRow, error: null })
     // La reserva del cupón (update().eq().eq().select("id") awaitado) resuelve vía `then`:
     // debe devolver una fila para que la reserva se considere exitosa.
-    coupons.then = (resolve: (v: unknown) => void) => resolve({ data: [{ id: 1 }], error: null })
+    coupons.then = ((resolve: (v: unknown) => void) =>
+      resolve({ data: [{ id: 1 }], error: null })) as unknown as (typeof coupons)["then"]
     const orders = tableBuilder({
       data: { id: 7, cashback_credits: 5, cashback_tier: "Verde", total: 125, restore_token: "tok" },
       error: null,
