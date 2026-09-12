@@ -462,7 +462,7 @@ export default function CartPage() {
 }
 
 const trustSignals = [
-  { icon: "🔒", label: "Pago Seguro", desc: "Stripe y Conekta" },
+  { icon: "🔒", label: "Pago Seguro", desc: "Procesado por Stripe" },
   { icon: "🚚", label: "Envío Rápido", desc: "Tarifa fija de $35" },
   { icon: "📄", label: "Factura (CFDI)", desc: "Para tu negocio" },
   { icon: "⭐", label: "Calidad Garantizada", desc: "O te devolvemos tu dinero" },

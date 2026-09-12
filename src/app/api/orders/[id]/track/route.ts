@@ -20,12 +20,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const orderId = Number(id)
   const token = request.nextUrl.searchParams.get("t")
 
-  if (!orderId || isNaN(orderId) || !token) {
+  // Solo enteros positivos: Number() aceptaría "1e3", negativos, etc.
+  if (!/^\d+$/.test(id) || !token) {
     return NextResponse.json({ error: "Parámetros inválidos" }, { status: 400 })
   }
+  const orderId = Number(id)
 
   try {
     const supabase = await createServiceClient()

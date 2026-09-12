@@ -1,6 +1,7 @@
 import { createPublicClient } from "@/lib/supabase/public"
 import type { City, Category, Product, RestaurantCollection } from "@/types"
 import { logger } from "@/lib/logger"
+import { expandSearchTerms, escapeIlike } from "@/lib/search-terms"
 
 type SupabasePublicClient = NonNullable<ReturnType<typeof createPublicClient>>
 
@@ -181,12 +182,23 @@ export async function searchAll(
 ): Promise<SearchResults> {
   const supabase = await tryCreateClient()
   if (!supabase) return { products: [] }
-  const searchTerm = `%${query}%`
+
+  // Nombre + descripción + marca, con expansión de sinónimos y sin acentos
+  // (search-terms.ts): "palta" encuentra "Aguacate Hass", "soda" → refrescos.
+  const terms = expandSearchTerms(query)
+  if (terms.length === 0) return { products: [] }
+
+  const orFilter = terms
+    .flatMap((term) => {
+      const t = escapeIlike(term)
+      return [`name.ilike.%${t}%`, `description.ilike.%${t}%`, `brand.ilike.%${t}%`]
+    })
+    .join(",")
 
   const { data: products } = await supabase
     .from("products")
     .select("*")
-    .ilike("name", searchTerm)
+    .or(orFilter)
     .eq("is_visible", true)
     .limit(20)
 

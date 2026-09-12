@@ -7,7 +7,9 @@ import {
   STATUS_LABEL,
   PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_LABEL,
+  isFinalOrderStatus,
 } from "@/lib/order-labels"
+import { usePolling } from "@/hooks/use-polling"
 import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Package, MapPin, Clock, CreditCard, DollarSign, Store, Truck, CheckCircle2, Circle } from "lucide-react"
 import Link from "next/link"
@@ -75,24 +77,26 @@ export function OrderDetailClient() {
   )
 
   useEffect(() => {
-    let cancelled = false
-    let timer: ReturnType<typeof setTimeout> | null = null
+    // sin sesión o sin id no hay nada que consultar: loading fuera de una vez
+    if (!supabase || !orderId) setLoading(false)
+  }, [supabase, orderId])
 
-    async function fetchOrder() {
-      if (!supabase || !orderId) {
+  // Actualización en vivo: mientras el pedido no llegue a un estado final,
+  // re-consulta cada 25s para mover el stepper sin recargar. Ante un error
+  // de red el polling se detiene (errorIntervalMs: null), como antes.
+  usePolling(
+    async () => {
+      if (!supabase || !orderId) return true
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.user?.id) {
         setLoading(false)
-        return
+        return true
       }
 
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-        if (!session?.user?.id) {
-          setLoading(false)
-          return
-        }
-
         const { data, error } = await supabase
           .from("orders")
           .select(
@@ -104,10 +108,8 @@ export function OrderDetailClient() {
 
         if (error || !data) {
           setLoading(false)
-          return
+          return true
         }
-
-        if (cancelled) return
 
         const { order_items, addresses, ...row } = data as OrderRow
         const items = (order_items ?? []).map((item) => ({
@@ -120,27 +122,13 @@ export function OrderDetailClient() {
           product_image: item.products?.image_url || "",
         }))
         setOrder({ ...row, address: addresses ?? null, items })
-
-        // Actualización en vivo: mientras el pedido no llegue a un estado
-        // final, re-consulta cada 25s para mover el stepper sin recargar.
-        const final = row.status === "delivered" || row.status === "cancelled"
-        if (!final && !cancelled) {
-          timer = setTimeout(fetchOrder, 25_000)
-        }
-      } catch {
-        // Keep defaults
+        return isFinalOrderStatus(row.status)
       } finally {
-        if (!cancelled) setLoading(false)
+        setLoading(false)
       }
-    }
-
-    fetchOrder()
-
-    return () => {
-      cancelled = true
-      if (timer) clearTimeout(timer)
-    }
-  }, [supabase, orderId])
+    },
+    { intervalMs: 25_000, errorIntervalMs: null }
+  )
 
   if (!city) {
     return <PageSkeleton />

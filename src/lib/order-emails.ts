@@ -11,7 +11,8 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/service"
-import { sendEmail, orderConfirmationEmailHtml, orderStatusEmailHtml } from "@/lib/email"
+import { sendEmail, orderConfirmationEmailHtml, orderStatusEmailHtml, escapeHtml } from "@/lib/email"
+import { PAYMENT_METHOD_LABEL } from "@/lib/order-labels"
 import { logger } from "@/lib/logger"
 import type { OrderStatus } from "@/types"
 
@@ -162,7 +163,8 @@ export async function sendOrderConfirmationEmail(orderId: number): Promise<void>
       (items ?? [])
         .map((i) => {
           const p = Array.isArray(i.products) ? i.products[0] : i.products
-          return `${i.quantity}× ${(p as { name?: string } | null)?.name ?? "Producto"}`
+          // Nombre escapado: se interpola directo en el HTML del correo.
+          return `${i.quantity}× ${escapeHtml((p as { name?: string } | null)?.name ?? "Producto")}`
         })
         .join("<br>") || "Tu pedido"
 
@@ -173,7 +175,10 @@ export async function sendOrderConfirmationEmail(orderId: number): Promise<void>
         orderId,
         itemsPreview,
         total: `$${Number(order.total).toFixed(2)}`,
-        paymentMethod: order.payment_method ?? "—",
+        paymentMethod:
+          (order.payment_method && PAYMENT_METHOD_LABEL[order.payment_method]) ||
+          order.payment_method ||
+          "—",
         scheduledFor: order.scheduled_for
           ? new Date(order.scheduled_for).toLocaleDateString("es-MX", {
               weekday: "long",

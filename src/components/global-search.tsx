@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Search, X, ArrowRight } from "lucide-react"
 import { readStored } from "@/lib/storage"
+import { searchProducts } from "@/app/[slug]/buscar/actions"
+import type { Product } from "@/types"
 
 interface InventarioItem {
   name: string
@@ -51,6 +53,9 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
   const router = useRouter()
   const [query, setQuery] = useState("")
   const [selectedIdx, setSelectedIdx] = useState(0)
+  // Productos del catálogo (server-side, todo el catálogo de la ciudad) —
+  // el Cmd+K del comprador busca productos, no solo datos del panel.
+  const [productHits, setProductHits] = useState<Product[]>([])
 
   // Reset state when the dialog opens. Se ajusta durante el render (patrón
   // recomendado por React) en vez de en un effect, para evitar re-renders en cascada.
@@ -60,8 +65,33 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
     if (open) {
       setQuery("")
       setSelectedIdx(0)
+      setProductHits([])
     }
   }
+
+  // Búsqueda server-side de productos (debounced 250ms) sobre el catálogo
+  // completo de la ciudad — incluye descripción/marca/sinónimos.
+  useEffect(() => {
+    const term = query.trim()
+    if (!open || term.length < 2) {
+      setProductHits([])
+      return
+    }
+    let cancelled = false
+    const timeout = setTimeout(() => {
+      searchProducts(term, slug ?? undefined)
+        .then((products) => {
+          if (!cancelled) setProductHits(products.slice(0, 4))
+        })
+        .catch(() => {
+          if (!cancelled) setProductHits([])
+        })
+    }, 250)
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+    }
+  }, [open, query, slug])
 
   // Parsea todas las fuentes de localStorage UNA sola vez por apertura del
   // diálogo (antes: se re-leían y re-parseaban en cada tecla).
@@ -88,6 +118,20 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
     if (!index || !query.trim()) return []
     const q = query.toLowerCase()
     const items: SearchResult[] = []
+
+    // Productos de la tienda primero (catálogo completo vía server search).
+    const citySlug = slug ?? "cdmx"
+    for (const p of productHits) {
+      items.push({
+        id: `product-${p.id}`,
+        label: p.name,
+        subtitle: `$${(p.sale_price ?? p.price).toFixed(2)}${p.unit ? ` · ${p.unit}` : ""}${p.brand ? ` · ${p.brand}` : ""}`,
+        tool: "tienda",
+        toolLabel: "Tienda",
+        url: `/${citySlug}/producto/${p.slug}`,
+        emoji: "🛒",
+      })
+    }
 
     // Index dishes from costeo (datos reales de shared-dishes)
     const seenDishes = new Set<string>()
@@ -184,7 +228,7 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
 
     // Limit to 8 results max
     return items.slice(0, 8)
-  }, [index, query])
+  }, [index, query, productHits, slug])
 
   const goTo = useCallback((url: string) => {
     onClose()
@@ -248,7 +292,7 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
           {query.trim() === "" ? (
             <div className="px-4 py-8 text-center text-gray-400">
               <Search className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">Escribe para buscar en todas las herramientas</p>
+              <p className="text-sm">Escribe para buscar productos de la tienda y en tus herramientas</p>
             </div>
           ) : results.length === 0 ? (
             <div className="px-4 py-8 text-center text-gray-400">

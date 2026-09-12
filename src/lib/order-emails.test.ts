@@ -5,6 +5,7 @@ vi.mock("@/lib/email", () => ({
   sendEmail: vi.fn().mockResolvedValue({ ok: true, id: "re_1" }),
   orderConfirmationEmailHtml: vi.fn(() => "<html>confirm</html>"),
   orderStatusEmailHtml: vi.fn(() => "<html>status</html>"),
+  escapeHtml: (s: string) => s,
 }))
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
 

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package, Search, Handshake } from "lucide-react"
+import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package, Search, Handshake, Heart } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
@@ -248,6 +248,14 @@ export function Header() {
                     >
                       <Package className="w-4 h-4" />
                       Mis pedidos
+                    </Link>
+                    <Link
+                      href={city ? `/${city.slug}/favoritos` : "/auth/login"}
+                      onClick={() => setShowUserMenu(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#343538] hover:bg-[#F7F5F0] transition-colors"
+                    >
+                      <Heart className="w-4 h-4" />
+                      Mi lista de resurtido
                     </Link>
                     <Link
                       href={city ? `/${city.slug}/mis-direcciones` : "/auth/login"}

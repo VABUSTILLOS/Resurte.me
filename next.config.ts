@@ -9,7 +9,6 @@ const nextConfig: NextConfig = {
     "resurte.me",
   ],
   images: {
-    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
@@ -22,6 +21,18 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "storage.googleapis.com",
+      },
+      {
+        protocol: "https",
+        hostname: "abpollo.com",
+      },
+      {
+        protocol: "https",
+        hostname: "upload.wikimedia.org",
+      },
+      {
+        protocol: "https",
+        hostname: "images.openfoodfacts.org",
       },
     ],
     formats: ["image/avif", "image/webp"],
@@ -56,6 +67,10 @@ const nextConfig: NextConfig = {
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(self), interest-cohort=()",
+          },
+          {
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin",
           },
         ],
       },

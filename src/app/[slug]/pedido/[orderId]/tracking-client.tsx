@@ -8,18 +8,19 @@ import {
   CheckCircle2,
   Package,
   Truck,
-  Circle,
-  MapPin,
   CreditCard,
   DollarSign,
   Store,
+  MessageCircle,
 } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import {
   STATUS_LABEL,
   PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_LABEL,
+  isFinalOrderStatus,
 } from "@/lib/order-labels"
+import { usePolling } from "@/hooks/use-polling"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
 import type { OrderStatus, PaymentMethod, PaymentStatus } from "@/types"
 
@@ -31,13 +32,12 @@ const ORDER_STATUSES: OrderStatus[] = [
   "delivered",
 ]
 
-const STATUS_ICONS: Record<OrderStatus, React.ReactNode> = {
+const STATUS_ICONS: Partial<Record<OrderStatus, React.ReactNode>> = {
   pending: <Clock className="w-5 h-5" />,
   confirmed: <CheckCircle2 className="w-5 h-5" />,
   preparing: <Package className="w-5 h-5" />,
   out_for_delivery: <Truck className="w-5 h-5" />,
   delivered: <CheckCircle2 className="w-5 h-5" />,
-  cancelled: <Circle className="w-5 h-5" />,
 }
 
 const STEP_HINTS = [
@@ -80,46 +80,31 @@ export function TrackingClient() {
     if (!orderId || !token) {
       setNotFound(true)
       setLoading(false)
-      return
     }
+  }, [orderId, token])
 
-    let cancelled = false
-    let timer: ReturnType<typeof setTimeout> | null = null
-
-    async function fetchOrder() {
+  // Sigue actualizando mientras el pedido no llegue a un estado final;
+  // ante error de red reintenta con backoff (2×) vía usePolling.
+  usePolling(
+    async () => {
       try {
         const res = await fetch(`/api/orders/${orderId}/track?t=${encodeURIComponent(token!)}`, {
           cache: "no-store",
         })
-        if (cancelled) return
         if (res.status === 404) {
           setNotFound(true)
-          setLoading(false)
-          return
+          return true
         }
         if (!res.ok) throw new Error(String(res.status))
         const data = (await res.json()) as { order: TrackedOrder }
         setOrder(data.order)
+        return isFinalOrderStatus(data.order.status)
+      } finally {
         setLoading(false)
-        // Sigue actualizando mientras el pedido no llegue a un estado final.
-        const final = data.order.status === "delivered" || data.order.status === "cancelled"
-        if (!final && !cancelled) {
-          timer = setTimeout(fetchOrder, POLL_MS)
-        }
-      } catch {
-        if (!cancelled) {
-          setLoading(false)
-          timer = setTimeout(fetchOrder, POLL_MS * 2)
-        }
       }
-    }
-
-    fetchOrder()
-    return () => {
-      cancelled = true
-      if (timer) clearTimeout(timer)
-    }
-  }, [orderId, token])
+    },
+    { intervalMs: POLL_MS, enabled: Boolean(orderId && token) }
+  )
 
   if (!city || loading) {
     return <PageSkeleton titleWidth="w-52" cards={3} />
@@ -161,8 +146,7 @@ export function TrackingClient() {
           })}
           {order.city ? ` · Entrega en ${order.city.name}` : ""}
         </p>
-        {order.status !== "delivered" && order.status !== "cancelled" && (
-          <p className="text-xs text-brand-600 mt-1 flex items-center gap-1">
+        {!isFinalOrderStatus(order.status) && (          <p className="text-xs text-brand-600 mt-1 flex items-center gap-1">
             <span className="inline-block w-2 h-2 rounded-full bg-brand-500 animate-pulse" />
             Se actualiza automáticamente
           </p>
@@ -301,7 +285,7 @@ export function TrackingClient() {
           rel="noopener noreferrer"
           className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
         >
-          <MapPin className="w-4 h-4" />
+          <MessageCircle className="w-4 h-4" />
           Ayuda con mi pedido
         </a>
       </div>

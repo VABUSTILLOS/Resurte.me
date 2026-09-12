@@ -1,9 +1,10 @@
 "use client"
 
-import { Plus, Check } from "lucide-react"
+import { Plus, Check, Heart } from "lucide-react"
 import Image from "next/image"
 import type { Product } from "@/types"
 import { useCart } from "@/contexts/cart-context"
+import { useFavorites } from "@/contexts/favorites-context"
 import { useToast } from "@/components/toast"
 import { cn, getProductTagline } from "@/lib/utils"
 import { AnalyticsEvents } from "@/lib/analytics"
@@ -37,7 +38,9 @@ export const ProductCard = memo(function ProductCard({
 }: ProductCardProps) {
   const { addItem } = useCart()
   const { toast } = useToast()
+  const { toggle: toggleFavorite, isFavorite } = useFavorites()
   const [added, setAdded] = useState(false)
+  const favorited = isFavorite(product.id)
 
   const price = product.sale_price ?? product.price
   const hasDiscount = product.sale_price && product.sale_price < product.price
@@ -196,6 +199,23 @@ export const ProductCard = memo(function ProductCard({
           )}
         </div>
       </Link>
+
+      {/* Favorito (lista de resurtido) — fuera del Link para no anidar
+          interactivos; posicionado sobre la esquina de la imagen. */}
+      <button
+        type="button"
+        onClick={() => toggleFavorite(product.id)}
+        aria-label={favorited ? `Quitar ${product.name} de mi lista de resurtido` : `Agregar ${product.name} a mi lista de resurtido`}
+        aria-pressed={favorited}
+        className="absolute top-2 right-2 z-20 p-2 rounded-full bg-white/90 backdrop-blur-sm shadow-sm border border-[#e0dbd2] hover:scale-110 active:scale-95 transition-transform touch-target"
+      >
+        <Heart
+          className={cn(
+            "w-4 h-4 transition-colors",
+            favorited ? "fill-[#de3534] text-[#de3534]" : "text-[#6b6b6b]"
+          )}
+        />
+      </button>
 
       {/* Quick-add button — mobile: inline dentro del card (sin saliente que
           pise la fila siguiente). ≥sm: Erewhon-style, flota bajo el card. */}

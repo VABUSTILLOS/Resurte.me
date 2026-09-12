@@ -195,16 +195,27 @@ function saveToStorage(cart: Cart, coupon: AppliedCoupon | null) {
 // ============================================================
 
 /** PUT best-effort del carrito completo al servidor (usuario con sesión). */
-async function pushCartToServer(items: CartItem[], coupon: AppliedCoupon | null): Promise<void> {
+async function pushCartToServer(
+  items: CartItem[],
+  coupon: AppliedCoupon | null,
+  opts?: { keepalive?: boolean }
+): Promise<void> {
   try {
     await fetch("/api/cart", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ items, coupon }),
+      // keepalive permite que el flush de cierre de pestaña sobreviva al unload
+      keepalive: opts?.keepalive,
     })
   } catch {
     // Offline: el carrito local (localStorage) sigue siendo la fuente visible.
   }
+}
+
+/** Serialización estable para detectar si el carrito ya fue subido. */
+function serializeCart(items: CartItem[], coupon: AppliedCoupon | null): string {
+  return JSON.stringify({ items, coupon })
 }
 
 function calcSubtotal(items: CartItem[]): number {
@@ -250,7 +261,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // sesión se hace merge last-write-wins con user_carts (ver cart-sync.ts).
   const [userId, setUserId] = useState<string | null>(null)
   const [serverSynced, setServerSynced] = useState(false)
-  const skipNextPush = useRef(false)
+  // Snapshot del último estado que ya está en el servidor (o acaba de
+  // aplicarse desde él). Comparar contra esto evita tanto el push redundante
+  // tras un use-server como la carrera del viejo flag skipNextPush, que podía
+  // tragarse una edición hecha entre el LOAD_CART y el efecto de debounce.
+  const lastPushedRef = useRef<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -287,12 +302,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
           server
         )
         if (decision.action === "use-server") {
-          skipNextPush.current = true
+          lastPushedRef.current = serializeCart(decision.cart.items, decision.coupon)
           dispatch({
             type: "LOAD_CART",
             payload: { cart: decision.cart, coupon: decision.coupon, isLoaded: true },
           })
         } else if (decision.action === "upload-local") {
+          lastPushedRef.current = serializeCart(local.cart.items, local.coupon)
           void pushCartToServer(local.cart.items, local.coupon)
         }
       } catch {
@@ -306,18 +322,34 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [userId])
 
-  // Push debounced de cambios (solo tras el merge inicial).
+  // Push debounced de cambios (solo tras el merge inicial). Si el estado
+  // actual ya está en el servidor (mismo snapshot), no se sube nada.
   useEffect(() => {
     if (!userId || !state.isLoaded || !serverSynced) return
-    if (skipNextPush.current) {
-      skipNextPush.current = false
-      return
-    }
+    const snapshot = serializeCart(state.cart.items, state.coupon)
+    if (snapshot === lastPushedRef.current) return
     const timer = setTimeout(() => {
+      lastPushedRef.current = snapshot
       void pushCartToServer(state.cart.items, state.coupon)
     }, 1500)
     return () => clearTimeout(timer)
   }, [userId, state.cart, state.coupon, state.isLoaded, serverSynced])
+
+  // Flush al desmontar/cerrar: el debounce se cancela en cleanup, así que sin
+  // esto el último cambio antes de navegar o cerrar la pestaña no se subiría.
+  const latestRef = useRef({ userId, serverSynced, state })
+  useEffect(() => {
+    latestRef.current = { userId, serverSynced, state }
+  })
+  useEffect(() => {
+    return () => {
+      const { userId: uid, serverSynced: synced, state: s } = latestRef.current
+      if (!uid || !synced || !s.isLoaded) return
+      const snapshot = serializeCart(s.cart.items, s.coupon)
+      if (snapshot === lastPushedRef.current) return
+      void pushCartToServer(s.cart.items, s.coupon, { keepalive: true })
+    }
+  }, [])
 
   const addItem = useCallback((item: CartItem) => {
     dispatch({ type: "ADD_ITEM", payload: item })

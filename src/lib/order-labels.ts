@@ -33,3 +33,8 @@ export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   mercado_pago: "Mercado Pago",
   codi: "CoDi",
 }
+
+/** Estados terminales del pedido: ya no requieren polling de seguimiento. */
+export function isFinalOrderStatus(status: string): boolean {
+  return status === "delivered" || status === "cancelled"
+}

@@ -31,14 +31,28 @@ function sanitizeItems(raw: unknown): CartItemInput[] | null {
       typeof it !== "object" ||
       it === null ||
       typeof (it as CartItemInput).product_id !== "number" ||
-      typeof (it as CartItemInput).quantity !== "number" ||
-      (it as CartItemInput).quantity <= 0
+      !Number.isInteger((it as CartItemInput).quantity) ||
+      (it as CartItemInput).quantity <= 0 ||
+      (it as CartItemInput).quantity > 999
     ) {
       return null
     }
     items.push(it as CartItemInput)
   }
   return items
+}
+
+/**
+ * Validación mínima del cupón: objeto con `code` string y tamaño acotado.
+ * El servidor de órdenes revalida el cupón al cobrar; aquí solo se persiste.
+ */
+function sanitizeCoupon(raw: unknown): Record<string, unknown> | null {
+  if (raw == null) return null
+  if (typeof raw !== "object" || Array.isArray(raw)) return null
+  const coupon = raw as Record<string, unknown>
+  if (typeof coupon.code !== "string" || coupon.code.length > 64) return null
+  if (JSON.stringify(coupon).length > 4096) return null
+  return coupon
 }
 
 export async function GET() {
@@ -94,7 +108,13 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       )
     }
-    const coupon = body?.coupon && typeof body.coupon === "object" ? body.coupon : null
+    const coupon = body?.coupon == null ? null : sanitizeCoupon(body.coupon)
+    if (body?.coupon != null && coupon === null) {
+      return NextResponse.json(
+        { error: "coupon inválido (se espera un objeto con code)" },
+        { status: 400 }
+      )
+    }
 
     const { data, error } = await supabase
       .from("user_carts")

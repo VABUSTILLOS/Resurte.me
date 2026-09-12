@@ -70,7 +70,7 @@ export function CityPageClient({ slug, categories, products }: Props) {
           Central de Abastos Digital en {city.name}
         </h1>
         <p className="mt-2 text-[var(--text-secondary)] max-w-2xl">
-          Más de 30 productos frescos para tu negocio. Sin membresía, sin mínimo de compra. Pedidos por caja, bulto o pieza.
+          {products.length} productos frescos para tu negocio. Sin membresía, sin mínimo de compra. Pedidos por caja, bulto o pieza.
         </p>
       </div>
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react"
 import { useSearchParams } from "next/navigation"
-import { Search, ShoppingBag, ArrowLeft, ArrowUpDown, X } from "lucide-react"
+import { Search, ShoppingBag, ArrowLeft, ArrowUpDown, X, DollarSign } from "lucide-react"
 import { ProductCard } from "@/components/product/product-card"
 import { SearchBar } from "@/components/search/search-bar"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
@@ -12,6 +12,15 @@ import { loadMoreProducts, searchProducts } from "@/app/[slug]/buscar/actions"
 import Link from "next/link"
 
 type SortOption = "categoria" | "name" | "price-asc" | "price-desc"
+
+// Rangos de precio rápidos para el filtro (MXN por unidad de venta).
+type PriceRange = "all" | "lt100" | "100-300" | "gt300"
+const PRICE_RANGES: { key: PriceRange; label: string; test: (price: number) => boolean }[] = [
+  { key: "all", label: "Cualquier precio", test: () => true },
+  { key: "lt100", label: "< $100", test: (p) => p < 100 },
+  { key: "100-300", label: "$100–$300", test: (p) => p >= 100 && p <= 300 },
+  { key: "gt300", label: "> $300", test: (p) => p > 300 },
+]
 
 interface SearchPageClientProps {
   citySlug: string
@@ -34,6 +43,8 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
 
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [sortBy, setSortBy] = useState<SortOption>("categoria")
+  const [priceRange, setPriceRange] = useState<PriceRange>("all")
+  const [onlyAvailable, setOnlyAvailable] = useState(false)
   const filterBarRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -104,9 +115,13 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
   // Compute filtered + searched results (derived state, no effect needed)
   const results = useMemo(() => {
     const term = normalize(query.trim())
-    const filtered = selectedCategory
-      ? allProducts.filter((p) => p.category_id === selectedCategory)
-      : allProducts
+    const priceTest = PRICE_RANGES.find((r) => r.key === priceRange)?.test ?? (() => true)
+    const filtered = allProducts.filter((p) => {
+      if (selectedCategory && p.category_id !== selectedCategory) return false
+      if (onlyAvailable && p.stock_status === "out_of_stock") return false
+      if (!priceTest(p.sale_price ?? p.price)) return false
+      return true
+    })
 
     if (!term) return filtered
     if (term.length < 2) return []
@@ -127,10 +142,12 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
     for (const p of clientMatches) byId.set(p.id, p)
     for (const p of serverResults) {
       if (selectedCategory && p.category_id !== selectedCategory) continue
+      if (onlyAvailable && p.stock_status === "out_of_stock") continue
+      if (!priceTest(p.sale_price ?? p.price)) continue
       if (!byId.has(p.id)) byId.set(p.id, p)
     }
     return Array.from(byId.values())
-  }, [query, selectedCategory, allProducts, serverResults])
+  }, [query, selectedCategory, allProducts, serverResults, priceRange, onlyAvailable])
 
   // Sort results
   const sortedResults = useMemo(() => {
@@ -294,6 +311,34 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
 
             {/* Sort dropdown & active filter indicator */}
             <div className="flex items-center gap-2 shrink-0">
+              {/* Solo disponibles */}
+              <button
+                onClick={() => setOnlyAvailable((v) => !v)}
+                aria-pressed={onlyAvailable}
+                className={`shrink-0 inline-flex items-center gap-1 px-3 py-2 sm:py-1.5 rounded-full text-xs font-medium transition-colors touch-target ${
+                  onlyAvailable
+                    ? "bg-[#0E7A0E] text-white shadow-sm"
+                    : "bg-white text-[#1a1a1a] border border-[#e0dbd2] hover:border-[#0E7A0E]/30"
+                }`}
+              >
+                Solo disponibles
+              </button>
+              {/* Rango de precio */}
+              <div className="relative flex items-center gap-1.5 bg-white border border-[#e0dbd2] rounded-full px-3 py-2 sm:py-1.5 touch-target">
+                <DollarSign className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                <select
+                  value={priceRange}
+                  onChange={(e) => setPriceRange(e.target.value as PriceRange)}
+                  aria-label="Filtrar por precio"
+                  className="text-xs font-medium text-[#1a1a1a] bg-transparent outline-none cursor-pointer appearance-none pr-1"
+                >
+                  {PRICE_RANGES.map((r) => (
+                    <option key={r.key} value={r.key}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               {selectedCategory && selectedCat && (
                 <button
                   onClick={() => setSelectedCategory(null)}

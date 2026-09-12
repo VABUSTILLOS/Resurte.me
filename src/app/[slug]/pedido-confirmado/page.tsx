@@ -49,9 +49,11 @@ export default function OrderConfirmedPage() {
   const orderId = lastOrder.orderId ? `#${lastOrder.orderId}` : null
   const cashback = lastOrder.cashback
   const repurchaseCoupon = lastOrder.repurchaseCoupon
+  // city puede ser null hasta que resuelve el contexto (guard más abajo);
+  // sin slug no construimos URL para no generar "//pedido/…".
   const trackingUrl =
-    lastOrder.orderId && lastOrder.trackingToken
-      ? `/${city?.slug ?? ""}/pedido/${lastOrder.orderId}?t=${lastOrder.trackingToken}`
+    city && lastOrder.orderId && lastOrder.trackingToken
+      ? `/${city.slug}/pedido/${lastOrder.orderId}?t=${lastOrder.trackingToken}`
       : null
 
   // Track purchase on page mount (total/items come from sessionStorage,
