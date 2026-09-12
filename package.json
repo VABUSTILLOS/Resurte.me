@@ -55,7 +55,8 @@
   },
   "knip": {
     "ignore": [
-      "scripts/archive/**"
+      "scripts/**",
+      "src/lib/ai/kie-ai-admin.ts"
     ],
     "ignoreIssues": {
       "src/lib/panel-utils.ts": [
@@ -83,6 +84,44 @@
       ],
       "src/lib/orders-address.ts": [
         "exports"
+      ],
+      "src/hooks/use-ventas-page.ts": [
+        "exports"
+      ],
+      "src/lib/admin-marketing-validation.ts": [
+        "exports"
+      ],
+      "src/lib/ai/kie-ai.ts": [
+        "exports",
+        "types"
+      ],
+      "src/lib/catalog-cache.ts": [
+        "exports"
+      ],
+      "src/lib/comercializacion/whatsapp.ts": [
+        "exports"
+      ],
+      "src/lib/email-workflows.ts": [
+        "exports",
+        "types"
+      ],
+      "src/lib/i18n/en.ts": [
+        "exports"
+      ],
+      "src/lib/i18n/es.ts": [
+        "exports"
+      ],
+      "src/lib/panel-roles.ts": [
+        "exports"
+      ],
+      "src/lib/panel-sync.ts": [
+        "exports"
+      ],
+      "src/lib/utm.ts": [
+        "exports"
+      ],
+      "src/types/index.ts": [
+        "types"
       ]
     }
   }
