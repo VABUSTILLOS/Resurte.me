@@ -81,7 +81,7 @@ const aguacate = {
   stock_status: "in_stock",
 }
 
-test.describe("checkout drawer (alta conversión)", () => {
+test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
   test("abre el drawer con el carrito y muestra la barra de envío gratis", async ({ page }) => {
     seedCart(page, [aguacate])
     await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
@@ -92,9 +92,12 @@ test.describe("checkout drawer (alta conversión)", () => {
     await expect(page.getByRole("button", { name: "Continuar al envío" })).toBeVisible()
     await expect(page.getByText("1× Aguacate Hass (caja 10 kg)")).toBeVisible()
 
-    // Barra de envío gratis: subtotal $850 ≥ $500 → envío gratis
-    await expect(page.getByText("🎉 Tienes envío gratis")).toBeVisible()
-    await expect(page.getByText("Gratis 🎉")).toBeVisible()
+    // Barra de envío gratis: subtotal $850 ≥ $500 → envío gratis.
+    // El texto existe duplicado en el DOM (variantes responsive); se acota al
+    // diálogo de Checkout y a la variante visible para no violar strict mode.
+    const drawer = page.getByLabel("Checkout", { exact: true })
+    await expect(drawer.getByText("🎉 Tienes envío gratis").filter({ visible: true })).toBeVisible()
+    await expect(drawer.getByText("Gratis 🎉").filter({ visible: true })).toBeVisible()
   })
 
   test("subtotal menor al umbral muestra la barra con lo que falta", async ({ page }) => {
@@ -105,8 +108,9 @@ test.describe("checkout drawer (alta conversión)", () => {
 
     await expect(page.getByRole("button", { name: "Continuar al envío" })).toBeVisible()
     // $250 → faltan $250 para envío gratis
-    await expect(page.getByText("Agrega $250.00 más para envío gratis")).toBeVisible()
-    await expect(page.getByText("$35.00")).toBeVisible() // envío con cargo
+    const drawer = page.getByLabel("Checkout", { exact: true })
+    await expect(drawer.getByText("Agrega $250.00 más para envío gratis").filter({ visible: true })).toBeVisible()
+    await expect(drawer.getByText("$35.00").filter({ visible: true })).toBeVisible() // envío con cargo
   })
 
   test("carrito vacío: botón de continuar deshabilitado (retrocompatibilidad)", async ({ page }) => {

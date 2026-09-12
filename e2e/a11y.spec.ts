@@ -2,6 +2,15 @@ import { test, expect, type Page } from "@playwright/test"
 
 // Inyecta axe-core y ejecuta el scan de la página actual.
 async function runAxe(page: Page): Promise<AxeResults> {
+  // Framer Motion escribe `opacity` como estilo inline durante las
+  // animaciones de entrada. Si axe corre a mitad de un fade-in, mide los
+  // colores mezclados con el fondo y reporta falsos positivos de
+  // color-contrast (visto en CI, runners más lentos que una laptop; los
+  // colores del tema ya cumplen WCAG AA en reposo — ver globals.css).
+  // Forzamos el estado final antes de escanear.
+  await page.addStyleTag({
+    content: '[style*="opacity"] { opacity: 1 !important; }',
+  })
   await page.addScriptTag({ path: require.resolve("axe-core/axe.min.js") })
   return page.evaluate(async () => {
     // @ts-expect-error — axe inyectado globalmente
@@ -40,7 +49,7 @@ function summarize(violations: AxeViolation[]): string {
     .join("\n")
 }
 
-test.describe("accesibilidad WCAG (axe-core)", () => {
+test.describe("accesibilidad WCAG (axe-core)", { tag: "@ci" }, () => {
   const pages: Array<[string, string]> = [
     ["home", "/"],
     ["marketplace", "/comer"],
