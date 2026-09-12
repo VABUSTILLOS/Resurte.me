@@ -263,7 +263,7 @@ export const ProductCard = memo(function ProductCard({
       ) : notifyMeUrl ? (
         /* Producto agotado con canal de WhatsApp: CTA "Avísame" para capturar
            la demanda en lugar de perder la venta. Ocupa el mismo slot que el
-           quick-add para que el grid no se desacomode. */}
+           quick-add para que el grid no se desacomode. */
         <a
           href={notifyMeUrl}
           target="_blank"
@@ -300,25 +300,40 @@ export function ProductCardGrid({
   if (products.length === 0) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-400">No se encontraron productos.</p>
+        <p className="text-5xl mb-3" aria-hidden="true">🥑</p>
+        <p className="text-gray-500 font-medium">No se encontraron productos.</p>
+        <p className="text-sm text-gray-400 mt-1 mb-5">
+          Prueba con otra categoría o revisa el catálogo completo.
+        </p>
+        <Link
+          href={`/${citySlug}`}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white text-sm font-semibold rounded-full hover:bg-brand-700 transition-colors"
+        >
+          Ver catálogo completo
+        </Link>
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
+    <ul
+      role="list"
+      aria-label={`${products.length} productos`}
+      className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4"
+    >
       {products.map((product, i) => (
-        <ProductCard
-          key={product.id}
-          product={product}
-          whatsappNumber={whatsappNumber}
-          citySlug={citySlug}
-          onAddToCart={onAddToCart}
-          // Solo la primera fila (4 en desktop, 2×2 en móvil) precarga su
-          // imagen: el resto usa lazy por defecto para no competir con el LCP.
-          priority={i < 4}
-        />
+        <li key={product.id} className="flex">
+          <ProductCard
+            product={product}
+            whatsappNumber={whatsappNumber}
+            citySlug={citySlug}
+            onAddToCart={onAddToCart}
+            // Solo la primera fila (4 en desktop, 2×2 en móvil) precarga su
+            // imagen: el resto usa lazy por defecto para no competir con el LCP.
+            priority={i < 4}
+          />
+        </li>
       ))}
-    </div>
+    </ul>
   )
 }
