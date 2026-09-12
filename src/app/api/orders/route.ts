@@ -45,8 +45,8 @@ interface CreateOrderBody {
   }
   payment_method: string
   phone?: string
-  // Email del cliente (drawer checkout): se persiste para notificaciones y
-  // reutilización del método de pago en upsells 1-click.
+  // Email del cliente (drawer checkout): se captura al salir del campo (onBlur) como lead y se
+  // pasa a Stripe como customer_email para habilitar Link Pay / prefill.
   email?: string
   subtotal: number
   delivery_fee: number
@@ -168,6 +168,19 @@ export async function POST(request: NextRequest) {
       if (!priceByProduct.has(item.product_id)) {
         return NextResponse.json(
           { error: `Producto no encontrado: ${item.product_id}` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Cantidades (A3): enteros entre 1 y 99, el mismo rango que ya usan los
+    // upsells. Sin esta validación, cantidades negativas (subtotales
+    // negativos e items corruptos), decimales o absurdas (10^9) pasaban
+    // intactas a la BD y a la comanda.
+    for (const item of items) {
+      if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99) {
+        return NextResponse.json(
+          { error: `Cantidad inválida para el producto ${item.product_id}` },
           { status: 400 }
         )
       }
