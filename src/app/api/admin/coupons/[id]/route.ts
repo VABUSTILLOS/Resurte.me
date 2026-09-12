@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { requireAdmin } from "@/lib/admin-auth"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
+import { validateCouponPatch } from "@/lib/admin-marketing-validation"
 
 export const runtime = "nodejs"
 
@@ -25,42 +26,12 @@ export async function PATCH(
     }
 
     const body = (await request.json()) as Record<string, unknown>
-    const patch: Record<string, unknown> = {}
-    if ("discount_value" in body) {
-      const v = Number(body.discount_value)
-      if (!Number.isFinite(v) || v <= 0) {
-        return NextResponse.json({ error: "discount_value debe ser positivo" }, { status: 400 })
-      }
-      patch.discount_value = v
+    // Fase 11 — validación extraída a lib para cubrirla con tests
+    const parsed = validateCouponPatch(body)
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 })
     }
-    if ("min_order" in body) {
-      const v = Number(body.min_order)
-      if (!Number.isFinite(v) || v < 0) {
-        return NextResponse.json({ error: "min_order inválido" }, { status: 400 })
-      }
-      patch.min_order = v
-    }
-    if ("max_uses" in body) {
-      const v = Math.trunc(Number(body.max_uses))
-      if (!Number.isFinite(v) || v < 0) {
-        return NextResponse.json({ error: "max_uses inválido" }, { status: 400 })
-      }
-      patch.max_uses = v
-    }
-    if ("expires_at" in body) {
-      if (body.expires_at === null) {
-        patch.expires_at = null
-      } else {
-        const d = new Date(String(body.expires_at))
-        if (Number.isNaN(d.getTime())) {
-          return NextResponse.json({ error: "expires_at inválido" }, { status: 400 })
-        }
-        patch.expires_at = d.toISOString()
-      }
-    }
-    if (Object.keys(patch).length === 0) {
-      return NextResponse.json({ error: "Sin campos para actualizar" }, { status: 400 })
-    }
+    const patch = parsed.value
 
     const supabase = await createServiceClient()
     const { error } = await supabase.from("coupons").update(patch).eq("id", couponId)
