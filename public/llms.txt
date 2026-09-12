@@ -30,6 +30,8 @@ El mismo catálogo existe para cada ciudad con el patrón `https://resurte.me/{c
 
 ## Guías destacadas del blog
 
+- [Proveeduría para restaurantes: guía completa (hub)](https://resurte.me/blog/guia-proveeduria-restaurantes)
+- [Costos de un restaurante: mapa completo y control (hub)](https://resurte.me/blog/guia-costos-restaurante)
 - [Guía del food cost para restaurantes](https://resurte.me/blog/guia-food-cost-restaurante-2026)
 - [Cómo reducir la merma en cocina](https://resurte.me/blog/como-reducir-merma-cocina)
 - [Cómo elegir proveedor mayorista](https://resurte.me/blog/elegir-proveedor-mayorista)
@@ -37,6 +39,8 @@ El mismo catálogo existe para cada ciudad con el patrón `https://resurte.me/{c
 - [Central de Abastos vs comprar en línea](https://resurte.me/blog/central-de-abastos-vs-comprar-en-linea)
 - [Cuánto cuesta surtir un restaurante al mes](https://resurte.me/blog/cuanto-cuesta-surtir-restaurante-mes)
 - [Mejores proveedores de mayoreo para restaurantes](https://resurte.me/blog/mejores-proveedores-mayoreo-restaurantes)
+- [Alternativas a Sysco y clubes de precio para restaurantes](https://resurte.me/blog/alternativas-sysco-clubes-precio)
+- [Lista de insumos para abrir un restaurante](https://resurte.me/blog/lista-insumos-abrir-restaurante)
 
 ## Contacto
 

@@ -14,7 +14,7 @@
 | frutas y verduras por mayoreo + [ciudad] | `/{ciudad}/categoria/frutas-verduras` | ✅ × 20 ciudades |
 | abarrotes por mayoreo + [ciudad] | `/{ciudad}/categoria/abarrotes` | ✅ × 20 |
 | carne por mayoreo + [ciudad] | `/{ciudad}/categoria/carnes-aves-pescados` | ✅ × 20 |
-| insumos para restaurantes / proveeduría para restaurantes | hub nuevo | ⬜ Crear |
+| insumos para restaurantes / proveeduría para restaurantes | `/blog/guia-proveeduria-restaurantes` | ✅ Creada (fase 3, PR #9) |
 | desechables para restaurantes mayoreo | `/{ciudad}/categoria/desechables` | ✅ × 20 |
 | insumos para taquería / pizzería / sushi… | `/{ciudad}/coleccion/*` | ✅ × 14 colecciones |
 | precios de central de abastos | post + página de precios | ⬜ Crear (ver Índice de precios) |
@@ -23,12 +23,12 @@
 ### Keywords informacionales (las que atraen y construyen autoridad)
 Ya cubiertas por los 108 posts: food cost, merma, inventario, NOM-251, CFDI, costeo, Google Maps para restaurantes, comisiones de apps, etc. **Brechas detectadas** (ninguna guía existente las cubre):
 
-1. **"cuánto cuesta surtir un restaurante al mes"** — alto intent, cero competencia seria.
-2. **"lista de insumos para abrir un restaurante"** — captura negocios nuevos = clientes nuevos de Resurte.
-3. **"central de abastos vs proveedor digital"** — comparativa directa (ver §3).
-4. **"cómo funciona la compra por mayoreo en línea"** — educación de categoría.
-5. **"precio del kilo de [insumo] hoy"** — la keyword de mayor volumen del segmento; se ataca con el Índice de precios (§5).
-6. **"proveedores de [insumo específico] en [ciudad]"** — aguacate, tortilla, carne de cerdo… posts programáticos por insumo top.
+1. **"cuánto cuesta surtir un restaurante al mes"** — alto intent, cero competencia seria. ✅ Creada en fase 2: `cuanto-cuesta-surtir-restaurante-mes`.
+2. **"lista de insumos para abrir un restaurante"** — captura negocios nuevos = clientes nuevos de Resurte. ✅ Creada en fase 3: `lista-insumos-abrir-restaurante`.
+3. **"central de abastos vs proveedor digital"** — comparativa directa (ver §3). ✅ Creada en fase 2: `central-de-abastos-vs-comprar-en-linea`.
+4. **"cómo funciona la compra por mayoreo en línea"** — educación de categoría. ⬜ Pendiente.
+5. **"precio del kilo de [insumo] hoy"** — la keyword de mayor volumen del segmento; se ataca con el Índice de precios (§5). ⬜ Pendiente (requiere exponer datos del catálogo).
+6. **"proveedores de [insumo específico] en [ciudad]"** — aguacate, tortilla, carne de cerdo… posts programáticos por insumo top. ⬜ Pendiente.
 
 ---
 
@@ -38,8 +38,8 @@ Reorganizar el blog plano en 6 hubs. Cada hub: 1 página pilar (guía madre enla
 
 | Hub | Página pilar (nueva) | Posts existentes que alimenta |
 |---|---|---|
-| 💰 Costos y rentabilidad | `/blog/guia-costos-restaurante` | food cost, costeo, márgenes, punto de equilibrio, utilidad, KPIs (~25 posts) |
-| 📦 Proveeduría y mayoreo | `/blog/guia-proveeduria-restaurantes` | elegir proveedor, negociación, mayoreo vs menudeo, ABC insumos, recepción (~18 posts) |
+| 💰 Costos y rentabilidad | `/blog/guia-costos-restaurante` ✅ creada (fase 3) | food cost, costeo, márgenes, punto de equilibrio, utilidad, KPIs (~25 posts) |
+| 📦 Proveeduría y mayoreo | `/blog/guia-proveeduria-restaurantes` ✅ creada (fase 3) | elegir proveedor, negociación, mayoreo vs menudeo, ABC insumos, recepción (~18 posts) |
 | 🍳 Operación de cocina | `/blog/guia-operacion-cocina` | mermas, inventario, mise en place, NOM-251, almacenamiento (~15 posts) |
 | 📣 Marketing y clientes | `/blog/guia-marketing-restaurantes` | Google Maps, Instagram, reseñas, loyalty, delivery (~20 posts) |
 | 📋 Legal y finanzas | `/blog/guia-legal-finanzas-restaurante` | CFDI, impuestos, crédito, salarios, legislación (~12 posts) |
@@ -51,10 +51,10 @@ Reorganizar el blog plano en 6 hubs. Cada hub: 1 página pilar (guía madre enla
 
 ## 3. Contenido de comparación (alto intent, baja competencia) — CREAR
 
-1. **"Resurte.me vs ir a la Central de Abastos: costo real comparado"** — tiempo, transporte, merma, precio. La keyword "central de abastos" tiene volumen enorme; esta página captura a quien ya considera el canal tradicional.
-2. **"Las 5 formas de surtir tu restaurante en México (2026): costos y cuál conviene"** — mercado, central, distribuidor, SAM's/Costco, Resurte.me. Formato tabla = imán de citas de IA.
-3. **"Alternativas a [principal competidor] para surtir tu restaurante"** — investigar competidores activos y crear una por cada uno con búsquedas.
-4. **"Cuánto cuesta surtir un restaurante al mes en México (desglose por tamaño)"** — con datos propios de ticket promedio. E-E-A-T + citas.
+1. **"Resurte.me vs ir a la Central de Abastos: costo real comparado"** — tiempo, transporte, merma, precio. La keyword "central de abastos" tiene volumen enorme; esta página captura a quien ya considera el canal tradicional. ✅ Creada en fase 2: `central-de-abastos-vs-comprar-en-linea`.
+2. **"Las 5 formas de surtir tu restaurante en México (2026): costos y cuál conviene"** — mercado, central, distribuidor, SAM's/Costco, Resurte.me. Formato tabla = imán de citas de IA. 🔶 Parcialmente cubierta por `mejores-proveedores-mayoreo-restaurantes` (fase 2) y `alternativas-sysco-clubes-precio` (fase 3).
+3. **"Alternativas a [principal competidor] para surtir tu restaurante"** — investigar competidores activos y crear una por cada uno con búsquedas. ✅ Creada en fase 3: `alternativas-sysco-clubes-precio` (con reglas de veracidad hedged: fuentes externas no verificables en la sesión, solo hechos verificados de Resurte.me afirmados).
+4. **"Cuánto cuesta surtir un restaurante al mes en México (desglose por tamaño)"** — con datos propios de ticket promedio. E-E-A-T + citas. ✅ Creada en fase 2: `cuanto-cuesta-surtir-restaurante-mes`.
 
 **Tips de formato para estas páginas:**
 - Tabla comparativa arriba del fold (Google y las IA la extraen directo).
