@@ -31,6 +31,54 @@ export interface ProductCityAvailability {
   updated_at: string
 }
 
+/**
+ * Proveedor (migración 00066). Datos de contacto y estatus comercial.
+ * `whatsapp` se guarda solo con dígitos y código de país (wa.me).
+ */
+export interface Supplier {
+  id: number
+  name: string
+  slug: string
+  contact_name: string | null
+  phone: string | null
+  whatsapp: string | null
+  email: string | null
+  website: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  status:
+    | 'prospecto'
+    | 'localizado'
+    | 'verificado'
+    | 'contactado'
+    | 'cotizado'
+    | 'aprobado'
+    | 'activo'
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Vínculo producto ↔ proveedor con costo de lista (migración 00066).
+ * Los costos son confidenciales: RLS sin políticas públicas, solo se
+ * leen vía rutas /api/admin/* con service role.
+ */
+export interface ProductSupplier {
+  id: number
+  product_id: number
+  supplier_id: number
+  supplier_sku: string | null
+  presentation: string | null
+  cost: number | null
+  list_date: string | null
+  is_primary: boolean
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface RestaurantCollection {
   id: number
   name: string
