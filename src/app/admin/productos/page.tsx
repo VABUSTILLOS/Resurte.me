@@ -102,6 +102,7 @@ export default function AdminProductsPage() {
 }
 
 import { RestockPanel } from "../components/RestockPanel"
+import { ImportProductsModal } from "../components/ImportProductsModal"
 
 function AdminProductsContent() {
   // Lazy browser-only client: creating it during SSR would throw when
@@ -172,6 +173,9 @@ function AdminProductsContent() {
   const [cityModalOpen, setCityModalOpen] = useState(false)
   const [draftCities, setDraftCities] = useState<Set<number>>(new Set())
   const [bulkSaving, setBulkSaving] = useState(false)
+  // Fase 16 — importación masiva vía CSV
+  const [importOpen, setImportOpen] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   // Fase 5 — filtros de categoría/stock (con deep-link ?stock= desde las
   // alertas del dashboard) y paginación.
@@ -213,7 +217,7 @@ function AdminProductsContent() {
     return () => {
       cancelled = true
     }
-  }, [supabase])
+  }, [supabase, reloadKey])
 
   const categoryName = (id: number | null) =>
     categories.find((c) => c.id === id)?.name ?? "Sin categoría"
@@ -501,6 +505,15 @@ function AdminProductsContent() {
             <MapPin className="w-4 h-4" />
             Matriz por ciudad
           </Link>
+          {/* Fase 16 — importación masiva CSV */}
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm"
+          >
+            <Package className="w-4 h-4" />
+            Importar CSV
+          </button>
           <button
             disabled
             title="Próximamente"
@@ -1026,6 +1039,14 @@ function AdminProductsContent() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Fase 16 — modal de importación masiva */}
+      {importOpen && (
+        <ImportProductsModal
+          onClose={() => setImportOpen(false)}
+          onImported={() => setReloadKey((k) => k + 1)}
+        />
       )}
     </div>
   )
