@@ -24,6 +24,8 @@ import AllTimeTip from "@/components/panel/ventas/AllTimeTip"
 import ConfirmDialog from "@/components/panel/ConfirmDialog"
 import AppOrdersCard from "@/components/panel/ventas/app-orders-card"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
+import EmptyState from "@/components/panel/EmptyState"
+import { useFoodosVentasSync } from "@/hooks/use-foodos-ventas-sync"
 
 export default function VentasPage() {
   const {
@@ -106,6 +108,10 @@ export default function VentasPage() {
 
   const slug = selectedCollection?.slug ?? null
   const [tab, setTab] = useState<"hoy" | "analisis" | "extras">("hoy")
+
+  // Importa los pedidos pagados del menú digital (FoodOS) como ventas:
+  // cierran el loop app → comanda/analítica/reportes (dedupe idempotente).
+  useFoodosVentasSync(slug)
 
   const exportVentasCsv = () => {
     if (reportEntries.length === 0) return
@@ -257,6 +263,22 @@ export default function VentasPage() {
             onToggleShowAll={() => setShowAll(!showAll)}
             onFocusFirstDish={() => document.getElementById("venta-dish")?.focus()}
           />
+
+          {entries.length === 0 && (
+            <EmptyState
+              icon={Receipt}
+              title="Aún no registras ventas"
+              description="Registra tu primera venta en el formulario de arriba. Si tienes tu menú digital activo, los pedidos pagados de tu app se importan solos."
+              action={
+                <button
+                  onClick={() => document.getElementById("venta-dish")?.focus()}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0E7A0E] text-white text-xs font-semibold rounded-xl hover:bg-green-800 transition-colors"
+                >
+                  Registrar mi primera venta
+                </button>
+              }
+            />
+          )}
 
           {entries.length > 0 && (
             <>

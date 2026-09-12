@@ -320,6 +320,22 @@ export function useVentasPage() {
           motivo: `Venta: ${dish.name} ×${qty}`,
         }))
         setMovements((prev) => [...newMovements, ...prev].slice(0, 500))
+
+        // Alerta de stock bajo/agotado tras el descuento: el restaurantero
+        // se entera en el momento de la venta, no al cierre del día.
+        const lowNow = Array.from(deductions.values())
+          .map((d) => {
+            const item = inventarioItems.find((i) => i.id === d.itemId)
+            if (!item) return null
+            const remaining = item.stock - d.neededQty
+            if (remaining <= 0) return `${item.name} (agotado)`
+            if (remaining <= item.minStock) return `${item.name} (quedan ${Math.max(0, Math.round(remaining * 100) / 100)} ${item.unit})`
+            return null
+          })
+          .filter((n): n is string => n !== null)
+        if (lowNow.length > 0) {
+          toast(`Stock bajo: ${lowNow.join(", ")}`, "warning")
+        }
       }
       deducted = deductions.size
     }

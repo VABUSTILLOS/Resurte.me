@@ -537,6 +537,36 @@ export async function listOrders(restaurantId: string) {
   return data ?? []
 }
 
+/**
+ * Pedidos pagados del restaurante del usuario para sincronizarlos como
+ * ventas del panel (ventas-entries). El mapeo y la deduplicación viven en
+ * src/lib/panel/foodos-sync.ts (función pura) y el hook
+ * useFoodosVentasSync los inserta como SaleEntry con id estable
+ * `foodos-<orderId>-<itemId>`.
+ */
+export async function listOrdersForSync(): Promise<FoodosOrder[]> {
+  const user = await getCurrentUser()
+  if (!user) return []
+  const supabase = await createClient()
+  const { data: restaurant } = await supabase
+    .from("foodos_restaurants")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle()
+  if (!restaurant) return []
+
+  const { data, error } = await supabase
+    .from("foodos_orders")
+    .select("id, items, total, discount, subtotal, delivery_fee, channel, fulfillment, status, payment_status, payment_method, customer_name, created_at")
+    .eq("restaurant_id", restaurant.id)
+    .eq("payment_status", "paid")
+    .neq("status", "cancelled")
+    .order("created_at", { ascending: false })
+    .limit(500)
+  if (error) throw new Error(error.message)
+  return (data as FoodosOrder[]) ?? []
+}
+
 export async function updateOrderStatus(
   orderId: string,
   status: FoodosOrderStatus

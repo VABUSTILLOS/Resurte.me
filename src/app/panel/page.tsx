@@ -32,6 +32,7 @@ import DaySummary from "@/components/panel/hub/DaySummary"
 import KitchenMonitor from "@/components/panel/hub/KitchenMonitor"
 import AlertsPanel from "@/components/panel/hub/AlertsPanel"
 import BackupStrip from "@/components/panel/hub/BackupStrip"
+import GettingStartedCard from "@/components/panel/hub/GettingStartedCard"
 import ToolGrid from "@/components/panel/hub/ToolGrid"
 import PurchaseStimulusCard from "@/components/panel/hub/PurchaseStimulusCard"
 import RestoreConfirmModal from "@/components/panel/hub/RestoreConfirmModal"
@@ -52,6 +53,8 @@ export default function PanelPage() {
   const [ventasEntries] = useSyncedRows<HubVenta>("ventas-entries", [], slug)
   const [mesas] = useSyncedStorage<HubMesa[]>("mesas", [], slug)
   const [ventasMetaDia] = useSyncedStorage<number>("ventas-meta-dia", 0, slug)
+  const [ventasDescontarStock] = useSyncedStorage<boolean>("ventas-descontar-stock", false, slug)
+  const [onboardingDismissed, setOnboardingDismissed] = useSyncedStorage<boolean>("hub-onboarding-dismissed", false, slug)
   const [ventasUmbralTicket] = useSyncedStorage<number>("ventas-umbral-ticket", 3000, slug)
   const [clientes] = useSyncedStorage<Cliente[]>("clientes", [], slug)
   const [puntosTasa] = useSyncedStorage<number>("ventas-puntos-tasa", 100, slug)
@@ -426,6 +429,43 @@ export default function PanelPage() {
       <div className="mb-4 sm:mb-6">
         <ToolGrid tools={visibleTools} selectedCollection={selectedCollection} />
       </div>
+
+      {selectedCollection && !onboardingDismissed &&
+        !(sharedDishes.length > 0 && inventarioItems.length > 0 && ventasEntries.length > 0 && ventasDescontarStock) && (
+        <GettingStartedCard
+          steps={[
+            {
+              key: "costeo",
+              label: "Costea tu primer platillo",
+              description: "Con receta e ingredientes, para conocer tu food cost real.",
+              href: "/panel/costeo",
+              done: sharedDishes.length > 0,
+            },
+            {
+              key: "inventario",
+              label: "Carga tu inventario",
+              description: "Los insumos con los que arrancas y su stock mínimo.",
+              href: "/panel/inventario",
+              done: inventarioItems.length > 0,
+            },
+            {
+              key: "venta",
+              label: "Registra tu primera venta",
+              description: "Una venta alimenta comanda, analítica y rentabilidad.",
+              href: "/panel/ventas",
+              done: ventasEntries.length > 0,
+            },
+            {
+              key: "auto-stock",
+              label: "Activa el descuento automático de stock",
+              description: "Cada venta descuenta insumos según la receta costeada.",
+              href: "/panel/ventas",
+              done: ventasDescontarStock,
+            },
+          ]}
+          onDismiss={() => setOnboardingDismissed(true)}
+        />
+      )}
 
       {selectedCollection && stats && (
         <LiveStats stats={stats} panelCfg={panelCfg} mesasInfo={mesasInfo} mesas={mesas} />
