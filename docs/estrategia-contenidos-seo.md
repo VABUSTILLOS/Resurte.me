@@ -18,7 +18,7 @@
 | desechables para restaurantes mayoreo | `/{ciudad}/categoria/desechables` | ✅ × 20 |
 | insumos para taquería / pizzería / sushi… | `/{ciudad}/coleccion/*` | ✅ × 14 colecciones |
 | precios de central de abastos | post + página de precios | ⬜ Crear (ver Índice de precios) |
-| comprar por mayoreo en línea México | `/` | 🔶 Long-tail en blog |
+| comprar por mayoreo en línea México | `/blog/como-funciona-compra-mayoreo-en-linea` | ✅ Creada (fase 5) |
 
 ### Keywords informacionales (las que atraen y construyen autoridad)
 Ya cubiertas por los 108 posts: food cost, merma, inventario, NOM-251, CFDI, costeo, Google Maps para restaurantes, comisiones de apps, etc. **Brechas detectadas** (ninguna guía existente las cubre):
@@ -26,9 +26,9 @@ Ya cubiertas por los 108 posts: food cost, merma, inventario, NOM-251, CFDI, cos
 1. **"cuánto cuesta surtir un restaurante al mes"** — alto intent, cero competencia seria. ✅ Creada en fase 2: `cuanto-cuesta-surtir-restaurante-mes`.
 2. **"lista de insumos para abrir un restaurante"** — captura negocios nuevos = clientes nuevos de Resurte. ✅ Creada en fase 3: `lista-insumos-abrir-restaurante`.
 3. **"central de abastos vs proveedor digital"** — comparativa directa (ver §3). ✅ Creada en fase 2: `central-de-abastos-vs-comprar-en-linea`.
-4. **"cómo funciona la compra por mayoreo en línea"** — educación de categoría. ⬜ Pendiente.
+4. **"cómo funciona la compra por mayoreo en línea"** — educación de categoría. ✅ Creada en fase 5: `como-funciona-compra-mayoreo-en-linea`.
 5. **"precio del kilo de [insumo] hoy"** — la keyword de mayor volumen del segmento; se ataca con el Índice de precios (§5). ⬜ Pendiente (requiere exponer datos del catálogo).
-6. **"proveedores de [insumo específico] en [ciudad]"** — aguacate, tortilla, carne de cerdo… posts programáticos por insumo top. ⬜ Pendiente.
+6. **"proveedores de [insumo específico] en [ciudad]"** — aguacate, tortilla, carne de cerdo… posts programáticos por insumo top. 🔶 Iniciada en fase 5 con 3 categorías (`proveedores-frutas-verduras-restaurantes`, `proveedores-carne-mayoreo-restaurantes`, `desechables-mayoreo-restaurantes`); pendientes lácteos/huevo, bebidas y abarrotes.
 
 ---
 
@@ -73,7 +73,7 @@ Reorganizar el blog plano en 6 hubs. Cada hub: 1 página pilar (guía madre enla
 2. **Una tabla de datos por post mínimo** — las tablas son el formato #1 extraído por AI Overviews.
 3. **Números propios en MXN** — diferenciador E-E-A-T: cualquiera escribe "reduce tu merma"; nadie más dice "de 9% a 5% son $4,800/mes en compras de $120,000".
 4. **FAQ schema en todos** — ya lo hacen; validar con Rich Results Test tras cada publicación.
-5. **Enlaces internos: 3–5 por post** — 1 al hub/pilar, 1–2 a posts hermanos, 1 a una página de categoría/colección transaccional (hoy enlazan al Panel pero poco al catálogo; el catálogo es el que convierte).
+5. **Enlaces internos: 3–5 por post** — 1 al hub/pilar, 1–2 a posts hermanos, 1 a una página de categoría/colección transaccional (hoy enlazan al Panel pero poco al catálogo; el catálogo es el que convierte). **Avance fase 5:** la serie por categoría de insumo ya enlaza a `/cdmx/categoria/{categoria}` (frutas-verduras, carnes-aves-pescados, desechables).
 6. **Actualizar > crear** — refrescar un post que ya rankeó (nueva fecha, dato nuevo, `updatedAt`) sube posiciones más rápido que publicar uno nuevo. Ritmo sugerido: 4 refreshes + 2 nuevos por mes.
 7. **Título ≤60c con keyword al frente y año cuando aplique** ("…en 2026"), description 140–160c con beneficio + CTA implícito.
 8. **Slug corto y estable** — nunca cambiarlo (el sitemap y los enlaces internos dependen de él).

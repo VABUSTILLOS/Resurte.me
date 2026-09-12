@@ -46,6 +46,13 @@ El mismo catálogo existe para cada ciudad con el patrón `https://resurte.me/{c
 - [Mejores proveedores de mayoreo para restaurantes](https://resurte.me/blog/mejores-proveedores-mayoreo-restaurantes)
 - [Alternativas a Sysco y clubes de precio para restaurantes](https://resurte.me/blog/alternativas-sysco-clubes-precio)
 - [Lista de insumos para abrir un restaurante](https://resurte.me/blog/lista-insumos-abrir-restaurante)
+- [Cómo funciona la compra por mayoreo en línea](https://resurte.me/blog/como-funciona-compra-mayoreo-en-linea)
+
+### Por categoría de insumo
+
+- [Proveedores de frutas y verduras para restaurantes](https://resurte.me/blog/proveedores-frutas-verduras-restaurantes)
+- [Proveedores de carne al mayoreo para restaurantes](https://resurte.me/blog/proveedores-carne-mayoreo-restaurantes)
+- [Desechables al mayoreo para restaurantes](https://resurte.me/blog/desechables-mayoreo-restaurantes)
 
 ### Guías clásicas
 
