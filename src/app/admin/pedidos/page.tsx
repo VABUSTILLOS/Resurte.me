@@ -18,6 +18,14 @@ import { ToastProvider, useToast } from "@/components/toast"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import { useOrderAutoRefresh } from "@/hooks/use-order-auto-refresh"
 import { formatRelativeTime } from "@/lib/relative-time"
+import {
+  normalizeDateRange,
+  parseSavedFilters,
+  serializeSavedFilters,
+  makeSavedFilter,
+  SAVED_FILTERS_STORAGE_KEY,
+  type SavedOrderFilter,
+} from "@/lib/order-filters"
 
 function formatAdminAddress(a: NonNullable<AdminOrder["address"]>): string {
   const parts = [
@@ -59,6 +67,10 @@ function AdminOrdersContent() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all")
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
+  // Fase 9 — rango de fechas (YYYY-MM-DD) y presets guardados en localStorage
+  const [fromDate, setFromDate] = useState("")
+  const [toDate, setToDate] = useState("")
+  const [savedFilters, setSavedFilters] = useState<SavedOrderFilter[]>([])
   const [updatingId, setUpdatingId] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [drivers, setDrivers] = useState<{ id: number; name: string; is_active: boolean }[]>([])
@@ -114,6 +126,15 @@ function AdminOrdersContent() {
     }
   }
 
+  // Fase 9 — cargar presets guardados una sola vez (cliente)
+  useEffect(() => {
+    try {
+      setSavedFilters(parseSavedFilters(localStorage.getItem(SAVED_FILTERS_STORAGE_KEY)))
+    } catch {
+      // localStorage no disponible (modo privado): presets simplemente no cargan
+    }
+  }, [])
+
   // Fase 3 — id del pedido más reciente conocido, para detectar altas nuevas
   // durante el auto-refresh y avisar con un toast.
   const lastTopIdRef = useRef<number | null>(null)
@@ -124,9 +145,12 @@ function AdminOrdersContent() {
     async function fetchOrders() {
       setLoading(true)
       try {
+        const { fromIso, toExclusiveIso } = normalizeDateRange({ from: fromDate, to: toDate })
         const { orders: data, hasMore: more } = await getAdminOrders(100, undefined, {
           status: statusFilter,
           search: debouncedSearch,
+          from: fromIso,
+          toExclusive: toExclusiveIso,
         })
         if (!cancelled) {
           setOrders(data)
@@ -147,15 +171,18 @@ function AdminOrdersContent() {
     return () => {
       cancelled = true
     }
-  }, [refreshKey, statusFilter, debouncedSearch])
+  }, [refreshKey, statusFilter, debouncedSearch, fromDate, toDate])
 
   // Fase 3 — auto-refresh silencioso cada 30 s (pausado en segundo plano).
   // Mantiene los filtros activos y avisa si entra un pedido nuevo.
   const silentRefresh = useCallback(async () => {
     try {
+      const { fromIso, toExclusiveIso } = normalizeDateRange({ from: fromDate, to: toDate })
       const { orders: data, hasMore: more } = await getAdminOrders(100, undefined, {
         status: statusFilter,
         search: debouncedSearch,
+        from: fromIso,
+        toExclusive: toExclusiveIso,
       })
       const topId = data[0]?.id ?? null
       if (
@@ -171,7 +198,7 @@ function AdminOrdersContent() {
     } catch {
       // Silencioso: el siguiente ciclo de 30 s lo reintenta
     }
-  }, [statusFilter, debouncedSearch, toast])
+  }, [statusFilter, debouncedSearch, fromDate, toDate, toast])
 
   useOrderAutoRefresh(silentRefresh, 30_000)
 
@@ -181,9 +208,12 @@ function AdminOrdersContent() {
     setLoadingMore(true)
     try {
       const cursor = lastOrder.created_at
+      const { fromIso, toExclusiveIso } = normalizeDateRange({ from: fromDate, to: toDate })
       const { orders: older, hasMore: more } = await getAdminOrders(100, cursor, {
         status: statusFilter,
         search: debouncedSearch,
+        from: fromIso,
+        toExclusive: toExclusiveIso,
       })
       setOrders((prev) => [...prev, ...older])
       setHasMore(more)
@@ -225,8 +255,42 @@ function AdminOrdersContent() {
     toast(`${filtered.length} pedido${filtered.length !== 1 ? "s" : ""} exportados a CSV`, "success")
   }
 
-  // El filtrado por estatus y la búsqueda ya se aplicaron en SQL.
+  // El filtrado por estatus, fechas y la búsqueda ya se aplicaron en SQL.
   const filtered = orders
+
+  // Fase 9 — guardar/aplicar/borrar presets de filtros
+  function persistSavedFilters(next: SavedOrderFilter[]) {
+    setSavedFilters(next)
+    try {
+      localStorage.setItem(SAVED_FILTERS_STORAGE_KEY, serializeSavedFilters(next))
+    } catch {
+      // sin localStorage: el preset vive solo en memoria esta sesión
+    }
+  }
+
+  function saveCurrentFilter() {
+    const name = window.prompt("Nombre para este filtro:")
+    const preset = makeSavedFilter(name ?? "", {
+      status: statusFilter,
+      search,
+      from: fromDate,
+      to: toDate,
+    })
+    if (!preset) return
+    persistSavedFilters([...savedFilters.filter((f) => f.name !== preset.name), preset])
+    toast(`Filtro "${preset.name}" guardado`, "success")
+  }
+
+  function applySavedFilter(f: SavedOrderFilter) {
+    setStatusFilter(f.status as OrderStatus | "all")
+    setSearch(f.search)
+    setFromDate(f.from)
+    setToDate(f.to)
+  }
+
+  function removeSavedFilter(name: string) {
+    persistSavedFilters(savedFilters.filter((f) => f.name !== name))
+  }
 
   async function updatePayment(id: number) {
     setUpdatingId(id)
@@ -338,7 +402,7 @@ function AdminOrdersContent() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar por #pedido o cliente..."
+            placeholder="Buscar por #pedido, cliente o teléfono..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
@@ -357,6 +421,69 @@ function AdminOrdersContent() {
             >
               {f.label}
             </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Fase 9 — rango de fechas + filtros guardados */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500" htmlFor="filter-from">Desde</label>
+          <input
+            id="filter-from"
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-600 focus:outline-none focus:border-brand-500"
+          />
+          <label className="text-xs text-gray-500" htmlFor="filter-to">Hasta</label>
+          <input
+            id="filter-to"
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-600 focus:outline-none focus:border-brand-500"
+          />
+          {(fromDate || toDate) && (
+            <button
+              type="button"
+              onClick={() => { setFromDate(""); setToDate("") }}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={saveCurrentFilter}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-dashed border-gray-300 text-gray-500 hover:border-brand-400 hover:text-brand-600 transition-colors"
+          >
+            + Guardar filtro
+          </button>
+          {savedFilters.map((f) => (
+            <span
+              key={f.name}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-brand-50 border border-brand-100 text-xs text-brand-700"
+            >
+              <button
+                type="button"
+                onClick={() => applySavedFilter(f)}
+                className="font-medium hover:underline"
+                title={`Estado: ${f.status || "todos"} · Buscar: ${f.search || "—"} · ${f.from || "…"} a ${f.to || "…"}`}
+              >
+                {f.name}
+              </button>
+              <button
+                type="button"
+                onClick={() => removeSavedFilter(f.name)}
+                aria-label={`Eliminar filtro ${f.name}`}
+                className="text-brand-400 hover:text-brand-700"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
           ))}
         </div>
       </div>
