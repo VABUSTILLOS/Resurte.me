@@ -5,7 +5,8 @@ import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/order-labels"
 import { getUserPurchaseHistory } from "@/lib/wallet-actions"
-import type { OrderWithCashback, OrderItem } from "@/types"
+import { useToast } from "@/components/toast"
+import type { OrderWithCashback, OrderItem, CartItem } from "@/types"
 import { Package, Clock, ChevronRight, ArrowLeft, RotateCcw, ShoppingCart } from "lucide-react"
 import { AnalyticsEvents } from "@/lib/analytics"
 import Link from "next/link"
@@ -21,6 +22,7 @@ interface OrderWithItems extends OrderWithCashback {
 export default function OrderHistoryPage() {
   const { city } = useCity()
   const { addOrderItems } = useCart()
+  const { toast } = useToast()
   const [orders, setOrders] = useState<OrderWithItems[]>([])
   const [loading, setLoading] = useState(true)
   const [reorderingId, setReorderingId] = useState<number | null>(null)
@@ -53,27 +55,94 @@ export default function OrderHistoryPage() {
     }
   }, [])
 
-  const handleRepeatOrder = (order: OrderWithItems, e: React.MouseEvent) => {
+  const handleRepeatOrder = async (order: OrderWithItems, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     setReorderingId(order.id)
 
-    // Add all items from the order to the cart
-    addOrderItems(
-      order.items.map((item) => ({
-        product_id: item.product_id,
-        name: item.product_name || `Producto #${item.product_id}`,
-        slug: `producto-${item.product_id}`,
-        image_url: item.product_image || "",
-        brand: "",
-        price: item.unit_price,
-        sale_price: null,
-        quantity: item.quantity,
-        stock_status: "in_stock" as const,
-      }))
-    )
+    // Rehidratar con el catálogo ACTUAL (precio, oferta, stock, slug): el
+    // servidor recalcula el subtotal contra la BD y rechaza la orden si no
+    // coincide al centavo, así que agregar con el precio histórico congelado
+    // hacía fallar "Repetir" en cuanto cambiaba cualquier precio.
+    const ids = order.items.map((i) => i.product_id)
+    const currentById = new Map<number, {
+      name: string
+      slug: string
+      image_url: string | null
+      price: number
+      sale_price: number | null
+      stock_status: "in_stock" | "low_stock" | "out_of_stock"
+      brand: string | null
+    }>()
+    let catalogFailed = false
+    try {
+      const { createClient } = await import("@/lib/supabase/client")
+      const supabase = createClient()
+      if (!supabase) throw new Error("no supabase client")
+      const { data: current, error: catalogError } = await supabase
+        .from("products")
+        .select("id, name, slug, image_url, price, sale_price, stock_status, brand")
+        .in("id", ids)
+      if (catalogError) throw catalogError
+      for (const p of current ?? []) {
+        currentById.set(p.id, p)
+      }
+    } catch {
+      // Si el catálogo no responde, se cae al snapshot de la orden (el
+      // servidor sigue validando precios al confirmar el pedido).
+      catalogFailed = true
+    }
 
-    AnalyticsEvents.repeatOrder(order.id, order.items.length)
+    const available: CartItem[] = []
+    let skipped = 0
+    for (const item of order.items) {
+      const current = currentById.get(item.product_id)
+      if (catalogFailed) {
+        // Fallback al snapshot histórico (mejor que no agregar nada).
+        available.push({
+          product_id: item.product_id,
+          name: item.product_name || `Producto #${item.product_id}`,
+          slug: `producto-${item.product_id}`,
+          image_url: item.product_image || "",
+          brand: "",
+          price: item.unit_price,
+          sale_price: null,
+          quantity: item.quantity,
+          stock_status: "in_stock" as const,
+        })
+        continue
+      }
+      // Fuera de catálogo o agotado: no se agrega (el servidor lo rechazaría).
+      if (!current || current.stock_status === "out_of_stock") {
+        skipped += 1
+        continue
+      }
+      available.push({
+        product_id: item.product_id,
+        name: current.name || item.product_name || `Producto #${item.product_id}`,
+        slug: current.slug || `producto-${item.product_id}`,
+        image_url: current.image_url || item.product_image || "",
+        brand: current.brand ?? "",
+        price: current.price,
+        sale_price: current.sale_price,
+        quantity: item.quantity,
+        stock_status: current.stock_status,
+      })
+    }
+
+    if (available.length > 0) {
+      addOrderItems(available)
+      AnalyticsEvents.repeatOrder(order.id, available.length)
+    }
+    if (skipped > 0) {
+      toast(
+        available.length > 0
+          ? `${skipped} producto${skipped !== 1 ? "s" : ""} ya no ${skipped !== 1 ? "están" : "está"} disponible${skipped !== 1 ? "s" : ""} y no se agregó`
+          : "Estos productos ya no están disponibles por ahora"
+      )
+    } else if (available.length > 0) {
+      toast(`${available.length} producto${available.length !== 1 ? "s" : ""} agregados al carrito`)
+    }
 
     setTimeout(() => setReorderingId(null), 1500)
   }
