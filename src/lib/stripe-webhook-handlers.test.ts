@@ -21,6 +21,8 @@ import {
   handlePaymentIntentRefunded,
   handlePaymentIntentFailed,
   handlePaymentIntentCanceled,
+  handleChargeRefunded,
+  handleChargeDisputeCreated,
   type ServiceClient,
 } from "./stripe-webhook-handlers"
 import { confirmPaymentToCustomer, notifyCustomerStatusUpdate } from "@/lib/workflows"
@@ -35,7 +37,7 @@ interface TableResult {
 /** Mismo patrón de builder que route.test.ts del webhook. */
 function tableBuilder(result: TableResult = { data: null, error: null }) {
   const builder: Record<string, unknown> = {}
-  for (const method of ["select", "eq", "update", "order", "limit"]) {
+  for (const method of ["select", "eq", "neq", "update", "order", "limit"]) {
     builder[method] = vi.fn().mockReturnValue(builder)
   }
   builder.insert = vi.fn().mockResolvedValue({ data: null, error: null })
@@ -206,5 +208,95 @@ describe("stripe-webhook-handlers", () => {
     )
     expect(confirmPaymentToCustomer).not.toHaveBeenCalled()
     expect(logger.info).toHaveBeenCalled()
+  })
+
+  it("succeeded duplicado (orden ya paid) no repite update ni workflows", async () => {
+    const orders = tableBuilder({
+      data: { id: 7, user_id: "user-1", total: 100, customer_email: null, payment_status: "paid" },
+      error: null,
+    })
+    const supabase = mockSupabase({ orders })
+
+    await handlePaymentIntentSucceeded(supabase, {
+      id: "pi_dup",
+      amount_received: 10000,
+      metadata: {},
+    })
+
+    expect(orders.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "paid" })
+    )
+    expect(confirmPaymentToCustomer).not.toHaveBeenCalled()
+    expect(sendOrderStatusEmail).not.toHaveBeenCalled()
+    expect(logger.info).toHaveBeenCalledWith("stripe.payment.succeeded.duplicate", { order: 7 })
+  })
+
+  it("charge.refunded marca orders y foodos_orders como refunded", async () => {
+    const orders = tableBuilder()
+    const foodos = tableBuilder()
+    const supabase = mockSupabase({ orders, foodos_orders: foodos })
+
+    await handleChargeRefunded(supabase, { id: "ch_1", payment_intent: "pi_ref" })
+
+    expect(orders.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "refunded" })
+    )
+    expect(orders.eq).toHaveBeenCalledWith("stripe_payment_intent_id", "pi_ref")
+    expect(foodos.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "refunded" })
+    )
+  })
+
+  it("charge.refunded sin payment_intent no toca la base", async () => {
+    const orders = tableBuilder()
+    const supabase = mockSupabase({ orders })
+
+    await handleChargeRefunded(supabase, { id: "ch_2", payment_intent: null })
+
+    expect(orders.update).not.toHaveBeenCalled()
+  })
+
+  it("charge.dispute.created marca disputed solo si estaba paid y loguea error", async () => {
+    const orders = tableBuilder()
+    const supabase = mockSupabase({ orders })
+
+    await handleChargeDisputeCreated(supabase, {
+      id: "dp_1",
+      payment_intent: "pi_paid",
+      amount: 10000,
+      reason: "fraudulent",
+    })
+
+    expect(orders.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "disputed" })
+    )
+    expect(orders.eq).toHaveBeenCalledWith("payment_status", "paid")
+    expect(logger.error).toHaveBeenCalledWith(
+      "stripe.dispute.created",
+      expect.objectContaining({ dispute: "dp_1", reason: "fraudulent" })
+    )
+  })
+
+  it("payment_failed libera el cupón reservado por la orden", async () => {
+    const orders = tableBuilder({
+      data: { id: 7, coupon_code: "VOLVI10" },
+      error: null,
+    })
+    const coupons = tableBuilder({ data: { id: 3, used_count: 1 }, error: null })
+    const supabase = mockSupabase({ orders, coupons })
+
+    await handlePaymentIntentFailed(supabase, { id: "pi_cupon" })
+
+    expect(coupons.update).toHaveBeenCalledWith({ used_count: 0 })
+  })
+
+  it("payment_failed sin cupón no toca la tabla coupons", async () => {
+    const orders = tableBuilder({ data: { id: 7, coupon_code: null }, error: null })
+    const coupons = tableBuilder()
+    const supabase = mockSupabase({ orders, coupons })
+
+    await handlePaymentIntentFailed(supabase, { id: "pi_sincupon" })
+
+    expect(coupons.update).not.toHaveBeenCalled()
   })
 })

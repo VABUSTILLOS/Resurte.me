@@ -29,7 +29,7 @@ interface TableResult {
 
 function tableBuilder(result: TableResult = { data: null, error: null }) {
   const builder: Record<string, unknown> = {}
-  for (const method of ["select", "eq", "not", "lt", "update", "order", "limit"]) {
+  for (const method of ["select", "eq", "neq", "not", "lt", "update", "order", "limit"]) {
     builder[method] = vi.fn().mockReturnValue(builder)
   }
   builder.insert = vi.fn().mockResolvedValue({ data: null, error: null })
