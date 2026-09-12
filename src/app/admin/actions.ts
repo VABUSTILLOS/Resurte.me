@@ -1238,3 +1238,54 @@ export async function getAdminPeriodComparison(days: number): Promise<PeriodComp
     prevRecurringCustomers: prevSplit.recurringCustomers,
   }
 }
+
+// ============================================================
+// FASE 15 — BITÁCORA DE AUDITORÍA (lectura)
+// ============================================================
+
+export interface AuditLogEntry {
+  id: number
+  actor_email: string | null
+  action: string
+  entity: string
+  entity_id: string | null
+  detail: Record<string, unknown>
+  created_at: string
+}
+
+/** Lee la bitácora admin_audit_log con filtros por acción y rango de fechas. */
+export async function getAdminAuditLog(filters?: {
+  action?: string
+  from?: string
+  to?: string
+}): Promise<AuditLogEntry[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const { normalizeAuditFilters, AUDIT_LOG_PAGE_SIZE } = await import("@/lib/audit-log")
+  const f = normalizeAuditFilters(filters ?? {})
+
+  const supabase = await createServiceClient()
+  let query = supabase
+    .from("admin_audit_log")
+    .select("id, actor_email, action, entity, entity_id, detail, created_at")
+    .order("created_at", { ascending: false })
+    .limit(AUDIT_LOG_PAGE_SIZE)
+
+  if (f.action) query = query.eq("action", f.action)
+  if (f.from) query = query.gte("created_at", new Date(`${f.from}T00:00:00`).toISOString())
+  if (f.to) {
+    const end = new Date(`${f.to}T00:00:00`)
+    end.setDate(end.getDate() + 1)
+    query = query.lt("created_at", end.toISOString())
+  }
+
+  const { data, error } = await query
+  if (error) {
+    logger.error("[ADMIN-AUDIT] Error fetching audit log:", error)
+    throw new Error("Error al cargar la bitácora")
+  }
+  return (data ?? []) as AuditLogEntry[]
+}

@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
+import { logAdminAction } from "@/lib/audit-log"
 import { NextResponse } from "next/server"
 
 /**
@@ -13,7 +14,7 @@ import { NextResponse } from "next/server"
 export async function PATCH(request: Request) {
   try {
     // Solo administradores pueden modificar el catálogo.
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied, user: adminUser } = await requireAdmin()
     if (adminDenied) {
       return adminDenied
     }
@@ -62,6 +63,16 @@ export async function PATCH(request: Request) {
     // Los cambios deben reflejarse en la tienda sin esperar el TTL de la caché.
     revalidateCatalogCache()
     resetCatalogCache()
+
+    // Fase 15 — bitácora de auditoría (best-effort)
+    await logAdminAction(supabase, {
+      actorId: adminUser?.id ?? null,
+      actorEmail: adminUser?.email ?? null,
+      action: "product_update",
+      entity: "products",
+      entityId: productId,
+      detail: updates as Record<string, unknown>,
+    })
 
     return NextResponse.json({ success: true, productId, ...updates })
   } catch (error) {
