@@ -14,12 +14,13 @@ function escapeCell(cell: CsvCell): string {
 
 export function toCsv(headers: CsvCell[], rows: CsvCell[][]): string {
   const lines = [headers, ...rows].map((r) => r.map(escapeCell).join(","))
-  return lines.join("\r\n")
+  // BOM para que Excel abra UTF-8 con acentos correctos
+  return "﻿" + lines.join("\r\n")
 }
 
 /** Dispara la descarga de un CSV en el navegador (solo cliente). */
 export function downloadCsv(filename: string, csv: string): void {
-  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url

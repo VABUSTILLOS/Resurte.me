@@ -100,10 +100,14 @@ export function CityProvider({ children, initialCitySlug }: CityProviderProps) {
     if (lsSlug !== effective) {
       setCityLocalStorage(effective)
     }
-    setCityState((current) => {
-      if (current?.slug === effective) return current
-      const found = MEXICO_CITIES.find((c) => c.slug === effective)
-      return found ? (found as City) : current
+    // Diferido a microtask: adoptar la ciudad persistida tras el mount sin
+    // setState síncrono dentro del efecto (evita renders en cascada).
+    void Promise.resolve().then(() => {
+      setCityState((current) => {
+        if (current?.slug === effective) return current
+        const found = MEXICO_CITIES.find((c) => c.slug === effective)
+        return found ? (found as City) : current
+      })
     })
   }, [])
 

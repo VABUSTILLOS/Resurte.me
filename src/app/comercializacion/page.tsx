@@ -6,7 +6,7 @@ import {
   getSellerDisplayName,
   getWeeklyTrends,
 } from "@/lib/comercializacion/actions"
-import { getWeeklyGoals } from "@/lib/comercializacion/goals"
+import { getWeeklyGoals, getMonthlyRevenueGoal } from "@/lib/comercializacion/goals"
 
 export default async function ComercializacionDashboardPage() {
   const [kpis, followUps, clientsToReorder, sellerName, trends] = await Promise.all([
@@ -24,6 +24,7 @@ export default async function ComercializacionDashboardPage() {
       clientsToReorder={clientsToReorder}
       sellerName={sellerName}
       goals={getWeeklyGoals()}
+      monthlyRevenueGoal={getMonthlyRevenueGoal()}
       trends={trends}
     />
   )

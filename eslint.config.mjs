@@ -35,7 +35,7 @@ const eslintConfig = [
     // Tests: el non-null assertion es idiomático en asserts sobre mocks
     // (mock.calls[0]![0]) y un falso positivo haría fallar el test de todos
     // modos; no aporta señal mantenerlo como warning aquí.
-    files: ["**/*.test.{ts,tsx}"],
+    files: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
     rules: {
       "@typescript-eslint/no-non-null-assertion": "off",
     },

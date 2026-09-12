@@ -14,6 +14,8 @@ import {
   Globe,
   ImagePlus,
   RefreshCw,
+  AlertTriangle,
+  PackageX,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -83,6 +85,8 @@ export default function AdminProductsPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
+  // Filtro de alertas de stock: "all" | "low_stock" | "out_of_stock"
+  const [stockFilter, setStockFilter] = useState<"all" | "low_stock" | "out_of_stock">("all")
 
   // Debounce: filtrar cientos de filas en cada tecla re-renderiza toda la tabla.
   useEffect(() => {
@@ -172,18 +176,30 @@ export default function AdminProductsPage() {
   const categoryName = (id: number | null) =>
     categories.find((c) => c.id === id)?.name ?? "Sin categoría"
 
+  const stockCounts = useMemo(() => {
+    let low = 0
+    let out = 0
+    for (const p of products) {
+      if (p.stock_status === "low_stock") low++
+      else if (p.stock_status === "out_of_stock") out++
+    }
+    return { low, out }
+  }, [products])
+
   const filtered = useMemo(() => {
     const q = debouncedSearch.toLowerCase()
-    if (!q) return products
     const categoryName = (id: number | null) =>
       categories.find((c) => c.id === id)?.name ?? "Sin categoría"
-    return products.filter(
-      (p) =>
+    return products.filter((p) => {
+      if (stockFilter !== "all" && p.stock_status !== stockFilter) return false
+      if (!q) return true
+      return (
         p.name.toLowerCase().includes(q) ||
         (p.brand ?? "").toLowerCase().includes(q) ||
         categoryName(p.category_id).toLowerCase().includes(q)
-    )
-  }, [products, debouncedSearch, categories])
+      )
+    })
+  }, [products, debouncedSearch, categories, stockFilter])
 
   // ---------- Disponibilidad por ciudad ----------
   // Sin filas en product_city_availability = "Global" (todas las ciudades).
@@ -409,6 +425,50 @@ export default function AdminProductsPage() {
       {error && (
         <div className="mb-4 px-4 py-3 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200">
           {error}
+        </div>
+      )}
+
+      {/* Alertas de stock: conteo de productos con stock bajo o agotado;
+          cada chip filtra la tabla. */}
+      {(stockCounts.low > 0 || stockCounts.out > 0) && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span className="text-sm font-semibold text-amber-800">Alertas de inventario:</span>
+          <button
+            type="button"
+            onClick={() => setStockFilter((f) => (f === "low_stock" ? "all" : "low_stock"))}
+            aria-pressed={stockFilter === "low_stock"}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              stockFilter === "low_stock"
+                ? "bg-amber-600 text-white"
+                : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-100"
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            {stockCounts.low} con stock bajo
+          </button>
+          <button
+            type="button"
+            onClick={() => setStockFilter((f) => (f === "out_of_stock" ? "all" : "out_of_stock"))}
+            aria-pressed={stockFilter === "out_of_stock"}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              stockFilter === "out_of_stock"
+                ? "bg-red-600 text-white"
+                : "bg-white border border-red-200 text-red-700 hover:bg-red-100"
+            }`}
+          >
+            <PackageX className="w-3.5 h-3.5" />
+            {stockCounts.out} agotado{stockCounts.out === 1 ? "" : "s"}
+          </button>
+          {stockFilter !== "all" && (
+            <button
+              type="button"
+              onClick={() => setStockFilter("all")}
+              className="text-xs font-semibold text-amber-700 hover:underline"
+            >
+              Ver todos
+            </button>
+          )}
         </div>
       )}
 

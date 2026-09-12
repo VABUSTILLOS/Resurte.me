@@ -216,6 +216,7 @@ export function DashboardPage({
   clientsToReorder,
   sellerName,
   goals,
+  monthlyRevenueGoal,
   trends,
 }: {
   kpis: DashboardKpis
@@ -223,6 +224,7 @@ export function DashboardPage({
   clientsToReorder: ClientToReorder[]
   sellerName: string
   goals: WeeklyGoals
+  monthlyRevenueGoal: number
   trends: WeeklyTrendsReport
 }) {
   const router = useRouter()
@@ -295,25 +297,31 @@ export function DashboardPage({
         />
       </div>
 
-      {/* Metas semanales */}
-      <SectionCard title="Metas de la semana">
+      {/* Metas semanales y mensual */}
+      <SectionCard title="Metas">
         <div className="space-y-3">
           <GoalBar
-            label="Llamadas"
+            label="Llamadas (semana)"
             current={kpis.callsWeek}
             goal={goals.calls}
             format={(n) => String(n)}
           />
           <GoalBar
-            label="WhatsApps"
+            label="WhatsApps (semana)"
             current={kpis.whatsappWeek}
             goal={goals.whatsapps}
             format={(n) => String(n)}
           />
           <GoalBar
-            label="Ventas de clientes"
+            label="Ventas de clientes (semana)"
             current={kpis.weekRevenue}
             goal={goals.revenue}
+            format={formatMoney}
+          />
+          <GoalBar
+            label="Ventas de clientes (mes)"
+            current={kpis.monthRevenue}
+            goal={monthlyRevenueGoal}
             format={formatMoney}
           />
         </div>

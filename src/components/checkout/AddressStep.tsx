@@ -56,11 +56,12 @@ export function AddressStep({
   // Autocompletado de colonia por CP (catálogo postal_codes; fail-open).
   const [colonias, setColonias] = useState<ColoniasResult | null>(null)
 
+  // Las colonias solo aplican mientras el CP tiene 5 dígitos; si el CP se
+  // edita y queda inválido, se ocultan sin necesidad de un setState síncrono.
+  const activeColonias = address.zip_code.length === 5 ? colonias : null
+
   useEffect(() => {
-    if (address.zip_code.length !== 5) {
-      setColonias(null)
-      return
-    }
+    if (address.zip_code.length !== 5) return
     let cancelled = false
     fetch(`/api/address/colonias?cp=${address.zip_code}`)
       .then((res) => (res.ok ? res.json() : null))
@@ -229,12 +230,12 @@ export function AddressStep({
             value={address.neighborhood}
             onChange={(e) => onUpdateAddress("neighborhood", e.target.value)}
             placeholder="Roma Norte"
-            list={colonias ? "checkout-colonias" : undefined}
+            list={activeColonias ? "checkout-colonias" : undefined}
             className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
           />
-          {colonias && (
+          {activeColonias && (
             <datalist id="checkout-colonias">
-              {colonias.neighborhoods.map((n) => (
+              {activeColonias.neighborhoods.map((n) => (
                 <option key={n} value={n} />
               ))}
             </datalist>
@@ -255,9 +256,9 @@ export function AddressStep({
           maxLength={5}
           className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
         />
-        {colonias && (colonias.municipality || colonias.state) && (
+        {activeColonias && (activeColonias.municipality || activeColonias.state) && (
           <p className="mt-1.5 text-xs text-gray-500">
-            {[colonias.municipality, colonias.state].filter(Boolean).join(", ")}
+            {[activeColonias.municipality, activeColonias.state].filter(Boolean).join(", ")}
           </p>
         )}
       </div>

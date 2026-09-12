@@ -29,12 +29,15 @@ interface ProductCardProps {
   whatsappNumber?: string | null
   citySlug: string
   onAddToCart?: () => void
+  /** Preload de la imagen (fetchpriority=high): solo primera fila del grid. */
+  priority?: boolean
 }
 
 export const ProductCard = memo(function ProductCard({
   product,
   citySlug,
   onAddToCart,
+  priority = false,
 }: ProductCardProps) {
   const { addItem } = useCart()
   const { toast } = useToast()
@@ -103,6 +106,7 @@ export const ProductCard = memo(function ProductCard({
                 src={product.image_url}
                 alt={product.name}
                 fill
+                priority={priority}
                 placeholder="blur"
                 blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23faf8f5' width='400' height='300'/%3E%3C/svg%3E"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -275,13 +279,16 @@ export function ProductCardGrid({
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
-      {products.map((product) => (
+      {products.map((product, i) => (
         <ProductCard
           key={product.id}
           product={product}
           whatsappNumber={whatsappNumber}
           citySlug={citySlug}
           onAddToCart={onAddToCart}
+          // Solo la primera fila (4 en desktop, 2×2 en móvil) precarga su
+          // imagen: el resto usa lazy por defecto para no competir con el LCP.
+          priority={i < 4}
         />
       ))}
     </div>

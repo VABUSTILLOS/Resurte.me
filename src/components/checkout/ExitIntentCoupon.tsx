@@ -44,9 +44,15 @@ export function ExitIntentCoupon() {
   const shownRef = useRef(false)
 
   // Countdown de urgencia: arranca al mostrarse el modal y se limpia al cerrar.
+  // El reinicio del contador se ajusta durante el render al cambiar `visible`.
+  const [prevVisible, setPrevVisible] = useState(visible)
+  if (visible !== prevVisible) {
+    setPrevVisible(visible)
+    if (visible) setSecondsLeft(COUNTDOWN_MINUTES * 60)
+  }
+
   useEffect(() => {
     if (!visible) return
-    setSecondsLeft(COUNTDOWN_MINUTES * 60)
     const timer = setInterval(() => {
       setSecondsLeft((s) => Math.max(0, s - 1))
     }, 1000)

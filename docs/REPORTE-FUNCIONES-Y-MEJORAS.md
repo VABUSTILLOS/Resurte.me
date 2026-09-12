@@ -117,5 +117,10 @@ Marketplace mayorista B2B de insumos para restaurantes (México) + suite SaaS de
 - ✅ **E1**: `e2e/money-flows.spec.ts` — 10 tests e2e de flujos de dinero (validación zod de `/api/orders` y `create-intent`, whitelist de métodos de pago, rechazo de `amount` del cliente, cupón UI inválido/válido/quitar).
 - ✅ **C6 (parcial)**: botón "Exportar CSV" en `/admin/pedidos` (respeta filtro/búsqueda; helper `src/lib/csv.ts` con BOM UTF-8 + tests).
 - ✅ **A3 (parcial)**: QR del link de referido en `ReferralDashboard` (compartir en persona) y exportación CSV del historial completo del monedero en `ActivityFeed`.
+- ✅ **C3**: banner de alertas de inventario en `/admin/productos` (conteo de stock bajo/agotado con filtro de un clic).
+- ✅ **C6**: exportación CSV del funnel en `/admin/conversion` (resumen + toques de recuperación + UTM).
+- ✅ **B3**: meta mensual de ventas en el dashboard de comercialización (`getMonthlyRevenueGoal`, env `SELLER_MONTHLY_GOAL_REVENUE`, default semanal ×4.33) + 3 tests.
+- ✅ Refactor: módulo CSV consolidado en `src/lib/csv.ts` (el de comercialización ahora re-exporta, `@deprecated`).
 - Nota: la whitelist de `/api/orders` ya admite `spei`, `oxxo`, `mercado_pago` y `codi`; A1 requiere habilitar esos métodos en la cuenta de Stripe y la UI de confirmación.
+- Nota 2: B1 (importar prospectos CSV) y B4 (exportar comisiones) ya existían (`import-csv-modal.tsx`, "Exportar mes" en el dashboard de comercialización).
 - Pendientes con credenciales externas: C1 (PAC para timbrado CFDI), A1 (Stripe MX para OXXO/SPEI).

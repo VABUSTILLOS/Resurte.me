@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { TrendingUp, ShoppingCart, Mail, Zap, Package, Globe } from "lucide-react"
+import { TrendingUp, ShoppingCart, Mail, Zap, Package, Globe, Download } from "lucide-react"
+import { toCsv, downloadCsv } from "@/lib/csv"
 
 interface FunnelData {
   days: number
@@ -53,6 +54,34 @@ export default function ConversionDashboardPage() {
     void Promise.resolve().then(fetchFunnel)
   }, [fetchFunnel])
 
+  // Exporta el funnel completo del período a CSV (resumen + toques + UTM).
+  function exportCsv() {
+    if (!data) return
+    const csv = toCsv(
+      ["Sección", "Métrica", "Valor"],
+      [
+        ["Resumen", "Período (días)", data.days],
+        ["Resumen", "Pedidos creados", data.funnel.ordersCreated],
+        ["Resumen", "Pedidos pagados", data.funnel.ordersPaid],
+        ["Resumen", "Abandonados pendientes", data.funnel.pendingAbandoned],
+        ["Resumen", "Tasa de pago", pct(data.funnel.paidRate)],
+        ["Take-rates", "Order bumps", pct(data.bumpTakeRate)],
+        ["Take-rates", "Upsells 1-click", pct(data.upsellTakeRate)],
+        ...Object.entries(TOUCH_LABEL).map(
+          ([type, label]): [string, string, number] => [
+            "Recuperación",
+            label,
+            data.recoveryByTouch[type] ?? 0,
+          ]
+        ),
+        ...(data.utmBreakdown ?? []).map(
+          (row): [string, string, number] => ["UTM", row.source, row.orders]
+        ),
+      ]
+    )
+    downloadCsv(`funnel-conversion-${data.days}d.csv`, csv)
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex items-center justify-between mb-6">
@@ -60,21 +89,32 @@ export default function ConversionDashboardPage() {
           <TrendingUp className="w-5 h-5 text-brand-600" />
           Funnel de conversión
         </h1>
-        <select
-          value={days}
-          onChange={(e) => {
-            // El reset de loading/error va en el event handler, no en el efecto.
-            setLoading(true)
-            setError(null)
-            setDays(Number(e.target.value))
-          }}
-          className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white"
-          aria-label="Período"
-        >
-          <option value={7}>Últimos 7 días</option>
-          <option value={30}>Últimos 30 días</option>
-          <option value={90}>Últimos 90 días</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={!data || loading}
+            className="inline-flex items-center gap-1.5 text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4" />
+            Exportar CSV
+          </button>
+          <select
+            value={days}
+            onChange={(e) => {
+              // El reset de loading/error va en el event handler, no en el efecto.
+              setLoading(true)
+              setError(null)
+              setDays(Number(e.target.value))
+            }}
+            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white"
+            aria-label="Período"
+          >
+            <option value={7}>Últimos 7 días</option>
+            <option value={30}>Últimos 30 días</option>
+            <option value={90}>Últimos 90 días</option>
+          </select>
+        </div>
       </div>
 
       {loading && <p className="text-sm text-gray-500">Cargando…</p>}

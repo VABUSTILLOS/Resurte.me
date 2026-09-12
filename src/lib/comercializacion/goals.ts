@@ -21,3 +21,15 @@ export function getWeeklyGoals(): WeeklyGoals {
     revenue: readGoal(process.env.SELLER_WEEKLY_GOAL_REVENUE, 5000),
   }
 }
+
+/**
+ * Meta mensual de ventas del vendedor. Configurable con
+ * SELLER_MONTHLY_GOAL_REVENUE; por default se deriva de la semanal
+ * (× 4.33 semanas/mes promedio, redondeado al centenar).
+ */
+export function getMonthlyRevenueGoal(): number {
+  return readGoal(
+    process.env.SELLER_MONTHLY_GOAL_REVENUE,
+    Math.round((getWeeklyGoals().revenue * 4.33) / 100) * 100
+  )
+}

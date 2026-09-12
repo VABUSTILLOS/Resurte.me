@@ -69,12 +69,19 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
     }
   }
 
+  // Limpiar resultados cuando el término queda corto: ajuste durante el
+  // render (patrón React) en vez de setState síncrono dentro del efecto.
+  const term = query.trim()
+  const [prevTerm, setPrevTerm] = useState(term)
+  if (term !== prevTerm) {
+    setPrevTerm(term)
+    if (term.length < 2) setProductHits([])
+  }
+
   // Búsqueda server-side de productos (debounced 250ms) sobre el catálogo
   // completo de la ciudad — incluye descripción/marca/sinónimos.
   useEffect(() => {
-    const term = query.trim()
     if (!open || term.length < 2) {
-      setProductHits([])
       return
     }
     let cancelled = false
@@ -91,7 +98,7 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
       cancelled = true
       clearTimeout(timeout)
     }
-  }, [open, query, slug])
+  }, [open, term, slug])
 
   // Parsea todas las fuentes de localStorage UNA sola vez por apertura del
   // diálogo (antes: se re-leían y re-parseaban en cada tecla).

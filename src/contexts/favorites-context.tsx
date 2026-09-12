@@ -61,11 +61,20 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     const local = readLocal()
-    setIds(local)
-    setLoaded(true)
+    // Diferido a microtask: el estado inicial debe coincidir con el SSR
+    // (por eso no es lazy init) pero el setState no corre síncrono en el efecto.
+    void Promise.resolve().then(() => {
+      if (cancelled) return
+      setIds(local)
+      setLoaded(true)
+    })
 
     const supabase = createClient()
-    if (!supabase) return
+    if (!supabase) {
+      return () => {
+        cancelled = true
+      }
+    }
 
     void (async () => {
       try {
