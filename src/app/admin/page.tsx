@@ -53,6 +53,18 @@ const AdminInsights = dynamic(
   },
 )
 
+// Fase 14 — comparativa por periodo (sin recharts, pero se carga diferida
+// para no bloquear el primer render del dashboard).
+const PeriodComparisonCard = dynamic(
+  () => import("./components/PeriodComparison").then((m) => m.PeriodComparisonCard),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-32 animate-pulse rounded-xl bg-gray-100" />
+    ),
+  },
+)
+
 /** Fase 1 — Delta porcentual vs ayer con dirección de tendencia. */
 function buildDelta(
   today: number,
@@ -259,6 +271,11 @@ export default function AdminDashboardPage() {
           />
         </Suspense>
       )}
+
+      {/* Fase 14 — comparativa 7/30/90 días vs periodo anterior */}
+      <div className="mt-8">
+        <PeriodComparisonCard />
+      </div>
 
       {/* Fase 6 — Analítica avanzada (carga diferida) */}
       {insights && (

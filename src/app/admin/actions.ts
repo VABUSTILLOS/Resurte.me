@@ -1151,3 +1151,90 @@ export async function setCrmProspectFollowUp(id: number, followUpAt: string | nu
   }
   await patchCrmProspect(id, { next_follow_up_at: followUpAt })
 }
+
+// ============================================================
+// FASE 14 — ANALÍTICA COMPARATIVA POR PERIODO
+// ============================================================
+
+export interface PeriodComparison {
+  days: number
+  orders: { current: number; previous: number; deltaPct: number | null; direction: "up" | "down" | "flat" }
+  revenue: { current: number; previous: number; deltaPct: number | null; direction: "up" | "down" | "flat" }
+  avgTicket: { current: number; previous: number; deltaPct: number | null; direction: "up" | "down" | "flat" }
+  newCustomers: number
+  recurringCustomers: number
+  prevNewCustomers: number
+  prevRecurringCustomers: number
+}
+
+/** Comparativa del periodo (7/30/90 días) contra el periodo anterior de igual duración. */
+export async function getAdminPeriodComparison(days: number): Promise<PeriodComparison> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const { isPeriodDays, periodBounds, compareMetric, splitNewVsRecurring } = await import(
+    "@/lib/analytics-periods"
+  )
+  if (!isPeriodDays(days)) {
+    throw new Error("Periodo inválido (7, 30 o 90 días)")
+  }
+
+  const { since, prevSince } = periodBounds(days)
+  const supabase = await createServiceClient()
+
+  const [currentRes, prevRes, priorUsersRes] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("id, total, payment_status, user_id")
+      .gte("created_at", since.toISOString()),
+    supabase
+      .from("orders")
+      .select("id, total, payment_status, user_id")
+      .gte("created_at", prevSince.toISOString())
+      .lt("created_at", since.toISOString()),
+    // user_ids con pedidos ANTES del periodo actual (para nuevo vs recurrente)
+    supabase
+      .from("orders")
+      .select("user_id")
+      .lt("created_at", since.toISOString())
+      .not("user_id", "is", null)
+      .limit(5000),
+  ])
+
+  if (currentRes.error || prevRes.error) {
+    logger.error("[ADMIN-COMPARE] Error fetching orders:", currentRes.error ?? prevRes.error)
+    throw new Error("Error al cargar la comparativa")
+  }
+
+  const current = currentRes.data ?? []
+  const previous = prevRes.data ?? []
+  const paidRevenue = (rows: typeof current) =>
+    rows.filter((o) => o.payment_status === "paid").reduce((s, o) => s + Number(o.total), 0)
+
+  const curRevenue = Math.round(paidRevenue(current) * 100) / 100
+  const prevRevenue = Math.round(paidRevenue(previous) * 100) / 100
+  const curPaidCount = current.filter((o) => o.payment_status === "paid").length
+  const prevPaidCount = previous.filter((o) => o.payment_status === "paid").length
+
+  const priorUserIds = new Set(
+    (priorUsersRes.data ?? []).map((r) => r.user_id as string)
+  )
+  const curSplit = splitNewVsRecurring(current, priorUserIds)
+  const prevSplit = splitNewVsRecurring(previous, priorUserIds)
+
+  return {
+    days,
+    orders: compareMetric(current.length, previous.length),
+    revenue: compareMetric(curRevenue, prevRevenue),
+    avgTicket: compareMetric(
+      curPaidCount > 0 ? Math.round((curRevenue / curPaidCount) * 100) / 100 : 0,
+      prevPaidCount > 0 ? Math.round((prevRevenue / prevPaidCount) * 100) / 100 : 0
+    ),
+    newCustomers: curSplit.newCustomers,
+    recurringCustomers: curSplit.recurringCustomers,
+    prevNewCustomers: prevSplit.newCustomers,
+    prevRecurringCustomers: prevSplit.recurringCustomers,
+  }
+}
