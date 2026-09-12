@@ -3,6 +3,7 @@
 import { Home, Wallet, Store, User, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect } from "react";
+import { haptic } from "@/lib/haptics";
 import type { Tab } from "./types";
 
 const tabs: { id: Tab; label: string; icon: typeof Home }[] = [
@@ -29,6 +30,12 @@ export function BottomTabBar({
     return () => document.body.classList.remove("has-bottom-tab")
   }, [])
 
+  // Cambio de sección con micro-vibración: patrón de app nativa.
+  const handleChange = (tab: Tab) => {
+    if (tab !== activeTab) haptic(8)
+    onTabChange(tab)
+  }
+
   return (
     <>
       {/* Mobile: fixed bottom bar. Usa --floating-bottom-offset (globals.css):
@@ -41,7 +48,7 @@ export function BottomTabBar({
               return (
                 <button
                   key={tab.id}
-                  onClick={() => onTabChange(tab.id)}
+                  onClick={() => handleChange(tab.id)}
                   aria-current={isActive ? "page" : undefined}
                   aria-label={tab.label}
                   className="relative flex flex-col items-center gap-1 px-3 py-1.5"
@@ -84,7 +91,7 @@ export function BottomTabBar({
           return (
             <button
               key={tab.id}
-              onClick={() => onTabChange(tab.id)}
+              onClick={() => handleChange(tab.id)}
               aria-current={isActive ? "page" : undefined}
               className={`relative flex items-center gap-3 px-3 py-3 rounded-xl transition-all group ${
                 isActive
