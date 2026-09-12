@@ -30,6 +30,18 @@ export default function CashbackPage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [balance, setBalance] = useState(0);
 
+  // Cambio de tab: además del estado local, sincroniza ?tab= en la URL
+  // (replaceState) para que un reload o compartir el link conserve la
+  // sección — la app solo leía el param en el primer render.
+  const handleTabChange = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    const url =
+      tab === "home"
+        ? window.location.pathname
+        : `${window.location.pathname}?tab=${tab}`;
+    window.history.replaceState(null, "", url);
+  }, []);
+
   // Check auth state on mount
   useEffect(() => {
     if (!supabase) {
@@ -88,6 +100,22 @@ export default function CashbackPage() {
     return () => subscription.unsubscribe();
   }, [supabase]);
 
+  // Saldo fresco al volver a la pestaña: si el usuario canjeó en otro
+  // dispositivo o el cashback de un pedido cayó mientras la app estaba en
+  // background, al regresar (visibilitychange) se refetchea el balance real.
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const refresh = () => {
+      if (document.visibilityState === "visible") {
+        getWalletBalance().then((wallet) => {
+          if (wallet) setBalance(Number(wallet.balance_credits))
+        })
+      }
+    }
+    document.addEventListener("visibilitychange", refresh)
+    return () => document.removeEventListener("visibilitychange", refresh)
+  }, [isAuthenticated]);
+
   const handleServiceSelect = useCallback((service: ServiceItem) => {
     setSelectedService(service);
     setShowCheckout(true);
@@ -99,12 +127,12 @@ export default function CashbackPage() {
   }, []);
 
   const handleNavigateStore = useCallback(() => {
-    setActiveTab("store");
-  }, []);
+    handleTabChange("store");
+  }, [handleTabChange]);
 
   const handleViewOrders = useCallback(() => {
-    setActiveTab("wallet");
-  }, []);
+    handleTabChange("wallet");
+  }, [handleTabChange]);
 
   const handleCheckoutComplete = useCallback((newBalance?: number) => {
     setShowCheckout(false);
@@ -138,7 +166,7 @@ export default function CashbackPage() {
       {/* Sidebar Navigation (Tablet/Desktop) */}
       {showShell && (
         <div className="hidden md:flex md:w-20 lg:w-64 md:flex-col md:border-r md:border-cream-300 md:bg-white/60 md:shrink-0">
-          <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+          <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
         </div>
       )}
 
@@ -216,6 +244,13 @@ export default function CashbackPage() {
         {/* Confetti */}
         {showConfetti && <ConfettiOverlay />}
       </div>
+
+      {/* Tab bar móvil: también usa handleTabChange para sincronizar la URL */}
+      {showShell && (
+        <div className="md:hidden">
+          <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
+        </div>
+      )}
     </div>
     </MotionConfig>
   );
