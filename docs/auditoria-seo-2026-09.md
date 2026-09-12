@@ -1,6 +1,6 @@
 # Auditoría SEO completa — Resurte.me (2026-09-12)
 
-**Alcance:** auditoría técnica, on-page, contenido y visibilidad en motores de IA (GEO) sobre el sitio en producción y el código fuente. Cambios implementados en el PR #9 (`seo/auditoria-2026-09`). **Fase 2 (misma rama, mismo día):** cierre del backlog de metadatos (31 menores), 3 guías "money" nuevas de alta intención comercial y sincronización de `llms.txt`. **Fase 3 (misma rama, mismo día):** 2 guías pilar (hubs), 4ª página de comparación (alternativas a Sysco/clubes), guía de lista de insumos de apertura e interlinking desde posts existentes.
+**Alcance:** auditoría técnica, on-page, contenido y visibilidad en motores de IA (GEO) sobre el sitio en producción y el código fuente. Cambios implementados en el PR #9 (`seo/auditoria-2026-09`). **Fase 2 (misma rama, mismo día):** cierre del backlog de metadatos (31 menores), 3 guías "money" nuevas de alta intención comercial y sincronización de `llms.txt`. **Fase 3 (misma rama, mismo día):** 2 guías pilar (hubs), 4ª página de comparación (alternativas a Sysco/clubes), guía de lista de insumos de apertura e interlinking desde posts existentes. **Fase 4 (misma rama, mismo día):** las 4 guías pilar restantes (operación, marketing, legal/finanzas, crecimiento) — 6/6 hubs — e interlinking desde 4 posts más.
 
 ---
 
@@ -24,7 +24,7 @@
 | 10 | HTML SSR pesado (396–573 KB por página) | Medio — LCP/INP en móvil | 📋 Recomendación |
 | 11 | Sin contenido "money" de comparación | Alto — keywords de alta intención sin cubrir | ✅ 5 guías creadas (fases 2-3) |
 | 12 | Cover 404 en `tendencias-consumo-restaurantes` (typo en nombre de imagen) | Bajo — og:image rota | ✅ Corregido en fase 2 |
-| 13 | Blog plano sin hubs temáticos | Medio — PageRank temático disperso | 🔶 2 de 6 pilares creadas en fase 3 |
+| 13 | Blog plano sin hubs temáticos | Medio — PageRank temático disperso | ✅ 6 de 6 pilares creadas (fases 3-4) |
 
 ---
 
@@ -60,7 +60,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 
 ### 2.6 Arquitectura y enlazado interno — OK con mejora
 - Páginas de categoría a 2 clics del home; blog interligado con CTAs contextuales; breadcrumbs con schema.
-- **Mejora sugerida:** hub pages por tema en el blog (ver estrategia de contenidos) y enlazar las páginas de colección (`/coleccion/taquerias-antojitos`) desde los artículos relacionados — hoy el blog enlaza al Panel pero poco al catálogo transaccional. **Avance fase 3:** 2 páginas pilar creadas (proveeduría y costos) e interlinking desde 4 posts existentes hacia las guías nuevas.
+- **Mejora sugerida:** hub pages por tema en el blog (ver estrategia de contenidos) y enlazar las páginas de colección (`/coleccion/taquerias-antojitos`) desde los artículos relacionados — hoy el blog enlaza al Panel pero poco al catálogo transaccional. **Avance fases 3-4:** las 6 páginas pilar creadas (proveeduría, costos, operación, marketing, legal/finanzas, crecimiento) e interlinking desde 8 posts existentes hacia las guías nuevas.
 
 ---
 
@@ -115,8 +115,8 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 **Brechas (ver estrategia de contenidos para el plan completo):**
 1. **Sin páginas de autor** — "Equipo Resurte.me" no es una entidad verificable. Crear `/about#equipo` con autores reales, credenciales y foto; enlazar desde cada post (mejora E-E-A-T directa).
 2. ~~**Sin contenido "money" de comparación**~~ — ✅ **cubierto**: fase 2 creó 3 guías (`central-de-abastos-vs-comprar-en-linea`, `cuanto-cuesta-surtir-restaurante-mes`, `mejores-proveedores-mayoreo-restaurantes`) y fase 3 agregó 2 más (`alternativas-sysco-clubes-precio`, `lista-insumos-abrir-restaurante`). Todas con FAQ schema, tablas con números en MXN e interlinking al clúster de proveeduría.
-3. **Páginas hub temáticas** — 🔶 **2 de 6 creadas en fase 3**: `guia-proveeduria-restaurantes` y `guia-costos-restaurante`, cada una con sección hub que mapea su clúster. Pendientes: operación, marketing, legal/finanzas y crecimiento.
-4. **Fechas de actualización** — los posts tienen `updatedAt`; verificar que se muestre visible en la página (señal de frescura). En fase 3 se refrescó el `updatedAt` de los posts que recibieron interlinking.
+3. ~~**Sin páginas hub temáticas**~~ — ✅ **6 de 6 creadas (fases 3-4)**: `guia-proveeduria-restaurantes`, `guia-costos-restaurante`, `guia-operacion-cocina`, `guia-marketing-restaurantes`, `guia-legal-finanzas-restaurante` y `guia-crecer-restaurante`, cada una con sección hub que mapea su clúster. Pendiente: enlazar las pilares desde home/nav (cambio de UI, fuera de este PR).
+4. **Fechas de actualización** — los posts tienen `updatedAt`; verificar que se muestre visible en la página (señal de frescura). En fases 3-4 se refrescó el `updatedAt` de los posts que recibieron interlinking.
 
 ---
 
@@ -125,7 +125,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 | Táctica | Antes | Ahora |
 |---|---|---|
 | Crawlers IA en robots.txt | GPTBot bloqueado | 12 permitidos: GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-User, PerplexityBot, Perplexity-User, Google-Extended, Applebot-Extended, Meta-ExternalAgent, Amazonbot, CCBot |
-| `llms.txt` | No existía | Creado + actualizado en fases 2 y 3 con todas las guías money y pilares (qué es Resurte.me, cobertura, URLs clave, guías top, contacto) |
+| `llms.txt` | No existía | Creado + actualizado en fases 2-4: secciones de guías pilar (6 hubs), comparativas money y guías clásicas |
 | FAQPage schema | Solo en posts | También en /faq (respuestas citables por AI Overviews) |
 | Datos consistentes | $3,000/$2,500, 6/20 ciudades | Unificados (clave: las IA amplifican contradicciones) |
 
@@ -151,7 +151,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 7. ✅ 4 páginas de comparación/alternativas creadas (3 en fase 2 + `alternativas-sysco-clubes-precio` en fase 3); adicional: `lista-insumos-abrir-restaurante` (brecha de apertura).
 
 ### Medio (meses 2–3)
-8. 🔶 6 hubs temáticos con página pilar + interlinking: 2 de 6 creados en fase 3 (proveeduría y costos); pendientes operación, marketing, legal/finanzas y crecimiento.
+8. ✅ 6 hubs temáticos con página pilar creados (fases 3-4) + interlinking desde 8 posts existentes. Pendiente: enlazar pilares desde home/nav (UI).
 9. ⬜ Link building: directorios B2B gastronómicos, CANIRAC, cámaras de comercio locales (20 ciudades = 20 oportunidades locales), guest posts en blogs de la industria restaurantera.
 10. ⬜ Google Business Profile para Resurte.me (aunque sea B2B sin tienda: perfil de servicio).
 
@@ -216,6 +216,34 @@ Pendientes 4 pilares: operación, marketing, legal/finanzas y crecimiento.
 ### Control de calidad de la producción por agentes
 
 El MDX de fase 3 se generó con subagentes y se revisó contra `src/lib/blog.ts` antes de publicar. Hallazgo corregido en revisión: el redactor entregó la clave YAML `faqs` en lugar de `faq` — sin esa corrección, los 2 posts nuevos habrían perdido su sección de preguntas y el schema FAQPage. Regla permanente: todo contenido generado por agente se valida contra el schema real del repo antes del push.
+
+---
+
+## Fase 4 (2026-09-12) — los 4 pilares restantes (6/6 hubs)
+
+### Guías pilar creadas
+
+| Slug | Keyword objetivo | Hub de |
+|---|---|---|
+| guia-operacion-cocina | "operación de cocina restaurante" | Mermas, inventario, mise en place, NOM-251, turnos (19 guías mapeadas) |
+| guia-marketing-restaurantes | "marketing para restaurantes" | Google Maps, reseñas, redes, delivery, fidelización (21 guías mapeadas) |
+| guia-legal-finanzas-restaurante | "obligaciones fiscales restaurante", "crédito restaurante" | CFDI, impuestos, crédito, salarios, datos (8 guías mapeadas) |
+| guia-crecer-restaurante | "cómo hacer crecer un restaurante" | 6 rutas de crecimiento con tabla de decisión (12 guías mapeadas) |
+
+Las 4 con FAQ schema (5 Q&A), tablas MXN y enlaces a pilares hermanos. Veracidad: la guía legal evita tasas/multas específicas (no verificables en la sesión) y remite a "confirma con tu contador".
+
+### Interlinking desde posts existentes (parte 2)
+
+| Post origen | Enlace agregado |
+|---|---|
+| mise-en-place-cocina-restaurante | guia-operacion-cocina |
+| google-maps-restaurantes-2026 | guia-marketing-restaurantes (updatedAt refrescado) |
+| facturacion-cfdi-restaurantes | guia-legal-finanzas-restaurante (updatedAt refrescado) |
+| franquicias-restaurantes-mexico | guia-crecer-restaurante |
+
+### Producción
+
+2 writers en paralelo (2 pilares cada uno), QA de schema del orquestador antes de cada push (esta vez ambos entregaron la clave `faq` correcta), un commit por etapa: pilares `444c759` + `8d1c692`, interlinking `540ea30` + `ceafa84`, docs/llms `b72fae8`.
 
 ---
 
