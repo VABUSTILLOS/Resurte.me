@@ -199,6 +199,46 @@ Las herramientas de `/panel` (ventas, mermas, inventario, comanda, temporada, pl
 
 ---
 
+## 8. Autenticación: SMTP propio, roles y master admin
+
+### 8.1 SMTP propio en Supabase (requerido para registro por email)
+
+El servicio de correo por defecto de Supabase Auth es **solo para desarrollo** (rate-limit severo; los correos de confirmación no llegan o caen en spam). Para que el registro por email/contraseña funcione en producción hay que configurar un SMTP propio:
+
+1. Dashboard de Supabase → **Project Settings → Authentication → SMTP Settings** (o **Auth → Emails → SMTP** según la versión).
+2. Activar **Custom SMTP** e ingresar las credenciales del proveedor (recomendado: Resend, SendGrid, Amazon SES):
+   - Host, puerto (587 con TLS o 465 con SSL), usuario, contraseña/API key.
+   - **Sender email**: un remitente verificado en el proveedor (p.ej. `no-reply@resurte.me`).
+   - **Sender name**: `Resurte.me`.
+3. Verificar que **Authentication → Sign In / Providers → Email → Confirm email** siga **activado** (los usuarios deben confirmar su correo).
+4. En **Authentication → URL Configuration**, asegurar que **Redirect URLs** incluya:
+   - `https://<dominio-prod>/auth/callback`
+   - `http://localhost:3000/auth/callback` (desarrollo)
+5. Probar: registrar un usuario de prueba en `/auth/register` y confirmar que llega el correo.
+
+Flujos que dependen de este SMTP: confirmación de registro, **enlace mágico** (`signInWithOtp`) y **recuperación de contraseña** (`resetPasswordForEmail` → `/auth/reset`).
+
+### 8.2 Roles del sitio y master admin
+
+Fuentes de verdad para admin (`isAdminUser()` en `src/lib/admin-auth.ts`, cualquiera basta):
+
+1. **`profiles.role = 'admin'`** (migración `00067_master_admin_roles.sql`) — fuente principal, gestionable desde la UI.
+2. **`ADMIN_EMAILS`** (env var, lista separada por comas) — bootstrap/emergencia.
+3. **`admin_users`** (migración `00030`) — legado; el panel la mantiene sincronizada.
+
+**Bootstrap del primer master admin** (una sola vez):
+
+```bash
+# 1. Aplicar la migración 00067 en el SQL Editor de Supabase
+# 2. Registrar el usuario en /auth/register (o con Google)
+# 3. Promoverlo:
+node scripts/make-admin.mjs tu-email@dominio.com
+```
+
+**Gestión continua**: desde `/admin/usuarios` cualquier admin puede listar usuarios, buscarlos y asignar/quitar roles (admin / vendedor / cliente). Reglas: un admin no puede quitarse su propio rol y el sistema siempre conserva al menos un admin. El área `/admin` tiene guard server-side (layout) — sin sesión redirige a `/auth/login?next=/admin` y sin rol admin redirige a `/`.
+
+---
+
 ## Referencias
 
 - `vercel.json` (crons + headers de seguridad), `src/app/api/cron/*`, `src/app/api/workflows/*`, `src/app/api/foodos/campaigns/run`.
