@@ -162,7 +162,7 @@ export function CheckoutDrawer() {
     // last_order (merge), limpia carrito, cierra, refresca direcciones,
     // dispara ORDER_PAID_EVENT (UpsellModal) y navega si nadie lo reclamó.
     onPaid: (info: CheckoutPaidInfo) => {
-      saveLastOrder(info.orderId ?? undefined, info.cashback?.credits, info.cashback?.tier, info.repurchaseCoupon)
+      saveLastOrder(info.orderId ?? undefined, info.cashback?.credits, info.cashback?.tier, info.repurchaseCoupon, info.trackingToken)
       clearCart()
       setIsOpen(false)
 
@@ -778,7 +778,7 @@ export function CheckoutDrawer() {
  * confirmación pueda disparar el evento `purchase` y mostrar el cashback.
  * Mismo contrato que el checkout page (last_order).
  */
-function saveLastOrder(orderId?: number, cashbackCredits?: number, cashbackTier?: string | null, repurchaseCoupon?: RepurchaseCouponInfo | null) {
+function saveLastOrder(orderId?: number, cashbackCredits?: number, cashbackTier?: string | null, repurchaseCoupon?: RepurchaseCouponInfo | null, trackingToken?: string | null) {
   if (typeof window === "undefined") return
   const raw = window.sessionStorage.getItem("last_order")
   const previous = raw ? JSON.parse(raw) : {}
@@ -790,6 +790,7 @@ function saveLastOrder(orderId?: number, cashbackCredits?: number, cashbackTier?
       cashbackCredits: cashbackCredits ?? 0,
       cashbackTier: cashbackTier ?? null,
       repurchaseCoupon: repurchaseCoupon ?? null,
+      trackingToken: trackingToken ?? null,
     })
   )
 }

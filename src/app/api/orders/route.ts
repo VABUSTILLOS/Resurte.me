@@ -527,7 +527,7 @@ export async function POST(request: NextRequest) {
     const firstTry = await supabase
       .from("orders")
       .insert(utmEntries.length > 0 ? withUtm : insertOrder)
-      .select("id, cashback_credits, cashback_tier, total")
+      .select("id, cashback_credits, cashback_tier, total, restore_token")
       .single()
 
     // 42703 = undefined_column: la migración 00061 aún no está aplicada →
@@ -539,7 +539,7 @@ export async function POST(request: NextRequest) {
             return supabase
               .from("orders")
               .insert(insertOrder)
-              .select("id, cashback_credits, cashback_tier, total")
+              .select("id, cashback_credits, cashback_tier, total, restore_token")
               .single()
           })()
         : firstTry
@@ -626,6 +626,9 @@ export async function POST(request: NextRequest) {
       total: realTotal,
       // Cupón personal de recompra emitido con esta orden (null si anónimo).
       repurchaseCoupon,
+      // Token de seguimiento público (restore_token de la migración 00063):
+      // capability URL para /pedido/[orderId]?t=... sin sesión.
+      trackingToken: order.restore_token ?? null,
       // Solo para checkout anónimo: el frontend lo persiste en localStorage
       // para reutilizar la dirección en la próxima compra y reclamarla al login.
       guestToken,

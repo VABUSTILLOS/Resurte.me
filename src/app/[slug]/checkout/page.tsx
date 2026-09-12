@@ -103,11 +103,12 @@ export default function CheckoutPage() {
 
   // Persist the order summary so the confirmation page can fire a complete
   // `purchase` event after the cart is cleared.
-  const saveLastOrder = (orderId?: number, cashbackCredits?: number, cashbackTier?: string | null, repurchaseCoupon?: RepurchaseCouponInfo | null) => {
+  const saveLastOrder = (orderId?: number, cashbackCredits?: number, cashbackTier?: string | null, repurchaseCoupon?: RepurchaseCouponInfo | null, trackingToken?: string | null) => {
     sessionStorage.setItem(
       "last_order",
       JSON.stringify({
         orderId: orderId ?? null,
+        trackingToken: trackingToken ?? null,
         total,
         cashbackCredits: cashbackCredits ?? 0,
         cashbackTier: cashbackTier ?? null,
@@ -178,7 +179,7 @@ export default function CheckoutPage() {
     // navega a la confirmación. `city` es City | null en el closure (el hook se
     // declara antes del early return), por eso se usa `city?.slug ?? DEFAULT_CITY_SLUG`.
     onPaid: (info: CheckoutPaidInfo) => {
-      saveLastOrder(info.orderId ?? undefined, info.cashback?.credits, info.cashback?.tier, info.repurchaseCoupon)
+      saveLastOrder(info.orderId ?? undefined, info.cashback?.credits, info.cashback?.tier, info.repurchaseCoupon, info.trackingToken)
       clearCart()
       router.push(`/${city?.slug ?? DEFAULT_CITY_SLUG}/pedido-confirmado`)
     },

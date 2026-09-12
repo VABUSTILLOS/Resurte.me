@@ -38,6 +38,8 @@ export type CreatedOrder = {
   orderId: number
   cashback: { credits: number; tier: string | null } | null
   repurchaseCoupon?: RepurchaseCouponInfo | null
+  /** Token de seguimiento público del pedido (restore_token de la orden). */
+  trackingToken?: string | null
 }
 
 export type CheckoutPaidInfo = {
@@ -46,6 +48,8 @@ export type CheckoutPaidInfo = {
   paymentIntentId: string
   /** Cupón de recompra emitido con esta orden (solo usuarios logueados). */
   repurchaseCoupon?: RepurchaseCouponInfo | null
+  /** Token de seguimiento público del pedido (restore_token de la orden). */
+  trackingToken?: string | null
 }
 
 export interface CheckoutOrderOptions {
@@ -138,6 +142,7 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
     tier: string | null
   } | null>(null)
   const [repurchaseCoupon, setRepurchaseCoupon] = useState<RepurchaseCouponInfo | null>(null)
+  const [orderTrackingToken, setOrderTrackingToken] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
   // ── Sesión + precarga de dirección anónima ──
@@ -395,6 +400,8 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
 
         const repurchaseCoupon = (data.repurchaseCoupon ?? null) as RepurchaseCouponInfo | null
         setRepurchaseCoupon(repurchaseCoupon)
+        const trackingToken = (data.trackingToken ?? null) as string | null
+        setOrderTrackingToken(trackingToken)
 
         return {
           orderId: data.orderId,
@@ -403,6 +410,7 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
             tier: data.cashbackTier ?? null,
           },
           repurchaseCoupon,
+          trackingToken,
         }
       } catch (err) {
         setCheckoutError(
@@ -490,9 +498,10 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
         cashback: finalCashback,
         paymentIntentId,
         repurchaseCoupon,
+        trackingToken: orderTrackingToken,
       })
     },
-    [createdOrderId, earnedCashback, repurchaseCoupon]
+    [createdOrderId, earnedCashback, repurchaseCoupon, orderTrackingToken]
   )
 
   const handleStripeBack = useCallback(() => {
@@ -527,6 +536,7 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
           cashback: created.cashback,
           paymentIntentId: "",
           repurchaseCoupon: created.repurchaseCoupon ?? null,
+          trackingToken: created.trackingToken ?? null,
         })
       } catch (err) {
         setCheckoutError(
