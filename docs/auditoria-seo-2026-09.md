@@ -19,7 +19,7 @@
 | 5 | Sin `llms.txt` | Medio para GEO | ✅ Creado |
 | 6 | `/faq` sin FAQPage schema | Medio — respuestas no citables | ✅ JSON-LD agregado |
 | 7 | Sitemap sin páginas institucionales (/about, /contact, /faq, /ciudades…) | Bajo-medio | ✅ Agregadas |
-| 8 | 39 títulos >60c y 25 descriptions >160c en blog | Medio — truncamiento en SERP | 🔶 4 peores corregidos; backlog abajo |
+| 8 | 39 títulos >60c y 25 descriptions >160c en blog | Medio — truncamiento en SERP | ✅ 13 graves corregidos; 31 menores en Anexo A |
 | 9 | Copy inconsistente (envío gratis $3,000 vs $2,500; 6 vs 20 ciudades) | Bajo — confianza/E-E-A-T | ✅ Corregido en /faq |
 | 10 | HTML SSR pesado (396–573 KB por página) | Medio — LCP/INP en móvil | 📋 Recomendación |
 
@@ -36,7 +36,8 @@
 ### 2.2 Indexación de páginas transaccionales — CRÍTICO
 - **Evidencia:** `curl` sobre `/cdmx/carrito`, `/cdmx/checkout`, `/cdmx/buscar` devolvía `index,follow` (heredado del layout raíz); el sitemap incluía `/carrito` y `/buscar` de las 20 ciudades más `/auth/login` y `/auth/register`.
 - **Impacto:** ~60 URLs thin/duplicadas compitiendo por crawl budget y diluyendo la autoridad de las páginas de categoría (las que sí rankean).
-- **Fix aplicado:** `noindex,nofollow` vía `layout.tsx` en `/auth`, `/cart`, `/{ciudad}/carrito`, `/checkout`, `/mis-pedidos`, `/mis-direcciones`, `/pedido-confirmado`, `/diagnostico-bumps`, `/panel`, `/admin`; `noindex,follow` en `/{ciudad}/buscar` (follow para no cortar el crawl hacia productos). Sitemap limpio.
+- **Fix aplicado:** `noindex,nofollow` vía `layout.tsx` en `/auth`, `/cart`, `/{ciudad}/carrito`, `/checkout`, `/mis-pedidos`, `/mis-direcciones`, `/pedido-confirmado`, `/diagnostico-bumps` y `/panel`; `noindex,follow` en `/{ciudad}/buscar` (follow para no cortar el crawl hacia productos). Sitemap limpio.
+- **`/admin`:** `noindex, nofollow` mediante el header `X-Robots-Tag` emitido desde `src/proxy.ts` (convención de Next.js 16, sucesora de `middleware.ts`). Cubre todas las subrutas de `/admin` actuales y futuras sin modificar la UI ni los layouts.
 - **Nota:** se eliminaron `/admin/` y `/auth/` del `Disallow` de robots.txt — si se bloquean por robots, Google nunca ve el `noindex` y puede indexarlas "a ciegas". Solo `/api/` queda bloqueado.
 
 ### 2.3 Contradicción sitemap ↔ robots — ALTO
@@ -64,14 +65,30 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 
 ### 3.1 Títulos y meta descriptions del blog — MEDIO
 - **Evidencia:** análisis de los 108 MDX: 39 títulos >60 caracteres (máx. 93) y 25 descriptions >160 (máx. 202).
-- **Corregidos en este PR (los 4 más graves):**
+- **Corregidos en este PR — los 13 casos graves** (título >79c o description >194c):
+
   | Post | Antes | Después |
   |---|---|---|
   | control-de-merma-sin-hojas | 93c / 179c | 58c / 142c |
   | inflacion-alimentos-menu-restaurante | 91c / 176c | 57c / 147c |
   | comisiones-delivery-apps-2026 | 89c / 171c | 62c / 154c |
   | nom-251-higiene-restaurante | 87c | 55c |
-- **Backlog listo para aplicar** (reemplazos redactados, ver Anexo A): 8 graves restantes (títulos 80–86c, descriptions 195–202c) y 32 menores (61–79c / 161–194c). Google los trunca con "…" — no es penalización, pero baja el CTR.
+
+  Otros 9 (antes: títulos de 80–86c y/o descriptions de 195–202c):
+
+  | Post | Después |
+  |---|---|
+  | costeo-platillo-nuevo-restaurante | 60c / 133c |
+  | proveeduria-mayoreo-restaurantes | 59c / 131c |
+  | sector-restaurantero-mexico-2026 | 50c (título) |
+  | menu-digital-restaurante-guia | 52c / 148c |
+  | margenes-delivery-vs-local | 46c / 152c |
+  | panel-herramientas-restaurante-guia | 47c / 155c |
+  | margenes-restaurantes-mexico | 52c / 150c |
+  | responder-resenas-google-restaurantes | 52c / 152c |
+  | inventario-conteo-ciclico-restaurante | 54c / 149c |
+
+- **Backlog restante:** 31 casos menores (títulos 61–79c / descriptions 161–194c) con reemplazos ya redactados en el Anexo A. Google los trunca con "…" — no es penalización, pero baja el CTR.
 
 ### 3.2 Lo que está bien (no tocar)
 - Títulos únicos con keyword al frente y marca al final en ciudades/categorías.
@@ -122,7 +139,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 3. ⬜ Reenviar `sitemap.xml` en Google Search Console; verificar en Cobertura que carritos/checkouts salen del índice (usar "Eliminaciones" si alguna ya está indexada).
 
 ### Alto (semanas 2–4)
-4. ⬜ Aplicar el backlog de metadatos del blog (Anexo A — reemplazos listos).
+4. 🔶 Metadatos del blog: los 13 casos graves ya se aplicaron en este PR; quedan 31 menores (Anexo A — reemplazos listos).
 5. ⬜ PageSpeed Insights en home, /cdmx y /blog tras el deploy; si LCP móvil > 2.5 s, atacar payload RSC y bundles.
 6. ⬜ Páginas de autor reales + `/about#equipo`.
 7. ⬜ 4 páginas de comparación/alternativas (ver estrategia).
@@ -138,10 +155,10 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 
 ---
 
-## Anexo A — Backlog de metadatos del blog (reemplazos listos)
+## Anexo A — Backlog de metadatos del blog
 
-### Graves restantes (aplicar primero)
-| Slug | Campo | Nuevo valor |
+### Graves — ✅ aplicados en este PR (registro de valores finales)
+| Slug | Campo | Valor aplicado |
 |---|---|---|
 | costeo-platillo-nuevo-restaurante | title | Costeo de un platillo nuevo: del borrador al menú en 5 pasos |
 | costeo-platillo-nuevo-restaurante | description | Cómo costear un platillo nuevo paso a paso: receta, costo por porción, margen y precio de venta, con ejemplo real en pesos mexicanos. |
@@ -161,7 +178,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 | inventario-conteo-ciclico-restaurante | title | Conteo cíclico de inventario en 30 minutos a la semana |
 | inventario-conteo-ciclico-restaurante | description | Método de conteo cíclico para restaurantes: qué contar, cuándo, cómo calcular tu merma real y por qué media hora semanal te ahorra miles. |
 
-### Menores (61–79c / 161–194c) — aplicar cuando se toque cada post
+### Menores (61–79c / 161–194c) — pendientes, reemplazos listos
 | Slug | Campo | Nuevo valor |
 |---|---|---|
 | calculadora-food-cost-gratis | title | Calculadora de food cost gratis: cómo usarla paso a paso |
