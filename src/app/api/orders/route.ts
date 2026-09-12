@@ -45,8 +45,8 @@ interface CreateOrderBody {
   }
   payment_method: string
   phone?: string
-  // Email del cliente (drawer checkout): se captura al salir del campo (onBlur) como lead y se
-  // pasa a Stripe como customer_email para habilitar Link Pay / prefill.
+  // Email del cliente (drawer checkout): se persiste para notificaciones y
+  // reutilización del método de pago en upsells 1-click.
   email?: string
   subtotal: number
   delivery_fee: number
