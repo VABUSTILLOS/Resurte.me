@@ -24,9 +24,6 @@ const TAB_TITLES: Record<Tab, string> = {
   profile: "Perfil",
 };
 
-/** Distancia de jalón (px, tras amortiguar) que dispara el refresh. */
-const PULL_REFRESH_THRESHOLD = 70;
-
 export default function CashbackPage() {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") as Tab) || "home";
@@ -243,6 +240,7 @@ export default function CashbackPage() {
               balance={balance}
             />
           ) : (
+<<<<<<< HEAD
             <div
               key="main"
               ref={mainRef}
@@ -264,6 +262,9 @@ export default function CashbackPage() {
                   />
                 </div>
               )}
+=======
+            <div key="main" className="flex-1 overflow-y-auto overscroll-contain pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+>>>>>>> 4705c43 (feat(recompensas): fases R5-R6 — título del documento por sección, overscroll en contenedor principal)
               {activeTab === "home" && (
                 <DashboardScreen
                   onOpenCalculator={handleOpenCalculator}
