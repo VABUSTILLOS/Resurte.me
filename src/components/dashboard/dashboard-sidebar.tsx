@@ -423,6 +423,7 @@ export function DashboardSidebar() {
           onClick={toggleCollapsed}
           className={`lg:hidden fixed bottom-[var(--floating-bottom-offset)] left-3 z-[60] w-11 h-11 rounded-full bg-white shadow-[0_4px_24px_rgba(0,0,0,0.15)] ring-1 ring-gray-200 flex items-center justify-center hover:shadow-[0_6px_28px_rgba(0,0,0,0.2)] active:scale-95 transition-all`}
           aria-label="Mostrar panel"
+          style={{ touchAction: "manipulation" }}
         >
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0E7A0E] to-[#16a34a] flex items-center justify-center text-white font-bold text-xs">
             {initial}
