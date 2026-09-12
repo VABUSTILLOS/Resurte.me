@@ -1057,3 +1057,97 @@ export async function getRestockSuggestions(limit = 10): Promise<
     limit
   )
 }
+
+// ============================================================
+// FASE 13 — CRM OPERATIVO (/admin/leads)
+// ============================================================
+
+export interface AdminLeadRow {
+  id: number
+  email: string
+  phone: string | null
+  source: string
+  coupon_code: string | null
+  created_at: string
+}
+
+/** Leads web capturados (checkout drawer / exit intent), más recientes primero. */
+export async function getAdminLeads(limit = 100): Promise<AdminLeadRow[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { data, error } = await supabase
+    .from("leads")
+    .select("id, email, phone, source, coupon_code, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit)
+  if (error) {
+    logger.error("[ADMIN-LEADS] Error fetching leads:", error)
+    throw new Error("Error al cargar los leads")
+  }
+  return data ?? []
+}
+
+/** Tablero CRM: todos los prospectos con sus campos de seguimiento. */
+export async function getAdminCrmBoard(): Promise<import("@/lib/crm-pipeline").CrmProspect[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { data, error } = await supabase
+    .from("crm_prospects")
+    .select("id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at")
+    .order("created_at", { ascending: false })
+    .limit(500)
+  if (error) {
+    logger.error("[ADMIN-CRM] Error fetching prospects:", error)
+    throw new Error("Error al cargar el pipeline CRM")
+  }
+  return data ?? []
+}
+
+async function patchCrmProspect(
+  id: number,
+  patch: Record<string, unknown>,
+  alsoTouchLastContact = false
+): Promise<void> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  if (alsoTouchLastContact) {
+    patch.last_contact_at = new Date().toISOString()
+  }
+  patch.updated_at = new Date().toISOString()
+  const { error } = await supabase.from("crm_prospects").update(patch).eq("id", id)
+  if (error) {
+    logger.error("[ADMIN-CRM] Error updating prospect:", error)
+    throw new Error("Error al actualizar el prospecto")
+  }
+}
+
+export async function updateCrmProspectStatus(id: number, status: string): Promise<void> {
+  const { isCrmStatus } = await import("@/lib/crm-pipeline")
+  if (!isCrmStatus(status)) {
+    throw new Error("Estado CRM inválido")
+  }
+  await patchCrmProspect(id, { status }, true)
+}
+
+export async function updateCrmProspectNotes(id: number, notes: string): Promise<void> {
+  await patchCrmProspect(id, { notes: notes.trim() || null })
+}
+
+export async function setCrmProspectFollowUp(id: number, followUpAt: string | null): Promise<void> {
+  if (followUpAt !== null && Number.isNaN(new Date(followUpAt).getTime())) {
+    throw new Error("Fecha de seguimiento inválida")
+  }
+  await patchCrmProspect(id, { next_follow_up_at: followUpAt })
+}
