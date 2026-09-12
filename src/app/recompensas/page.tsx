@@ -12,7 +12,7 @@ import { CheckoutFlowScreen } from "./_components/CheckoutFlowScreen";
 import { ConfettiOverlay } from "./_components/ConfettiOverlay";
 import { InvoiceScannerScreen } from "./_components/InvoiceScannerScreen";
 import { OnboardingScreen } from "./_components/OnboardingScreen";
-import { getWalletBalance } from "@/lib/wallet-actions";
+import { getWalletBalance, getRewardsOnboarded, markRewardsOnboarded } from "@/lib/wallet-actions";
 import type { Tab, ServiceItem } from "./_components/types";
 
 export default function CashbackPage() {
@@ -51,9 +51,22 @@ export default function CashbackPage() {
           if (wallet) setBalance(Number(wallet.balance_credits))
         })
 
-        // Only show onboarding if user hasn't completed it before
+        // Onboarding: localStorage o, con sesión, la marca persistente del
+        // perfil (sobrevive entre dispositivos). Si el servidor dice que ya
+        // se completó, se sella localmente y no se vuelve a mostrar.
         const onboarded = localStorage.getItem("cashback-onboarded");
-        if (!onboarded) setShowOnboarding(true);
+        if (!onboarded) {
+          getRewardsOnboarded().then((serverOnboarded) => {
+            if (serverOnboarded) {
+              localStorage.setItem("cashback-onboarded", "true");
+            } else if (serverOnboarded === false) {
+              setShowOnboarding(true);
+            } else {
+              // Sin dato del servidor (sin migración/offline): fallback local
+              setShowOnboarding(true);
+            }
+          });
+        }
       } else {
         // Visitantes: onboarding solo en la primera visita; pueden
         // "Explorar sin cuenta" y volver a verlo desde Perfil.
@@ -103,6 +116,8 @@ export default function CashbackPage() {
   const handleOnboardingComplete = useCallback(() => {
     setShowOnboarding(false);
     localStorage.setItem("cashback-onboarded", "true");
+    // Persistencia server-side (no-op para visitantes).
+    void markRewardsOnboarded();
   }, []);
 
   // Show nothing while checking auth state
@@ -137,7 +152,6 @@ export default function CashbackPage() {
             <InvoiceScannerScreen
               key="scanner"
               onClose={() => setShowScanner(false)}
-              balance={balance}
             />
           ) : showCalculator ? (
             <ROICalculatorScreen

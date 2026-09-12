@@ -6,9 +6,28 @@ import { Bell, TrendingUp, Star, Megaphone, Gift, Sparkles, BellOff } from "luci
 import type { Notification, Tier } from "./types";
 import { getWalletHistory, getMonthlyCashbackProgress } from "@/lib/wallet-actions";
 import { useEscapeKey } from "@/hooks/use-escape-key";
-import { deriveNotifications, type WalletMovement } from "./notifications-data";
+import { deriveNotifications, formatRelativeTime, type WalletMovement } from "./notifications-data";
 
 const READ_IDS_KEY = "rewards-notifications-read";
+
+/** Fila de la tabla notifications (migración 00070). */
+interface ServerNotification {
+  id: number;
+  type: string;
+  title: string;
+  body: string | null;
+  action_url: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+/** Mapea tipos de evento del servidor a los tipos visuales de la campana. */
+function serverTypeToVisual(type: string): Notification["type"] {
+  if (type === "cashback_credited") return "cashback_earned";
+  if (type === "redemption") return "service_ready";
+  if (type.startsWith("order_")) return "service_update";
+  return "service_update";
+}
 
 const iconMap: Record<Notification["type"], { icon: typeof Bell; bg: string; color: string }> = {
   cashback_earned: { icon: TrendingUp, bg: "bg-brand-50", color: "text-brand-500" },
@@ -50,6 +69,8 @@ export function NotificationBell() {
   // null = usuario no autenticado (la server action devolvió null) → estado vacío.
   const [progress, setProgress] = useState<TierProgress | null>(null);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  // Notificaciones persistentes del servidor (null = no cargadas / invitado).
+  const [serverNotifs, setServerNotifs] = useState<ServerNotification[] | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLButtonElement>(null);
 
@@ -92,6 +113,19 @@ export function NotificationBell() {
               }
             : null
         );
+        // Con sesión: notificaciones persistentes (servidor). Sin sesión:
+        // se queda con las derivadas locales.
+        if (monthly) {
+          try {
+            const res = await fetch("/api/notifications", { cache: "no-store" });
+            if (res.ok) {
+              const data = (await res.json()) as { notifications?: ServerNotification[] };
+              if (!cancelled) setServerNotifs(data.notifications ?? []);
+            }
+          } catch {
+            // offline: derivadas locales
+          }
+        }
       } catch {
         if (!cancelled) {
           setMovements([]);
@@ -111,20 +145,57 @@ export function NotificationBell() {
 
   const notifications = useMemo<Notification[]>(() => {
     if (loading || !progress) return [];
-    return deriveNotifications({
+    const derived = deriveNotifications({
       movements,
       tier: progress.tier,
       weekCount: progress.weekCount,
-    }).map((n) => ({ ...n, read: readIds.has(n.id) }));
-  }, [loading, progress, movements, readIds]);
+    });
+
+    // Hitos derivados (metas/nivel) siempre se calculan en cliente.
+    const milestones = derived
+      .filter((n) => n.type === "milestone")
+      .map((n) => ({ ...n, read: readIds.has(n.id) }));
+
+    // Con notificaciones del servidor: eventos reales persistentes +
+    // hitos derivados. Sin servidor (invitado/offline): todo derivado.
+    if (serverNotifs && serverNotifs.length > 0) {
+      const events: Notification[] = serverNotifs.map((n) => ({
+        id: `srv-${n.id}`,
+        type: serverTypeToVisual(n.type),
+        title: n.title,
+        body: n.body ?? "",
+        timestamp: formatRelativeTime(new Date(n.created_at)),
+        read: n.read_at !== null,
+        actionLabel: n.action_url ? "Ver" : undefined,
+        actionUrl: n.action_url ?? undefined,
+      }));
+      return [...milestones, ...events].slice(0, 12);
+    }
+
+    return derived.map((n) => ({ ...n, read: readIds.has(n.id) }));
+  }, [loading, progress, movements, readIds, serverNotifs]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const markAllRead = () => {
     const next = new Set(readIds);
-    for (const n of notifications) next.add(n.id);
+    const serverIds: number[] = [];
+    for (const n of notifications) {
+      next.add(n.id);
+      if (n.id.startsWith("srv-")) serverIds.push(Number(n.id.slice(4)));
+    }
     persistReadIds(next);
     setReadIds(next);
+    if (serverIds.length > 0) {
+      void fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: serverIds }),
+      }).catch(() => {});
+      setServerNotifs((prev) =>
+        prev ? prev.map((n) => (serverIds.includes(n.id) ? { ...n, read_at: n.read_at ?? new Date().toISOString() } : n)) : prev
+      );
+    }
   };
 
   const markRead = (id: string) => {
@@ -133,6 +204,17 @@ export function NotificationBell() {
     next.add(id);
     persistReadIds(next);
     setReadIds(next);
+    if (id.startsWith("srv-")) {
+      const numId = Number(id.slice(4));
+      void fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [numId] }),
+      }).catch(() => {});
+      setServerNotifs((prev) =>
+        prev ? prev.map((n) => (n.id === numId ? { ...n, read_at: n.read_at ?? new Date().toISOString() } : n)) : prev
+      );
+    }
   };
 
   return (
@@ -231,7 +313,13 @@ export function NotificationBell() {
                     return (
                       <motion.button
                         key={notif.id}
-                        onClick={() => markRead(notif.id)}
+                        onClick={() => {
+                          markRead(notif.id);
+                          if (notif.actionUrl) {
+                            setIsOpen(false);
+                            window.location.href = notif.actionUrl;
+                          }
+                        }}
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors

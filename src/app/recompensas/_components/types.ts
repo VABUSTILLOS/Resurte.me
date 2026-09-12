@@ -103,6 +103,8 @@ export interface Notification {
   timestamp: string;
   read: boolean;
   actionLabel?: string;
+  /** Destino al tocar la notificación (eventos del servidor). */
+  actionUrl?: string;
 }
 
 export interface ImpactStory {
@@ -121,12 +123,14 @@ export interface ImpactStory {
 export interface InvoiceScanState {
   status: "idle" | "scanning" | "extracting" | "success" | "error";
   progress: number;
+  /** Datos reales del envío registrado (no OCR simulado). */
   extracted?: {
-    supplier: string;
-    amount: number;
-    date: string;
-    folio: string;
+    fileName: string;
+    amount: number | null;
+    submittedId: number | null;
   };
+  /** Mensaje de error accionable cuando status === "error". */
+  errorMessage?: string;
 }
 
 // ---------------------------------------------------------------------------

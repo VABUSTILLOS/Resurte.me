@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
 import type { ServiceItem, Tier } from "./types";
@@ -54,12 +54,28 @@ interface StoreScreenProps {
 export function StoreScreen({ onServiceSelect, onOpenCalculator, balance = 0 }: StoreScreenProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [detailService, setDetailService] = useState<ServiceItem | null>(null);
+  // Catálogo administrable (reward_services, migración 00072) con fallback
+  // al catálogo estático si el endpoint no responde.
+  const [services, setServices] = useState<ServiceItem[]>(SERVICES);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/recompensas/servicios")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { services?: ServiceItem[] } | null) => {
+        if (!cancelled && data?.services?.length) setServices(data.services);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const { monthlyCashback } = useLoyaltyTier();
 
   const filtered =
     activeCategory === "all"
-      ? SERVICES
-      : SERVICES.filter((s) => s.category === activeCategory);
+      ? services
+      : services.filter((s) => s.category === activeCategory);
 
   // Datos reales del monedero y del nivel actual
   const monthsToUnlockOf = (cost: number) =>
@@ -87,8 +103,8 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator, balance = 0 }: 
         {categories.map((cat) => {
           const count =
             cat.id === "all"
-              ? SERVICES.length
-              : SERVICES.filter((s) => s.category === cat.id).length;
+              ? services.length
+              : services.filter((s) => s.category === cat.id).length;
           return (
             <button
               key={cat.id}

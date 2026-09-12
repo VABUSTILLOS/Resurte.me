@@ -13,7 +13,7 @@ export const FEATURED_CATEGORY_SLUGS = [
 export const LANDING_PREVIEW_COUNT = 4
 
 // Productos por categoría que se pre-renderizan en /catalogo/[ciudad].
-export const CATALOG_PREVIEW_COUNT = 8
+const CATALOG_PREVIEW_COUNT = 8
 
 // Productos pre-renderizados en /[ciudad]/categoria/[slug]; el resto se
 // pagina en cliente con loadMoreCategoryProducts (mismo page size).

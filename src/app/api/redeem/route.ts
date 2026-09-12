@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { redeemCredits } from "@/lib/wallet-actions"
-import { SERVICES } from "@/app/recompensas/_components/services-data"
+import { getRewardServices } from "@/lib/reward-services"
+import { notifyUser } from "@/lib/notifications"
 import { logger } from "@/lib/logger"
 import { rateLimited, rateLimitResponse } from "@/lib/rate-limit"
 
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Buscar el servicio en el catálogo (nunca confiar en cost/name del cliente)
-    const service = SERVICES.find((s) => s.id === service_id)
+    const service = (await getRewardServices()).find((s) => s.id === service_id)
     if (!service) {
       return NextResponse.json({ error: "Servicio no encontrado" }, { status: 404 })
     }

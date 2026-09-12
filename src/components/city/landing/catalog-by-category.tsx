@@ -3,10 +3,12 @@ import { ArrowRight } from "lucide-react"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import { ProductCard } from "@/components/product/product-card"
 import { getCategoryIcon } from "@/lib/utils"
+import { LANDING_PREVIEW_COUNT } from "@/lib/catalog-preview"
 import type { Category, Product } from "@/types"
 
-// Products per category to show on landing — show first 4, then "Ver Todo"
-const PREVIEW_COUNT = 4
+// Products per category to show on landing — show first N, then "Ver Todo".
+// Debe coincidir con el preview que el server serializa (buildLandingPreview).
+const PREVIEW_COUNT = LANDING_PREVIEW_COUNT
 
 interface CatalogByCategoryProps {
   featuredCategories: Category[]

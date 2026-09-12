@@ -379,3 +379,41 @@ export async function redeemCredits(
     redemptionId: result.redemption_id ?? null,
   }
 }
+
+// ── Onboarding de recompensas persistente (migración 00070) ──
+
+/**
+ * true si el usuario con sesión ya completó el onboarding de /recompensas
+ * (profiles.rewards_onboarded_at). null sin sesión. Ante error o si la
+ * columna aún no existe (migración sin aplicar), devuelve null para que el
+ * cliente use su localStorage.
+ */
+export async function getRewardsOnboarded(): Promise<boolean | null> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("rewards_onboarded_at")
+    .eq("id", user.id)
+    .maybeSingle()
+  if (error) return null
+  return data?.rewards_onboarded_at != null
+}
+
+/** Marca el onboarding de recompensas como completado (best-effort). */
+export async function markRewardsOnboarded(): Promise<void> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return
+
+  await supabase
+    .from("profiles")
+    .update({ rewards_onboarded_at: new Date().toISOString() })
+    .eq("id", user.id)
+}
