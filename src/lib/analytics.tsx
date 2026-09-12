@@ -13,9 +13,22 @@
  */
 import Script from "next/script"
 
-const GA_ID =
+// Sanea valores de env: en Vercel es común pegar por error
+// "NOMBRE_VAR=valor" completo como valor (pasó con GA: el tag de gtag quedó
+// como `gtag/js?id=NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXX` y no medía nada).
+// Nos quedamos solo con la parte posterior al "=" y sin espacios.
+function sanitizeEnvId(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  const clean = value.includes("=") ? value.split("=").pop() : value
+  return clean?.trim() || undefined
+}
+
+const GA_ID = sanitizeEnvId(
   process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || process.env.GOOGLEANALYTICS
-const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || process.env.FBPIXEL
+)
+const PIXEL_ID = sanitizeEnvId(
+  process.env.NEXT_PUBLIC_META_PIXEL_ID || process.env.FBPIXEL
+)
 
 declare global {
   interface Window {
@@ -157,7 +170,7 @@ export function trackEvent(eventName: string, params?: EventParams) {
   const metaEvent = META_EVENT_MAP[eventName]
   const fbParams = toMetaParams(params)
   if (metaEvent) {
-    // Standard events use Meta's exact PascalCase names; the 4th arg (event_id)
+    // Standard events use Meta's exact PascalCase names, the 4th arg (event_id)
     // enables deduplication with the Conversions API.
     window.fbq?.("track", metaEvent, fbParams, params?.event_id)
   } else {
@@ -172,7 +185,7 @@ export function trackEvent(eventName: string, params?: EventParams) {
 /** A line item in an ecommerce event payload */
 type AnalyticsItem = {
   item_id: string | number
-  item_name: string
+  item_name?: string
   item_category?: string
   price?: number
   quantity?: number
@@ -246,7 +259,7 @@ export const AnalyticsEvents = {
   repeatOrder: (orderId: number, itemCount?: number) =>
     trackEvent(
       "repeat_order",
-      itemCount != null ? { order_id: orderId, item_count: itemCount } : { order_id: orderId }
+      itemCount != null ? { order_id: itemCount } : { order_id: orderId }
     ),
 
   /** Quick-add desde la sección "Volver a pedir" del home */
