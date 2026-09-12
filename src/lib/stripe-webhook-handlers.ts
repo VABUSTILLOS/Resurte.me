@@ -1,5 +1,6 @@
 import { after } from "next/server"
 import { confirmPaymentToCustomer, notifyCustomerStatusUpdate } from "@/lib/workflows"
+import { sendOrderStatusEmail } from "@/lib/order-emails"
 import { isAmountSufficient, toCents } from "@/lib/payment-validation"
 import { logger } from "@/lib/logger"
 import type { createServiceClient } from "@/lib/supabase/service"
@@ -104,6 +105,13 @@ export async function handlePaymentIntentSucceeded(
         )
         notifyCustomerStatusUpdate(lookupOrder.id, "confirmed").catch((e) =>
           logger.error("Workflow: status_update failed:", e)
+        )
+        // Email del hito "confirmed": cuando el pago confirma la orden sin
+        // pasar por el panel admin, onOrderStatusChange no corre y el cliente
+        // no recibía el correo. Dedupe en email_logs evita doble envío si el
+        // admin también dispara el cambio de estado.
+        sendOrderStatusEmail(lookupOrder.id, "confirmed").catch((e) =>
+          logger.error("Email: order_status_confirmed failed:", e)
         )
       })
     } else {

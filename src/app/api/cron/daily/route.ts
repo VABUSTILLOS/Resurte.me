@@ -13,6 +13,7 @@ import { logger } from "@/lib/logger"
 
 import { NextRequest, NextResponse } from "next/server"
 import { checkAndSendPaymentReminders } from "@/lib/workflows"
+import { retryFailedOrderEmails } from "@/lib/order-emails"
 import { runDueFoodosCampaigns } from "@/lib/foodos-campaigns"
 
 // Los 4 jobs comparten un solo presupuesto de tiempo.
@@ -51,6 +52,7 @@ export async function GET(req: NextRequest) {
         return checkReorderReminders()
       },
     ],
+    ["retry-order-emails", () => retryFailedOrderEmails()],
     ["foodos-campaigns", () => runDueFoodosCampaigns()],
   ]
 

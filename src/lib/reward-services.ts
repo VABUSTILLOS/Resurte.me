@@ -1,7 +1,7 @@
 /**
  * Catálogo de servicios canjeables (Tienda de Crecimiento).
  *
- * Fuente de verdad: tabla `reward_services` (migración 00072,
+ * Fuente de verdad: tabla `reward_services` (migración 00075,
  * administrable desde /admin/recompensas). Si la tabla aún no existe o
  * está vacía, se usa el catálogo estático SERVICES como fallback — así la
  * tienda nunca se rompe aunque la migración no se haya aplicado.
@@ -53,7 +53,7 @@ export async function getRewardServices(): Promise<ServiceItem[]> {
       .order("display_order")
 
     if (error) {
-      // 42P01 = tabla inexistente (migración 00072 sin aplicar)
+      // 42P01 = tabla inexistente (migración 00075 sin aplicar)
       logger.warn("reward-services.fallback", { message: error.message, code: error.code })
       return SERVICES
     }

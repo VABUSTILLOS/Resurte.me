@@ -11,6 +11,9 @@ vi.mock("@/lib/workflows", () => ({
   confirmPaymentToCustomer: vi.fn().mockResolvedValue(null),
   notifyCustomerStatusUpdate: vi.fn().mockResolvedValue(null),
 }))
+vi.mock("@/lib/order-emails", () => ({
+  sendOrderStatusEmail: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
 
 import {
@@ -21,6 +24,7 @@ import {
   type ServiceClient,
 } from "./stripe-webhook-handlers"
 import { confirmPaymentToCustomer, notifyCustomerStatusUpdate } from "@/lib/workflows"
+import { sendOrderStatusEmail } from "@/lib/order-emails"
 import { logger } from "@/lib/logger"
 
 interface TableResult {
@@ -83,6 +87,9 @@ describe("stripe-webhook-handlers", () => {
     )
     expect(confirmPaymentToCustomer).toHaveBeenCalledWith(7)
     expect(notifyCustomerStatusUpdate).toHaveBeenCalledWith(7, "confirmed")
+    // El pago confirma la orden sin pasar por el panel admin: el email del
+    // hito también debe dispararse desde aquí.
+    expect(sendOrderStatusEmail).toHaveBeenCalledWith(7, "confirmed")
   })
 
   it("succeeded: monto insuficiente marca amount_mismatch y nunca paid", async () => {
@@ -105,6 +112,7 @@ describe("stripe-webhook-handlers", () => {
       expect.objectContaining({ payment_status: "paid" })
     )
     expect(confirmPaymentToCustomer).not.toHaveBeenCalled()
+    expect(sendOrderStatusEmail).not.toHaveBeenCalled()
   })
 
   it("succeeded: fallback por metadata.order_id repara el PI canónico", async () => {

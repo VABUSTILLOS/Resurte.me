@@ -1,5 +1,5 @@
 -- ============================================================
--- 00070: notifications + onboarding de recompensas persistente
+-- 00073: notifications + onboarding de recompensas persistente
 --
 -- La campana de /recompensas derivaba notificaciones en el cliente y
 -- guardaba "leído" en localStorage: se perdía entre dispositivos y no

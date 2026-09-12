@@ -15,7 +15,7 @@ export const runtime = "nodejs"
  * GET → envíos del usuario con sesión (más recientes primero).
  *
  * La acreditación de créditos ocurre al aprobar en /admin/facturas
- * (grant_wallet_credit, migración 00071).
+ * (grant_wallet_credit, migración 00074).
  */
 export async function POST(request: NextRequest) {
   try {

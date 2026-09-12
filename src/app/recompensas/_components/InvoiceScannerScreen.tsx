@@ -25,7 +25,7 @@ interface InvoiceScannerScreenProps {
   onClose: () => void;
 }
 
-/** Envío registrado en invoice_submissions (migración 00071). */
+/** Envío registrado en invoice_submissions (migración 00074). */
 interface InvoiceSubmission {
   id: number;
   total_amount: number | null;

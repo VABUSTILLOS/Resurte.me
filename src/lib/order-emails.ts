@@ -266,3 +266,83 @@ export async function sendOrderStatusEmail(orderId: number, status: OrderStatus)
     logger.error("order-emails.status.error", err)
   }
 }
+
+// ── Reintentos de fallidos ──
+
+/** Máximo de intentos (original + reintentos) por (order_id, email_type). */
+const MAX_EMAIL_ATTEMPTS = 3
+/** Solo se reintentan fallos recientes; pasada esta ventana se da por perdido. */
+const RETRY_WINDOW_HOURS = 24
+
+/**
+ * Reintenta emails transaccionales de pedido que quedaron en 'failed'
+ * (p.ej. caída transitoria del proveedor). Pensado para el cron diario.
+ *
+ * Respeta el dedupe: si ya existe un 'sent' para ese (order_id, email_type)
+ * no se reintenta, y el índice único parcial (migración 00070) garantiza que
+ * un reintento exitoso registre un solo 'sent' aunque haya carrera.
+ */
+export async function retryFailedOrderEmails(): Promise<{ retried: number; skipped: number }> {
+  let retried = 0
+  let skipped = 0
+  try {
+    const supabase = await createServiceClient()
+    const cutoff = new Date(Date.now() - RETRY_WINDOW_HOURS * 60 * 60 * 1000).toISOString()
+
+    const { data: rows, error } = await supabase
+      .from("email_logs")
+      .select("order_id, email_type, status")
+      .gte("sent_at", cutoff)
+      .not("order_id", "is", null)
+      .or("email_type.eq.order_confirmation,email_type.like.order_status_%")
+
+    if (error) {
+      logger.error("order-emails.retry.fetch", { message: error.message })
+      return { retried, skipped }
+    }
+
+    interface Group {
+      orderId: number
+      emailType: string
+      attempts: number
+      hasSent: boolean
+      hasFailed: boolean
+    }
+    const groups = new Map<string, Group>()
+    for (const row of rows ?? []) {
+      const key = `${row.order_id}:${row.email_type}`
+      const g =
+        groups.get(key) ??
+        ({
+          orderId: row.order_id as number,
+          emailType: row.email_type as string,
+          attempts: 0,
+          hasSent: false,
+          hasFailed: false,
+        } satisfies Group)
+      g.attempts++
+      if (row.status === "sent") g.hasSent = true
+      if (row.status === "failed") g.hasFailed = true
+      groups.set(key, g)
+    }
+
+    for (const g of groups.values()) {
+      if (!g.hasFailed || g.hasSent || g.attempts >= MAX_EMAIL_ATTEMPTS) {
+        skipped++
+        continue
+      }
+      // Los senders revalidan dedupe y destinatario; aquí solo se re-dispara.
+      if (g.emailType === "order_confirmation") {
+        await sendOrderConfirmationEmail(g.orderId)
+      } else {
+        const status = g.emailType.replace("order_status_", "") as OrderStatus
+        await sendOrderStatusEmail(g.orderId, status)
+      }
+      retried++
+    }
+    logger.info("order-emails.retry.done", { retried, skipped })
+  } catch (err) {
+    logger.error("order-emails.retry.error", err)
+  }
+  return { retried, skipped }
+}

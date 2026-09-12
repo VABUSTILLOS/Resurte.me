@@ -1,5 +1,5 @@
 -- ============================================================
--- 00072: reward_services — catálogo canjeable administrable
+-- 00075: reward_services — catálogo canjeable administrable
 --
 -- La Tienda de Crecimiento (/recompensas) tenía los 12 servicios
 -- hardcodeados en services-data.ts. Ahora viven en

@@ -211,7 +211,7 @@ export default function AdminRecompensasPage() {
           <Gift className="w-10 h-10 text-gray-200 mx-auto mb-3" />
           <p className="text-gray-500 font-medium">Catálogo vacío</p>
           <p className="text-xs text-gray-400 mt-1">
-            Aplica la migración 00072 y/o crea el primer servicio.
+            Aplica la migración 00075 y/o crea el primer servicio.
           </p>
         </div>
       ) : (

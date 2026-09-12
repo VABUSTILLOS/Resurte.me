@@ -10,7 +10,7 @@ import { deriveNotifications, formatRelativeTime, type WalletMovement } from "./
 
 const READ_IDS_KEY = "rewards-notifications-read";
 
-/** Fila de la tabla notifications (migración 00070). */
+/** Fila de la tabla notifications (migración 00073). */
 interface ServerNotification {
   id: number;
   type: string;

@@ -54,7 +54,7 @@ interface StoreScreenProps {
 export function StoreScreen({ onServiceSelect, onOpenCalculator, balance = 0 }: StoreScreenProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [detailService, setDetailService] = useState<ServiceItem | null>(null);
-  // Catálogo administrable (reward_services, migración 00072) con fallback
+  // Catálogo administrable (reward_services, migración 00075) con fallback
   // al catálogo estático si el endpoint no responde.
   const [services, setServices] = useState<ServiceItem[]>(SERVICES);
 

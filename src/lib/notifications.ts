@@ -1,5 +1,5 @@
 /**
- * Notificaciones persistentes por usuario (migración 00070).
+ * Notificaciones persistentes por usuario (migración 00073).
  *
  * notifyUser() es best-effort: nunca lanza. Los productores son eventos
  * reales del negocio (pedido confirmado/en camino/entregado, cashback

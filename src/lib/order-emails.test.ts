@@ -13,6 +13,7 @@ import {
   sendOrderConfirmationEmail,
   sendOrderStatusEmail,
   buildTrackingUrl,
+  retryFailedOrderEmails,
   EMAILED_STATUSES,
 } from "./order-emails"
 import { createServiceClient } from "@/lib/supabase/service"
@@ -39,11 +40,13 @@ function serviceWith(opts: {
   orderRow?: unknown
   dedupeRows?: unknown[]
   itemsRows?: unknown[]
+  logRows?: unknown[]
+  logError?: { message: string } | null
 }) {
   const inserts: unknown[] = []
   const from = vi.fn((table: string) => {
     const b: Record<string, unknown> = {}
-    for (const m of ["select", "eq", "order"]) b[m] = vi.fn().mockReturnValue(b)
+    for (const m of ["select", "eq", "order", "gte", "not", "or"]) b[m] = vi.fn().mockReturnValue(b)
     if (table === "orders") {
       b.maybeSingle = vi.fn().mockResolvedValue({ data: opts.orderRow ?? ORDER, error: null })
     } else if (table === "email_logs") {
@@ -52,6 +55,9 @@ function serviceWith(opts: {
         inserts.push(row)
         return Promise.resolve({ error: null })
       })
+      // Cadena del retry (.select().gte().not().or()) → await directo (thenable)
+      b.then = (resolve: (v: unknown) => void) =>
+        resolve({ data: opts.logRows ?? [], error: opts.logError ?? null })
     } else if (table === "order_items") {
       // .select().eq() → await directo (thenable)
       b.eq = vi.fn().mockReturnValue({
@@ -136,6 +142,62 @@ describe("sendOrderStatusEmail", () => {
   it("no duplica el hito ya enviado", async () => {
     serviceWith({ dedupeRows: [{ id: 9 }] })
     await sendOrderStatusEmail(42, "delivered")
+    expect(sendEmail).not.toHaveBeenCalled()
+  })
+})
+
+describe("retryFailedOrderEmails", () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it("reintenta un fallo reciente de confirmación", async () => {
+    serviceWith({
+      logRows: [{ order_id: 42, email_type: "order_confirmation", status: "failed" }],
+    })
+    const result = await retryFailedOrderEmails()
+    expect(result).toEqual({ retried: 1, skipped: 0 })
+    expect(sendEmail).toHaveBeenCalledOnce()
+  })
+
+  it("reintenta un hito logístico fallido", async () => {
+    serviceWith({
+      logRows: [{ order_id: 42, email_type: "order_status_out_for_delivery", status: "failed" }],
+    })
+    const result = await retryFailedOrderEmails()
+    expect(result.retried).toBe(1)
+    expect(vi.mocked(sendEmail).mock.calls[0]![0]).toMatchObject({
+      tag: "order_status_out_for_delivery",
+    })
+  })
+
+  it("no reintenta si ya existe un 'sent' para ese tipo", async () => {
+    serviceWith({
+      logRows: [
+        { order_id: 42, email_type: "order_confirmation", status: "failed" },
+        { order_id: 42, email_type: "order_confirmation", status: "sent" },
+      ],
+    })
+    const result = await retryFailedOrderEmails()
+    expect(result).toEqual({ retried: 0, skipped: 1 })
+    expect(sendEmail).not.toHaveBeenCalled()
+  })
+
+  it("respeta el tope de intentos (original + reintentos)", async () => {
+    serviceWith({
+      logRows: [
+        { order_id: 42, email_type: "order_confirmation", status: "failed" },
+        { order_id: 42, email_type: "order_confirmation", status: "failed" },
+        { order_id: 42, email_type: "order_confirmation", status: "failed" },
+      ],
+    })
+    const result = await retryFailedOrderEmails()
+    expect(result).toEqual({ retried: 0, skipped: 1 })
+    expect(sendEmail).not.toHaveBeenCalled()
+  })
+
+  it("ante error de consulta devuelve ceros sin lanzar", async () => {
+    serviceWith({ logError: { message: "boom" } })
+    const result = await retryFailedOrderEmails()
+    expect(result).toEqual({ retried: 0, skipped: 0 })
     expect(sendEmail).not.toHaveBeenCalled()
   })
 })

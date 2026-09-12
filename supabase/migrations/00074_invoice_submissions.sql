@@ -1,5 +1,5 @@
 -- ============================================================
--- 00071: invoice_submissions — captura real de facturas/tickets
+-- 00074: invoice_submissions — captura real de facturas/tickets
 --
 -- El "escáner de facturas" de /recompensas era simulado (mockData,
 -- créditos nunca acreditados). Ahora el usuario sube la foto de su

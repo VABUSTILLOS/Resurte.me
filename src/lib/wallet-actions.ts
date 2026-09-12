@@ -380,7 +380,7 @@ export async function redeemCredits(
   }
 }
 
-// ── Onboarding de recompensas persistente (migración 00070) ──
+// ── Onboarding de recompensas persistente (migración 00073) ──
 
 /**
  * true si el usuario con sesión ya completó el onboarding de /recompensas

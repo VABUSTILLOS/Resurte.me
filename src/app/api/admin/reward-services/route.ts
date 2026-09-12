@@ -7,7 +7,7 @@ export const runtime = "nodejs"
 
 /**
  * /api/admin/reward-services — CRUD del catálogo canjeable (reward_services,
- * migración 00072). La tienda pública lee solo activos vía RLS; aquí el
+ * migración 00075). La tienda pública lee solo activos vía RLS; aquí el
  * admin ve todos y edita con service_role.
  *
  * GET  → { services: [...] } (todos, incluidos inactivos)
