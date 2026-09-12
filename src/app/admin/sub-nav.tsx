@@ -23,6 +23,7 @@ const ADMIN_NAV = [
   { href: "/admin/proveedores", label: "Proveedores", exact: false },
   { href: "/admin/whatsapp", label: "WhatsApp", exact: false },
   { href: "/admin/workflows", label: "Workflows", exact: false },
+  { href: "/admin/auditoria", label: "Auditoría", exact: false },
 ]
 
 /**

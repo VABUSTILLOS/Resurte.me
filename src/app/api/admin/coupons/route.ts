@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin-auth"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
 import { validateCouponInput } from "@/lib/admin-marketing-validation"
+import { logAdminAction } from "@/lib/audit-log"
 
 export const runtime = "nodejs"
 
@@ -40,7 +41,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { response: adminDenied } = await requireAdmin()
+  const { response: adminDenied, user: adminUser } = await requireAdmin()
   if (adminDenied) return adminDenied
 
   try {
@@ -62,6 +63,15 @@ export async function POST(request: NextRequest) {
       }
       throw error
     }
+    // Fase 15 — bitácora de auditoría (best-effort)
+    await logAdminAction(supabase, {
+      actorId: adminUser?.id ?? null,
+      actorEmail: adminUser?.email ?? null,
+      action: "coupon_create",
+      entity: "coupons",
+      entityId: data.id,
+      detail: { code: parsed.value.code, discount_type: parsed.value.discount_type, discount_value: parsed.value.discount_value },
+    })
     return NextResponse.json({ id: data.id }, { status: 201 })
   } catch (error) {
     logger.error("[ADMIN-COUPONS] create error:", error)
