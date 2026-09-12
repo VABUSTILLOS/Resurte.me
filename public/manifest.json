@@ -2,10 +2,12 @@
   "name": "Resurte.me — Central de Abastos Digital",
   "short_name": "Resurte.me",
   "description": "Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#F7F5F0",
-  "theme_color": "#108910",
+  "theme_color": "#0E7A0E",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -17,6 +19,35 @@
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Ver catálogo",
+      "short_name": "Catálogo",
+      "description": "Explorar el catálogo de insumos",
+      "url": "/catalogo/chihuahua",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mis recompensas",
+      "short_name": "Recompensas",
+      "description": "Saldo y canje de recompensas",
+      "url": "/recompensas",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Panel del restaurante",
+      "short_name": "Panel",
+      "description": "Herramientas de gestión para tu negocio",
+      "url": "/panel",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ],
   "categories": ["food", "business", "shopping"],
