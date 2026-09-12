@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { revalidateCatalogCache } from "@/lib/catalog-cache";
 import { resetCatalogCache } from "@/lib/catalog";
+import { safeSecretEqual } from "@/lib/secret-equal";
 
 // Fail-closed: el seed solo corre con SEED_API_TOKEN configurado en el
 // entorno. No hay fallback hardcodeado.
@@ -162,7 +163,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Server misconfigured: SEED_API_TOKEN is not set" }, { status: 503 });
   }
   const token = request.headers.get("x-seed-token");
-  if (token !== SEED_API_TOKEN) {
+  if (!safeSecretEqual(token, SEED_API_TOKEN)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
