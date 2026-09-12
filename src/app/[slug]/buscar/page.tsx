@@ -4,8 +4,10 @@ import { Metadata } from "next"
 import { SearchPageClient } from "@/components/search/search-page-client"
 import { Suspense } from "react"
 import {
+  filterByCityAvailability,
   getCachedCategories,
   getCachedProductsPaginated,
+  getCityAvailabilityForSlug,
 } from "@/lib/catalog-cache"
 
 // ISR: catálogo revalidado cada 5 min (alineado con src/lib/catalog-cache.ts).
@@ -57,10 +59,18 @@ export default async function SearchPage({ params }: Props) {
 
   const productsPromise = getCachedProductsPaginated(0, INITIAL_PAGE_SIZE)
 
-  const [categories, { products, total }] = await Promise.all([
+  // Selector por ciudad (migración 00065): null = sin filtro.
+  const availabilityPromise = getCityAvailabilityForSlug(slug)
+
+  const [categories, { products: pageProducts, total }, availableIds] = await Promise.all([
     categoriesPromise,
     productsPromise,
+    availabilityPromise,
   ])
+
+  const products = filterByCityAvailability(pageProducts, availableIds)
+  // Con filtro activo, el total real es el universo disponible en la ciudad.
+  const totalInCity = availableIds ? availableIds.length : total
 
   return (
     <Suspense fallback={<div className="p-8 text-center text-[var(--text-secondary)]">Cargando...</div>}>
@@ -69,7 +79,7 @@ export default async function SearchPage({ params }: Props) {
         cityName={city.name}
         products={products}
         categories={categories}
-        totalProducts={total}
+        totalProducts={totalInCity}
         pageSize={INITIAL_PAGE_SIZE}
       />
     </Suspense>
