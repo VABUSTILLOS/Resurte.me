@@ -406,6 +406,33 @@ export default function PanelPage() {
     [role],
   )
 
+  // Atajos 1–9: abre la N-ésima herramienta visible sin tocar el mouse
+  // (guard: no roba teclas cuando el foco está en un campo editable ni con
+  // modificadores Cmd/Ctrl/Alt).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (!/^[1-9]$/.test(e.key)) return
+      const el = document.activeElement
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          (el as HTMLElement).isContentEditable)
+      ) {
+        return
+      }
+      const tool = visibleTools[Number(e.key) - 1]
+      if (tool) {
+        e.preventDefault()
+        router.push(tool.href)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [visibleTools, router])
+
   return (
     <div>
       <div className="mb-4 sm:mb-8">
