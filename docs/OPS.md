@@ -201,6 +201,18 @@ Las herramientas de `/panel` (ventas, mermas, inventario, comanda, temporada, pl
 
 ## 8. Autenticación: SMTP propio, roles y master admin
 
+## 8.0 Emails transaccionales de pedido (Resend)
+
+El cliente recibe correo al crear el pedido y en los hitos **confirmado / en camino / entregado** (`src/lib/order-emails.ts`, cableado en `workflows.ts`). Requisitos:
+
+1. `RESEND_API_KEY` configurada (sin ella solo se loguea en dev).
+2. `NEXT_PUBLIC_SITE_URL=https://resurte.me` — base de los enlaces de rastreo.
+3. Migración `00063` aplicada (`orders.restore_token` — capability URL del rastreo público `/[ciudad]/pedido/[id]?t=...`).
+
+Dedupe: cada envío se registra en `email_logs` (`order_id` + `email_type`); reintentos no reenvían. Los envíos se pueden auditar en la tabla `email_logs`.
+
+Carrito persistente: la migración `00068_user_carts.sql` habilita el carrito cross-device para usuarios con sesión (merge last-write-wins con localStorage vía `/api/cart`).
+
 ### 8.1 SMTP propio en Supabase (requerido para registro por email)
 
 El servicio de correo por defecto de Supabase Auth es **solo para desarrollo** (rate-limit severo; los correos de confirmación no llegan o caen en spam). Para que el registro por email/contraseña funcione en producción hay que configurar un SMTP propio:
