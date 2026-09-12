@@ -467,7 +467,7 @@ export function DashboardSidebar() {
 
             <div className="p-4 space-y-3">
               <div className="flex gap-3">
-                <div className="flex-1 bg-[#F0DF4] rounded-xl p-3 flex flex-col justify-between min-h-[68px]">
+                <div className="flex-1 bg-[#F0FDF4] rounded-xl p-3 flex flex-col justify-between min-h-[68px]">
                   <div className="flex items-center gap-1.5 text-xs text-[#0E7A0E]">
                     <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                     <span className="font-medium leading-tight">Pedidos</span>
