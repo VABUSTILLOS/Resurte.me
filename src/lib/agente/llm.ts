@@ -6,6 +6,13 @@
  *   2. OpenAI (u otro gateway): OPENAI_BASE_URL (opcional) + OPENAI_API_KEY
  * Modelo: AGENT_MODEL u OPENAI_MODEL (default "gpt-4o-mini").
  *
+ * Temperatura: NO se envía por defecto. Los modelos de razonamiento
+ * (p.ej. kimi-k2-thinking, o1, gpt-5) rechazan cualquier temperature ≠ 1
+ * con 400 ("invalid temperature: only 1 is allowed for this model"), así
+ * que omitirla deja el default del proveedor y funciona con todos. Si el
+ * modelo configurado sí la admite y quieres ajustarla, define
+ * AGENT_TEMPERATURE (número, p.ej. "0.7").
+ *
  * Si no hay API key configurada devuelve null y el agente usa las
  * plantillas deterministas del plan (templates.ts).
  */
@@ -32,6 +39,15 @@ export async function chatCompletion(
   const model =
     process.env.AGENT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini"
 
+  // Solo incluir `temperature` cuando AGENT_TEMPERATURE esté definida y sea
+  // un número válido; si no, se omite del body para no romper modelos que
+  // solo aceptan temperature = 1.
+  const temperatureEnv = process.env.AGENT_TEMPERATURE?.trim()
+  const temperature =
+    temperatureEnv && !Number.isNaN(Number(temperatureEnv))
+      ? Number(temperatureEnv)
+      : undefined
+
   try {
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
@@ -41,7 +57,7 @@ export async function chatCompletion(
       },
       body: JSON.stringify({
         model,
-        temperature: 0.7,
+        ...(temperature !== undefined ? { temperature } : {}),
         max_tokens: 600,
         messages: [
           { role: "system", content: system },
