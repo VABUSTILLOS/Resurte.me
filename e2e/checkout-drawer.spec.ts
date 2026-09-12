@@ -252,7 +252,9 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
 
     await expect(page.getByRole("button", { name: "Continuar al envío" })).toBeVisible()
     // El review del checkout incluye el bump: subtotal $850 + bump $31.50.
-    await expect(page.getByText("Artículos especiales")).toBeVisible()
-    await expect(page.getByText("+$31.50")).toBeVisible()
+    // exact: true — "Artículos especiales" como subcadena también coincide con
+    // "Hasta 3 artículos especiales por pedido." del cart drawer (strict mode).
+    await expect(page.getByText("Artículos especiales", { exact: true })).toBeVisible()
+    await expect(page.getByText("+$31.50", { exact: true })).toBeVisible()
   })
 })
