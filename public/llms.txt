@@ -34,6 +34,9 @@ El mismo catálogo existe para cada ciudad con el patrón `https://resurte.me/{c
 - [Cómo reducir la merma en cocina](https://resurte.me/blog/como-reducir-merma-cocina)
 - [Cómo elegir proveedor mayorista](https://resurte.me/blog/elegir-proveedor-mayorista)
 - [Precios de mayoreo para restaurantes](https://resurte.me/blog/precios-mayoreo-restaurantes)
+- [Central de Abastos vs comprar en línea](https://resurte.me/blog/central-de-abastos-vs-comprar-en-linea)
+- [Cuánto cuesta surtir un restaurante al mes](https://resurte.me/blog/cuanto-cuesta-surtir-restaurante-mes)
+- [Mejores proveedores de mayoreo para restaurantes](https://resurte.me/blog/mejores-proveedores-mayoreo-restaurantes)
 
 ## Contacto
 
