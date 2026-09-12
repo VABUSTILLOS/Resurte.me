@@ -13,6 +13,8 @@ import { CartDrawer, MobileCartBar } from "@/components/cart/cart-drawer"
 import { CheckoutOverlays } from "@/components/checkout/checkout-overlays"
 import { BumpsDebugProbe } from "@/components/checkout/BumpsDebugProbe"
 import { WhatsAppButton } from "@/components/whatsapp/whatsapp-button"
+import { BackToTop } from "@/components/layout/back-to-top"
+import { OfflineBanner } from "@/components/layout/offline-banner"
 import { Analytics } from "@/lib/analytics"
 import { CookieConsent } from "@/components/ui/cookie-consent"
 import { ToastProvider } from "@/components/toast"
@@ -171,6 +173,8 @@ export default async function RootLayout({
               <CheckoutOverlays />
               <BumpsDebugProbe />
               <MobileCartBar />
+              <OfflineBanner />
+              <BackToTop />
               <WhatsAppButton
                 phoneNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}
                 message="¡Hola! Quiero hacer un pedido en Resurte.me"
