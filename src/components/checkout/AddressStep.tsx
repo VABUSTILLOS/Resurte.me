@@ -94,9 +94,9 @@ export function AddressStep({
       {isLoggedIn && savedAddresses.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <span className="block text-sm font-medium text-gray-700">
               Mis direcciones
-            </label>
+            </span>
             <Link
               href={`/${city.slug}/mis-direcciones`}
               className="text-xs font-medium text-brand-600 hover:text-brand-700 touch-target -my-[14px]"
@@ -104,11 +104,12 @@ export function AddressStep({
               Gestionar direcciones
             </Link>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2" role="radiogroup" aria-label="Direcciones guardadas">
             <button
               type="button"
               onClick={onNewAddress}
-              aria-pressed={selectedAddressId === null}
+              role="radio"
+              aria-checked={selectedAddressId === null}
               className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
                 selectedAddressId === null
                   ? "border-brand-500 bg-brand-50"
@@ -125,7 +126,8 @@ export function AddressStep({
                 key={addr.id}
                 type="button"
                 onClick={() => onSelectSavedAddress(addr)}
-                aria-pressed={selectedAddressId === addr.id}
+                role="radio"
+                aria-checked={selectedAddressId === addr.id}
                 className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
                   selectedAddressId === addr.id
                     ? "border-brand-500 bg-brand-50"
@@ -157,10 +159,10 @@ export function AddressStep({
 
       {/* Address label */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <span className="block text-sm font-medium text-gray-700 mb-1.5" id="address-label-legend">
           Etiqueta
-        </label>
-        <div className="flex gap-2">
+        </span>
+        <div className="flex gap-2" role="group" aria-labelledby="address-label-legend">
           {["Casa", "Oficina", "Otro"].map((l) => (
             <button
               key={l}
@@ -182,26 +184,33 @@ export function AddressStep({
       {/* Street + Number */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label htmlFor="addr-street" className="block text-sm font-medium text-gray-700 mb-1.5">
             Calle *
           </label>
           <input
+            id="addr-street"
             type="text"
             value={address.street}
             onChange={(e) => onUpdateAddress("street", e.target.value)}
             placeholder="Av. Insurgentes Sur"
+            autoComplete="address-line1"
+            enterKeyHint="next"
+            required
             className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label htmlFor="addr-number" className="block text-sm font-medium text-gray-700 mb-1.5">
             Número *
           </label>
           <input
+            id="addr-number"
             type="text"
             value={address.number}
             onChange={(e) => onUpdateAddress("number", e.target.value)}
             placeholder="1234"
+            enterKeyHint="next"
+            required
             className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
           />
         </div>
@@ -210,27 +219,34 @@ export function AddressStep({
       {/* Interior + Neighborhood */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label htmlFor="addr-interior" className="block text-sm font-medium text-gray-700 mb-1.5">
             Interior (opcional)
           </label>
           <input
+            id="addr-interior"
             type="text"
             value={address.interior}
             onChange={(e) => onUpdateAddress("interior", e.target.value)}
             placeholder="Depto 4B"
+            autoComplete="address-line2"
+            enterKeyHint="next"
             className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label htmlFor="addr-neighborhood" className="block text-sm font-medium text-gray-700 mb-1.5">
             Colonia *
           </label>
           <input
+            id="addr-neighborhood"
             type="text"
             value={address.neighborhood}
             onChange={(e) => onUpdateAddress("neighborhood", e.target.value)}
             placeholder="Roma Norte"
             list={activeColonias ? "checkout-colonias" : undefined}
+            autoComplete="address-level3"
+            enterKeyHint="next"
+            required
             className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
           />
           {activeColonias && (
@@ -245,15 +261,20 @@ export function AddressStep({
 
       {/* ZIP code */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label htmlFor="addr-zip" className="block text-sm font-medium text-gray-700 mb-1.5">
           Código Postal *
         </label>
         <input
+          id="addr-zip"
           type="text"
+          inputMode="numeric"
           value={address.zip_code}
           onChange={(e) => onUpdateAddress("zip_code", e.target.value.replace(/\D/g, "").slice(0, 5))}
           placeholder="06700"
           maxLength={5}
+          autoComplete="postal-code"
+          enterKeyHint="next"
+          required
           className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
         />
         {activeColonias && (activeColonias.municipality || activeColonias.state) && (
@@ -265,10 +286,11 @@ export function AddressStep({
 
       {/* References */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label htmlFor="addr-references" className="block text-sm font-medium text-gray-700 mb-1.5">
           Referencias (opcional)
         </label>
         <textarea
+          id="addr-references"
           value={address.references}
           onChange={(e) => onUpdateAddress("references", e.target.value)}
           placeholder="Entre calles, color de fachada, etc."
@@ -294,16 +316,20 @@ export function AddressStep({
 
       {/* Phone — se guarda en orders.customer_phone para la confirmación por WhatsApp */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label htmlFor="checkout-phone" className="block text-sm font-medium text-gray-700 mb-1.5">
           Teléfono de contacto *
         </label>
         <input
+          id="checkout-phone"
           type="tel"
           inputMode="tel"
           value={phone}
           onChange={(e) => onPhoneChange(e.target.value.replace(/\D/g, "").slice(0, 10))}
           placeholder="55 1234 5678"
           maxLength={10}
+          autoComplete="tel-national"
+          enterKeyHint="next"
+          required
           className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
         />
         <p className="mt-1 text-xs text-gray-400">
@@ -314,13 +340,15 @@ export function AddressStep({
       {/* Email — captura de lead al salir del campo (onBlur) */}
       {email !== undefined && onEmailChange && (
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label htmlFor="checkout-email" className="block text-sm font-medium text-gray-700 mb-1.5">
             Correo electrónico
           </label>
           <input
+            id="checkout-email"
             type="email"
             inputMode="email"
             autoComplete="email"
+            enterKeyHint="done"
             value={email}
             onChange={(e) => onEmailChange(e.target.value.trim())}
             onBlur={(e) => onEmailBlur?.(e.target.value.trim())}
