@@ -5,6 +5,7 @@ import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { supabaseConfigError } from "@/lib/supabase/env"
 import { useRouter, useSearchParams } from "next/navigation"
+import { Eye, EyeOff } from "lucide-react"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { claimGuestAddresses } from "@/lib/guest-address"
 
@@ -40,10 +41,15 @@ function mapAuthError(err: unknown, isLogin: boolean): string {
     : raw || "No pudimos crear tu cuenta. Inténtalo de nuevo."
 }
 
+const INPUT_CLASS =
+  "mt-1 block w-full rounded-lg border border-gray-300 px-3 py-3 sm:py-2 text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+
 export function AuthForm({ mode }: AuthFormProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [fullName, setFullName] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [capsLockOn, setCapsLockOn] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -235,13 +241,13 @@ export function AuthForm({ mode }: AuthFormProps) {
       </h1>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+        <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
           {error}
         </div>
       )}
 
       {successMessage && (
-        <div className="mb-4 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700">
+        <div role="status" className="mb-4 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700">
           <p className="font-semibold mb-1">¡Cuenta creada!</p>
           <p>{successMessage}</p>
         </div>
@@ -259,7 +265,9 @@ export function AuthForm({ mode }: AuthFormProps) {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-3 sm:py-2 text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              autoComplete="name"
+              enterKeyHint="next"
+              className={INPUT_CLASS}
               placeholder="María García"
             />
           </div>
@@ -275,7 +283,10 @@ export function AuthForm({ mode }: AuthFormProps) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-3 sm:py-2 text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            autoComplete="email"
+            inputMode="email"
+            enterKeyHint="next"
+            className={INPUT_CLASS}
             placeholder="tu@correo.com"
           />
         </div>
@@ -284,16 +295,46 @@ export function AuthForm({ mode }: AuthFormProps) {
           <label htmlFor="password" className="block text-sm font-medium text-gray-700">
             Contraseña
           </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-3 sm:py-2 text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            placeholder="••••••"
-          />
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => setCapsLockOn(e.getModifierState?.("CapsLock") ?? false)}
+              onKeyUp={(e) => setCapsLockOn(e.getModifierState?.("CapsLock") ?? false)}
+              onBlur={() => setCapsLockOn(false)}
+              required
+              minLength={6}
+              autoComplete={isLogin ? "current-password" : "new-password"}
+              enterKeyHint="done"
+              aria-describedby={
+                (!isLogin ? "password-hint" : undefined) ?? undefined
+              }
+              className={`${INPUT_CLASS} pr-11`}
+              placeholder="••••••"
+            />
+            {/* Mostrar/ocultar contraseña: reduce errores de captura en móvil */}
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-pressed={showPassword}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          {capsLockOn && (
+            <p role="status" className="mt-1 text-xs text-amber-600 font-medium">
+              ⚠️ Bloq Mayús está activado.
+            </p>
+          )}
+          {!isLogin && (
+            <p id="password-hint" className="mt-1 text-xs text-gray-400">
+              Mínimo 6 caracteres.
+            </p>
+          )}
         </div>
 
         <button
@@ -340,7 +381,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         disabled={loading}
         className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 sm:py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
       >
-        <svg className="h-5 w-5" viewBox="0 0 24 24">
+        <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
           <path
             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
             fill="#4285F4"
