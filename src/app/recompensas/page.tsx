@@ -12,7 +12,7 @@ import { CheckoutFlowScreen } from "./_components/CheckoutFlowScreen";
 import { ConfettiOverlay } from "./_components/ConfettiOverlay";
 import { InvoiceScannerScreen } from "./_components/InvoiceScannerScreen";
 import { OnboardingScreen } from "./_components/OnboardingScreen";
-import { getWalletBalance } from "@/lib/wallet-actions";
+import { getWalletBalance, getRewardsOnboarded, markRewardsOnboarded } from "@/lib/wallet-actions";
 import { haptic } from "@/lib/haptics";
 import type { Tab, ServiceItem } from "./_components/types";
 
@@ -23,6 +23,9 @@ const TAB_TITLES: Record<Tab, string> = {
   referidos: "Referidos",
   profile: "Perfil",
 };
+
+/** Distancia de jalón (px, tras amortiguar) que dispara el refresh. */
+const PULL_REFRESH_THRESHOLD = 70;
 
 export default function CashbackPage() {
   const searchParams = useSearchParams();
