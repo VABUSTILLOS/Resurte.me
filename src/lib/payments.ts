@@ -612,7 +612,7 @@ export async function createPaymentIntentForOrder(params: {
   if (params.type === "main") {
     const { data: order, error } = await supabase
       .from("orders")
-      .select("id, user_id, payment_method, payment_status, total, address_id, customer_email")
+      .select("id, user_id, payment_method, payment_status, total, address_id, customer_email, stripe_payment_intent_id")
       .eq("id", Number(params.orderId))
       .maybeSingle()
 
@@ -645,6 +645,48 @@ export async function createPaymentIntentForOrder(params: {
           .maybeSingle()
         if (addr && addr.guest_token && addr.guest_token !== params.guestToken) {
           throw new PaymentIntentError("No autorizado para este pedido", 403)
+        }
+      }
+    }
+
+    // Idempotencia: si la orden ya tiene un PaymentIntent reutilizable, se
+    // reconcilia contra Stripe en lugar de crear uno nuevo (mismo patrón que
+    // chargeOrderWithSavedCard). Antes, cada llamada creaba un PI nuevo y
+    // sobrescribía stripe_payment_intent_id sin cancelar el anterior: con dos
+    // pestañas o un reintento tras 3DS fallido podían existir dos PI
+    // confirmables para el mismo pedido → riesgo de doble cobro.
+    if (order.stripe_payment_intent_id) {
+      let existing
+      try {
+        existing = await stripe.paymentIntents.retrieve(order.stripe_payment_intent_id)
+      } catch {
+        existing = null
+      }
+      if (existing) {
+        if (existing.status === "succeeded" || existing.status === "processing") {
+          throw new PaymentIntentError("El pedido ya no está pendiente de pago", 409, "order_not_pending")
+        }
+        if (
+          (existing.status === "requires_payment_method" ||
+            existing.status === "requires_confirmation" ||
+            existing.status === "requires_action") &&
+          existing.amount === toCents(order.total) &&
+          existing.client_secret
+        ) {
+          return {
+            clientSecret: existing.client_secret,
+            paymentIntentId: existing.id,
+            saveCardEnabled: false,
+          }
+        }
+        // PI en cualquier otro estado (canceled, monto distinto, etc.):
+        // se cancela por si acaso y se continúa con uno nuevo.
+        if (existing.status !== "canceled") {
+          try {
+            await stripe.paymentIntents.cancel(existing.id)
+          } catch {
+            // Best-effort: si ya no es cancelable, el nuevo PI se crea igual.
+          }
         }
       }
     }
