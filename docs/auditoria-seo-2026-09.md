@@ -1,6 +1,6 @@
 # Auditoría SEO completa — Resurte.me (2026-09-12)
 
-**Alcance:** auditoría técnica, on-page, contenido y visibilidad en motores de IA (GEO) sobre el sitio en producción y el código fuente. Cambios implementados en el PR #9 (`seo/auditoria-2026-09`). **Fase 2 (misma rama, mismo día):** cierre del backlog de metadatos (31 menores), 3 guías "money" nuevas de alta intención comercial y sincronización de `llms.txt`.
+**Alcance:** auditoría técnica, on-page, contenido y visibilidad en motores de IA (GEO) sobre el sitio en producción y el código fuente. Cambios implementados en el PR #9 (`seo/auditoria-2026-09`). **Fase 2 (misma rama, mismo día):** cierre del backlog de metadatos (31 menores), 3 guías "money" nuevas de alta intención comercial y sincronización de `llms.txt`. **Fase 3 (misma rama, mismo día):** 2 guías pilar (hubs), 4ª página de comparación (alternativas a Sysco/clubes), guía de lista de insumos de apertura e interlinking desde posts existentes.
 
 ---
 
@@ -22,8 +22,9 @@
 | 8 | 39 títulos >60c y 25 descriptions >160c en blog | Medio — truncamiento en SERP | ✅ 44 corregidos (13 graves + 31 menores) |
 | 9 | Copy inconsistente (envío gratis $3,000 vs $2,500; 6 vs 20 ciudades) | Bajo — confianza/E-E-A-T | ✅ Corregido en /faq |
 | 10 | HTML SSR pesado (396–573 KB por página) | Medio — LCP/INP en móvil | 📋 Recomendación |
-| 11 | Sin contenido "money" de comparación | Alto — keywords de alta intención sin cubrir | ✅ 3 guías creadas en fase 2 |
+| 11 | Sin contenido "money" de comparación | Alto — keywords de alta intención sin cubrir | ✅ 5 guías creadas (fases 2-3) |
 | 12 | Cover 404 en `tendencias-consumo-restaurantes` (typo en nombre de imagen) | Bajo — og:image rota | ✅ Corregido en fase 2 |
+| 13 | Blog plano sin hubs temáticos | Medio — PageRank temático disperso | 🔶 2 de 6 pilares creadas en fase 3 |
 
 ---
 
@@ -59,7 +60,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 
 ### 2.6 Arquitectura y enlazado interno — OK con mejora
 - Páginas de categoría a 2 clics del home; blog interligado con CTAs contextuales; breadcrumbs con schema.
-- **Mejora sugerida:** hub pages por tema en el blog (ver estrategia de contenidos) y enlazar las páginas de colección (`/coleccion/taquerias-antojitos`) desde los artículos relacionados — hoy el blog enlaza al Panel pero poco al catálogo transaccional.
+- **Mejora sugerida:** hub pages por tema en el blog (ver estrategia de contenidos) y enlazar las páginas de colección (`/coleccion/taquerias-antojitos`) desde los artículos relacionados — hoy el blog enlaza al Panel pero poco al catálogo transaccional. **Avance fase 3:** 2 páginas pilar creadas (proveeduría y costos) e interlinking desde 4 posts existentes hacia las guías nuevas.
 
 ---
 
@@ -113,9 +114,9 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 
 **Brechas (ver estrategia de contenidos para el plan completo):**
 1. **Sin páginas de autor** — "Equipo Resurte.me" no es una entidad verificable. Crear `/about#equipo` con autores reales, credenciales y foto; enlazar desde cada post (mejora E-E-A-T directa).
-2. ~~**Sin contenido "money" de comparación**~~ — ✅ **cubierto en fase 2** con 3 guías de alta intención comercial: `central-de-abastos-vs-comprar-en-linea`, `cuanto-cuesta-surtir-restaurante-mes` y `mejores-proveedores-mayoreo-restaurantes`. Todas con FAQ schema, tablas comparativas con números en MXN e interlinking al clúster de proveeduría.
-3. **Sin páginas hub temáticas** — 108 posts planos bajo /blog. Agrupar en 6 hubs (costos, proveeduría, operaciones, marketing, legal, crecimiento) con página pilar cada uno.
-4. **Fechas de actualización** — los posts tienen `updatedAt`; verificar que se muestre visible en la página (señal de frescura).
+2. ~~**Sin contenido "money" de comparación**~~ — ✅ **cubierto**: fase 2 creó 3 guías (`central-de-abastos-vs-comprar-en-linea`, `cuanto-cuesta-surtir-restaurante-mes`, `mejores-proveedores-mayoreo-restaurantes`) y fase 3 agregó 2 más (`alternativas-sysco-clubes-precio`, `lista-insumos-abrir-restaurante`). Todas con FAQ schema, tablas con números en MXN e interlinking al clúster de proveeduría.
+3. **Páginas hub temáticas** — 🔶 **2 de 6 creadas en fase 3**: `guia-proveeduria-restaurantes` y `guia-costos-restaurante`, cada una con sección hub que mapea su clúster. Pendientes: operación, marketing, legal/finanzas y crecimiento.
+4. **Fechas de actualización** — los posts tienen `updatedAt`; verificar que se muestre visible en la página (señal de frescura). En fase 3 se refrescó el `updatedAt` de los posts que recibieron interlinking.
 
 ---
 
@@ -124,7 +125,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 | Táctica | Antes | Ahora |
 |---|---|---|
 | Crawlers IA en robots.txt | GPTBot bloqueado | 12 permitidos: GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-User, PerplexityBot, Perplexity-User, Google-Extended, Applebot-Extended, Meta-ExternalAgent, Amazonbot, CCBot |
-| `llms.txt` | No existía | Creado + actualizado en fase 2 con las 3 guías money (qué es Resurte.me, cobertura, URLs clave, guías top, contacto) |
+| `llms.txt` | No existía | Creado + actualizado en fases 2 y 3 con todas las guías money y pilares (qué es Resurte.me, cobertura, URLs clave, guías top, contacto) |
 | FAQPage schema | Solo en posts | También en /faq (respuestas citables por AI Overviews) |
 | Datos consistentes | $3,000/$2,500, 6/20 ciudades | Unificados (clave: las IA amplifican contradicciones) |
 
@@ -147,10 +148,10 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 4. ✅ Metadatos del blog: 44/44 aplicados (13 graves en fase 1 + 31 menores en fase 2, Anexo A).
 5. ⬜ PageSpeed Insights en home, /cdmx y /blog tras el deploy; si LCP móvil > 2.5 s, atacar payload RSC y bundles.
 6. ⬜ Páginas de autor reales + `/about#equipo`.
-7. 🔶 3 de 4 páginas de comparación/alternativas creadas en fase 2 (Central de Abastos vs en línea, costo mensual de surtido, mejores proveedores). Pendiente: "alternativas a [competidor]".
+7. ✅ 4 páginas de comparación/alternativas creadas (3 en fase 2 + `alternativas-sysco-clubes-precio` en fase 3); adicional: `lista-insumos-abrir-restaurante` (brecha de apertura).
 
 ### Medio (meses 2–3)
-8. ⬜ 6 hubs temáticos con página pilar + interlinking.
+8. 🔶 6 hubs temáticos con página pilar + interlinking: 2 de 6 creados en fase 3 (proveeduría y costos); pendientes operación, marketing, legal/finanzas y crecimiento.
 9. ⬜ Link building: directorios B2B gastronómicos, CANIRAC, cámaras de comercio locales (20 ciudades = 20 oportunidades locales), guest posts en blogs de la industria restaurantera.
 10. ⬜ Google Business Profile para Resurte.me (aunque sea B2B sin tienda: perfil de servicio).
 
@@ -182,6 +183,39 @@ Las 3 siguen el patrón editorial del blog: respuesta directa en el primer párr
 
 ### Fix adicional
 Cover 404 de `tendencias-consumo-restaurantes` (ver 3.4).
+
+---
+
+## Fase 3 (2026-09-12) — hubs, 4ª comparativa y brecha de apertura
+
+### Guías pilar (arquitectura de clusters, estrategia §2)
+
+| Slug | Keyword objetivo | Rol |
+|---|---|---|
+| guia-proveeduria-restaurantes | "proveeduría para restaurantes" | Hub: mapea las 10 guías del clúster de proveeduría |
+| guia-costos-restaurante | "costos de un restaurante" | Hub: mapea el clúster de costos y rentabilidad |
+
+Pendientes 4 pilares: operación, marketing, legal/finanzas y crecimiento.
+
+### Contenido money y apertura
+
+| Slug | Keyword objetivo | Nota |
+|---|---|---|
+| alternativas-sysco-clubes-precio | "alternativas a Sysco México", "surtir restaurante sin membresía" | Cierra la 4ª página de comparación del plan. Veracidad: fuentes externas no verificables en la sesión → todo dato de terceros hedged; solo hechos verificados de Resurte.me afirmados |
+| lista-insumos-abrir-restaurante | "lista de insumos para abrir un restaurante" | Brecha n.º 2 de la estrategia; captura negocios en apertura |
+
+### Interlinking desde posts existentes
+
+| Post origen | Enlaces agregados |
+|---|---|
+| precios-mayoreo-restaurantes | central-de-abastos-vs-comprar-en-linea, mejores-proveedores-mayoreo-restaurantes, guia-proveeduria-restaurantes (updatedAt refrescado) |
+| elegir-proveedor-mayorista | mejores-proveedores-mayoreo-restaurantes, guia-proveeduria-restaurantes |
+| guia-food-cost-restaurante-2026 | cuanto-cuesta-surtir-restaurante-mes, guia-costos-restaurante (updatedAt refrescado) |
+| cuanto-cuesta-abrir-restaurante-mexico | lista-insumos-abrir-restaurante |
+
+### Control de calidad de la producción por agentes
+
+El MDX de fase 3 se generó con subagentes y se revisó contra `src/lib/blog.ts` antes de publicar. Hallazgo corregido en revisión: el redactor entregó la clave YAML `faqs` en lugar de `faq` — sin esa corrección, los 2 posts nuevos habrían perdido su sección de preguntas y el schema FAQPage. Regla permanente: todo contenido generado por agente se valida contra el schema real del repo antes del push.
 
 ---
 
