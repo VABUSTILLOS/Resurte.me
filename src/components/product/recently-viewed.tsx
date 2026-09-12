@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { History } from "lucide-react"
 
-interface RecentProduct {
+export interface RecentProduct {
   id: number
   name: string
   slug: string
