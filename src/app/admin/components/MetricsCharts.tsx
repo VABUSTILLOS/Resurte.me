@@ -64,8 +64,13 @@ function formatValue(value: number, type: keyof Omit<ChartDataPoint, "period">):
    /TalkBack queda mudo). */
 function describeSeries(data: ChartDataPoint[], key: keyof Omit<ChartDataPoint, "period">, label: string): string {
   if (data.length === 0) return `${label}: sin datos en el período`
+<<<<<<< HEAD
   const first = data.at(0)?.[key] ?? 0
   const last = data.at(-1)?.[key] ?? 0
+=======
+  const first = data[0]![key]
+  const last = data[data.length - 1]![key]
+>>>>>>> 40373f0 (feat(admin): fases A8-A10 — radiogroup etiquetado y resúmenes accesibles role=img en las 3 gráficas de métricas)
   const total = data.reduce((s, d) => s + d[key], 0)
   const trend = last > first ? "al alza" : last < first ? "a la baja" : "estable"
   return `${label}: ${data.length} puntos, total ${formatValue(total, key)}, tendencia ${trend} (último: ${formatValue(last, key)})`
