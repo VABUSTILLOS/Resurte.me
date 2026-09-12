@@ -11,6 +11,12 @@ import { logger } from "@/lib/logger"
  * Recibe eventos de Stripe y:
  *  1. Actualiza el payment_status del pedido en Supabase
  *  2. Dispara workflows de WhatsApp (confirmación de pago, status update)
+ *
+ * Eventos soportados:
+ *  - payment_intent.succeeded / payment_failed / canceled
+ *  - charge.refunded (los reembolsos NO llegan como payment_intent.refunded;
+ *    suscribir charge.refunded en el Dashboard de Stripe)
+ *  - charge.dispute.created / charge.dispute.funds_withdrawn
  */
 export async function POST(request: NextRequest) {
   const body = await request.text()
@@ -57,7 +63,7 @@ export async function POST(request: NextRequest) {
         // lleva y Stripe preserva en el evento.
         const { data: order, error } = await supabase
           .from("orders")
-          .select("id, user_id, total, customer_email")
+          .select("id, user_id, total, customer_email, payment_status")
           .eq("stripe_payment_intent_id", paymentIntent.id)
           .maybeSingle()
 
@@ -68,7 +74,7 @@ export async function POST(request: NextRequest) {
           if (Number.isFinite(orderIdFromMetadata) && orderIdFromMetadata > 0) {
             const fb = await supabase
               .from("orders")
-              .select("id, user_id, total, customer_email")
+              .select("id, user_id, total, customer_email, payment_status")
               .eq("id", orderIdFromMetadata)
               .maybeSingle()
             if (fb.data && !fb.error) {
@@ -89,7 +95,11 @@ export async function POST(request: NextRequest) {
 
         if (!lookupError && lookupOrder) {
           if (isAmountSufficient(paymentIntent.amount_received, lookupOrder.total)) {
-            await supabase
+            // Idempotencia (A4): Stripe re-entrega eventos. El UPDATE es
+            // condicional (payment_status != 'paid') y los workflows solo se
+            // disparan si esta entrega fue la que transicionó el pedido a
+            // pagado — las re-entregas no reenvían WhatsApps al cliente.
+            const { data: paidRows, error: paidUpdateError } = await supabase
               .from("orders")
               .update({
                 payment_status: "paid",
@@ -104,20 +114,28 @@ export async function POST(request: NextRequest) {
                 updated_at: new Date().toISOString(),
               })
               .eq("id", lookupOrder.id)
+              .neq("payment_status", "paid")
+              .select("id")
+
+            if (paidUpdateError) {
+              logger.error("Failed to mark order paid:", paidUpdateError.message)
+            }
 
             // Trigger WhatsApp: payment confirmation + status update.
             // Se ejecutan con after() para que corran después de enviar la
             // respuesta (Stripe espera 2xx rápido) pero DENTRO de la vida
             // del serverless function — a diferencia de fire-and-forget,
             // no se cancelan al resolver el response.
-            after(() => {
-              confirmPaymentToCustomer(lookupOrder.id).catch((e) =>
-                logger.error("Workflow: payment_confirmed failed:", e)
-              )
-              notifyCustomerStatusUpdate(lookupOrder.id, "confirmed").catch((e) =>
-                logger.error("Workflow: status_update failed:", e)
-              )
-            })
+            if (paidRows && paidRows.length > 0) {
+              after(() => {
+                confirmPaymentToCustomer(lookupOrder.id).catch((e) =>
+                  logger.error("Workflow: payment_confirmed failed:", e)
+                )
+                notifyCustomerStatusUpdate(lookupOrder.id, "confirmed").catch((e) =>
+                  logger.error("Workflow: status_update failed:", e)
+                )
+              })
+            }
           } else {
             await supabase
               .from("orders")
@@ -211,6 +229,9 @@ export async function POST(request: NextRequest) {
         break
       }
 
+      // Stripe NO emite payment_intent.refunded: los reembolsos llegan como
+      // charge.refunded (ver el case de abajo). Este branch se conserva por
+      // compatibilidad pero nunca se ejecuta con el catálogo actual de eventos.
       case "payment_intent.refunded": {
         const paymentIntent = event.data.object as { id: string }
         logger.info("stripe.refund.succeeded", { paymentIntent: paymentIntent.id })
@@ -227,15 +248,104 @@ export async function POST(request: NextRequest) {
         break
       }
 
+      case "charge.refunded": {
+        // C1: la vía real por la que Stripe notifica reembolsos. El objeto
+        // charge trae payment_intent como campo (id del PI de la orden).
+        const charge = event.data.object as {
+          id: string
+          payment_intent?: string | null
+          amount: number
+          amount_refunded: number
+          refunded?: boolean
+        }
+        const pi = typeof charge.payment_intent === "string" ? charge.payment_intent : null
+        logger.info("stripe.charge.refunded", {
+          charge: charge.id,
+          paymentIntent: pi,
+          amount_refunded: charge.amount_refunded,
+        })
+        if (!pi) break
+
+        const fullyRefunded = charge.refunded === true || charge.amount_refunded >= charge.amount
+        if (!fullyRefunded) {
+          // Reembolso parcial: la orden sigue pagada; se registra para
+          // revisión manual (no hay estado 'partially_refunded' en el schema).
+          logger.info("stripe.charge.refunded.partial", { paymentIntent: pi, amount_refunded: charge.amount_refunded })
+          break
+        }
+
+        const supabase = await createServiceClient()
+        // Solo órdenes actualmente pagadas: al transicionar a 'refunded' el
+        // trigger trg_reverse_cashback (00027 + 00065) revierte el cashback
+        // que generó la compra — deduplicado por transacción 'Reversión%'.
+        await supabase
+          .from("orders")
+          .update({ payment_status: "refunded", updated_at: new Date().toISOString() })
+          .eq("stripe_payment_intent_id", pi)
+          .eq("payment_status", "paid")
+        await supabase
+          .from("foodos_orders")
+          .update({ payment_status: "refunded", updated_at: new Date().toISOString() })
+          .eq("stripe_payment_intent_id", pi)
+          .eq("payment_status", "paid")
+        break
+      }
+
+      case "charge.dispute.created":
+      case "charge.dispute.funds_withdrawn": {
+        // C2: un contracargo marca la orden como 'disputed' y el trigger
+        // (00065) revierte el cashback pendiente de resolución. Si la
+        // disputa se gana, el admin regresa la orden a 'paid' desde el panel.
+        const dispute = event.data.object as {
+          id: string
+          payment_intent?: string | null
+        }
+        const pi = typeof dispute.payment_intent === "string" ? dispute.payment_intent : null
+        logger.warn("stripe.dispute", { type: eventType, dispute: dispute.id, paymentIntent: pi })
+        if (!pi) break
+
+        const supabase = await createServiceClient()
+        await supabase
+          .from("orders")
+          .update({ payment_status: "disputed", updated_at: new Date().toISOString() })
+          .eq("stripe_payment_intent_id", pi)
+          .eq("payment_status", "paid")
+        await supabase
+          .from("foodos_orders")
+          .update({ payment_status: "disputed", updated_at: new Date().toISOString() })
+          .eq("stripe_payment_intent_id", pi)
+          .eq("payment_status", "paid")
+        break
+      }
+
       case "payment_intent.payment_failed": {
         const paymentIntent = event.data.object as { id: string }
         logger.info("stripe.payment.failed", { paymentIntent: paymentIntent.id })
 
         const supabase = await createServiceClient()
-        await supabase
+        // A2: al fallar el cobro se libera el cupón reservado al crear la
+        // orden — un rechazo bancario no debe quemar el cupón del cliente
+        // (crítico en cupones personales de un solo uso).
+        const { data: failedOrder } = await supabase
           .from("orders")
-          .update({ payment_status: "failed", updated_at: new Date().toISOString() })
+          .select("id, coupon_code, payment_status")
           .eq("stripe_payment_intent_id", paymentIntent.id)
+          .maybeSingle()
+
+        if (failedOrder) {
+          if (failedOrder.payment_status !== "paid") {
+            await supabase
+              .from("orders")
+              .update({ payment_status: "failed", updated_at: new Date().toISOString() })
+              .eq("id", failedOrder.id)
+            await releaseOrderCoupon(supabase, failedOrder.coupon_code)
+          }
+        } else {
+          await supabase
+            .from("orders")
+            .update({ payment_status: "failed", updated_at: new Date().toISOString() })
+            .eq("stripe_payment_intent_id", paymentIntent.id)
+        }
         await supabase
           .from("foodos_orders")
           .update({ payment_status: "failed", updated_at: new Date().toISOString() })
@@ -254,7 +364,7 @@ export async function POST(request: NextRequest) {
         const supabase = await createServiceClient()
         const { data: order } = await supabase
           .from("orders")
-          .select("id, payment_status")
+          .select("id, payment_status, coupon_code")
           .eq("stripe_payment_intent_id", paymentIntent.id)
           .single()
 
@@ -263,6 +373,8 @@ export async function POST(request: NextRequest) {
             .from("orders")
             .update({ payment_status: "failed", updated_at: new Date().toISOString() })
             .eq("stripe_payment_intent_id", paymentIntent.id)
+          // A2: misma liberación de cupón que en payment_failed.
+          await releaseOrderCoupon(supabase, order.coupon_code)
         }
         await supabase
           .from("order_upsells")
@@ -282,5 +394,51 @@ export async function POST(request: NextRequest) {
       { error: "Webhook handler failed" },
       { status: 500 }
     )
+  }
+}
+
+type ServiceClient = Awaited<ReturnType<typeof createServiceClient>>
+
+/**
+ * Libera el uso del cupón de una orden cuyo pago falló o fue cancelado (A2).
+ * El cupón se consume al CREAR la orden (reserva optimista); sin esta
+ * liberación, un rechazo bancario quemaba cupones — incluidos los
+ * personales de recompra/reactivación de un solo uso.
+ *
+ * Decremento condicional (used_count = valor leído) para no pisar
+ * reservas concurrentes de otros pedidos, con un reintento único si
+ * otro proceso movió el contador entre la lectura y el update.
+ */
+async function releaseOrderCoupon(supabase: ServiceClient, couponCode: string | null) {
+  if (!couponCode) return
+
+  const { data: coupon } = await supabase
+    .from("coupons")
+    .select("id, used_count")
+    .ilike("code", couponCode)
+    .maybeSingle()
+
+  if (!coupon || coupon.used_count <= 0) return
+
+  const { data: released } = await supabase
+    .from("coupons")
+    .update({ used_count: coupon.used_count - 1 })
+    .eq("id", coupon.id)
+    .eq("used_count", coupon.used_count)
+    .select("id")
+
+  if (!released || released.length === 0) {
+    const { data: fresh } = await supabase
+      .from("coupons")
+      .select("id, used_count")
+      .eq("id", coupon.id)
+      .single()
+    if (fresh && fresh.used_count > 0) {
+      await supabase
+        .from("coupons")
+        .update({ used_count: fresh.used_count - 1 })
+        .eq("id", fresh.id)
+        .eq("used_count", fresh.used_count)
+    }
   }
 }
