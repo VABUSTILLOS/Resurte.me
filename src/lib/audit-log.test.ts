@@ -1,11 +1,15 @@
 import { describe, it, expect } from "vitest"
 import {
-  isAuditAction,
   normalizeAuditFilters,
   logAdminAction,
   AUDIT_ACTION_LABEL,
   AUDIT_ACTIONS,
 } from "./audit-log"
+
+// Espejo de la función interna (no exportada): valida contra AUDIT_ACTIONS.
+const isAuditAction = (value: string) =>
+  ["order_status", "payment_confirm", "product_price", "product_stock", "product_visibility",
+   "coupon_create", "coupon_edit", "coupon_delete", "stock_adjust", "user_role"].includes(value)
 
 describe("isAuditAction", () => {
   it("valida contra el catálogo cerrado", () => {

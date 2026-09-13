@@ -27,7 +27,7 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   user_role: "Cambio de rol",
 }
 
-export function isAuditAction(value: string): value is AuditAction {
+function isAuditAction(value: string): value is AuditAction {
   return (AUDIT_ACTIONS as readonly string[]).includes(value)
 }
 
