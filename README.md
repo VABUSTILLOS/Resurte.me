@@ -7,7 +7,7 @@ Marketplace mayorista de insumos para restaurantes en México + suite de herrami
 | Ruta | Descripción |
 | --- | --- |
 | `/` y `/[ciudad]` | Landing pública y catálogo por ciudad (marketplace B2B). |
-| `/panel` | Suite de ~13 herramientas para restaurantes: ventas, comanda, mermas, costeo, inventario, planificador, temporada, apertura, personal, rentabilidad, analítica y FoodOS (menú digital). |
+| `/panel` | Suite de herramientas para restaurantes: ventas, comanda, mermas, costeo, inventario, planificador, temporada, apertura, personal, rentabilidad, analítica y FoodOS (menú digital con modificadores, pedidos web/QR/WhatsApp, dine-in, horarios, cupones, lealtad, reseñas, KDS y cierre diario — ver [`docs/foodos-paridad-takeapp.md`](docs/foodos-paridad-takeapp.md)). |
 | `/admin` | Backoffice interno: pedidos, productos, visibilidad, WhatsApp y workflows. |
 | `/negocio` | Portal B2B para negocios aliados. |
 | `/comercializacion` | Flujos de comercialización. |
