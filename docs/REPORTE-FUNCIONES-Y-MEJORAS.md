@@ -129,5 +129,7 @@ Marketplace mayorista B2B de insumos para restaurantes (México) + suite SaaS de
 - ✅ **A4**: "Mi canasta" — listas de compra recurrentes en localStorage (`shopping-lists.ts`), guardar carrito como lista, Mis listas con reordenar/renombrar/borrar en `/carrito` (commit `081e186`, 6 tests).
 - ✅ **B3**: alertas de reorden específicas — `getClientsToReorder` con productos del último pedido + días sin pedir, badge de inactividad >14d, mensaje WhatsApp con el detalle (commit `081e186`, 2 tests).
 - ✅ **A1 (parcial)**: instrucciones de pago SPEI/OXXO en `pedido-confirmado` (CLABE/referencia por env `NEXT_PUBLIC_SPEI_CLABE`/`_BENEFICIARIO`/`_OXXO_REFERENCIA`); el admin confirma el cobro manualmente (commit `081e186`).
+- ✅ **E2**: `/admin/errores` — salud de la app leyendo `error_logs` (conteos por severidad, filtro por fuente client/server/edge, export CSV), sin Sentry. Link en sub-nav (commit `9d679cb`).
+- ✅ **C6**: export CSV de la cola de facturas en `/admin/facturas` (commit `9d679cb`).
 - ⏸️ **C2 prueba de entrega**: pospuesta (requiere migración `orders.delivery_proof_url`; el usuario decidió no tocar la BD por ahora).
 - Pendientes con credenciales externas: C1 (PAC para timbrado CFDI), A1 completo (confirmación Stripe OXXO/SPEI en la cuenta).
