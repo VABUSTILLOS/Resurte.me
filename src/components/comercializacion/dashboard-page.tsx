@@ -35,7 +35,7 @@ import type { WeeklyGoals } from "@/lib/comercializacion/goals"
 import { formatMoney } from "@/lib/comercializacion/commissions"
 import { toCsv, downloadCsv } from "@/lib/comercializacion/csv"
 import { formatDateTime, getTodayBounds } from "@/lib/comercializacion/dates"
-import { weeklyReminderMessage, buildWhatsappLink } from "@/lib/comercializacion/whatsapp"
+import { weeklyReminderMessage, reorderSuggestionMessage, buildWhatsappLink } from "@/lib/comercializacion/whatsapp"
 import { addActivity } from "@/lib/comercializacion/actions"
 import { useToast } from "@/components/toast"
 
@@ -49,9 +49,14 @@ function ReminderButtons({
   const { toast } = useToast()
   const [logging, setLogging] = useState(false)
 
+  // Mensaje de reorden específico (con los productos del último pedido);
+  // si no hay historial, cae al recordatorio semanal genérico.
+  const hasHistory = (client.last_order_items?.length ?? 0) > 0
   const waLink = buildWhatsappLink(
     client.whatsapp ?? client.phone,
-    weeklyReminderMessage(sellerName, client.restaurant_name ?? client.name)
+    hasHistory
+      ? reorderSuggestionMessage(sellerName, client.restaurant_name ?? client.name, client.last_order_items)
+      : weeklyReminderMessage(sellerName, client.restaurant_name ?? client.name)
   )
 
   async function logWhatsappSent() {
@@ -83,7 +88,7 @@ function ReminderButtons({
             className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#25D366]/15 text-[#128C4A] px-3 py-1.5 rounded-xl hover:bg-[#25D366]/25 transition-colors"
           >
             <MessageCircle className="w-3.5 h-3.5" />
-            Recordar pedido
+            {hasHistory ? "Sugerir reorden" : "Recordar pedido"}
           </a>
           <span className="text-[10px] text-gray-400">
             {logging ? "Registrando…" : "Se abre WhatsApp"}
@@ -378,7 +383,7 @@ export function DashboardPage({
             {clientsToReorder.map((c) => (
               <li key={c.id} className="py-3 flex items-center justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-gray-900 truncate">
                       {c.name}
                     </p>
@@ -387,12 +392,25 @@ export function DashboardPage({
                         · {c.restaurant_name}
                       </span>
                     ) : null}
+                    {/* Badge de inactividad: cliente activo sin pedir >14 días */}
+                    {c.days_since_order != null && c.days_since_order > 14 && (
+                      <Badge color="red">
+                        {c.days_since_order} días sin pedir
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500">
                     {c.last_order_at
                       ? `Último pedido: ${formatDateTime(c.last_order_at)}`
                       : "Sin pedidos aún"}
                   </p>
+                  {/* Productos del último pedido (sugerencia de reorden) */}
+                  {c.last_order_items.length > 0 && (
+                    <p className="text-[11px] text-gray-400 mt-0.5 truncate" title={c.last_order_items.join(", ")}>
+                      {c.last_order_items.slice(0, 3).join(" · ")}
+                      {c.last_order_items.length > 3 ? ` +${c.last_order_items.length - 3}` : ""}
+                    </p>
+                  )}
                 </div>
                 <ReminderButtons client={c} sellerName={sellerName} />
               </li>
