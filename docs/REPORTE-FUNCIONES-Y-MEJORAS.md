@@ -125,4 +125,9 @@ Marketplace mayorista B2B de insumos para restaurantes (México) + suite SaaS de
 - Nota 2: B1 (importar prospectos CSV) y B4 (exportar comisiones) ya existían (`import-csv-modal.tsx`, "Exportar mes" en el dashboard de comercialización).
 - ✅ **C5 (ligero)**: bitácora de acciones admin — `src/lib/audit.ts` registra cambios de estado/pago/repartidor en `/api/orders/[id]/status` (log estructurado `[AUDIT]` + notificación `admin_audit` a todos los admins), feed "Bitácora de actividad" en el dashboard `/admin`, API `GET /api/admin/audit-log` (solo admins), tests unitarios + e2e de guards (`e2e/admin-audit.spec.ts`). Sin migración: reutiliza `notifications` (00073).
 - Nota 3: A4 ya estaba cubierto — `search-page-client.tsx` tiene toggle "Solo disponibles", rangos de precio y orden por precio/nombre. R3.4 (guards `/admin` sin sesión) ya estaba en `e2e/auth.spec.ts`; i18n del panel ya cubre las 5 páginas restantes.
-- Pendientes con credenciales externas: C1 (PAC para timbrado CFDI), A1 (Stripe MX para OXXO/SPEI).
+- ✅ **B2**: agente IA transaccional — `getDailyBriefing` (resumen del día con IA + fallback) + `BriefingModal` (copiar/compartir WhatsApp) + atajo "Hacer pedido" en la cola (commit `d06091e`).
+- ✅ **A4**: "Mi canasta" — listas de compra recurrentes en localStorage (`shopping-lists.ts`), guardar carrito como lista, Mis listas con reordenar/renombrar/borrar en `/carrito` (commit `081e186`, 6 tests).
+- ✅ **B3**: alertas de reorden específicas — `getClientsToReorder` con productos del último pedido + días sin pedir, badge de inactividad >14d, mensaje WhatsApp con el detalle (commit `081e186`, 2 tests).
+- ✅ **A1 (parcial)**: instrucciones de pago SPEI/OXXO en `pedido-confirmado` (CLABE/referencia por env `NEXT_PUBLIC_SPEI_CLABE`/`_BENEFICIARIO`/`_OXXO_REFERENCIA`); el admin confirma el cobro manualmente (commit `081e186`).
+- ⏸️ **C2 prueba de entrega**: pospuesta (requiere migración `orders.delivery_proof_url`; el usuario decidió no tocar la BD por ahora).
+- Pendientes con credenciales externas: C1 (PAC para timbrado CFDI), A1 completo (confirmación Stripe OXXO/SPEI en la cuenta).
