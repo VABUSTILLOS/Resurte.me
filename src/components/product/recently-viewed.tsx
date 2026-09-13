@@ -58,7 +58,9 @@ export function RecentlyViewed({
   useEffect(() => {
     // 1) historial previo (sin el actual) para el rail
     const prev = readList().filter((p) => p.id !== current.id)
-    setItems(prev.slice(0, RAIL_ITEMS))
+    const snapshot = prev.slice(0, RAIL_ITEMS)
+    // Diferido a microtask: ningún setState corre síncrono en el efecto.
+    void Promise.resolve().then(() => setItems(snapshot))
     // 2) registrar el producto actual al frente del historial
     recordView(current)
     // Solo al montar o cambiar de producto.

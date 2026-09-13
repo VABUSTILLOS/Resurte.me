@@ -3,6 +3,7 @@ import { Suspense } from "react"
 import { Geist, Geist_Mono } from "next/font/google"
 import { CityProvider } from "@/contexts/city-context"
 import { CartProvider } from "@/contexts/cart-context"
+import { FavoritesProvider } from "@/contexts/favorites-context"
 import { UtmCapture } from "@/components/utm-capture"
 import { Header } from "@/components/layout/header"
 import { FooterForRoute } from "@/components/layout/FooterForRoute"
@@ -160,6 +161,10 @@ export default async function RootLayout({
         <ToastProvider>
           <CityProvider>
             <CartProvider>
+              {/* FavoritesProvider envuelve todo lo que usa useFavorites
+                  (header, cards, /favoritos); lo quitó el merge de #28 y
+                  rompía el prerender de /[slug]/favoritos. */}
+              <FavoritesProvider>
               <OnboardingWizardGate />
               <Header />
               <main id="main-content" tabIndex={-1} className="flex-1 outline-none"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
@@ -183,6 +188,7 @@ export default async function RootLayout({
                 label="Pedir por WhatsApp"
               />
               <CookieConsent />
+              </FavoritesProvider>
             </CartProvider>
           </CityProvider>
         </ToastProvider>
