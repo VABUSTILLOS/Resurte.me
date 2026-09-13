@@ -12,7 +12,7 @@ import { CheckoutFlowScreen } from "./_components/CheckoutFlowScreen";
 import { ConfettiOverlay } from "./_components/ConfettiOverlay";
 import { InvoiceScannerScreen } from "./_components/InvoiceScannerScreen";
 import { OnboardingScreen } from "./_components/OnboardingScreen";
-import { getWalletBalance, getRewardsOnboarded, markRewardsOnboarded } from "@/lib/wallet-actions";
+import { getWalletBalance } from "@/lib/wallet-actions";
 import { haptic } from "@/lib/haptics";
 import type { Tab, ServiceItem } from "./_components/types";
 
