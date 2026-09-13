@@ -35,6 +35,8 @@ import type {
   FoodosBranchMenuOverride,
   FoodosLoyaltyProgram,
   FoodosReview,
+  FoodosWebhook,
+  FoodosWebhookDelivery,
 } from "@/types/foodos"
 
 // ------------------------------------------------------------
@@ -121,6 +123,8 @@ export async function upsertRestaurant(input: {
   currency?: string
   collection_id?: number | null
   theme_color?: string | null
+  meta_pixel_id?: string | null
+  tiktok_pixel_id?: string | null
   transfer_clabe?: string | null
   transfer_bank?: string | null
   transfer_beneficiary?: string | null
@@ -151,6 +155,8 @@ export async function upsertRestaurant(input: {
     currency: input.currency || "MXN",
     collection_id: input.collection_id ?? null,
     theme_color: input.theme_color || null,
+    meta_pixel_id: input.meta_pixel_id || null,
+    tiktok_pixel_id: input.tiktok_pixel_id || null,
     transfer_clabe: input.transfer_clabe || null,
     transfer_bank: input.transfer_bank || null,
     transfer_beneficiary: input.transfer_beneficiary || null,
@@ -221,6 +227,8 @@ export async function upsertBranch(input: {
   pickup_active: boolean
   delivery_active: boolean
   dine_in_active?: boolean
+  scheduled_orders_active?: boolean
+  lead_minutes?: number
   delivery_fee: number
   min_order: number
 }): Promise<void> {
@@ -244,6 +252,8 @@ export async function upsertBranch(input: {
     pickup_active: input.pickup_active,
     delivery_active: input.delivery_active,
     dine_in_active: input.dine_in_active ?? false,
+    scheduled_orders_active: input.scheduled_orders_active ?? false,
+    lead_minutes: Math.max(0, Number(input.lead_minutes) || 30),
     delivery_fee: Number(input.delivery_fee) || 0,
     min_order: Number(input.min_order) || 0,
   }
@@ -1197,4 +1207,66 @@ export async function importMenuCsv(
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/menu")
   return { added: itemRows.length, categories: createdCategories }
+}
+
+// ------------------------------------------------------------
+// Webhooks salientes (notificaciones de pedido a URL externa)
+// ------------------------------------------------------------
+
+export async function listWebhooks(restaurantId: string): Promise<FoodosWebhook[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_webhooks")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("created_at")
+  if (error) throw new Error(error.message)
+  return (data as FoodosWebhook[]) ?? []
+}
+
+export async function addWebhook(restaurantId: string, url: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const parsed = new URL(url) // lanza si no es URL válida
+  if (parsed.protocol !== "https:") throw new Error("La URL del webhook debe ser HTTPS")
+  const { error } = await supabase
+    .from("foodos_webhooks")
+    .insert({ restaurant_id: restaurantId, url })
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/restaurante")
+}
+
+export async function toggleWebhook(id: string, isActive: boolean): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_webhooks")
+    .update({ is_active: isActive })
+    .eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/restaurante")
+}
+
+export async function deleteWebhook(id: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase.from("foodos_webhooks").delete().eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/restaurante")
+}
+
+export async function listWebhookDeliveries(restaurantId: string): Promise<FoodosWebhookDelivery[]> {
+  const { supabase } = await requireAuth()
+  const { data: hooks, error: hErr } = await supabase
+    .from("foodos_webhooks")
+    .select("id")
+    .eq("restaurant_id", restaurantId)
+  if (hErr) throw new Error(hErr.message)
+  const ids = (hooks ?? []).map((h) => h.id)
+  if (!ids.length) return []
+  const { data, error } = await supabase
+    .from("foodos_webhook_deliveries")
+    .select("*")
+    .in("webhook_id", ids)
+    .order("attempted_at", { ascending: false })
+    .limit(10)
+  if (error) throw new Error(error.message)
+  return (data as FoodosWebhookDelivery[]) ?? []
 }

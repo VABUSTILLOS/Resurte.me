@@ -231,3 +231,15 @@ describe("computeOrderTotals con propina", () => {
     expect(t).toEqual({ subtotal: 100, discount: 10, tip: 15, total: 135 })
   })
 })
+
+import { signWebhookPayload } from "./foodos-webhooks"
+
+describe("signWebhookPayload", () => {
+  it("firma HMAC-SHA256 determinista", () => {
+    const a = signWebhookPayload("secret", "body")
+    const b = signWebhookPayload("secret", "body")
+    expect(a).toBe(b)
+    expect(a).toMatch(/^[0-9a-f]{64}$/)
+    expect(signWebhookPayload("otro", "body")).not.toBe(a)
+  })
+})

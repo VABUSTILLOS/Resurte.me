@@ -21,9 +21,48 @@ export interface FoodosRestaurant {
   transfer_clabe: string | null
   transfer_bank: string | null
   transfer_beneficiary: string | null
+  // Stripe Connect Express (00085). De sólo lectura para el dueño: el
+  // REVOKE de columna impide que los escriba desde el navegador.
+  stripe_account_id: string | null
+  stripe_charges_enabled: boolean
+  stripe_payouts_enabled: boolean
+  stripe_details_submitted: boolean
+  stripe_requirements_due: string[]
+  stripe_onboarded_at: string | null
+  platform_fee_percent: number
+  meta_pixel_id: string | null
+  tiktok_pixel_id: string | null
   created_at: string
   updated_at: string
 }
+
+// --- Webhooks salientes (paridad take.app) ---
+
+export interface FoodosWebhook {
+  id: string
+  restaurant_id: string
+  url: string
+  secret: string
+  is_active: boolean
+  created_at: string
+}
+
+export interface FoodosWebhookDelivery {
+  id: string
+  webhook_id: string
+  order_id: string | null
+  event: string
+  response_code: number | null
+  success: boolean
+  attempted_at: string
+}
+
+/** Estados de la conexión de cobros de un restaurante (Stripe Connect). */
+export type FoodosConnectState =
+  | "not_connected"   // sin cuenta Express todavía
+  | "pending"         // cuenta creada, faltan datos en Stripe
+  | "active"          // cobra y recibe transferencias
+  | "restricted"      // Stripe bloqueó la cuenta (requisitos vencidos)
 
 export interface FoodosBranch {
   id: string
@@ -39,6 +78,8 @@ export interface FoodosBranch {
   dine_in_active: boolean
   delivery_fee: number
   min_order: number
+  scheduled_orders_active: boolean
+  lead_minutes: number
   created_at: string
 }
 
@@ -264,6 +305,7 @@ export interface FoodosOrder {
   coupon_code: string | null
   loyalty_points_redeemed: number
   loyalty_points_earned: number
+  scheduled_for: string | null
   created_at: string
 }
 

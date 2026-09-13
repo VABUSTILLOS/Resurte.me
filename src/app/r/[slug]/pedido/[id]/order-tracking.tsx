@@ -11,6 +11,7 @@ import {
   Bike, CheckCircle2, ChefHat, Clock, Loader2, PackageCheck, Star, Store, UtensilsCrossed, XCircle,
 } from "lucide-react"
 import { formatMoney, modifiersSummary } from "@/lib/foodos"
+import { detectStorefrontLang } from "@/lib/foodos-i18n"
 import type { FoodosOrderItem, FoodosOrderStatus } from "@/types/foodos"
 import { PaymentProofUpload } from "../../_components/payment-proof-upload"
 
@@ -21,6 +22,7 @@ interface TrackData {
   fulfillment: "delivery" | "pickup" | "dine_in"
   table_number: string | null
   created_at: string
+  scheduled_for: string | null
   branch_name: string | null
   total: number
   items: FoodosOrderItem[]
@@ -43,6 +45,7 @@ const FULFILLMENT_ICON = {
 export function OrderTracking({ slug, orderId, restaurantName }: { slug: string; orderId: string; restaurantName: string }) {
   const [data, setData] = useState<TrackData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [lang] = useState(() => detectStorefrontLang(slug))
 
   useEffect(() => {
     let cancelled = false
@@ -122,6 +125,11 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
           <p className="text-xs text-stone-400 mt-1">
             {new Date(data.created_at).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}
           </p>
+          {data.scheduled_for && (
+            <p className="text-xs font-semibold text-purple-700 bg-purple-50 rounded-lg px-2 py-1 mt-2 inline-block">
+              📅 Programado: {new Date(data.scheduled_for).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}
+            </p>
+          )}
         </div>
 
         {data.status === "cancelled" ? (
@@ -246,6 +254,15 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
         )}
 
         {data.status === "delivered" && <ReviewForm orderId={orderId} />}
+
+        <div className="flex gap-2">
+          <Link
+            href={`/r/${slug}?reorden=${orderId}`}
+            className="flex-1 text-center py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700"
+          >
+            {lang === "es" ? "🔁 Volver a pedir" : "🔁 Order again"}
+          </Link>
+        </div>
 
         <Link
           href={`/r/${slug}`}

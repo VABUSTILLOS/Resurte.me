@@ -44,7 +44,7 @@ export async function GET(
 
     const { data: order } = await supabase
       .from("foodos_orders")
-      .select("id, status, payment_status, fulfillment, table_number, created_at, branch_id, total, items")
+      .select("id, status, payment_status, fulfillment, table_number, created_at, branch_id, total, items, scheduled_for")
       .eq("id", id)
       .eq("restaurant_id", restaurant.id)
       .maybeSingle()
@@ -69,6 +69,7 @@ export async function GET(
       fulfillment: order.fulfillment,
       table_number: order.table_number,
       created_at: order.created_at,
+      scheduled_for: order.scheduled_for,
       branch_name: branchName,
       total: order.total,
       items: order.items,

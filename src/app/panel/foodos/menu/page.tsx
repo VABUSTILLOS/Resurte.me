@@ -33,7 +33,7 @@ import type {
   FoodosBranchMenuOverride,
 } from "@/types/foodos"
 import {
-  UtensilsCrossed, Plus, Pencil, Trash2, Download, Check, X, Star, Loader2, Tag, ListPlus, Building2, Upload,
+  UtensilsCrossed, Plus, Pencil, Trash2, Download, Check, X, Star, Loader2, Tag, ListPlus, Building2, Upload, Copy,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
@@ -167,6 +167,23 @@ export default function MenuPage() {
     })
     setShowItemForm(false)
     setEditingItem(null)
+    setItems(await listMenuItems(restaurant.id))
+  }
+
+  async function handleDuplicateItem(item: FoodosMenuItem) {
+    if (!restaurant) return
+    await upsertMenuItem({
+      restaurant_id: restaurant.id,
+      category_id: item.category_id,
+      name: `${item.name} (copia)`,
+      description: item.description,
+      price: item.price,
+      cost: item.cost,
+      tags: item.tags ?? [],
+      is_featured: false,
+      is_available: item.is_available,
+      sort_order: items.length,
+    })
     setItems(await listMenuItems(restaurant.id))
   }
 
@@ -421,6 +438,13 @@ export default function MenuPage() {
                         >
                           <ListPlus className="w-3.5 h-3.5" />
                         </button>
+                        <button
+                          onClick={() => handleDuplicateItem(item)}
+                          className="p-1.5 rounded-md text-gray-400 hover:text-[#0E7A0E]"
+                          title="Duplicar platillo"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
                         {branches.length > 1 && (
                           <button
                             onClick={() => setOverridesItem(item)}
@@ -497,6 +521,13 @@ export default function MenuPage() {
                           title="Opciones y extras"
                         >
                           <ListPlus className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDuplicateItem(item)}
+                          className="p-1.5 rounded-md text-gray-400 hover:text-[#0E7A0E]"
+                          title="Duplicar platillo"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
                         </button>
                         {branches.length > 1 && (
                           <button

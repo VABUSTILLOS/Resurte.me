@@ -69,6 +69,11 @@ export default async function FoodosPrintOrderPage({
             {" · "}
             {STATUS_LABEL[o.status] ?? o.status}
           </p>
+          {o.scheduled_for && (
+            <p className="text-xs font-bold text-purple-700 mt-1">
+              PROGRAMADO: {new Date(o.scheduled_for).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}
+            </p>
+          )}
         </div>
 
         {/* Items */}

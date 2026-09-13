@@ -1,11 +1,13 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import dynamic from "next/dynamic"
 import Link from "next/link"
+import Script from "next/script"
 import { Compass, ShoppingBag } from "lucide-react"
 import { detectStorefrontLang, sf, type StorefrontLang } from "@/lib/foodos-i18n"
+import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import {
   computeOrderTotals,
   buildRecommendations,
@@ -76,6 +78,9 @@ export function FoodosStorefront({
 }: Props) {
   const [cart, setCart] = useState<FoodosOrderItem[]>([])
   const [view, setView] = useState<View>("menu")
+  // Auto-hide: el header del storefront se oculta al bajar y reaparece al
+  // subir; el carrito sigue accesible por la barra inferior fija.
+  const headerHidden = useScrollDirection() === "down"
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [optionsItem, setOptionsItem] = useState<FoodosMenuItem | null>(null)
 
@@ -117,6 +122,13 @@ export function FoodosStorefront({
       ? null
       : new URLSearchParams(window.location.search).get("mesa")
   )
+  // Reorden: /r/[slug]?reorden=<orderId> repuebla el carrito desde ese pedido.
+  const [reorderId] = useState(() =>
+    typeof window === "undefined"
+      ? null
+      : new URLSearchParams(window.location.search).get("reorden")
+  )
+  const [reorderLoaded, setReorderLoaded] = useState(false)
   const [fulfillment, setFulfillment] = useState<"pickup" | "delivery" | "dine_in">(
     mesaParam ? "dine_in" : "pickup"
   )
@@ -139,6 +151,10 @@ export function FoodosStorefront({
   const [loyalty, setLoyalty] = useState<{ active: boolean; points: number; credit: number; points_value: number } | null>(null)
   const [redeemPoints, setRedeemPoints] = useState(false)
   const [useCredit, setUseCredit] = useState(false)
+
+  // Pedido programado (si la sucursal lo permite)
+  const [scheduledDate, setScheduledDate] = useState("")
+  const [scheduledTime, setScheduledTime] = useState("")
 
   // Stripe flow
   const [clientSecret, setClientSecret] = useState<string | null>(null)
@@ -217,6 +233,44 @@ export function FoodosStorefront({
   )
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0)
+
+  // Carga diferida del reorden: trae el pedido y mapea sus líneas al menú
+  // actual (precios vigentes; se omiten ítems que ya no existen).
+  useEffect(() => {
+    if (!reorderId || reorderLoaded) return
+    let cancelled = false
+    fetch(`/api/foodos/orders/${reorderId}/track?slug=${encodeURIComponent(restaurant.slug)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.items) return
+        const lines: FoodosOrderItem[] = []
+        for (const line of data.items as FoodosOrderItem[]) {
+          if (line.combo_id) {
+            const combo = combos.find((c) => c.id === line.combo_id && c.is_active)
+            if (combo) lines.push({ item_id: combo.id, name: combo.name, price: combo.price, qty: line.qty, combo_id: combo.id })
+            continue
+          }
+          const menuItem = items.find((i) => i.id === line.item_id && i.is_available)
+          if (!menuItem) continue
+          const mods = (line.modifiers ?? []).filter((m) =>
+            optionValues.some((v) => v.id === m.value_id && v.is_available)
+          )
+          lines.push({
+            item_id: menuItem.id,
+            name: menuItem.name,
+            price: unitPriceWithModifiers(menuItem.price, mods),
+            qty: line.qty,
+            modifiers: mods.length ? mods : undefined,
+          })
+        }
+        if (lines.length) setCart(lines)
+        setReorderLoaded(true)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [reorderId, reorderLoaded, restaurant.slug, items, combos, optionValues])
 
   const itemHasOptions = (itemId: string) =>
     optionGroups.some((g) => g.item_id === itemId)
@@ -332,6 +386,10 @@ export function FoodosStorefront({
           tip: tipAmount,
           redeem_points: redeemPoints,
           use_credit: useCredit,
+          scheduled_for:
+            scheduledDate && scheduledTime
+              ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
+              : null,
         }),
       })
 
@@ -487,8 +545,36 @@ export function FoodosStorefront({
       <style>{`.foodos-accent { background-color: var(--foodos-accent) !important; }
 .foodos-accent:hover { filter: brightness(0.92); }
 .foodos-accent-text { color: var(--foodos-accent) !important; }`}</style>
+
+      {/* Pixels de marketing del restaurante (opcionales) */}
+      {restaurant.meta_pixel_id && (
+        <Script id={`meta-pixel-${restaurant.id}`} strategy="afterInteractive">
+          {`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '${restaurant.meta_pixel_id}'); fbq('track', 'PageView');`}
+        </Script>
+      )}
+      {restaurant.tiktok_pixel_id && (
+        <Script id={`tiktok-pixel-${restaurant.id}`} strategy="afterInteractive">
+          {`!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];
+ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"];
+ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};
+for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);
+ttq.load=function(e){var i="https://analytics.tiktok.com/i18n/pixel/events.js";
+ttq._i=ttq._i||{};ttq._i[e]=[];ttq._i[e]._u=i;ttq._t=ttq._t||{};ttq._t[e]=+new Date;
+ttq._o=ttq._o||{};ttq._o[e]={};var o=document.createElement("script");o.type="text/javascript";
+o.async=!0;o.src=i+"?sdkid="+e+"&lib="+t;var a=document.getElementsByTagName("script")[0];
+a.parentNode.insertBefore(o,a)};ttq.load('${restaurant.tiktok_pixel_id}');ttq.page();}(window,document,'ttq');`}
+        </Script>
+      )}
       {/* Header */}
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-30">
+      <header
+        className="bg-white border-b border-stone-200 sticky top-0 z-30 transition-transform duration-300 motion-reduce:transition-none"
+        style={{ transform: headerHidden ? "translateY(-100%)" : undefined }}
+      >
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {restaurant.logo_url ? (
@@ -527,6 +613,11 @@ export function FoodosStorefront({
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-6 pb-32">
+        {reorderLoaded && (
+          <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 text-sm text-emerald-800 font-semibold text-center">
+            🔁 {lang === "es" ? "Cargamos tu pedido anterior al carrito" : "We loaded your previous order into the cart"}
+          </div>
+        )}
         {!openStatus.isOpen && (
           <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-800 font-semibold text-center">
             🕐 {openStatus.nextOpenLabel ?? (lang === "es" ? "Cerrado por ahora" : "Closed for now")} — {sf(lang, "closedBanner")}
@@ -589,6 +680,10 @@ export function FoodosStorefront({
             setRedeemPoints={setRedeemPoints}
             useCredit={useCredit}
             setUseCredit={setUseCredit}
+            scheduledDate={scheduledDate}
+            setScheduledDate={setScheduledDate}
+            scheduledTime={scheduledTime}
+            setScheduledTime={setScheduledTime}
             transferAvailable={Boolean(restaurant.transfer_clabe)}
             onChangeQty={changeQty}
             onRemoveItem={removeItem}

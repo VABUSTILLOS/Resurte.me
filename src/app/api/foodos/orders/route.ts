@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { computeOrderTotals, getOpenStatus, validateCoupon } from "@/lib/foodos"
+import { dispatchOrderCreated } from "@/lib/foodos-webhooks"
 import type { FoodosBranchHours, FoodosCoupon, FoodosOrderItem, FoodosOrderItemModifier } from "@/types/foodos"
 import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
@@ -39,6 +40,7 @@ interface FoodosOrderBody {
   customer_phone?: string | null
   note?: string | null
   table_number?: string | null
+  scheduled_for?: string | null
   coupon_code?: string | null
   tip?: number
   redeem_points?: boolean
@@ -76,7 +78,11 @@ export async function POST(request: NextRequest) {
       customer_phone,
       note,
       table_number,
+      scheduled_for,
     } = body
+
+    // Pedido programado (opcional): se valida contra la sucursal más abajo.
+    const scheduledFor = scheduled_for ? new Date(scheduled_for) : null
 
     const missing: string[] = []
     if (!restaurant_id) missing.push("restaurant_id")
@@ -105,7 +111,7 @@ export async function POST(request: NextRequest) {
     if (branch_id) {
       const { data: branch } = await supabase
         .from("foodos_branches")
-        .select("id, pickup_active, delivery_active, dine_in_active, delivery_fee")
+        .select("id, pickup_active, delivery_active, dine_in_active, delivery_fee, scheduled_orders_active, lead_minutes")
         .eq("id", branch_id)
         .eq("restaurant_id", restaurant_id)
         .maybeSingle()
@@ -125,6 +131,25 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Esta sucursal no ofrece servicio en mesa" }, { status: 400 })
       }
       serverDeliveryFee = fulfillment === "delivery" ? Number(branch.delivery_fee) || 0 : 0
+
+      // Pedido programado: solo si la sucursal lo permite y respeta el lead time.
+      if (scheduledFor) {
+        if (!branch.scheduled_orders_active) {
+          return NextResponse.json(
+            { error: "Esta sucursal no acepta pedidos programados" },
+            { status: 400 }
+          )
+        }
+        const minTime = Date.now() + (Number(branch.lead_minutes) || 30) * 60_000
+        const maxTime = Date.now() + 30 * 86_400_000
+        const when = scheduledFor.getTime()
+        if (Number.isNaN(when) || when < minTime || when > maxTime) {
+          return NextResponse.json(
+            { error: `El pedido debe programarse con al menos ${branch.lead_minutes ?? 30} minutos de anticipación (máx. 30 días)` },
+            { status: 400 }
+          )
+        }
+      }
 
       // Horario de operación: rechazar pedidos fuera de horario.
       const { data: hours } = await supabase
@@ -147,6 +172,13 @@ export async function POST(request: NextRequest) {
     if (items.length > MAX_LINES) {
       return NextResponse.json(
         { error: `Máximo ${MAX_LINES} líneas por pedido` },
+        { status: 400 }
+      )
+    }
+
+    if (scheduledFor && !branch_id) {
+      return NextResponse.json(
+        { error: "Los pedidos programados requieren seleccionar sucursal" },
         { status: 400 }
       )
     }
@@ -384,6 +416,7 @@ export async function POST(request: NextRequest) {
       customer_phone: customer_phone || null,
       note: note || null,
       table_number: fulfillment === "dine_in" ? (table_number || null) : null,
+      scheduled_for: scheduledFor ? scheduledFor.toISOString() : null,
     }
 
     const { data: order, error: orderError } = await supabase
@@ -425,6 +458,12 @@ export async function POST(request: NextRequest) {
           .eq("id", loyaltyCustomerId)
       }
     }
+
+    // Webhooks salientes: notificar order.created (nunca bloquea la respuesta).
+    await dispatchOrderCreated(supabase, restaurant_id, {
+      ...payload,
+      id: order.id,
+    })
 
     // El PaymentIntent de Stripe para tarjeta lo crea el storefront llamando a
     // POST /api/payments/stripe/create-intent con type: "foodos" y el order_id

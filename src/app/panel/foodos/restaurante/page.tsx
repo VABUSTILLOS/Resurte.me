@@ -19,6 +19,7 @@ import {
   Store, MapPin, Plus, Trash2, QrCode, Copy, Check, ExternalLink, Loader2, Building2, Clock,
 } from "lucide-react"
 import { BranchHoursModal } from "./_components/branch-hours-modal"
+import { WebhooksCard } from "./_components/webhooks-card"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
 
@@ -42,6 +43,8 @@ export default function RestaurantePage() {
   const [logoUrl, setLogoUrl] = useState("")
   const [currency, setCurrency] = useState("MXN")
   const [themeColor, setThemeColor] = useState("")
+  const [metaPixel, setMetaPixel] = useState("")
+  const [tiktokPixel, setTiktokPixel] = useState("")
   const [transferClabe, setTransferClabe] = useState("")
   const [transferBank, setTransferBank] = useState("")
   const [transferBeneficiary, setTransferBeneficiary] = useState("")
@@ -63,6 +66,8 @@ export default function RestaurantePage() {
         setLogoUrl(r.logo_url ?? "")
         setCurrency(r.currency)
         setThemeColor(r.theme_color ?? "")
+        setMetaPixel(r.meta_pixel_id ?? "")
+        setTiktokPixel(r.tiktok_pixel_id ?? "")
         setTransferClabe(r.transfer_clabe ?? "")
         setTransferBank(r.transfer_bank ?? "")
         setTransferBeneficiary(r.transfer_beneficiary ?? "")
@@ -117,6 +122,8 @@ export default function RestaurantePage() {
         logo_url: logoUrl || null,
         currency,
         theme_color: themeColor || null,
+        meta_pixel_id: metaPixel || null,
+        tiktok_pixel_id: tiktokPixel || null,
         transfer_clabe: transferClabe || null,
         transfer_bank: transferBank || null,
         transfer_beneficiary: transferBeneficiary || null,
@@ -173,11 +180,56 @@ export default function RestaurantePage() {
       pickup_active: branch.pickup_active,
       delivery_active: branch.delivery_active,
       dine_in_active: !branch.dine_in_active,
+      scheduled_orders_active: branch.scheduled_orders_active,
+      lead_minutes: branch.lead_minutes,
       delivery_fee: branch.delivery_fee,
       min_order: branch.min_order,
     })
     setBranches((prev) =>
       prev.map((b) => (b.id === branch.id ? { ...b, dine_in_active: !b.dine_in_active } : b))
+    )
+  }
+
+  async function handleToggleScheduled(branch: FoodosBranch) {
+    await upsertBranch({
+      id: branch.id,
+      restaurant_id: branch.restaurant_id,
+      name: branch.name,
+      city: branch.city,
+      address: branch.address,
+      phone: branch.phone,
+      pickup_active: branch.pickup_active,
+      delivery_active: branch.delivery_active,
+      dine_in_active: branch.dine_in_active,
+      scheduled_orders_active: !branch.scheduled_orders_active,
+      lead_minutes: branch.lead_minutes,
+      delivery_fee: branch.delivery_fee,
+      min_order: branch.min_order,
+    })
+    setBranches((prev) =>
+      prev.map((b) => (b.id === branch.id ? { ...b, scheduled_orders_active: !b.scheduled_orders_active } : b))
+    )
+  }
+
+  async function handleLeadMinutes(branch: FoodosBranch, value: string) {
+    const minutes = Math.max(0, Number(value) || 30)
+    await upsertBranch({
+      id: branch.id,
+      restaurant_id: branch.restaurant_id,
+      name: branch.name,
+      city: branch.city,
+      address: branch.address,
+      phone: branch.phone,
+      pickup_active: branch.pickup_active,
+      delivery_active: branch.delivery_active,
+      dine_in_active: branch.dine_in_active,
+      scheduled_orders_active: branch.scheduled_orders_active,
+      lead_minutes: minutes,
+      delivery_fee: branch.delivery_fee,
+      min_order: branch.min_order,
+    })
+    setBranches((prev) =>
+      prev.map((b) => (b.id === branch.id ? { ...b, lead_minutes: minutes } : b))
     )
   }
 
@@ -323,6 +375,25 @@ export default function RestaurantePage() {
                   />
                 </div>
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Meta Pixel ID (opcional)</label>
+                <input
+                  value={metaPixel}
+                  onChange={(e) => setMetaPixel(e.target.value.replace(/\D/g, ""))}
+                  placeholder="1234567890"
+                  inputMode="numeric"
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">TikTok Pixel ID (opcional)</label>
+                <input
+                  value={tiktokPixel}
+                  onChange={(e) => setTiktokPixel(e.target.value)}
+                  placeholder="C4A5B6C7D8E9F0"
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                />
+              </div>
             </div>
             <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4 space-y-3">
               <p className="text-xs font-semibold text-gray-500">Pago por transferencia (opcional)</p>
@@ -419,6 +490,7 @@ export default function RestaurantePage() {
         </div>
       </div>
 
+
       {/* Sucursales */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <div className="flex items-center gap-2 mb-5">
@@ -456,6 +528,26 @@ export default function RestaurantePage() {
                         >
                           🍽️ En mesa {b.dine_in_active ? "activo" : "inactivo"}
                         </button>
+                        <button
+                          onClick={() => handleToggleScheduled(b)}
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
+                            b.scheduled_orders_active
+                              ? "bg-indigo-100 text-indigo-700"
+                              : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                          }`}
+                          title="Aceptar pedidos programados (fecha/hora)"
+                        >
+                          📅 Programados {b.scheduled_orders_active ? "sí" : "no"}
+                        </button>
+                        {b.scheduled_orders_active && (
+                          <input
+                            type="number" min="0" step="5"
+                            defaultValue={b.lead_minutes ?? 30}
+                            onBlur={(e) => handleLeadMinutes(b, e.target.value)}
+                            title="Minutos de anticipación mínima (lead time)"
+                            className="w-14 text-[10px] px-1.5 py-0.5 rounded-lg border border-gray-200"
+                          />
+                        )}
                       </div>
                     </div>
                     <button
@@ -556,6 +648,9 @@ export default function RestaurantePage() {
           )}
         </div>
       )}
+
+      {/* Webhooks salientes */}
+      {restaurant && <WebhooksCard restaurantId={restaurant.id} />}
 
       {hoursBranch && (
         <BranchHoursModal branch={hoursBranch} onClose={() => setHoursBranch(null)} />

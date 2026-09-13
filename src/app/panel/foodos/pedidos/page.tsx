@@ -521,6 +521,11 @@ export default function PedidosPage() {
                     {" · "}{FULFILLMENT_LABEL[order.fulfillment] ?? order.fulfillment}
                     {order.table_number ? ` · Mesa ${order.table_number}` : ""}
                     {" · "}{branchName(order.branch_id)}
+                    {order.scheduled_for && (
+                      <span className="ml-2 text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+                        📅 {new Date(order.scheduled_for).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
                   </p>
                   {(order.customer_name || order.customer_phone) && (
                     <p className="text-sm text-stone-600 mt-1">

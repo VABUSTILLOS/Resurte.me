@@ -44,6 +44,10 @@ export function CheckoutView({
   setRedeemPoints,
   useCredit,
   setUseCredit,
+  scheduledDate,
+  setScheduledDate,
+  scheduledTime,
+  setScheduledTime,
   transferAvailable,
   onChangeQty,
   onRemoveItem,
@@ -90,6 +94,10 @@ export function CheckoutView({
   setRedeemPoints: (v: boolean) => void
   useCredit: boolean
   setUseCredit: (v: boolean) => void
+  scheduledDate: string
+  setScheduledDate: (v: string) => void
+  scheduledTime: string
+  setScheduledTime: (v: string) => void
   transferAvailable: boolean
   onChangeQty: (index: number, delta: number) => void
   onRemoveItem: (index: number) => void
@@ -243,6 +251,35 @@ export function CheckoutView({
                 inputMode="numeric"
                 className="w-full px-4 py-3 mb-4 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
+            )}
+
+            {/* Pedido programado */}
+            {branches.find((b) => b.id === branchId)?.scheduled_orders_active && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-stone-500 mb-2">
+                  {lang === "es" ? "Programar pedido (opcional)" : "Schedule order (optional)"}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={scheduledDate}
+                    min={new Date().toLocaleDateString("en-CA")}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    className="px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <input
+                    type="time"
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
+                    className="px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                {scheduledDate && !scheduledTime && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    {lang === "es" ? "Elige también la hora" : "Pick a time too"}
+                  </p>
+                )}
+              </div>
             )}
 
             {branches.length > 0 && (
