@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { TrendingUp, ShoppingCart, Mail, Zap, Package, Globe, Download } from "lucide-react"
+import { TrendingUp, ShoppingCart, Mail, Zap, Package, Globe, Download, Repeat } from "lucide-react"
 import { toCsv, downloadCsv } from "@/lib/csv"
+import type { CohortRow } from "@/lib/admin-cohorts"
 
 interface FunnelData {
   days: number
@@ -36,6 +37,7 @@ export default function ConversionDashboardPage() {
   const [data, setData] = useState<FunnelData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [cohorts, setCohorts] = useState<CohortRow[] | null>(null)
 
   const fetchFunnel = useCallback(async () => {
     try {
@@ -53,6 +55,20 @@ export default function ConversionDashboardPage() {
     // Diferido a microtask: ningún setState de fetchFunnel corre síncrono en el efecto.
     void Promise.resolve().then(fetchFunnel)
   }, [fetchFunnel])
+
+  // Cohortes de recompra (independiente del funnel; best-effort).
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/admin/cohorts?months=12", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d: { cohorts?: CohortRow[] } | null) => {
+        if (!cancelled && d?.cohorts) setCohorts(d.cohorts)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Exporta el funnel completo del período a CSV (resumen + toques + UTM).
   function exportCsv() {
