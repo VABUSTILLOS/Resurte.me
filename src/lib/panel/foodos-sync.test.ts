@@ -31,6 +31,7 @@ function order(partial: Partial<FoodosOrder> = {}): FoodosOrder {
     coupon_code: null,
     loyalty_points_redeemed: 0,
     loyalty_points_earned: 0,
+    scheduled_for: null,
     created_at: "2026-09-12T18:30:00.000Z",
     ...partial,
   }

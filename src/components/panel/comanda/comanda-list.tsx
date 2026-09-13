@@ -24,6 +24,7 @@ const ComandaList = memo(function ComandaList({ filtered, onIniciar, onListo, on
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
       <div className="overflow-x-auto">
+        <p className="sm:hidden px-4 pt-2 text-[10px] text-gray-400" aria-hidden="true">Desliza para ver más columnas →</p>
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50">

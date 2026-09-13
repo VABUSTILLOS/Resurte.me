@@ -75,7 +75,7 @@ export default function PurchaseStimulusCard({
       </div>
 
       {(shortfall > 0 || lowStockCount > 0 || shoppingList.length > 0) && (
-        <div className="mt-3 pt-3 border-t border-[#0E7A0E]/10 grid grid-cols-3 gap-2 sm:max-w-md">
+        <div className="mt-3 pt-3 border-t border-[#0E7A0E]/10 grid grid-cols-1 min-[380px]:grid-cols-3 gap-2 sm:max-w-md">
           <div className="flex items-center gap-1.5 text-xs text-gray-600">
             <TrendingUp className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span className="truncate">{shortfall > 0 ? `${shortfall} faltantes` : "Sin faltantes"}</span>

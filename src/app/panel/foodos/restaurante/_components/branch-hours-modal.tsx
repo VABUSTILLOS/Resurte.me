@@ -7,8 +7,8 @@
 import { useEffect, useState } from "react"
 import { Clock, Loader2, X } from "lucide-react"
 import { listBranchHours, upsertBranchHours } from "../../actions"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 import type { FoodosBranch } from "@/types/foodos"
-import { useEscapeKey } from "@/hooks/use-escape-key"
 
 const DAYS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
 
@@ -31,8 +31,6 @@ export function BranchHoursModal({ branch, onClose }: { branch: FoodosBranch; on
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEscapeKey(onClose, true)
 
   useEffect(() => {
     let cancelled = false
@@ -88,10 +86,10 @@ export function BranchHoursModal({ branch, onClose }: { branch: FoodosBranch; on
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+    <BottomSheet open onClose={onClose} ariaLabelledby="branch-hours-title" maxWidthClass="max-w-md">
+      <div className="p-6">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+          <h3 id="branch-hours-title" className="font-semibold text-gray-900 flex items-center gap-2">
             <Clock className="w-5 h-5 text-[#0E7A0E]" />
             Horario — {branch.name}
           </h3>
@@ -158,6 +156,6 @@ export function BranchHoursModal({ branch, onClose }: { branch: FoodosBranch; on
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

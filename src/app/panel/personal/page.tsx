@@ -267,6 +267,7 @@ export default function PersonalPage() {
             <h2 className="text-sm font-semibold text-gray-900 mb-1">{t("personal.matrixTitle")}</h2>
             <p className="text-xs text-gray-400 mb-3">{t("personal.matrixHint")}</p>
             <div className="overflow-x-auto -mx-1 px-1">
+              <p className="sm:hidden pt-1 pb-2 text-[10px] text-gray-400" aria-hidden="true">Desliza para ver más columnas →</p>
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-gray-500">

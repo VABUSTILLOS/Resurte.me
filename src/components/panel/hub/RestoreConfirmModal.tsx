@@ -1,7 +1,7 @@
 "use client"
 
 import { AlertTriangle } from "lucide-react"
-import { useEscapeKey } from "@/hooks/use-escape-key"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 
 interface RestoreConfirmModalProps {
   open: boolean
@@ -11,13 +11,9 @@ interface RestoreConfirmModalProps {
 }
 
 export default function RestoreConfirmModal({ open, pendingBackup, onCancel, onConfirm }: RestoreConfirmModalProps) {
-  useEscapeKey(onCancel, open)
-
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl">
+    <BottomSheet open={open} onClose={onCancel} ariaLabel="¿Restaurar respaldo?" maxWidthClass="max-w-sm">
+      <div className="p-5 pt-3">
         <div className="flex items-center gap-2 mb-3">
           <AlertTriangle className="w-5 h-5 text-amber-500" />
           <h3 className="font-bold text-gray-900">¿Restaurar respaldo?</h3>
@@ -43,6 +39,6 @@ export default function RestoreConfirmModal({ open, pendingBackup, onCancel, onC
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

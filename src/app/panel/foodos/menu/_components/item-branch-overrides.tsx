@@ -14,7 +14,7 @@ import type {
   FoodosBranchMenuOverride,
   FoodosMenuItem,
 } from "@/types/foodos"
-import { useEscapeKey } from "@/hooks/use-escape-key"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 
 interface Props {
   item: FoodosMenuItem
@@ -35,8 +35,6 @@ export function ItemBranchOverrides({ item, branches, overrides, onClose }: Prop
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEscapeKey(onClose, true)
 
   const handleSave = async () => {
     setSaving(true)
@@ -62,10 +60,10 @@ export function ItemBranchOverrides({ item, branches, overrides, onClose }: Prop
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+    <BottomSheet open onClose={onClose} ariaLabelledby="item-overrides-title" maxWidthClass="max-w-md">
+      <div className="p-6">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+          <h3 id="item-overrides-title" className="font-semibold text-gray-900 flex items-center gap-2">
             <Building2 className="w-5 h-5 text-[#0E7A0E]" />
             &quot;{item.name}&quot; por sucursal
           </h3>
@@ -125,6 +123,6 @@ export function ItemBranchOverrides({ item, branches, overrides, onClose }: Prop
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

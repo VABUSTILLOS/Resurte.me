@@ -23,6 +23,7 @@ import {
   deleteCampaign,
 } from "../actions"
 import { formatMoney, SEGMENT_META, segmentCustomer } from "@/lib/foodos"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 import StatCard from "@/components/panel/StatCard"
 import type {
   FoodosLoyaltyProgram,
@@ -46,7 +47,6 @@ import {
   Star,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
-import { useEscapeKey } from "@/hooks/use-escape-key"
 import { t } from "@/lib/i18n/es"
 
 const AUTOMATION_TYPES: { id: FoodosAutomationType; label: string; hint: string }[] = [
@@ -104,8 +104,6 @@ export default function ClientesPage() {
   const [reviews, setReviews] = useState<FoodosReview[]>([])
   const [creditDraft, setCreditDraft] = useState<string | null>(null) // customer_id en edición
   const [creditAmount, setCreditAmount] = useState("")
-
-  useEscapeKey(useCallback(() => setShowAutoForm(false), []), showAutoForm)
 
   const load = useCallback(async () => {
     try {
@@ -583,11 +581,15 @@ export default function ClientesPage() {
       </div>
 
       {/* Modal nueva automatización */}
-      {showAutoForm && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <form onSubmit={handleSaveAuto} className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-black text-stone-900">{t("foodos.clientes.newAutomation")}</h2>
+      <BottomSheet
+        open={showAutoForm}
+        onClose={() => setShowAutoForm(false)}
+        ariaLabelledby="auto-form-title"
+        maxWidthClass="max-w-lg"
+      >
+        <form onSubmit={handleSaveAuto} className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 id="auto-form-title" className="font-black text-stone-900">{t("foodos.clientes.newAutomation")}</h2>
               <button type="button" onClick={() => setShowAutoForm(false)} className="text-stone-400 hover:text-stone-600">
                 ✕
               </button>
@@ -678,8 +680,7 @@ export default function ClientesPage() {
               </button>
             </div>
           </form>
-        </div>
-      )}
+      </BottomSheet>
       <ToolGuideHost toolKey="clientes" pathname="/panel/foodos/clientes" slug={null} icon="👥" title={t("foodos.clientes.guideTitle")} />
     </div>
   )

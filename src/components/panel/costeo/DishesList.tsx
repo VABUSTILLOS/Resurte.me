@@ -67,7 +67,7 @@ export default function DishesList({
                 </div>
               ))}
             </div>
-            <div className="border-t border-gray-100 pt-3 grid grid-cols-3 gap-2 text-center">
+            <div className="border-t border-gray-100 pt-3 grid grid-cols-1 min-[380px]:grid-cols-3 gap-2 text-center">
               <div>
                 <p className="text-xs text-gray-400">Costo total</p>
                 <p className="font-bold text-gray-900">${totalCost.toFixed(2)}</p>

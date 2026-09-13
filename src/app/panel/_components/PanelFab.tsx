@@ -23,7 +23,7 @@ export function PanelFab({ onOpen, sheetOpen }: PanelFabProps) {
     <button
       type="button"
       onClick={onOpen}
-      aria-label="Abrir menú de herramientas"
+      aria-label="Abrir herramientas"
       aria-haspopup="dialog"
       aria-expanded={sheetOpen}
       className={`fixed right-4 z-40 lg:hidden flex items-center gap-2 rounded-full bg-[#0E7A0E] text-white pl-4 pr-5 py-3.5 shadow-lg shadow-emerald-900/20 hover:bg-[#0A5F0A] active:scale-95 transition-all duration-300 motion-reduce:transition-none ${

@@ -438,7 +438,7 @@ export default function RentabilidadPage() {
       </div>
 
       {/* Summary bar */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
         <div className="bg-green-50 rounded-2xl border border-green-200 p-4 text-center">
           <CheckCircle2 className="w-5 h-5 text-green-600 mx-auto mb-1" />
           <p className="text-2xl font-extrabold text-green-700">{greenCount}</p>
@@ -698,7 +698,7 @@ export default function RentabilidadPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 mt-3 pt-3 border-t border-gray-50">
+              <div className="grid grid-cols-1 min-[380px]:grid-cols-3 gap-3 mt-3 pt-3 border-t border-gray-50">
                 <div className="text-center">
                   <p className="text-[10px] text-gray-400">{t("rentabilidad.costLabel")}</p>
                   <p className="font-bold text-sm text-gray-700">${dish.cost}</p>
