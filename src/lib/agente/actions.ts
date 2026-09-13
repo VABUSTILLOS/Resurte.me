@@ -660,3 +660,112 @@ export async function getAgentKpis(): Promise<AgentKpis> {
       : null,
   }
 }
+
+
+// ============================================================
+// RESUMEN DIARIO (B2) — briefing del día para el vendedor
+// ============================================================
+
+export interface DailyBriefing {
+  /** Texto del resumen listo para compartir por WhatsApp. */
+  text: string
+  /** true si lo generó la IA; false si es la plantilla determinista. */
+  fromAI: boolean
+  stats: {
+    visitas: number
+    whatsapps: number
+    llamadas: number
+    demos: number
+    seguimientosVencidos: number
+    borradoresPendientes: number
+    zoneLabel: string | null
+  }
+}
+
+/**
+ * Genera el resumen del día del vendedor: toques registrados hoy, pendientes
+ * para mañana y la ruta del día siguiente. Usa la IA cuando está configurada
+ * (tono motivador y sugerencias) y cae a una plantilla determinista si no.
+ * El vendedor lo copia o lo abre en WhatsApp para enviárselo a sí mismo / a
+ * su gerente.
+ */
+export async function getDailyBriefing(): Promise<DailyBriefing> {
+  const { userId, role } = await requireSellerOrAdminAction()
+  const supabase = await createServiceClient()
+  const today = getTodayBounds()
+
+  const activitiesQuery = supabase
+    .from("crm_activities")
+    .select("type")
+    .gte("occurred_at", today.startISO)
+  const overdueQuery = supabase
+    .from("crm_prospects")
+    .select("id", { count: "exact", head: true })
+    .not("next_follow_up_at", "is", null)
+    .lt("next_follow_up_at", today.startISO)
+    .neq("status", "perdido")
+  const draftsQuery = supabase
+    .from("crm_agent_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "borrador")
+  if (role !== "admin") {
+    activitiesQuery.eq("seller_id", userId)
+    overdueQuery.eq("seller_id", userId)
+    draftsQuery.eq("seller_id", userId)
+  }
+
+  const [activitiesRes, overdueRes, draftsRes] = await Promise.all([
+    activitiesQuery,
+    overdueQuery,
+    draftsQuery,
+  ])
+
+  const activities = (activitiesRes.data ?? []) as Array<{ type: string }>
+  const count = (t: string) => activities.filter((a) => a.type === t).length
+
+  const stats = {
+    visitas: count("visita"),
+    whatsapps: count("whatsapp"),
+    llamadas: count("llamada"),
+    demos: count("demo"),
+    seguimientosVencidos: overdueRes.count ?? 0,
+    borradoresPendientes: draftsRes.count ?? 0,
+    zoneLabel: zoneOfDay()?.label ?? null,
+  }
+
+  const sellerName = await getSellerName(supabase, userId)
+  const totalTouches =
+    stats.visitas + stats.whatsapps + stats.llamadas + stats.demos
+
+  const fallbackText = [
+    `📋 *Resumen del día — ${sellerName}*`,
+    ``,
+    `Toques de hoy: ${totalTouches}`,
+    `· Visitas: ${stats.visitas}`,
+    `· WhatsApp: ${stats.whatsapps}`,
+    `· Llamadas: ${stats.llamadas}`,
+    `· Demos: ${stats.demos}`,
+    ``,
+    `Pendientes: ${stats.seguimientosVencidos} seguimientos vencidos · ${stats.borradoresPendientes} borradores por aprobar`,
+    stats.zoneLabel ? `Ruta de hoy: ${stats.zoneLabel}` : null,
+  ]
+    .filter((l) => l !== null)
+    .join("\n")
+
+  const userPrompt = [
+    "REDACTA EL RESUMEN DIARIO DEL VENDEDOR para compartir por WhatsApp.",
+    "Tono: breve, motivador, en español, con emojis sobrios. Máximo 12 líneas.",
+    "Incluye: toques de hoy por canal, pendientes (seguimientos vencidos y borradores), una sugerencia concreta para mañana y la ruta del día si existe.",
+    "",
+    `VENDEDOR: ${sellerName}`,
+    `DATOS: ${JSON.stringify(stats)}`,
+    `TOTAL TOQUES HOY: ${totalTouches}`,
+  ].join("\n")
+
+  const llm = await chatCompletion(AGENT_SYSTEM_PROMPT, userPrompt)
+  return {
+    text: llm?.text ?? fallbackText,
+    fromAI: llm != null,
+    stats,
+  }
+}

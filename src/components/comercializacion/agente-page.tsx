@@ -14,7 +14,11 @@ import {
   BarChart3,
   Trash2,
   Check,
+  ClipboardList,
+  ShoppingCart,
+  Copy,
 } from "lucide-react"
+import Link from "next/link"
 import { useToast } from "@/components/toast"
 import {
   Button,
@@ -33,7 +37,9 @@ import {
   setAgentMessageStatus,
   updateAgentMessageText,
   registerAgentTouch,
+  getDailyBriefing,
 } from "@/lib/agente/actions"
+import type { DailyBriefing } from "@/lib/agente/actions"
 import {
   MESSAGE_KIND_LABEL,
   type AgentKpis,
@@ -96,6 +102,8 @@ export function AgentePage({
 }) {
   const [tab, setTab] = useState<Tab>("cola")
   const [draft, setDraft] = useState<AgentMessage | null>(null)
+  const [briefing, setBriefing] = useState<DailyBriefing | null>(null)
+  const [loadingBriefing, setLoadingBriefing] = useState(false)
 
   const TABS: Array<{ id: Tab; label: string; icon: typeof Bot; badge?: number }> = [
     { id: "cola", label: "Cola del día", icon: ListTodo, badge: queue.length },
@@ -116,6 +124,27 @@ export function AgentePage({
             Prioriza tu día, redacta los WhatsApp y tú apruebas antes de enviar.
           </p>
         </div>
+        <div className="flex items-start gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={loadingBriefing}
+            onClick={async () => {
+              setLoadingBriefing(true)
+              try {
+                setBriefing(await getDailyBriefing())
+              } finally {
+                setLoadingBriefing(false)
+              }
+            }}
+          >
+            {loadingBriefing ? (
+              <Spinner className="w-3.5 h-3.5 border-current border-t-transparent" />
+            ) : (
+              <ClipboardList className="w-3.5 h-3.5" />
+            )}
+            Resumen del día
+          </Button>
         {kpis.zoneOfDay && (
           <div className="hidden sm:block text-right">
             <Badge color="green">Ruta de hoy: {kpis.zoneOfDay.label}</Badge>
@@ -124,6 +153,7 @@ export function AgentePage({
             </p>
           </div>
         )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -154,6 +184,7 @@ export function AgentePage({
       {tab === "kpis" && <KpisTab kpis={kpis} />}
 
       <DraftModal draft={draft} onClose={() => setDraft(null)} />
+      <BriefingModal briefing={briefing} onClose={() => setBriefing(null)} />
     </div>
   )
 }
@@ -161,6 +192,83 @@ export function AgentePage({
 // ------------------------------------------------------------
 // Cola del día
 // ------------------------------------------------------------
+
+// ------------------------------------------------------------
+// Modal del resumen diario (B2)
+// ------------------------------------------------------------
+
+function BriefingModal({
+  briefing,
+  onClose,
+}: {
+  briefing: DailyBriefing | null
+  onClose: () => void
+}) {
+  const { toast } = useToast()
+  const [copied, setCopied] = useState(false)
+  if (!briefing) return null
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(briefing.text)
+      setCopied(true)
+      toast("Resumen copiado")
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast("No se pudo copiar", "error")
+    }
+  }
+
+  const shareWhatsApp = () => {
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(briefing.text)}`,
+      "_blank",
+      "noopener"
+    )
+  }
+
+  const s = briefing.stats
+  return (
+    <Modal
+      open={!!briefing}
+      onClose={onClose}
+      title={
+        <span className="flex items-center gap-2">
+          Resumen del día
+          {briefing.fromAI && (
+            <span className="text-xs font-normal text-[#0E7A0E]">· generado con IA</span>
+          )}
+        </span>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-4 gap-2 text-center">
+          {[
+            { label: "Visitas", value: s.visitas },
+            { label: "WhatsApp", value: s.whatsapps },
+            { label: "Llamadas", value: s.llamadas },
+            { label: "Demos", value: s.demos },
+          ].map((k) => (
+            <div key={k.label} className="rounded-lg bg-gray-50 py-2">
+              <p className="text-lg font-bold text-gray-900">{k.value}</p>
+              <p className="text-[10px] text-gray-500">{k.label}</p>
+            </div>
+          ))}
+        </div>
+        <TextArea rows={10} value={briefing.text} readOnly />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button className="flex-1" onClick={shareWhatsApp}>
+            <Send className="w-4 h-4" /> Compartir por WhatsApp
+          </Button>
+          <Button variant="secondary" onClick={copy}>
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            {copied ? "Copiado" : "Copiar"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
 
 function QueueTab({
   queue,
@@ -308,6 +416,11 @@ function QueueTab({
               >
                 <MonitorPlay className="w-3.5 h-3.5" /> Demo
               </Button>
+              <Link href={`/comercializacion/pedidos?prospecto=${item.prospectId}`}>
+                <Button size="sm" variant="outline">
+                  <ShoppingCart className="w-3.5 h-3.5" /> Hacer pedido
+                </Button>
+              </Link>
             </div>
           </div>
         )
