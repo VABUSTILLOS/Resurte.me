@@ -1,0 +1,390 @@
+---
+title: "Google Analytics para restaurantes: mide qué marketing sí trae clientes"
+description: "Tutorial de Google Analytics para restaurantes: instálalo, entiende los 5 reportes que importan y descubre qué canal de marketing te trae clientes."
+category: herramientas
+contentType: tutorial
+date: "2026-09-19"
+updatedAt: "2026-09-19"
+author: "Equipo Resurte.me"
+authorRole: "Especialistas en restaurantes"
+tags: ["Google Analytics restaurantes", "medición marketing", "analítica web restaurante", "herramientas restaurante", "datos marketing"]
+featured: false
+coverImage: "/images/blog/google-analytics-restaurante.webp"
+coverAlt: "Dueño de restaurante revisando gráficas de Google Analytics en una laptop junto a su menú"
+faq:
+  - question: "¿Para qué sirve Google Analytics en un restaurante?"
+    answer: "Para responder con datos la pregunta clave del marketing: ¿qué canal me está trayendo clientes? Te dice cuánta gente visita tu sitio, de dónde vienen (Google, Instagram, anuncios), qué páginas ven (tu menú, tu ubicación) y qué acciones hacen (llamar, pedir cómo llegar, reservar). Sin eso, tu presupuesto de marketing se decide a ciegas."
+  - question: "¿Google Analytics es gratis para restaurantes?"
+    answer: "Sí, completamente gratis (la versión GA4). Solo necesitas una cuenta de Google, un sitio web y pegar un código de seguimiento. No requiere pagos ni tarjeta. Las herramientas de paga son para volúmenes y análisis que un restaurante típico no necesita."
+  - question: "¿Necesito sitio web para usar Google Analytics?"
+    answer: "Sí: Analytics mide lo que pasa en TU sitio. Si aún no tienes uno, primero monta tu página mínima (menú, ubicación, horarios, teléfono) y después instala Analytics. Tu Perfil de Empresa de Google tiene sus propias estadísticas gratuitas que puedes usar mientras tanto."
+  - question: "¿Cuáles son las métricas más importantes de Google Analytics para un restaurante?"
+    answer: "Cinco: usuarios (cuánta gente te visita), fuentes de tráfico (de dónde vienen), páginas más vistas (si ven tu menú o se van), eventos de contacto (clics en llamar, cómo llegar o WhatsApp) y conversiones de tus campañas. Todo lo demás es secundario para una operación local."
+  - question: "¿Cada cuánto debo revisar Google Analytics?"
+    answer: "20–30 minutos al mes es suficiente para un restaurante: un reporte mensual con usuarios, fuentes, páginas y eventos, comparado contra el mes anterior. La revisión diaria es ansiedad innecesaria; la ausencia total de revisión es marketing a ciegas. El ritmo mensual es el punto correcto."
+  - question: "¿Google Analytics mide a los clientes que entran físicamente a mi local?"
+    answer: "No directamente: mide el comportamiento en tu sitio web. El puente entre lo digital y lo físico lo haces tú: eventos de 'cómo llegar' y llamadas como proxy de intención de visita, más la pregunta '¿cómo se enteraron?' en tu caja para confirmar qué canal terminó en comensal real."
+---
+
+**Google Analytics para restaurantes existe para contestar una sola pregunta que hoy probablemente respondes a ciegas: ¿cuál de mis esfuerzos de marketing está trayendo clientes y cuál solo está gastando mi tiempo?** Este tutorial te lleva de cero a un sistema de medición funcionando: instalación paso a paso, los 5 reportes que importan (y los 50 que puedes ignorar), cómo medir las acciones que sí valen — llamadas, "cómo llegar", WhatsApp — y el reporte mensual de 20 minutos que convierte datos en decisiones de pesos.
+
+## Qué es Google Analytics y qué NO va a hacer por ti
+
+Google Analytics (GA4, la versión actual, gratuita) es un medidor de lo que pasa en tu sitio web: cuánta gente entra, de dónde viene, qué ve y qué hace. Piensa en él como el contador de clientes de tu local, pero para tu sitio.
+
+Lo que SÍ te da:
+
+- **El origen de tus visitas:** cuánta gente llega desde Google (búsqueda orgánica), desde Instagram, desde tus anuncios de pago, desde el link de tu perfil de Maps.
+- **El contenido que funciona:** si tu menú es la página más vista (señal sana) o si todos se van sin verlo (señal de problema).
+- **Las acciones de intención:** clics en "llamar", "cómo llegar", "WhatsApp" y reservas — las señales digitales más cercanas a un comensal real.
+- **El efecto de tus campañas:** si esa promoción que publicaste movió visitas al sitio o no movió nada.
+
+Lo que NO te da (para que no lo esperes):
+
+- No cuenta a los que entran físicamente a tu local (eso lo mides en caja con la pregunta "¿cómo se enteraron?").
+- No mide tu Perfil de Empresa de Google ni tus apps de delivery (esas tienen sus propias estadísticas).
+- No decide por ti: te muestra números; las decisiones siguen siendo tuyas.
+
+### El requisito previo: tener sitio web
+
+Analytics mide TU sitio. Si hoy no tienes página, el orden correcto es: 1) página mínima (menú con precios, dirección con link a Maps, horarios, teléfono/WhatsApp clickeable, 5–8 fotos reales), 2) instalar Analytics, 3) empezar a medir. Una landing page sencilla es suficiente; no necesitas un sitio complejo para que la medición valga la pena.
+
+Y un apunte importante: si todavía no tienes sitio, no estás en cero mientras tanto. Las estadísticas gratuitas de tu Perfil de Empresa de Google (búsquedas, llamadas, solicitudes de direcciones) ya te dan una medición básica de tu canal más importante. El sitio con Analytics es el nivel 2; el perfil bien revisado es el nivel 1 que ya tienes disponible hoy.
+
+## Instalación paso a paso (30–45 minutos, una sola vez)
+
+Vamos de la cuenta cero al medidor funcionando:
+
+### Paso 1: crea tu cuenta y propiedad
+
+1. Entra a [analytics.google.com](https://analytics.google.com) con tu cuenta de Google de negocio (la misma de tu Perfil de Empresa, idealmente).
+2. Crea la cuenta con el nombre de tu restaurante y una "propiedad" GA4 con el nombre de tu sitio.
+3. Configura: zona horaria de tu ciudad y moneda en pesos mexicanos (esto facilita leer los reportes después).
+
+### Paso 2: conecta el medidor a tu sitio
+
+GA4 te dará un código de seguimiento (el "tag"). Cómo instalarlo depende de dónde esté hecho tu sitio:
+
+| Tu sitio está en... | Cómo instalar el tag |
+|---|---|
+| WordPress | Plugin oficial de Google (Site Kit) o pegar el código en el header: 10 minutos |
+| Wix / Squarespace | Tienen integración directa: pega tu ID de medición en la sección de marketing/integraciones |
+| Sitio hecho por un programador | Pásale el código: "instálame el tag de GA4 en todas las páginas", es trabajo de 15 minutos |
+| Google Sites / páginas simples | La mayoría permite pegar el ID de medición en configuración |
+
+Verifica que funciona: entra a tu sitio desde tu celular y mira el reporte "Tiempo real" de Analytics — deberías aparecer tú como 1 usuario activo. Si te ves, estás midiendo.
+
+### El orden de los códigos: Analytics, pixel de Meta y compañía
+
+A medida que crezcas, tu sitio acumulará etiquetas: el tag de GA4, el pixel de Meta si anuncias en Facebook/Instagram, quizá el de TikTok. Reglas de orden para no volverte loco:
+
+- **Una etiqueta por herramienta, instalada una sola vez** y verificada con sus propias vistas de tiempo real.
+- **Documenta qué tienes instalado** (una nota: "GA4 tal fecha, pixel Meta tal fecha"). El día que cambies de sitio o de programador, esa nota vale oro.
+- **No instales etiquetas "por si acaso".** Cada código pesa velocidad de carga, y la velocidad en celular afecta directamente tus conversiones: la gente con hambre no espera.
+- **Si usas Google Tag Manager** (el administrador de etiquetas de Google), todas viven en un solo lugar. Cuando tengas 2+ etiquetas, vale la pena; con solo GA4, es opcional.
+
+### Paso 3: configura los eventos que valen dinero
+
+Aquí está la pieza que el 95% de los restaurantes se salta y la más importante: medir las ACCIONES, no solo las visitas. Los eventos que te importan:
+
+| Evento | Qué significa en la vida real |
+|---|---|
+| Clic en "Llamar" | Cliente que quiere hablarte ya |
+| Clic en "Cómo llegar" | Cliente decidiendo visitarte |
+| Clic en WhatsApp | Pedido o pregunta en puerta |
+| Clic en el menú | Interés de compra serio |
+| Envío de formulario / reserva | Compromiso de visita |
+
+En GA4 estos se configuran como "eventos" y luego se marcan como "conversiones clave". Si tu sitio está en WordPress/Wix, hay tutoriales específicos de 10 minutos para cada botón; si te lo hizo alguien, pídele esta frase exacta: "configura como conversiones los clics en llamar, WhatsApp y cómo llegar". Esa frase le dice todo a quien sepa hacerlo.
+
+<BlogCallout variant="warning" title="Sin eventos, Analytics es un contador de vanidad">
+Medir solo "visitas" es como contar cuánta gente pasa caminando frente a tu local: número bonito que no paga la renta. Lo que vale es cuántos SE ACERCAN a la puerta (clics en cómo llegar) y cuántos tocan (llamadas). Configura los eventos desde el día uno o tus reportes serán decoración.
+</BlogCallout>
+
+## Los 5 reportes que importan (ignora los demás)
+
+GA4 tiene decenas de reportes. Un restaurante necesita cinco, revisados una vez al mes. Aquí están, con qué pregunta responde cada uno y dónde encontrarlo:
+
+### Reporte 1: usuarios y sesiones — "¿cuánta gente me visita?"
+
+En Inicio o en Reportes > Ciclo de vida > Adquisición. Te dice cuántos usuarios únicos visitaron tu sitio en el mes. Para un restaurante local, la referencia sana no es un número universal sino tu tendencia: ¿está subiendo mes a mes? 300 visitas mensuales crecientes valen más que 2,000 estancadas. El número absoluto importa menos que la dirección.
+
+### Reporte 2: fuentes de tráfico — "¿de dónde vienen?"
+
+El reporte más valioso de todos. Reportes > Adquisición > Adquisición de tráfico. Verás canales como:
+
+| Canal | Qué es | Qué te dice |
+|---|---|---|
+| Organic Search | Google, sin anuncios | Si tu SEO local funciona |
+| Paid Search | Tus anuncios de Google Ads | Si la pauta rinde en visitas |
+| Social | Facebook, Instagram | Si tus redes mueven gente al sitio |
+| Direct | Escribieron tu dirección directo | Clientes que ya te conocen |
+| Referral | Links desde otros sitios | Directorios, blogs, menciones |
+
+La lectura clave: qué canal CRECE y cuál solo consume tu tiempo. Si publicas diario en Instagram y el canal Social te manda 8 visitas al mes, tienes datos para repensar el esfuerzo.
+
+### Reporte 3: páginas más vistas — "¿qué les interesa?"
+
+Reportes > Interacción > Páginas y pantallas. Para un restaurante, la jerarquía sana: página de inicio primero, menú segundo (y cercano). Si tu menú es la página 6 en visitas, tu sitio está escondiendo lo que la gente vino a buscar. Las páginas que NADIE visita son candidatas a eliminarse o rehacerse.
+
+### Reporte 4: eventos y conversiones — "¿cuántos casi-clientes generé?"
+
+Reportes > Interacción > Eventos. Aquí viven tus clics en llamar, WhatsApp y cómo llegar. Este es tu número del mes: **los eventos de contacto son tu proxy de clientes potenciales generados por el sitio**. 100 visitas con 12 eventos de contacto es un sitio que funciona; 1,000 visitas con 3 eventos es un sitio bonito que no vende.
+
+### Bonus: Search Console, el hermano gratuito que te dice qué buscan
+
+Mientras Analytics mide lo que pasa DENTRO de tu sitio, Google Search Console (también gratis, en [search.google.com/search-console](https://search.google.com/search-console)) te dice qué pasó ANTES: qué frases escribió la gente en Google cuando tu sitio apareció, cuántas veces apareciste y cuántos hicieron clic. Para un restaurante es revelador: descubres búsquedas exactas de tu zona ("desayunos [tu colonia]", "tacos de guisado cerca del mercado") que puedes convertir en contenido, en secciones del menú en línea o en keywords para tus anuncios.
+
+La instalación es similar (verificar que el sitio es tuyo) y la revisión cabe en los mismos 20 minutos mensuales: qué frases suben, qué frases te muestran sin clic (oportunidad de mejorar tu título y descripción) y qué páginas tuyas aparecen más. Analytics + Search Console juntos son el kit de medición gratuito completo: uno mide tu escaparate, el otro mide la calle que lleva a él.
+
+### Reporte 5: el comparativo mensual — "¿voy mejorando?"
+
+GA4 compara periodos (este mes vs. el anterior). Esa comparación es tu reporte mensual: usuarios, fuentes, páginas y eventos, este mes contra el pasado. Cuatro números, 20 minutos, decisiones claras.
+
+<BlogCallout variant="tip" title="El filtro de tu propia visita">
+Configura la exclusión de tu IP (o simplemente ignora mentalmente tus propias visitas) para que tus checadas diarias del sitio no inflem los números. En Propiedades > Flujos de datos > Configuración puedes excluir tráfico interno. Datos limpios, decisiones limpias.
+</BlogCallout>
+
+## Conecta Analytics con tu marketing real: los UTMs explicados sin tecnicismos
+
+Aquí está el truco que convierte Analytics de "interesante" a "imprescindible": los UTMs. Son etiquetas que se agregan al final de un link para que Analytics sepa EXACTAMENTE de dónde vino cada visita. Sin ellas, todo lo que viene de redes se mezcla en "Social" y no sabes qué publicación funcionó.
+
+### Qué es un UTM con ejemplo real
+
+Link normal: `turestaurante.com/menu`
+Link con UTM: `turestaurante.com/menu?utm_source=instagram&utm_medium=historia&utm_campaign=pozole_septiembre`
+
+Ese link te dice en Analytics: vino de Instagram, de una historia, de la campaña del pozole. Mismo destino, misma página — pero ahora SABES qué la trajo.
+
+### Dónde poner UTMs en tu operación diaria
+
+| Canal | Link con UTM para... |
+|---|---|
+| Historias de Instagram | Cada promo que subas con link |
+| Posts de Facebook | El menú de la semana |
+| QR en mesas y volantes | Medir si tu material impreso mueve algo |
+| WhatsApp de difusión | Las promos que mandas a tu lista |
+| Google Ads | Se etiqueta solo al vincular las cuentas (vincúlalas: Configuración > Vinculaciones) |
+
+Crearlos es gratis y toma 1 minuto con el "generador de URL de campaña" de Google (búscalo así: Campaign URL Builder). El hábito: TODO link que publiques lleva sus etiquetas. En 60 días tendrás el mapa real de qué esfuerzos mueven gente y cuáles no.
+
+### El ejemplo que lo vuelve concreto
+
+Publicas en Instagram historias del lunes (menú de comida corrida) y del jueves (promo de la noche), ambas con link a tu sitio y UTM distintas. Al fin de mes, Analytics te dice: historias del lunes = 45 visitas y 9 clics en llamar; promo del jueves = 12 visitas y 1 clic. Decisión con datos: la comida corrida del lunes se publicita cada semana; la promo del jueves se rediseña o se mata. Sin UTMs, ambas "se sintieron" igual de bien.
+
+Multiplica ese ejemplo por todo tu marketing: el volante del gimnasio de enfrente, la mención del blog local, el grupo de Facebook de tu colonia, tu propia firma de WhatsApp. Cada esfuerzo con su etiqueta, cada etiqueta con su contador. En dos meses dejas de adivinar qué funciona: lo lees.
+
+## El puente online-offline: conectar Analytics con tu caja
+
+Analytics mide intención digital; tu caja mide comensales reales. La decisión buena necesita ambos. El puente, sin tecnología complicada:
+
+### Los 3 puentes que funcionan
+
+1. **La pregunta en caja (el clásico invencible):** "¿cómo se enteraron de nosotros?" anotado por categoría: Google, Instagram, recomendación, anuncio, pasaba por aquí. Cruza contra tus fuentes de tráfico: si "Google" domina la caja y Organic Search domina Analytics, el círculo cierra.
+2. **El código de promo por canal:** la promo de Instagram lleva una palabra ("menciona ANTRO"), la de WhatsApp otra. Lo que se menciona en caja se atribuye al canal, sin apps ni sistemas.
+3. **Los eventos como proxy:** los clics en "cómo llegar" no garantizan visita, pero su tendencia sí la anticipa. Cuando tus eventos de direcciones suben 30%, tus clientes nuevos de las semanas siguientes suben parecido. Valídalo un par de meses con tu caja y después confía en el patrón.
+
+### El mes de calibración: cuántos eventos se vuelven clientes reales
+
+El número que más vale la pena conocer de tu operación digital: de cada 10 eventos de contacto (llamadas, direcciones, WhatsApp), ¿cuántos terminan en comensal? Un mes de calibración lo responde: cuenta eventos en Analytics y cruza con la pregunta en caja de los clientes nuevos. Si ese mes tuviste 90 eventos y ~30 clientes nuevos dijeron venir de Google o tu sitio, tu tasa puente es ~1 de cada 3. Con ese número, cada reporte futuro se traduce mentalmente a clientes: "150 eventos este mes ≈ 50 clientes nuevos potenciales". Esa traducción es la que convierte el reporte mensual en decisiones de pesos sin calculadora.
+
+### La tabla de decisiones que todo esto alimenta
+
+Al final, la medición existe para decidir. Tu tabla mensual de decisiones:
+
+| Canal | Visitas | Eventos | Costo mensual | Decisión |
+|---|---|---|---|---|
+| SEO local / Google orgánico | ______ | ______ | Tu tiempo | Mantener/reforzar |
+| Instagram | ______ | ______ | Horas del equipo | ¿Rinde o se ajusta? |
+| Google Ads | ______ | ______ | $______ | Escalar/pausar keywords |
+| WhatsApp difusión | ______ | ______ | Casi $0 | Frecuencia y contenido |
+| Impresos/QR | ______ | ______ | $______ | ¿Sigue o se elimina? |
+
+Cuando esta tabla tiene números, el presupuesto de marketing deja de ser "a ver qué tal" y se vuelve asignación por rendimiento: más dinero y tiempo a lo que convierte, menos a lo que solo se siente bonito.
+
+## Preguntas de negocio que Analytics responde (y hoy decides a ciegas)
+
+La mejor forma de entender para qué sirve: la lista de decisiones que probablemente estás tomando a corazonada y que tienen respuesta en tus datos:
+
+### "¿Mi menú en línea sirve para algo?"
+
+Mira páginas vistas del menú y su tasa de eventos posteriores. Si el 40% de tus visitas ve el menú y luego pica "cómo llegar", tu menú digital es un vendedor. Si nadie lo abre, tu link al menú está escondido o tu foto de portada no convence. La decisión de rehacer el menú en línea deja de ser gusto y se vuelve dato.
+
+### "¿Las promos que publico mueven algo?"
+
+Con UTMs, cada promo tiene su contador: visitas, eventos, y el cruce con la caja. La promo que publicaste 6 veces y nunca generó ni 10 visitas se jubila; la que explotó una vez se repite mejorada. Sin medición, las promociones se repiten por costumbre y se cancelan por ánimo.
+
+### "¿Vale la pena seguir pagando el directorio / el influencer / el patrocinio?"
+
+Todo lo pagado lleva UTM o código propio. El patrocinio del equipo local que no generó ni una visita en 3 meses se renegocia o se corta; el blog que te mencionó y te manda 40 visitas al mes se agradece y se cultiva. El marketing deja de ser fe.
+
+### "¿Mi sitio ahuyenta a la gente?"
+
+Si tus visitas son sanas pero los eventos son casi cero, el sitio está fallando en lo único que importa: convertir interés en contacto. Las causas típicas que Analytics te obliga a revisar: el teléfono no es clickeable en celular, el menú no carga rápido, la dirección está enterrada. Tres arreglos de una tarde que duplican conversiones sin tocar nada más.
+
+### "¿En qué horario buscan mis clientes?"
+
+El reporte por horas te dice cuándo visita la gente tu sitio. Si el pico es 12–1 pm, ahí publicas, ahí mandas el WhatsApp de difusión, ahí concentra tus anuncios. Publicar "cuando puedes" en vez de "cuando te buscan" es desperdiciar alcance gratis.
+
+## El reporte mensual de 20 minutos: plantilla completa
+
+Convierte la medición en ritual con esta plantilla (cópiala a una hoja de cálculo, llénala el primer lunes del mes):
+
+| Sección | Métrica | Mes pasado | Este mes | ¿Qué haré distinto? |
+|---|---|---|---|---|
+| Tráfico | Usuarios totales | ______ | ______ | ______ |
+| Fuentes | Canal #1 y su participación | ______ | ______ | ______ |
+| Fuentes | Canal que más creció | ______ | ______ | ______ |
+| Contenido | Visitas a la página del menú | ______ | ______ | ______ |
+| Acción | Eventos de contacto (total) | ______ | ______ | ______ |
+| Acción | Desglose: llamadas / direcciones / WhatsApp | ______ | ______ | ______ |
+| Campañas | Mejor UTM del mes | ______ | ______ | ______ |
+| Caja | "¿Cómo se enteraron?" — canal dominante | ______ | ______ | ______ |
+
+### Las 3 preguntas del cierre del reporte
+
+Después de llenarla, responde por escrito:
+
+1. **¿Qué canal dio más eventos por peso/hora invertida?** → recibe más recursos este mes.
+2. **¿Qué esfuerzo no produjo casi nada?** → se rediseña o se elimina.
+3. **¿Qué UNA cosa voy a probar este mes?** → un solo experimento, medible, con fecha de evaluación.
+
+Con esta plantilla, tu marketing entra en un ciclo de mejora continua de una hora al mes. No necesitas más sofisticación que esta para superar al 95% de los restaurantes de tu zona, que siguen decidiendo por corazonada. Y cuando quieras ir un paso más allá, cada experimento nuevo (una promo, un canal, un cambio del sitio) entra al mismo ciclo: hipótesis, medición, decisión. La plantilla no cambia; los resultados sí.
+
+## Cuándo Analytics no basta: límites honestos y complementos
+
+Analytics es la base, no el techo. Sus límites y cómo cubrirlos:
+
+### No mide tu Perfil de Google ni las apps
+
+Tu ficha de Maps y tus apps de delivery tienen sus propias estadísticas (gratis, en sus paneles). El cuadro completo de tu marketing digital = Analytics (tu sitio) + estadísticas del Perfil de Empresa (tu mapa) + paneles de delivery. Revísalos juntos en el mismo reporte mensual: tres fuentes, una sola hoja.
+
+### No mide lo que pasa dentro de tu local
+
+La conversión final — el evento de contacto que se vuelve comensal — se mide en caja con la pregunta "¿cómo se enteraron?" y los códigos de promo. Analytics te da la intención; tu caja te da la verdad. El que mide solo lo digital se autoengaña con tráfico; el que mide solo la caja no sabe qué canal alimentar.
+
+### No sustituye el criterio de temporada
+
+Tus datos de octubre no predicen diciembre. Los reportes se leen con el calendario en la mano: compara contra el mes anterior Y contra el mismo mes del año pasado cuando tengas un año de historia. La primera vuelta del calendario midiendo es la que más enseña.
+
+### Comparte el acceso sin arriesgar la cuenta
+
+Si tu sobrino, tu encargado o una agencia van a revisar Analytics, NO compartas tu contraseña de Google: dales acceso por permisos (Configuración de la propiedad > Gestión de accesos). Niveles: "Lector" para quien solo consulta reportes, "Editor" para quien configura eventos. Reglas de oro: cada persona con su propio acceso (nada de cuentas compartidas), y cuando alguien deje de trabajar contigo, su acceso se retira la misma semana. Tus datos de marketing son un activo del negocio; cuídalos como cuidas la llave de la caja registradora.
+
+### Cuándo considerar herramientas adicionales
+
+Para la mayoría de los restaurantes, nunca. Si tu operación crece a varios locales, delivery propio con pedidos en línea y campañas grandes, ahí entran complementos (paneles unificados, CRM con medición, agencias de analítica). La regla: agrega herramienta cuando la actual se quede corta en hechos, no cuando suene profesional tenerla.
+
+## Casos de uso por tipo de operación: qué mirar según tu negocio
+
+No todos los restaurantes necesitan las mismas métricas primero. Tu giro define tu reporte:
+
+### Restaurante de salón (el cliente viene a ti)
+
+Tu métrica reina: clics en "cómo llegar" y llamadas de reserva. Vigila especialmente las búsquedas de marca (Direct + tu nombre) como termómetro de fama, y la página del menú como vendedor principal. Si tienes horarios flojos, mira qué días/horas visitan tu sitio y concentra ahí promos y publicaciones.
+
+### Dark kitchen o delivery propio
+
+Tu sitio ES tu local. Métrica reina: pedidos completados (o clics en "pedir") y su tasa de conversión, por canal. Aquí cada punto de conversión vale dinero directo: pasar de 4% a 6% en el sitio de una dark kitchen es dinero semanal visible. Mide también abandono: cuántos llegan al menú y no piden (señal de precios, fotos o proceso complicado).
+
+### Cafetería o bar de barrio
+
+Tu métrica reina: el crecimiento de búsquedas de marca y visitas directas (la gente que ya te conoce y vuelve a buscarte). Tu juego es comunidad y repetición: mide qué contenido (eventos, menú de temporada, tu historia) hace regresar visitas, y alimenta eso.
+
+### Restaurante con varios locales
+
+Una propiedad GA4 por sitio (o por local si cada uno tiene página propia), y un reporte mensual comparativo entre sucursales. El local cuyo sitio convierte peor casi siempre esconde un problema offline (ubicación difícil, fachada, estacionamiento) que el dato digital delata primero.
+
+### Qué hacer cuando los números se caen de golpe
+
+Tarde o temprano pasará: abres el reporte y el tráfico se desplomó 40%. Antes del pánico, el diagnóstico ordenado:
+
+1. **¿El tag sigue funcionando?** Entra a "Tiempo real" desde tu celular: si no te ves, el código se perdió en una actualización del sitio. Es la causa más común de "caídas" falsas: no perdiste visitas, perdiste el medidor.
+2. **¿Es temporada?** Compara contra el mismo periodo del año pasado si tienes historia. Enero cae en casi todo el giro; no es tu sitio, es la cuesta.
+3. **¿Cambiaste algo?** Sitio nuevo, menú movido, campaña apagada. Las caídas suelen tener causa propia y reciente.
+4. **¿Cayó un solo canal o todos?** Un solo canal caído (ej. Social) apunta a ese canal (dejaste de publicar, el alcance bajó); todos los canales caídos apuntan al sitio o a la medición.
+
+El 90% de las caídas repentinas se explican en esos cuatro pasos. La regla: nunca rediseñes nada por una caída que no diagnosticaste primero.
+
+### El principio que gobierna todos los casos
+
+Mide primero lo que más cerca está del dinero: el pedido, la llamada, el "cómo llegar". Las métricas de vanidad (visitas, alcance, seguidores) se miran después y solo como contexto. El restaurante que optimiza eventos de contacto gana; el que optimiza likes entretiene.
+
+## Errores comunes con Google Analytics en restaurantes
+
+❌ **Instalarlo y nunca abrirlo.** El Analytics abandonado es como la báscula guardada: la medición que no se revisa no existe. 20 minutos al mes, agendados, mismo día.
+
+❌ **Medir solo visitas y celebrar números grandes.** 5,000 visitas sin eventos de contacto es tráfico que no toca tu puerta. Las visitas son el medio; los eventos (llamadas, direcciones, WhatsApp) son el fin.
+
+❌ **No configurar eventos ni conversiones.** El error técnico más común y el más costoso: sin eventos, cada reporte es vanidad. Configura llamar, cómo llegar y WhatsApp como conversiones desde la primera semana.
+
+❌ **Publicar links sin UTM.** Todas tus redes revueltas en "Social" te impiden saber qué publicación funcionó. La etiqueta toma un minuto y su ausencia te ciega para siempre.
+
+❌ **Esperar datos "perfectos" para decidir.** Con 2 meses de tendencia ya puedes decidir qué canal reforzar. El perfeccionismo analítico es procrastinación disfrazada; decide con lo que tengas y afina después.
+
+❌ **Contar tus propias visitas y las del equipo.** Si tú y tus meseros checan el sitio 20 veces al día, tus números mienten. Excluye el tráfico interno en la configuración.
+
+❌ **Comparar contra restaurantes ajenos.** "Es que el otro tiene 10,000 visitas" — no sabes su zona, su antigüedad ni su presupuesto. Tu única comparación válida: tú contra tu mes pasado.
+
+❌ **Cambiar el sitio entero por un mal mes.** Un mes flojo puede ser temporada, no diseño. Cambia una cosa a la vez y mide 4–6 semanas antes de tocar la siguiente, o nunca sabrás qué funcionó.
+
+❌ **Ignorar el canal Direct.** Visitas "Direct" altas suelen ser gente que te buscó por nombre (te conocen) o que llegó de links sin etiqueta. Si crece, tu marca crece; si es grande y no sabes por qué, revisa tus UTMs.
+
+## Caso práctico: restaurante de alitas que descubrió que su Instagram no vendía (y qué hizo)
+
+Caso compuesto con patrones reales de restaurantes casuales en México. Restaurante de alitas con sitio sencillo, activísimo en Instagram (publicación diaria, reels, historias) y con promociones de volantes en universidades cercanas. La sensación del dueño: "Instagram es lo nuestro".
+
+### La instalación y el primer mes de datos
+
+Instalaron GA4 con eventos (llamar, WhatsApp, cómo llegar), UTMs en todas las historias y en los QR de los volantes. Un mes después, el reporte:
+
+| Canal | Visitas | Eventos de contacto | Costo/esfuerzo |
+|---|---|---|---|
+| Organic Search (Google) | 380 | 34 | Tiempo del SEO local |
+| Instagram (todo junto) | 210 | 6 | ~30 horas/mes del equipo |
+| Volantes con QR | 45 | 11 | $1,200 MXN de impresión |
+| Direct | 160 | 19 | — |
+| Google Ads (campaña chica de $1,500) | 95 | 14 | $1,500 MXN |
+
+La revelación incómoda: Instagram traía el 25% de las visitas pero solo el 7% de las acciones de contacto — mucho mirar, poco actuar. Los volantes "anticuados" traían pocas visitas pero con intención altísima (11 eventos de 45 visitas). Y Google orgánico, alimentado por el perfil de Maps optimizado, era el campeón silencioso.
+
+### Las decisiones que tomaron
+
+1. **Instagram bajó a 3 publicaciones semanales** de calidad (en vez de diario por inercia): las horas liberadas se fueron a responder reseñas y mantener el perfil de Google.
+2. **Los volantes se repitieron** con diseño renovado cada mes, porque su conversión por visita era la más alta.
+3. **Google Ads subió a $2,500 MXN** en las keywords que convertían, pausando las que solo daban visitas.
+4. **El menú se movió** a un clic desde la portada (era la 4ª página más vista cuando debería ser la 2ª).
+
+### Tres meses después
+
+Eventos de contacto mensuales: de 84 a 141 (+68%) con MENOS horas de trabajo en marketing y el mismo presupuesto. La lección que el dueño resume así: "Instagram no era malo; era caro en tiempo para lo que daba. Los datos no mataron mi canal favorito: le pusieron el precio correcto."
+
+## Checklist: tu Analytics midiendo en una semana
+
+- [ ] Tengo sitio web mínimo (menú, ubicación, horarios, contacto clickeable)
+- [ ] Creé mi cuenta GA4 con zona horaria y moneda correctas
+- [ ] Instalé el tag y verifiqué en "Tiempo real" que mide
+- [ ] Configuré como conversiones: llamar, cómo llegar, WhatsApp
+- [ ] Excluí mi tráfico interno (el mío y el del equipo)
+- [ ] Vinculé Google Ads con Analytics (si tengo campañas)
+- [ ] Creé mis UTMs para redes, WhatsApp y QR impresos
+- [ ] Todo link que publico lleva etiquetas desde hoy
+- [ ] Agendé el reporte mensual de 20 minutos (usuarios, fuentes, páginas, eventos)
+- [ ] Conecté la medición con la pregunta "¿cómo se enteraron?" en caja
+- [ ] Definí qué canal quiero evaluar primero con 2 meses de datos
+- [ ] Registré mi tasa puente (eventos que se vuelven clientes reales) tras el mes de calibración
+- [ ] Di acceso por permisos a quien me ayuda, sin compartir mi contraseña
+
+## Tu próximo paso
+
+Hoy, 45 minutos: crea la cuenta GA4, instala el tag en tu sitio y verifica en "Tiempo real" que te estás midiendo. Eso es todo por hoy. Mañana configura los tres eventos de contacto; esta semana, genera tus primeras UTMs y etiqueta todo lo que publiques. En 30 días harás tu primera revisión mensual y por primera vez sabrás — con números, no con sensaciones — qué pedazo de tu marketing está trabajando y cuál solo está posando.
+
+La medición no es un lujo de cadenas grandes: es la diferencia entre el restaurante que invierte en lo que funciona y el que repite lo que se siente bien. Y cuando tus datos digitales ya hablan, el siguiente nivel es que tus mensajes de marketing se disparen solos en el momento correcto — ahí entra la automatización de marketing, que sobre datos bien medidos convierte tu lista de clientes en una máquina de promos puntuales sin trabajo diario.
+
+<BlogCTA variant="herramienta" href="/panel" title="Tus números de operación y marketing en un solo panel">
+Del dato web al dato de caja: centraliza la información de tu restaurante en el panel y decide con todo a la vista.
+</BlogCTA>
+
+<BlogCTA variant="coleccion" collectionSlug="pollo-alitas" collectionName="Pollo y alitas" title="Surtido para el menú que tus datos dicen que vende">
+Cuando la medición te diga qué platillo empuja tu negocio, asegura su insumo: explora la colección de pollo y alitas con precio de proveedor.
+</BlogCTA>
