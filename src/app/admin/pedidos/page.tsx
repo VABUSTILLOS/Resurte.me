@@ -67,10 +67,19 @@ function AdminOrdersContent() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all")
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
-  // Fase 9 — rango de fechas (YYYY-MM-DD) y presets guardados en localStorage
+  // Fase 9 — rango de fechas (YYYY-MM-DD) y presets guardados en localStorage.
+  // Lazy init: lee localStorage en el primer render del cliente (este componente
+  // no hace SSR de datos, no hay riesgo de mismatch de hidratación).
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
-  const [savedFilters, setSavedFilters] = useState<SavedOrderFilter[]>([])
+  const [savedFilters, setSavedFilters] = useState<SavedOrderFilter[]>(() => {
+    try {
+      return parseSavedFilters(localStorage.getItem(SAVED_FILTERS_STORAGE_KEY))
+    } catch {
+      // localStorage no disponible (modo privado/SSR): presets vacíos
+      return []
+    }
+  })
   const [updatingId, setUpdatingId] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [drivers, setDrivers] = useState<{ id: number; name: string; is_active: boolean }[]>([])
@@ -125,15 +134,6 @@ function AdminOrdersContent() {
       setUpdatingId(null)
     }
   }
-
-  // Fase 9 — cargar presets guardados una sola vez (cliente)
-  useEffect(() => {
-    try {
-      setSavedFilters(parseSavedFilters(localStorage.getItem(SAVED_FILTERS_STORAGE_KEY)))
-    } catch {
-      // localStorage no disponible (modo privado): presets simplemente no cargan
-    }
-  }, [])
 
   // Fase 3 — id del pedido más reciente conocido, para detectar altas nuevas
   // durante el auto-refresh y avisar con un toast.
