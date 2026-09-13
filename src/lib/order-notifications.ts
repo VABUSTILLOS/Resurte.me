@@ -12,7 +12,7 @@ export interface NotificationPrefs {
 
 export const NOTIF_PREFS_STORAGE_KEY = "admin-notif-prefs"
 
-export const DEFAULT_NOTIF_PREFS: NotificationPrefs = {
+const DEFAULT_NOTIF_PREFS: NotificationPrefs = {
   sound: true,
   browser: false,
 }
@@ -60,7 +60,7 @@ export interface AdminNotificationEvent {
   at: string // ISO
 }
 
-export const MAX_NOTIFICATION_EVENTS = 20
+const MAX_NOTIFICATION_EVENTS = 20
 
 /** Inserta el evento al frente y recorta el historial. */
 export function pushEvent(
