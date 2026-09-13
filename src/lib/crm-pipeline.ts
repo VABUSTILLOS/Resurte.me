@@ -2,7 +2,7 @@
  * Fase 13 — lógica pura del pipeline CRM admin (crm_prospects).
  */
 
-export const CRM_STATUSES = [
+const CRM_STATUSES = [
   "nuevo",
   "contactado",
   "en_seguimiento",
@@ -39,7 +39,8 @@ export function isCrmStatus(value: string): value is CrmStatus {
 export function nextCrmStatus(status: CrmStatus): CrmStatus | null {
   const flow: CrmStatus[] = ["nuevo", "contactado", "en_seguimiento", "cliente_activo"]
   const idx = flow.indexOf(status)
-  return idx >= 0 && idx < flow.length - 1 ? flow[idx + 1]! : null
+  const next = idx >= 0 && idx < flow.length - 1 ? flow[idx + 1] : undefined
+  return next ?? null
 }
 
 export interface CrmProspect {
@@ -65,10 +66,11 @@ export function groupIntoBoard(prospects: CrmProspect[]): CrmBoard {
   const board: CrmBoard = Object.fromEntries(CRM_BOARD_COLUMNS.map((c) => [c.key, []]))
   for (const p of prospects) {
     const col = CRM_BOARD_COLUMNS.find((c) => c.statuses.includes(p.status as CrmStatus))
-    if (col) board[col.key]!.push(p)
+    const column = col ? board[col.key] : undefined
+    if (column) column.push(p)
   }
   for (const key of Object.keys(board)) {
-    board[key]!.sort((a, b) => b.created_at.localeCompare(a.created_at))
+    board[key]?.sort((a, b) => b.created_at.localeCompare(a.created_at))
   }
   return board
 }
