@@ -1,0 +1,402 @@
+---
+title: "Estado de resultados de un restaurante: cómo leerlo y armarlo"
+description: "Aprende a leer y armar el estado de resultados de un restaurante sin contador: estructura, porcentajes de referencia y ejemplo real con pesos mexicanos."
+category: costos
+contentType: guia
+date: "2026-09-12"
+updatedAt: "2026-09-12"
+author: "Equipo Resurte.me"
+authorRole: "Especialistas en restaurantes"
+tags: ["estado de resultados", "finanzas restaurante", "costos de alimentos", "utilidad neta", "contabilidad restaurante"]
+featured: false
+coverImage: "/images/blog/estado-de-resultados-restaurante.webp"
+coverAlt: "Dueño de restaurante revisando su estado de resultados en una laptop con números de ventas y costos"
+faq:
+  - question: "¿Qué es el estado de resultados de un restaurante?"
+    answer: "Es el reporte que muestra cuánto vendiste, cuánto te costó producir lo que vendiste, cuánto gastaste en operar y cuánto te quedó de utilidad en un periodo (normalmente un mes). Es la radiografía financiera del negocio: te dice si el restaurante gana dinero o solo mueve dinero."
+  - question: "¿Cada cuándo debo hacer el estado de resultados de mi restaurante?"
+    answer: "Mínimo una vez al mes, cerrando a más tardar el día 5 del mes siguiente. Si tu restaurante tiene ventas arriba de $500,000 mensuales o varias sucursales, hazlo también por semana. Esperar al año es demasiado tarde: para entonces el problema ya te costó meses de fuga de dinero."
+  - question: "¿Cuánto debería ganar un restaurante según su estado de resultados?"
+    answer: "En México, un restaurante sano suele operar con un costo de alimentos del 28% al 35% de las ventas, nómina del 25% al 33% y una utilidad neta del 5% al 15%. Una taquería de alto volumen puede acercarse al 12-18% neto; un restaurante de servicio completo difícilmente pasa del 10%."
+  - question: "¿Puedo hacer el estado de resultados sin contador?"
+    answer: "Sí. Necesitas solo cuatro fuentes de datos: tus ventas del punto de venta, tus facturas de compras de insumos, tu nómina y tus gastos fijos (renta, servicios, comisiones). Con eso y una hoja de cálculo armas un estado de resultados útil en una tarde. El contador lo necesitas para impuestos, no para operar."
+  - question: "¿Qué diferencia hay entre estado de resultados y flujo de efectivo?"
+    answer: "El estado de resultados mide utilidad: ventas menos costos y gastos de un periodo, sin importar cuándo se cobró o pagó el dinero. El flujo de efectivo mide dinero real que entra y sale de tu caja y banco. Puedes tener utilidad en papel y quedarte sin efectivo si tus clientes te pagan a crédito o compraste inventario de más."
+  - question: "¿Qué es el prime cost en un restaurante?"
+    answer: "Es la suma del costo de alimentos y bebidas más la nómina total (incluyendo prestaciones). Es el indicador más importante del estado de resultados: en un restaurante sano se mantiene entre el 55% y el 65% de las ventas. Si tu prime cost pasa del 68%, casi seguro estás perdiendo dinero aunque vendas bien."
+---
+
+**El estado de resultados de un restaurante es el papel donde se ve, en negro o en rojo, si tu negocio gana dinero o solo finge ganarlo.** En esta guía vas a aprender qué es, cómo armarlo tú mismo con los datos que ya tienes (punto de venta, facturas y nómina), cómo leerlo línea por línea y qué porcentajes son sanos en México. Sin contador, sin tecnicismos y con un ejemplo completo de una taquería real con números en pesos.
+
+La mayoría de los dueños de restaurantes en México opera de memoria: "me quedaron como veinte mil pesos este mes, creo". Esa frase es la causa número uno de cierres silenciosos. No es que el restaurante no venda; es que el dueño no sabe dónde se fue el dinero. El estado de resultados existe justo para responder eso, y armarlo toma una tarde al mes.
+
+## Qué es el estado de resultados de un restaurante y por qué te importa
+
+El estado de resultados (también llamado estado de pérdidas y ganancias, o P&L por sus siglas en inglés) es un reporte que resume tres cosas en un periodo determinado: todo lo que entró por ventas, todo lo que te costó generar esas ventas y lo que sobró o faltó al final.
+
+Piénsalo como el marcador del partido. Las ventas diarias son las jugadas; el estado de resultados es el marcador final que te dice si ganaste o perdiste, y por cuánto.
+
+### Por qué los restaurantes que no lo llevan mueren sin enterarse
+
+En México, según datos generales del sector que reportan organismos como la [CANIRAC](https://canirac.org.mx/) y el [INEGI](https://www.inegi.org.mx/), una parte importante de los restaurantes nuevos no llega a los cinco años de vida. Las causas varían, pero hay un patrón que se repite: el dueño confunde ventas con ganancias.
+
+Un restaurante que vende $300,000 al mes suena exitoso. Pero si su costo de alimentos es del 40%, su nómina del 35% y su renta del 12%, está perdiendo dinero todos los meses mientras el salón está lleno. Sin estado de resultados, ese dueño se entera cuando ya no puede pagar la nómina, y para entonces ya no hay corrección posible.
+
+### Qué responde este documento, en concreto
+
+Con un estado de resultados mensual bien hecho puedes responder, en menos de cinco minutos, preguntas como estas:
+
+- ¿Cuál es mi costo de alimentos real este mes? ¿Subió o bajó contra el mes pasado?
+- ¿Mi nómina está dentro de rango o estoy sobrecontratado en los turnos flojos?
+- ¿Me conviene subir el precio de los tacos de pastor de $22 a $25 o eso ya lo absorbe mi margen?
+- ¿Las comisiones de las apps de delivery me dejan algo o trabajo para ellas?
+- ¿Puedo pagarme un sueldo de $20,000 sin quebrar el negocio?
+
+Si hoy no puedes responder tres de esas cinco preguntas con números, necesitas este documento. Y la buena noticia: no necesitas saber contabilidad.
+
+## La estructura del estado de resultados de un restaurante, línea por línea
+
+El estado de resultados tiene una lógica de cascada: empiezas con todo lo que vendiste y vas restando capa por capa hasta llegar a lo que de verdad te quedó. Cada línea intermedia te da un indicador distinto. Vamos línea por línea.
+
+### Ventas netas
+
+Es todo lo que vendiste de comida y bebida, menos descuentos, cortesías y cancelaciones. Importante: es antes de IVA. El IVA que cobras no es tuyo, solo lo trasladas al [SAT](https://www.sat.gob.mx/), así que nunca lo metas como ingreso.
+
+Si tu punto de venta dice que facturaste $312,400 en el mes, de ese número quita el IVA (dividiendo entre 1.16, si tu operación causa IVA) y los descuentos que hayas aplicado. Lo que queda son tus ventas netas reales. En nuestro ejemplo: $269,310.
+
+<BlogCallout variant="warning" title="El error del IVA">
+Meter el IVA como ingreso infla tus ventas un 16% y hace que todos tus porcentajes se calculen mal. Siempre trabaja con ventas sin IVA. Si tu punto de venta no lo separa, divide entre 1.16.
+</BlogCallout>
+
+### Costo de ventas (costo de alimentos y bebidas)
+
+Es lo que te costó la materia prima de todo lo que vendiste: carne, tortillas, verduras, aceite, cerveza, refrescos, empaques. Ojo con la palabra clave: lo que **vendiste**, no lo que compraste.
+
+Si en el mes compraste $95,000 de insumos pero empezaste con $18,000 de inventario y terminaste con $22,000, tu costo real es:
+
+```
+Costo de ventas = Inventario inicial + Compras - Inventario final
+Costo de ventas = $18,000 + $95,000 - $22,000 = $91,000
+```
+
+Esta fórmula es la que casi nadie aplica y la que hace que "me estoy gastando mucho en carne" se convierta en un número exacto: 33.8% de tus ventas netas en este ejemplo. Dentro de rango, pero cerca del límite.
+
+### Utilidad bruta (o margen de contribución bruto)
+
+Ventas netas menos costo de ventas. Es el dinero que te queda para pagar todo lo demás: gente, renta, luz, comisiones. En el ejemplo: $269,310 - $91,000 = $178,310, es decir, 66.2% de las ventas.
+
+De esta línea hacia abajo es donde se pelea la batalla. Un margen bruto sano en restaurantes mexicanos suele estar entre 60% y 70%. Si el tuyo está abajo de 60%, tienes un problema de costos, de mermas o de precios.
+
+### Gastos operativos
+
+Aquí entra todo lo que cuesta abrir las puertas cada día, vendas mucho o poco:
+
+- **Nómina total**: sueldos, propinas que tú complementas, IMSS, INFONAVIT, aguinaldo prorrateado, vacaciones. No solo lo que depositas: el costo real de un mesero de $9,000 mensuales ronda $12,500 con prestaciones.
+- **Renta**: el número fijo más peligroso. Lo sano es que no pase del 8-10% de tus ventas.
+- **Servicios**: luz, gas, agua, internet, telefonía.
+- **Comisiones**: apps de delivery (15-30% por pedido), terminales bancarias (2.5-3.6% por tarjeta).
+- **Marketing**: pauta, diseño, promociones.
+- **Otros**: limpieza, mantenimiento, licencias, contador, software.
+
+### EBITDA y utilidad neta
+
+EBITDA es la utilidad antes de intereses, impuestos, depreciaciones y amortizaciones. Dicho simple: lo que gana la operación del restaurante antes de puros asuntos contables. Es el número que miran los inversionistas y el que te dice si el negocio en sí funciona.
+
+La utilidad neta es lo que queda después de todo, incluyendo la depreciación de tu equipo (tu estufa de $80,000 dura unos 8 años: carga $833 mensuales de desgaste) y los impuestos. Para operar el día a día, el EBITDA te basta; la utilidad neta la usas para saber cuánto dinero genera realmente el negocio al año.
+
+## Cómo armar tu estado de resultados paso a paso, sin contador
+
+Vamos al trabajo. Esto toma entre 2 y 4 horas el primer mes; después, una hora. Hazlo el día 3 o 4 de cada mes, con el mes anterior ya cerrado.
+
+### Paso 1: junta tus cuatro fuentes de datos
+
+No necesitas sistemas caros. Necesitas esto:
+
+1. **Reporte de ventas del mes** de tu punto de venta o, si no tienes, la suma de tus cortes de caja diarios.
+2. **Facturas y tickets de compras** de insumos: pide factura al mercado, al rastro, al proveedor de bebidas. Los tickets de caja chica también cuentan, pero sepáralos.
+3. **Nómina real**: lo que depositaste más lo que retuviste o pagaste de IMSS y demás cuotas.
+4. **Gastos fijos del mes**: renta, recibos de CFE y gas, internet, comisiones de apps y terminal, pago al contador.
+
+Si algo de esto no existe en papel, créalo a partir de hoy. Un cuaderno con tres columnas (fecha, concepto, monto) ya es un sistema mejor que la memoria.
+
+### Paso 2: calcula el costo de ventas con inventario
+
+El último día del mes, antes de cerrar, haz un conteo rápido de inventario. No necesitas pesar todo al gramo: usa categorías con valores aproximados.
+
+| Categoría | Qué incluye | Cómo estimarlo |
+| --- | --- | --- |
+| Carnes y proteínas | Res, cerdo, pollo, pescado congelado | Precio de compra por kilo x kilos en refrigerador/congelador |
+| Secos y abarrotes | Arroz, frijol, aceite, especias, harina | Valor estimado por bulto o litro |
+| Frutas y verduras | Frescos de perecero corto | Estimación rápida (representan poco valor en reposo) |
+| Bebidas | Refrescos, cervezas, insumos de barra/café | Conteo de piezas x costo unitario |
+| Empaques | Contenedores, bolsas, servilletas, vasos | Piezas x costo unitario |
+
+Con inventario inicial, compras e inventario final aplicas la fórmula que vimos arriba y listo: tienes tu costo de ventas real, no adivinado.
+
+### Paso 3: ordena los gastos en categorías fijas
+
+Usa siempre las mismas categorías, mes con mes. La comparabilidad es lo que hace útil al estado de resultados. Una estructura simple:
+
+| Categoría de gasto | Ejemplos | Rango sano sobre ventas |
+| --- | --- | --- |
+| Nómina total | Sueldos, prestaciones, IMSS, aguinaldo prorrateado | 25% - 33% |
+| Renta | Local, bodega si aplica | 6% - 10% |
+| Servicios | Luz, gas, agua, internet | 3% - 5% |
+| Comisiones | Apps delivery, terminal bancaria | 3% - 10% (según canal) |
+| Marketing | Pauta, promociones, diseño | 2% - 4% |
+| Administración | Contador, software, licencias | 2% - 3% |
+| Otros / imprevistos | Mantenimiento, limpieza, reparaciones | 2% - 3% |
+
+### Paso 4: arma el documento y calcula porcentajes
+
+En una hoja de cálculo (o en papel, si prefieres), ordena de arriba hacia abajo: ventas netas, menos costo de ventas, igual utilidad bruta, menos cada categoría de gasto, igual EBITDA, menos depreciación e impuestos, igual utilidad neta.
+
+Y aquí está el truco que convierte al estado de resultados en herramienta y no en trámite: **cada línea va acompañada de su porcentaje sobre ventas netas**. El peso engaña; el porcentaje no. Que tu costo de alimentos haya subido de $80,000 a $91,000 puede ser terrible (si las ventas no crecieron) o normal (si vendiste 15% más). El porcentaje te lo dice al instante.
+
+<BlogCallout variant="tip" title="La regla del día 5">
+Comprométete a tener el estado de resultados cerrado a más tardar el día 5 de cada mes. Un diagnóstico que llega el día 20 ya no sirve para corregir nada del mes en curso. Mejor un número 95% exacto el día 4 que uno perfecto el día 25.
+</BlogCallout>
+
+## Ejemplo completo: el estado de resultados de una taquería
+
+Taquería "El Compa", en una colonia de clase media en Guadalajara. 40 asientos, vende tacos de pastor, asada y birria, refrescos y cervezas. Ticket promedio de $145. Estos son sus números de un mes típico:
+
+| Línea | Monto MXN | % sobre ventas |
+| --- | --- | --- |
+| Ventas brutas (con IVA) | $312,400 | — |
+| IVA trasladado | -$43,090 | — |
+| **Ventas netas** | **$269,310** | **100%** |
+| Costo de alimentos y bebidas | -$91,000 | 33.8% |
+| **Utilidad bruta** | **$178,310** | **66.2%** |
+| Nómina total (6 empleados + dueño) | -$78,500 | 29.1% |
+| Renta | -$22,000 | 8.2% |
+| Servicios (luz, gas, agua, internet) | -$9,800 | 3.6% |
+| Comisiones (apps + terminal) | -$11,400 | 4.2% |
+| Marketing | -$6,000 | 2.2% |
+| Administración y otros | -$9,500 | 3.5% |
+| **EBITDA** | **$41,110** | **15.3%** |
+| Depreciación de equipo | -$2,600 | 1.0% |
+| Provisiones fiscales | -$9,600 | 3.6% |
+| **Utilidad neta** | **$28,910** | **10.7%** |
+
+### Qué nos dice este estado de resultados
+
+A primera vista, El Compa gana $28,910 al mes. Nada mal. Pero el documento revela tres cosas que el dueño no veía "a ojo":
+
+1. **El prime cost está en 62.9%** (33.8% alimentos + 29.1% nómina). Está dentro del rango sano (55-65%) pero en el borde alto. Un aumento de $4 por kilo en la carne lo saca de rango.
+2. **La renta está en 8.2%**, bien. Pero el contrato sube con inflación cada año y las ventas llevan tres meses planas. En dos años, sin crecer ventas, la renta se comerá 1 punto de utilidad.
+3. **Las comisiones de apps ya son 4.2%** y creciendo: el delivery representa 22% de las ventas y paga en promedio 19% de comisión. Cada punto de ventas que migre de salón a delivery le cuesta al negocio margen real.
+
+Eso es lo que hace un estado de resultados: convierte "siento que las apps me dejan poco" en "las apps me cuestan $11,400 al mes y si suben 2 puntos más de ventas me quitan otros $1,100".
+
+## Cómo leer tu estado de resultados: los 5 números que mandan
+
+No necesitas analizar las 15 líneas todos los meses. Hay cinco que mandan.
+
+### 1. Costo de alimentos (%)
+
+El más volátil y el más traicionero. Se mueve por tres causas: precios de proveedores, mermas y robos, y platillos mal costeados. Si sube más de 2 puntos de un mes a otro sin que hayas cambiado precios de lista, tienes una fuga. Revisa primero mermas y porcionamiento: el 80% de las veces está ahí, no en el proveedor.
+
+### 2. Nómina (%)
+
+Compara contra ventas, no como número absoluto. Si tus ventas bajan 10% en temporada floja y la nómina queda igual, tu porcentaje sube y tu utilidad se evapora. La solución no es correr gente: es escalar turnos. Los restaurantes que manejan horarios flexibles por demanda mantienen la nómina en rango todo el año.
+
+### 3. Prime cost
+
+Alimentos más nómina. Es el resumen ejecutivo del estado de resultados. Arriba de 68%: el negocio casi seguro pierde dinero o vive al día. Entre 55% y 62%: sano. Abajo de 55%: excelente, pero revisa que no estés descapitalizando al equipo o bajando calidad de insumos.
+
+### 4. Gastos fijos totales (%)
+
+Renta, servicios base, administración, sueldos fijos. La suma no debería pasar del 25-28% de ventas. Si pasa, tu punto de equilibrio está demasiado alto y cualquier mes flojo te mete en pérdidas. Aquí la palanca no es "gastar menos en luz" sino renegociar renta o subir el ticket promedio.
+
+### 5. Utilidad neta (%)
+
+El veredicto final. En restaurantes independientes mexicanos, lo común va de 3% a 12%. Abajo de 3% estás trabajando mucho para ganar como empleado; arriba de 15% tienes un negocio excepcional (o te falta cargarte un sueldo real como dueño, que es lo más frecuente).
+
+<BlogCallout variant="note" title="¿Te pagas sueldo?">
+La mayoría de los dueños de restaurantes independientes no se asignan un sueldo: "lo que sobra es mío". Eso infla la utilidad y oculta la verdad. Asígnate un sueldo de mercado por tu función (digamos $18,000-$30,000 según el tamaño del negocio) dentro de la nómina. Si el restaurante sigue en números negros después de pagarte, entonces sí es rentable.
+</BlogCallout>
+
+## Porcentajes de referencia por tipo de restaurante en México
+
+No todos los formatos se comportan igual. Un café no tiene el mismo estado de resultados que una marisquería. Estos rangos son referencias de operación habituales en restaurantes independientes mexicanos; tu realidad puede variar por ciudad, zona y ticket promedio.
+
+| Tipo de negocio | Costo alimentos | Nómina | Prime cost | Utilidad neta típica |
+| --- | --- | --- | --- | --- |
+| Taquería / antojitos | 30% - 36% | 22% - 28% | 55% - 62% | 8% - 15% |
+| Comida corrida | 32% - 38% | 24% - 30% | 58% - 65% | 5% - 10% |
+| Hamburguesas / fast casual | 28% - 34% | 22% - 28% | 52% - 60% | 10% - 18% |
+| Restaurante servicio completo | 28% - 33% | 28% - 35% | 60% - 68% | 4% - 10% |
+| Mariscos | 35% - 42% | 22% - 28% | 60% - 68% | 5% - 12% |
+| Café / desayunos | 25% - 32% | 26% - 33% | 55% - 63% | 8% - 15% |
+| Dark kitchen / solo delivery | 28% - 35% | 18% - 25% | 50% - 58% | 5% - 12% (con comisiones altas) |
+
+Fíjate en los extremos: la marisquería tiene el costo de alimentos más alto del grupo (el pescado y el camarón son caros y volátiles), pero compensa con tickets altos y bebidas. El café tiene el costo más bajo, pero depende del volumen matutino. Tu estado de resultados solo se puede juzgar contra el formato correcto: comparar tu taquería con el restaurante de servicio completo de enfrente no tiene sentido.
+
+## Estado de resultados mensual vs. anual: cada cuándo y para qué
+
+El mensual es para operar; el anual es para decidir. Son el mismo documento con distinta lupa.
+
+### El mensual: tu tablero de control
+
+Sirve para detectar desvíos rápido. La rutina recomendada:
+
+- Día 1: cierra caja e inventario del mes que terminó.
+- Días 2-4: junta facturas, nómina y gastos. Llena el estado.
+- Día 5: revisa los 5 números que mandan y compara contra el mes anterior y contra el mismo mes del año pasado (el restaurante es un negocio estacional: comparar diciembre contra noviembre engaña; comparar diciembre contra diciembre anterior informa).
+- Día 6: toma una decisión. Solo una: ajustar un precio, renegociar un insumo, recortar un turno flojo. Un estado de resultados que no produce una acción es un trámite.
+
+Esa última regla parece exagerada y es la más importante. Los restaurantes no quiebran por no saber sus números; quiebran por saberlos y no hacer nada distinto. El estado de resultados mensual existe para provocar un cambio pequeño cada mes. Doce cambios pequeños al año son la diferencia entre una utilidad del 4% y una del 11%, que en un negocio de $270,000 mensuales significa más de $200,000 extra al año.
+
+### El anual: tu herramienta de estrategia
+
+Con doce estados mensuales apilados puedes ver lo que ningún mes aislado muestra:
+
+- Qué meses sostienen al negocio y cuáles lo drenan (muchas taquerías ganan su año entre octubre y abril y sobreviven el verano).
+- Si tu utilidad del año alcanza para la inversión que quieres hacer (una plancha nueva de $45,000 equivale a mes y medio de utilidad neta de El Compa).
+- Si te conviene abrir un segundo local, o si el primero todavía no demuestra que el modelo funciona.
+
+Además, el estado anual es lo que te van a pedir si buscas un crédito para crecer o un socio. Un estado de resultados de doce meses, hecho por ti, vale más que cualquier presentación bonita.
+
+### Cómo presentarlo ante un banco o un socio
+
+Si vas por financiamiento, el estado de resultados es tu credencial. Tres reglas para que juegue a tu favor:
+
+1. **Lleva doce meses completos, no los mejores tres.** El banco conoce la estacionalidad del giro; un promedio anual honesto genera más confianza que picos sospechosos.
+2. **Que los números cuadren con tus estados de cuenta.** Si tu estado de resultados dice $270,000 mensuales de ventas y tus depósitos muestran $150,000, pierdes el crédito y la credibilidad. Factura y deposita en la misma cuenta del negocio.
+3. **Explica los meses malos antes de que los pregunten.** "En febrero cerré ocho días por remodelación, aquí está la factura del contratista" convierte un rojo en evidencia de que sabes manejar tu negocio.
+
+Un restaurante con utilidad neta anual del 8-12%, ventas estables y doce meses documentados es un candidato razonable para créditos PyME en banca comercial o instituciones de desarrollo. Un restaurante "que vende muy bien" pero sin papeles, no.
+
+## Errores comunes al hacer el estado de resultados de un restaurante
+
+Estos son los que vemos repetirse una y otra vez en restaurantes independientes:
+
+❌ **Meter el IVA como ingreso.** Infla ventas 16% y desordena todos tus porcentajes. Trabaja siempre sin IVA.
+
+❌ **Usar las compras del mes como costo de ventas.** Si compraste $40,000 de carne para congelar, no la gastaste toda. Sin la fórmula de inventarios, tu costo mensual baila arbitrariamente y no detectas las fugas reales.
+
+❌ **No contarse sueldo como dueño.** "Yo no me pago, vivo de lo que sobra" convierte tu utilidad neta en un espejismo. Cárgate un sueldo de mercado y mira si el negocio sigue en pie.
+
+❌ **Revolver gastos personales con los del negocio.** La despensa de la casa pagada con la tarjeta del restaurante destruye la lectura del estado de resultados y te mete en problemas fiscales. Dos cuentas, dos tarjetas, sin excepción.
+
+❌ **Hacerlo una vez al año "para impuestos".** El estado anual que arma el contador en enero no sirve para operar: cuando lo ves, el daño tiene once meses de antigüedad.
+
+❌ **Comparar solo contra el mes anterior.** El negocio es estacional. Compara siempre contra el mismo mes del año pasado y contra tu promedio de doce meses.
+
+❌ **Celebrar las ventas y no mirar la utilidad.** Vender $50,000 más con un costo de alimentos 4 puntos más alto puede significar ganar menos. El récord de ventas no paga la renta; la utilidad sí.
+
+## Herramientas para llevar tu estado de resultados sin volverte contador
+
+Puedes empezar con una hoja de cálculo: una pestaña por mes, las líneas que vimos arriba y fórmulas de porcentaje. Es gratis y suficiente para un local.
+
+Cuando el volumen crece, el cuello de botella deja de ser el formato y pasa a ser la captura: registrar cada compra, cada merma, cada platillo vendido. Ahí es donde un sistema te ahorra horas. Lo mínimo que debe darte cualquier herramienta:
+
+- Ventas por día y por canal (salón, para llevar, delivery) ya separadas del IVA.
+- Control de inventario con entradas por compra y salidas automáticas por venta, para que el costo de ventas se calcule solo.
+- Costeo por receta, para saber qué platillos sostienen tu margen bruto y cuáles lo erosionan.
+- Reporte mensual de costos y gastos exportable, listo para tu estado de resultados.
+
+Con esos cuatro datos automatizados, armar tu estado de resultados deja de ser una tarde de cazar tickets y se convierte en media hora de revisar números.
+
+<BlogCallout variant="tip" title="Costea primero, opina después">
+Antes de discutir si un platillo "deja o no deja", costéalo: ingredientes con precio de factura, porción real, empaque incluido. Un taco de birria con costo de $11.40 vendido a $28 deja 59% de margen bruto; el mismo taco a $24 deja 52%. Esa diferencia de $4, multiplicada por 3,000 tacos al mes, son $12,000 de utilidad que se fueron o se quedaron. Tu estado de resultados mensual es solo la suma de cientos de decisiones así.
+</BlogCallout>
+
+## Punto de equilibrio: el número que tu estado de resultados te regala
+
+Con tu estado de resultados de un solo mes puedes calcular el dato más útil de todos: cuánto necesitas vender para no perder. La fórmula es simple:
+
+```
+Punto de equilibrio = Gastos fijos del mes / Margen bruto %
+```
+
+Siguiendo con El Compa: sus gastos fijos (nómina, renta, servicios, administración, más la parte fija de comisiones y marketing) suman $137,200 y su margen bruto es 66.2%. Entonces:
+
+```
+Punto de equilibrio = $137,200 / 0.662 = $207,250 mensuales
+```
+
+Es decir, la taquería necesita vender $207,250 al mes (unos $6,900 diarios, unos 48 tickets de $145) solo para no perder. Todo lo que venda arriba de eso deja, aproximadamente, 66 centavos de cada peso para utilidad. Todo lo que venda abajo, lo pone en rojo.
+
+### Para qué te sirve este número el lunes por la mañana
+
+- **Decidir horarios**: si los martes vendes $4,200, estás operando ese día por debajo del equilibrio diario. Quizá conviene cerrar martes o abrir solo en la noche.
+- **Evaluar promociones**: un 2x1 que duplica comensales pero recorta el margen bruto a 50% sube tu punto de equilibrio a $274,400. ¿Realmente vas a vender eso?
+- **Planeación de temporada**: si enero históricamente baja 25%, sabes de antemano si caerás debajo del equilibrio y puedes recortar turnos antes, no después de dos semanas de pérdidas.
+
+Recalcula tu punto de equilibrio cada vez que cambie la renta, la nómina o tu costo de alimentos. Es un número vivo.
+
+## Qué hacer cuando tu estado de resultados sale en rojo
+
+Algún mes saldrá en rojo. Le pasa a todos. La diferencia entre un restaurante que sobrevive y uno que cierra es lo que hace el dueño en los siguientes 15 días. El orden importa: ataca en esta secuencia.
+
+### 1. Confirma que el rojo es real y no un error de captura
+
+Antes de entrar en pánico, revisa: ¿metiste el IVA como ingreso? ¿cargaste una compra grande de inventario como costo del mes? ¿falta una semana de ventas del punto de venta? Un tercio de los "meses en rojo" que revisamos son errores de captura, no de operación.
+
+### 2. Identifica qué línea se movió
+
+Compara contra el último mes sano, línea por línea, en porcentajes. Casi siempre el rojo viene de una de estas tres: costo de alimentos que brincó (proveedor caro, merma, robo), nómina que creció sin crecer ventas (un contratación de más, horas extra), o una caída de ventas con gastos fijos intactos.
+
+### 3. Aplica el correctivo correcto para cada causa
+
+| Causa del rojo | Correctivo | Plazo de efecto |
+| --- | --- | --- |
+| Costo de alimentos subió 3+ puntos | Recostear platillos, renegociar 2-3 insumos principales, auditar mermas | 2-4 semanas |
+| Nómina subió 3+ puntos | Reescalar turnos a la demanda real, pausar contrataciones | Inmediato |
+| Ventas cayeron con gastos fijos iguales | Campaña para subir ticket o tráfico, activar canales (delivery, para llevar) | 4-8 semanas |
+| Renta/comisiones comiendo margen | Renegociar contrato, migrar pedidos de apps a canal propio | 1-3 meses |
+
+### 4. Ponle fecha de revisión
+
+Un rojo no se corrige en una semana, pero tampoco se deja "a ver qué pasa". Agenda la revisión del siguiente estado de resultados como una cita inamovible: si el correctivo funcionó, el rojo se reduce; si no, toca el siguiente nivel de decisiones (cambiar el menú, reducir horarios, renegociar renta).
+
+<BlogCallout variant="warning" title="Lo que NO debes hacer ante un mes en rojo">
+No recortes calidad de insumos ni porciones: eso se nota en el plato y te cuesta clientes justo cuando más los necesitas. Y no dejes de pagar impuestos o IMSS "para ahorrar": conviertes un problema de operación en un problema legal. Recorta primero en horarios, compras y gastos que el cliente nunca ve.
+</BlogCallout>
+
+## El estado de resultados por canal: salón, para llevar y delivery
+
+Un solo estado de resultados consolidado puede esconderte un canal que pierde dinero. Si tu restaurante vende por salón, para llevar y apps de delivery, vale la pena abrir tres columnas una vez al trimestre y ver qué pasa.
+
+La mecánica es la misma, pero los números cambian mucho por canal: en salón cargas meseros y platería; en delivery cargas comisión del 15-30% y empaque, pero no mesero; en para llevar cargas empaque sin comisión. Un mismo taco puede dejar márgenes muy distintos según por dónde salga.
+
+| Concepto | Salón | Para llevar | Delivery (apps) |
+| --- | --- | --- | --- |
+| Ventas del mes | $170,000 | $40,000 | $59,310 |
+| Costo de alimentos (34%) | -$57,800 | -$13,600 | -$20,165 |
+| Empaque | -$1,200 | -$2,800 | -$4,150 |
+| Comisión de canal | -$4,500 (terminal) | -$1,200 (terminal) | -$12,455 (app + terminal) |
+| Nómina atribuible | -$58,000 | -$8,500 | -$12,000 |
+| **Margen del canal** | **$48,500 (28.5%)** | **$13,900 (34.8%)** | **$10,540 (17.8%)** |
+
+La lectura de El Compa: el delivery aporta ventas pero con un margen de 17.8%, diez puntos abajo del salón. No significa cerrarlo: significa tratarlo como lo que es, un canal de volumen con margen delgado, y empujar precios específicos de app (5-8% más altos que el menú de salón, práctica común en el sector) o promociones que muevan al cliente al canal propio de para llevar, que es el más rentable del negocio.
+
+Haz este ejercicio aunque sea con números aproximados. La mayoría de los dueños que lo hace por primera vez descubre que uno de sus canales trabaja para el otro.
+
+## Tu próximo paso
+
+No necesitas sistemas ni contador para empezar hoy. Necesitas una tarde, tus papeles y decisión. Este es el plan:
+
+- [ ] Bloquear 3 horas esta semana para armar el estado de resultados del mes pasado
+- [ ] Exportar o sumar las ventas del mes y separar el IVA
+- [ ] Juntar facturas y tickets de compras de insumos en una sola carpeta
+- [ ] Hacer un conteo de inventario de fin de mes en 5 categorías (carnes, secos, frescos, bebidas, empaques)
+- [ ] Calcular el costo de ventas con la fórmula de inventarios
+- [ ] Listar nómina total con prestaciones incluidas (y tu sueldo como dueño)
+- [ ] Ordenar gastos en las 7 categorías fijas
+- [ ] Calcular el porcentaje de cada línea sobre ventas netas
+- [ ] Comparar prime cost y utilidad neta contra los rangos de tu tipo de restaurante
+- [ ] Tomar UNA decisión concreta derivada de los números y anotarla
+- [ ] Agendar la misma rutina para el día 3 del próximo mes
+
+Haz el primer estado de resultados aunque salga feo y con huecos. Un número aproximado que revisas cada mes le gana siempre a la certeza de la memoria, que solo acierta a recordar lo que dolió.
+
+<BlogCTA variant="herramienta" href="/panel/costeo" title="Costea tus platillos y alimenta tu estado de resultados">
+  Calcula el costo real de cada receta con precios de tus proveedores y detecta qué platillos sostienen tu margen. Sin hojas de cálculo complicadas.
+</BlogCTA>
+
+<BlogCTA variant="coleccion" collectionSlug="taquerias-antojitos" collectionName="Taquerías y antojitos" title="Insumos para tu taquería al mejor costo">
+  Compara precios de carne, tortillas y empaques entre proveedores verificados y baja tu costo de alimentos desde la compra.
+</BlogCTA>

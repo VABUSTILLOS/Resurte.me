@@ -1,0 +1,445 @@
+---
+title: "Ingeniería de menú paso a paso: encuentra tus estrellas, vacas y perros"
+description: "Guía de ingeniería de menú para restaurantes en México: clasifica tus platillos en estrellas, vacas, enigmas y perros, y decide precios con datos."
+category: costos
+contentType: guia
+date: "2026-09-12"
+updatedAt: "2026-09-12"
+author: "Equipo Resurte.me"
+authorRole: "Especialistas en restaurantes"
+tags: ["ingeniería de menú", "matriz de platillos", "rentabilidad restaurante", "costos de alimentos", "diseño de menú"]
+featured: false
+coverImage: "/images/blog/ingenieria-de-menu-restaurante.webp"
+coverAlt: "Menú de restaurante mexicano con platillos clasificados por rentabilidad y popularidad"
+faq:
+  - question: "¿Qué es la ingeniería de menú en un restaurante?"
+    answer: "Es un método de análisis que cruza la popularidad (cuántas veces se vende) y la rentabilidad (margen en pesos) de cada platillo para clasificarlo en cuatro grupos: estrellas, vacas, enigmas y perros. Con esa clasificación decides qué promocionar, qué ajustar de precio y qué quitar del menú."
+  - question: "¿Qué son los platillos estrella en ingeniería de menú?"
+    answer: "Son los platillos con alta popularidad y alto margen: se venden mucho y dejan buena ganancia. Es el grupo que debes proteger, mantener en calidad constante y destacar visualmente en el menú, porque sostiene tu negocio."
+  - question: "¿Qué hago con los platillos perro de mi menú?"
+    answer: "Los perros tienen baja venta y bajo margen. Las opciones son: quitarlos del menú, rediseñarlos (mejor receta o presentación) o convertirlos en especiales de temporada. Mantenerlos solo tiene sentido si cumplen una función estratégica, como opción vegetariana o platillo infantil."
+  - question: "¿Cada cuánto tiempo se hace el análisis de ingeniería de menú?"
+    answer: "Lo ideal es cada 3 meses, o cada vez que cambies precios, proveedores o carta. Un menú que no se revisa acumula platillos zombis que comen inventario, tiempo de cocina y margen sin que te des cuenta."
+  - question: "¿Necesito software para hacer ingeniería de menú?"
+    answer: "No. Con una hoja de cálculo basta: necesitas las ventas por platillo del periodo, el costo de ingredientes de cada receta y el precio de venta. Con esas tres columnas construyes la matriz completa en una tarde. Un costeador digital solo te ahorra el cálculo de costos."
+---
+
+**La ingeniería de menú es la técnica que usan los restaurantes rentables para decidir con datos qué platillos promocionar, cuáles subir de precio y cuáles despedir.** Si tu carta tiene más de 15 platillos y nunca has analizado cuál te deja dinero de verdad, es casi seguro que estás cargando varios "perros" que te comen inventario y margen. En esta guía te llevo paso a paso por la matriz de estrellas, vacas, enigmas y perros, con ejemplos reales en pesos mexicanos y decisiones concretas para cada cuadrante.
+
+## Qué es la ingeniería de menú y de dónde viene
+
+La ingeniería de menú (menu engineering) es un método de análisis desarrollado en la escuela de hotelería de la Universidad de Cornell en los años ochenta, y desde entonces es estándar en la industria restaurantera mundial. La idea central es simple pero poderosa: **no todos los platillos de tu menú trabajan igual para ti**, y tratarlos como si fueran iguales es una de las fugas de dinero más comunes en restaurantes mexicanos.
+
+El método cruza dos variables de cada platillo:
+
+- **Popularidad (mix de ventas):** qué porcentaje de tus ventas totales de platillos representa ese producto.
+- **Rentabilidad (margen de contribución):** cuántos pesos te deja cada venta después de descontar el costo de los ingredientes.
+
+Al cruzar ambas, cada platillo cae en uno de cuatro cuadrantes, cada uno con un nombre y una estrategia distinta:
+
+| Cuadrante | Popularidad | Margen | Apodo | Estrategia general |
+|---|---|---|---|---|
+| Estrella | Alta | Alto | El campeón | Proteger y destacar |
+| Vaca (o caballo de batalla) | Alta | Bajo | El que trae gente | Optimizar costo, subir margen |
+| Enigma (o rompecabezas) | Baja | Alto | El tesoro escondido | Promocionar y reposicionar |
+| Perro | Baja | Bajo | El lastre | Quitar o rediseñar |
+
+Los nombres vienen de la traducción clásica al español: stars, plowhorses (o cash cows), puzzles y dogs. En México los escucharás como "estrellas, vacas, enigmas y perros" o "caballos de batalla" para las vacas. Da igual el nombre: lo importante es la decisión que tomas con cada uno.
+
+## Por qué tu menú probablemente está perdiendo dinero
+
+Antes de entrar al paso a paso, entiende el problema típico. Un menú de restaurante mexicano de tamaño medio tiene entre 20 y 40 platillos. Cuando analizas sus números, casi siempre aparece el mismo patrón:
+
+- El 20–30% de los platillos genera el 60–70% de las ventas y casi todo el margen.
+- Hay 5–10 platillos que se venden menos de 3 veces por semana pero siguen obligándote a tener inventario de ingredientes especiales.
+- Los platillos más vendidos muchas veces son los de menor margen, porque nunca se les ajustó el precio.
+- El dueño decide el menú por gusto personal o por "así ha sido siempre", no por números.
+
+El costo de este desorden no es abstracto. Cada platillo perro implica: ingredientes que se echan a perder (merma), espacio en refrigeración, complejidad en cocina, tiempos de preparación más largos y un menú más confuso para el cliente. Y cada vaca mal administrada es un platillo que vendes mucho y casi no te deja: trabajas para el proveedor.
+
+<BlogCallout variant="note" title="La ingeniería de menú no es solo quitar platillos">
+Es también diseño: dónde pones cada platillo en la carta, qué nombre le das, cómo lo describes. Los estudios de comportamiento del consumidor muestran que la posición en el menú puede cambiar las ventas de un platillo 20–30% sin tocar la receta ni el precio.
+</BlogCallout>
+
+## Paso 1: junta los datos que necesitas
+
+La ingeniería de menú es un ejercicio de datos. Necesitas tres cosas por cada platillo, para un periodo definido (un mes es lo habitual):
+
+### 1. Ventas por platillo
+
+Cuántas unidades se vendieron de cada platillo en el periodo. Si tienes punto de venta, es un reporte estándar. Si no, una semana de bitácora en cuaderno te da una muestra razonable (multiplica por 4 con cuidado de no mezclar semana floja con quincena).
+
+### 2. Costo de ingredientes por platillo
+
+Cuánto cuestan, en pesos, los ingredientes de una porción. Aquí es donde la mayoría se atora, porque nunca han costeado sus recetas con precisión. El método: escribe la receta real (la que cocina tu cocinero, no la del papel), pesa cada ingrediente y calcula el costo proporcional según lo que pagas al proveedor.
+
+Ejemplo con tacos al pastor (orden de 5):
+
+| Ingrediente | Cantidad | Costo |
+|---|---|---|
+| Carne de cerdo marinada | 250 g | $21.00 MXN |
+| Tortillas (5) | 150 g | $3.50 MXN |
+| Piña | 30 g | $1.20 MXN |
+| Cebolla y cilantro | 40 g | $1.80 MXN |
+| Salsa | 50 ml | $2.00 MXN |
+| **Costo total** | — | **$29.50 MXN** |
+
+Si la orden se vende a $85 MXN, el margen de contribución es $85 - $29.50 = **$55.50 MXN** y el food cost es 34.7%.
+
+### Ajusta el costo por rendimiento y merma: el error que infla tu matriz
+
+El ejemplo anterior asume algo que casi nunca es cierto: que todo lo que compras termina en el plato. En la vida real, **el precio que pagas al proveedor no es el costo del ingrediente usable**. Entre que compras una cebolla y la sirves, pierdes la piel, el tallo y la primera capa. Eso se llama rendimiento (o aprovechamiento), y si no lo incluyes, tu costo teórico queda 10–25% por debajo del real y toda tu matriz de ingeniería de menú se construye sobre números bonitos pero falsos.
+
+La fórmula es:
+
+```
+Costo real del ingrediente usable = Precio de compra / Rendimiento
+```
+
+Rendimientos típicos en cocina mexicana (varían por proveedor, temporada y quién limpia el producto):
+
+| Ingrediente | Presentación de compra | Rendimiento típico | Lo que pierdes |
+|---|---|---|---|
+| Cebolla blanca | A granel, con piel | 85–90% | Piel, raíz, primera capa |
+| Jitomate saladet | A granel | 90–95% | Pedúnculo, golpeados |
+| Cilantro | Manojo con raíz | 70–80% | Raíz, hojas amarillas |
+| Aguacate hass | Pieza entera | 70–75% | Piel y hueso |
+| Carne de res para asar | Corte con grasa y hueso | 80–90% | Grasa, hueso, desposte |
+| Pollo entero | Con vísceras | 75–85% | Huesos, piel sobrante |
+| Pescado entero | Sin limpiar | 45–60% | Escamas, vísceras, espinas |
+| Camarón mediano | Con cabeza y cáscara | 50–65% | Cabeza y cáscara |
+
+Un ejemplo con números: si el kilo de camarón con cabeza te cuesta $220 MXN y tu rendimiento es 55%, el kilo de camarón limpio que realmente pones en el plato te cuesta $220 / 0.55 = **$400 MXN**. Si tu coctel de camarón lleva 120 g de camarón limpio, el costo real del camarón es $48 MXN, no los $26.40 que saldrían si costearas con el precio de compra directo. En un platillo de $150 MXN, esa diferencia mueve tu food cost de 17.6% a 32%: puede ser la diferencia entre clasificarlo como estrella o como perro.
+
+**Cómo medir tu propio rendimiento sin volverte loco:**
+
+1. Pesa el producto tal como llega (antes de limpiar).
+2. Límpialo como lo hace tu cocina todos los días, no de forma perfecta de laboratorio.
+3. Pesa lo que queda usable.
+4. Divide: usable / comprado. Ese es tu rendimiento.
+5. Repite 2–3 veces con distintas compras y promedia.
+
+Hazlo una sola vez por ingrediente y guárdalo en tu ficha de costeo. No necesitas repetirlo cada semana; solo revísalo cuando cambies de proveedor o de temporada.
+
+**La merma es distinta del rendimiento.** El rendimiento es lo que se pierde al preparar el ingrediente; la merma es lo que se pierde porque se echó a perder, se quemó, se regresó de una mesa o caducó en el refrigerador. La merma no se incluye en el costo del platillo individual, pero sí debes registrarla aparte, porque te dice qué ingredientes estás sobrecomprando. Una bitácora mínima: fecha, producto, cantidad, motivo (caducó, se quemó, devolución, error de preparación) y costo estimado. Al final del mes sumas y comparas contra tus ventas: en restaurantes bien operados la merma suele mantenerse en 2–4% de las ventas; si estás arriba de 6%, tienes un problema de compras, de almacenamiento o de capacitación, y ninguna matriz de menú te lo va a resolver.
+
+Y aquí conecta con la ingeniería de menú: **los platillos perro son fábricas de merma**. Si un platillo vende 3 veces por semana pero exige un ingrediente que solo él usa (digamos, berenjena o flor de calabaza), ese ingrediente se echa a perder antes de que lo vendas. Al quitar el perro del menú no solo limpias la carta: eliminas su merma asociada y liberas espacio y dinero en tu refrigerador.
+
+### 3. Precio de venta actual
+
+El precio del menú, sin IVA desglosado (trabaja con el precio final al cliente para simplificar).
+
+<BlogCallout variant="tip" title="No incluyas mano de obra en este análisis">
+La matriz clásica usa solo costo de ingredientes. La mano de obra es casi fija: tu cocinero cobra lo mismo haya 10 o 100 órdenes. Si quieres afinar después, puedes penalizar los platillos que tardan muchísimo en prepararse, pero para empezar, ingredientes bastan.
+</BlogCallout>
+
+## Paso 2: calcula el margen de contribución de cada platillo
+
+Con los datos anteriores, construye tu tabla base. El margen de contribución (MC) es:
+
+```
+MC unitario = Precio de venta - Costo de ingredientes
+```
+
+Y el margen total del platillo en el periodo:
+
+```
+MC total = MC unitario x Unidades vendidas
+```
+
+Ejemplo con 6 platillos de un restaurante de comida mexicana, mes de agosto:
+
+| Platillo | Precio | Costo | MC unitario | Ventas/mes | MC total |
+|---|---|---|---|---|---|
+| Enchiladas verdes | $120 | $42 | $78 | 410 | $31,980 |
+| Mole poblano | $145 | $58 | $87 | 195 | $16,965 |
+| Tacos de bistec (orden) | $95 | $36 | $59 | 520 | $30,680 |
+| Chiles en nogada | $185 | $78 | $107 | 85 | $9,095 |
+| Sopa de tortilla | $75 | $22 | $53 | 160 | $8,480 |
+| Pechuga empanizada | $110 | $48 | $62 | 55 | $3,410 |
+
+Con esta tabla ya puedes ver cosas que a simple vista no se notaban: los tacos de bistec venden muchísimo pero dejan poco por orden; las enchiladas son la máquina de dinero del negocio; la pechuga empanizada casi no aporta nada.
+
+## Paso 3: calcula los umbrales de la matriz
+
+La matriz compara cada platillo contra dos umbrales: uno de popularidad y uno de rentabilidad.
+
+### Umbral de popularidad (mix de ventas)
+
+El criterio clásico: un platillo es "popular" si su participación en las ventas totales es al menos el 70% del promedio esperado. La fórmula:
+
+```
+Umbral de popularidad = (1 / Número de platillos) x 70%
+```
+
+Con 6 platillos: (1/6) x 0.70 = 11.67%. Cualquier platillo que represente más del 11.67% de las ventas totales de platillos es "alta popularidad".
+
+Total de ventas del ejemplo: 410 + 195 + 520 + 85 + 160 + 55 = 1,425 platillos. Participaciones:
+
+- Enchiladas: 410/1,425 = 28.8% → alta ✅
+- Mole: 195/1,425 = 13.7% → alta ✅
+- Tacos de bistec: 520/1,425 = 36.5% → alta ✅
+- Chiles en nogada: 85/1,425 = 6.0% → baja ❌
+- Sopa de tortilla: 160/1,425 = 11.2% → baja (casi, pero no) ❌
+- Pechuga empanizada: 55/1,425 = 3.9% → baja ❌
+
+### Umbral de rentabilidad (margen promedio ponderado)
+
+El umbral de margen se calcula como el margen de contribución promedio del menú completo, ponderado por ventas:
+
+```
+Umbral de margen = MC total del menú / Ventas totales de platillos
+```
+
+Del ejemplo: (31,980 + 16,965 + 30,680 + 9,095 + 8,480 + 3,410) / 1,425 = 100,610 / 1,425 = **$70.60 MXN**.
+
+Cada platillo con MC unitario mayor a $70.60 es "alto margen"; menor, "bajo margen":
+
+- Enchiladas: $78 → alto ✅
+- Mole: $87 → alto ✅
+- Tacos de bistec: $59 → bajo ❌
+- Chiles en nogada: $107 → alto ✅
+- Sopa de tortilla: $53 → bajo ❌
+- Pechuga empanizada: $62 → bajo ❌
+
+## Paso 4: clasifica cada platillo en la matriz
+
+Cruzando ambos resultados, la matriz del ejemplo queda así:
+
+| Platillo | Popularidad | Margen | Clasificación |
+|---|---|---|---|
+| Enchiladas verdes | Alta | Alto | ⭐ Estrella |
+| Mole poblano | Alta | Alto | ⭐ Estrella |
+| Tacos de bistec | Alta | Bajo | 🐄 Vaca |
+| Chiles en nogada | Baja | Alto | 🧩 Enigma |
+| Sopa de tortilla | Baja | Bajo | 🐕 Perro (borderline) |
+| Pechuga empanizada | Baja | Bajo | 🐕 Perro |
+
+Ahora viene lo importante: qué hacer con cada grupo.
+
+### Qué hacer con tus estrellas
+
+Las estrellas se protegen y se exhiben:
+
+- Mantén la calidad y la porción exactamente igual. La tentación de "reducir tantito la carne" para ganar margen mata estrellas.
+- Dales la mejor posición del menú: arriba a la derecha en cartas físicas, primer lugar de su categoría.
+- Entrena a los meseros para que las sugieran por nombre.
+- Revisa su costo cada mes: una estrella cuyo ingrediente principal subió 20% puede estar convirtiéndose en vaca sin que lo notes.
+
+### Qué hacer con tus vacas
+
+Las vacas traen clientes pero dejan poco. No las quites: la gente viene por ellas. La estrategia es mejorar su margen sin romper su popularidad:
+
+- **Sube el precio poco a poco.** Los tacos de bistec a $95 podrían ir a $99 o $105 con resistencia mínima. Eso mueve el MC de $59 a $63–$69, casi al umbral.
+- **Reduce el costo, no la calidad percibida.** Renegocia la carne con el proveedor, ajusta el corte, compra a mejor volumen. Bajar el costo de $36 a $32 es como subir el precio $4 sin que el cliente lo note.
+- **Véndeles complementos de alto margen.** El cliente de la vaca es tu público cautivo: ahí es donde la bebida, la entrada y el postre hacen el dinero.
+- **Quítales protagonismo visual en el menú** y dáselo a las estrellas y enigmas. Que sigan disponibles, pero no en el lugar de honor.
+
+### Qué hacer con tus enigmas
+
+Los enigmas dejan buen margen pero nadie los pide. Antes de rendirte, prueba estas palancas:
+
+- **Reposición en el menú:** muévelos al primer lugar de su categoría o ponles un recuadro de "recomendación del chef".
+- **Mejor nombre y descripción:** "Chiles en nogada" vende menos que "Chile en nogada relleno de picadillo de res y cerdo, bañado en nogada cremosa con granada fresca". Las descripciones sensoriales venden.
+- **Sugerencia activa del mesero:** "¿ya probó la nogada? Es el platillo que más elogian."
+- **Foto de calidad** si tu menú las usa: un enigma con buena foto puede duplicar sus ventas.
+- **Baja el precio como último recurso**, solo si sospechas que el precio es la barrera. Un enigma a precio menor sigue siendo buen negocio si el margen aguanta.
+
+Si después de 2–3 meses de empuje real el enigma no despega, recalifícalo: quizá es un perro disfrazado.
+
+### Qué hacer con tus perros
+
+Los perros no se venden y no dejan. Opciones en orden de preferencia:
+
+1. **Quítalos del menú.** La pechuga empanizada del ejemplo aporta $3,410 al mes y probablemente consume más que eso en complejidad, inventario de pan molido y espacio. Un menú más corto vende mejor y opera más barato.
+2. **Rediseñalos** si tienen valor estratégico: la sopa de tortilla, aunque borderline, es la entrada natural que abre el apetito (y la venta de lo demás). Puede quedarse como táctica, no como negocio.
+3. **Conviértelos en especiales** de fin de semana o de temporada, sin inventario permanente.
+
+<BlogCallout variant="warning" title="El perro consentido">
+Todo restaurante tiene un platillo que el dueño ama y los clientes ignoran. Si los números dicen perro, es perro, aunque sea la receta de la abuela. Déjalo como especial ocasional si no quieres soltarlo, pero sácalo de la carta fija.
+</BlogCallout>
+
+## Paso 5: rediseña el menú físico según la matriz
+
+La clasificación no sirve de nada si no la traduces a la carta que el cliente tiene en la mano. El diseño del menú es vendedor silencioso.
+
+### Los puntos calientes de la carta
+
+En menús físicos, la mirada del cliente sigue patrones conocidos: en una carta de una hoja, los primeros lugares que se leen son el centro y la parte superior; en cartas de dos páginas abiertas, la esquina superior derecha es el lugar premium. Ahí van tus estrellas y tus enigmas que quieres empujar. Las vacas van en lugares visibles pero no privilegiados. Los perros, si se quedan, van al final sin adornos.
+
+### Nombres y descripciones que venden
+
+Compara estas dos líneas de menú:
+
+- "Filete de pescado — $210"
+- "Filete de robalo a la plancha con mantequilla de ajo, arroz blanco y ensalada fresca — $210"
+
+El segundo vende más al mismo precio. Reglas prácticas:
+
+- Nombra el ingrediente principal con su especificidad ("robalo", no "pescado"; "arrachera", no "carne asada genérica").
+- Menciona el método de cocción: a las brasas, al comal, horneado, ahumado.
+- Describe una o dos guarniciones: da sensación de plato completo.
+- Evita adjetivos vacíos ("delicioso", "exquisito"): mejor sensoriales ("crujiente", "cremosa", "recién hecha").
+
+### Precios: cómo mostrarlos
+
+- Quita el símbolo de pesos cuando el formato lo permita: "Chile en nogada 185" duele menos que "$185.00".
+- No alinees los precios en columna: una columna de precios invita a comparar y elegir el más barato. Pon el precio al final de la descripción, en el mismo tamaño o un punto menor.
+- Usa precios terminados en 5, 9 o 0 según tu giro: los terminados en 9 funcionan bien en giros de volumen; en restaurantes de ticket alto, los números redondos se perciben más honestos.
+
+### Longitud del menú
+
+Como regla general del sector, menús de más de 30 platillos empiezan a confundir y a encarecer la operación. Muchos restaurantes exitosos en México operan con 12–20 platillos bien ejecutados. La matriz te da la excusa perfecta para recortar: no estás "quitando opciones", estás enfocando la cocina en lo que sí vende y sí deja.
+
+## Paso 6: implementa, mide y repite cada trimestre
+
+La ingeniería de menú no es un proyecto de una vez: es un ciclo trimestral.
+
+### Calendario sugerido
+
+| Semana | Actividad |
+|---|---|
+| Semana 1 | Exportar ventas del periodo y costear recetas nuevas o modificadas |
+| Semana 2 | Calcular márgenes, umbrales y clasificar la matriz |
+| Semana 3 | Definir decisiones: precios, posiciones, bajas de menú |
+| Semana 4 | Imprimir/actualizar carta, entrenar meseros con guiones nuevos |
+| Semanas 5–12 | Medir: ventas por platillo, ticket promedio, margen total |
+
+### Qué medir después del cambio
+
+- **Mix de ventas:** ¿los enigmas empujados subieron su participación?
+- **Margen total del menú:** el indicador rey. Suma los MC totales de todos los platillos y compáralo contra el trimestre anterior.
+- **Ticket promedio:** una buena ingeniería de menú lo sube 5–12% en 1–2 meses.
+- **Mermas:** si quitaste perros, tus mermas de ingredientes raros deben bajar.
+
+Cada trimestre, la matriz cambia: estrellas se convierten en vacas (subió el costo del insumo), enigmas se vuelven estrellas (funcionó el reposicionamiento) y aparecen nuevos perros. Por eso se repite.
+
+## La matriz aplicada a bebidas, postres y paquetes
+
+Hasta aquí hemos hablado de platillos fuertes, pero tu menú tiene más piezas y la matriz funciona igual en todas. Eso sí, cada categoría tiene sus trampas.
+
+### Bebidas: el margen escondido
+
+Las bebidas suelen tener food cost mucho más bajo que la comida: un agua fresca de jamaica cuesta $4–7 MXN el litro preparado y se vende a $30–45 MXN; una limonada mineral anda en costos similares. El refresco embotellado tiene margen más apretado (compras a $10–14 MXN y vendes a $25–35 MXN), pero no exige preparación ni refrigeración de ingredientes perecederos. Cuando armes tu matriz, haz una matriz separada para bebidas: mezclar bebidas con platillos en la misma tabla distorsiona los umbrales, porque casi todas las bebidas saldrían "estrella" por su margen alto y eso no te dice nada útil.
+
+Lo que sí debes cruzar: qué bebida acompaña a qué platillo. Si tu estrella es la parrillada pero el 70% de quienes la piden toman solo agua natural, hay una oportunidad de sugerencia del mesero (la famosa venta sugestiva): entrenar al equipo para ofrecer la bebida de alto margen junto al platillo estrella puede subir tu ticket $25–40 MXN por mesa sin vender un solo platillo más.
+
+### Postres: el enigma por naturaleza
+
+Los postres casi siempre caen en el cuadrante de enigma: margen razonable, popularidad baja. La razón no es que sean malos, es mecánica: el cliente ya comió, está lleno y el postre se ofrece al final, cuando la decisión de gasto ya está cerrada. Las palancas que funcionan en restaurantes mexicanos:
+
+- **Mostrar, no listar:** una charola o vitrina con el flan, el pastel de tres leches o el plátano flameado vende más que una línea de texto en la carta.
+- **Porciones chicas, precio chico:** un mini postre a $35–45 MXN se decide sin remordimiento; un postre de $95 MXN exige convencer a toda la mesa.
+- **El gancho del mesero:** "¿les traigo el volcán de chocolate mientras les preparo la cuenta?" dicho en el momento correcto convierte 1 de cada 5 mesas.
+
+Si después de un trimestre de empujarlos siguen abajo del umbral, decide: o los conviertes en arma de marketing (el postre famoso que te diferencia) o los recortas a uno o dos de rotación sencilla.
+
+### Paquetes, combos y menús del día: úsalos como herramienta de matriz
+
+Aquí está el movimiento más rentable de toda esta guía: **los combos te permiten usar a tus estrellas para arrastrar a tus enigmas**. La lógica: juntas en un paquete un platillo de alta popularidad (estrella o vaca) con un acompañamiento o bebida de alto margen y baja popularidad, a un precio que mejore el margen combinado.
+
+Ejemplo con números:
+
+| Elemento | Precio suelto | Costo | MC suelto |
+|---|---|---|---|
+| Enchiladas suizas (estrella) | $110 MXN | $38 MXN | $72 MXN |
+| Agua de horchata (enigma) | $35 MXN | $6 MXN | $29 MXN |
+| Arroz y frijoles extra (enigma) | $25 MXN | $8 MXN | $17 MXN |
+| **Total suelto** | **$170 MXN** | **$52 MXN** | **$118 MXN** |
+| **Combo a $149 MXN** | $149 MXN | $52 MXN | **$97 MXN** |
+
+A primera vista el combo tiene menos margen unitario ($97 vs $118). Pero si el 60% de tus clientes pedía solo las enchiladas con agua natural ($72 MXN de margen), y ahora el 40% de las mesas se va por el combo, tu margen promedio por mesa sube: antes $72 MXN; ahora 0.6 x $72 + 0.4 x $97 = $82 MXN por mesa. Ganaste $10 MXN por mesa moviendo volumen a productos que ya tenías en inventario, sin un solo cliente nuevo.
+
+Reglas para que los combos no te coman:
+
+1. **Nunca combines dos estrellas:** te canibalizas a ti mismo y regalas margen.
+2. **El descuento del combo debe ser menor al margen del producto ancla:** si tu estrella deja $72 MXN, no des descuentos de más de $25–30 MXN en el paquete.
+3. **Mide el mix antes y después:** si el combo solo convierte clientes que ya iban a gastar más, no está funcionando; debe convertir a los que gastaban poco.
+4. **El menú del día es tu laboratorio:** rota ahí los enigmas que quieres probar; lo que funcione en el menú del día puede ganarse un lugar fijo en la carta.
+
+### Comida para llevar y delivery: otra matriz, otros umbrales
+
+Si vendes por aplicaciones de entrega, arma una matriz aparte con los precios de la app y las comisiones incluidas como costo. Un platillo que en salón es estrella puede volverse vaca o hasta perro en delivery: entre la comisión de la plataforma (típicamente 20–30% del pedido), el empaque ($8–18 MXN por pedido) y las promociones que absorbes, el margen se desploma. Además hay platillos que viajan mal (frituras, caldos con mucha grasa, platillos montados) y generan quejas y reembolsos: esos, aunque vendan mucho en línea, te cuestan en reseñas.
+
+La decisión correcta suele ser un menú de delivery reducido: solo los platillos que mantienen calidad después de 30 minutos en moto y cuyo margen sobrevive a la comisión. Eso, en la práctica, es ingeniería de menú con un filtro extra.
+
+## Errores comunes al hacer ingeniería de menú
+
+❌ **Clasificar por gusto, no por datos.** "Es que a mí me encanta" no es un cuadrante. Si no tienes ventas por platillo, primero consigue los datos; decidir a ciegas es peor que no hacer el análisis.
+
+❌ **Usar el food cost porcentual como único criterio.** Un platillo con 40% de food cost puede dejar más pesos por venta que uno con 25%. La matriz usa margen en pesos, no porcentajes, y esa es la decisión correcta.
+
+❌ **Quitar todos los perros de golpe.** Algunos perros cumplen funciones: la opción infantil, la vegetariana, el platillo que pide "el que acompaña". Quítalos uno por uno y observa.
+
+❌ **Rediseñar la carta sin entrenar meseros.** El menú nuevo con meseros que siguen sugiriendo lo de siempre es medio cambio. Los guiones de sugerencia son parte del rediseño.
+
+❌ **Cambiar todo el mismo día que subes precios.** Si mueves posiciones, cambias nombres y subes precios simultáneamente, no sabrás qué funcionó y qué espantó clientes. Escalona.
+
+❌ **Olvidar los insumos compartidos.** Antes de quitar un platillo, revisa qué ingredientes exclusivos usa: si el perro es el único que consume la crema y el queso de cabra, su salida también simplifica tu inventario (bien). Pero si comparte insumos con las estrellas, el ahorro es menor de lo que crees.
+
+❌ **Hacer el análisis una vez y archivarlo.** Los costos de insumos en México se mueven cada mes (huevo, aguacate, carne, limón). Un análisis con costos de hace un año clasifica mal la mitad del menú.
+
+## Caso práctico: fonda que subió su margen 22% en un trimestre
+
+Ejemplo compuesto con cifras típicas de una fonda de comida corrida y antojitos en Puebla, carta de 24 platillos:
+
+**Diagnóstico (mes 1).** Costeo de todas las recetas y análisis de ventas de 8 semanas. Resultado: 6 estrellas, 5 vacas, 4 enigmas y 9 perros. Los 9 perros representaban solo el 8% de las ventas pero obligaban a mantener 14 ingredientes exclusivos.
+
+**Decisiones (mes 2).**
+
+- Se quitaron 7 perros; 2 se quedaron como especiales de fin de semana (el consomé de borrego y la tinga de pollo, por tradición).
+- A 3 vacas se les subió el precio entre $5 y $10 MXN (tacos árabes, molotes, memelas).
+- A 2 vacas se les renegoció insumo: cambio de proveedor de queso y compra de carne por corte completo, bajando el costo 8%.
+- Los 4 enigmas (entre ellos el chile relleno capeado de la casa, MC de $92) se movieron a la parte superior de la carta con descripciones nuevas y recuadro de "favoritos de la casa".
+- Los meseros recibieron 3 guiones de sugerencia enfocados en estrellas y enigmas.
+
+**Resultados (mes 3).**
+
+| Indicador | Antes | Después | Cambio |
+|---|---|---|---|
+| Platillos en carta | 24 | 17 | -29% |
+| Margen total mensual | $128,000 MXN | $156,200 MXN | +22% |
+| Ticket promedio | $132 MXN | $148 MXN | +12% |
+| Mermas semanales | ~$1,900 MXN | ~$1,150 MXN | -39% |
+| Tiempo promedio de cocina | 18 min | 14 min | -22% |
+
+Nada de esto requirió más clientes, más publicidad ni más personal. Fue pura reorganización de lo que ya existía, guiada por la matriz.
+
+## Herramientas: del cuaderno al costeador digital
+
+Puedes hacer todo este ejercicio con tres niveles de herramienta:
+
+1. **Cuaderno y calculadora.** Funciona para una muestra de una semana y 10 platillos. Lento pero mejor que nada.
+2. **Hoja de cálculo.** El nivel recomendado para empezar: columnas de platillo, precio, costo, ventas; fórmulas de MC, participación y umbrales. Una tarde de trabajo por trimestre.
+3. **Costeador digital conectado a tu inventario.** Cuando tus compras alimentan automáticamente los costos de receta, la matriz se actualiza sola y detectas en la semana, no en el trimestre, cuando una estrella se está volviendo vaca porque subió el precio de la carne.
+
+Sea cual sea tu nivel, la regla es la misma: datos de ventas reales, costos de receta reales, decisiones documentadas.
+
+## Checklist: tu primera matriz de ingeniería de menú
+
+- [ ] Definí el periodo de análisis (mínimo 4 semanas).
+- [ ] Exporté o anoté las ventas por platillo del periodo.
+- [ ] Costeé la receta real de cada platillo (ingrediente por ingrediente).
+- [ ] Calculé el margen de contribución unitario de cada platillo.
+- [ ] Calculé el umbral de popularidad (70% del promedio).
+- [ ] Calculé el umbral de margen (MC promedio ponderado del menú).
+- [ ] Clasifiqué cada platillo: estrella, vaca, enigma o perro.
+- [ ] Definí una acción concreta para cada platillo (precio, posición, descripción o baja).
+- [ ] Actualicé la carta física/digital según la matriz.
+- [ ] Entrené a los meseros con guiones de sugerencia de estrellas y enigmas.
+- [ ] Agendé el próximo análisis dentro de 3 meses.
+- [ ] Documenté los cambios para poder medirlos contra el siguiente periodo.
+
+## Tu próximo paso
+
+La matriz solo es tan buena como los costos que le metes. Si tus recetas no están costeadas al día con los precios reales de tus proveedores, todo lo demás se clasifica mal. Empieza por ahí: costea tus 10 platillos más vendidos esta semana y tendrás el 80% del trabajo hecho.
+
+<BlogCTA variant="herramienta" href="/panel/costeo" title="Costea tus recetas y arma tu matriz en minutos">
+  El costeador de resurte.me calcula el costo y margen de cada platillo con tus precios reales de proveedor, para que clasifiques estrellas, vacas, enigmas y perros sin hojas de cálculo interminables.
+</BlogCTA>
+
+<BlogCTA variant="coleccion" collectionSlug="comida-mexicana-corrida" collectionName="Comida mexicana corrida" title="Insumos para tu cocina a precio de proveedor">
+  Explora la colección de comida mexicana corrida: mejores precios en insumos significan mejores márgenes en toda tu matriz.
+</BlogCTA>
+
+Un menú chico, bien costeado y revisado cada trimestre le gana siempre a una carta enorme administrada por costumbre. Tus estrellas ya están en tu cocina: ahora sabes cómo encontrarlas y cómo hacerlas brillar.
