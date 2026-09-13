@@ -7,8 +7,6 @@ import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/order-la
 import { getUserPurchaseHistory } from "@/lib/wallet-actions"
 import type { OrderWithCashback, OrderItem } from "@/types"
 import { Package, Clock, ChevronRight, ArrowLeft, RotateCcw, ShoppingCart } from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
-import { es } from "date-fns/locale"
 import { AnalyticsEvents } from "@/lib/analytics"
 import Link from "next/link"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
@@ -115,21 +113,10 @@ export default function OrderHistoryPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {orders.map((order) => {
-            const orderDate = new Date(order.created_at)
-            const absoluteDate = orderDate.toLocaleDateString("es-MX", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })
-            // Fecha relativa ("hace 3 días"): más escaneable que la absoluta
-            // para reconocer el último pedido de un vistazo.
-            const relativeDate = formatDistanceToNow(orderDate, { addSuffix: true, locale: es })
-            return (
+          {orders.map((order) => (
             <Link
               key={order.id}
               href={`/${city.slug}/mis-pedidos/${order.id}`}
-              aria-label={`Ver detalle del pedido #${order.id} de ${absoluteDate}, total $${order.total.toFixed(2)}`}
               className="block bg-white rounded-xl border border-gray-200 p-4 hover:border-brand-300 hover:shadow-sm transition-all"
             >
               <div className="flex items-center justify-between mb-3">
@@ -139,10 +126,11 @@ export default function OrderHistoryPage() {
                       Pedido #{order.id}
                     </p>
                     <p className="text-xs text-gray-400">
-                      <span className="capitalize">{relativeDate}</span>
-                      <span aria-hidden="true"> · </span>
-                      <span className="sr-only">Fecha: </span>
-                      {absoluteDate}
+                      {new Date(order.created_at).toLocaleDateString("es-MX", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </p>
                   </div>
                 </div>
@@ -166,7 +154,6 @@ export default function OrderHistoryPage() {
                   <button
                     onClick={(e) => handleRepeatOrder(order, e)}
                     disabled={reorderingId === order.id}
-                    aria-label={`Repetir pedido #${order.id} (${order.items.length} productos)`}
                     className="flex items-center gap-1.5 px-3.5 py-2 sm:px-2.5 sm:py-1.5 sm:text-xs text-sm font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors disabled:opacity-50 touch-target"
                   >
                     {reorderingId === order.id ? (
@@ -193,8 +180,7 @@ export default function OrderHistoryPage() {
                 </div>
               </div>
             </Link>
-            )
-          })}
+          ))}
         </div>
       )}
     </div>
