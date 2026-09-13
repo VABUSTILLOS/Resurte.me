@@ -5,6 +5,7 @@ import Image from "next/image"
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { Compass, ShoppingBag } from "lucide-react"
+import { detectStorefrontLang, sf, type StorefrontLang } from "@/lib/foodos-i18n"
 import {
   computeOrderTotals,
   buildRecommendations,
@@ -77,6 +78,13 @@ export function FoodosStorefront({
   const [view, setView] = useState<View>("menu")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [optionsItem, setOptionsItem] = useState<FoodosMenuItem | null>(null)
+
+  // Idioma del storefront (es/en), persistido por restaurante
+  const [lang, setLang] = useState<StorefrontLang>(() => detectStorefrontLang(restaurant.slug))
+  const changeLang = (next: StorefrontLang) => {
+    setLang(next)
+    try { localStorage.setItem(`foodos-lang-${restaurant.slug}`, next) } catch { /* privado */ }
+  }
 
   // Wishlist local por restaurante (favoritos del comensal)
   const [favorites, setFavorites] = useState<Set<string>>(() => {
@@ -492,7 +500,7 @@ export function FoodosStorefront({
             )}
             <div>
               <h1 className="font-black text-stone-900 leading-tight">{restaurant.name}</h1>
-              <p className="text-xs text-stone-500">{restaurant.description ?? "Pide en línea"}</p>
+              <p className="text-xs text-stone-500">{restaurant.description ?? sf(lang, "orderOnline")}</p>
               <Link
                 href="/comer"
                 className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-600 mt-0.5"
@@ -501,6 +509,13 @@ export function FoodosStorefront({
               </Link>
             </div>
           </div>
+          <button
+            onClick={() => changeLang(lang === "es" ? "en" : "es")}
+            className="px-3 py-2 rounded-full bg-white border border-stone-200 text-xs font-bold text-stone-600 hover:bg-stone-50"
+            aria-label="Cambiar idioma / Switch language"
+          >
+            {lang === "es" ? "EN" : "ES"}
+          </button>
           <button
             onClick={() => (cartCount ? setView("checkout") : setView("menu"))}
             className="relative flex items-center gap-2 px-4 py-2 rounded-full bg-stone-900 text-white text-sm font-semibold hover:bg-stone-700 transition-colors"
@@ -514,7 +529,7 @@ export function FoodosStorefront({
       <div className="max-w-4xl mx-auto px-4 py-6 pb-32">
         {!openStatus.isOpen && (
           <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-800 font-semibold text-center">
-            🕐 {openStatus.nextOpenLabel ?? "Cerrado por ahora"} — puedes ver el menú, pero no pedir.
+            🕐 {openStatus.nextOpenLabel ?? (lang === "es" ? "Cerrado por ahora" : "Closed for now")} — {sf(lang, "closedBanner")}
           </div>
         )}
         {view === "menu" && (
@@ -533,6 +548,7 @@ export function FoodosStorefront({
             reviews={reviews}
             favorites={favorites}
             onToggleFavorite={toggleFavorite}
+            lang={lang}
           />
         )}
 
@@ -582,6 +598,7 @@ export function FoodosStorefront({
             openStatus={openStatus}
             loading={loading}
             error={error}
+            lang={lang}
           />
         )}
 
@@ -595,10 +612,20 @@ export function FoodosStorefront({
           />
         )}
 
-        {clientSecret && (
+        {clientSecret && orderId && (
           <CardPaymentOverlay
             clientSecret={clientSecret}
             amount={total}
+            orderId={orderId}
+            slug={restaurant.slug}
+            // Stripe devuelve aquí al cliente en los métodos que salen del
+            // navegador (CoDi, 3DS). La página de seguimiento ya consulta el
+            // estado real del pedido, así que es el destino correcto.
+            returnUrl={
+              typeof window === "undefined"
+                ? ""
+                : `${window.location.origin}/r/${restaurant.slug}/pedido/${orderId}`
+            }
             onSuccess={handlePaymentSuccess}
             onCancel={() => setClientSecret(null)}
           />

@@ -1109,3 +1109,66 @@ export async function setReviewVisibility(id: string, isVisible: boolean): Promi
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/clientes")
 }
+
+// ------------------------------------------------------------
+// Importación CSV del menú
+// ------------------------------------------------------------
+
+/**
+ * Importa filas de CSV (categoria,nombre,descripcion,precio,costo,tags).
+ * Crea las categorías faltantes por nombre y agrega los platillos.
+ */
+export async function importMenuCsv(
+  restaurantId: string,
+  rows: Array<{
+    category_name?: string | null
+    name: string
+    description?: string | null
+    price: number
+    cost?: number
+    tags?: string[]
+  }>
+): Promise<{ added: number; categories: number }> {
+  const { supabase } = await requireAuth()
+
+  // Categorías existentes por nombre (lowercase)
+  const { data: cats, error: catErr } = await supabase
+    .from("foodos_menu_categories")
+    .select("id, name, sort_order")
+    .eq("restaurant_id", restaurantId)
+  if (catErr) throw new Error(catErr.message)
+
+  const byName = new Map((cats ?? []).map((c) => [c.name.trim().toLowerCase(), c.id]))
+  let sortOrder = (cats ?? []).length
+  let createdCategories = 0
+
+  // Crear categorías faltantes
+  const wanted = [...new Set(rows.map((r) => r.category_name?.trim().toLowerCase()).filter(Boolean))] as string[]
+  for (const name of wanted) {
+    if (byName.has(name)) continue
+    const displayName = rows.find((r) => r.category_name?.trim().toLowerCase() === name)?.category_name?.trim() ?? name
+    const { data, error } = await supabase
+      .from("foodos_menu_categories")
+      .insert({ restaurant_id: restaurantId, name: displayName, sort_order: sortOrder++ })
+      .select("id")
+      .single()
+    if (error) throw new Error(error.message)
+    byName.set(name, data.id)
+    createdCategories++
+  }
+
+  const itemRows = rows.map((r) => ({
+    restaurant_id: restaurantId,
+    category_id: r.category_name ? byName.get(r.category_name.trim().toLowerCase()) ?? null : null,
+    name: r.name.trim(),
+    description: r.description?.trim() || null,
+    price: Number(r.price) || 0,
+    cost: Number(r.cost) || 0,
+    tags: r.tags ?? [],
+    is_available: true,
+  }))
+  const { error } = await supabase.from("foodos_menu_items").insert(itemRows)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/menu")
+  return { added: itemRows.length, categories: createdCategories }
+}

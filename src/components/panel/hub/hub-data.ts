@@ -318,6 +318,17 @@ export const TOOLS: Tool[] = [
     standalone: true,
   },
   {
+    title: "Cocina en vivo (KDS)",
+    description: "Pantalla de cocina: pedidos confirmados y en preparación con tiempo transcurrido, modificadores y mesa. Avanza estados con un toque.",
+    icon: Flame,
+    href: "/panel/foodos/cocina",
+    color: "text-orange-700",
+    bgColor: "bg-orange-50",
+    area: "sistema",
+    short: "Cocina",
+    standalone: true,
+  },
+  {
     title: "Tablero FoodTech",
     description: "Pedidos por día, canal y sucursal, ticket promedio, top platillos e ingresos. Mide la efectividad de combos y cross-sell.",
     icon: BarChart3,

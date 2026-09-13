@@ -185,6 +185,48 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
           {data.payment_status === "paid" && (
             <p className="text-xs text-emerald-600 font-bold mt-2">✓ Pagado</p>
           )}
+          {data.payment_status === "processing" && (
+            <div className="mt-3 rounded-2xl bg-amber-50 border border-amber-200 px-3 py-2.5">
+              <p className="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Pago en proceso
+              </p>
+              <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                Estamos esperando la confirmación de tu pago. Si elegiste OXXO o SPEI puede
+                tardar unos minutos; esta página se actualiza sola.
+              </p>
+            </div>
+          )}
+          {data.payment_status === "expired" && (
+            <div className="mt-3 rounded-2xl bg-stone-100 border border-stone-300 px-3 py-2.5">
+              <p className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                <XCircle className="w-3.5 h-3.5" />
+                Pago expirado
+              </p>
+              <p className="text-xs text-stone-600 mt-1 leading-relaxed">
+                El tiempo para completar el pago terminó.{" "}
+                <Link href={`/r/${slug}`} className="font-bold text-emerald-700 hover:text-emerald-600">
+                  Vuelve al menú
+                </Link>{" "}
+                para generar un nuevo intento.
+              </p>
+            </div>
+          )}
+          {data.payment_status === "failed" && (
+            <div className="mt-3 rounded-2xl bg-rose-50 border border-rose-200 px-3 py-2.5">
+              <p className="text-xs font-bold text-rose-700 flex items-center gap-1.5">
+                <XCircle className="w-3.5 h-3.5" />
+                El pago no se completó
+              </p>
+              <p className="text-xs text-rose-600 mt-1 leading-relaxed">
+                No se realizó ningún cargo.{" "}
+                <Link href={`/r/${slug}`} className="font-bold text-emerald-700 hover:text-emerald-600">
+                  Intenta de nuevo
+                </Link>
+                .
+              </p>
+            </div>
+          )}
         </div>
 
         {data.status === "delivered" && <ReviewForm orderId={orderId} />}

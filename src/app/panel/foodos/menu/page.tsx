@@ -18,6 +18,7 @@ import {
   upsertMenuItem,
   deleteMenuItem,
   bulkUpsertMenuItems,
+  importMenuCsv,
 } from "../actions"
 import { ItemOptionsManager } from "./_components/item-options-manager"
 import { ItemBranchOverrides } from "./_components/item-branch-overrides"
@@ -32,7 +33,7 @@ import type {
   FoodosBranchMenuOverride,
 } from "@/types/foodos"
 import {
-  UtensilsCrossed, Plus, Pencil, Trash2, Download, Check, X, Star, Loader2, Tag, ListPlus, Building2,
+  UtensilsCrossed, Plus, Pencil, Trash2, Download, Check, X, Star, Loader2, Tag, ListPlus, Building2, Upload,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
@@ -82,6 +83,7 @@ export default function MenuPage() {
   const [editingItem, setEditingItem] = useState<ItemForm | null>(null)
   const [showItemForm, setShowItemForm] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importingCsv, setImportingCsv] = useState(false)
 
   const closeItemForm = useCallback(() => setShowItemForm(false), [])
   useEscapeKey(closeItemForm, showItemForm)
@@ -200,6 +202,49 @@ export default function MenuPage() {
     }
   }
 
+  // CSV: categoria,nombre,descripcion,precio,costo,tags (tags separados por |)
+  async function handleCsvFile(file: File) {
+    if (!restaurant) return
+    setImportingCsv(true)
+    setError(null)
+    try {
+      const text = await file.text()
+      const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+      if (lines.length < 2) throw new Error("El CSV no tiene filas de datos")
+      const rows = lines.slice(1).map((line) => {
+        const c = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""))
+        return {
+          category_name: c[0] || null,
+          name: c[1] ?? "",
+          description: c[2] || null,
+          price: Number(c[3]) || 0,
+          cost: Number(c[4]) || 0,
+          tags: c[5] ? c[5].split("|").map((tg) => tg.trim()).filter(Boolean) : [],
+        }
+      }).filter((r) => r.name)
+      if (rows.length === 0) throw new Error("No se encontraron platillos válidos")
+      const { added, categories } = await importMenuCsv(restaurant.id, rows)
+      setItems(await listMenuItems(restaurant.id))
+      setCategories(await listCategories(restaurant.id))
+      setError(`Se importaron ${added} platillos${categories ? ` y ${categories} categorías nuevas` : ""}.`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al importar el CSV")
+    } finally {
+      setImportingCsv(false)
+    }
+  }
+
+  function downloadCsvTemplate() {
+    const csv = "categoria,nombre,descripcion,precio,costo,tags\nTacos,Taco al pastor,Con piña y cilantro,45,18,favorito\nBebidas,Agua de horchata,Vaso 500ml,35,8,"
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "plantilla-menu.csv"
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   function toggleTag(tag: string) {
     if (!editingItem) return
     setEditingItem({
@@ -239,6 +284,28 @@ export default function MenuPage() {
             {t("foodos.menu.subtitle")}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        <button
+          onClick={downloadCsvTemplate}
+          className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50"
+          title="Descargar plantilla CSV"
+        >
+          <Download className="w-3.5 h-3.5" /> Plantilla
+        </button>
+        <label className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border border-[#0E7A0E]/30 text-[#0E7A0E] text-xs font-semibold hover:bg-[#F0FDF4] cursor-pointer ${importingCsv ? "opacity-40 pointer-events-none" : ""}`}>
+          {importingCsv ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+          Importar CSV
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) handleCsvFile(f)
+              e.target.value = ""
+            }}
+          />
+        </label>
         <button
           onClick={handleImportFromCosteo}
           disabled={importing || sharedDishes.length === 0}
@@ -248,6 +315,7 @@ export default function MenuPage() {
           {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           {t("foodos.menu.importFromCosteo")}
         </button>
+        </div>
       </div>
 
       {error && (

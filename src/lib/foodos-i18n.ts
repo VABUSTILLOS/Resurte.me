@@ -1,0 +1,151 @@
+// ============================================================
+// i18n del micrositio /r/[slug] (es/en). Diccionario plano de
+// cadenas visibles para el comensal; el idioma se persiste por
+// restaurante en localStorage.
+// ============================================================
+
+export type StorefrontLang = "es" | "en"
+
+const es = {
+  orderOnline: "Pide en línea",
+  viewOrder: "Ver pedido",
+  backToMenu: "Volver al menú",
+  yourOrder: "Tu pedido",
+  emptyCart: "Tu carrito está vacío.",
+  suggestions: "Sugerencias para tu pedido",
+  add: "Agregar",
+  yourData: "Tus datos",
+  fullName: "Nombre completo",
+  phone10: "Teléfono (10 dígitos)",
+  notes: "Notas (opcional): sin cebolla, bien cocido, etc.",
+  deliverySection: "Entrega",
+  pickup: "Para llevar",
+  delivery: "A domicilio",
+  dineIn: "En el local",
+  tableNumber: "Número de mesa",
+  coupon: "Cupón",
+  couponCode: "Código de cupón",
+  apply: "Aplicar",
+  remove: "Quitar",
+  tip: "Propina (opcional)",
+  tipNone: "Sin",
+  tipOther: "Otra",
+  tipCustom: "Monto de propina",
+  rewards: "Tus recompensas",
+  usePoints: "Usar puntos",
+  useCredit: "Usar crédito en tienda",
+  payment: "Pago",
+  payAtBranch: "Pagar en sucursal",
+  card: "Tarjeta",
+  transfer: "Transferencia",
+  whatsappOrder: "Enviar pedido por WhatsApp",
+  whatsappHint: "Al confirmar se abrirá WhatsApp con tu pedido listo para enviar al restaurante. El pago se acuerda por chat o al recoger.",
+  transferHint: "Al confirmar verás la CLABE del restaurante. Tu pedido se prepara en cuanto compartas tu comprobante.",
+  summary: "Resumen",
+  subtotal: "Subtotal",
+  discount: "Descuento",
+  deliveryFee: "Envío",
+  tipLabel: "Propina",
+  total: "Total",
+  confirmOrder: "Confirmar pedido",
+  confirmWhatsapp: "Confirmar y abrir WhatsApp",
+  creatingOrder: "Creando pedido...",
+  closedBanner: "puedes ver el menú, pero no pedir.",
+  customizable: "Personalizable",
+  favoritesSection: "Favoritos",
+  combosSection: "Combos",
+  all: "Todo",
+  dishes: "Platillos",
+  reviews: "Reseñas",
+  // success
+  orderReceived: "¡Pedido recibido!",
+  orderSentTo: "Tu orden fue enviada a",
+  trackOrder: "Ver estado de mi pedido",
+  backToMenuBtn: "Volver al menú",
+  reference: "Referencia",
+  transferTitle: "Transfiere para completar tu pedido",
+  bank: "Banco",
+  beneficiary: "Beneficiario",
+  transferProof: "Envía tu comprobante por WhatsApp al restaurante con tu referencia.",
+} as const
+
+export type StorefrontKey = keyof typeof es
+
+const en: Record<StorefrontKey, string> = {
+  orderOnline: "Order online",
+  viewOrder: "View order",
+  backToMenu: "Back to menu",
+  yourOrder: "Your order",
+  emptyCart: "Your cart is empty.",
+  suggestions: "Suggestions for your order",
+  add: "Add",
+  yourData: "Your details",
+  fullName: "Full name",
+  phone10: "Phone (10 digits)",
+  notes: "Notes (optional): no onions, well done, etc.",
+  deliverySection: "Delivery",
+  pickup: "Pickup",
+  delivery: "Delivery",
+  dineIn: "Dine-in",
+  tableNumber: "Table number",
+  coupon: "Coupon",
+  couponCode: "Coupon code",
+  apply: "Apply",
+  remove: "Remove",
+  tip: "Tip (optional)",
+  tipNone: "None",
+  tipOther: "Other",
+  tipCustom: "Tip amount",
+  rewards: "Your rewards",
+  usePoints: "Use points",
+  useCredit: "Use store credit",
+  payment: "Payment",
+  payAtBranch: "Pay at the store",
+  card: "Card",
+  transfer: "Bank transfer",
+  whatsappOrder: "Send order via WhatsApp",
+  whatsappHint: "When you confirm, WhatsApp will open with your order ready to send to the restaurant. Payment is arranged via chat or at pickup.",
+  transferHint: "When you confirm you'll see the restaurant's bank details. Your order is prepared once you share your receipt.",
+  summary: "Summary",
+  subtotal: "Subtotal",
+  discount: "Discount",
+  deliveryFee: "Delivery",
+  tipLabel: "Tip",
+  total: "Total",
+  confirmOrder: "Place order",
+  confirmWhatsapp: "Confirm and open WhatsApp",
+  creatingOrder: "Creating order...",
+  closedBanner: "you can browse the menu, but ordering is off.",
+  customizable: "Customizable",
+  favoritesSection: "Favorites",
+  combosSection: "Combos",
+  all: "All",
+  dishes: "Dishes",
+  reviews: "Reviews",
+  orderReceived: "Order received!",
+  orderSentTo: "Your order was sent to",
+  trackOrder: "Track my order",
+  backToMenuBtn: "Back to menu",
+  reference: "Reference",
+  transferTitle: "Transfer to complete your order",
+  bank: "Bank",
+  beneficiary: "Beneficiary",
+  transferProof: "Send your receipt via WhatsApp to the restaurant with your reference.",
+}
+
+const DICTS: Record<StorefrontLang, Record<StorefrontKey, string>> = { es, en }
+
+/** Traduce una clave del storefront. */
+export function sf(lang: StorefrontLang, key: StorefrontKey): string {
+  return DICTS[lang][key] ?? es[key]
+}
+
+/** Idioma inicial: preferencia guardada o navegador. */
+export function detectStorefrontLang(slug: string): StorefrontLang {
+  if (typeof window === "undefined") return "es"
+  try {
+    const saved = localStorage.getItem(`foodos-lang-${slug}`)
+    if (saved === "es" || saved === "en") return saved
+  } catch { /* storage privado */ }
+  return navigator.language?.toLowerCase().startsWith("en") ? "en" : "es"
+}

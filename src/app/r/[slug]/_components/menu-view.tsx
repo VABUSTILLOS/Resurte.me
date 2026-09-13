@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react"
 import Image from "next/image"
 import { ArrowRight, Heart, Plus, Star } from "lucide-react"
 import { formatMoney } from "@/lib/foodos"
+import { sf, type StorefrontLang } from "@/lib/foodos-i18n"
 import type { FoodosMenuCategory, FoodosMenuItem, FoodosCombo, FoodosReview } from "@/types/foodos"
 
 export function MenuView({
@@ -21,6 +22,7 @@ export function MenuView({
   reviews,
   favorites,
   onToggleFavorite,
+  lang,
 }: {
   categories: FoodosMenuCategory[]
   items: FoodosMenuItem[]
@@ -36,6 +38,7 @@ export function MenuView({
   reviews: FoodosReview[]
   favorites: Set<string>
   onToggleFavorite: (itemId: string) => void
+  lang: StorefrontLang
 }) {
   const featured = items.filter((i) => i.is_featured)
   const visibleCategories = selectedCategory
@@ -70,10 +73,10 @@ export function MenuView({
     <div>
       {featured.length > 0 && (
         <section className="mb-8">
-          <h2 className="text-lg font-black text-stone-900 mb-3">🔥 Favoritos</h2>
+          <h2 className="text-lg font-black text-stone-900 mb-3">🔥 {sf(lang, "favoritesSection")}</h2>
           <div className="grid gap-3">
             {featured.map((item) => (
-              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} isFavorite={favorites.has(item.id)} onToggleFavorite={() => onToggleFavorite(item.id)} onAdd={() => onAddItem(item)} />
+              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} isFavorite={favorites.has(item.id)} onToggleFavorite={() => onToggleFavorite(item.id)} onAdd={() => onAddItem(item)} lang={lang} />
             ))}
           </div>
         </section>
@@ -81,7 +84,7 @@ export function MenuView({
 
       {combos.length > 0 && (
         <section className="mb-8">
-          <h2 className="text-lg font-black text-stone-900 mb-3">🎁 Combos</h2>
+          <h2 className="text-lg font-black text-stone-900 mb-3">🎁 {sf(lang, "combosSection")}</h2>
           <div className="grid gap-3">
             {combos.map((combo) => (
               <div key={combo.id} className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
@@ -105,7 +108,7 @@ export function MenuView({
                   onClick={() => onAddCombo(combo)}
                   className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700"
                 >
-                  Agregar
+                  {sf(lang, "add")}
                 </button>
               </div>
             ))}
@@ -121,7 +124,7 @@ export function MenuView({
             selectedCategory === null ? "bg-stone-900 text-white" : "bg-white text-stone-600 border border-stone-200"
           }`}
         >
-          Todo
+          {sf(lang, "all")}
         </button>
         {categories.map((c) => (
           <button
@@ -143,7 +146,7 @@ export function MenuView({
             {items
               .filter((i) => i.category_id === cat.id)
               .map((item) => (
-                <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} isFavorite={favorites.has(item.id)} onToggleFavorite={() => onToggleFavorite(item.id)} onAdd={() => onAddItem(item)} />
+                <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} isFavorite={favorites.has(item.id)} onToggleFavorite={() => onToggleFavorite(item.id)} onAdd={() => onAddItem(item)} lang={lang} />
               ))}
           </div>
         </section>
@@ -151,10 +154,10 @@ export function MenuView({
 
       {uncategorized.length > 0 && (
         <section className="mb-8">
-          <h2 className="text-lg font-black text-stone-900 mb-3">Platillos</h2>
+          <h2 className="text-lg font-black text-stone-900 mb-3">{sf(lang, "dishes")}</h2>
           <div className="grid gap-3">
             {uncategorized.map((item) => (
-              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} isFavorite={favorites.has(item.id)} onToggleFavorite={() => onToggleFavorite(item.id)} onAdd={() => onAddItem(item)} />
+              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} isFavorite={favorites.has(item.id)} onToggleFavorite={() => onToggleFavorite(item.id)} onAdd={() => onAddItem(item)} lang={lang} />
             ))}
           </div>
         </section>
@@ -164,7 +167,7 @@ export function MenuView({
         <section className="mb-8">
           <h2 className="text-lg font-black text-stone-900 mb-3 flex items-center gap-2">
             <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
-            Reseñas · {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
+            {sf(lang, "reviews")} · {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
           </h2>
           <div className="grid gap-3">
             {reviews.slice(0, 5).map((r) => (
@@ -191,7 +194,7 @@ export function MenuView({
               onClick={onGoToCart}
               className="flex items-center gap-2 px-6 py-3 rounded-full foodos-accent bg-emerald-600 text-white font-bold hover:bg-emerald-700"
             >
-              Ver pedido ({cartCount})
+              {sf(lang, "viewOrder")} ({cartCount})
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -201,7 +204,7 @@ export function MenuView({
   )
 }
 
-function ItemCard({ item, hasOptions, price, isFavorite, onToggleFavorite, onAdd }: { item: FoodosMenuItem; hasOptions: boolean; price: number; isFavorite: boolean; onToggleFavorite: () => void; onAdd: () => void }) {
+function ItemCard({ item, hasOptions, price, isFavorite, onToggleFavorite, onAdd, lang }: { item: FoodosMenuItem; hasOptions: boolean; price: number; isFavorite: boolean; onToggleFavorite: () => void; onAdd: () => void; lang: StorefrontLang }) {
   return (
     <div className="flex items-center justify-between gap-3 bg-white border border-stone-200 rounded-2xl p-4">
       <div className="min-w-0 flex-1">
@@ -227,7 +230,7 @@ function ItemCard({ item, hasOptions, price, isFavorite, onToggleFavorite, onAdd
           >
             <Heart className={`w-4 h-4 ${isFavorite ? "text-red-500 fill-red-500" : "text-stone-300"}`} />
           </button>
-          {hasOptions && <span className="ml-2 text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Personalizable</span>}
+          {hasOptions && <span className="ml-2 text-[10px] font-semibold text-stone-400 uppercase tracking-wide">{sf(lang, "customizable")}</span>}
         </p>
       </div>
       {item.image_url ? (
