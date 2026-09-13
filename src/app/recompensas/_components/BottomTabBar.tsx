@@ -3,6 +3,7 @@
 import { Home, Wallet, Store, User, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { useEffect } from "react";
+import { haptic } from "@/lib/haptics";
 import type { Tab } from "./types";
 
 const tabs: { id: Tab; label: string; icon: typeof Home }[] = [
@@ -29,11 +30,17 @@ export function BottomTabBar({
     return () => document.body.classList.remove("has-bottom-tab")
   }, [])
 
+  // Cambio de sección con micro-vibración: patrón de app nativa.
+  const handleChange = (tab: Tab) => {
+    if (tab !== activeTab) haptic(8)
+    onTabChange(tab)
+  }
+
   return (
     <>
       {/* Mobile: fixed bottom bar. Usa --floating-bottom-offset (globals.css):
           cuando el carrito tiene items sube por encima del MobileCartBar. */}
-      <nav className="fixed bottom-[var(--floating-bottom-offset)] left-1/2 -translate-x-1/2 w-full max-w-md z-50 md:hidden">
+      <nav aria-label="Navegación de recompensas" className="fixed bottom-[var(--floating-bottom-offset)] left-1/2 -translate-x-1/2 w-full max-w-md z-50 md:hidden">
         <div className="mx-3 rounded-2xl border border-cream-300 bg-white/90 backdrop-blur-xl px-2 py-2 shadow-lg">
           <div className="flex items-center justify-around">
             {tabs.map((tab) => {
@@ -41,7 +48,9 @@ export function BottomTabBar({
               return (
                 <button
                   key={tab.id}
-                  onClick={() => onTabChange(tab.id)}
+                  onClick={() => handleChange(tab.id)}
+                  aria-current={isActive ? "page" : undefined}
+                  aria-label={tab.label}
                   className="relative flex flex-col items-center gap-1 px-3 py-1.5"
                 >
                   {isActive && (
@@ -72,7 +81,7 @@ export function BottomTabBar({
       </nav>
 
       {/* Desktop: vertical sidebar */}
-      <nav className="hidden md:flex md:flex-col md:h-full md:justify-start md:pt-8 md:gap-1 md:px-3">
+      <nav aria-label="Navegación de recompensas" className="hidden md:flex md:flex-col md:h-full md:justify-start md:pt-8 md:gap-1 md:px-3">
         <div className="hidden lg:block mb-8 px-3">
           <span className="text-lg font-bold text-brand-500 tracking-tight">Resurte</span>
           <span className="text-lg font-bold text-warm-700 tracking-tight">.me</span>
@@ -82,7 +91,8 @@ export function BottomTabBar({
           return (
             <button
               key={tab.id}
-              onClick={() => onTabChange(tab.id)}
+              onClick={() => handleChange(tab.id)}
+              aria-current={isActive ? "page" : undefined}
               className={`relative flex items-center gap-3 px-3 py-3 rounded-xl transition-all group ${
                 isActive
                   ? "bg-brand-50 border border-brand-200"

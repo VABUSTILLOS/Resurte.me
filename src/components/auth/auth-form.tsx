@@ -3,8 +3,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
-import { supabaseConfigError } from "@/lib/supabase/env"
 import { useRouter, useSearchParams } from "next/navigation"
+import { Eye, EyeOff } from "lucide-react"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { claimGuestAddresses } from "@/lib/guest-address"
 
@@ -12,50 +12,21 @@ interface AuthFormProps {
   mode: "login" | "register"
 }
 
-/** Traduce errores de Supabase Auth a mensajes claros para el usuario. */
-function mapAuthError(err: unknown, isLogin: boolean): string {
-  const raw = err instanceof Error ? err.message : ""
-  const message = raw.toLowerCase()
-
-  if (message.includes("invalid login credentials")) {
-    return "Correo o contraseña incorrectos. Si no recuerdas tu contraseña, usa «¿Olvidaste tu contraseña?»."
-  }
-  if (message.includes("email not confirmed")) {
-    return "Aún no confirmas tu correo. Revisa tu bandeja de entrada (y spam) o usa el enlace mágico."
-  }
-  if (message.includes("user already registered") || message.includes("already been registered")) {
-    return "Este correo ya tiene una cuenta. Inicia sesión o restablece tu contraseña."
-  }
-  if (message.includes("rate limit") || message.includes("too many requests")) {
-    return "Demasiados intentos o correos enviados. Espera unos minutos e inténtalo de nuevo."
-  }
-  if (message.includes("password") && (message.includes("weak") || message.includes("least"))) {
-    return "La contraseña es demasiado débil. Usa al menos 6 caracteres."
-  }
-  if (message.includes("unable to validate email") || message.includes("invalid email")) {
-    return "El correo no parece válido. Revísalo e inténtalo de nuevo."
-  }
-  return isLogin
-    ? raw || "No pudimos iniciar sesión. Inténtalo de nuevo."
-    : raw || "No pudimos crear tu cuenta. Inténtalo de nuevo."
-}
+const INPUT_CLASS =
+  "mt-1 block w-full rounded-lg border border-gray-300 px-3 py-3 sm:py-2 text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
 
 export function AuthForm({ mode }: AuthFormProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [fullName, setFullName] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [capsLockOn, setCapsLockOn] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const referralCode = searchParams.get("ref")
-  // Destino post-login (p.ej. /auth/login?next=/admin desde el guard de admin)
-  const nextPath = searchParams.get("next")
-  const safeNext =
-    nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
-      ? nextPath
-      : "/"
   // Lazy browser-only client: creating it during SSR would throw when
   // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
   const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
@@ -64,10 +35,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!supabase) {
-      setError(supabaseConfigError())
-      return
-    }
+    if (!supabase) return
     setLoading(true)
     setError(null)
     setSuccessMessage(null)
@@ -79,7 +47,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         // Vincula las direcciones de compras anónimas hechas en este navegador
         await claimGuestAddresses()
         router.refresh()
-        router.push(safeNext)
+        router.push("/")
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -131,7 +99,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           // Vincula las direcciones de compras anónimas hechas en este navegador
           await claimGuestAddresses()
           router.refresh()
-          router.push(safeNext)
+          router.push("/")
         } else {
           // Email confirmation required — show message to user
           setSuccessMessage(
@@ -140,76 +108,14 @@ export function AuthForm({ mode }: AuthFormProps) {
         }
       }
     } catch (err) {
-      setError(mapAuthError(err, isLogin))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleMagicLink() {
-    if (!email) {
-      setError("Escribe tu correo electrónico para enviarte el enlace.")
-      return
-    }
-    if (!supabase) {
-      setError(supabaseConfigError())
-      return
-    }
-    setLoading(true)
-    setError(null)
-    setSuccessMessage(null)
-
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
-        },
-      })
-      if (error) throw error
-      setSuccessMessage(
-        `Te enviamos un enlace de acceso a ${email}. Ábrelo para entrar sin contraseña.`
-      )
-    } catch (err) {
-      setError(mapAuthError(err, true))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleForgotPassword() {
-    if (!email) {
-      setError("Escribe tu correo electrónico para restablecer tu contraseña.")
-      return
-    }
-    if (!supabase) {
-      setError(supabaseConfigError())
-      return
-    }
-    setLoading(true)
-    setError(null)
-    setSuccessMessage(null)
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
-      })
-      if (error) throw error
-      setSuccessMessage(
-        `Te enviamos un enlace a ${email} para restablecer tu contraseña.`
-      )
-    } catch (err) {
-      setError(mapAuthError(err, true))
+      setError(err instanceof Error ? err.message : "Error de autenticación")
     } finally {
       setLoading(false)
     }
   }
 
   async function handleGoogleSignIn() {
-    if (!supabase) {
-      setError(supabaseConfigError())
-      return
-    }
+    if (!supabase) return
     setLoading(true)
     setError(null)
 
@@ -235,13 +141,13 @@ export function AuthForm({ mode }: AuthFormProps) {
       </h1>
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+        <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
           {error}
         </div>
       )}
 
       {successMessage && (
-        <div className="mb-4 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700">
+        <div role="status" className="mb-4 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700">
           <p className="font-semibold mb-1">¡Cuenta creada!</p>
           <p>{successMessage}</p>
         </div>
@@ -259,7 +165,9 @@ export function AuthForm({ mode }: AuthFormProps) {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-3 sm:py-2 text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              autoComplete="name"
+              enterKeyHint="next"
+              className={INPUT_CLASS}
               placeholder="María García"
             />
           </div>
@@ -275,7 +183,10 @@ export function AuthForm({ mode }: AuthFormProps) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-3 sm:py-2 text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            autoComplete="email"
+            inputMode="email"
+            enterKeyHint="next"
+            className={INPUT_CLASS}
             placeholder="tu@correo.com"
           />
         </div>
@@ -284,16 +195,46 @@ export function AuthForm({ mode }: AuthFormProps) {
           <label htmlFor="password" className="block text-sm font-medium text-gray-700">
             Contraseña
           </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-3 sm:py-2 text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            placeholder="••••••"
-          />
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => setCapsLockOn(e.getModifierState?.("CapsLock") ?? false)}
+              onKeyUp={(e) => setCapsLockOn(e.getModifierState?.("CapsLock") ?? false)}
+              onBlur={() => setCapsLockOn(false)}
+              required
+              minLength={6}
+              autoComplete={isLogin ? "current-password" : "new-password"}
+              enterKeyHint="done"
+              aria-describedby={
+                (!isLogin ? "password-hint" : undefined) ?? undefined
+              }
+              className={`${INPUT_CLASS} pr-11`}
+              placeholder="••••••"
+            />
+            {/* Mostrar/ocultar contraseña: reduce errores de captura en móvil */}
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-pressed={showPassword}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          {capsLockOn && (
+            <p role="status" className="mt-1 text-xs text-amber-600 font-medium">
+              ⚠️ Bloq Mayús está activado.
+            </p>
+          )}
+          {!isLogin && (
+            <p id="password-hint" className="mt-1 text-xs text-gray-400">
+              Mínimo 6 caracteres.
+            </p>
+          )}
         </div>
 
         <button
@@ -303,27 +244,6 @@ export function AuthForm({ mode }: AuthFormProps) {
         >
           {loading ? "Cargando..." : isLogin ? "Iniciar Sesión" : "Crear Cuenta"}
         </button>
-
-        {isLogin && (
-          <div className="flex items-center justify-between text-sm">
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              disabled={loading}
-              className="text-emerald-600 hover:text-emerald-500 font-medium disabled:opacity-50"
-            >
-              ¿Olvidaste tu contraseña?
-            </button>
-            <button
-              type="button"
-              onClick={handleMagicLink}
-              disabled={loading}
-              className="text-emerald-600 hover:text-emerald-500 font-medium disabled:opacity-50"
-            >
-              Enlace mágico
-            </button>
-          </div>
-        )}
       </form>
 
       <div className="relative my-6">
@@ -340,7 +260,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         disabled={loading}
         className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 sm:py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
       >
-        <svg className="h-5 w-5" viewBox="0 0 24 24">
+        <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
           <path
             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
             fill="#4285F4"

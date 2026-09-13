@@ -3,7 +3,6 @@ import { Suspense } from "react"
 import { Geist, Geist_Mono } from "next/font/google"
 import { CityProvider } from "@/contexts/city-context"
 import { CartProvider } from "@/contexts/cart-context"
-import { FavoritesProvider } from "@/contexts/favorites-context"
 import { UtmCapture } from "@/components/utm-capture"
 import { Header } from "@/components/layout/header"
 import { FooterForRoute } from "@/components/layout/FooterForRoute"
@@ -13,6 +12,10 @@ import { CartDrawer, MobileCartBar } from "@/components/cart/cart-drawer"
 import { CheckoutOverlays } from "@/components/checkout/checkout-overlays"
 import { BumpsDebugProbe } from "@/components/checkout/BumpsDebugProbe"
 import { WhatsAppButton } from "@/components/whatsapp/whatsapp-button"
+import { BackToTop } from "@/components/layout/back-to-top"
+import { OfflineBanner } from "@/components/layout/offline-banner"
+import { InstallPrompt } from "@/components/pwa/install-prompt"
+import { RegisterSW } from "@/components/pwa/register-sw"
 import { Analytics } from "@/lib/analytics"
 import { CookieConsent } from "@/components/ui/cookie-consent"
 import { ToastProvider } from "@/components/toast"
@@ -153,10 +156,10 @@ export default async function RootLayout({
           }}
         />
         <Analytics />
+        <RegisterSW />
         <ToastProvider>
           <CityProvider>
             <CartProvider>
-              <FavoritesProvider>
               <OnboardingWizardGate />
               <Header />
               <main id="main-content" tabIndex={-1} className="flex-1 outline-none"><div className="flex"><DashboardSidebar /><div className="flex-1 min-w-0">{children}</div></div></main>
@@ -171,13 +174,15 @@ export default async function RootLayout({
               <CheckoutOverlays />
               <BumpsDebugProbe />
               <MobileCartBar />
+              <OfflineBanner />
+              <BackToTop />
+              <InstallPrompt />
               <WhatsAppButton
                 phoneNumber={process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"}
                 message="¡Hola! Quiero hacer un pedido en Resurte.me"
                 label="Pedir por WhatsApp"
               />
               <CookieConsent />
-              </FavoritesProvider>
             </CartProvider>
           </CityProvider>
         </ToastProvider>

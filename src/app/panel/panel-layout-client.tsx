@@ -55,6 +55,7 @@ function PanelContent({ children }: { children: React.ReactNode }) {
   const [showPicker, setShowPicker] = useState(false)
   const [showMobileNav, setShowMobileNav] = useState(false)
   useEscapeKey(() => setShowPicker(false), showPicker)
+  useEscapeKey(() => setShowMobileNav(false), showMobileNav)
   const { locale, setLocale } = useLocale()
   usePanelRealtimeSync()
 
@@ -139,6 +140,9 @@ function PanelContent({ children }: { children: React.ReactNode }) {
               <div className="relative min-w-0">
                 <button
                   onClick={() => setShowPicker(!showPicker)}
+                  aria-haspopup="listbox"
+                  aria-expanded={showPicker}
+                  aria-label={t("panel.pickRestaurantType")}
                   className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
                     selectedCollection
                       ? "border-[#0E7A0E]/30 bg-[#F0FDF4] text-[#0E7A0E]"
@@ -165,13 +169,15 @@ function PanelContent({ children }: { children: React.ReactNode }) {
                     className="fixed inset-0 z-10"
                     onClick={() => setShowPicker(false)}
                   />
-                  <div className="absolute right-0 top-full mt-1 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-20 max-h-80 overflow-y-auto">
+                  <div role="listbox" aria-label={t("panel.cuisinePrompt")} className="absolute right-0 top-full mt-1 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-20 max-h-80 overflow-y-auto overscroll-contain">
                     <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                       {t("panel.cuisinePrompt")}
                     </div>
                     {collections.map((c) => (
                       <button
                         key={c.id}
+                        role="option"
+                        aria-selected={selectedCollection?.id === c.id}
                         onClick={() => { setSelectedCollection(c); setShowPicker(false) }}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left hover:bg-gray-50 transition-colors ${
                           selectedCollection?.id === c.id ? "bg-[#F0FDF4] text-[#0E7A0E] font-semibold" : "text-gray-700"
