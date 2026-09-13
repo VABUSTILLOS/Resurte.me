@@ -65,7 +65,7 @@ interface SupabaseLike {
 /**
  * Inserta un evento en admin_audit_log con service_role. Best-effort:
  * nunca lanza (la bitácora no debe romper la acción que registra, p.ej.
- * si la migración 00070 aún no está aplicada en el entorno).
+ * si la migración 00078 aún no está aplicada en el entorno).
  */
 export async function logAdminAction(
   supabase: SupabaseLike,
