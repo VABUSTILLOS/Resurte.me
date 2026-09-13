@@ -32,7 +32,6 @@ import DaySummary from "@/components/panel/hub/DaySummary"
 import KitchenMonitor from "@/components/panel/hub/KitchenMonitor"
 import AlertsPanel from "@/components/panel/hub/AlertsPanel"
 import BackupStrip from "@/components/panel/hub/BackupStrip"
-import GettingStartedCard from "@/components/panel/hub/GettingStartedCard"
 import ToolGrid from "@/components/panel/hub/ToolGrid"
 import PurchaseStimulusCard from "@/components/panel/hub/PurchaseStimulusCard"
 import RestoreConfirmModal from "@/components/panel/hub/RestoreConfirmModal"
@@ -53,8 +52,6 @@ export default function PanelPage() {
   const [ventasEntries] = useSyncedRows<HubVenta>("ventas-entries", [], slug)
   const [mesas] = useSyncedStorage<HubMesa[]>("mesas", [], slug)
   const [ventasMetaDia] = useSyncedStorage<number>("ventas-meta-dia", 0, slug)
-  const [ventasDescontarStock] = useSyncedStorage<boolean>("ventas-descontar-stock", false, slug)
-  const [onboardingDismissed, setOnboardingDismissed] = useSyncedStorage<boolean>("hub-onboarding-dismissed", false, slug)
   const [ventasUmbralTicket] = useSyncedStorage<number>("ventas-umbral-ticket", 3000, slug)
   const [clientes] = useSyncedStorage<Cliente[]>("clientes", [], slug)
   const [puntosTasa] = useSyncedStorage<number>("ventas-puntos-tasa", 100, slug)
@@ -406,6 +403,33 @@ export default function PanelPage() {
     [role],
   )
 
+  // Atajos 1–9: abre la N-ésima herramienta visible sin tocar el mouse
+  // (guard: no roba teclas cuando el foco está en un campo editable ni con
+  // modificadores Cmd/Ctrl/Alt).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (!/^[1-9]$/.test(e.key)) return
+      const el = document.activeElement
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          (el as HTMLElement).isContentEditable)
+      ) {
+        return
+      }
+      const tool = visibleTools[Number(e.key) - 1]
+      if (tool) {
+        e.preventDefault()
+        router.push(tool.href)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [visibleTools, router])
+
   return (
     <div>
       <div className="mb-4 sm:mb-8">
@@ -417,8 +441,13 @@ export default function PanelPage() {
       </div>
 
       {selectedCollection && (
-        <button onClick={() => setShowSearch(true)} className="w-full mb-4 sm:mb-6 bg-white rounded-xl border border-gray-100 px-4 py-2.5 sm:py-3 flex items-center gap-3 text-sm text-gray-400 hover:border-gray-200 hover:text-gray-500 transition-colors group touch-target">
-          <Search className="w-4 h-4 shrink-0" />
+        <button
+          onClick={() => setShowSearch(true)}
+          aria-label="Buscar platillos, productos o inventario (atajo: Control K)"
+          aria-keyshortcuts="Control+k"
+          className="w-full mb-4 sm:mb-6 bg-white rounded-xl border border-gray-100 px-4 py-2.5 sm:py-3 flex items-center gap-3 text-sm text-gray-400 hover:border-gray-200 hover:text-gray-500 transition-colors group touch-target"
+        >
+          <Search className="w-4 h-4 shrink-0" aria-hidden="true" />
           <span className="flex-1 text-left">Buscar platillos, productos, inventario...</span>
           <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-50 text-[10px] font-medium text-gray-300 font-mono border border-gray-100 group-hover:border-gray-200">
             <span className="text-xs">⌘</span>K
@@ -429,43 +458,6 @@ export default function PanelPage() {
       <div className="mb-4 sm:mb-6">
         <ToolGrid tools={visibleTools} selectedCollection={selectedCollection} />
       </div>
-
-      {selectedCollection && !onboardingDismissed &&
-        !(sharedDishes.length > 0 && inventarioItems.length > 0 && ventasEntries.length > 0 && ventasDescontarStock) && (
-        <GettingStartedCard
-          steps={[
-            {
-              key: "costeo",
-              label: "Costea tu primer platillo",
-              description: "Con receta e ingredientes, para conocer tu food cost real.",
-              href: "/panel/costeo",
-              done: sharedDishes.length > 0,
-            },
-            {
-              key: "inventario",
-              label: "Carga tu inventario",
-              description: "Los insumos con los que arrancas y su stock mínimo.",
-              href: "/panel/inventario",
-              done: inventarioItems.length > 0,
-            },
-            {
-              key: "venta",
-              label: "Registra tu primera venta",
-              description: "Una venta alimenta comanda, analítica y rentabilidad.",
-              href: "/panel/ventas",
-              done: ventasEntries.length > 0,
-            },
-            {
-              key: "auto-stock",
-              label: "Activa el descuento automático de stock",
-              description: "Cada venta descuenta insumos según la receta costeada.",
-              href: "/panel/ventas",
-              done: ventasDescontarStock,
-            },
-          ]}
-          onDismiss={() => setOnboardingDismissed(true)}
-        />
-      )}
 
       {selectedCollection && stats && (
         <LiveStats stats={stats} panelCfg={panelCfg} mesasInfo={mesasInfo} mesas={mesas} />
