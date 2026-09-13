@@ -4,7 +4,15 @@ import { CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import type { FoodosRestaurant } from "@/types/foodos"
 
-export function SuccessScreen({ restaurant, orderId }: { restaurant: FoodosRestaurant; orderId: string }) {
+export function SuccessScreen({
+  restaurant,
+  orderId,
+  showTransfer = false,
+}: {
+  restaurant: FoodosRestaurant
+  orderId: string
+  showTransfer?: boolean
+}) {
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center px-4">
       <div className="bg-white border border-stone-200 rounded-3xl p-8 max-w-md w-full text-center">
@@ -15,6 +23,23 @@ export function SuccessScreen({ restaurant, orderId }: { restaurant: FoodosResta
         <p className="text-stone-500 mt-2">
           Tu orden fue enviada a <strong>{restaurant.name}</strong>. Te contactarán por WhatsApp para confirmar la entrega.
         </p>
+        {showTransfer && restaurant.transfer_clabe && (
+          <div className="mt-4 text-left bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <p className="text-sm font-bold text-amber-900">Transfiere para completar tu pedido</p>
+            <dl className="mt-2 space-y-1 text-sm text-amber-800">
+              {restaurant.transfer_bank && (
+                <div className="flex justify-between"><dt>Banco</dt><dd className="font-semibold">{restaurant.transfer_bank}</dd></div>
+              )}
+              {restaurant.transfer_beneficiary && (
+                <div className="flex justify-between"><dt>Beneficiario</dt><dd className="font-semibold">{restaurant.transfer_beneficiary}</dd></div>
+              )}
+              <div className="flex justify-between"><dt>CLABE</dt><dd className="font-mono font-semibold">{restaurant.transfer_clabe}</dd></div>
+            </dl>
+            <p className="text-xs text-amber-700 mt-2">
+              Envía tu comprobante por WhatsApp al restaurante con tu referencia.
+            </p>
+          </div>
+        )}
         <p className="text-sm text-stone-400 mt-4">Referencia: #{orderId.slice(0, 8).toUpperCase()}</p>
         <Link
           href={`/r/${restaurant.slug}/pedido/${orderId}`}

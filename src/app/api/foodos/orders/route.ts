@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
-import { computeOrderTotals, getOpenStatus } from "@/lib/foodos"
-import type { FoodosBranchHours, FoodosOrderItem, FoodosOrderItemModifier } from "@/types/foodos"
+import { computeOrderTotals, getOpenStatus, validateCoupon } from "@/lib/foodos"
+import type { FoodosBranchHours, FoodosCoupon, FoodosOrderItem, FoodosOrderItemModifier } from "@/types/foodos"
 import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 
@@ -39,6 +39,8 @@ interface FoodosOrderBody {
   customer_phone?: string | null
   note?: string | null
   table_number?: string | null
+  coupon_code?: string | null
+  tip?: number
 }
 
 /**
@@ -186,6 +188,21 @@ export async function POST(request: NextRequest) {
     }
     const valueById = new Map((valuesRes.data ?? []).map((v) => [v.id, v]))
 
+    // Overrides por sucursal: precio/disponibilidad específicos de la sucursal.
+    const branchPriceOverride = new Map<string, number>()
+    const branchUnavailable = new Set<string>()
+    if (branch_id && itemIds.length) {
+      const { data: overrides } = await supabase
+        .from("foodos_branch_menu_overrides")
+        .select("item_id, price, is_available")
+        .eq("branch_id", branch_id)
+        .in("item_id", itemIds)
+      for (const o of overrides ?? []) {
+        if (o.is_available === false) branchUnavailable.add(o.item_id)
+        if (o.price !== null && o.price !== undefined) branchPriceOverride.set(o.item_id, Number(o.price))
+      }
+    }
+
     const cleanItems: FoodosOrderItem[] = []
     for (const raw of items) {
       const qty = Math.min(Math.max(Math.round(Number(raw.qty)) || 1, 1), MAX_QTY_PER_LINE)
@@ -205,7 +222,13 @@ export async function POST(request: NextRequest) {
           combo_id: raw.combo_id,
         })
       } else {
-        const basePrice = itemPrice.get(raw.item_id)
+        if (branchUnavailable.has(raw.item_id)) {
+          return NextResponse.json(
+            { error: "Un platillo no está disponible en esta sucursal" },
+            { status: 400 }
+          )
+        }
+        const basePrice = branchPriceOverride.get(raw.item_id) ?? itemPrice.get(raw.item_id)
         if (basePrice === undefined) {
           return NextResponse.json(
             { error: "Platillo no válido en el pedido" },
@@ -270,10 +293,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { subtotal, discount: cappedDiscount, total } = computeOrderTotals(
+    const baseTotals = computeOrderTotals(cleanItems, serverDeliveryFee, 0)
+
+    // Cupón: validación server-side contra la BD (nunca confiar en el cliente).
+    let couponDiscountValue = 0
+    let couponCode: string | null = null
+    if (body.coupon_code) {
+      const { data: coupon } = await supabase
+        .from("foodos_coupons")
+        .select("*")
+        .eq("restaurant_id", restaurant_id)
+        .ilike("code", body.coupon_code.trim())
+        .maybeSingle()
+      const result = validateCoupon(coupon as FoodosCoupon | null, baseTotals.subtotal)
+      if (!result.valid) {
+        return NextResponse.json({ error: result.error ?? "Cupón no válido" }, { status: 400 })
+      }
+      couponDiscountValue = result.discount
+      couponCode = (coupon as FoodosCoupon).code.toUpperCase()
+    }
+
+    const serverTip = Math.min(Math.max(Number(body.tip) || 0, 0), baseTotals.subtotal)
+    const { subtotal, discount: cappedDiscount, tip: cappedTip, total } = computeOrderTotals(
       cleanItems,
       serverDeliveryFee,
-      0 // descuentos se calculan server-side (v1: el descuento de combos ya está en su precio)
+      couponDiscountValue,
+      serverTip
     )
 
     const payload = {
@@ -283,12 +328,15 @@ export async function POST(request: NextRequest) {
       subtotal,
       discount: cappedDiscount,
       delivery_fee: serverDeliveryFee,
+      tip: cappedTip,
+      coupon_code: couponCode,
       total,
       channel,
       fulfillment,
       status: "pending",
       payment_method: payment_method || null,
-      payment_status: payment_method === "card" ? "pending" : "paid",
+      // tarjeta y transferencia quedan pendientes hasta pagar/confirmar
+      payment_status: payment_method === "card" || payment_method === "transfer" ? "pending" : "paid",
       customer_name: customer_name || null,
       customer_phone: customer_phone || null,
       note: note || null,
@@ -307,6 +355,14 @@ export async function POST(request: NextRequest) {
         { error: "Error al crear el pedido", detail: orderError.message, code: orderError.code },
         { status: 500 }
       )
+    }
+
+    // Registrar uso del cupón (best-effort; el pedido ya se creó).
+    if (couponCode) {
+      await supabase.rpc("increment_foodos_coupon_usage", {
+        p_restaurant_id: restaurant_id,
+        p_code: couponCode,
+      })
     }
 
     // El PaymentIntent de Stripe para tarjeta lo crea el storefront llamando a

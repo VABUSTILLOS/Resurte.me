@@ -12,6 +12,7 @@ import {
   getFoodosPanelData,
   listOrders,
   updateOrderStatus,
+  markOrderPaid,
 } from "../actions"
 import { formatMoney, modifiersSummary } from "@/lib/foodos"
 import { createClient } from "@/lib/supabase/client"
@@ -363,13 +364,38 @@ export default function PedidosPage() {
                   <p className="flex items-center justify-end gap-1 text-xs text-stone-500 mt-1">
                     {order.payment_method === "card" ? (
                       <><CreditCard className="w-3 h-3" /> {t("foodos.common.card")}</>
+                    ) : order.payment_method === "transfer" ? (
+                      <><CreditCard className="w-3 h-3" /> Transferencia</>
                     ) : (
                       <><Banknote className="w-3 h-3" /> {t("foodos.common.atBranch")}</>
                     )}
-                    {order.payment_status === PAID && (
+                    {order.payment_status === PAID ? (
                       <span className="ml-1 text-emerald-600 font-bold">· {t("foodos.common.paid")}</span>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          setSaving(order.id)
+                          try {
+                            await markOrderPaid(order.id)
+                            await load()
+                          } finally {
+                            setSaving(null)
+                          }
+                        }}
+                        disabled={saving === order.id}
+                        className="ml-1 text-amber-700 font-bold hover:text-amber-900 underline"
+                      >
+                        · Marcar pagado
+                      </button>
                     )}
                   </p>
+                  {(order.tip > 0 || order.discount > 0) && (
+                    <p className="text-[11px] text-stone-400 mt-0.5">
+                      {order.discount > 0 && `cupón ${order.coupon_code ?? ""} −${formatMoney(order.discount)}`}
+                      {order.discount > 0 && order.tip > 0 && " · "}
+                      {order.tip > 0 && `propina ${formatMoney(order.tip)}`}
+                    </p>
+                  )}
                   <p className="text-[11px] text-stone-400 uppercase tracking-wide mt-1">{t("foodos.common.channel", { channel: order.channel })}</p>
                 </div>
               </div>

@@ -3,7 +3,7 @@ import type { RestaurantCollection } from "@/types"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp, Calendar, ClipboardCheck,
   Package, Receipt, Flame, QrCode, UtensilsCrossed, Gift, Megaphone,
-  BarChart3, Compass, Users,
+  BarChart3, Compass, Users, Ticket,
 } from "lucide-react"
 
 export type HubCollection = RestaurantCollection
@@ -304,6 +304,17 @@ export const TOOLS: Tool[] = [
     bgColor: "bg-red-50",
     area: "sistema",
     short: "Clientes",
+    standalone: true,
+  },
+  {
+    title: "Cupones",
+    description: "Crea códigos de descuento (% o monto fijo) con pedido mínimo, límite de usos y expiración. Los clientes los aplican en el checkout de tu menú.",
+    icon: Ticket,
+    href: "/panel/foodos/cupones",
+    color: "text-pink-600",
+    bgColor: "bg-pink-50",
+    area: "sistema",
+    short: "Cupones",
     standalone: true,
   },
   {

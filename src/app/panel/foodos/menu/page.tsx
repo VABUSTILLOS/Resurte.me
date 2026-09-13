@@ -20,16 +20,19 @@ import {
   bulkUpsertMenuItems,
 } from "../actions"
 import { ItemOptionsManager } from "./_components/item-options-manager"
+import { ItemBranchOverrides } from "./_components/item-branch-overrides"
 import { formatMoney, itemMargin } from "@/lib/foodos"
 import type {
   FoodosRestaurant,
+  FoodosBranch,
   FoodosMenuCategory,
   FoodosMenuItem,
   FoodosItemOptionGroup,
   FoodosItemOptionValue,
+  FoodosBranchMenuOverride,
 } from "@/types/foodos"
 import {
-  UtensilsCrossed, Plus, Pencil, Trash2, Download, Check, X, Star, Loader2, Tag, ListPlus,
+  UtensilsCrossed, Plus, Pencil, Trash2, Download, Check, X, Star, Loader2, Tag, ListPlus, Building2,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
@@ -67,6 +70,9 @@ export default function MenuPage() {
   const [optionGroups, setOptionGroups] = useState<FoodosItemOptionGroup[]>([])
   const [optionValues, setOptionValues] = useState<FoodosItemOptionValue[]>([])
   const [optionsItem, setOptionsItem] = useState<FoodosMenuItem | null>(null)
+  const [overridesItem, setOverridesItem] = useState<FoodosMenuItem | null>(null)
+  const [branches, setBranches] = useState<FoodosBranch[]>([])
+  const [overrides, setOverrides] = useState<FoodosBranchMenuOverride[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -84,12 +90,13 @@ export default function MenuPage() {
 
   const load = useCallback(async () => {
     try {
-      const { restaurant: r, categories: cats, items: its, optionGroups: ogs, optionValues: ovs } = await getFoodosPanelData()
+      const { restaurant: r, categories: cats, items: its, optionGroups: ogs, optionValues: ovs, branches: bs } = await getFoodosPanelData()
       setRestaurant(r)
       setCategories(cats)
       setItems(its)
       setOptionGroups(ogs)
       setOptionValues(ovs)
+      setBranches(bs)
     } catch (e) {
       setError(e instanceof Error ? e.message : t("foodos.menu.loadError"))
     } finally {
@@ -348,6 +355,15 @@ export default function MenuPage() {
                         >
                           <ListPlus className="w-3.5 h-3.5" />
                         </button>
+                        {branches.length > 1 && (
+                          <button
+                            onClick={() => setOverridesItem(item)}
+                            className="p-1.5 rounded-md text-gray-400 hover:text-[#0E7A0E]"
+                            title="Precio/disponibilidad por sucursal"
+                          >
+                            <Building2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => setEditingItem({
                             id: item.id, category_id: item.category_id, name: item.name,
@@ -416,6 +432,15 @@ export default function MenuPage() {
                         >
                           <ListPlus className="w-3.5 h-3.5" />
                         </button>
+                        {branches.length > 1 && (
+                          <button
+                            onClick={() => setOverridesItem(item)}
+                            className="p-1.5 rounded-md text-gray-400 hover:text-[#0E7A0E]"
+                            title="Precio/disponibilidad por sucursal"
+                          >
+                            <Building2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => setEditingItem({
                             id: item.id, category_id: item.category_id, name: item.name,
@@ -574,6 +599,21 @@ export default function MenuPage() {
             </form>
           </div>
         </div>
+      )}
+      {overridesItem && branches.length > 0 && (
+        <ItemBranchOverrides
+          item={overridesItem}
+          branches={branches}
+          overrides={overrides}
+          onClose={async () => {
+            setOverridesItem(null)
+            if (restaurant) {
+              const { listBranchMenuOverrides } = await import("../actions")
+              const all = await Promise.all(branches.map((b) => listBranchMenuOverrides(b.id)))
+              setOverrides(all.flat())
+            }
+          }}
+        />
       )}
       {optionsItem && restaurant && (
         <ItemOptionsManager

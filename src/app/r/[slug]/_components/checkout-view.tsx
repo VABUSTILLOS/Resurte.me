@@ -1,8 +1,8 @@
 "use client"
 
 import {
-  ArrowLeft, ArrowRight, Banknote, Bike, CreditCard, MapPin, MessageCircle,
-  Minus, Plus, Sparkles, Store, Trash2, UtensilsCrossed,
+  ArrowLeft, ArrowRight, Banknote, Bike, CreditCard, Landmark, MapPin, MessageCircle,
+  Minus, Plus, Sparkles, Store, Ticket, Trash2, UtensilsCrossed,
 } from "lucide-react"
 import { buildRecommendations, formatMoney, modifiersSummary, type OpenStatus } from "@/lib/foodos"
 import type { FoodosBranch, FoodosOrderItem } from "@/types/foodos"
@@ -27,6 +27,18 @@ export function CheckoutView({
   setPaymentMethod,
   note,
   setNote,
+  couponInput,
+  setCouponInput,
+  appliedCoupon,
+  couponError,
+  couponLoading,
+  onApplyCoupon,
+  onRemoveCoupon,
+  tipPct,
+  setTipPct,
+  customTip,
+  setCustomTip,
+  transferAvailable,
   onChangeQty,
   onRemoveItem,
   onAddRecommendation,
@@ -38,7 +50,7 @@ export function CheckoutView({
 }: {
   branches: FoodosBranch[]
   cart: FoodosOrderItem[]
-  totals: { subtotal: number; discount: number; total: number }
+  totals: { subtotal: number; discount: number; tip: number; total: number }
   deliveryFee: number
   recommendations: ReturnType<typeof buildRecommendations>
   customerName: string
@@ -51,10 +63,22 @@ export function CheckoutView({
   setTableNumber: (v: string) => void
   branchId: string | null
   setBranchId: (v: string) => void
-  paymentMethod: "card" | "branch" | "whatsapp"
-  setPaymentMethod: (v: "card" | "branch" | "whatsapp") => void
+  paymentMethod: "card" | "branch" | "whatsapp" | "transfer"
+  setPaymentMethod: (v: "card" | "branch" | "whatsapp" | "transfer") => void
   note: string
   setNote: (v: string) => void
+  couponInput: string
+  setCouponInput: (v: string) => void
+  appliedCoupon: { code: string; discount: number } | null
+  couponError: string | null
+  couponLoading: boolean
+  onApplyCoupon: () => void
+  onRemoveCoupon: () => void
+  tipPct: 0 | 10 | 15 | "custom"
+  setTipPct: (v: 0 | 10 | 15 | "custom") => void
+  customTip: string
+  setCustomTip: (v: string) => void
+  transferAvailable: boolean
   onChangeQty: (index: number, delta: number) => void
   onRemoveItem: (index: number) => void
   onAddRecommendation: (rec: (typeof recommendations)[number]) => void
@@ -235,6 +259,77 @@ export function CheckoutView({
             )}
           </section>
 
+          {/* Cupón */}
+          <section className="bg-white border border-stone-200 rounded-2xl p-4">
+            <h2 className="font-bold text-stone-900 mb-3 flex items-center gap-2">
+              <Ticket className="w-4 h-4 text-emerald-600" /> Cupón
+            </h2>
+            {appliedCoupon ? (
+              <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5">
+                <p className="text-sm font-bold text-emerald-800">
+                  {appliedCoupon.code} · −{formatMoney(appliedCoupon.discount)}
+                </p>
+                <button onClick={onRemoveCoupon} className="text-xs font-semibold text-emerald-700 hover:text-emerald-900">
+                  Quitar
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div className="flex gap-2">
+                  <input
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                    placeholder="Código de cupón"
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-stone-200 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    onClick={onApplyCoupon}
+                    disabled={couponLoading || !couponInput.trim()}
+                    className="px-4 py-2.5 rounded-xl bg-stone-900 text-white text-sm font-bold hover:bg-stone-700 disabled:opacity-50"
+                  >
+                    {couponLoading ? "…" : "Aplicar"}
+                  </button>
+                </div>
+                {couponError && <p className="mt-2 text-xs text-red-600">{couponError}</p>}
+              </div>
+            )}
+          </section>
+
+          {/* Propina */}
+          <section className="bg-white border border-stone-200 rounded-2xl p-4">
+            <h2 className="font-bold text-stone-900 mb-3">Propina (opcional)</h2>
+            <div className="grid grid-cols-4 gap-2">
+              {([0, 10, 15] as const).map((pct) => (
+                <button
+                  key={pct}
+                  onClick={() => setTipPct(pct)}
+                  className={`rounded-xl p-2.5 border-2 text-sm font-semibold ${
+                    tipPct === pct ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-stone-200 text-stone-500"
+                  }`}
+                >
+                  {pct === 0 ? "Sin" : `${pct}%`}
+                </button>
+              ))}
+              <button
+                onClick={() => setTipPct("custom")}
+                className={`rounded-xl p-2.5 border-2 text-sm font-semibold ${
+                  tipPct === "custom" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-stone-200 text-stone-500"
+                }`}
+              >
+                Otra
+              </button>
+            </div>
+            {tipPct === "custom" && (
+              <input
+                value={customTip}
+                onChange={(e) => setCustomTip(e.target.value.replace(/[^\d.]/g, ""))}
+                placeholder="Monto de propina"
+                inputMode="decimal"
+                className="mt-2 w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            )}
+          </section>
+
           {/* Pago */}
           <section className="bg-white border border-stone-200 rounded-2xl p-4">
             <h2 className="font-bold text-stone-900 mb-3">Pago</h2>
@@ -257,6 +352,17 @@ export function CheckoutView({
                 <CreditCard className="w-5 h-5" />
                 Tarjeta
               </button>
+              {transferAvailable && (
+                <button
+                  onClick={() => setPaymentMethod("transfer")}
+                  className={`flex flex-col items-center gap-1 rounded-xl p-3 border-2 text-sm font-semibold ${
+                    paymentMethod === "transfer" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-stone-200 text-stone-500"
+                  }`}
+                >
+                  <Landmark className="w-5 h-5" />
+                  Transferencia
+                </button>
+              )}
               {branches.find((b) => b.id === branchId)?.phone && (
                 <button
                   onClick={() => setPaymentMethod("whatsapp")}
@@ -274,6 +380,11 @@ export function CheckoutView({
                 Al confirmar se abrirá WhatsApp con tu pedido listo para enviar al restaurante. El pago se acuerda por chat o al recoger.
               </p>
             )}
+            {paymentMethod === "transfer" && (
+              <p className="mt-3 text-xs text-stone-500">
+                Al confirmar verás la CLABE del restaurante. Tu pedido se prepara en cuanto compartas tu comprobante.
+              </p>
+            )}
           </section>
         </div>
 
@@ -286,10 +397,22 @@ export function CheckoutView({
                 <span>Subtotal</span>
                 <span>{formatMoney(totals.subtotal)}</span>
               </div>
+              {totals.discount > 0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>Descuento{appliedCoupon ? ` (${appliedCoupon.code})` : ""}</span>
+                  <span>−{formatMoney(totals.discount)}</span>
+                </div>
+              )}
               {deliveryFee > 0 && (
                 <div className="flex justify-between text-stone-600">
                   <span>Envío</span>
                   <span>{formatMoney(deliveryFee)}</span>
+                </div>
+              )}
+              {totals.tip > 0 && (
+                <div className="flex justify-between text-stone-600">
+                  <span>Propina</span>
+                  <span>{formatMoney(totals.tip)}</span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-black text-stone-900 pt-2 border-t border-stone-200">
@@ -305,7 +428,7 @@ export function CheckoutView({
             <button
               onClick={onSubmit}
               disabled={loading || cart.length === 0 || !openStatus.isOpen}
-              className="mt-4 w-full py-3 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="mt-4 w-full py-3 rounded-xl foodos-accent bg-emerald-600 text-white font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

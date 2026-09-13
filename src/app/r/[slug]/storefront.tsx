@@ -27,6 +27,7 @@ import type {
   FoodosItemOptionGroup,
   FoodosItemOptionValue,
   FoodosBranchHours,
+  FoodosBranchMenuOverride,
 } from "@/types/foodos"
 import { MenuView } from "./_components/menu-view"
 import { CheckoutView } from "./_components/checkout-view"
@@ -54,6 +55,7 @@ interface Props {
   optionGroups: FoodosItemOptionGroup[]
   optionValues: FoodosItemOptionValue[]
   branchHours: FoodosBranchHours[]
+  overrides: FoodosBranchMenuOverride[]
 }
 
 export function FoodosStorefront({
@@ -66,6 +68,7 @@ export function FoodosStorefront({
   optionGroups,
   optionValues,
   branchHours,
+  overrides,
 }: Props) {
   const [cart, setCart] = useState<FoodosOrderItem[]>([])
   const [view, setView] = useState<View>("menu")
@@ -87,10 +90,18 @@ export function FoodosStorefront({
   )
   const [tableNumber, setTableNumber] = useState(mesaParam ?? "")
   const [branchId, setBranchId] = useState<string | null>(branches[0]?.id ?? null)
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "branch" | "whatsapp">("branch")
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "branch" | "whatsapp" | "transfer">("branch")
   const [note, setNote] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Cupón y propina
+  const [couponInput, setCouponInput] = useState("")
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null)
+  const [couponError, setCouponError] = useState<string | null>(null)
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [tipPct, setTipPct] = useState<0 | 10 | 15 | "custom">(0)
+  const [customTip, setCustomTip] = useState("")
 
   // Stripe flow
   const [clientSecret, setClientSecret] = useState<string | null>(null)
@@ -109,9 +120,48 @@ export function FoodosStorefront({
     return getOpenStatus(hours, restaurant.timezone)
   }, [branchHours, branchId, restaurant.timezone])
 
+  // Overrides por sucursal: precio y disponibilidad efectivos del menú.
+  const branchOverrides = useMemo(
+    () => new Map(overrides.filter((o) => o.branch_id === branchId).map((o) => [o.item_id, o])),
+    [overrides, branchId]
+  )
+  const effectivePrice = (item: FoodosMenuItem) => {
+    const override = branchOverrides.get(item.id)
+    return override?.price ?? item.price
+  }
+  const isAvailableAtBranch = (itemId: string) =>
+    branchOverrides.get(itemId)?.is_available !== false
+
+  /** Cambio de sucursal: re-precia el carrito y quita ítems no disponibles. */
+  const handleSelectBranch = (id: string) => {
+    setBranchId(id)
+    const nextOverrides = new Map(overrides.filter((o) => o.branch_id === id).map((o) => [o.item_id, o]))
+    setCart((prev) =>
+      prev
+        .filter((line) => line.combo_id || nextOverrides.get(line.item_id)?.is_available !== false)
+        .map((line) => {
+          if (line.combo_id) return line
+          const menuItem = items.find((i) => i.id === line.item_id)
+          if (!menuItem) return line
+          const base = nextOverrides.get(line.item_id)?.price ?? menuItem.price
+          return { ...line, price: unitPriceWithModifiers(base, line.modifiers) }
+        })
+    )
+  }
+
+  const cartSubtotal = useMemo(
+    () => cart.reduce((sum, i) => sum + i.price * i.qty, 0),
+    [cart]
+  )
+
+  const tipAmount = useMemo(() => {
+    if (tipPct === "custom") return Math.min(Math.max(Number(customTip) || 0, 0), cartSubtotal)
+    return (cartSubtotal * tipPct) / 100
+  }, [tipPct, customTip, cartSubtotal])
+
   const totals = useMemo(
-    () => computeOrderTotals(cart, deliveryFee, 0),
-    [cart, deliveryFee]
+    () => computeOrderTotals(cart, deliveryFee, appliedCoupon?.discount ?? 0, tipAmount),
+    [cart, deliveryFee, appliedCoupon, tipAmount]
   )
 
   const recommendations = useMemo(
@@ -129,7 +179,7 @@ export function FoodosStorefront({
       setOptionsItem(item)
       return
     }
-    pushCartLine({ item_id: item.id, name: item.name, price: item.price, qty: 1 })
+    pushCartLine({ item_id: item.id, name: item.name, price: effectivePrice(item), qty: 1 })
   }
 
   const addItemWithModifiers = (modifiers: FoodosOrderItemModifier[]) => {
@@ -137,7 +187,7 @@ export function FoodosStorefront({
     pushCartLine({
       item_id: optionsItem.id,
       name: optionsItem.name,
-      price: unitPriceWithModifiers(optionsItem.price, modifiers),
+      price: unitPriceWithModifiers(effectivePrice(optionsItem), modifiers),
       qty: 1,
       modifiers: modifiers.length ? modifiers : undefined,
     })
@@ -225,11 +275,14 @@ export function FoodosStorefront({
           discount: 0,
           channel: paymentMethod === "whatsapp" ? "whatsapp" : tableNumber ? "qr" : "web",
           fulfillment,
-          payment_method: paymentMethod === "card" ? "card" : null,
+          payment_method:
+            paymentMethod === "card" ? "card" : paymentMethod === "transfer" ? "transfer" : null,
           customer_name: customerName.trim(),
           customer_phone: customerPhone.trim(),
           note: note.trim() || null,
           table_number: fulfillment === "dine_in" ? tableNumber.trim() : null,
+          coupon_code: appliedCoupon?.code ?? null,
+          tip: tipAmount,
         }),
       })
 
@@ -260,7 +313,8 @@ export function FoodosStorefront({
             items: cart,
             subtotal: totals.subtotal,
             deliveryFee,
-            discount: 0,
+            discount: totals.discount,
+            tip: totals.tip,
             total: data.total,
             fulfillment,
             tableNumber: fulfillment === "dine_in" ? tableNumber.trim() : null,
@@ -321,12 +375,54 @@ export function FoodosStorefront({
     setView("success")
   }
 
-  if (view === "success" && orderId) {
-    return <SuccessScreen restaurant={restaurant} orderId={orderId} />
+  const applyCoupon = async () => {
+    if (!couponInput.trim()) return
+    setCouponLoading(true)
+    setCouponError(null)
+    try {
+      const res = await fetch("/api/foodos/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          restaurant_id: restaurant.id,
+          code: couponInput.trim(),
+          subtotal: cartSubtotal,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.valid) {
+        setAppliedCoupon(null)
+        setCouponError(data.error ?? "Cupón no válido")
+      } else {
+        setAppliedCoupon({ code: data.code, discount: data.discount })
+      }
+    } catch {
+      setCouponError("No se pudo validar el cupón. Intenta de nuevo.")
+    } finally {
+      setCouponLoading(false)
+    }
   }
 
+  if (view === "success" && orderId) {
+    return (
+      <SuccessScreen
+        restaurant={restaurant}
+        orderId={orderId}
+        showTransfer={paymentMethod === "transfer"}
+      />
+    )
+  }
+
+  const accent = restaurant.theme_color || "#059669"
+
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div
+      className="min-h-screen bg-stone-50"
+      style={{ "--foodos-accent": accent } as React.CSSProperties}
+    >
+      <style>{`.foodos-accent { background-color: var(--foodos-accent) !important; }
+.foodos-accent:hover { filter: brightness(0.92); }
+.foodos-accent-text { color: var(--foodos-accent) !important; }`}</style>
       {/* Header */}
       <header className="bg-white border-b border-stone-200 sticky top-0 z-30">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -368,7 +464,7 @@ export function FoodosStorefront({
         {view === "menu" && (
           <MenuView
             categories={categories}
-            items={items}
+            items={items.filter((i) => isAvailableAtBranch(i.id))}
             combos={combos}
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
@@ -377,6 +473,7 @@ export function FoodosStorefront({
             cartCount={cartCount}
             onGoToCart={() => setView("checkout")}
             itemHasOptions={itemHasOptions}
+            priceFor={effectivePrice}
           />
         )}
 
@@ -396,11 +493,23 @@ export function FoodosStorefront({
             tableNumber={tableNumber}
             setTableNumber={setTableNumber}
             branchId={branchId}
-            setBranchId={setBranchId}
+            setBranchId={handleSelectBranch}
             paymentMethod={paymentMethod}
             setPaymentMethod={setPaymentMethod}
             note={note}
             setNote={setNote}
+            couponInput={couponInput}
+            setCouponInput={setCouponInput}
+            appliedCoupon={appliedCoupon}
+            couponError={couponError}
+            couponLoading={couponLoading}
+            onApplyCoupon={applyCoupon}
+            onRemoveCoupon={() => setAppliedCoupon(null)}
+            tipPct={tipPct}
+            setTipPct={setTipPct}
+            customTip={customTip}
+            setCustomTip={setCustomTip}
+            transferAvailable={Boolean(restaurant.transfer_clabe)}
             onChangeQty={changeQty}
             onRemoveItem={removeItem}
             onAddRecommendation={addRecommendation}

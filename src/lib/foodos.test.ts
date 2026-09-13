@@ -99,6 +99,7 @@ describe("buildWhatsAppOrderMessage", () => {
       subtotal: 210,
       deliveryFee: 0,
       discount: 0,
+      tip: 0,
       total: 210,
       fulfillment: "dine_in",
       tableNumber: "4",
@@ -179,5 +180,54 @@ describe("getOpenStatus", () => {
     const s = getOpenStatus(rows, TZ, new Date("2026-09-12T18:00:00Z"))
     expect(s.isOpen).toBe(false)
     expect(s.nextOpenLabel).toBe("Abre mañana 10:00")
+  })
+})
+
+import { couponDiscount, validateCoupon, computeOrderTotals } from "./foodos"
+import type { FoodosCoupon } from "@/types/foodos"
+
+const coupon = (partial: Partial<FoodosCoupon> = {}): FoodosCoupon => ({
+  id: "c1",
+  restaurant_id: "r1",
+  code: "LUNES10",
+  type: "percent",
+  value: 10,
+  min_order: 0,
+  max_uses: null,
+  usage_count: 0,
+  is_active: true,
+  expires_at: null,
+  created_at: "",
+  ...partial,
+})
+
+describe("couponDiscount", () => {
+  it("percent y fixed con tope al subtotal", () => {
+    expect(couponDiscount(coupon({ type: "percent", value: 10 }), 200)).toBe(20)
+    expect(couponDiscount(coupon({ type: "fixed", value: 50 }), 200)).toBe(50)
+    expect(couponDiscount(coupon({ type: "fixed", value: 500 }), 200)).toBe(200)
+  })
+})
+
+describe("validateCoupon", () => {
+  it("rechaza cupón inexistente, inactivo, expirado o sin usos", () => {
+    expect(validateCoupon(null, 100).valid).toBe(false)
+    expect(validateCoupon(coupon({ is_active: false }), 100).valid).toBe(false)
+    expect(validateCoupon(coupon({ expires_at: "2020-01-01T00:00:00Z" }), 100).valid).toBe(false)
+    expect(validateCoupon(coupon({ max_uses: 5, usage_count: 5 }), 100).valid).toBe(false)
+  })
+
+  it("exige pedido mínimo y calcula descuento", () => {
+    expect(validateCoupon(coupon({ min_order: 300 }), 100).valid).toBe(false)
+    const ok = validateCoupon(coupon({ min_order: 100, value: 25 }), 200)
+    expect(ok.valid).toBe(true)
+    expect(ok.discount).toBe(50)
+  })
+})
+
+describe("computeOrderTotals con propina", () => {
+  it("suma propina al total", () => {
+    const t = computeOrderTotals([{ item_id: "i1", name: "X", price: 100, qty: 1 }], 30, 10, 15)
+    expect(t).toEqual({ subtotal: 100, discount: 10, tip: 15, total: 135 })
   })
 })

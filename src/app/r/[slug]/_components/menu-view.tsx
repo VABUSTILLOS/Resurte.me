@@ -17,6 +17,7 @@ export function MenuView({
   cartCount,
   onGoToCart,
   itemHasOptions,
+  priceFor,
 }: {
   categories: FoodosMenuCategory[]
   items: FoodosMenuItem[]
@@ -28,6 +29,7 @@ export function MenuView({
   cartCount: number
   onGoToCart: () => void
   itemHasOptions: (itemId: string) => boolean
+  priceFor: (item: FoodosMenuItem) => number
 }) {
   const featured = items.filter((i) => i.is_featured)
   const visibleCategories = selectedCategory
@@ -65,7 +67,7 @@ export function MenuView({
           <h2 className="text-lg font-black text-stone-900 mb-3">🔥 Favoritos</h2>
           <div className="grid gap-3">
             {featured.map((item) => (
-              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} onAdd={() => onAddItem(item)} />
+              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} onAdd={() => onAddItem(item)} />
             ))}
           </div>
         </section>
@@ -135,7 +137,7 @@ export function MenuView({
             {items
               .filter((i) => i.category_id === cat.id)
               .map((item) => (
-                <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} onAdd={() => onAddItem(item)} />
+                <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} onAdd={() => onAddItem(item)} />
               ))}
           </div>
         </section>
@@ -146,7 +148,7 @@ export function MenuView({
           <h2 className="text-lg font-black text-stone-900 mb-3">Platillos</h2>
           <div className="grid gap-3">
             {uncategorized.map((item) => (
-              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} onAdd={() => onAddItem(item)} />
+              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} onAdd={() => onAddItem(item)} />
             ))}
           </div>
         </section>
@@ -157,7 +159,7 @@ export function MenuView({
           <div className="max-w-4xl mx-auto px-4 py-3 flex justify-end">
             <button
               onClick={onGoToCart}
-              className="flex items-center gap-2 px-6 py-3 rounded-full bg-emerald-600 text-white font-bold hover:bg-emerald-700"
+              className="flex items-center gap-2 px-6 py-3 rounded-full foodos-accent bg-emerald-600 text-white font-bold hover:bg-emerald-700"
             >
               Ver pedido ({cartCount})
               <ArrowRight className="w-4 h-4" />
@@ -169,7 +171,7 @@ export function MenuView({
   )
 }
 
-function ItemCard({ item, hasOptions, onAdd }: { item: FoodosMenuItem; hasOptions: boolean; onAdd: () => void }) {
+function ItemCard({ item, hasOptions, price, onAdd }: { item: FoodosMenuItem; hasOptions: boolean; price: number; onAdd: () => void }) {
   return (
     <div className="flex items-center justify-between gap-3 bg-white border border-stone-200 rounded-2xl p-4">
       <div className="min-w-0 flex-1">
@@ -187,7 +189,7 @@ function ItemCard({ item, hasOptions, onAdd }: { item: FoodosMenuItem; hasOption
           <p className="text-sm text-stone-500 line-clamp-2">{item.description}</p>
         )}
         <p className="text-sm font-bold text-stone-900 mt-1">
-          {formatMoney(item.price)}
+          {formatMoney(price)}
           {hasOptions && <span className="ml-2 text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Personalizable</span>}
         </p>
       </div>
@@ -196,7 +198,7 @@ function ItemCard({ item, hasOptions, onAdd }: { item: FoodosMenuItem; hasOption
           <Image src={item.image_url} alt={item.name} width={80} height={80} className="w-20 h-20 rounded-xl object-cover" />
           <button
             onClick={onAdd}
-            className="absolute -bottom-2 -right-2 w-11 h-11 rounded-full bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 shadow touch-target"
+            className="absolute -bottom-2 -right-2 w-11 h-11 rounded-full foodos-accent bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 shadow touch-target"
             aria-label={`Agregar ${item.name}`}
           >
             <Plus className="w-4 h-4" />
@@ -205,7 +207,7 @@ function ItemCard({ item, hasOptions, onAdd }: { item: FoodosMenuItem; hasOption
       ) : (
         <button
           onClick={onAdd}
-          className="shrink-0 w-11 h-11 rounded-full bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 touch-target"
+          className="shrink-0 w-11 h-11 rounded-full foodos-accent bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 touch-target"
           aria-label={`Agregar ${item.name}`}
         >
           <Plus className="w-5 h-5" />

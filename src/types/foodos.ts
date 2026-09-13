@@ -17,6 +17,10 @@ export interface FoodosRestaurant {
   status: FoodosRestaurantStatus
   currency: string
   timezone: string
+  theme_color: string | null
+  transfer_clabe: string | null
+  transfer_bank: string | null
+  transfer_beneficiary: string | null
   created_at: string
   updated_at: string
 }
@@ -47,6 +51,33 @@ export interface FoodosBranchHours {
   open_time: string | null  // "HH:MM:SS"
   close_time: string | null
   is_closed: boolean
+  created_at: string
+}
+
+// --- Cupones por restaurante ---
+
+export interface FoodosCoupon {
+  id: string
+  restaurant_id: string
+  code: string
+  type: "percent" | "fixed"
+  value: number
+  min_order: number
+  max_uses: number | null
+  usage_count: number
+  is_active: boolean
+  expires_at: string | null
+  created_at: string
+}
+
+// --- Overrides de menú por sucursal ---
+
+export interface FoodosBranchMenuOverride {
+  id: string
+  branch_id: string
+  item_id: string
+  price: number | null
+  is_available: boolean | null
   created_at: string
 }
 
@@ -194,6 +225,8 @@ export interface FoodosOrder {
   customer_phone: string | null
   note: string | null
   table_number: string | null
+  tip: number
+  coupon_code: string | null
   created_at: string
 }
 

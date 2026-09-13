@@ -7,6 +7,7 @@
 import type {
   FoodosBranchHours,
   FoodosCombo,
+  FoodosCoupon,
   FoodosCustomerSegment,
   FoodosItemOptionGroup,
   FoodosMenuItem,
@@ -37,15 +38,55 @@ export function publicRestaurantUrl(slug: string): string {
 export function computeOrderTotals(
   items: FoodosOrderItem[],
   deliveryFee: number,
-  discount = 0
-): { subtotal: number; discount: number; total: number } {
+  discount = 0,
+  tip = 0
+): { subtotal: number; discount: number; tip: number; total: number } {
   const subtotal = items.reduce((sum, i) => sum + i.price * i.qty, 0)
   const cappedDiscount = Math.min(discount, subtotal)
+  const cappedTip = Math.max(0, tip)
   return {
     subtotal,
     discount: cappedDiscount,
-    total: Math.max(0, subtotal - cappedDiscount + deliveryFee),
+    tip: cappedTip,
+    total: Math.max(0, subtotal - cappedDiscount + deliveryFee + cappedTip),
   }
+}
+
+// --- Cupones ---
+
+/** Descuento de un cupón sobre el subtotal (percent | fixed). */
+export function couponDiscount(
+  coupon: Pick<FoodosCoupon, "type" | "value">,
+  subtotal: number
+): number {
+  if (coupon.type === "percent") {
+    return Math.min(subtotal, (subtotal * Number(coupon.value)) / 100)
+  }
+  return Math.min(subtotal, Number(coupon.value))
+}
+
+/** Valida reglas de negocio de un cupón contra un subtotal. */
+export function validateCoupon(
+  coupon: FoodosCoupon | null,
+  subtotal: number,
+  now = new Date()
+): { valid: boolean; discount: number; error: string | null } {
+  if (!coupon) return { valid: false, discount: 0, error: "Cupón no válido" }
+  if (!coupon.is_active) return { valid: false, discount: 0, error: "Este cupón está desactivado" }
+  if (coupon.expires_at && new Date(coupon.expires_at) < now) {
+    return { valid: false, discount: 0, error: "Este cupón expiró" }
+  }
+  if (coupon.max_uses !== null && coupon.usage_count >= coupon.max_uses) {
+    return { valid: false, discount: 0, error: "Este cupón alcanzó su límite de usos" }
+  }
+  if (subtotal < Number(coupon.min_order)) {
+    return {
+      valid: false,
+      discount: 0,
+      error: `Pedido mínimo de ${formatMoney(Number(coupon.min_order))} para este cupón`,
+    }
+  }
+  return { valid: true, discount: couponDiscount(coupon, subtotal), error: null }
 }
 
 // --- Modificadores ---
@@ -98,6 +139,7 @@ export function buildWhatsAppOrderMessage(input: {
   subtotal: number
   deliveryFee: number
   discount: number
+  tip: number
   total: number
   fulfillment: string
   tableNumber?: string | null
@@ -121,6 +163,7 @@ export function buildWhatsAppOrderMessage(input: {
   lines.push(`Subtotal: ${fmt(input.subtotal)}`)
   if (input.discount > 0) lines.push(`Descuento: -${fmt(input.discount)}`)
   if (input.deliveryFee > 0) lines.push(`Envío: ${fmt(input.deliveryFee)}`)
+  if (input.tip > 0) lines.push(`Propina: ${fmt(input.tip)}`)
   lines.push(`*Total: ${fmt(input.total)}*`)
   lines.push("")
   const fulfillmentLabel =

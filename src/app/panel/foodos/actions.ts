@@ -29,6 +29,8 @@ import type {
   FoodosItemOptionGroup,
   FoodosItemOptionValue,
   FoodosBranchHours,
+  FoodosCoupon,
+  FoodosBranchMenuOverride,
 } from "@/types/foodos"
 
 // ------------------------------------------------------------
@@ -114,6 +116,10 @@ export async function upsertRestaurant(input: {
   status?: FoodosRestaurantStatus
   currency?: string
   collection_id?: number | null
+  theme_color?: string | null
+  transfer_clabe?: string | null
+  transfer_bank?: string | null
+  transfer_beneficiary?: string | null
 }): Promise<FoodosRestaurant> {
   const { supabase, user } = await requireAuth()
 
@@ -140,6 +146,10 @@ export async function upsertRestaurant(input: {
     status: input.status ?? "draft",
     currency: input.currency || "MXN",
     collection_id: input.collection_id ?? null,
+    theme_color: input.theme_color || null,
+    transfer_clabe: input.transfer_clabe || null,
+    transfer_bank: input.transfer_bank || null,
+    transfer_beneficiary: input.transfer_beneficiary || null,
   }
 
   let result
@@ -900,4 +910,114 @@ export async function deleteCampaign(id: string): Promise<void> {
   const { error } = await supabase.from("foodos_campaigns").delete().eq("id", id)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/clientes")
+}
+
+// ------------------------------------------------------------
+// Cupones del restaurante
+// ------------------------------------------------------------
+
+export async function listCoupons(restaurantId: string): Promise<FoodosCoupon[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_coupons")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("created_at", { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data as FoodosCoupon[]) ?? []
+}
+
+export async function upsertCoupon(input: {
+  id?: string
+  restaurant_id: string
+  code: string
+  type: "percent" | "fixed"
+  value: number
+  min_order?: number
+  max_uses?: number | null
+  is_active?: boolean
+  expires_at?: string | null
+}): Promise<void> {
+  const { supabase } = await requireAuth()
+  const payload = {
+    restaurant_id: input.restaurant_id,
+    code: input.code.trim().toUpperCase(),
+    type: input.type,
+    value: Number(input.value) || 0,
+    min_order: Number(input.min_order) || 0,
+    max_uses: input.max_uses ?? null,
+    is_active: input.is_active ?? true,
+    expires_at: input.expires_at || null,
+  }
+  const { error } = input.id
+    ? await supabase.from("foodos_coupons").update(payload).eq("id", input.id)
+    : await supabase.from("foodos_coupons").insert(payload)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/cupones")
+}
+
+export async function deleteCoupon(id: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase.from("foodos_coupons").delete().eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/cupones")
+}
+
+// ------------------------------------------------------------
+// Overrides de menú por sucursal
+// ------------------------------------------------------------
+
+export async function listBranchMenuOverrides(
+  branchId: string
+): Promise<FoodosBranchMenuOverride[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_branch_menu_overrides")
+    .select("*")
+    .eq("branch_id", branchId)
+  if (error) throw new Error(error.message)
+  return (data as FoodosBranchMenuOverride[]) ?? []
+}
+
+/** Guarda (o borra, si ambos campos son null) el override de un ítem en una sucursal. */
+export async function upsertBranchMenuOverride(input: {
+  branch_id: string
+  item_id: string
+  price?: number | null
+  is_available?: boolean | null
+}): Promise<void> {
+  const { supabase } = await requireAuth()
+  const price = input.price ?? null
+  const isAvailable = input.is_available ?? null
+  if (price === null && isAvailable === null) {
+    const { error } = await supabase
+      .from("foodos_branch_menu_overrides")
+      .delete()
+      .eq("branch_id", input.branch_id)
+      .eq("item_id", input.item_id)
+    if (error) throw new Error(error.message)
+  } else {
+    const { error } = await supabase
+      .from("foodos_branch_menu_overrides")
+      .upsert(
+        { branch_id: input.branch_id, item_id: input.item_id, price, is_available: isAvailable },
+        { onConflict: "branch_id,item_id" }
+      )
+    if (error) throw new Error(error.message)
+  }
+  revalidatePath("/panel/foodos/menu")
+}
+
+// ------------------------------------------------------------
+// Pedidos: confirmar pago manual (transferencia/efectivo)
+// ------------------------------------------------------------
+
+export async function markOrderPaid(orderId: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_orders")
+    .update({ payment_status: "paid" })
+    .eq("id", orderId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/pedidos")
 }
