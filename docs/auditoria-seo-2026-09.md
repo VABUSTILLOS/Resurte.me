@@ -1,6 +1,6 @@
 # Auditoría SEO completa — Resurte.me (2026-09-12)
 
-**Alcance:** auditoría técnica, on-page, contenido y visibilidad en motores de IA (GEO) sobre el sitio en producción y el código fuente. Cambios implementados en el PR #9 (`seo/auditoria-2026-09`). **Fase 2 (misma rama, mismo día):** cierre del backlog de metadatos (31 menores), 3 guías "money" nuevas de alta intención comercial y sincronización de `llms.txt`. **Fase 3 (misma rama, mismo día):** 2 guías pilar (hubs), 4ª página de comparación (alternativas a Sysco/clubes), guía de lista de insumos de apertura e interlinking desde posts existentes. **Fase 4 (misma rama, mismo día):** las 4 guías pilar restantes (operación, marketing, legal/finanzas, crecimiento) — 6/6 hubs — e interlinking desde 4 posts más.
+**Alcance:** auditoría técnica, on-page, contenido y visibilidad en motores de IA (GEO) sobre el sitio en producción y el código fuente. Cambios implementados en el PR #9 (`seo/auditoria-2026-09`). **Fases 2-5 (misma rama, mismo día):** cierre del backlog de metadatos (31 menores), 15 guías nuevas (5 money/comparativas, 6 pilares/hubs, 1 de apertura, 3 de la serie por categoría de insumo), interlinking desde 8 posts existentes y sincronización de `llms.txt`.
 
 ---
 
@@ -25,6 +25,7 @@
 | 11 | Sin contenido "money" de comparación | Alto — keywords de alta intención sin cubrir | ✅ 5 guías creadas (fases 2-3) |
 | 12 | Cover 404 en `tendencias-consumo-restaurantes` (typo en nombre de imagen) | Bajo — og:image rota | ✅ Corregido en fase 2 |
 | 13 | Blog plano sin hubs temáticos | Medio — PageRank temático disperso | ✅ 6 de 6 pilares creadas (fases 3-4) |
+| 14 | Blog enlaza poco al catálogo transaccional | Medio — PageRank no fluye a páginas que convierten | 🔶 Iniciado en fase 5 (serie por insumo enlaza a `/cdmx/categoria/*`) |
 
 ---
 
@@ -60,7 +61,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 
 ### 2.6 Arquitectura y enlazado interno — OK con mejora
 - Páginas de categoría a 2 clics del home; blog interligado con CTAs contextuales; breadcrumbs con schema.
-- **Mejora sugerida:** hub pages por tema en el blog (ver estrategia de contenidos) y enlazar las páginas de colección (`/coleccion/taquerias-antojitos`) desde los artículos relacionados — hoy el blog enlaza al Panel pero poco al catálogo transaccional. **Avance fases 3-4:** las 6 páginas pilar creadas (proveeduría, costos, operación, marketing, legal/finanzas, crecimiento) e interlinking desde 8 posts existentes hacia las guías nuevas.
+- **Mejora sugerida:** hub pages por tema en el blog (ver estrategia de contenidos) y enlazar las páginas de colección (`/coleccion/taquerias-antojitos`) desde los artículos relacionados — hoy el blog enlaza al Panel pero poco al catálogo transaccional. **Avance fases 3-5:** las 6 páginas pilar creadas con interlinking desde 8 posts existentes, y la fase 5 inició los enlaces directos a páginas transaccionales del catálogo: la serie por categoría de insumo enlaza a `/cdmx/categoria/frutas-verduras`, `/cdmx/categoria/carnes-aves-pescados` y `/cdmx/categoria/desechables`.
 
 ---
 
@@ -125,7 +126,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 | Táctica | Antes | Ahora |
 |---|---|---|
 | Crawlers IA en robots.txt | GPTBot bloqueado | 12 permitidos: GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-User, PerplexityBot, Perplexity-User, Google-Extended, Applebot-Extended, Meta-ExternalAgent, Amazonbot, CCBot |
-| `llms.txt` | No existía | Creado + actualizado en fases 2-4: secciones de guías pilar (6 hubs), comparativas money y guías clásicas |
+| `llms.txt` | No existía | Creado + actualizado en fases 2-5: guías pilar (6 hubs), comparativas money, serie por categoría de insumo y guías clásicas |
 | FAQPage schema | Solo en posts | También en /faq (respuestas citables por AI Overviews) |
 | Datos consistentes | $3,000/$2,500, 6/20 ciudades | Unificados (clave: las IA amplifican contradicciones) |
 
@@ -244,6 +245,27 @@ Las 4 con FAQ schema (5 Q&A), tablas MXN y enlaces a pilares hermanos. Veracidad
 ### Producción
 
 2 writers en paralelo (2 pilares cada uno), QA de schema del orquestador antes de cada push (esta vez ambos entregaron la clave `faq` correcta), un commit por etapa: pilares `444c759` + `8d1c692`, interlinking `540ea30` + `ceafa84`, docs/llms `b72fae8`.
+
+---
+
+## Fase 5 (2026-09-12) — brechas de keywords y serie por categoría de insumo
+
+### Guías creadas
+
+| Slug | Keyword objetivo | Nota |
+|---|---|---|
+| como-funciona-compra-mayoreo-en-linea | "comprar por mayoreo en línea México", "cómo funciona la compra por mayoreo en línea" | Brecha n.º 4 de la estrategia (educación de categoría) |
+| proveedores-frutas-verduras-restaurantes | "proveedores de frutas y verduras para restaurantes" | Brecha n.º 6, categoría 1; enlaza a `/cdmx/categoria/frutas-verduras` (2×) |
+| proveedores-carne-mayoreo-restaurantes | "proveedores de carne al mayoreo para restaurantes" | Brecha n.º 6, categoría 2; enlaza a `/cdmx/categoria/carnes-aves-pescados` (2×) |
+| desechables-mayoreo-restaurantes | "desechables al mayoreo para restaurantes" | Brecha n.º 6, categoría 3; enlaza a `/cdmx/categoria/desechables` (2×) |
+
+### Por qué importa la serie por insumo
+
+Resuelve dos hallazgos a la vez: la brecha de keywords "proveedores de [insumo] para restaurantes" y el hallazgo 2.6 (el blog enlazaba al Panel pero casi nada al catálogo transaccional — las páginas que convierten). Cada guía de la serie enlaza a su página de categoría transaccional con ancla natural.
+
+### Veracidad
+
+Sin precios de mercado actuales (fluctúan y no eran verificables en la sesión): las guías enseñan a evaluar precio por kg útil tras rendimiento, comparar por costo por unidad y verificar calidad en recepción. El ejemplo numérico de carne ($180→$240→$48 por 200 g) es el ya publicado en la guía de food cost. Pendientes de la serie: lácteos/huevo, bebidas y abarrotes.
 
 ---
 
