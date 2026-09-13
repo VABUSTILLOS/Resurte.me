@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   getAdminOrders,
   type AdminOrder,
@@ -16,6 +16,8 @@ import { toCsv, downloadCsv } from "@/lib/csv"
 import type { OrderStatus } from "@/types"
 import { ToastProvider, useToast } from "@/components/toast"
 import { useEscapeKey } from "@/hooks/use-escape-key"
+import { useOrderAutoRefresh } from "@/hooks/use-order-auto-refresh"
+import { formatRelativeTime } from "@/lib/relative-time"
 
 function formatAdminAddress(a: NonNullable<AdminOrder["address"]>): string {
   const parts = [
@@ -112,6 +114,10 @@ function AdminOrdersContent() {
     }
   }
 
+  // Fase 3 — id del pedido más reciente conocido, para detectar altas nuevas
+  // durante el auto-refresh y avisar con un toast.
+  const lastTopIdRef = useRef<number | null>(null)
+
   useEffect(() => {
     let cancelled = false
 
@@ -126,6 +132,7 @@ function AdminOrdersContent() {
           setOrders(data)
           setHasMore(more)
           setError(null)
+          if (data[0]) lastTopIdRef.current = data[0].id
         }
       } catch (e) {
         if (!cancelled) {
@@ -141,6 +148,32 @@ function AdminOrdersContent() {
       cancelled = true
     }
   }, [refreshKey, statusFilter, debouncedSearch])
+
+  // Fase 3 — auto-refresh silencioso cada 30 s (pausado en segundo plano).
+  // Mantiene los filtros activos y avisa si entra un pedido nuevo.
+  const silentRefresh = useCallback(async () => {
+    try {
+      const { orders: data, hasMore: more } = await getAdminOrders(100, undefined, {
+        status: statusFilter,
+        search: debouncedSearch,
+      })
+      const topId = data[0]?.id ?? null
+      if (
+        lastTopIdRef.current !== null &&
+        topId !== null &&
+        topId !== lastTopIdRef.current
+      ) {
+        toast("Nuevo pedido recibido", "success")
+      }
+      if (topId !== null) lastTopIdRef.current = topId
+      setOrders(data)
+      setHasMore(more)
+    } catch {
+      // Silencioso: el siguiente ciclo de 30 s lo reintenta
+    }
+  }, [statusFilter, debouncedSearch, toast])
+
+  useOrderAutoRefresh(silentRefresh, 30_000)
 
   async function loadOlder() {
     const lastOrder = orders[orders.length - 1]
@@ -255,6 +288,14 @@ function AdminOrdersContent() {
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <p className="text-red-600 text-sm font-medium">{error}</p>
         <p className="text-gray-400 text-xs mt-1">Verifica que estés autenticado como administrador.</p>
+        {/* Fase 7 — recuperación ante error sin recargar la página */}
+        <button
+          type="button"
+          onClick={refresh}
+          className="mt-4 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 transition-colors"
+        >
+          Reintentar
+        </button>
       </div>
     )
   }
@@ -269,11 +310,13 @@ function AdminOrdersContent() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Fase 4 — exporta los pedidos actualmente filtrados */}
           <button
             type="button"
             onClick={exportCsv}
             disabled={filtered.length === 0}
-            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Descargar los pedidos filtrados en CSV (Excel)"
+            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
             Exportar CSV
@@ -408,8 +451,12 @@ function AdminOrdersContent() {
                       <span className="text-xs text-gray-400">Web</span>
                     )}
                   </td>
-                  <td className="px-5 py-3 text-xs text-gray-400">
-                    {new Date(order.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}
+                  {/* Fase 7 — fecha relativa con la absoluta en el tooltip */}
+                  <td
+                    className="px-5 py-3 text-xs text-gray-400"
+                    title={new Date(order.created_at).toLocaleString("es-MX")}
+                  >
+                    {formatRelativeTime(order.created_at)}
                   </td>
                   <td className="px-5 py-3">
                     <button

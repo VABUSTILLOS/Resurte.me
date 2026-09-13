@@ -7,14 +7,29 @@ import Link from "next/link"
 import {
   ShoppingBag,
   Store,
-  Users,
+  Ban,
   DollarSign,
   ArrowUpRight,
   ArrowDownRight,
+  Clock,
   type LucideIcon,
 } from "lucide-react"
-import { type AdminOrder } from "./actions"
+import {
+  getAdminTodayStats,
+  getAdminAlerts,
+  getAdminInsights,
+  getAdminLeadsSummary,
+  type AdminOrder,
+  type AdminTodayStats,
+  type AdminAlert,
+  type AdminInsights as AdminInsightsData,
+  type AdminLeadsSummary,
+} from "./actions"
 import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/order-labels"
+import { formatRelativeTime } from "@/lib/relative-time"
+import { AdminAlerts } from "./components/AdminAlerts"
+import { LeadsCrmWidget } from "./components/LeadsCrmWidget"
+import { DashboardSkeleton } from "./components/DashboardSkeleton"
 
 // recharts is ~100 KB gz; load charts on demand with a skeleton.
 const MetricsCharts = dynamic(
@@ -27,6 +42,35 @@ const MetricsCharts = dynamic(
   },
 )
 
+// Fase 6 — también usa recharts; se carga bajo demanda igual que MetricsCharts.
+const AdminInsights = dynamic(
+  () => import("./components/AdminInsights").then((m) => m.AdminInsights),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-64 animate-pulse rounded-xl bg-gray-100" />
+    ),
+  },
+)
+
+/** Fase 1 — Delta porcentual vs ayer con dirección de tendencia. */
+function buildDelta(
+  today: number,
+  yesterday: number
+): { change: string | null; trend: "up" | "down" | "neutral" } {
+  if (yesterday <= 0) {
+    return today > 0
+      ? { change: "nuevo hoy", trend: "up" }
+      : { change: null, trend: "neutral" }
+  }
+  const pct = ((today - yesterday) / yesterday) * 100
+  const rounded = Math.abs(Math.round(pct))
+  return {
+    change: `${pct >= 0 ? "+" : "−"}${rounded}% vs ayer`,
+    trend: pct > 0 ? "up" : pct < 0 ? "down" : "neutral",
+  }
+}
+
 export default function AdminDashboardPage() {
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("daily")
   const [metrics, setMetrics] = useState<{
@@ -36,72 +80,52 @@ export default function AdminDashboardPage() {
     avgAov: number
     avgConversion: number
   } | null>(null)
-  const [metricsLoading, setMetricsLoading] = useState(true)
-  const [metricsError, setMetricsError] = useState<string | null>(null)
 
   const [orders, setOrders] = useState<AdminOrder[]>([])
-  const [ordersLoading, setOrdersLoading] = useState(true)
-  const [ordersError, setOrdersError] = useState<string | null>(null)
-  const [stats, setStats] = useState({
-    ordersToday: 0,
-    revenueToday: 0,
-    activeStores: 0,
-    cancellations: 0,
-  })
+  const [stats, setStats] = useState<AdminTodayStats | null>(null)
+  const [alerts, setAlerts] = useState<AdminAlert[]>([])
+  const [insights, setInsights] = useState<AdminInsightsData | null>(null)
+  const [leads, setLeads] = useState<AdminLeadsSummary | null>(null)
 
-  const fetchMetrics = useCallback(async () => {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchDashboard = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
-      const res = await fetch(`/api/admin/metrics?period=${period}`)
-      if (!res.ok) throw new Error("Error al cargar métricas")
-      const data = await res.json()
-      setMetrics(data)
+      const [metricsRes, ordersRes, statsData, alertsData, insightsData, leadsData] =
+        await Promise.all([
+          fetch(`/api/admin/metrics?period=${period}`),
+          fetch("/api/admin/orders?limit=10"),
+          getAdminTodayStats(),
+          getAdminAlerts(),
+          getAdminInsights(),
+          getAdminLeadsSummary(),
+        ])
+      if (!metricsRes.ok) throw new Error("Error al cargar métricas")
+      if (!ordersRes.ok) throw new Error("Error al cargar pedidos")
+      const [metricsData, ordersData] = await Promise.all([
+        metricsRes.json(),
+        ordersRes.json(),
+      ])
+      setMetrics(metricsData)
+      setOrders(ordersData.orders)
+      setStats(statsData)
+      setAlerts(alertsData)
+      setInsights(insightsData)
+      setLeads(leadsData)
     } catch (e) {
-      setMetricsError(e instanceof Error ? e.message : "Error al cargar métricas")
+      setError(e instanceof Error ? e.message : "Error al cargar el dashboard")
     } finally {
-      setMetricsLoading(false)
+      setLoading(false)
     }
   }, [period])
 
-  const fetchOrders = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/orders?limit=50")
-      if (!res.ok) throw new Error("Error al cargar pedidos")
-      const data = await res.json()
-      setOrders(data.orders)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const todaysOrders = data.orders.filter(
-        (o: AdminOrder) => new Date(o.created_at) >= today
-      )
-      const revenueToday = todaysOrders
-        .filter((o: AdminOrder) => o.payment_status === "paid")
-        .reduce((sum: number, o: AdminOrder) => sum + Number(o.total), 0)
-      const cancellations = todaysOrders.filter(
-        (o: AdminOrder) => o.status === "cancelled"
-      ).length
-      setStats({
-        ordersToday: todaysOrders.length,
-        revenueToday,
-        activeStores: data.activeStores,
-        cancellations,
-      })
-    } catch (e) {
-      setOrdersError(e instanceof Error ? e.message : "Error al cargar pedidos")
-    } finally {
-      setOrdersLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
     // Diferido a microtask: ningún setState corre síncrono en el efecto.
-    void Promise.resolve().then(fetchMetrics)
-  }, [fetchMetrics])
-
-  // Carga inicial de pedidos (una sola vez)
-  useEffect(() => {
-    // Diferido a microtask: ningún setState corre síncrono en el efecto.
-    void Promise.resolve().then(fetchOrders)
-  }, [fetchOrders])
+    void Promise.resolve().then(fetchDashboard)
+  }, [fetchDashboard])
 
   const recentOrders = orders.slice(0, 5)
   const statCards: {
@@ -111,70 +135,91 @@ export default function AdminDashboardPage() {
     trend: "up" | "down" | "neutral"
     icon: LucideIcon
     color: string
-  }[] = [
-    {
-      label: "Pedidos hoy",
-      value: String(stats.ordersToday),
-      change: null,
-      trend: "neutral" as const,
-      icon: ShoppingBag,
-      color: "bg-blue-50 text-blue-600",
-    },
-    {
-      label: "Ingresos hoy",
-      value: `$${stats.revenueToday.toLocaleString("es-MX")}`,
-      change: null,
-      trend: "neutral" as const,
-      icon: DollarSign,
-      color: "bg-green-50 text-green-600",
-    },
-    {
-      label: "Tiendas activas",
-      value: String(stats.activeStores),
-      change: null,
-      trend: "neutral" as const,
-      icon: Store,
-      color: "bg-purple-50 text-purple-600",
-    },
-    {
-      label: "Cancelaciones",
-      value: String(stats.cancellations),
-      change: null,
-      trend: "neutral" as const,
-      icon: Users,
-      color: "bg-red-50 text-red-600",
-    },
-  ]
+  }[] = stats
+    ? [
+        {
+          label: "Pedidos hoy",
+          value: String(stats.ordersToday),
+          ...buildDelta(stats.ordersToday, stats.ordersYesterday),
+          icon: ShoppingBag,
+          color: "bg-blue-50 text-blue-600",
+        },
+        {
+          label: "Ingresos hoy",
+          value: `$${stats.revenueToday.toLocaleString("es-MX")}`,
+          ...buildDelta(stats.revenueToday, stats.revenueYesterday),
+          icon: DollarSign,
+          color: "bg-green-50 text-green-600",
+        },
+        {
+          label: "Ticket promedio hoy",
+          value: `$${stats.aovToday.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`,
+          ...buildDelta(stats.aovToday, stats.aovYesterday),
+          icon: Store,
+          color: "bg-purple-50 text-purple-600",
+        },
+        {
+          label: "Cancelaciones hoy",
+          value: String(stats.cancellationsToday),
+          // En cancelaciones, "subir" es malo: invertimos el color de tendencia
+          ...(() => {
+            const d = buildDelta(stats.cancellationsToday, stats.cancellationsYesterday)
+            return {
+              change: d.change,
+              trend: d.trend === "up" ? ("down" as const) : d.trend === "down" ? ("up" as const) : ("neutral" as const),
+            }
+          })(),
+          icon: Ban,
+          color: "bg-red-50 text-red-600",
+        },
+      ]
+    : []
 
-  if (ordersLoading || metricsLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-brand-600" />
-      </div>
-    )
+  // Fase 7 — Skeleton completo en lugar de spinner genérico
+  if (loading) {
+    return <DashboardSkeleton />
   }
 
-  if (ordersError || metricsError) {
+  if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <p className="text-red-600 text-sm font-medium">
-          {ordersError || metricsError}
-        </p>
+        <p className="text-red-600 text-sm font-medium">{error}</p>
         <p className="text-gray-400 text-xs mt-1">
           Verifica que estés autenticado como administrador.
         </p>
+        {/* Fase 7 — recuperación ante error sin recargar la página */}
+        <button
+          onClick={fetchDashboard}
+          className="mt-4 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 transition-colors"
+        >
+          Reintentar
+        </button>
       </div>
     )
   }
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500">Resumen general de Resurte.me</p>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-sm text-gray-500">Resumen general de Resurte.me</p>
+        </div>
+        {stats && stats.pendingCount > 0 && (
+          <Link
+            href="/admin/pedidos"
+            className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
+          >
+            <Clock className="w-3.5 h-3.5" />
+            {stats.pendingCount} pendiente{stats.pendingCount === 1 ? "" : "s"} por atender
+          </Link>
+        )}
       </div>
 
-      {/* Stat cards */}
+      {/* Fase 2 — Alertas operativas */}
+      <AdminAlerts alerts={alerts} />
+
+      {/* Fase 1 — Stat cards con comparativa vs ayer */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {statCards.map((card) => (
           <div key={card.label} className="bg-white rounded-xl border border-gray-200 p-5">
@@ -210,18 +255,23 @@ export default function AdminDashboardPage() {
           <MetricsCharts
             data={metrics.points}
             period={period}
-            onPeriodChange={(p) => {
-              // El reset de loading/error va en el event handler, no en el efecto.
-              setMetricsLoading(true)
-              setMetricsError(null)
-              setPeriod(p)
-            }}
+            onPeriodChange={setPeriod}
           />
         </Suspense>
       )}
 
+      {/* Fase 6 — Analítica avanzada (carga diferida) */}
+      {insights && (
+        <div className="mt-8">
+          <AdminInsights insights={insights} />
+        </div>
+      )}
+
+      {/* Fase 8 — Leads y CRM */}
+      {leads && <LeadsCrmWidget summary={leads} />}
+
       {/* Recent orders */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mt-8">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Pedidos recientes</h2>
           <Link
@@ -260,11 +310,12 @@ export default function AdminDashboardPage() {
                       {STATUS_LABEL[order.status]}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-xs text-gray-400">
-                    {new Date(order.created_at).toLocaleDateString("es-MX", {
-                      day: "numeric",
-                      month: "short",
-                    })}
+                  {/* Fase 7 — fecha relativa con la absoluta en el tooltip */}
+                  <td
+                    className="px-5 py-3 text-xs text-gray-400"
+                    title={new Date(order.created_at).toLocaleString("es-MX")}
+                  >
+                    {formatRelativeTime(order.created_at)}
                   </td>
                 </tr>
               ))}

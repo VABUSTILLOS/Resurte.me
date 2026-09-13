@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef } from "react"
+import { Suspense, useState, useEffect, useMemo, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
   Search,
@@ -16,6 +17,10 @@ import {
   RefreshCw,
   AlertTriangle,
   PackageX,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -61,6 +66,16 @@ const STOCK_LABELS: Record<StockStatus, string> = {
   out_of_stock: "Agotado",
 }
 
+/** Fase 5 — paginación del catálogo (424+ productos). */
+const PAGE_SIZE = 50
+
+const STOCK_FILTERS: { label: string; value: StockStatus | "all" }[] = [
+  { label: "Todo el stock", value: "all" },
+  { label: "En stock", value: "in_stock" },
+  { label: "Stock bajo", value: "low_stock" },
+  { label: "Agotados", value: "out_of_stock" },
+]
+
 function buildMap(rows: AvailabilityRow[]): AvailabilityMap {
   const map: AvailabilityMap = new Map()
   for (const row of rows) {
@@ -72,6 +87,21 @@ function buildMap(rows: AvailabilityRow[]): AvailabilityMap {
 }
 
 export default function AdminProductsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-20 text-gray-400">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+          Cargando productos...
+        </div>
+      }
+    >
+      <AdminProductsContent />
+    </Suspense>
+  )
+}
+
+function AdminProductsContent() {
   // Lazy browser-only client: creating it during SSR would throw when
   // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
   const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
@@ -85,8 +115,6 @@ export default function AdminProductsPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
-  // Filtro de alertas de stock: "all" | "low_stock" | "out_of_stock"
-  const [stockFilter, setStockFilter] = useState<"all" | "low_stock" | "out_of_stock">("all")
 
   // Debounce: filtrar cientos de filas en cada tecla re-renderiza toda la tabla.
   useEffect(() => {
@@ -143,6 +171,18 @@ export default function AdminProductsPage() {
   const [draftCities, setDraftCities] = useState<Set<number>>(new Set())
   const [bulkSaving, setBulkSaving] = useState(false)
 
+  // Fase 5 — filtros de categoría/stock (con deep-link ?stock= desde las
+  // alertas del dashboard) y paginación.
+  const searchParams = useSearchParams()
+  const initialStock = searchParams.get("stock")
+  const [categoryFilter, setCategoryFilter] = useState<string>("all")
+  const [stockFilter, setStockFilter] = useState<StockStatus | "all">(
+    initialStock === "in_stock" || initialStock === "low_stock" || initialStock === "out_of_stock"
+      ? initialStock
+      : "all"
+  )
+  const [page, setPage] = useState(1)
+
   useEffect(() => {
     if (!supabase) return
     let cancelled = false
@@ -191,6 +231,7 @@ export default function AdminProductsPage() {
     const categoryName = (id: number | null) =>
       categories.find((c) => c.id === id)?.name ?? "Sin categoría"
     return products.filter((p) => {
+      if (categoryFilter !== "all" && String(p.category_id ?? "") !== categoryFilter) return false
       if (stockFilter !== "all" && p.stock_status !== stockFilter) return false
       if (!q) return true
       return (
@@ -199,7 +240,17 @@ export default function AdminProductsPage() {
         categoryName(p.category_id).toLowerCase().includes(q)
       )
     })
-  }, [products, debouncedSearch, categories, stockFilter])
+  }, [products, debouncedSearch, categories, categoryFilter, stockFilter])
+
+  // Fase 5 — paginación sobre los resultados filtrados
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  function updateFilters(next: () => void) {
+    next()
+    setPage(1)
+  }
 
   // ---------- Disponibilidad por ciudad ----------
   // Sin filas en product_city_availability = "Global" (todas las ciudades).
@@ -328,6 +379,39 @@ export default function AdminProductsPage() {
     setCityModalOpen(false)
   }
 
+  /** Fase 5 — muestra/oculta en tienda todos los productos seleccionados. */
+  async function bulkSetVisibility(isVisible: boolean) {
+    if (selected.size === 0 || bulkSaving) return
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const ids = [...selected]
+      const results = await Promise.all(
+        ids.map(async (productId) => {
+          const res = await fetch("/api/admin/products/update", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId, is_visible: isVisible }),
+          })
+          return res.ok
+        })
+      )
+      const failed = results.filter((ok) => !ok).length
+      const succeededIds = ids.filter((_, i) => results[i])
+      setProducts((prev) =>
+        prev.map((p) => (succeededIds.includes(p.id) ? { ...p, is_visible: isVisible } : p))
+      )
+      setSelected(new Set())
+      if (failed > 0) {
+        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
+      }
+    } catch {
+      setError("Error al actualizar la visibilidad en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
   // ---------- Edición por producto (precio, stock, WhatsApp) ----------
   const patchProduct = async (productId: number, fields: Record<string, unknown>) => {
     setSaving((prev) => new Set(prev).add(productId))
@@ -401,7 +485,11 @@ export default function AdminProductsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Productos</h1>
-          <p className="text-sm text-gray-500">{products.length} productos registrados</p>
+          <p className="text-sm text-gray-500">
+            {filtered.length === products.length
+              ? `${products.length} productos registrados`
+              : `${filtered.length} de ${products.length} productos`}
+          </p>
         </div>
         <div className="flex items-center gap-4">
           <Link
@@ -436,7 +524,7 @@ export default function AdminProductsPage() {
           <span className="text-sm font-semibold text-amber-800">Alertas de inventario:</span>
           <button
             type="button"
-            onClick={() => setStockFilter((f) => (f === "low_stock" ? "all" : "low_stock"))}
+            onClick={() => updateFilters(() => setStockFilter((f) => (f === "low_stock" ? "all" : "low_stock")))}
             aria-pressed={stockFilter === "low_stock"}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               stockFilter === "low_stock"
@@ -449,7 +537,7 @@ export default function AdminProductsPage() {
           </button>
           <button
             type="button"
-            onClick={() => setStockFilter((f) => (f === "out_of_stock" ? "all" : "out_of_stock"))}
+            onClick={() => updateFilters(() => setStockFilter((f) => (f === "out_of_stock" ? "all" : "out_of_stock")))}
             aria-pressed={stockFilter === "out_of_stock"}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               stockFilter === "out_of_stock"
@@ -463,7 +551,7 @@ export default function AdminProductsPage() {
           {stockFilter !== "all" && (
             <button
               type="button"
-              onClick={() => setStockFilter("all")}
+              onClick={() => updateFilters(() => setStockFilter("all"))}
               className="text-xs font-semibold text-amber-700 hover:underline"
             >
               Ver todos
@@ -472,16 +560,43 @@ export default function AdminProductsPage() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Buscar producto o categoría..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-        />
+      {/* Fase 5 — búsqueda + filtros de categoría y stock */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar producto o categoría..."
+            value={search}
+            onChange={(e) => updateFilters(() => setSearch(e.target.value))}
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+          />
+        </div>
+        <select
+          value={categoryFilter}
+          onChange={(e) => updateFilters(() => setCategoryFilter(e.target.value))}
+          className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+          aria-label="Filtrar por categoría"
+        >
+          <option value="all">Todas las categorías</option>
+          {categories.map((c) => (
+            <option key={c.id} value={String(c.id)}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={stockFilter}
+          onChange={(e) => updateFilters(() => setStockFilter(e.target.value as StockStatus | "all"))}
+          className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+          aria-label="Filtrar por stock"
+        >
+          {STOCK_FILTERS.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Barra de acciones para la selección */}
@@ -515,6 +630,23 @@ export default function AdminProductsPage() {
               title="No disponibles en ninguna ciudad"
             >
               Ninguna
+            </button>
+            {/* Fase 5 — visibilidad en tienda en lote */}
+            <button
+              onClick={() => bulkSetVisibility(true)}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 text-xs font-semibold hover:bg-green-100 disabled:opacity-50"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              Mostrar en tienda
+            </button>
+            <button
+              onClick={() => bulkSetVisibility(false)}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200 text-xs font-semibold hover:bg-gray-200 disabled:opacity-50"
+            >
+              <EyeOff className="w-3.5 h-3.5" />
+              Ocultar de tienda
             </button>
             <button
               onClick={() => setSelected(new Set())}
@@ -553,7 +685,7 @@ export default function AdminProductsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map((product) => {
+              {pageItems.map((product) => {
                 const global = isGlobal(product.id)
                 const cityCount = citiesAvailableCount(product.id)
                 return (
@@ -736,6 +868,37 @@ export default function AdminProductsPage() {
             </div>
           )}
         </div>
+
+        {/* Fase 5 — paginación */}
+        {filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+            <p className="text-xs text-gray-400">
+              Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–
+              {Math.min(currentPage * PAGE_SIZE, filtered.length)} de {filtered.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                aria-label="Página anterior"
+                className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs font-medium text-gray-600 px-2">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                aria-label="Página siguiente"
+                className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input oculto para subir imagen de producto */}
