@@ -15,7 +15,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { AnalyticsEvents } from "@/lib/analytics"
-import { haptic } from "@/lib/haptics"
 import { CHECKOUT_DRAWER_EVENT } from "@/components/checkout/CheckoutDrawer"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
@@ -26,9 +25,6 @@ import { calcCheckoutTotals, DELIVERY_FEE_FLAT, freeShippingProgress } from "@/l
 // Global event bus to control drawer from header
 export const CART_DRAWER_EVENT = "resurte:toggle-cart-drawer"
 
-/** Distancia de arrastre hacia abajo que confirma el cierre del drawer. */
-const SWIPE_CLOSE_THRESHOLD = 80
-
 export function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false)
   const { cart, itemCount, subtotal, coupon, removeItem, updateQuantity, clearCart } = useCart()
@@ -37,31 +33,6 @@ export function CartDrawer() {
   // CheckoutDrawer vía detail.bumps al presionar "Ir a Checkout". Compartidos
   // con /cart y /{ciudad}/carrito vía sessionStorage + evento global.
   const { selectedBumps, setSelectedBumps } = useSelectedBumps()
-  const closeBtnRef = useRef<HTMLButtonElement>(null)
-
-  // Swipe-to-close (móvil, patrón app nativa): arrastrar el handle/header
-  // hacia abajo desliza el drawer; al soltar por encima del umbral se cierra.
-  const [dragY, setDragY] = useState(0)
-  const dragStartY = useRef<number | null>(null)
-
-  const onHandleTouchStart = (e: React.TouchEvent) => {
-    dragStartY.current = e.touches[0]?.clientY ?? null
-  }
-  const onHandleTouchMove = (e: React.TouchEvent) => {
-    if (dragStartY.current === null) return
-    const currentY = e.touches[0]?.clientY
-    if (currentY === undefined) return
-    const dy = currentY - dragStartY.current
-    if (dy > 0) setDragY(dy)
-  }
-  const onHandleTouchEnd = () => {
-    if (dragY > SWIPE_CLOSE_THRESHOLD) {
-      haptic(12)
-      setIsOpen(false)
-    }
-    setDragY(0)
-    dragStartY.current = null
-  }
 
   // Totales en tiempo real (fuente única calcCheckoutTotals): el descuento de
   // cupón se aplica sobre subtotal + bumps, igual que el checkout y el servidor.
@@ -90,16 +61,9 @@ export function CartDrawer() {
     return () => { document.body.style.overflow = "" }
   }, [isOpen])
 
-  // Gestión de foco (diálogo modal): al abrir, el foco entra al drawer para
-  // que la navegación por teclado/lector de pantalla empiece dentro.
-  useEffect(() => {
-    if (isOpen) closeBtnRef.current?.focus()
-  }, [isOpen])
-
   useEscapeKey(useCallback(() => setIsOpen(false), []), isOpen)
 
   const handleCheckout = () => {
-    haptic(15)
     AnalyticsEvents.beginCheckout(
       subtotal,
       cart.items.length,
@@ -136,49 +100,30 @@ export function CartDrawer() {
         aria-modal="true"
         aria-label="Mi Carrito"
         className="fixed right-0 top-0 bottom-0 z-[70] w-full max-w-md sm:max-w-2xl bg-white shadow-2xl flex flex-col animate-slide-in-right"
-        style={{
-          transform: dragY > 0 ? `translateY(${dragY}px)` : undefined,
-          transition: dragY > 0 ? "none" : "transform 0.2s ease",
-        }}
       >
-        {/* Zona de arrastre (handle + header): en móvil comunica y ejecuta el
-            cierre por gesto de deslizamiento hacia abajo. */}
-        <div
-          onTouchStart={onHandleTouchStart}
-          onTouchMove={onHandleTouchMove}
-          onTouchEnd={onHandleTouchEnd}
-        >
-          <div className="sm:hidden flex justify-center pt-2" aria-hidden="true">
-            <div className="w-10 h-1 rounded-full bg-[#E8E9EB]" />
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E9EB]">
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="w-5 h-5 text-[#0E7A0E]" />
+            <h2 className="text-lg font-bold text-[#242529]">
+              Mi Carrito
+            </h2>
+            {itemCount > 0 && (
+              <span className="text-sm text-[var(--text-secondary)]">
+                ({itemCount} {itemCount === 1 ? "producto" : "productos"})
+              </span>
+            )}
           </div>
-
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8E9EB]">
-            <div className="flex items-center gap-2">
-              <ShoppingBag className="w-5 h-5 text-[#0E7A0E]" />
-              <h2 className="text-lg font-bold text-[#242529]">
-                Mi Carrito
-              </h2>
-              {itemCount > 0 && (
-                <span className="text-sm text-[var(--text-secondary)]">
-                  ({itemCount} {itemCount === 1 ? "producto" : "productos"})
-                </span>
-              )}
-            </div>
-            <button
-              ref={closeBtnRef}
-              onClick={() => setIsOpen(false)}
-              aria-label="Cerrar carrito"
-              className="p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
-            >
-              <X className="w-5 h-5 text-[var(--text-secondary)]" />
-            </button>
-          </div>
+          <button
+            onClick={() => setIsOpen(false)}
+            className="p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors"
+          >
+            <X className="w-5 h-5 text-[var(--text-secondary)]" />
+          </button>
         </div>
 
-        {/* Items — overscroll-contain: el scroll de la lista no arrastra la
-            página de fondo (scroll chaining) en móvil. */}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-5">
+        {/* Items */}
+        <div className="flex-1 overflow-y-auto px-5">
           {/* Barra de progreso hacia envío gratis — visible arriba del pliegue
               y se actualiza en tiempo real al seleccionar order bumps. */}
           {cart.items.length > 0 && (
@@ -268,7 +213,7 @@ export function CartDrawer() {
                           >
                             <Minus className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[var(--text-secondary)]" />
                           </button>
-                          <span className="w-8 text-center text-sm font-medium text-[#242529]" aria-live="polite" aria-label={`Cantidad: ${item.quantity}`}>
+                          <span className="w-8 text-center text-sm font-medium text-[#242529]">
                             {item.quantity}
                           </span>
                           <button
@@ -372,14 +317,10 @@ export function CartDrawer() {
               </span>
             </div>
 
-            {/* Total (recalculado en tiempo real con bumps + envío). aria-live
-                anuncia el cambio de total a lectores de pantalla al ajustar
-                cantidades o bumps. */}
+            {/* Total (recalculado en tiempo real con bumps + envío) */}
             <div className="flex items-center justify-between pt-1 border-t border-[#E8E9EB]">
               <span className="text-sm font-bold text-[#242529]">Total</span>
-              <span className="text-base font-bold text-brand-700" aria-live="polite">
-                ${drawerTotal.toFixed(2)}
-              </span>
+              <span className="text-base font-bold text-brand-700">${drawerTotal.toFixed(2)}</span>
             </div>
 
             {/* Actions */}
@@ -475,7 +416,6 @@ export function MobileCartBar() {
   const handleCheckout = () => {
     // begin_checkout desde la barra móvil (la otra superficie es el
     // CartDrawer al tocar "Ir a Checkout").
-    haptic(15)
     AnalyticsEvents.beginCheckout(
       subtotal,
       itemCount,
@@ -521,7 +461,6 @@ export function MobileCartBar() {
           {/* Tap to open drawer — flex-1 + truncate absorbe el texto largo a 320px */}
           <button
             onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
-            aria-label={`Abrir carrito, total $${barTotal.toFixed(2)}`}
             className="flex items-center gap-2 min-w-0 flex-1 justify-start touch-target"
           >
             <span className="bg-[#0E7A0E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
@@ -545,7 +484,6 @@ export function MobileCartBar() {
           {/* Tap to open drawer — always visible */}
           <button
             onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
-            aria-label={`Abrir carrito, total $${barTotal.toFixed(2)}`}
             className="flex items-center gap-2.5 min-w-0"
           >
             <span className="bg-[#0E7A0E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
