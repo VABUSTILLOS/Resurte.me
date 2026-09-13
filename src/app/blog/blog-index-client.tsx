@@ -292,11 +292,13 @@ export function BlogIndexClient({
             </div>
           </div>
           <div className="mt-6 flex flex-col gap-6">
-            <FeaturedBlogCard
-              post={featured[0]!}
-              size="large"
-              priority
-            />
+            {featured[0] && (
+              <FeaturedBlogCard
+                post={featured[0]}
+                size="large"
+                priority
+              />
+            )}
             <div className="grid gap-6 sm:grid-cols-3">
               {featured.slice(1, 4).map((post) => (
                 <FeaturedBlogCard key={post.slug} post={post} />
