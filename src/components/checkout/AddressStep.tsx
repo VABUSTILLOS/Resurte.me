@@ -90,12 +90,15 @@ export function AddressStep({
   const hydrated = useRef(false)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LAST_ADDRESS_KEY)
-      if (raw) setLastSaved(JSON.parse(raw))
-    } catch {
-      /* datos corruptos o storage no disponible */
-    }
+    // Diferido a microtask: ningún setState corre síncrono en el efecto.
+    void Promise.resolve().then(() => {
+      try {
+        const raw = localStorage.getItem(LAST_ADDRESS_KEY)
+        if (raw) setLastSaved(JSON.parse(raw))
+      } catch {
+        /* datos corruptos o storage no disponible */
+      }
+    })
     hydrated.current = true
   }, [])
 

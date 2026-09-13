@@ -33,7 +33,8 @@ export function InstallPrompt() {
     if ((navigator as unknown as { standalone?: boolean }).standalone) return
 
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent)
-    setIsIos(ios)
+    // Diferido a microtask: ningún setState corre síncrono en el efecto.
+    void Promise.resolve().then(() => setIsIos(ios))
 
     const onPrompt = (e: Event) => {
       e.preventDefault()

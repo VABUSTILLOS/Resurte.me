@@ -235,7 +235,6 @@ export const ProductCard = memo(function ProductCard({
         </div>
       </Link>
 
-<<<<<<< HEAD
       {/* Favorito (lista de resurtido) — fuera del Link para no anidar
           interactivos; posicionado sobre la esquina de la imagen. */}
       <button
@@ -253,10 +252,6 @@ export const ProductCard = memo(function ProductCard({
         />
       </button>
 
-      {/* Quick-add button — mobile: inline dentro del card (sin saliente que
-          pise la fila siguiente). ≥sm: Erewhon-style, flota bajo el card. */}
-      {!outOfStock ? (
-=======
       {/* Acción principal del card:
           1) ya en carrito → stepper − N + (siempre visible, comunica el estado)
           2) disponible    → quick-add
@@ -288,7 +283,6 @@ export const ProductCard = memo(function ProductCard({
           </button>
         </div>
       ) : !outOfStock ? (
->>>>>>> 25e9cb9 (feat(catalogo): fase C11 — stepper − N + en la card cuando el producto ya está en el carrito (ajuste rápido sin abrir el drawer))
         <button
           onClick={handleAdd}
           aria-label={`Agregar ${product.name} al carrito`}
