@@ -15,9 +15,6 @@ interface AuthFormProps {
 const INPUT_CLASS =
   "mt-1 block w-full rounded-lg border border-gray-300 px-3 py-3 sm:py-2 text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
 
-const INPUT_CLASS =
-  "mt-1 block w-full rounded-lg border border-gray-300 px-3 py-3 sm:py-2 text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-
 export function AuthForm({ mode }: AuthFormProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
