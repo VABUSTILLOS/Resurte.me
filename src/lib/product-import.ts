@@ -5,7 +5,7 @@
 
 import { slugify } from "./foodos"
 
-export const PRODUCT_IMPORT_HEADER = [
+const PRODUCT_IMPORT_HEADER = [
   "nombre",
   "slug",
   "precio",
@@ -27,7 +27,7 @@ export interface ProductImportRow {
   is_visible: boolean
 }
 
-export interface ProductImportError {
+interface ProductImportError {
   /** 1-based, contando la fila de encabezado */
   line: number
   message: string
