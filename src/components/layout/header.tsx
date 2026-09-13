@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package, Search, Handshake, Heart } from "lucide-react"
+import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package, Search, Handshake } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
@@ -9,7 +9,8 @@ import { SearchBar } from "@/components/search/search-bar"
 import { CART_DRAWER_EVENT } from "@/components/cart/cart-drawer"
 import { MobileSearchOverlay, MOBILE_SEARCH_EVENT } from "@/components/search/mobile-search-overlay"
 import { useRouter } from "next/navigation"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { User as SupabaseUser, SupabaseClient } from "@supabase/supabase-js"
 
 export function Header() {
@@ -27,6 +28,11 @@ export function Header() {
   const [cashbackBalance, setCashbackBalance] = useState<number | null>(null)
   const [role, setRole] = useState<"admin" | "vendedor" | "cliente" | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Teclado: Escape cierra los menús flotantes (selector de ciudad y menú de
+  // usuario) — patrón ARIA disclosure; antes solo se cerraban con clic fuera.
+  useEscapeKey(useCallback(() => setShowUserMenu(false), []), showUserMenu)
+  useEscapeKey(useCallback(() => setShowCitySelector(false), []), showCitySelector)
 
   // Resolver el rol del usuario (server action) para navegación por sección
   useEffect(() => {
@@ -107,7 +113,7 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-50 glass-header print:hidden"
+      className="sticky top-0 z-50 glass-header"
       style={{ paddingTop: "var(--header-inset-top)" }}
     >
       <div className="max-w-7xl mx-auto px-3 sm:px-6">
@@ -127,6 +133,7 @@ export function Header() {
             <Link
               href="/recompensas"
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-[#0E7A0E]/10 border border-[#0E7A0E]/20 hover:bg-[#0E7A0E]/15 transition-colors text-sm shrink-0"
+              aria-label={`Tienes $${cashbackBalance.toLocaleString("es-MX")} en recompensas — ir a Recompensas`}
             >
               <Coins className="w-4 h-4 text-[#0E7A0E]" />
               <span className="font-semibold text-[#0E7A0E]">
@@ -140,6 +147,7 @@ export function Header() {
           <button
             onClick={() => setShowCitySelector(!showCitySelector)}
             aria-label="Seleccionar ciudad"
+            aria-expanded={showCitySelector}
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] hover:bg-[#F7F5F0] transition-colors text-sm shrink-0 touch-target"
           >
             <MapPin className="w-4 h-4 text-[#0E7A0E]" aria-hidden="true" />
@@ -177,6 +185,7 @@ export function Header() {
             <button
               onClick={() => setShowCitySelector(!showCitySelector)}
               aria-label="Seleccionar ciudad"
+              aria-expanded={showCitySelector}
               className="sm:hidden p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
             >
               <MapPin className="w-5 h-5 text-[#343538]" aria-hidden="true" />
@@ -224,7 +233,7 @@ export function Header() {
                 </button>
 
                 {showUserMenu && (
-                  <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-50">
+                  <div role="menu" aria-label="Cuenta" className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-50">
                     <div className="px-4 py-2 border-b border-gray-100">
                       <p className="text-sm font-medium text-[#343538] truncate">
                         {user.user_metadata?.full_name || user.email}
@@ -242,44 +251,40 @@ export function Header() {
                       )}
                     </div>
                     <Link
+                      role="menuitem"
                       href={city ? `/${city.slug}/mis-pedidos` : "/auth/login"}
                       onClick={() => setShowUserMenu(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#343538] hover:bg-[#F7F5F0] transition-colors"
                     >
-                      <Package className="w-4 h-4" />
+                      <Package className="w-4 h-4" aria-hidden="true" />
                       Mis pedidos
                     </Link>
                     <Link
-                      href={city ? `/${city.slug}/favoritos` : "/auth/login"}
-                      onClick={() => setShowUserMenu(false)}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#343538] hover:bg-[#F7F5F0] transition-colors"
-                    >
-                      <Heart className="w-4 h-4" />
-                      Mi lista de resurtido
-                    </Link>
-                    <Link
+                      role="menuitem"
                       href={city ? `/${city.slug}/mis-direcciones` : "/auth/login"}
                       onClick={() => setShowUserMenu(false)}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#343538] hover:bg-[#F7F5F0] transition-colors"
                     >
-                      <MapPin className="w-4 h-4" />
+                      <MapPin className="w-4 h-4" aria-hidden="true" />
                       Mis direcciones
                     </Link>
                     {(role === "vendedor" || role === "admin") && (
                       <Link
+                        role="menuitem"
                         href="/comercializacion"
                         onClick={() => setShowUserMenu(false)}
                         className="flex items-center gap-2 px-4 py-2.5 text-sm text-[#343538] hover:bg-[#F7F5F0] transition-colors"
                       >
-                        <Handshake className="w-4 h-4" />
+                        <Handshake className="w-4 h-4" aria-hidden="true" />
                         Comercialización
                       </Link>
                     )}
                     <button
+                      role="menuitem"
                       onClick={handleSignOut}
                       className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
-                      <LogOut className="w-4 h-4" />
+                      <LogOut className="w-4 h-4" aria-hidden="true" />
                       Cerrar sesión
                     </button>
                   </div>

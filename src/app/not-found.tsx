@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { MapPin } from "lucide-react"
+import { MapPin, Search, MessageCircle, HelpCircle } from "lucide-react"
 
 export default function NotFound() {
   return (
@@ -19,6 +19,34 @@ export default function NotFound() {
         <MapPin className="w-4 h-4" />
         Seleccionar ciudad
       </Link>
+
+      {/* Rutas de escape: un 404 sin salida es sesión perdida; ofrecemos las
+          tres acciones más probables (buscar producto, ayuda, WhatsApp). */}
+      <nav aria-label="Opciones alternativas" className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm">
+        <Link
+          href="/catalogo/chihuahua"
+          className="inline-flex items-center gap-1.5 text-brand-600 hover:text-brand-700 font-medium"
+        >
+          <Search className="w-4 h-4" aria-hidden="true" />
+          Explorar el catálogo
+        </Link>
+        <Link
+          href="/faq"
+          className="inline-flex items-center gap-1.5 text-brand-600 hover:text-brand-700 font-medium"
+        >
+          <HelpCircle className="w-4 h-4" aria-hidden="true" />
+          Preguntas frecuentes
+        </Link>
+        <a
+          href={`https://wa.me/${(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486").replace(/\D/g, "")}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-brand-600 hover:text-brand-700 font-medium"
+        >
+          <MessageCircle className="w-4 h-4" aria-hidden="true" />
+          Ayuda por WhatsApp
+        </a>
+      </nav>
     </div>
   )
 }
