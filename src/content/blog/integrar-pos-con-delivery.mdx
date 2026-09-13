@@ -1,0 +1,363 @@
+---
+title: "Integra tu POS con las apps de delivery: adiós a capturar pedidos a mano"
+description: "Tutorial para integrar el POS de tu restaurante con Uber Eats, Didi Food y Rappi: opciones, costos, pasos y errores a evitar."
+category: herramientas
+contentType: tutorial
+date: "2026-09-20"
+updatedAt: "2026-09-20"
+author: "Equipo Resurte.me"
+authorRole: "Especialistas en restaurantes"
+tags: ["POS restaurante", "integración delivery", "Uber Eats restaurante", "punto de venta", "herramientas restaurante"]
+featured: false
+coverImage: "/images/blog/integrar-pos-con-delivery.webp"
+coverAlt: "Terminal punto de venta de restaurante mostrando pedidos de apps de delivery integrados"
+faq:
+  - question: "¿Qué significa integrar el POS con las apps de delivery?"
+    answer: "Que los pedidos de Uber Eats, Didi Food o Rappi entren directo a tu punto de venta y tu cocina sin que nadie los capture a mano. La integración también sincroniza tu menú y precios entre plataformas, manda el ticket a impresión automática y te da reportes unificados de ventas en salón y delivery."
+  - question: "¿Cuánto cuesta integrar el POS con apps de delivery en México?"
+    answer: "Depende de la vía: agregadores/integradores especializados cobran típicamente $500–2,000 MXN mensuales por sucursal; algunos POS modernos incluyen integración en su mensualidad; y la opción 'gratis' es capturar a mano, que cuesta horas del equipo y errores. Evalúa el costo contra los pedidos que procesas al día."
+  - question: "¿Qué pasa si no integro y sigo capturando pedidos manualmente?"
+    answer: "Lo que ya te pasa: pedidos capturados con errores, tiempos de aceptación lentos (que las apps castigan bajándote en el listado), inventarios descuadrados y un empleado secuestrado por las tablets durante la hora pico. A partir de 15–20 pedidos diarios por app, la captura manual suele costar más que la integración."
+  - question: "¿Puedo tener el mismo menú y precios en todas las apps automáticamente?"
+    answer: "Sí: esa es una de las funciones principales de la integración. Cambias un precio o agotaste un platillo una sola vez en tu POS o integrador, y el cambio se refleja en todas las plataformas. Sin integración, cada cambio se hace app por app, con el riesgo de precios distintos en cada una."
+  - question: "¿Necesito internet especial para la integración?"
+    answer: "No especial, pero sí confiable: la integración vive en la nube, así que una caída de internet es una caída de pedidos. Lo mínimo recomendable: conexión estable con respaldo (un segundo proveedor o datos móviles de contingencia) para las horas pico."
+  - question: "¿Cómo elijo entre integrador externo y POS con integración incluida?"
+    answer: "Si tu POS actual te funciona y solo falta delivery, un integrador externo lo conecta sin cambiar de sistema. Si vas a cambiar de POS de todos modos, elige uno con integración nativa a las apps que usas y te ahorras una mensualidad. Compara: costo total mensual, apps soportadas y soporte en español."
+---
+
+**Cómo integrar el POS con las apps de delivery es la pregunta que te haces el día que tu encargado pasa la hora pico capturando pedidos de tres tablets a mano, se equivoca en dos y tu cocina grita.** Este tutorial te lleva del caos de las tablets al pedido que entra solo: qué es la integración, las tres vías para lograrla con sus costos reales en pesos, el paso a paso de la implementación en 2–4 semanas, cómo mantener menús sincronizados sin volverte loco y los errores que cuestan dinero la primera semana.
+
+## El problema que resuelves (y cuánto te cuesta hoy)
+
+Si tienes apps de delivery sin integración, tu operación se ve así: suena la tablet de Uber Eats, alguien acepta el pedido y lo captura en tu POS; suena la de Didi, lo mismo; suena Rappi, lo mismo. Tres pantallas, un empleado capturando, y cada pedido transcrito es una oportunidad de error: el "sin cebolla" que no se transcribió, el precio viejo, el platillo agotado que se vendió igual porque nadie lo pausó en las tres apps.
+
+Y el problema crece contigo: el restaurante que maneja 8 pedidos diarios a mano sobrevive; el mismo restaurante seis meses después, con 30 pedidos diarios de tres apps, tiene a su mejor empleado secuestrado por las tablets en el momento exacto en que el salón más lo necesita. El crecimiento del delivery sin integración convierte tu mejor hora en tu peor caos.
+
+El costo real de capturar a mano, en números típicos de un restaurante mexicano con delivery activo:
+
+| Concepto | Costo estimado |
+|---|---|
+| Tiempo de captura (2–4 min por pedido) | 1–2 horas diarias de un empleado |
+| Errores de captura (1–3% de pedidos) | $200–600 MXN/semana en reposiciones y cortesías |
+| Aceptación lenta de pedidos | Las apps te bajan en el listado = menos ventas |
+| Precios desincronizados entre apps | Clientes que comparan y reclaman |
+| Inventario descuadrado | Mermas que "no cuadran" al cierre |
+
+La pregunta no es si la integración cuesta: es que NO integrar ya te está costando, solo que ese costo está escondido en la operación diaria, repartido entre sueldos, errores y ventas que nunca llegaron.
+
+## Qué es exactamente la integración POS-delivery
+
+Una integración conecta tres cosas que hoy viven separadas:
+
+1. **Los pedidos:** el pedido de la app entra directo a tu POS como si lo hubiera capturado tu propio cajero, con sus modificadores completos, y sale impreso en cocina automáticamente. Nadie lo transcribe.
+2. **El menú:** tu catálogo (platillos, precios, disponibilidad) se sincroniza con todas las apps desde un solo lugar. Agotas el mole: lo pausas una vez y se pausa en todas las plataformas al mismo tiempo.
+3. **Los reportes:** ventas de salón y delivery en el mismo sistema, con la comisión de cada app visible, para que sepas cuánto GANAS por canal y no solo cuánto vendes.
+
+Cuando las tres conexiones funcionan, el delivery deja de ser una operación paralela que hay que "cuadrar" al final del día y se vuelve una extensión natural de tu mostrador: mismo inventario, mismos reportes, misma disciplina.
+
+### Lo que la integración NO hace
+
+Para alinear expectativas: no reduce la comisión de las apps (eso se negocia aparte), no maneja a los repartidores (eso es de la plataforma) y no arregla un menú mal diseñado (si tu menú de delivery no está pensado para viajar, la integración solo hará que los problemas lleguen más rápido). Es plomería digital: conecta tuberías, no cocina.
+
+### POS en la nube vs. POS instalado: qué importa para el delivery
+
+Si tu POS es de los antiguos (instalado en una computadora local, sin conexión a internet), la integración directa probablemente no sea posible — esos sistemas nacieron antes del delivery. Tus opciones reales:
+
+- **Migrar a POS en la nube:** la mayoría de los POS modernos para restaurantes viven en la nube (tus datos accesibles, actualizaciones automáticas, integraciones posibles). La migración cuesta un cambio de hábitos y un fin de semana de configuración; a cambio, abre la puerta a delivery integrado, reportes desde tu celular y respaldo automático de tu información.
+- **El puente intermedio:** algunos integradores ofrecen una tablet/pantalla consolidadora que recibe TODOS los pedidos en un solo lugar aunque no entren al POS — no elimina la captura, pero la reduce a una sola pantalla. Es el escalón razonable si cambiar de POS hoy no es viable.
+- **La decisión honesta:** si tu POS local ya se quedó chico (sin reportes decentes, sin respaldo, depende de "la computadora de la caja"), el delivery es la excusa perfecta para migrar. Si aún te sirve para salón, el puente consolidador te compra tiempo sin frenar el crecimiento del delivery.
+
+## Las 3 vías para integrar: cuál es la tuya
+
+### Vía 1: el integrador/agregador externo
+
+Empresas especializadas (en México operan varias: Deliverect, Otter, Deliverart y similares) hacen de "traductor universal": reciben los pedidos de todas las apps y los inyectan a tu POS. 
+
+- **A favor:** funciona con casi cualquier POS, soporta muchas apps, suma reportes consolidados de todos los canales y suele incluir la pantalla consolidada de pedidos.
+- **En contra:** mensualidad adicional ($500–2,000 MXN por sucursal, según volumen y apps), y dependes de un eslabón más en la cadena: cuando el integrador falla, todo falla a la vez.
+
+### Vía 2: POS con integración nativa
+
+Varios POS modernos para restaurantes (los que operan en México como Soft Restaurant, Poster, Square for Restaurants y otros) incluyen conexión directa con las principales apps dentro de su mensualidad o como módulo adicional.
+
+- **A favor:** un solo proveedor, un solo soporte, un solo recibo, y una sola persona a quien reclamarle cuando algo falla.
+- **En contra:** si tu POS actual no la tiene, implica cambiar de sistema completo (migración de menú, capacitación del equipo, historial de ventas). Es la vía correcta cuando ya tocaba cambiar de POS de todos modos.
+
+### Vía 3: el híbrido pragmático (tablet + proceso disciplinado)
+
+No es integración, pero hay que mencionarlo honestamente: si procesas menos de 10–15 pedidos diarios de delivery, un proceso manual BIEN diseñado (una sola tablet consolidadora, plantillas de captura, responsable asignado por turno) puede ser suficiente por ahora. La integración se justifica cuando el volumen hace que el error y el tiempo cuesten más que la mensualidad.
+
+### Tabla comparativa
+
+| Criterio | Integrador externo | POS nativo | Manual disciplinado |
+|---|---|---|---|
+| Costo mensual | $500–2,000 MXN | Incluido o módulo extra | $0 (pero tiempo del equipo) |
+| Cambiar de POS | No | Sí | No |
+| Apps soportadas | Muchas | Las que el POS soporte | Todas (a mano) |
+| Errores de captura | Casi cero | Casi cero | 1–3% típico |
+| Volumen donde rinde | 15+ pedidos/día | 15+ pedidos/día | Menos de 15/día |
+
+La regla de decisión rápida: si amas tu POS actual, integrador externo; si tu POS ya te quedó chico en otras cosas (reportes, inventario, nube), aprovecha y migra a uno con integración nativa; si tu volumen es bajo, perfecciona el manual y guarda este tutorial para cuando crezcas. No hay respuesta universal: hay respuesta para tu volumen y tu stack.
+
+<BlogCallout variant="tip" title="La cuenta rápida para decidir">
+Suma lo que te cuesta hoy capturar a mano: horas del equipo al mes × sueldo por hora + errores y reposiciones semanales + ventas perdidas por aceptación lenta. Si el total supera la mensualidad del integrador, la decisión está tomada: la integración no es un gasto, es recuperar dinero que ya estás perdiendo.
+</BlogCallout>
+
+## Paso a paso: implementación en 2–4 semanas
+
+### Semana 1: auditoría y elección
+
+1. **Inventario de tu stack actual:** qué POS usas (y su versión), en cuántas apps estás, cuántos pedidos diarios procesas por app, qué tablet/equipo tienes en mostrador.
+2. **Solicita demos a 2–3 opciones** (integradores y/o POS con integración). Preguntas obligatorias: ¿qué apps soportan en México? ¿el pedido entra con modificadores completos? ¿puedo pausar un platillo en todas las apps desde un lugar? ¿el reporte muestra comisiones? ¿soporte en español y horario?
+3. **Pide el costo total real:** mensualidad + instalación + equipo adicional si se requiere + costo por volumen si existe. Que te lo manden por escrito.
+
+### Semana 2: contratación y configuración del menú
+
+4. **Firma y alta:** el proveedor conecta tus cuentas de apps (necesitarás accesos de administrador de cada plataforma).
+5. **La carga del menú (el paso crítico):** tu catálogo se mapea platillo por platillo entre tu POS y las apps. Revisa personalmente: nombres, precios de delivery (recuerda: con comisión considerada), fotos, modificadores, y que los combos se hayan mapeado bien. El 80% de los problemas de arranque nacen de un mapeo de menú hecho con prisa.
+6. **Define tus precios de delivery:** política común en la industria: el menú de apps cuesta 10–20% más que el de salón para absorber comisiones. Decide tu estrategia ANTES de mapear, no después.
+
+### Semana 3: pruebas controladas
+
+7. **Pedidos de prueba:** tu equipo hace pedidos reales (que se preparan y consumen) desde cada app y verifica: ¿entró al POS solo? ¿imprimió en cocina con modificadores? ¿el inventario descontó?
+8. **Prueba los casos especiales:** pedido con modificador raro, platillo agotado a media tarde, cancelación de la app, pedido en hora pico. Todo lo que pueda salir mal lo pruebas esta semana, con calma.
+9. **Capacita al equipo:** quién vigila la pantalla, qué hacer si no imprime, cómo pausar un platillo, a quién se avisa si algo falla. Una hoja plastificada en mostrador con el protocolo de fallas.
+
+### Semana 4: arranque y ajuste
+
+10. **Salida en vivo** un día de semana tranquilo (no un viernes por la noche).
+11. **Primera semana con doble verificación:** el encargado revisa al cierre que los pedidos de las apps cuadren contra el POS. Las diferencias se reportan al soporte en caliente.
+12. **Ajusta tiempos de preparación en las apps:** con la integración, tus tiempos reales de cocina alimentan la promesa de entrega; afínalos con la primera semana de datos.
+
+<BlogCallout variant="warning" title="No arranques en tu día más fuerte">
+El error clásico: instalar la integración y estrenarla un 10 de mayo o un viernes de quincena. Todo sistema nuevo tiene una semana de curva de aprendizaje; que la tuya caiga en martes tranquilo, no en tu Super Bowl. El día fuerte es para operar lo que ya dominas.
+</BlogCallout>
+
+## La operación diaria con la integración funcionando
+
+### El menú de delivery se diseña para el viaje, no para el salón
+
+Antes de mapear nada, revisa tu menú con la pregunta correcta: ¿este platillo aguanta 30–40 minutos de motocicleta y llega como algo que volverías a pedir? Reglas de diseño para delivery:
+
+- **Lo frito va ventilado o no va:** empaque con salida de vapor o el crujiente llega aguado (y la reseña de 2 estrellas llega contigo).
+- **Salsas y aderezos aparte:** siempre, en contenedor separado. El cliente ensambla en casa y el platillo llega con textura.
+- **Menú corto de delivery:** 15–25 platillos que viajan bien venden mejor que el menú completo con sorpresas desagradables. La integración te permite mantener catálogos distintos por canal — aprovéchalo.
+- **Combos de ticket alto:** el delivery premia el combo (platillo + bebida + postre) porque el cliente de app compra por conveniencia; arma 3–5 combos con margen calculado con comisión incluida.
+- **Fotos reales del empaque:** la foto del platillo EN su empaque de delivery baja las quejas por expectativa y sube la conversión.
+
+### La nueva hora pico
+
+Con integración, la hora pico cambia de oficio: en vez de un empleado capturando tablets, tienes un encargado vigilando UNA pantalla donde caen todos los pedidos (salón y delivery juntos). Su trabajo ya no es transcribir: es priorizar, avisar a cocina de los picos y atender excepciones. La captura desaparece; el criterio permanece.
+
+### El menú sincronizado: la disciplina semanal
+
+La integración facilita, pero no automatiza el criterio comercial. El ritual de 15 minutos semanales:
+
+- **Disponibilidad:** ¿algo que se agota seguido merece pausa programada en ciertas horas?
+- **Precios:** ¿los costos del insumo subieron? Un cambio en el POS se propaga a todas las apps — el peligro es olvidar actualizar y vender a precio viejo en todos lados a la vez.
+- **Fotos y descripciones:** las apps premian menús con buenas fotos; una actualización de fotos al mes mantiene el listado competitivo.
+- **Los "fantasmas":** platillos que existen en la app pero ya no en tu menú (o al revés). La revisión semanal los caza antes de que un cliente los pida.
+
+### Protocolo de contingencia: cuando la integración falla a media pica
+
+Tarde o temprano pasará: viernes 8 pm, los pedidos dejan de entrar solos. El protocolo plastificado en mostrador:
+
+1. **Verifica:** ¿es internet, el integrador o la app? (Checa si entra otro pedido de otra app — eso aísla la falla.)
+2. **Modo manual temporal:** se activa la captura a mano SOLO hasta que vuelva el sistema. Por eso tu equipo conserva la capacitación manual básica: la integración elimina la captura diaria, no la habilidad de hacerlo en emergencia.
+3. **Avisa:** al soporte del integrador con capturas de pantalla y hora exacta; y al piso: "modo manual, avisen a cocina verbalmente los modificadores".
+4. **Recupera:** cuando vuelva el servicio, verifica que no haya pedidos perdidos ni duplicados (el momento del regreso es cuando se duplican pedidos: el que entró manual y reaparece en el sistema).
+5. **Aprende:** al cierre, anota qué falló, cuánto duró y cuánto costó. Tres fallas iguales en un mes = conversación seria con el proveedor o cambio.
+
+### El cambio cultural: tu equipo ante la máquina
+
+La integración cambia puestos: el que capturaba tablets ahora supervisa excepciones. Comunícalo como lo que es — una promoción del puesto, no una amenaza: "ya no vas a transcribir; vas a vigilar que nada falle y a atender lo que la máquina no puede". El equipo que entiende su nuevo rol abraza el sistema; el que no fue informado lo sabotea sin querer (desconecta lo que "falla", captura por fuera, no reporta errores). Incluye a los líderes de turno desde la semana de pruebas: que rompan el sistema ellos antes de que lo rompan los pedidos reales.
+
+### Inventario unificado: adiós al descuadre
+
+Cuando el delivery descuenta del mismo inventario que el salón, por primera vez sabes tu consumo real total. Configura los ingredientes de tus platillos de delivery igual que los de salón, y tu reporte de mermas al fin de mes incluye TODO lo que vendiste, no solo lo que pasó por tu caja física. Si usas control de inventario, este es el beneficio más subestimado de la integración.
+
+### El corte de caja con delivery integrado
+
+El cierre del día cambia cuando el delivery pasa por tu POS. El nuevo corte, en orden:
+
+1. **Ventas de salón** (efectivo + tarjeta) como siempre.
+2. **Ventas de delivery por app:** el POS ya las tiene; se comparan contra los reportes de cada plataforma. Diferencias típicas y su causa: pedidos cancelados que no se reflejaron, promociones que la app absorbió, ajustes por pedidos con problema.
+3. **Lo que NO llega al corte diario:** el depósito bancario de las apps (llega semanal o quincenal, neto de comisión). Tu caja diaria registra la venta; tu conciliación bancaria semanal cruza depósitos contra ventas. Dos calendarios distintos que tu contador agradece tener separados y documentados.
+4. **El reporte que sale del corte:** venta total, venta por canal, comisiones del día estimadas y margen bruto por canal. Cuatro números que te dicen si el delivery de hoy dejó dinero o solo dejó trabajo.
+
+El restaurante que hace este corte descubre cosas que el de la tablet nunca ve: que los domingos de app dejan menos margen de lo que cree, o que el combo del lunes es su platillo más rentable de delivery. Esa visibilidad es el verdadero producto de la integración.
+
+## Cómo medir si la integración está rindiendo
+
+Instalada no significa amortizada. Las métricas mensuales de tu integración:
+
+| Métrica | Antes (manual) | Meta con integración |
+|---|---|---|
+| Tiempo de aceptación del pedido | 2–5 min | Menos de 1 min |
+| Errores de captura | 1–3% de pedidos | Casi cero |
+| Horas del equipo en tablets/día | 1–2 h | 10–20 min (supervisión) |
+| Tiempo de "platillo agotado" sin pausar en apps | Horas o días | Minutos |
+| Reporte de ventas por canal | No existe | Mensual, con comisiones |
+
+### Cuánto cobran las apps: el panorama general
+
+Sin cifras oficiales de cada plataforma (cada plan y cada restaurante negocia distinto), los rangos de práctica en México: comisiones de 15–30% sobre el pedido según plan (los planes con más visibilidad y reparto incluido cobran más), más cargos adicionales en promociones cofinanciadas o servicios extra. A eso súmale tu empaque ($5–15 MXN por pedido) y tu precio de delivery ajustado. La fórmula del pedido sano:
+
+**Precio de app = precio de salón + comisión + empaque + margen protegido**
+
+Si el número resultante queda muy por encima de tu competencia en la app, tu problema no es la comisión: es tu estructura de costos o tu elección de platillos para delivery. La integración te da los datos para saber cuál de los dos es, pedido por pedido.
+
+### La pregunta de los 90 días
+
+Tres meses después de instalar, responde con números: ¿la mensualidad + costos de la integración es menor que lo que recuperaste en tiempo, errores evitados y ventas ganadas por mejor posicionamiento en las apps? Si sí, la decisión queda validada; si no, revisa qué parte no se configuró bien antes de culpar a la herramienta — el 90% de las integraciones "que no rindieron" tienen un menú mal mapeado o un equipo que nunca fue capacitado detrás.
+
+## Las preguntas incómodas que debes hacer ANTES de firmar
+
+Los vendedores de integración son buenos vendiendo. Tu defensa es esta lista de preguntas — escríbelas y pide las respuestas por correo para que queden constancia:
+
+### Sobre la operación diaria
+
+- **"Cuando un pedido entra con 5 modificadores, ¿llegan TODOS al ticket de cocina?"** Los modificadores son donde las integraciones baratas fallan.
+- **"¿Qué pasa cuando se cae su servicio? ¿Los pedidos se pierden o se encolan?"** La respuesta correcta incluye notificaciones de falla y recuperación automática.
+- **"¿Puedo pausar UN platillo en UNA app o en todas desde tu panel? ¿En cuánto tiempo se refleja?"** Minutos, no horas, es la respuesta aceptable.
+- **"¿Cómo manejan las cancelaciones y los reembolsos de las apps? ¿Se reflejan en mi POS?"** Si no se reflejan, tu inventario y tus reportes mienten.
+
+### Sobre el dinero
+
+- **"¿Cuál es el costo total en 12 meses: mensualidad, instalación, equipo, cargos por volumen?"** Que sumen TODO, por escrito.
+- **"¿Hay permanencia mínima? ¿Costo de cancelación?"** La confianza del proveedor se mide en lo fácil que te deja irte.
+- **"Si agrego otra app o otra sucursal, ¿cuánto más cuesta?"** Tu crecimiento no debería castigar tu factura de forma sorpresiva.
+
+### Sobre el soporte
+
+- **"¿El soporte es en español, por qué canal y en qué horario?"** Un delivery caído el sábado a las 8 pm necesita soporte de sábado a las 8 pm, no un ticket con respuesta el lunes.
+- **"¿Tienen clientes de mi giro y tamaño en México con los que pueda hablar?"** Una referencia real vale más que cualquier demo.
+
+## El lado fiscal y contable del delivery integrado
+
+Tema que casi nadie revisa hasta que el contador pregunta. Generalidades importantes (tu caso específico, con tu contador):
+
+### Lo que la integración ordena
+
+Cuando los pedidos de apps entran a tu POS, tus ventas de delivery quedan registradas en el mismo sistema que las de salón: cierres de caja completos, reportes de venta total y una sola fuente de verdad para tu contabilidad. Sin integración, las ventas de apps viven en los reportes de cada plataforma y cuadrarlas contra depósitos es un rompecabezas mensual.
+
+### Los tres números que debes entender de cada app
+
+| Concepto | Qué es |
+|---|---|
+| Venta bruta | Lo que el cliente pagó por tu comida |
+| Comisión + cargos | Lo que la app descuenta (15–30% típico, según plan y plataforma) |
+| Depósito neto | Lo que realmente llega a tu banco, en ciclos semanales o quincenales |
+
+El error contable común: registrar solo el depósito neto como venta. Lo correcto (confírmalo con tu contador) es registrar la venta bruta como ingreso y la comisión como gasto — tu integración y los reportes de las apps te dan ambos números separados.
+
+### La facturación al cliente
+
+Los pedidos pagados por app suelen facturarse bajo reglas propias de cada plataforma (algunas plataformas facturan al cliente final por el servicio completo). Revisa con tu contador qué parte te corresponde facturar a ti y cómo; no asumas — la diferencia entre "la app factura" y "tú facturas" cambia tu operación fiscal. Fuente oficial para dudas de facturación: el portal del [SAT](https://www.sat.gob.mx).
+
+## Escenarios especiales: dark kitchens, varios locales y pedidos propios
+
+### Dark kitchen: la integración no es opcional
+
+Si tu negocio ES delivery, la integración es tu mostrador: sin ella, tu operación es inviable más allá de 30–40 pedidos diarios. Además busca: consolidación de varias marcas virtuales en una cocina (un solo integrador manejando varios menús), reportes por marca y por app, y tiempos de preparación ajustables por horario. La dark kitchen sin integración es como un restaurante sin caja registradora.
+
+### Varios locales: el reporte consolidado
+
+Con sucursales, exige: integración por sucursal con reporte consolidado (qué app vende más en qué local), menús por sucursal cuando los precios o disponibilidad difieren, y permisos por usuario (cada gerente ve su local). La sorpresa frecuente: la sucursal que "vende menos" resulta tener mejor margen por canal cuando ves las comisiones separadas.
+
+### Tu propio canal de pedidos (el movimiento maestro)
+
+La integración madura te libera tiempo para construir el canal que no paga comisión: pedidos directos por WhatsApp o tu sitio, con reparto propio o para recoger. Muchos restaurantes usan las apps como vitrina de adquisición y migran a sus clientes frecuentes al canal directo con un incentivo (mejor precio, programa de puntos). La integración te da los datos para saber exactamente cuánto te cuesta cada canal — y cuánto vale cada cliente que mueves al tuyo.
+
+<BlogCallout variant="note" title="Las apps son la vitrina; tu canal es la tienda">
+No se trata de abandonar las plataformas: para la mayoría son la fuente principal de clientes nuevos de delivery. Se trata de que cada cliente frecuente de app es un candidato a tu canal directo, donde el margen completo es tuyo. La integración te ordena la operación para que sobren horas para construir ese canal.
+</BlogCallout>
+
+## Errores comunes al integrar el POS con las apps
+
+❌ **Mapear el menú con prisa.** Nombres distintos, modificadores incompletos, combos rotos: todo pedido que entra mal mapeado llega mal a cocina. El mapeo se revisa platillo por platillo, personalmente, antes del arranque.
+
+❌ **Mismo precio en salón y en apps "por ser justos".** La comisión de las apps (típicamente 15–30% según plataforma y plan) convierte la "justicia" en pérdida por pedido. El menú de delivery lleva su propio precio, calculado con la comisión incluida.
+
+❌ **Estrenar en el día más fuerte.** La curva de aprendizaje caída en viernes de noche es caos garantizado y equipo que le agarra odio al sistema nuevo. Arranque en día tranquilo, siempre.
+
+❌ **No capacitar al segundo turno.** La integración la configura el dueño y la sufre el turno de la noche que nunca vio el entrenamiento. TODOS los turnos pasan por la capacitación, con la hoja de protocolo de fallas en mostrador.
+
+❌ **Olvidar el respaldo de internet.** La integración vive en la nube: sin internet no entran pedidos. Un plan de datos de respaldo o un segundo proveedor cuestan poco comparado con un viernes sin delivery.
+
+❌ **No revisar las comisiones en el reporte.** La integración te muestra lo que ganas por canal; el que no lo revisa puede descubrir al año que una app le vende mucho y le deja poco. Venta no es utilidad: mide el neto por canal.
+
+❌ **Vender platillos que no viajan bien.** La integración hará llegar más pedidos de tu menú completo — incluido lo que llega feo. Diseña tu menú de delivery para el viaje (o restringe en apps lo que no aguanta 30 minutos de motocicleta) antes de conectar las tuberías.
+
+❌ **Firmar sin preguntar por la salida.** ¿Si cancelo, me llevo mi configuración? ¿Hay permanencia mínima? ¿El integrador cobra más por volumen cuando crezca? Las preguntas incómodas se hacen antes de firmar, no en la disputa de salida.
+
+❌ **Tratar la integración como proyecto de "una vez".** Las apps cambian sus sistemas, tu menú cambia, tu operación cambia. La integración sana tiene revisión mensual: sincronización, reportes y casos especiales.
+
+❌ **Borrar la capacitación manual.** El día que falle el sistema (pasará), el equipo que olvidó capturar a mano se paraliza en plena pica. La captura manual se convierte en habilidad de emergencia: se practica una vez al mes, como el simulacro de evacuación.
+
+❌ **Medir el éxito en "pedidos procesados".** La métrica correcta es margen neto por canal y errores evitados, no volumen bruto. Cien pedidos mal cobrados o mal mapeados son peores que ochenta bien operados.
+
+## Caso práctico: marisquería que recuperó 10 horas semanales y subió 22% su delivery
+
+Caso compuesto con patrones reales de restaurantes con alto volumen de apps en México. Marisquería familiar, ~35 pedidos diarios de delivery entre tres apps, con la hija del dueño capturando a mano "porque así siempre se hizo".
+
+### El diagnóstico de una semana
+
+Antes de contratar nada, midieron su situación real:
+
+- 2.5 horas diarias de captura manual (17.5 horas semanales de un puesto).
+- 2–4 errores semanales de captura: reposiciones y cortesías de $300–500 MXN/semana.
+- Tiempos de aceptación de 3–4 minutos en hora pico (las apps los mostraban abajo en el listado).
+- 3 incidentes al mes de "vendimos lo agotado" por no pausar a tiempo en las tres apps.
+
+### Lo que implementaron
+
+Integrador externo conectado a su POS existente, $1,400 MXN mensuales. Implementación en 3 semanas siguiendo el calendario de este tutorial, con una semana extra de mapeo de menú porque sus modificadores (término del camarón, salsas aparte, "sin picante") eran complejos. Arranque un martes.
+
+### Los resultados a los 90 días
+
+| Indicador | Antes | Después |
+|---|---|---|
+| Horas de captura/semana | 17.5 h | 2 h (supervisión) |
+| Errores de captura | 2–4/semana | 1 al mes |
+| Tiempo de aceptación | 3–4 min | 40 segundos |
+| Pedidos delivery/semana | ~245 | ~300 (+22%) |
+| Costo integración | — | $1,400 MXN/mes |
+
+La explicación del +22%: al aceptar rápido y tener siempre el menú correcto y disponible, las apps los subieron en el listado, y estar más arriba es vender más. La hija del dueño dejó las tablets y hoy lleva las redes y las reseñas del restaurante — que es donde su tiempo genera más ventas. Esa reasignación, dice el dueño, valió más que la integración misma.
+
+El aprendizaje que no esperaban: con los reportes por canal descubrieron que una de las tres apps les vendía el 35% del delivery pero les dejaba el margen más bajo por su plan de comisión. Renegociaron esa app con los números en la mano y mejoraron 3 puntos de comisión. Sin el reporte unificado, ese ajuste — que paga la integración ella sola — nunca habría ocurrido.
+
+## Checklist: tu integración en orden
+
+- [ ] Medí mi costo actual de capturar a mano (horas + errores + ventas perdidas)
+- [ ] Hice inventario de mi stack: POS actual, apps, volumen diario por app
+- [ ] Pedí demos a 2–3 opciones con las preguntas obligatorias
+- [ ] Comparé costo total real (mensualidad + instalación + equipo + volumen)
+- [ ] Definí mi estrategia de precios de delivery ANTES de mapear el menú
+- [ ] Revisé personalmente el mapeo: nombres, precios, modificadores, combos
+- [ ] Probé pedidos reales desde cada app con casos especiales
+- [ ] Capacité a TODOS los turnos con protocolo de fallas en mostrador
+- [ ] Aseguré respaldo de internet para las horas pico
+- [ ] Arranqué en día tranquilo, no en fecha fuerte
+- [ ] Agendé la revisión semanal de menú sincronizado (15 min)
+- [ ] Definí las métricas de los 90 días para validar la inversión
+- [ ] Documenté el corte de caja nuevo: venta por canal + comisiones separadas
+- [ ] Practiqué la captura manual de emergencia una vez al mes con todos los turnos
+
+## Tu próximo paso
+
+Esta semana, sin contratar nada todavía: mide tu verdad actual. Anota durante 7 días cuántos pedidos capturas a mano, cuánto tiempo toma cada uno, cuántos errores salen y cuánto cuestan. Con ese número real en la mano, pedirás las demos sabiendo exactamente cuánto vale para ti la integración — y ningún vendedor te venderá de más ni de menos.
+
+La semana siguiente, con la medición hecha: pide dos demos y haz las preguntas incómodas de esta guía. Si los números dicen que capturas menos de 15 pedidos diarios, no compres nada todavía: implementa el proceso manual disciplinado (una tablet consolidadora, un responsable por turno, plantillas de captura) y vuelve a evaluar en tres meses. La integración correcta en el momento correcto es una inversión; la misma herramienta comprada antes de tiempo es una mensualidad sin retorno.
+
+El delivery ya no es un canal secundario: para muchos restaurantes es el 20–40% de la venta. Operarlo con tablets y memoria es como llevar la contabilidad en servilletas. La integración correcta no te vuelve más tecnológico: te devuelve las horas y la exactitud que el crecimiento de las apps te fue quitando sin avisar.
+
+<BlogCTA variant="herramienta" href="/panel" title="Tus ventas de salón y delivery en un solo tablero">
+Centraliza la operación de tu restaurante en el panel: pedidos, inventario y números claros sin importar por qué canal llegaron.
+</BlogCTA>
+
+<BlogCTA variant="coleccion" collectionSlug="mariscos-pescados" collectionName="Mariscos y pescados" title="Insumos para un delivery que ya no falla">
+Con la operación integrada, tu cocina vende más: surte tus mariscos con precio de proveedor y mantén el margen sano.
+</BlogCTA>
