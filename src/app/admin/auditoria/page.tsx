@@ -42,7 +42,8 @@ export default function AdminAuditPage() {
   }, [action, from, to])
 
   useEffect(() => {
-    void load()
+    // Diferido a microtask: ningún setState corre síncrono en el efecto.
+    void Promise.resolve().then(load)
   }, [load])
 
   return (
