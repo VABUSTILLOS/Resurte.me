@@ -30,13 +30,40 @@ El mismo catálogo existe para cada ciudad con el patrón `https://resurte.me/{c
 
 ## Guías destacadas del blog
 
+### Guías pilar (hubs por tema)
+
+- [Proveeduría para restaurantes: guía completa](https://resurte.me/blog/guia-proveeduria-restaurantes)
+- [Costos de un restaurante: mapa completo y control](https://resurte.me/blog/guia-costos-restaurante)
+- [Operación de cocina: guía completa](https://resurte.me/blog/guia-operacion-cocina)
+- [Marketing para restaurantes: guía completa](https://resurte.me/blog/guia-marketing-restaurantes)
+- [Legal y finanzas para restaurantes: guía esencial](https://resurte.me/blog/guia-legal-finanzas-restaurante)
+- [Cómo hacer crecer tu restaurante: guía completa](https://resurte.me/blog/guia-crecer-restaurante)
+
+### Comparativas y costos (alta intención)
+
+- [Las 5 formas de surtir tu restaurante en México](https://resurte.me/blog/formas-surtir-restaurante-mexico)
+- [Central de Abastos vs comprar en línea](https://resurte.me/blog/central-de-abastos-vs-comprar-en-linea)
+- [Cuánto cuesta surtir un restaurante al mes](https://resurte.me/blog/cuanto-cuesta-surtir-restaurante-mes)
+- [Mejores proveedores de mayoreo para restaurantes](https://resurte.me/blog/mejores-proveedores-mayoreo-restaurantes)
+- [Alternativas a Sysco y clubes de precio para restaurantes](https://resurte.me/blog/alternativas-sysco-clubes-precio)
+- [Lista de insumos para abrir un restaurante](https://resurte.me/blog/lista-insumos-abrir-restaurante)
+- [Cómo funciona la compra por mayoreo en línea](https://resurte.me/blog/como-funciona-compra-mayoreo-en-linea)
+
+### Por categoría de insumo
+
+- [Abarrotes al mayoreo para restaurantes](https://resurte.me/blog/abarrotes-mayoreo-restaurantes)
+- [Proveedores de frutas y verduras para restaurantes](https://resurte.me/blog/proveedores-frutas-verduras-restaurantes)
+- [Proveedores de carne al mayoreo para restaurantes](https://resurte.me/blog/proveedores-carne-mayoreo-restaurantes)
+- [Proveedores de lácteos y huevo para restaurantes](https://resurte.me/blog/proveedores-lacteos-huevo-restaurantes)
+- [Proveedores de bebidas al mayoreo para restaurantes](https://resurte.me/blog/proveedores-bebidas-mayoreo-restaurantes)
+- [Desechables al mayoreo para restaurantes](https://resurte.me/blog/desechables-mayoreo-restaurantes)
+
+### Guías clásicas
+
 - [Guía del food cost para restaurantes](https://resurte.me/blog/guia-food-cost-restaurante-2026)
 - [Cómo reducir la merma en cocina](https://resurte.me/blog/como-reducir-merma-cocina)
 - [Cómo elegir proveedor mayorista](https://resurte.me/blog/elegir-proveedor-mayorista)
 - [Precios de mayoreo para restaurantes](https://resurte.me/blog/precios-mayoreo-restaurantes)
-- [Central de Abastos vs comprar en línea](https://resurte.me/blog/central-de-abastos-vs-comprar-en-linea)
-- [Cuánto cuesta surtir un restaurante al mes](https://resurte.me/blog/cuanto-cuesta-surtir-restaurante-mes)
-- [Mejores proveedores de mayoreo para restaurantes](https://resurte.me/blog/mejores-proveedores-mayoreo-restaurantes)
 
 ## Contacto
 
