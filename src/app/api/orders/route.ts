@@ -248,12 +248,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Cantidades: enteras, entre 1 y 99 por item (mismo rango que upsells).
+    // Sin esta validación, cantidades negativas producían subtotales
+    // negativos/items corruptos, y cantidades absurdas pasaban intactas.
+    for (const item of items) {
+      const qty = Number(item.quantity)
+      if (!Number.isInteger(qty) || qty < 1 || qty > 99) {
+        return NextResponse.json(
+          { error: `Cantidad inválida para el producto ${item.product_id}` },
+          { status: 400 }
+        )
+      }
+      item.quantity = qty
+    }
+
     // Items agotados
     for (const item of items) {
       const db = getDbProduct(item.product_id)
       if (db.stock_status === "out_of_stock") {
         return NextResponse.json(
-          { error: `El producto ${item.product_id} está agotado` },
+          { error: `El producto ${item.name ?? item.product_id} está agotado` },
           { status: 400 }
         )
       }

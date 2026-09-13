@@ -46,7 +46,7 @@ export async function handlePaymentIntentSucceeded(
   // lleva y Stripe preserva en el evento.
   const { data: order, error } = await supabase
     .from("orders")
-    .select("id, user_id, total, customer_email")
+    .select("id, user_id, total, customer_email, payment_status")
     .eq("stripe_payment_intent_id", paymentIntent.id)
     .maybeSingle()
 
@@ -57,7 +57,7 @@ export async function handlePaymentIntentSucceeded(
     if (Number.isFinite(orderIdFromMetadata) && orderIdFromMetadata > 0) {
       const fb = await supabase
         .from("orders")
-        .select("id, user_id, total, customer_email")
+        .select("id, user_id, total, customer_email, payment_status")
         .eq("id", orderIdFromMetadata)
         .maybeSingle()
       if (fb.data && !fb.error) {
@@ -77,7 +77,13 @@ export async function handlePaymentIntentSucceeded(
   }
 
   if (!lookupError && lookupOrder) {
-    if (isAmountSufficient(paymentIntent.amount_received, lookupOrder.total)) {
+    // Idempotencia: Stripe puede re-entregar payment_intent.succeeded.
+    // Si la orden YA está pagada, no repetir el update ni reenviar las
+    // notificaciones de WhatsApp (el cashback ya está protegido por el
+    // trigger, pero los workflows no).
+    if (lookupOrder.payment_status === "paid") {
+      logger.info("stripe.payment.succeeded.duplicate", { order: lookupOrder.id })
+    } else if (isAmountSufficient(paymentIntent.amount_received, lookupOrder.total)) {
       await supabase
         .from("orders")
         .update({
@@ -93,6 +99,7 @@ export async function handlePaymentIntentSucceeded(
           updated_at: new Date().toISOString(),
         })
         .eq("id", lookupOrder.id)
+        .neq("payment_status", "paid")
 
       // Trigger WhatsApp: payment confirmation + status update.
       // Se ejecutan con after() para que corran después de enviar la
@@ -242,6 +249,9 @@ export async function handlePaymentIntentFailed(
     .from("order_upsells")
     .update({ status: "failed" })
     .eq("stripe_payment_intent_id", paymentIntent.id)
+  // Devuelve el uso del cupón: el pago no se completó, el cliente no
+  // debe perderlo (crítico para cupones personales de recompra de 1 uso).
+  await releaseCouponForPaymentIntent(supabase, paymentIntent.id)
 }
 
 /**
@@ -265,9 +275,107 @@ export async function handlePaymentIntentCanceled(
       .from("orders")
       .update({ payment_status: "failed", updated_at: new Date().toISOString() })
       .eq("stripe_payment_intent_id", paymentIntent.id)
+    // Mismo criterio que payment_failed: el cupón vuelve a estar disponible.
+    await releaseCouponForPaymentIntent(supabase, paymentIntent.id)
   }
   await supabase
     .from("order_upsells")
     .update({ status: "canceled" })
     .eq("stripe_payment_intent_id", paymentIntent.id)
+}
+
+/**
+ * charge.refunded: Stripe no emite payment_intent.refunded — los reembolsos
+ * llegan por esta vía. Marca orders y foodos_orders como refunded; el trigger
+ * reverse_cashback_on_cancel() (00065) revierte el cashback abonado.
+ */
+export async function handleChargeRefunded(
+  supabase: ServiceClient,
+  charge: { id: string; payment_intent?: string | null; amount_refunded?: number }
+): Promise<void> {
+  const piId = typeof charge.payment_intent === "string" ? charge.payment_intent : null
+  logger.info("stripe.charge.refunded", { charge: charge.id, paymentIntent: piId })
+  if (!piId) return
+
+  await supabase
+    .from("orders")
+    .update({ payment_status: "refunded", updated_at: new Date().toISOString() })
+    .eq("stripe_payment_intent_id", piId)
+  await supabase
+    .from("foodos_orders")
+    .update({ payment_status: "refunded", updated_at: new Date().toISOString() })
+    .eq("stripe_payment_intent_id", piId)
+}
+
+/**
+ * charge.dispute.created: contracargo — el banco retira los fondos. Se marca
+ * la orden como disputed (solo si estaba pagada; el trigger 00065 revierte
+ * el cashback) y queda el rastro en el log para seguimiento operativo.
+ */
+export async function handleChargeDisputeCreated(
+  supabase: ServiceClient,
+  dispute: { id: string; payment_intent?: string | null; amount?: number; reason?: string }
+): Promise<void> {
+  const piId = typeof dispute.payment_intent === "string" ? dispute.payment_intent : null
+  logger.error("stripe.dispute.created", {
+    dispute: dispute.id,
+    paymentIntent: piId,
+    amount: dispute.amount,
+    reason: dispute.reason,
+  })
+  if (!piId) return
+
+  await supabase
+    .from("orders")
+    .update({ payment_status: "disputed", updated_at: new Date().toISOString() })
+    .eq("stripe_payment_intent_id", piId)
+    .eq("payment_status", "paid")
+}
+
+/**
+ * Devuelve el uso del cupón de la orden ligada a un PaymentIntent cuando el
+ * cobro no se completó (payment_failed / canceled). El cupón se reservó al
+ * crear la orden (POST /api/orders) y sin esta liberación el cliente lo
+ * pierde por un rechazo bancario — peor caso: cupones personales de recompra
+ * con max_uses = 1.
+ *
+ * Mismo patrón de concurrencia optimista que releaseCoupon() en
+ * /api/orders: el UPDATE es condicional al used_count leído para no pisar
+ * una reserva concurrente. Best-effort: nunca rompe el webhook.
+ */
+async function releaseCouponForPaymentIntent(
+  supabase: ServiceClient,
+  paymentIntentId: string
+) {
+  try {
+    const { data: order } = await supabase
+      .from("orders")
+      .select("id, coupon_code")
+      .eq("stripe_payment_intent_id", paymentIntentId)
+      .maybeSingle()
+    if (!order?.coupon_code) return
+
+    const { data: coupon } = await supabase
+      .from("coupons")
+      .select("id, used_count")
+      .eq("code", order.coupon_code)
+      .maybeSingle()
+    if (!coupon || coupon.used_count <= 0) return
+
+    const { data: released } = await supabase
+      .from("coupons")
+      .update({ used_count: coupon.used_count - 1 })
+      .eq("id", coupon.id)
+      .eq("used_count", coupon.used_count)
+      .select("id")
+
+    if (released && released.length > 0) {
+      logger.info("stripe.coupon.released", {
+        order: order.id,
+        coupon: order.coupon_code,
+      })
+    }
+  } catch (e) {
+    logger.error("stripe.coupon.release_failed:", e)
+  }
 }

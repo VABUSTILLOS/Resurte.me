@@ -10,13 +10,14 @@ import { rateLimited, rateLimitResponse, clientIp } from "@/lib/rate-limit"
  * Vincula al usuario autenticado las direcciones creadas durante checkouts
  * anónimos (las que tienen user_id NULL y el mismo guest_token). Se llama tras
  * iniciar sesión / registrarse desde el navegador que hizo la compra anónima.
- * También reclama los platillos del panel (panel_dishes) y los datos de las
- * herramientas del panel (panel_entries) guardados con el mismo guest_token.
+ * También reclama los pedidos hechos con esas direcciones (orders), los
+ * platillos del panel (panel_dishes) y los datos de las herramientas del
+ * panel (panel_entries, panel_rows) guardados con el mismo guest_token.
  *
  * Body: { guest_token: string }
  * Auth: requiere sesión activa (auth.uid()).
  *
- * Respuesta: { claimed: number, dishesClaimed: number, entriesClaimed: number }.
+ * Respuesta: { claimed, ordersClaimed, dishesClaimed, entriesClaimed, rowsClaimed }.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -59,6 +60,28 @@ export async function POST(request: NextRequest) {
         { error: "Error al vincular las direcciones", detail: error.message },
         { status: 500 }
       )
+    }
+
+    // Reclamar también los PEDIDOS anónimos hechos con esas direcciones.
+    // Sin esto, las compras de invitado quedaban con user_id NULL de por
+    // vida: no aparecían en "Mis pedidos", no generaban cashback y rompían
+    // el loop de recompra (sin historial no hay "Repetir" ni recordatorios).
+    // Es seguro: solo se tocan órdenes huérfanas cuya dirección acaba de
+    // vincularse con el token exacto del navegador que compró.
+    let ordersClaimed = 0
+    const claimedAddressIds = (data ?? []).map((a) => a.id)
+    if (claimedAddressIds.length > 0) {
+      const { data: claimedOrders, error: ordersError } = await supabase
+        .from("orders")
+        .update({ user_id: user.id })
+        .in("address_id", claimedAddressIds)
+        .is("user_id", null)
+        .select("id")
+      if (ordersError) {
+        logger.error("Orders claim error:", ordersError)
+      } else {
+        ordersClaimed = claimedOrders?.length ?? 0
+      }
     }
 
     // Mismo reclamo para los platillos del panel guardados como anónimo.
@@ -106,7 +129,7 @@ export async function POST(request: NextRequest) {
       rowsClaimed = panelRows?.length ?? 0
     }
 
-    return NextResponse.json({ claimed: data?.length ?? 0, dishesClaimed, entriesClaimed, rowsClaimed })
+    return NextResponse.json({ claimed: data?.length ?? 0, ordersClaimed, dishesClaimed, entriesClaimed, rowsClaimed })
   } catch (err) {
     logger.error("Claim address error:", err)
     return NextResponse.json(

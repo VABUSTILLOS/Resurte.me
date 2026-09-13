@@ -7,6 +7,8 @@ import {
   handlePaymentIntentRefunded,
   handlePaymentIntentFailed,
   handlePaymentIntentCanceled,
+  handleChargeRefunded,
+  handleChargeDisputeCreated,
   type StripePaymentIntentLike,
 } from "@/lib/stripe-webhook-handlers"
 import { logger } from "@/lib/logger"
@@ -77,6 +79,39 @@ export async function POST(request: NextRequest) {
         await handlePaymentIntentCanceled(
           supabase,
           event.data.object as { id: string }
+        )
+        break
+      }
+
+      // Los reembolsos se notifican por charge.refunded (Stripe no emite
+      // payment_intent.refunded). El trigger reverse_cashback_on_cancel()
+      // (00065) revierte el cashback abonado.
+      case "charge.refunded": {
+        const supabase = await createServiceClient()
+        await handleChargeRefunded(
+          supabase,
+          event.data.object as {
+            id: string
+            payment_intent?: string | null
+            amount_refunded?: number
+          }
+        )
+        break
+      }
+
+      // Contracargos: el banco retira los fondos. Se marca la orden como
+      // disputada (el trigger 00065 revierte el cashback) y queda el rastro
+      // en el log para seguimiento operativo.
+      case "charge.dispute.created": {
+        const supabase = await createServiceClient()
+        await handleChargeDisputeCreated(
+          supabase,
+          event.data.object as {
+            id: string
+            payment_intent?: string | null
+            amount?: number
+            reason?: string
+          }
         )
         break
       }
