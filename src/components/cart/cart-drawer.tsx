@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useCart } from "@/contexts/cart-context"
 import { useCity } from "@/contexts/city-context"
 import { useMediaQuery } from "@/hooks/use-media-query"
+import Image from "next/image"
 import {
   X,
   ShoppingBag,
@@ -201,9 +202,9 @@ export function CartDrawer() {
                 <li key={item.product_id} className="py-4 group">
                   <div className="flex gap-3">
                     {/* Product image placeholder */}
-                    <div className="w-16 h-16 rounded-[10px] bg-[#F7F5F0] flex items-center justify-center shrink-0">
+                    <div className="w-16 h-16 rounded-[10px] bg-[#F7F5F0] flex items-center justify-center shrink-0 relative overflow-hidden">
                       {item.image_url ? (
-                        <img
+                        <Image
                           src={item.image_url}
                           alt={item.name}
                           loading="lazy"
