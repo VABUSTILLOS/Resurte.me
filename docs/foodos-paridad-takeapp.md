@@ -1,7 +1,7 @@
 # Paridad FoodOS ↔ take.app
 
 Auditoría de funcionalidades de take.app y estado de cobertura en FoodOS
-(rama `paridad-takeapp-foodos`, migraciones `00078`–`00081`).
+(rama `paridad-takeapp-foodos`, migraciones `00078`–`00085`).
 
 ## Cubierto (preexistente)
 
@@ -57,10 +57,32 @@ Auditoría de funcionalidades de take.app y estado de cobertura en FoodOS
   desglose por método/canal/servicio y exportación CSV
 - **Storefront bilingüe** es/en (toggle, persistencia por restaurante)
 
+### Fase F — cobros y ciclo de pago asíncrono
+- **Comprobante de transferencia**: el comensal sube su comprobante
+  (`foodos_payment_proofs`, `00082`), el restaurante lo aprueba o rechaza desde
+  la comanda, con URL firmada por tiempo limitado
+- **Avisos al comensal**: `notifyFoodosCustomer()` (`00083`) con dedupe por
+  `(order_id, event, channel)`
+- **Recordatorios y cancelación**: barrido diario que avisa y caduca pedidos sin
+  pagar (`FOODOS_VOUCHER_TTL_HOURS`, `FOODOS_UNPAID_CANCEL_HOURS = 72`)
+- **Stripe Connect Express por restaurante** (`00085`): cada restaurante tiene su
+  cuenta Express y los cargos con tarjeta son *destination charges*
+  (`transfer_data.destination` + `application_fee_amount`). La plataforma deja de
+  custodiar fondos de terceros. Onboarding, estado y requisitos se gestionan desde
+  `/panel/foodos/restaurante` → "Cobros en línea"; el enrutamiento se controla con
+  `STRIPE_CONNECT_ENABLED` y sólo aplica a cuentas cobrables (ver `docs/OPS.md` §11)
+
+### Fase F — programación e integraciones
+- **Pedidos programados**: fecha/hora con lead time por sucursal (validación server-side)
+- **Reorden** desde la página de tracking (precios vigentes)
+- **Webhooks salientes** `order.created` firmados HMAC-SHA256 con registro de entregas
+- **Meta/TikTok Pixel** por restaurante
+- **Duplicar platillo** en el panel
+
 ## Brechas conscientes (fuera de alcance)
 
 - App POS nativa, impresoras térmicas/Bluetooth, TV menu board
 - Integraciones de couriers (Lalamove/Uber Direct), catálogo nativo de WhatsApp
 - Dominio propio por restaurante, multi-idioma del panel (solo storefront)
 - API pública/webhooks/MCP para comercios, white label/resellers
-- Suscripciones/pedidos recurrentes, pre-órdenes con fecha, pedidos grupales
+- Suscripciones/pedidos recurrentes, pedidos grupales
