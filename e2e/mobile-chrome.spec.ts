@@ -75,4 +75,43 @@ test.describe("móvil: chrome de navegación", () => {
     await page.keyboard.press("Escape")
     await expect(sheet).not.toBeVisible()
   })
+
+  test("header móvil: botón 'Ver todos los productos' navega al catálogo @ci", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "solo viewport móvil")
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+
+    const todosBtn = page.locator("header").getByRole("link", { name: "Ver todos los productos" })
+    await expect(todosBtn).toBeVisible({ timeout: 8000 })
+    await expect(todosBtn).toHaveAttribute("href", /\/cdmx\/buscar$/)
+    await todosBtn.tap()
+    await page.waitForURL(/\/cdmx\/buscar$/, { timeout: 8000 })
+
+    // Estado activo en /buscar (aria-current) y título del catálogo visible.
+    await expect(todosBtn).toHaveAttribute("aria-current", "page")
+    await expect(page.getByRole("heading", { name: "Todos los productos" })).toBeVisible({ timeout: 8000 })
+  })
+
+  test("producto en móvil: breadcrumb con Atrás y ruta visible @ci", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "solo viewport móvil")
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+
+    // Navega al primer producto disponible; sin datos locales se omite.
+    const productLink = page.locator('a[href*="/producto/"]').first()
+    if ((await productLink.count()) === 0) {
+      test.skip(true, "sin productos en el entorno local")
+      return
+    }
+    await productLink.tap()
+    await page.waitForURL(/\/producto\//, { timeout: 8000 })
+
+    const nav = page.getByRole("navigation", { name: "Ruta de navegación" })
+    await expect(nav).toBeVisible({ timeout: 8000 })
+    await expect(nav.getByRole("button", { name: "Atrás" })).toBeVisible()
+    // La ubicación actual (nombre del producto) se anuncia como página actual.
+    await expect(nav.locator('[aria-current="page"]')).toBeVisible()
+
+    // Atrás regresa a la página anterior del historial.
+    await nav.getByRole("button", { name: "Atrás" }).tap()
+    await page.waitForURL(/\/cdmx$/, { timeout: 8000 })
+  })
 })

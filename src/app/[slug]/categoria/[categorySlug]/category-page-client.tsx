@@ -6,6 +6,7 @@ import { ArrowLeft, ShoppingBag } from "lucide-react"
 import { ProductCard } from "@/components/product/product-card"
 import { SearchBar } from "@/components/search/search-bar"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
+import { StoreBreadcrumb } from "@/components/ui/store-breadcrumb"
 import { loadMoreCategoryProducts } from "@/app/[slug]/catalog-actions"
 import type { Product } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
@@ -44,14 +45,8 @@ export function CategoryPageClient({ citySlug, cityName, category, products: ini
       {/* Header — Erewhon cream palette */}
       <div className="bg-[#f7f4ef] border-b border-[#ede8df]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-sm text-[#6b6b6b] mb-4">
-            <Link href={`/${citySlug}`} className="hover:text-[#0E7A0E] transition-colors">
-              {cityName}
-            </Link>
-            <span className="text-[var(--text-secondary)]">/</span>
-            <span className="text-[#1a1a1a] font-medium">{category.name}</span>
-          </div>
+          {/* Breadcrumb con Atrás real + ruta Inicio / Todos / Categoría */}
+          <StoreBreadcrumb citySlug={citySlug} homeLabel={cityName} current={category.name} />
 
           {/* Category header */}
           <ScrollReveal>

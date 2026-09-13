@@ -1,14 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package, Search, Handshake } from "lucide-react"
+import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package, Search, Handshake, LayoutGrid } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
 import { SearchBar } from "@/components/search/search-bar"
 import { CART_DRAWER_EVENT } from "@/components/cart/cart-drawer"
 import { MobileSearchOverlay, MOBILE_SEARCH_EVENT } from "@/components/search/mobile-search-overlay"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import { useEscapeKey } from "@/hooks/use-escape-key"
@@ -18,6 +18,7 @@ export function Header() {
   const { city } = useCity()
   const { itemCount } = useCart()
   const router = useRouter()
+  const pathname = usePathname()
   // Lazy browser-only client: created via dynamic import after mount so
   // auth-js (78KB) no longer ships in the initial layout bundle. The
   // consumer degrades gracefully while `supabase` is null.
@@ -185,7 +186,24 @@ export function Header() {
           )}
 
           {/* Right actions */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Mobile: acceso persistente a "todos los productos" de la tienda */}
+            {city && (
+              <Link
+                href={`/${city.slug}/buscar`}
+                aria-label="Ver todos los productos"
+                aria-current={pathname === `/${city.slug}/buscar` ? "page" : undefined}
+                className={`sm:hidden flex items-center gap-1 p-2 min-[360px]:pr-2.5 rounded-[10px] transition-colors touch-target ${
+                  pathname === `/${city.slug}/buscar`
+                    ? "bg-[#0E7A0E]/10 text-[#0E7A0E]"
+                    : "hover:bg-[#F7F5F0] text-[#343538]"
+                }`}
+              >
+                <LayoutGrid className="w-5 h-5" aria-hidden="true" />
+                <span className="hidden min-[360px]:inline text-xs font-semibold">Todo</span>
+              </Link>
+            )}
+
             {/* Mobile search shortcut — opens live search overlay */}
             {city && (
               <button
