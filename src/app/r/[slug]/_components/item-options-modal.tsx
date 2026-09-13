@@ -157,7 +157,7 @@ export function ItemOptionsModal({ item, groups, values, onConfirm, onClose }: P
         <div className="sticky bottom-0 bg-white border-t border-stone-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <button
             onClick={handleConfirm}
-            className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700"
+            className="w-full py-3 rounded-xl foodos-accent bg-emerald-600 text-white font-bold hover:bg-emerald-700"
           >
             Agregar · {formatMoney(item.price + modifiersTotal)}
           </button>

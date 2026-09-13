@@ -41,6 +41,10 @@ export default function RestaurantePage() {
   const [description, setDescription] = useState("")
   const [logoUrl, setLogoUrl] = useState("")
   const [currency, setCurrency] = useState("MXN")
+  const [themeColor, setThemeColor] = useState("")
+  const [transferClabe, setTransferClabe] = useState("")
+  const [transferBank, setTransferBank] = useState("")
+  const [transferBeneficiary, setTransferBeneficiary] = useState("")
 
   // Nueva sucursal
   const [branchName, setBranchName] = useState("")
@@ -58,6 +62,10 @@ export default function RestaurantePage() {
         setDescription(r.description ?? "")
         setLogoUrl(r.logo_url ?? "")
         setCurrency(r.currency)
+        setThemeColor(r.theme_color ?? "")
+        setTransferClabe(r.transfer_clabe ?? "")
+        setTransferBank(r.transfer_bank ?? "")
+        setTransferBeneficiary(r.transfer_beneficiary ?? "")
         setBranches(b)
       }
     } catch (e) {
@@ -108,6 +116,10 @@ export default function RestaurantePage() {
         description,
         logo_url: logoUrl || null,
         currency,
+        theme_color: themeColor || null,
+        transfer_clabe: transferClabe || null,
+        transfer_bank: transferBank || null,
+        transfer_beneficiary: transferBeneficiary || null,
       })
       setRestaurant(saved)
     } catch (err) {
@@ -290,6 +302,54 @@ export default function RestaurantePage() {
                   <option value="USD">{t("foodos.restaurante.currencyUsd")}</option>
                 </select>
               </div>
+            </div>
+
+            {/* Personalización + transferencia */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Color del menú (tema)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={themeColor || "#059669"}
+                    onChange={(e) => setThemeColor(e.target.value)}
+                    className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer"
+                  />
+                  <input
+                    value={themeColor}
+                    onChange={(e) => setThemeColor(e.target.value)}
+                    placeholder="#059669 (por defecto)"
+                    className="flex-1 rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4 space-y-3">
+              <p className="text-xs font-semibold text-gray-500">Pago por transferencia (opcional)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  value={transferClabe}
+                  onChange={(e) => setTransferClabe(e.target.value.replace(/\D/g, "").slice(0, 18))}
+                  placeholder="CLABE (18 dígitos)"
+                  inputMode="numeric"
+                  className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                />
+                <input
+                  value={transferBank}
+                  onChange={(e) => setTransferBank(e.target.value)}
+                  placeholder="Banco"
+                  className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                />
+                <input
+                  value={transferBeneficiary}
+                  onChange={(e) => setTransferBeneficiary(e.target.value)}
+                  placeholder="Beneficiario"
+                  className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                />
+              </div>
+              <p className="text-[11px] text-gray-400">
+                Si capturas la CLABE, el checkout ofrece &quot;Transferencia&quot; y muestra estos datos al confirmar.
+              </p>
             </div>
             <div className="flex items-center gap-3 pt-1">
               <button

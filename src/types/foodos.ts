@@ -17,6 +17,10 @@ export interface FoodosRestaurant {
   status: FoodosRestaurantStatus
   currency: string
   timezone: string
+  theme_color: string | null
+  transfer_clabe: string | null
+  transfer_bank: string | null
+  transfer_beneficiary: string | null
   created_at: string
   updated_at: string
 }
@@ -47,6 +51,33 @@ export interface FoodosBranchHours {
   open_time: string | null  // "HH:MM:SS"
   close_time: string | null
   is_closed: boolean
+  created_at: string
+}
+
+// --- Cupones por restaurante ---
+
+export interface FoodosCoupon {
+  id: string
+  restaurant_id: string
+  code: string
+  type: "percent" | "fixed"
+  value: number
+  min_order: number
+  max_uses: number | null
+  usage_count: number
+  is_active: boolean
+  expires_at: string | null
+  created_at: string
+}
+
+// --- Overrides de menú por sucursal ---
+
+export interface FoodosBranchMenuOverride {
+  id: string
+  branch_id: string
+  item_id: string
+  price: number | null
+  is_available: boolean | null
   created_at: string
 }
 
@@ -138,8 +169,32 @@ export interface FoodosCustomer {
   total_spend: number
   last_order_at: string | null
   segment: FoodosCustomerSegment
+  loyalty_points: number
+  store_credit: number
   created_at: string
   updated_at: string
+}
+
+export interface FoodosLoyaltyProgram {
+  id: string
+  restaurant_id: string
+  points_per_100: number
+  point_value: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface FoodosReview {
+  id: string
+  restaurant_id: string
+  order_id: string | null
+  customer_name: string | null
+  customer_phone: string | null
+  item_id: string | null
+  rating: number
+  comment: string | null
+  is_visible: boolean
+  created_at: string
 }
 
 export type FoodosOrderStatus =
@@ -152,7 +207,18 @@ export type FoodosOrderStatus =
 
 export type FoodosOrderChannel = "web" | "qr" | "whatsapp"
 export type FoodosFulfillment = "delivery" | "pickup" | "dine_in"
-export type FoodosPaymentStatus = "pending" | "paid" | "failed" | "refunded"
+/**
+ * `processing` = el cliente ya recibió las instrucciones de un método
+ * asíncrono (OXXO/SPEI/CoDi) y el pago aún no se acredita.
+ * `expired` = el voucher/CLABE caducó sin pago.
+ */
+export type FoodosPaymentStatus =
+  | "pending"
+  | "processing"
+  | "paid"
+  | "failed"
+  | "expired"
+  | "refunded"
 
 /** Modificador elegido en una línea de pedido (snapshot con precio server-side). */
 export interface FoodosOrderItemModifier {
@@ -194,7 +260,32 @@ export interface FoodosOrder {
   customer_phone: string | null
   note: string | null
   table_number: string | null
+  tip: number
+  coupon_code: string | null
+  loyalty_points_redeemed: number
+  loyalty_points_earned: number
   created_at: string
+}
+
+/** Comprobante de pago manual (transferencia/OXXO/efectivo) subido por el comensal. */
+export type FoodosPaymentProofMethod = "transfer" | "oxxo" | "efectivo" | "otro"
+export type FoodosPaymentProofStatus = "pending" | "approved" | "rejected"
+
+export interface FoodosOrderPayment {
+  id: number
+  order_id: string
+  restaurant_id: string
+  method: FoodosPaymentProofMethod
+  amount: number | null
+  proof_path: string
+  reference: string | null
+  status: FoodosPaymentProofStatus
+  reviewed_by: string | null
+  reviewed_at: string | null
+  notes: string | null
+  created_at: string
+  /** URL firmada de corta vida, generada en el servidor al leer. */
+  proof_url?: string | null
 }
 
 export type FoodosAutomationType =

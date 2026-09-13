@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes } from "@/hooks/use-local-storage"
-import { useEscapeKey } from "@/hooks/use-escape-key"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 import {
   getFoodosPanelData,
   listCategories,
@@ -18,18 +18,22 @@ import {
   upsertMenuItem,
   deleteMenuItem,
   bulkUpsertMenuItems,
+  importMenuCsv,
 } from "../actions"
 import { ItemOptionsManager } from "./_components/item-options-manager"
+import { ItemBranchOverrides } from "./_components/item-branch-overrides"
 import { formatMoney, itemMargin } from "@/lib/foodos"
 import type {
   FoodosRestaurant,
+  FoodosBranch,
   FoodosMenuCategory,
   FoodosMenuItem,
   FoodosItemOptionGroup,
   FoodosItemOptionValue,
+  FoodosBranchMenuOverride,
 } from "@/types/foodos"
 import {
-  UtensilsCrossed, Plus, Pencil, Trash2, Download, Check, X, Star, Loader2, Tag, ListPlus,
+  UtensilsCrossed, Plus, Pencil, Trash2, Download, Check, X, Star, Loader2, Tag, ListPlus, Building2, Upload,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
@@ -67,6 +71,9 @@ export default function MenuPage() {
   const [optionGroups, setOptionGroups] = useState<FoodosItemOptionGroup[]>([])
   const [optionValues, setOptionValues] = useState<FoodosItemOptionValue[]>([])
   const [optionsItem, setOptionsItem] = useState<FoodosMenuItem | null>(null)
+  const [overridesItem, setOverridesItem] = useState<FoodosMenuItem | null>(null)
+  const [branches, setBranches] = useState<FoodosBranch[]>([])
+  const [overrides, setOverrides] = useState<FoodosBranchMenuOverride[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -76,20 +83,20 @@ export default function MenuPage() {
   const [editingItem, setEditingItem] = useState<ItemForm | null>(null)
   const [showItemForm, setShowItemForm] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importingCsv, setImportingCsv] = useState(false)
 
-  const closeItemForm = useCallback(() => setShowItemForm(false), [])
-  useEscapeKey(closeItemForm, showItemForm)
 
   const [sharedDishes] = useSharedDishes(selectedCollection?.slug)
 
   const load = useCallback(async () => {
     try {
-      const { restaurant: r, categories: cats, items: its, optionGroups: ogs, optionValues: ovs } = await getFoodosPanelData()
+      const { restaurant: r, categories: cats, items: its, optionGroups: ogs, optionValues: ovs, branches: bs } = await getFoodosPanelData()
       setRestaurant(r)
       setCategories(cats)
       setItems(its)
       setOptionGroups(ogs)
       setOptionValues(ovs)
+      setBranches(bs)
     } catch (e) {
       setError(e instanceof Error ? e.message : t("foodos.menu.loadError"))
     } finally {
@@ -193,6 +200,49 @@ export default function MenuPage() {
     }
   }
 
+  // CSV: categoria,nombre,descripcion,precio,costo,tags (tags separados por |)
+  async function handleCsvFile(file: File) {
+    if (!restaurant) return
+    setImportingCsv(true)
+    setError(null)
+    try {
+      const text = await file.text()
+      const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+      if (lines.length < 2) throw new Error("El CSV no tiene filas de datos")
+      const rows = lines.slice(1).map((line) => {
+        const c = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""))
+        return {
+          category_name: c[0] || null,
+          name: c[1] ?? "",
+          description: c[2] || null,
+          price: Number(c[3]) || 0,
+          cost: Number(c[4]) || 0,
+          tags: c[5] ? c[5].split("|").map((tg) => tg.trim()).filter(Boolean) : [],
+        }
+      }).filter((r) => r.name)
+      if (rows.length === 0) throw new Error("No se encontraron platillos válidos")
+      const { added, categories } = await importMenuCsv(restaurant.id, rows)
+      setItems(await listMenuItems(restaurant.id))
+      setCategories(await listCategories(restaurant.id))
+      setError(`Se importaron ${added} platillos${categories ? ` y ${categories} categorías nuevas` : ""}.`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al importar el CSV")
+    } finally {
+      setImportingCsv(false)
+    }
+  }
+
+  function downloadCsvTemplate() {
+    const csv = "categoria,nombre,descripcion,precio,costo,tags\nTacos,Taco al pastor,Con piña y cilantro,45,18,favorito\nBebidas,Agua de horchata,Vaso 500ml,35,8,"
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "plantilla-menu.csv"
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   function toggleTag(tag: string) {
     if (!editingItem) return
     setEditingItem({
@@ -232,6 +282,28 @@ export default function MenuPage() {
             {t("foodos.menu.subtitle")}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        <button
+          onClick={downloadCsvTemplate}
+          className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 text-gray-500 text-xs font-semibold hover:bg-gray-50"
+          title="Descargar plantilla CSV"
+        >
+          <Download className="w-3.5 h-3.5" /> Plantilla
+        </button>
+        <label className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border border-[#0E7A0E]/30 text-[#0E7A0E] text-xs font-semibold hover:bg-[#F0FDF4] cursor-pointer ${importingCsv ? "opacity-40 pointer-events-none" : ""}`}>
+          {importingCsv ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+          Importar CSV
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) handleCsvFile(f)
+              e.target.value = ""
+            }}
+          />
+        </label>
         <button
           onClick={handleImportFromCosteo}
           disabled={importing || sharedDishes.length === 0}
@@ -241,6 +313,7 @@ export default function MenuPage() {
           {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           {t("foodos.menu.importFromCosteo")}
         </button>
+        </div>
       </div>
 
       {error && (
@@ -348,6 +421,15 @@ export default function MenuPage() {
                         >
                           <ListPlus className="w-3.5 h-3.5" />
                         </button>
+                        {branches.length > 1 && (
+                          <button
+                            onClick={() => setOverridesItem(item)}
+                            className="p-1.5 rounded-md text-gray-400 hover:text-[#0E7A0E]"
+                            title="Precio/disponibilidad por sucursal"
+                          >
+                            <Building2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => setEditingItem({
                             id: item.id, category_id: item.category_id, name: item.name,
@@ -416,6 +498,15 @@ export default function MenuPage() {
                         >
                           <ListPlus className="w-3.5 h-3.5" />
                         </button>
+                        {branches.length > 1 && (
+                          <button
+                            onClick={() => setOverridesItem(item)}
+                            className="p-1.5 rounded-md text-gray-400 hover:text-[#0E7A0E]"
+                            title="Precio/disponibilidad por sucursal"
+                          >
+                            <Building2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => setEditingItem({
                             id: item.id, category_id: item.category_id, name: item.name,
@@ -460,10 +551,15 @@ export default function MenuPage() {
       </div>
 
       {/* Form de item */}
-      {showItemForm && editingItem && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setShowItemForm(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+      <BottomSheet
+        open={showItemForm && editingItem != null}
+        onClose={() => setShowItemForm(false)}
+        ariaLabelledby="menu-item-form-title"
+        maxWidthClass="max-w-lg"
+      >
+        {editingItem && (
+          <div className="p-6">
+            <h3 id="menu-item-form-title" className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <UtensilsCrossed className="w-5 h-5 text-[#0E7A0E]" />
               {editingItem.id ? t("foodos.menu.editItem") : t("foodos.menu.newItem")}
             </h3>
@@ -573,7 +669,22 @@ export default function MenuPage() {
               </div>
             </form>
           </div>
-        </div>
+        )}
+      </BottomSheet>
+      {overridesItem && branches.length > 0 && (
+        <ItemBranchOverrides
+          item={overridesItem}
+          branches={branches}
+          overrides={overrides}
+          onClose={async () => {
+            setOverridesItem(null)
+            if (restaurant) {
+              const { listBranchMenuOverrides } = await import("../actions")
+              const all = await Promise.all(branches.map((b) => listBranchMenuOverrides(b.id)))
+              setOverrides(all.flat())
+            }
+          }}
+        />
       )}
       {optionsItem && restaurant && (
         <ItemOptionsManager

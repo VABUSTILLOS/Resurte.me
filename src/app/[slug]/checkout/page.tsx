@@ -109,6 +109,7 @@ export default function CheckoutPage() {
       JSON.stringify({
         orderId: orderId ?? null,
         trackingToken: trackingToken ?? null,
+        paymentMethod,
         total,
         cashbackCredits: cashbackCredits ?? 0,
         cashbackTier: cashbackTier ?? null,

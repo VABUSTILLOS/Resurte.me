@@ -2,36 +2,25 @@
 
 import type { ImportConfirm } from "./planificador-shared"
 import { t } from "@/lib/i18n/es"
-import { useEscapeKey } from "@/hooks/use-escape-key"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 
 interface ConfirmImportModalProps {
-  confirmImport: ImportConfirm
+  confirmImport: ImportConfirm | null
   onCancel: () => void
   onConfirm: () => void
 }
 
 // Modal: sobrescribir cantidades manuales al importar un platillo del Costeador.
 export default function ConfirmImportModal({ confirmImport, onCancel, onConfirm }: ConfirmImportModalProps) {
-  useEscapeKey(onCancel)
-
   return (
-    <div
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onCancel}
-    >
-      <div
-        className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-import-title"
-      >
+    <BottomSheet open={!!confirmImport} onClose={onCancel} ariaLabelledby="confirm-import-title">
+      <div className="p-6 pt-3">
         <h4 id="confirm-import-title" className="font-bold text-gray-900 mb-2">{t("planificador.overwriteTitle")}</h4>
         <p className="text-xs text-gray-500 mb-4">
-          {t("planificador.overwriteA")} <span className="font-semibold text-gray-700">&quot;{confirmImport.dishName}&quot;</span> {t("planificador.overwriteB")}
+          {t("planificador.overwriteA")} <span className="font-semibold text-gray-700">&quot;{confirmImport?.dishName}&quot;</span> {t("planificador.overwriteB")}
         </p>
         <ul className="space-y-1.5 mb-5 bg-amber-50 border border-amber-200 rounded-xl p-3">
-          {confirmImport.ingredients.map((o) => (
+          {confirmImport?.ingredients.map((o) => (
             <li key={o.name} className="flex items-center justify-between text-xs">
               <span className="text-amber-800 font-medium">{o.name}</span>
               <span className="text-amber-600">{o.existing} {t("planificador.toAutomatic")}</span>
@@ -53,6 +42,6 @@ export default function ConfirmImportModal({ confirmImport, onCancel, onConfirm 
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

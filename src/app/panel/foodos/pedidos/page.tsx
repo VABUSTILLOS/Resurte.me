@@ -12,7 +12,15 @@ import {
   getFoodosPanelData,
   listOrders,
   updateOrderStatus,
+  markOrderPaid,
 } from "../actions"
+import {
+  listPendingPaymentProofs,
+  getPaymentProofUrl,
+  approvePaymentProof,
+  rejectPaymentProof,
+  type PaymentProofWithOrder,
+} from "../payment-proofs"
 import { formatMoney, modifiersSummary } from "@/lib/foodos"
 import { createClient } from "@/lib/supabase/client"
 import type {
@@ -37,6 +45,8 @@ import {
   Banknote,
   Bell,
   Printer,
+  Receipt,
+  Image as ImageIcon,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
@@ -69,6 +79,13 @@ const FULFILLMENT_LABEL: Record<FoodosFulfillment, string> = {
 
 const PAID: FoodosPaymentStatus = "paid"
 
+const METHOD_LABEL: Record<string, string> = {
+  transfer: "Transferencia",
+  oxxo: "OXXO",
+  efectivo: "Efectivo",
+  otro: "Otro",
+}
+
 const CHANNEL_OPTIONS: { id: FoodosOrderChannel | "all"; label: string }[] = [
   { id: "all", label: t("foodos.common.allChannels") },
   { id: "web", label: "Web" },
@@ -86,6 +103,16 @@ export default function PedidosPage() {
   const [channelFilter, setChannelFilter] = useState<FoodosOrderChannel | "all">("all")
   const [saving, setSaving] = useState<string | null>(null)
   const [newOrdersCount, setNewOrdersCount] = useState(0)
+  const [proofs, setProofs] = useState<PaymentProofWithOrder[]>([])
+  const [proofBusy, setProofBusy] = useState<number | null>(null)
+
+  const loadProofs = useCallback(async (restaurantId: string) => {
+    try {
+      setProofs(await listPendingPaymentProofs(restaurantId))
+    } catch {
+      // silencioso: la cola de comprobantes no debe tumbar la comanda
+    }
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -93,12 +120,13 @@ export default function PedidosPage() {
       setRestaurant(r)
       setOrders(os)
       setBranches(bs)
+      if (r) await loadProofs(r.id)
     } catch (e) {
       setError(e instanceof Error ? e.message : t("foodos.common.loadError"))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loadProofs])
 
   const handleRetry = () => {
     setLoading(true)
@@ -121,6 +149,7 @@ export default function PedidosPage() {
       try {
         const os = await listOrders(restaurant.id)
         if (!stopped) setOrders(os)
+        await loadProofs(restaurant.id)
       } catch {
         // silencioso: el siguiente ciclo reintenta
       }
@@ -137,7 +166,7 @@ export default function PedidosPage() {
       clearInterval(id)
       document.removeEventListener("visibilitychange", onVisible)
     }
-  }, [restaurant])
+  }, [restaurant, loadProofs])
 
   // Comanda en vivo: suscripción Realtime a foodos_orders (INSERT = nuevo
   // pedido → beep + badge; UPDATE = cambio de estado). El RLS owner-only
@@ -248,6 +277,45 @@ export default function PedidosPage() {
     }
   }
 
+  async function viewProof(proofId: number) {
+    try {
+      const url = await getPaymentProofUrl(proofId)
+      if (!url) {
+        setError(t("foodos.pedidos.proofsViewError"))
+        return
+      }
+      window.open(url, "_blank", "noopener,noreferrer")
+    } catch {
+      setError(t("foodos.pedidos.proofsViewError"))
+    }
+  }
+
+  async function approveProof(proofId: number) {
+    setProofBusy(proofId)
+    try {
+      await approvePaymentProof(proofId)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("foodos.pedidos.proofsActionError"))
+    } finally {
+      setProofBusy(null)
+    }
+  }
+
+  async function rejectProof(proofId: number) {
+    const reason = prompt(t("foodos.pedidos.proofsRejectPrompt"))
+    if (reason === null) return
+    setProofBusy(proofId)
+    try {
+      await rejectPaymentProof(proofId, reason)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("foodos.pedidos.proofsActionError"))
+    } finally {
+      setProofBusy(null)
+    }
+  }
+
   if (!restaurant) {
     if (loading) {
       return (
@@ -292,6 +360,108 @@ export default function PedidosPage() {
 
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>
+      )}
+
+      {/* Comprobantes de pago manual pendientes de revisión */}
+      {proofs.length > 0 && (
+        <section className="mb-6 bg-white border border-amber-200 rounded-2xl p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <h2 className="text-lg font-black text-stone-900 flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-amber-600" />
+                {t("foodos.pedidos.proofsTitle")}
+              </h2>
+              <p className="text-sm text-stone-500">{t("foodos.pedidos.proofsSubtitle")}</p>
+            </div>
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-800">
+              {proofs.length === 1
+                ? t("foodos.pedidos.proofsCount", { count: proofs.length })
+                : t("foodos.pedidos.proofsCountPlural", { count: proofs.length })}
+            </span>
+          </div>
+
+          <div className="grid gap-3">
+            {proofs.map((proof) => (
+              <div
+                key={proof.id}
+                className="border border-stone-200 rounded-xl p-4 flex flex-wrap items-start justify-between gap-4"
+              >
+                <div className="min-w-[16rem]">
+                  <p className="font-black text-stone-900">
+                    #{proof.order_id.slice(0, 8).toUpperCase()}
+                  </p>
+                  <p className="text-sm text-stone-600 mt-0.5">
+                    {proof.order?.customer_name ?? t("foodos.common.customer")}
+                    {proof.order?.customer_phone ? ` · ${proof.order.customer_phone}` : ""}
+                  </p>
+                  <dl className="mt-2 text-xs text-stone-500 space-y-0.5">
+                    <div className="flex gap-2">
+                      <dt>{t("foodos.pedidos.proofsMethod")}:</dt>
+                      <dd className="font-semibold text-stone-700">
+                        {METHOD_LABEL[proof.method] ?? proof.method}
+                      </dd>
+                    </div>
+                    {proof.amount != null && (
+                      <div className="flex gap-2">
+                        <dt>{t("foodos.pedidos.proofsClaimed")}:</dt>
+                        <dd className="font-semibold text-stone-700">{formatMoney(proof.amount)}</dd>
+                      </div>
+                    )}
+                    {proof.order && (
+                      <div className="flex gap-2">
+                        <dt>{t("foodos.pedidos.proofsOrderTotal")}:</dt>
+                        <dd className="font-semibold text-stone-700">
+                          {formatMoney(proof.order.total)}
+                        </dd>
+                      </div>
+                    )}
+                    {proof.reference && (
+                      <div className="flex gap-2">
+                        <dt>{t("foodos.pedidos.proofsReference")}:</dt>
+                        <dd className="font-mono text-stone-700">{proof.reference}</dd>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <dt>{new Date(proof.created_at).toLocaleString("es-MX", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}</dt>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => viewProof(proof.id)}
+                    disabled={proofBusy === proof.id}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5" /> {t("foodos.pedidos.proofsView")}
+                  </button>
+                  <button
+                    onClick={() => approveProof(proof.id)}
+                    disabled={proofBusy === proof.id}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {proofBusy === proof.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    )}
+                    {t("foodos.pedidos.proofsApprove")}
+                  </button>
+                  <button
+                    onClick={() => rejectProof(proof.id)}
+                    disabled={proofBusy === proof.id}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <XCircle className="w-3.5 h-3.5" /> {t("foodos.pedidos.proofsReject")}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Filtros por estado */}
@@ -363,13 +533,38 @@ export default function PedidosPage() {
                   <p className="flex items-center justify-end gap-1 text-xs text-stone-500 mt-1">
                     {order.payment_method === "card" ? (
                       <><CreditCard className="w-3 h-3" /> {t("foodos.common.card")}</>
+                    ) : order.payment_method === "transfer" ? (
+                      <><CreditCard className="w-3 h-3" /> Transferencia</>
                     ) : (
                       <><Banknote className="w-3 h-3" /> {t("foodos.common.atBranch")}</>
                     )}
-                    {order.payment_status === PAID && (
+                    {order.payment_status === PAID ? (
                       <span className="ml-1 text-emerald-600 font-bold">· {t("foodos.common.paid")}</span>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          setSaving(order.id)
+                          try {
+                            await markOrderPaid(order.id)
+                            await load()
+                          } finally {
+                            setSaving(null)
+                          }
+                        }}
+                        disabled={saving === order.id}
+                        className="ml-1 text-amber-700 font-bold hover:text-amber-900 underline"
+                      >
+                        · Marcar pagado
+                      </button>
                     )}
                   </p>
+                  {(order.tip > 0 || order.discount > 0) && (
+                    <p className="text-[11px] text-stone-400 mt-0.5">
+                      {order.discount > 0 && `cupón ${order.coupon_code ?? ""} −${formatMoney(order.discount)}`}
+                      {order.discount > 0 && order.tip > 0 && " · "}
+                      {order.tip > 0 && `propina ${formatMoney(order.tip)}`}
+                    </p>
+                  )}
                   <p className="text-[11px] text-stone-400 uppercase tracking-wide mt-1">{t("foodos.common.channel", { channel: order.channel })}</p>
                 </div>
               </div>

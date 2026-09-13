@@ -24,6 +24,7 @@ export interface StripePaymentIntentLike {
   payment_method?: string | null
   customer?: string | null
   receipt_email?: string | null
+  cancellation_reason?: string | null
 }
 
 /**
@@ -176,31 +177,58 @@ export async function handlePaymentIntentSucceeded(
 
   // Actualiza pedidos FoodOS (micrositio /r/[slug]) del mismo intent,
   // solo si el monto recibido coincide con el total del pedido.
+  //
+  // Igual que en `orders`, se busca por stripe_payment_intent_id (canonical) y
+  // si no está persistido se hace fallback por metadata.foodos_order_id: el PI
+  // siempre lo lleva y Stripe lo preserva en el evento, así que un fallo
+  // silencioso al guardar la columna no pierde el cobro.
   const { data: foodosOrder, error: foodosError } = await supabase
     .from("foodos_orders")
     .select("id, total")
     .eq("stripe_payment_intent_id", paymentIntent.id)
     .maybeSingle()
 
-  if (foodosError) {
-    logger.error("Failed to fetch foodos order payment:", foodosError.message)
-  } else if (foodosOrder) {
-    if (isAmountSufficient(paymentIntent.amount_received, foodosOrder.total)) {
+  let lookupFoodosOrder = foodosOrder
+  let lookupFoodosError = foodosError
+  if (!foodosOrder && !foodosError) {
+    const foodosOrderId = paymentIntent.metadata?.foodos_order_id
+    if (foodosOrderId) {
+      const fb = await supabase
+        .from("foodos_orders")
+        .select("id, total")
+        .eq("id", foodosOrderId)
+        .maybeSingle()
+      if (fb.data && !fb.error) {
+        lookupFoodosOrder = fb.data
+        lookupFoodosError = null
+        // Repara el dato canónico para que el tracking del cliente y la
+        // reconciliación encuentren el pedido por el PI.
+        await supabase
+          .from("foodos_orders")
+          .update({ stripe_payment_intent_id: paymentIntent.id })
+          .eq("id", fb.data.id)
+      }
+    }
+  }
+
+  if (lookupFoodosError) {
+    logger.error("Failed to fetch foodos order payment:", lookupFoodosError.message)
+  } else if (lookupFoodosOrder) {
+    if (isAmountSufficient(paymentIntent.amount_received, lookupFoodosOrder.total)) {
       await supabase
         .from("foodos_orders")
-        .update({ payment_status: "paid", updated_at: new Date().toISOString() })
-        .eq("id", foodosOrder.id)
-      logger.info("stripe.foodos.payment.succeeded", { order: foodosOrder.id })
+        .update({ payment_status: "paid" })
+        .eq("id", lookupFoodosOrder.id)
+      logger.info("stripe.foodos.payment.succeeded", { order: lookupFoodosOrder.id })
     } else {
       await supabase
         .from("foodos_orders")
         .update({
           payment_status: "amount_mismatch",
-          updated_at: new Date().toISOString(),
         })
-        .eq("id", foodosOrder.id)
+        .eq("id", lookupFoodosOrder.id)
       logger.error(
-        `⚠️ FoodOS amount mismatch: order ${foodosOrder.id} expected ${toCents(foodosOrder.total)}, received ${paymentIntent.amount_received}`
+        `⚠️ FoodOS amount mismatch: order ${lookupFoodosOrder.id} expected ${toCents(lookupFoodosOrder.total)}, received ${paymentIntent.amount_received}`
       )
     }
   }
@@ -219,7 +247,7 @@ export async function handlePaymentIntentRefunded(
     .eq("stripe_payment_intent_id", paymentIntent.id)
   await supabase
     .from("foodos_orders")
-    .update({ payment_status: "refunded", updated_at: new Date().toISOString() })
+    .update({ payment_status: "refunded" })
     .eq("stripe_payment_intent_id", paymentIntent.id)
 }
 
@@ -236,7 +264,7 @@ export async function handlePaymentIntentFailed(
     .eq("stripe_payment_intent_id", paymentIntent.id)
   await supabase
     .from("foodos_orders")
-    .update({ payment_status: "failed", updated_at: new Date().toISOString() })
+    .update({ payment_status: "failed" })
     .eq("stripe_payment_intent_id", paymentIntent.id)
   await supabase
     .from("order_upsells")
@@ -247,12 +275,22 @@ export async function handlePaymentIntentFailed(
 /**
  * payment_intent.canceled: marca failed solo si el pedido NO está pagado
  * (nunca degrada un pago confirmado); los upsells pasan a canceled.
+ *
+ * `cancellation_reason === "expired"` indica que un método asíncrono
+ * (OXXO/SPEI/CoDi) caducó sin acreditarse; en FoodOS se refleja como
+ * `expired` en vez de `failed` para que el panel distinga "el cliente
+ * nunca pagó el voucher" de "el cobro fue rechazado".
  */
 export async function handlePaymentIntentCanceled(
   supabase: ServiceClient,
-  paymentIntent: { id: string }
+  paymentIntent: { id: string; cancellation_reason?: string | null }
 ): Promise<void> {
-  logger.info("stripe.payment.canceled", { paymentIntent: paymentIntent.id })
+  logger.info("stripe.payment.canceled", {
+    paymentIntent: paymentIntent.id,
+    reason: paymentIntent.cancellation_reason ?? null,
+  })
+
+  const expired = paymentIntent.cancellation_reason === "expired"
 
   const { data: order } = await supabase
     .from("orders")
@@ -266,8 +304,74 @@ export async function handlePaymentIntentCanceled(
       .update({ payment_status: "failed", updated_at: new Date().toISOString() })
       .eq("stripe_payment_intent_id", paymentIntent.id)
   }
+
+  // FoodOS: mismo guard (nunca degradar un pago acreditado).
+  const { data: foodosOrder } = await supabase
+    .from("foodos_orders")
+    .select("id, payment_status")
+    .eq("stripe_payment_intent_id", paymentIntent.id)
+    .maybeSingle()
+
+  if (foodosOrder && foodosOrder.payment_status !== "paid") {
+    await supabase
+      .from("foodos_orders")
+      .update({
+        payment_status: expired ? "expired" : "failed",
+      })
+      .eq("id", foodosOrder.id)
+  }
+
   await supabase
     .from("order_upsells")
     .update({ status: "canceled" })
     .eq("stripe_payment_intent_id", paymentIntent.id)
+}
+
+/**
+ * payment_intent.processing / payment_intent.requires_action: el cliente ya
+ * recibió las instrucciones de un método asíncrono (voucher OXXO, CLABE SPEI,
+ * QR CoDi) y el dinero aún no se acredita.
+ *
+ * El guard `.eq("payment_status", "pending")` hace la transición idempotente
+ * y, sobre todo, evita degradar un pedido ya pagado cuando Stripe re-entrega
+ * el evento fuera de orden.
+ */
+export async function handlePaymentIntentProcessing(
+  supabase: ServiceClient,
+  paymentIntent: { id: string }
+): Promise<void> {
+  logger.info("stripe.payment.processing", { paymentIntent: paymentIntent.id })
+
+  await supabase
+    .from("orders")
+    .update({ payment_status: "processing", updated_at: new Date().toISOString() })
+    .eq("stripe_payment_intent_id", paymentIntent.id)
+    .eq("payment_status", "pending")
+
+  await supabase
+    .from("foodos_orders")
+    .update({ payment_status: "processing" })
+    .eq("stripe_payment_intent_id", paymentIntent.id)
+    .eq("payment_status", "pending")
+}
+
+/**
+ * Expiración de un voucher FoodOS detectada por el cron de reconciliación
+ * (Stripe deja el intent en `requires_payment_method` sin `last_payment_error`
+ * cuando un OXXO/SPEI caduca, y ese estado no dispara `payment_failed`).
+ *
+ * Solo toca `foodos_orders`: los pedidos del marketplace conservan la
+ * semántica existente de `handlePaymentIntentFailed`.
+ */
+export async function handleFoodosPaymentIntentExpired(
+  supabase: ServiceClient,
+  paymentIntent: { id: string }
+): Promise<void> {
+  logger.warn("stripe.foodos.payment.expired", { paymentIntent: paymentIntent.id })
+
+  await supabase
+    .from("foodos_orders")
+    .update({ payment_status: "expired" })
+    .eq("stripe_payment_intent_id", paymentIntent.id)
+    .in("payment_status", ["pending", "processing"])
 }

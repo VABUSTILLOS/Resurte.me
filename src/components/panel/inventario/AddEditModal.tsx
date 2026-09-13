@@ -1,5 +1,5 @@
 import { X } from "lucide-react"
-import { useEscapeKey } from "@/hooks/use-escape-key"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 import type { Proveedor } from "./inventario-shared"
 
 interface Props {
@@ -45,11 +45,9 @@ export default function AddEditModal({
   onCancel,
   onSave,
 }: Props) {
-  useEscapeKey(onCancel, showForm)
-  if (!showForm) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onCancel}>
-      <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+    <BottomSheet open={showForm} onClose={onCancel} ariaLabel={editingId ? "Editar producto" : "Agregar producto"}>
+      <div className="p-6 pt-3">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-gray-900">{editingId ? "Editar producto" : "Agregar producto"}</h3>
           <button
@@ -138,6 +136,6 @@ export default function AddEditModal({
           </div>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

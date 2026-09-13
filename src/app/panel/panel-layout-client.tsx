@@ -14,7 +14,7 @@ import { usePanelRole } from "@/hooks/use-panel-role"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import { canAccessTool, toolKeyForPath } from "@/lib/panel-roles"
 import { PanelMobileNav } from "./_components/PanelMobileNav"
-import { PanelQuickNav } from "./_components/PanelQuickNav"
+import { PanelFab } from "./_components/PanelFab"
 import { PanelCompactFooter } from "@/components/panel/PanelCompactFooter"
 import ToolSwitcher from "@/components/panel/guide/tool-switcher"
 import Link from "next/link"
@@ -86,7 +86,7 @@ function PanelContent({ children }: { children: React.ReactNode }) {
   }, [loading, selectedCollection, router])
 
   // Publish a body class so floating elements (cookie banner, toast)
-  // move above the quick-nav bar on mobile.
+  // move above the tools FAB on mobile.
   useEffect(() => {
     if (!loading && selectedCollection) {
       document.body.classList.add("has-panel-bottom-nav")
@@ -98,8 +98,9 @@ function PanelContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}>
-      {/* Top bar with restaurant type selector */}
-      <div className="sticky top-[var(--header-top-offset)] z-40 bg-white/90 backdrop-blur-md border-b border-gray-100">
+      {/* Top bar with restaurant type selector — sticky solo en desktop;
+          en móvil queda en flujo (sin barras fijas apiladas) */}
+      <div className="lg:sticky lg:top-[var(--header-top-offset)] z-40 bg-white/90 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             <div className="flex items-center gap-2 min-w-0">
@@ -214,11 +215,16 @@ function PanelContent({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
-        {/* Persistent tool-switcher bar — shown once a collection is selected */}
-        {selectedCollection && <ToolSwitcher />}
+        {/* Persistent tool-switcher bar — desktop only; en móvil la
+            navegación entre herramientas vive en el FAB + bottom sheet */}
+        {selectedCollection && (
+          <div className="hidden lg:block">
+            <ToolSwitcher />
+          </div>
+        )}
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-24 lg:pb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-20 lg:pb-6">
         {denied ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center max-w-md mx-auto mt-8">
             <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
@@ -240,7 +246,9 @@ function PanelContent({ children }: { children: React.ReactNode }) {
 
       <PanelCompactFooter />
 
-      {selectedCollection && <PanelQuickNav />}
+      {selectedCollection && (
+        <PanelFab sheetOpen={showMobileNav} onOpen={() => setShowMobileNav(true)} />
+      )}
 
       <PanelMobileNav
         open={showMobileNav}

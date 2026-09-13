@@ -171,8 +171,10 @@ export const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: strin
 
 export type PaymentStatus =
   | 'pending'
+  | 'processing'
   | 'paid'
   | 'failed'
+  | 'expired'
   | 'refunded'
   | 'amount_mismatch'
 

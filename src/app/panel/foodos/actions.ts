@@ -10,7 +10,9 @@ import { requireAuth, getCurrentUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { slugify } from "@/lib/foodos"
+import { notifyFoodosCustomer } from "@/lib/foodos-notifications"
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 import type {
   FoodosRestaurant,
   FoodosRestaurantStatus,
@@ -29,6 +31,10 @@ import type {
   FoodosItemOptionGroup,
   FoodosItemOptionValue,
   FoodosBranchHours,
+  FoodosCoupon,
+  FoodosBranchMenuOverride,
+  FoodosLoyaltyProgram,
+  FoodosReview,
 } from "@/types/foodos"
 
 // ------------------------------------------------------------
@@ -114,6 +120,10 @@ export async function upsertRestaurant(input: {
   status?: FoodosRestaurantStatus
   currency?: string
   collection_id?: number | null
+  theme_color?: string | null
+  transfer_clabe?: string | null
+  transfer_bank?: string | null
+  transfer_beneficiary?: string | null
 }): Promise<FoodosRestaurant> {
   const { supabase, user } = await requireAuth()
 
@@ -140,6 +150,10 @@ export async function upsertRestaurant(input: {
     status: input.status ?? "draft",
     currency: input.currency || "MXN",
     collection_id: input.collection_id ?? null,
+    theme_color: input.theme_color || null,
+    transfer_clabe: input.transfer_clabe || null,
+    transfer_bank: input.transfer_bank || null,
+    transfer_beneficiary: input.transfer_beneficiary || null,
   }
 
   let result
@@ -735,12 +749,32 @@ export async function updateOrderStatus(
   status: FoodosOrderStatus
 ): Promise<void> {
   const { supabase } = await requireAuth()
+
+  const { data: current, error: readError } = await supabase
+    .from("foodos_orders")
+    .select("status")
+    .eq("id", orderId)
+    .maybeSingle()
+  if (readError) throw new Error(readError.message)
+
+  // Sin cambio real no se reescribe ni se reavisa. Los botones de estado
+  // del panel y el tablero de cocina pueden dispararse dos veces con el
+  // mismo valor; el UPDATE es idempotente pero el aviso al comensal no.
+  if ((current as { status: string } | null)?.status === status) return
+
   const { error } = await supabase
     .from("foodos_orders")
     .update({ status })
     .eq("id", orderId)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/pedidos")
+
+  // after(): el aviso se manda después de responder para no dejar al
+  // dueño esperando al mensajero, pero dentro de la vida de la función
+  // (fire-and-forget se cancelaría al resolver la respuesta).
+  after(() => {
+    void notifyFoodosCustomer(orderId, `status:${status}`)
+  })
 }
 
 // ------------------------------------------------------------
@@ -900,4 +934,267 @@ export async function deleteCampaign(id: string): Promise<void> {
   const { error } = await supabase.from("foodos_campaigns").delete().eq("id", id)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/clientes")
+}
+
+// ------------------------------------------------------------
+// Cupones del restaurante
+// ------------------------------------------------------------
+
+export async function listCoupons(restaurantId: string): Promise<FoodosCoupon[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_coupons")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("created_at", { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data as FoodosCoupon[]) ?? []
+}
+
+export async function upsertCoupon(input: {
+  id?: string
+  restaurant_id: string
+  code: string
+  type: "percent" | "fixed"
+  value: number
+  min_order?: number
+  max_uses?: number | null
+  is_active?: boolean
+  expires_at?: string | null
+}): Promise<void> {
+  const { supabase } = await requireAuth()
+  const payload = {
+    restaurant_id: input.restaurant_id,
+    code: input.code.trim().toUpperCase(),
+    type: input.type,
+    value: Number(input.value) || 0,
+    min_order: Number(input.min_order) || 0,
+    max_uses: input.max_uses ?? null,
+    is_active: input.is_active ?? true,
+    expires_at: input.expires_at || null,
+  }
+  const { error } = input.id
+    ? await supabase.from("foodos_coupons").update(payload).eq("id", input.id)
+    : await supabase.from("foodos_coupons").insert(payload)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/cupones")
+}
+
+export async function deleteCoupon(id: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase.from("foodos_coupons").delete().eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/cupones")
+}
+
+// ------------------------------------------------------------
+// Overrides de menú por sucursal
+// ------------------------------------------------------------
+
+export async function listBranchMenuOverrides(
+  branchId: string
+): Promise<FoodosBranchMenuOverride[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_branch_menu_overrides")
+    .select("*")
+    .eq("branch_id", branchId)
+  if (error) throw new Error(error.message)
+  return (data as FoodosBranchMenuOverride[]) ?? []
+}
+
+/** Guarda (o borra, si ambos campos son null) el override de un ítem en una sucursal. */
+export async function upsertBranchMenuOverride(input: {
+  branch_id: string
+  item_id: string
+  price?: number | null
+  is_available?: boolean | null
+}): Promise<void> {
+  const { supabase } = await requireAuth()
+  const price = input.price ?? null
+  const isAvailable = input.is_available ?? null
+  if (price === null && isAvailable === null) {
+    const { error } = await supabase
+      .from("foodos_branch_menu_overrides")
+      .delete()
+      .eq("branch_id", input.branch_id)
+      .eq("item_id", input.item_id)
+    if (error) throw new Error(error.message)
+  } else {
+    const { error } = await supabase
+      .from("foodos_branch_menu_overrides")
+      .upsert(
+        { branch_id: input.branch_id, item_id: input.item_id, price, is_available: isAvailable },
+        { onConflict: "branch_id,item_id" }
+      )
+    if (error) throw new Error(error.message)
+  }
+  revalidatePath("/panel/foodos/menu")
+}
+
+// ------------------------------------------------------------
+// Pedidos: confirmar pago manual (transferencia/efectivo)
+// ------------------------------------------------------------
+
+export async function markOrderPaid(orderId: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_orders")
+    .update({ payment_status: "paid" })
+    .eq("id", orderId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/pedidos")
+
+  after(() => {
+    void notifyFoodosCustomer(orderId, "payment:paid")
+  })
+}
+
+// ------------------------------------------------------------
+// Programa de lealtad + store credit
+// ------------------------------------------------------------
+
+export async function getLoyaltyProgram(
+  restaurantId: string
+): Promise<FoodosLoyaltyProgram | null> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_loyalty_programs")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as FoodosLoyaltyProgram | null) ?? null
+}
+
+export async function upsertLoyaltyProgram(input: {
+  restaurant_id: string
+  points_per_100: number
+  point_value: number
+  is_active: boolean
+}): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_loyalty_programs")
+    .upsert(
+      {
+        restaurant_id: input.restaurant_id,
+        points_per_100: Math.max(0, Number(input.points_per_100) || 0),
+        point_value: Math.max(0, Number(input.point_value) || 0),
+        is_active: input.is_active,
+      },
+      { onConflict: "restaurant_id" }
+    )
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/clientes")
+}
+
+/** Ajuste manual de store credit (ej. compensación por mala experiencia). */
+export async function adjustCustomerCredit(
+  customerId: string,
+  amount: number
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { data: customer, error: readErr } = await supabase
+    .from("foodos_customers")
+    .select("store_credit")
+    .eq("id", customerId)
+    .single()
+  if (readErr) throw new Error(readErr.message)
+  const next = Math.max(0, Number(customer.store_credit) + amount)
+  const { error } = await supabase
+    .from("foodos_customers")
+    .update({ store_credit: next })
+    .eq("id", customerId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/clientes")
+}
+
+// ------------------------------------------------------------
+// Reseñas (moderación)
+// ------------------------------------------------------------
+
+export async function listReviews(restaurantId: string): Promise<FoodosReview[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_reviews")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("created_at", { ascending: false })
+    .limit(50)
+  if (error) throw new Error(error.message)
+  return (data as FoodosReview[]) ?? []
+}
+
+export async function setReviewVisibility(id: string, isVisible: boolean): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_reviews")
+    .update({ is_visible: isVisible })
+    .eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/clientes")
+}
+
+// ------------------------------------------------------------
+// Importación CSV del menú
+// ------------------------------------------------------------
+
+/**
+ * Importa filas de CSV (categoria,nombre,descripcion,precio,costo,tags).
+ * Crea las categorías faltantes por nombre y agrega los platillos.
+ */
+export async function importMenuCsv(
+  restaurantId: string,
+  rows: Array<{
+    category_name?: string | null
+    name: string
+    description?: string | null
+    price: number
+    cost?: number
+    tags?: string[]
+  }>
+): Promise<{ added: number; categories: number }> {
+  const { supabase } = await requireAuth()
+
+  // Categorías existentes por nombre (lowercase)
+  const { data: cats, error: catErr } = await supabase
+    .from("foodos_menu_categories")
+    .select("id, name, sort_order")
+    .eq("restaurant_id", restaurantId)
+  if (catErr) throw new Error(catErr.message)
+
+  const byName = new Map((cats ?? []).map((c) => [c.name.trim().toLowerCase(), c.id]))
+  let sortOrder = (cats ?? []).length
+  let createdCategories = 0
+
+  // Crear categorías faltantes
+  const wanted = [...new Set(rows.map((r) => r.category_name?.trim().toLowerCase()).filter(Boolean))] as string[]
+  for (const name of wanted) {
+    if (byName.has(name)) continue
+    const displayName = rows.find((r) => r.category_name?.trim().toLowerCase() === name)?.category_name?.trim() ?? name
+    const { data, error } = await supabase
+      .from("foodos_menu_categories")
+      .insert({ restaurant_id: restaurantId, name: displayName, sort_order: sortOrder++ })
+      .select("id")
+      .single()
+    if (error) throw new Error(error.message)
+    byName.set(name, data.id)
+    createdCategories++
+  }
+
+  const itemRows = rows.map((r) => ({
+    restaurant_id: restaurantId,
+    category_id: r.category_name ? byName.get(r.category_name.trim().toLowerCase()) ?? null : null,
+    name: r.name.trim(),
+    description: r.description?.trim() || null,
+    price: Number(r.price) || 0,
+    cost: Number(r.cost) || 0,
+    tags: r.tags ?? [],
+    is_available: true,
+  }))
+  const { error } = await supabase.from("foodos_menu_items").insert(itemRows)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/menu")
+  return { added: itemRows.length, categories: createdCategories }
 }

@@ -59,6 +59,8 @@ export default async function StorefrontPage({ params }: PageProps) {
       optionGroups={data.optionGroups}
       optionValues={data.optionValues}
       branchHours={data.branchHours}
+      overrides={data.overrides}
+      reviews={data.reviews}
     />
   )
 }

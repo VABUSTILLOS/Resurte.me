@@ -2,10 +2,12 @@ import { logger } from "@/lib/logger"
 /**
  * GET /api/cron/daily
  *
- * Cron diario consolidado: ejecuta secuencialmente los 4 jobs que antes
+ * Cron diario consolidado: ejecuta secuencialmente los jobs que antes
  * corrían como crons separados en vercel.json (payment-reminders 8:00,
- * reactivation 9:00, abandoned-cart 12:00, foodos/campaigns 0:00).
- * Un solo cold start diario en vez de cuatro (ahorro de Active CPU).
+ * reactivation 9:00, abandoned-cart 12:00, foodos/campaigns 0:00), más
+ * los que se añadieron después (reorder-reminders, retry-order-emails,
+ * reconcile-payments, foodos-payment-reminders).
+ * Un solo cold start diario en vez de varios (ahorro de Active CPU).
  *
  * Protegido con el header Authorization: Bearer <CRON_SECRET> (Vercel Cron
  * lo envía automáticamente cuando CRON_SECRET está configurado).
@@ -13,6 +15,7 @@ import { logger } from "@/lib/logger"
 
 import { NextRequest, NextResponse } from "next/server"
 import { checkAndSendPaymentReminders } from "@/lib/workflows"
+import { checkAndSendFoodosPaymentReminders } from "@/lib/foodos-payment-reminders"
 import { retryFailedOrderEmails } from "@/lib/order-emails"
 import { runDueFoodosCampaigns } from "@/lib/foodos-campaigns"
 
@@ -31,6 +34,7 @@ export async function GET(req: NextRequest) {
 
   const jobs: Array<[string, () => Promise<unknown>]> = [
     ["payment-reminders", () => checkAndSendPaymentReminders()],
+    ["foodos-payment-reminders", () => checkAndSendFoodosPaymentReminders()],
     [
       "abandoned-cart",
       async () => {

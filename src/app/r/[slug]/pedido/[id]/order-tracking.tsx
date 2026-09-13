@@ -8,10 +8,11 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
-  Bike, CheckCircle2, ChefHat, Clock, Loader2, PackageCheck, Store, UtensilsCrossed, XCircle,
+  Bike, CheckCircle2, ChefHat, Clock, Loader2, PackageCheck, Star, Store, UtensilsCrossed, XCircle,
 } from "lucide-react"
 import { formatMoney, modifiersSummary } from "@/lib/foodos"
 import type { FoodosOrderItem, FoodosOrderStatus } from "@/types/foodos"
+import { PaymentProofUpload } from "../../_components/payment-proof-upload"
 
 interface TrackData {
   id: string
@@ -127,7 +128,11 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
           <div className="bg-red-50 border border-red-200 rounded-2xl p-5 text-center">
             <XCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
             <p className="font-bold text-red-700">Pedido cancelado</p>
-            <p className="text-sm text-red-500 mt-1">Contacta al restaurante si crees que es un error.</p>
+            <p className="text-sm text-red-500 mt-1">
+              {data.payment_status === "expired"
+                ? "No registramos el pago dentro del plazo y el pedido se canceló solo. No hubo ningún cargo."
+                : "Contacta al restaurante si crees que es un error."}
+            </p>
           </div>
         ) : (
           <div className="bg-white border border-stone-200 rounded-3xl p-6">
@@ -163,8 +168,7 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
         )}
 
         <div className="bg-white border border-stone-200 rounded-3xl p-6">
-          <h2 className="font-bold text-stone-900 mb-3">Tu pedido</h2>
-          <div className="space-y-2">
+          <h2 className="font-bold text-stone-900 mb-3">Tu pedido</h2>          <div className="space-y-2">
             {data.items.map((item, idx) => (
               <div key={idx} className="flex items-start justify-between gap-3 text-sm">
                 <div className="min-w-0">
@@ -186,7 +190,62 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
           {data.payment_status === "paid" && (
             <p className="text-xs text-emerald-600 font-bold mt-2">✓ Pagado</p>
           )}
+          {data.payment_status === "processing" && (
+            <div className="mt-3 rounded-2xl bg-amber-50 border border-amber-200 px-3 py-2.5">
+              <p className="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Pago en proceso
+              </p>
+              <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                Estamos esperando la confirmación de tu pago. Si elegiste OXXO o SPEI puede
+                tardar unos minutos; esta página se actualiza sola.
+              </p>
+            </div>
+          )}
+          {data.payment_status === "expired" && (
+            <div className="mt-3 rounded-2xl bg-stone-100 border border-stone-300 px-3 py-2.5">
+              <p className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                <XCircle className="w-3.5 h-3.5" />
+                Pago expirado
+              </p>
+              <p className="text-xs text-stone-600 mt-1 leading-relaxed">
+                El tiempo para completar el pago terminó.{" "}
+                <Link href={`/r/${slug}`} className="font-bold text-emerald-700 hover:text-emerald-600">
+                  Vuelve al menú
+                </Link>{" "}
+                para generar un nuevo intento.
+              </p>
+            </div>
+          )}
+          {data.payment_status === "failed" && (
+            <div className="mt-3 rounded-2xl bg-rose-50 border border-rose-200 px-3 py-2.5">
+              <p className="text-xs font-bold text-rose-700 flex items-center gap-1.5">
+                <XCircle className="w-3.5 h-3.5" />
+                El pago no se completó
+              </p>
+              <p className="text-xs text-rose-600 mt-1 leading-relaxed">
+                No se realizó ningún cargo.{" "}
+                <Link href={`/r/${slug}`} className="font-bold text-emerald-700 hover:text-emerald-600">
+                  Intenta de nuevo
+                </Link>
+                .
+              </p>
+            </div>
+          )}
         </div>
+
+        {(data.payment_status === "pending" ||
+          data.payment_status === "failed" ||
+          data.payment_status === "expired" ||
+          data.payment_status === "amount_mismatch") && (
+          <PaymentProofUpload
+            restaurantSlug={slug}
+            orderId={orderId}
+            defaultMethod="transfer"
+          />
+        )}
+
+        {data.status === "delivered" && <ReviewForm orderId={orderId} />}
 
         <Link
           href={`/r/${slug}`}
@@ -195,6 +254,86 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
           ← Volver al menú
         </Link>
       </div>
+    </div>
+  )
+}
+
+/** Reseña post-entrega (una por pedido; el API lo valida). */
+function ReviewForm({ orderId }: { orderId: string }) {
+  const [rating, setRating] = useState(0)
+  const [comment, setComment] = useState("")
+  const [name, setName] = useState("")
+  const [sending, setSending] = useState(false)
+  const [done, setDone] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  if (done) {
+    return (
+      <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 text-center">
+        <p className="font-bold text-emerald-800">¡Gracias por tu reseña! ⭐</p>
+      </div>
+    )
+  }
+
+  const submit = async () => {
+    if (rating === 0) return
+    setSending(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/foodos/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId, rating, comment, customer_name: name }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? "No se pudo enviar")
+        return
+      }
+      setDone(true)
+    } catch {
+      setError("Error de conexión")
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-3xl p-6">
+      <h2 className="font-bold text-stone-900 mb-2">¿Cómo estuvo tu pedido?</h2>
+      <div className="flex gap-1 mb-3">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            onClick={() => setRating(n)}
+            className="p-1"
+            aria-label={`${n} estrellas`}
+          >
+            <Star className={`w-7 h-7 ${n <= rating ? "text-amber-400 fill-amber-400" : "text-stone-300"}`} />
+          </button>
+        ))}
+      </div>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Tu nombre (opcional)"
+        className="w-full px-4 py-2.5 mb-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+      />
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="Cuéntanos más (opcional)"
+        rows={2}
+        className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+      />
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      <button
+        onClick={submit}
+        disabled={rating === 0 || sending}
+        className="mt-3 w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"
+      >
+        {sending ? "Enviando…" : "Enviar reseña"}
+      </button>
     </div>
   )
 }

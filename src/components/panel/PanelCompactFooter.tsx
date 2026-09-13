@@ -5,12 +5,12 @@ import { FOOTER_LINKS } from "@/components/layout/footer"
 /**
  * Compact sliding footer for the /panel section only.
  * Brand row on top, link columns in a horizontal snap carousel (swipeable),
- * thin bottom bar. Mobile keeps padding below the PanelQuickNav bar.
+ * thin bottom bar. Mobile keeps clearance for the tools FAB.
  */
 export function PanelCompactFooter() {
   return (
     <footer className="bg-[#242529] text-[#C7C8CD] panel-compact-footer">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 pb-[calc(4.5rem+var(--inset-bottom)+1.5rem)] lg:pb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 pb-[calc(3.5rem+var(--inset-bottom)+1.5rem)] lg:pb-6">
         {/* Brand — single compact row */}
         <div className="flex items-baseline gap-2 mb-4">
           <Link href="/" className="inline-block shrink-0" aria-label="Resurte.me — Ir al inicio">

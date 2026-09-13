@@ -105,6 +105,22 @@
         "exports",
         "types"
       ],
+      "src/app/panel/foodos/payment-proofs.ts": [
+        "exports"
+      ],
+      "src/lib/foodos-payment-reminders.ts": [
+        "exports"
+      ],
+      "src/lib/payment-next-action.ts": [
+        "exports"
+      ],
+      "src/lib/shopping-lists.ts": [
+        "exports",
+        "types"
+      ],
+      "src/lib/foodos-notifications.ts": [
+        "types"
+      ],
       "src/hooks/use-ventas-page.ts": [
         "exports"
       ],
