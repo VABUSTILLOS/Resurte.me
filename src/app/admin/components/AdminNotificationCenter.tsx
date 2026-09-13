@@ -43,19 +43,20 @@ function playBeep() {
 export function AdminNotificationCenter() {
   const [events, setEvents] = useState<AdminNotificationEvent[]>([])
   const [open, setOpen] = useState(false)
-  const [prefs, setPrefs] = useState<NotificationPrefs>({ sound: true, browser: false })
+  // Lazy init desde localStorage: el componente es client-only (campanita de
+  // la subnav), no hay mismatch de hidratación.
+  const [prefs, setPrefs] = useState<NotificationPrefs>(() => {
+    try {
+      return parseNotifPrefs(localStorage.getItem(NOTIF_PREFS_STORAGE_KEY))
+    } catch {
+      // sin localStorage: defaults en memoria
+      return { sound: true, browser: false }
+    }
+  })
   const prevCountRef = useRef<number | null>(null)
   const eventSeq = useRef(0)
 
   useEscapeKey(useCallback(() => setOpen(false), []), open)
-
-  useEffect(() => {
-    try {
-      setPrefs(parseNotifPrefs(localStorage.getItem(NOTIF_PREFS_STORAGE_KEY)))
-    } catch {
-      // sin localStorage: defaults en memoria
-    }
-  }, [])
 
   function updatePrefs(next: NotificationPrefs) {
     setPrefs(next)
