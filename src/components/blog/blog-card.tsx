@@ -28,7 +28,7 @@ export function BlogCard({ post, priority = false }: BlogCardProps) {
             priority={priority}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-4xl">
+          <div className="flex h-full w-full items-center justify-center text-4xl" aria-hidden="true">
             {category.emoji}
           </div>
         )}
@@ -36,7 +36,7 @@ export function BlogCard({ post, priority = false }: BlogCardProps) {
       <div className="flex flex-1 flex-col p-5">
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-600">
-            {category.emoji} {category.label}
+            <span aria-hidden="true">{category.emoji} </span>{category.label}
           </span>
         </div>
         <h3 className="mt-3 text-base font-bold leading-snug text-warm-900 group-hover:text-brand-600">
@@ -46,12 +46,13 @@ export function BlogCard({ post, priority = false }: BlogCardProps) {
           {post.description}
         </p>
         <div className="mt-auto flex items-center gap-3 pt-4 text-xs text-[var(--text-secondary)]">
-          <span>
+          {/* <time dateTime> expone la fecha en formato máquina (SEO + SR) */}
+          <time dateTime={post.date}>
             {formatPostDate(post.date)}
-          </span>
+          </time>
           <span className="inline-flex items-center gap-1">
             <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-            {post.readingTime} min
+            {post.readingTime} min<span className="sr-only"> de lectura</span>
           </span>
           <span className="ml-auto inline-flex items-center gap-1 font-semibold text-brand-600">
             Leer <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />

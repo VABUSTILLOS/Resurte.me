@@ -16,6 +16,19 @@ interface SearchBarProps {
   mobileOverlay?: boolean
 }
 
+/** ¿El foco está en un campo editable? El atajo "/" no debe robarse la tecla
+    mientras el usuario escribe en otro input/textarea o edita contenido. */
+function isEditableTarget(el: Element | null): boolean {
+  if (!el) return false
+  const tag = el.tagName
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    (el as HTMLElement).isContentEditable
+  )
+}
+
 export function SearchBar({
   citySlug,
   placeholder,
@@ -50,7 +63,7 @@ export function SearchBar({
   // Keyboard shortcut: "/" to focus search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "/" && !e.ctrlKey && !e.metaKey && document.activeElement !== inputRef.current) {
+      if (e.key === "/" && !e.ctrlKey && !e.metaKey && !isEditableTarget(document.activeElement)) {
         e.preventDefault()
         inputRef.current?.focus()
       }
@@ -64,7 +77,7 @@ export function SearchBar({
   }, [])
 
   return (
-    <form onSubmit={handleSubmit} className={`relative ${className}`}>
+    <form onSubmit={handleSubmit} role="search" aria-label="Buscar en el catálogo" className={`relative ${className}`}>
       <div
         className={`flex items-center bg-white border rounded-xl transition-all ${
           focused
@@ -74,10 +87,11 @@ export function SearchBar({
       >
         <Search
           className={`shrink-0 text-[var(--text-secondary)] ${compact ? "w-4 h-4 ml-3" : "w-5 h-5 ml-4"}`}
+          aria-hidden="true"
         />
         <input
           ref={inputRef}
-          type="text"
+          type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => {
@@ -89,6 +103,9 @@ export function SearchBar({
           }}
           onBlur={() => setTimeout(() => setFocused(false), 200)}
           placeholder={placeholder ?? "Buscar productos..."}
+          aria-label={placeholder ?? "Buscar productos"}
+          enterKeyHint="search"
+          autoComplete="off"
           className="flex-1 bg-transparent px-3 text-[#1a1a1a] placeholder:text-[var(--text-secondary)] focus:outline-none text-sm"
           minLength={2}
         />
@@ -96,6 +113,7 @@ export function SearchBar({
           <button
             type="button"
             onClick={handleClear}
+            aria-label="Limpiar búsqueda"
             className="shrink-0 p-1 mr-1 rounded-full hover:bg-[#F7F5F0]"
           >
             <X className="w-4 h-4 text-[var(--text-secondary)]" />

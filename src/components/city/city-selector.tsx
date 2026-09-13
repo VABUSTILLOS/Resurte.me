@@ -2,13 +2,21 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Search, MapPin, X } from "lucide-react"
+import { Search, MapPin, X, Check } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import { CITIES_BY_STATE } from "@/lib/cities"
 
 interface CitySelectorProps {
   onClose: () => void
+}
+
+/** Búsqueda insensible a acentos: "merida" debe encontrar "Mérida". */
+function fold(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
 }
 
 export function CitySelector({ onClose }: CitySelectorProps) {
@@ -18,11 +26,12 @@ export function CitySelector({ onClose }: CitySelectorProps) {
 
   useEscapeKey(onClose)
 
-  const filtered = search
+  const needle = fold(search.trim())
+  const filtered = needle
     ? Object.entries(CITIES_BY_STATE).reduce(
         (acc, [state, cities]) => {
           const filteredCities = cities.filter((c) =>
-            c.name.toLowerCase().includes(search.toLowerCase())
+            fold(c.name).includes(needle)
           )
           if (filteredCities.length > 0) {
             acc[state] = filteredCities
@@ -61,6 +70,7 @@ export function CitySelector({ onClose }: CitySelectorProps) {
           </h2>
           <button
             onClick={onClose}
+            aria-label="Cerrar selector de ciudad"
             className="p-1 rounded-lg hover:bg-[#F7F5F0] transition-colors"
           >
             <X className="w-5 h-5 text-[var(--text-secondary)]" />
@@ -70,10 +80,12 @@ export function CitySelector({ onClose }: CitySelectorProps) {
         {/* Search */}
         <div className="p-4 border-b border-[#E8E9EB]">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-secondary)]" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-secondary)]" aria-hidden="true" />
             <input
-              type="text"
+              type="search"
               placeholder="Busca tu ciudad..."
+              aria-label="Buscar ciudad"
+              enterKeyHint="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-[#F7F5F0] rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E] focus:bg-white transition-colors"
@@ -83,10 +95,10 @@ export function CitySelector({ onClose }: CitySelectorProps) {
         </div>
 
         {/* City list */}
-        <div className="overflow-y-auto flex-1 p-4">
+        <div className="overflow-y-auto overscroll-contain flex-1 p-4">
           {Object.keys(filtered).length === 0 ? (
             <p className="text-center text-[var(--text-secondary)] py-8">
-              No se encontraron ciudades.
+              No se encontraron ciudades{search.trim() ? ` para “${search.trim()}”` : ""}.
             </p>
           ) : (
             Object.entries(filtered).map(([state, cities]) => (
@@ -101,6 +113,7 @@ export function CitySelector({ onClose }: CitySelectorProps) {
                       <button
                         key={c.slug}
                         onClick={() => handleSelect(c.slug)}
+                        aria-current={isActive ? "true" : undefined}
                         className={`w-full flex items-center gap-2 px-3 py-2 rounded-[10px] text-sm text-left transition-colors ${
                           isActive
                             ? "bg-brand-50 text-brand-700 font-medium"
@@ -111,8 +124,12 @@ export function CitySelector({ onClose }: CitySelectorProps) {
                           className={`w-4 h-4 shrink-0 ${
                             isActive ? "text-[#0E7A0E]" : "text-[var(--text-secondary)]"
                           }`}
+                          aria-hidden="true"
                         />
                         {c.name}
+                        {isActive && (
+                          <Check className="w-4 h-4 ml-auto text-[#0E7A0E]" aria-label="Ciudad actual" />
+                        )}
                       </button>
                     )
                   })}

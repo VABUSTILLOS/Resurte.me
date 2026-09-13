@@ -10,6 +10,7 @@ import {
   getCityAvailabilityForSlug,
 } from "@/lib/catalog-cache"
 import { ProductDetailClient } from "./product-detail-client"
+import { RecentlyViewed } from "@/components/product/recently-viewed"
 import { getBreadcrumbSchema, getProductSchema } from "@/lib/structured-data"
 
 // ISR: se revalida cada 5 min (alineado con catalog-cache). La primera
@@ -135,6 +136,18 @@ export default async function ProductPage({ params }: Props) {
         relatedProducts={related}
         citySlug={slug}
         cityName={city.name}
+      />
+      {/* Rail de vistos recientemente (cliente, localStorage) */}
+      <RecentlyViewed
+        current={{
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          image_url: product.image_url ?? null,
+          price: product.price,
+          sale_price: product.sale_price ?? null,
+        }}
+        citySlug={slug}
       />
     </>
   )
