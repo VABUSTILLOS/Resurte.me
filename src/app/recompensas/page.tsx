@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -12,8 +12,20 @@ import { CheckoutFlowScreen } from "./_components/CheckoutFlowScreen";
 import { ConfettiOverlay } from "./_components/ConfettiOverlay";
 import { InvoiceScannerScreen } from "./_components/InvoiceScannerScreen";
 import { OnboardingScreen } from "./_components/OnboardingScreen";
-import { getWalletBalance, getRewardsOnboarded, markRewardsOnboarded } from "@/lib/wallet-actions";
+import { getWalletBalance } from "@/lib/wallet-actions";
+import { haptic } from "@/lib/haptics";
 import type { Tab, ServiceItem } from "./_components/types";
+
+const TAB_TITLES: Record<Tab, string> = {
+  home: "Inicio",
+  wallet: "Cartera",
+  store: "Tienda",
+  referidos: "Referidos",
+  profile: "Perfil",
+};
+
+/** Distancia de jalón (px, tras amortiguar) que dispara el refresh. */
+const PULL_REFRESH_THRESHOLD = 70;
 
 export default function CashbackPage() {
   const searchParams = useSearchParams();
@@ -29,6 +41,68 @@ export default function CashbackPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [balance, setBalance] = useState(0);
+
+  // Pull-to-refresh (patrón app nativa): jalar hacia abajo desde el tope del
+  // scroll refresca el saldo real del monedero.
+  const mainRef = useRef<HTMLDivElement>(null);
+  const pullStartY = useRef<number | null>(null);
+  const [pullY, setPullY] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onPullStart = (e: React.TouchEvent) => {
+    if (mainRef.current && mainRef.current.scrollTop <= 0) {
+      pullStartY.current = e.touches[0]?.clientY ?? null;
+    }
+  };
+  const onPullMove = (e: React.TouchEvent) => {
+    if (pullStartY.current === null) return;
+    const currentY = e.touches[0]?.clientY;
+    if (currentY === undefined) return;
+    const dy = currentY - pullStartY.current;
+    // Resistencia 0.5x como iOS/Android nativos; tope visual de 90px.
+    if (dy > 0 && mainRef.current && mainRef.current.scrollTop <= 0) {
+      setPullY(Math.min(dy * 0.5, 90));
+    }
+  };
+  const onPullEnd = async () => {
+    if (pullY > PULL_REFRESH_THRESHOLD && isAuthenticated && !refreshing) {
+      setRefreshing(true);
+      haptic(12);
+      try {
+        const wallet = await getWalletBalance();
+        if (wallet) setBalance(Number(wallet.balance_credits));
+      } finally {
+        setRefreshing(false);
+      }
+    }
+    setPullY(0);
+    pullStartY.current = null;
+  };
+
+  // Cambio de tab: además del estado local, sincroniza ?tab= en la URL
+  // (replaceState) para que un reload o compartir el link conserve la
+  // sección — la app solo leía el param en el primer render. Además sube el
+  // scroll al inicio (patrón de app: cada sección empieza desde arriba).
+  const handleTabChange = useCallback((tab: Tab) => {
+    setActiveTab(tab);
+    const url =
+      tab === "home"
+        ? window.location.pathname
+        : `${window.location.pathname}?tab=${tab}`;
+    window.history.replaceState(null, "", url);
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  // Título del documento por sección: con varias pestañas abiertas (o en el
+  // historial del navegador) el usuario distingue en qué parte de
+  // Recompensas estaba.
+  useEffect(() => {
+    const prev = document.title;
+    document.title = `${TAB_TITLES[activeTab]} · Recompensas — Resurte.me`;
+    return () => {
+      document.title = prev;
+    };
+  }, [activeTab]);
 
   // Check auth state on mount
   useEffect(() => {
@@ -51,22 +125,9 @@ export default function CashbackPage() {
           if (wallet) setBalance(Number(wallet.balance_credits))
         })
 
-        // Onboarding: localStorage o, con sesión, la marca persistente del
-        // perfil (sobrevive entre dispositivos). Si el servidor dice que ya
-        // se completó, se sella localmente y no se vuelve a mostrar.
+        // Only show onboarding if user hasn't completed it before
         const onboarded = localStorage.getItem("cashback-onboarded");
-        if (!onboarded) {
-          getRewardsOnboarded().then((serverOnboarded) => {
-            if (serverOnboarded) {
-              localStorage.setItem("cashback-onboarded", "true");
-            } else if (serverOnboarded === false) {
-              setShowOnboarding(true);
-            } else {
-              // Sin dato del servidor (sin migración/offline): fallback local
-              setShowOnboarding(true);
-            }
-          });
-        }
+        if (!onboarded) setShowOnboarding(true);
       } else {
         // Visitantes: onboarding solo en la primera visita; pueden
         // "Explorar sin cuenta" y volver a verlo desde Perfil.
@@ -88,6 +149,22 @@ export default function CashbackPage() {
     return () => subscription.unsubscribe();
   }, [supabase]);
 
+  // Saldo fresco al volver a la pestaña: si el usuario canjeó en otro
+  // dispositivo o el cashback de un pedido cayó mientras la app estaba en
+  // background, al regresar (visibilitychange) se refetchea el balance real.
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const refresh = () => {
+      if (document.visibilityState === "visible") {
+        getWalletBalance().then((wallet) => {
+          if (wallet) setBalance(Number(wallet.balance_credits))
+        })
+      }
+    }
+    document.addEventListener("visibilitychange", refresh)
+    return () => document.removeEventListener("visibilitychange", refresh)
+  }, [isAuthenticated]);
+
   const handleServiceSelect = useCallback((service: ServiceItem) => {
     setSelectedService(service);
     setShowCheckout(true);
@@ -99,12 +176,12 @@ export default function CashbackPage() {
   }, []);
 
   const handleNavigateStore = useCallback(() => {
-    setActiveTab("store");
-  }, []);
+    handleTabChange("store");
+  }, [handleTabChange]);
 
   const handleViewOrders = useCallback(() => {
-    setActiveTab("wallet");
-  }, []);
+    handleTabChange("wallet");
+  }, [handleTabChange]);
 
   const handleCheckoutComplete = useCallback((newBalance?: number) => {
     setShowCheckout(false);
@@ -116,8 +193,6 @@ export default function CashbackPage() {
   const handleOnboardingComplete = useCallback(() => {
     setShowOnboarding(false);
     localStorage.setItem("cashback-onboarded", "true");
-    // Persistencia server-side (no-op para visitantes).
-    void markRewardsOnboarded();
   }, []);
 
   // Show nothing while checking auth state
@@ -138,7 +213,7 @@ export default function CashbackPage() {
       {/* Sidebar Navigation (Tablet/Desktop) */}
       {showShell && (
         <div className="hidden md:flex md:w-20 lg:w-64 md:flex-col md:border-r md:border-cream-300 md:bg-white/60 md:shrink-0">
-          <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+          <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
         </div>
       )}
 
@@ -152,6 +227,7 @@ export default function CashbackPage() {
             <InvoiceScannerScreen
               key="scanner"
               onClose={() => setShowScanner(false)}
+              balance={balance}
             />
           ) : showCalculator ? (
             <ROICalculatorScreen
@@ -168,7 +244,27 @@ export default function CashbackPage() {
               balance={balance}
             />
           ) : (
-            <div key="main" className="flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+            <div
+              key="main"
+              ref={mainRef}
+              onTouchStart={onPullStart}
+              onTouchMove={onPullMove}
+              onTouchEnd={onPullEnd}
+              className="flex-1 overflow-y-auto overscroll-contain pb-[calc(5rem+env(safe-area-inset-bottom,0px))] md:pb-0"
+            >
+              {/* Indicador de pull-to-refresh */}
+              {(pullY > 0 || refreshing) && (
+                <div
+                  className="flex justify-center overflow-hidden transition-[height] duration-150"
+                  style={{ height: refreshing ? 40 : Math.min(pullY * 0.6, 40) }}
+                  aria-hidden="true"
+                >
+                  <div
+                    className={`h-6 w-6 my-2 rounded-full border-2 border-brand-500 border-t-transparent ${refreshing ? "animate-spin" : ""}`}
+                    style={!refreshing ? { transform: `rotate(${pullY * 3}deg)` } : undefined}
+                  />
+                </div>
+              )}
               {activeTab === "home" && (
                 <DashboardScreen
                   onOpenCalculator={handleOpenCalculator}
@@ -216,6 +312,13 @@ export default function CashbackPage() {
         {/* Confetti */}
         {showConfetti && <ConfettiOverlay />}
       </div>
+
+      {/* Tab bar móvil: también usa handleTabChange para sincronizar la URL */}
+      {showShell && (
+        <div className="md:hidden">
+          <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
+        </div>
+      )}
     </div>
     </MotionConfig>
   );
