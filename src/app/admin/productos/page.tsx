@@ -115,8 +115,6 @@ function AdminProductsContent() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
-  // Filtro de alertas de stock: "all" | "low_stock" | "out_of_stock"
-  const [stockFilter, setStockFilter] = useState<"all" | "low_stock" | "out_of_stock">("all")
 
   // Debounce: filtrar cientos de filas en cada tecla re-renderiza toda la tabla.
   useEffect(() => {

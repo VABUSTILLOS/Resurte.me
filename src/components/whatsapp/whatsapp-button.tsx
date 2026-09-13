@@ -40,6 +40,7 @@ export function WhatsAppButton({
         target="_blank"
         rel="noopener noreferrer"
         onClick={handleWhatsAppClick}
+        aria-label={label}
         className="flex items-center gap-2 px-4 py-3 bg-green-700 text-white font-semibold rounded-full shadow-lg hover:bg-green-800 hover:shadow-xl transition-all group"
       >
         <MessageCircle className="w-5 h-5" />
