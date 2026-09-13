@@ -52,13 +52,13 @@ export function Footer() {
                 <MessageCircle className="w-4 h-4" aria-hidden="true" />
                 WhatsApp directo
               </a>
-              <a
+              <Link
                 href="/contact"
                 className="inline-flex items-center gap-2 text-[13px] text-[#8F939B] hover:text-[#E8E9EB] transition-colors"
               >
                 <Mail className="w-4 h-4" aria-hidden="true" />
                 Escríbenos
-              </a>
+              </Link>
             </div>
           </div>
 
