@@ -360,6 +360,11 @@ export function FoodosStorefront({
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-6 pb-32">
+        {!openStatus.isOpen && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-800 font-semibold text-center">
+            🕐 {openStatus.nextOpenLabel ?? "Cerrado por ahora"} — puedes ver el menú, pero no pedir.
+          </div>
+        )}
         {view === "menu" && (
           <MenuView
             categories={categories}
@@ -401,6 +406,7 @@ export function FoodosStorefront({
             onAddRecommendation={addRecommendation}
             onBack={() => setView("menu")}
             onSubmit={submitOrder}
+            openStatus={openStatus}
             loading={loading}
             error={error}
           />

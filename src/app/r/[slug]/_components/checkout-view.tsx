@@ -4,7 +4,7 @@ import {
   ArrowLeft, ArrowRight, Banknote, Bike, CreditCard, MapPin, MessageCircle,
   Minus, Plus, Sparkles, Store, Trash2, UtensilsCrossed,
 } from "lucide-react"
-import { buildRecommendations, formatMoney, modifiersSummary } from "@/lib/foodos"
+import { buildRecommendations, formatMoney, modifiersSummary, type OpenStatus } from "@/lib/foodos"
 import type { FoodosBranch, FoodosOrderItem } from "@/types/foodos"
 
 export function CheckoutView({
@@ -32,6 +32,7 @@ export function CheckoutView({
   onAddRecommendation,
   onBack,
   onSubmit,
+  openStatus,
   loading,
   error,
 }: {
@@ -59,6 +60,7 @@ export function CheckoutView({
   onAddRecommendation: (rec: (typeof recommendations)[number]) => void
   onBack: () => void
   onSubmit: () => void
+  openStatus: OpenStatus
   loading: boolean
   error: string | null
 }) {
@@ -302,7 +304,7 @@ export function CheckoutView({
 
             <button
               onClick={onSubmit}
-              disabled={loading || cart.length === 0}
+              disabled={loading || cart.length === 0 || !openStatus.isOpen}
               className="mt-4 w-full py-3 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (

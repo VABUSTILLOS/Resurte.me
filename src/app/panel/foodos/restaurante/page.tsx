@@ -16,8 +16,9 @@ import {
 import { publicRestaurantUrl } from "@/lib/foodos"
 import type { FoodosRestaurant, FoodosBranch } from "@/types/foodos"
 import {
-  Store, MapPin, Plus, Trash2, QrCode, Copy, Check, ExternalLink, Loader2, Building2,
+  Store, MapPin, Plus, Trash2, QrCode, Copy, Check, ExternalLink, Loader2, Building2, Clock,
 } from "lucide-react"
+import { BranchHoursModal } from "./_components/branch-hours-modal"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
 
@@ -32,6 +33,7 @@ export default function RestaurantePage() {
   // QR por mesa (dine-in)
   const [tableCount, setTableCount] = useState("5")
   const [tableQrs, setTableQrs] = useState<{ mesa: number; url: string }[]>([])
+  const [hoursBranch, setHoursBranch] = useState<FoodosBranch | null>(null)
 
   // Formulario
   const [name, setName] = useState("")
@@ -397,6 +399,13 @@ export default function RestaurantePage() {
                       </div>
                     </div>
                     <button
+                      onClick={() => setHoursBranch(b)}
+                      className="flex items-center gap-1 p-2 rounded-lg text-gray-400 hover:text-[#0E7A0E] hover:bg-[#F0FDF4] transition-colors"
+                      title="Horario de la sucursal"
+                    >
+                      <Clock className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => handleRemoveBranch(b.id)}
                       className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                     >
@@ -486,6 +495,10 @@ export default function RestaurantePage() {
             </div>
           )}
         </div>
+      )}
+
+      {hoursBranch && (
+        <BranchHoursModal branch={hoursBranch} onClose={() => setHoursBranch(null)} />
       )}
 
       <ToolGuideHost toolKey="restaurante" pathname="/panel/foodos/restaurante" slug={null} icon="🏪" title={t("foodos.restaurante.guideTitle")} />

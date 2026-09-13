@@ -93,17 +93,6 @@ async function fetchPublicRestaurantBySlug(slug: string): Promise<PublicFoodosDa
     optionValues: (optionValues.data as FoodosItemOptionValue[]) ?? [],
     branchHours: (branchHours.data as FoodosBranchHours[]) ?? [],
   }
-
-  return {
-    restaurant: restaurant as FoodosRestaurant,
-    branches: (branches.data as FoodosBranch[]) ?? [],
-    categories: (categories.data as FoodosMenuCategory[]) ?? [],
-    items: (items.data as FoodosMenuItem[]) ?? [],
-    combos: (combos.data as FoodosCombo[]) ?? [],
-    rules: (rules.data as FoodosUpsellRule[]) ?? [],
-    optionGroups: (optionGroups.data as FoodosItemOptionGroup[]) ?? [],
-    optionValues: (optionValues.data as FoodosItemOptionValue[]) ?? [],
-  }
 }
 
 // Caché por slug: el micrositio /r/[slug] es público (RLS anónimo) y reune 6

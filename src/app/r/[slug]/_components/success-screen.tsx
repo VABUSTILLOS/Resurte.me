@@ -1,6 +1,7 @@
 "use client"
 
 import { CheckCircle2 } from "lucide-react"
+import Link from "next/link"
 import type { FoodosRestaurant } from "@/types/foodos"
 
 export function SuccessScreen({ restaurant, orderId }: { restaurant: FoodosRestaurant; orderId: string }) {
@@ -15,9 +16,15 @@ export function SuccessScreen({ restaurant, orderId }: { restaurant: FoodosResta
           Tu orden fue enviada a <strong>{restaurant.name}</strong>. Te contactarán por WhatsApp para confirmar la entrega.
         </p>
         <p className="text-sm text-stone-400 mt-4">Referencia: #{orderId.slice(0, 8).toUpperCase()}</p>
+        <Link
+          href={`/r/${restaurant.slug}/pedido/${orderId}`}
+          className="mt-6 block w-full py-3 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700"
+        >
+          Ver estado de mi pedido
+        </Link>
         <button
           onClick={() => window.location.reload()}
-          className="mt-6 w-full py-3 rounded-xl bg-stone-900 text-white font-bold hover:bg-stone-700"
+          className="mt-3 w-full py-3 rounded-xl bg-stone-900 text-white font-bold hover:bg-stone-700"
         >
           Volver al menú
         </button>

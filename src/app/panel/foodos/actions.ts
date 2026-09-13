@@ -28,6 +28,7 @@ import type {
   FoodosCampaignStatus,
   FoodosItemOptionGroup,
   FoodosItemOptionValue,
+  FoodosBranchHours,
 } from "@/types/foodos"
 
 // ------------------------------------------------------------
@@ -243,6 +244,50 @@ export async function upsertBranch(input: {
 export async function deleteBranch(id: string): Promise<void> {
   const { supabase } = await requireAuth()
   const { error } = await supabase.from("foodos_branches").delete().eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/restaurante")
+}
+
+// ------------------------------------------------------------
+// Horarios de sucursal
+// ------------------------------------------------------------
+
+export async function listBranchHours(
+  branchId: string
+): Promise<FoodosBranchHours[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_branch_hours")
+    .select("*")
+    .eq("branch_id", branchId)
+    .order("day_of_week")
+  if (error) throw new Error(error.message)
+  return (data as FoodosBranchHours[]) ?? []
+}
+
+/** Reemplaza el horario semanal completo de una sucursal (7 días). */
+export async function upsertBranchHours(
+  branchId: string,
+  days: Array<{
+    day_of_week: number
+    open_time: string | null
+    close_time: string | null
+    is_closed: boolean
+  }>
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  const rows = days
+    .filter((d) => d.day_of_week >= 0 && d.day_of_week <= 6)
+    .map((d) => ({
+      branch_id: branchId,
+      day_of_week: d.day_of_week,
+      open_time: d.is_closed ? null : d.open_time,
+      close_time: d.is_closed ? null : d.close_time,
+      is_closed: d.is_closed,
+    }))
+  const { error } = await supabase
+    .from("foodos_branch_hours")
+    .upsert(rows, { onConflict: "branch_id,day_of_week" })
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/restaurante")
 }

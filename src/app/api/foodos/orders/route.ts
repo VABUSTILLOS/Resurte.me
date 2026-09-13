@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
-import { computeOrderTotals } from "@/lib/foodos"
-import type { FoodosOrderItem, FoodosOrderItemModifier } from "@/types/foodos"
+import { computeOrderTotals, getOpenStatus } from "@/lib/foodos"
+import type { FoodosBranchHours, FoodosOrderItem, FoodosOrderItemModifier } from "@/types/foodos"
 import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     // restaurante y recalcular precios server-side.
     const { data: restaurant } = await supabase
       .from("foodos_restaurants")
-      .select("id")
+      .select("id, timezone")
       .eq("id", restaurant_id)
       .eq("status", "active")
       .maybeSingle()
@@ -121,6 +121,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Esta sucursal no ofrece servicio en mesa" }, { status: 400 })
       }
       serverDeliveryFee = fulfillment === "delivery" ? Number(branch.delivery_fee) || 0 : 0
+
+      // Horario de operación: rechazar pedidos fuera de horario.
+      const { data: hours } = await supabase
+        .from("foodos_branch_hours")
+        .select("branch_id, day_of_week, open_time, close_time, is_closed")
+        .eq("branch_id", branch.id)
+      if (hours?.length) {
+        const status = getOpenStatus(hours as FoodosBranchHours[], restaurant.timezone)
+        if (!status.isOpen) {
+          return NextResponse.json(
+            { error: status.nextOpenLabel ?? "La sucursal está cerrada por ahora" },
+            { status: 400 }
+          )
+        }
+      }
     }
 
     const MAX_LINES = 20

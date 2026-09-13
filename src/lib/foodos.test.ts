@@ -133,3 +133,51 @@ describe("modifiersSummary", () => {
     expect(modifiersSummary(undefined)).toBe("")
   })
 })
+
+import { getOpenStatus } from "./foodos"
+import type { FoodosBranchHours } from "@/types/foodos"
+
+const hours = (partial: Partial<FoodosBranchHours> = {}): FoodosBranchHours => ({
+  id: "h1",
+  branch_id: "b1",
+  day_of_week: 1,
+  open_time: "09:00:00",
+  close_time: "22:00:00",
+  is_closed: false,
+  created_at: "",
+  ...partial,
+})
+
+// 2026-09-12 15:00 UTC = 09:00 en America/Mexico_City (sábado)
+const TZ = "America/Mexico_City"
+
+describe("getOpenStatus", () => {
+  it("sin horarios configurados siempre está abierto", () => {
+    const s = getOpenStatus([], TZ)
+    expect(s.isOpen).toBe(true)
+    expect(s.hasSchedule).toBe(false)
+  })
+
+  it("dentro del horario está abierto", () => {
+    const rows = [hours({ day_of_week: 6 })] // sábado
+    const s = getOpenStatus(rows, TZ, new Date("2026-09-12T18:00:00Z")) // 12:00 CDMX
+    expect(s.isOpen).toBe(true)
+  })
+
+  it("fuera del horario está cerrado con próxima apertura", () => {
+    const rows = [hours({ day_of_week: 6 }), hours({ id: "h2", day_of_week: 0 })]
+    const s = getOpenStatus(rows, TZ, new Date("2026-09-12T06:00:00Z")) // 00:00 CDMX
+    expect(s.isOpen).toBe(false)
+    expect(s.nextOpenLabel).toBe("Abre hoy 09:00")
+  })
+
+  it("día cerrado reporta la apertura del día siguiente", () => {
+    const rows = [
+      hours({ day_of_week: 6, is_closed: true, open_time: null, close_time: null }),
+      hours({ id: "h2", day_of_week: 0, open_time: "10:00:00" }),
+    ]
+    const s = getOpenStatus(rows, TZ, new Date("2026-09-12T18:00:00Z"))
+    expect(s.isOpen).toBe(false)
+    expect(s.nextOpenLabel).toBe("Abre mañana 10:00")
+  })
+})
