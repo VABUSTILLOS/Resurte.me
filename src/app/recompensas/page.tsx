@@ -227,7 +227,6 @@ export default function CashbackPage() {
             <InvoiceScannerScreen
               key="scanner"
               onClose={() => setShowScanner(false)}
-              balance={balance}
             />
           ) : showCalculator ? (
             <ROICalculatorScreen
