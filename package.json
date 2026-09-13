@@ -91,6 +91,20 @@
       "src/lib/order-emails.ts": [
         "exports"
       ],
+      "src/lib/admin-cohorts.ts": [
+        "exports"
+      ],
+      "src/lib/audit.ts": [
+        "exports",
+        "types"
+      ],
+      "src/lib/comercializacion/actions/commissions-admin.ts": [
+        "types"
+      ],
+      "src/lib/foodos.ts": [
+        "exports",
+        "types"
+      ],
       "src/hooks/use-ventas-page.ts": [
         "exports"
       ],

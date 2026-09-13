@@ -12,7 +12,9 @@ import {
   Eye,
   EyeOff,
   RefreshCw,
+  Download,
 } from "lucide-react"
+import { toCsv, downloadCsv } from "@/lib/csv"
 
 // ============================================================
 // /admin/proveedores — Directorio de proveedores con costos de
@@ -144,6 +146,43 @@ export default function ProveedoresPage() {
     0
   )
 
+  // Exporta el directorio completo: una fila por producto vinculado (o por
+  // proveedor sin productos), con costos de lista para análisis en Excel.
+  function exportCsv() {
+    const rows: (string | number | null)[][] = []
+    for (const s of suppliers) {
+      const base = [
+        s.name,
+        s.contact_name,
+        s.phone,
+        s.whatsapp,
+        s.email,
+        s.city,
+        s.state,
+        STATUS_STYLE[s.status]?.label ?? s.status,
+      ]
+      if (s.products.length === 0) {
+        rows.push([...base, "", "", "", ""])
+      } else {
+        for (const p of s.products) {
+          rows.push([
+            ...base,
+            p.products?.name ?? `#${p.product_id}`,
+            p.presentation,
+            p.cost != null ? p.cost.toFixed(2) : "",
+            p.is_primary ? "Sí" : "No",
+          ])
+        }
+      }
+    }
+    const csv = toCsv(
+      ["Proveedor", "Contacto", "Teléfono", "WhatsApp", "Email", "Ciudad", "Estado (ubicación)", "Estatus", "Producto", "Presentación", "Costo", "Principal"],
+      rows
+    )
+    const stamp = new Date().toISOString().slice(0, 10)
+    downloadCsv(`proveedores-${stamp}.csv`, csv)
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
       {/* Header */}
@@ -159,14 +198,24 @@ export default function ProveedoresPage() {
             </p>
           </div>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-full bg-white border border-gray-200 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportCsv}
+            disabled={loading || suppliers.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white border border-gray-200 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Exportar CSV
+          </button>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white border border-gray-200 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {/* Stats */}

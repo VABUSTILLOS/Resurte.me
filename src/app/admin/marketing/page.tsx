@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Megaphone, Percent, Plus, Power, TicketPercent, Trash2 } from "lucide-react"
+import { Copy, Megaphone, Pencil, Percent, Plus, Power, TicketPercent, Trash2 } from "lucide-react"
+import { suggestDuplicateCode } from "@/lib/admin-marketing-validation"
 
 interface BumpRule {
   id: number
@@ -158,6 +159,83 @@ export default function MarketingAdminPage() {
   const isExpired = (c: Coupon) => c.expires_at !== null && new Date(c.expires_at) < new Date()
   const isExhausted = (c: Coupon) => c.max_uses > 0 && c.used_count >= c.max_uses
 
+  // Fase 11 — edición en línea, duplicado y borrado de cupones
+  const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null)
+  const [editValue, setEditValue] = useState("")
+  const [editMinOrder, setEditMinOrder] = useState("")
+  const [editMaxUses, setEditMaxUses] = useState("")
+  const [editExpires, setEditExpires] = useState("")
+
+  const startEdit = (c: Coupon) => {
+    setEditingCoupon(c)
+    setEditValue(String(c.discount_value))
+    setEditMinOrder(String(c.min_order))
+    setEditMaxUses(String(c.max_uses))
+    setEditExpires(c.expires_at ? c.expires_at.slice(0, 10) : "")
+  }
+
+  const saveEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingCoupon) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/coupons/${editingCoupon.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          discount_value: Number(editValue),
+          min_order: Number(editMinOrder) || 0,
+          max_uses: Number(editMaxUses) || 0,
+          expires_at: editExpires ? new Date(`${editExpires}T23:59:59`).toISOString() : null,
+        }),
+      })
+      const data = (await res.json()) as { error?: string }
+      if (!res.ok) throw new Error(data.error ?? "Error al actualizar el cupón")
+      setEditingCoupon(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al actualizar el cupón")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const duplicateCoupon = async (c: Coupon) => {
+    const suggested = suggestDuplicateCode(c.code, coupons.map((x) => x.code))
+    const code = window.prompt("Código para el cupón duplicado:", suggested)
+    if (!code) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          discount_type: c.discount_type,
+          discount_value: c.discount_value,
+          min_order: c.min_order,
+          max_uses: c.max_uses,
+          expires_at: c.expires_at,
+        }),
+      })
+      const data = (await res.json()) as { error?: string }
+      if (!res.ok) throw new Error(data.error ?? "Error al duplicar el cupón")
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al duplicar el cupón")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deleteCoupon = async (c: Coupon) => {
+    if (!window.confirm(`¿Eliminar el cupón ${c.code} definitivamente?`)) return
+    const res = await fetch(`/api/admin/coupons/${c.id}`, { method: "DELETE" })
+    if (res.ok) await load()
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
       <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2 mb-6">
@@ -285,6 +363,67 @@ export default function MarketingAdminPage() {
           </button>
         </form>
 
+        {/* Fase 11 — edición en línea del cupón seleccionado */}
+        {editingCoupon && (
+          <form
+            onSubmit={(e) => void saveEdit(e)}
+            className="mb-4 rounded-lg border border-brand-200 bg-brand-50/50 p-3 flex flex-wrap items-center gap-2"
+            aria-label={`Editar cupón ${editingCoupon.code}`}
+          >
+            <span className="font-mono text-sm font-bold text-gray-900">{editingCoupon.code}</span>
+            <input
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              type="number"
+              min="0"
+              step="0.01"
+              required
+              aria-label="Valor del descuento"
+              className="w-24 text-sm border border-gray-200 rounded-lg px-2 py-1.5"
+            />
+            <input
+              value={editMinOrder}
+              onChange={(e) => setEditMinOrder(e.target.value)}
+              type="number"
+              min="0"
+              step="0.01"
+              aria-label="Pedido mínimo"
+              placeholder="Mín. pedido"
+              className="w-28 text-sm border border-gray-200 rounded-lg px-2 py-1.5"
+            />
+            <input
+              value={editMaxUses}
+              onChange={(e) => setEditMaxUses(e.target.value)}
+              type="number"
+              min="0"
+              aria-label="Usos máximos (0 = ilimitado)"
+              placeholder="Máx. usos"
+              className="w-28 text-sm border border-gray-200 rounded-lg px-2 py-1.5"
+            />
+            <input
+              value={editExpires}
+              onChange={(e) => setEditExpires(e.target.value)}
+              type="date"
+              aria-label="Fecha de expiración (vacío = sin expiración)"
+              className="text-sm border border-gray-200 rounded-lg px-2 py-1.5"
+            />
+            <button
+              type="submit"
+              disabled={saving}
+              className="text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg px-3 py-1.5 disabled:opacity-50"
+            >
+              Guardar
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingCoupon(null)}
+              className="text-sm text-gray-500 hover:underline"
+            >
+              Cancelar
+            </button>
+          </form>
+        )}
+
         <ul className="divide-y divide-gray-100">
           {coupons.map((c) => {
             const inactive = isExpired(c) || isExhausted(c)
@@ -305,15 +444,45 @@ export default function MarketingAdminPage() {
                     ` · ${isExpired(c) ? "expiró" : "expira"} ${new Date(c.expires_at).toLocaleDateString("es-MX")}`}
                   {c.origin && ` · ${c.origin}`}
                 </span>
-                {!inactive && (
+                <span className="ml-auto flex items-center gap-1">
+                  {/* Fase 11 — editar, duplicar, eliminar */}
                   <button
                     type="button"
-                    onClick={() => void expireCoupon(c)}
-                    className="ml-auto text-xs font-semibold text-red-600 hover:underline"
+                    onClick={() => startEdit(c)}
+                    aria-label={`Editar cupón ${c.code}`}
+                    title="Editar"
+                    className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
                   >
-                    Expirar ahora
+                    <Pencil className="w-3.5 h-3.5" />
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => void duplicateCoupon(c)}
+                    aria-label={`Duplicar cupón ${c.code}`}
+                    title="Duplicar"
+                    className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void deleteCoupon(c)}
+                    aria-label={`Eliminar cupón ${c.code}`}
+                    title="Eliminar"
+                    className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                  {!inactive && (
+                    <button
+                      type="button"
+                      onClick={() => void expireCoupon(c)}
+                      className="ml-1 text-xs font-semibold text-red-600 hover:underline"
+                    >
+                      Expirar ahora
+                    </button>
+                  )}
+                </span>
               </li>
             )
           })}

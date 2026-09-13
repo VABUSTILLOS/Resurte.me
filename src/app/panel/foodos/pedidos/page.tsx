@@ -6,13 +6,15 @@
 // camino→entregado) y filtrar por canal / cumplimiento.
 // ============================================================
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
 import {
   getFoodosPanelData,
   listOrders,
   updateOrderStatus,
 } from "../actions"
-import { formatMoney } from "@/lib/foodos"
+import { formatMoney, modifiersSummary } from "@/lib/foodos"
+import { createClient } from "@/lib/supabase/client"
 import type {
   FoodosRestaurant,
   FoodosBranch,
@@ -33,6 +35,8 @@ import {
   RefreshCw,
   CreditCard,
   Banknote,
+  Bell,
+  Printer,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
@@ -81,6 +85,7 @@ export default function PedidosPage() {
   const [filter, setFilter] = useState<FoodosOrderStatus | "all">("all")
   const [channelFilter, setChannelFilter] = useState<FoodosOrderChannel | "all">("all")
   const [saving, setSaving] = useState<string | null>(null)
+  const [newOrdersCount, setNewOrdersCount] = useState(0)
 
   const load = useCallback(async () => {
     try {
@@ -131,6 +136,60 @@ export default function PedidosPage() {
       stopped = true
       clearInterval(id)
       document.removeEventListener("visibilitychange", onVisible)
+    }
+  }, [restaurant])
+
+  // Comanda en vivo: suscripción Realtime a foodos_orders (INSERT = nuevo
+  // pedido → beep + badge; UPDATE = cambio de estado). El RLS owner-only
+  // filtra los eventos a los restaurantes del usuario autenticado.
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  useEffect(() => {
+    if (!restaurant) return
+    const supabase = createClient()
+    if (!supabase) return
+
+    const beep = () => {
+      try {
+        audioCtxRef.current ??= new AudioContext()
+        const ctx = audioCtxRef.current
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = "sine"
+        osc.frequency.value = 880
+        gain.gain.setValueAtTime(0.15, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6)
+        osc.connect(gain).connect(ctx.destination)
+        osc.start()
+        osc.stop(ctx.currentTime + 0.6)
+      } catch {
+        // autoplay bloqueado hasta la primera interacción; se reintenta luego
+      }
+    }
+
+    const channel = supabase
+      .channel(`foodos-orders-${restaurant.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "foodos_orders", filter: `restaurant_id=eq.${restaurant.id}` },
+        (payload) => {
+          const row = payload.new as FoodosOrder
+          setOrders((prev) => (prev.some((o) => o.id === row.id) ? prev : [row, ...prev]))
+          setNewOrdersCount((c) => c + 1)
+          beep()
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "foodos_orders", filter: `restaurant_id=eq.${restaurant.id}` },
+        (payload) => {
+          const row = payload.new as FoodosOrder
+          setOrders((prev) => prev.map((o) => (o.id === row.id ? row : o)))
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
     }
   }, [restaurant])
 
@@ -221,6 +280,16 @@ export default function PedidosPage() {
         </button>
       </div>
 
+      {newOrdersCount > 0 && (
+        <button
+          onClick={() => { setNewOrdersCount(0); setFilter("pending") }}
+          className="mb-4 w-full flex items-center justify-center gap-2 bg-emerald-600 text-white rounded-xl px-4 py-3 text-sm font-bold animate-pulse"
+        >
+          <Bell className="w-4 h-4" />
+          {newOrdersCount} pedido{newOrdersCount > 1 ? "s" : ""} nuevo{newOrdersCount > 1 ? "s" : ""} — ver pendientes
+        </button>
+      )}
+
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>
       )}
@@ -280,6 +349,7 @@ export default function PedidosPage() {
                       timeStyle: "short",
                     })}
                     {" · "}{FULFILLMENT_LABEL[order.fulfillment] ?? order.fulfillment}
+                    {order.table_number ? ` · Mesa ${order.table_number}` : ""}
                     {" · "}{branchName(order.branch_id)}
                   </p>
                   {(order.customer_name || order.customer_phone) && (
@@ -307,11 +377,16 @@ export default function PedidosPage() {
               {/* Items */}
               <div className="bg-stone-50 rounded-xl p-3 space-y-1.5 mb-4">
                 {order.items.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-sm">
-                    <span className="text-stone-700">
-                      <span className="font-bold text-stone-900">{item.qty}×</span> {item.name}
-                    </span>
-                    <span className="text-stone-600 font-semibold">{formatMoney(item.price * item.qty)}</span>
+                  <div key={idx}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-stone-700">
+                        <span className="font-bold text-stone-900">{item.qty}×</span> {item.name}
+                      </span>
+                      <span className="text-stone-600 font-semibold">{formatMoney(item.price * item.qty)}</span>
+                    </div>
+                    {item.modifiers && item.modifiers.length > 0 && (
+                      <p className="text-xs text-stone-500 pl-6">└ {modifiersSummary(item.modifiers)}</p>
+                    )}
                   </div>
                 ))}
                 {order.note && (
@@ -344,6 +419,15 @@ export default function PedidosPage() {
                   </button>
                 </div>
               )}
+              <div className="mt-3 flex justify-end">
+                <Link
+                  href={`/panel/foodos/pedidos/${order.id}/print`}
+                  target="_blank"
+                  className="flex items-center gap-1.5 text-xs font-semibold text-stone-400 hover:text-stone-700"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Imprimir comanda
+                </Link>
+              </div>
             </div>
           ))}
         </div>

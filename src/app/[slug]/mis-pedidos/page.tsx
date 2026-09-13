@@ -150,6 +150,13 @@ export default function OrderHistoryPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
+                  {/* Badge de pago pendiente: avisa que falta completar el cobro con tarjeta */}
+                  {order.payment_status === "pending" && order.payment_method === "card" && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                      <Clock className="w-3 h-3" />
+                      Pago pendiente
+                    </span>
+                  )}
                   {/* Repeat Order button */}
                   <button
                     onClick={(e) => handleRepeatOrder(order, e)}

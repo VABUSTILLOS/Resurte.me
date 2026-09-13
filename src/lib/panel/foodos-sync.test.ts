@@ -26,6 +26,7 @@ function order(partial: Partial<FoodosOrder> = {}): FoodosOrder {
     customer_name: null,
     customer_phone: null,
     note: null,
+    table_number: null,
     created_at: "2026-09-12T18:30:00.000Z",
     ...partial,
   }

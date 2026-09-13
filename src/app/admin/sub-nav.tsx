@@ -4,10 +4,12 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ShieldCheck } from "lucide-react"
 import { PendingOrdersBadge } from "./components/PendingOrdersBadge"
+import { AdminNotificationCenter } from "./components/AdminNotificationCenter"
 
 const ADMIN_NAV = [
   { href: "/admin", label: "Dashboard", exact: true },
   { href: "/admin/conversion", label: "Conversión", exact: false },
+  { href: "/admin/comisiones", label: "Comisiones", exact: false },
   { href: "/admin/marketing", label: "Marketing", exact: false },
   { href: "/admin/pedidos", label: "Pedidos", exact: false },
   { href: "/admin/repartidores", label: "Repartidores", exact: false },
@@ -60,6 +62,10 @@ export function AdminSubNav() {
             )
           })}
         </nav>
+        {/* Fase 10 — centro de notificaciones (pedidos nuevos en vivo) */}
+        <div className="ml-auto">
+          <AdminNotificationCenter />
+        </div>
       </div>
     </div>
   )

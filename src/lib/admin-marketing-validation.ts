@@ -129,3 +129,72 @@ export function validateCouponInput(
     },
   }
 }
+
+export interface CouponPatch {
+  discount_value?: number
+  min_order?: number
+  max_uses?: number
+  expires_at?: string | null
+}
+
+/**
+ * Fase 11 — valida una actualización parcial de cupón (PATCH). Mismas
+ * reglas que validateCouponInput pero todos los campos opcionales;
+ * expires_at admite null explícito (quitar expiración).
+ */
+export function validateCouponPatch(
+  body: Record<string, unknown>,
+): { ok: true; value: CouponPatch } | { ok: false; error: string } {
+  const patch: CouponPatch = {}
+  if ("discount_value" in body) {
+    const v = Number(body.discount_value)
+    if (!Number.isFinite(v) || v <= 0) {
+      return { ok: false, error: "discount_value debe ser positivo" }
+    }
+    patch.discount_value = v
+  }
+  if ("min_order" in body) {
+    const v = Number(body.min_order)
+    if (!Number.isFinite(v) || v < 0) {
+      return { ok: false, error: "min_order inválido" }
+    }
+    patch.min_order = v
+  }
+  if ("max_uses" in body) {
+    const v = Math.trunc(Number(body.max_uses))
+    if (!Number.isFinite(v) || v < 0) {
+      return { ok: false, error: "max_uses inválido" }
+    }
+    patch.max_uses = v
+  }
+  if ("expires_at" in body) {
+    if (body.expires_at === null) {
+      patch.expires_at = null
+    } else {
+      const d = new Date(String(body.expires_at))
+      if (Number.isNaN(d.getTime())) {
+        return { ok: false, error: "expires_at inválido" }
+      }
+      patch.expires_at = d.toISOString()
+    }
+  }
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: "Sin campos para actualizar" }
+  }
+  return { ok: true, value: patch }
+}
+
+/**
+ * Sugiere un código para duplicar un cupón: "<CODE>-COPIA" (o -COPIA2,
+ * -COPIA3…) recortado al máximo de 32 caracteres del validador.
+ */
+export function suggestDuplicateCode(code: string, existing: string[]): string {
+  const upper = code.toUpperCase()
+  const taken = new Set(existing.map((c) => c.toUpperCase()))
+  for (let n = 1; n <= 99; n++) {
+    const suffix = n === 1 ? "-COPIA" : `-COPIA${n}`
+    const candidate = `${upper.slice(0, 32 - suffix.length)}${suffix}`
+    if (!taken.has(candidate)) return candidate
+  }
+  return `${upper.slice(0, 28)}-C${Date.now() % 100}`
+}

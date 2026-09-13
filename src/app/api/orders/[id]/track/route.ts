@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 
 export const runtime = "nodejs"
@@ -30,6 +31,15 @@ export async function GET(
 
   try {
     const supabase = await createServiceClient()
+
+    // Rate limit por IP: ruta pública con polling de clientes (cada ~20s por
+    // pestaña abierta) y capability URL — sin tope, una IP podría amplificar
+    // consultas a la DB. 30 req/min da margen de sobra sobre el uso legítimo
+    // (3/min por pestaña) y comparte el patrón de /api/leads.
+    const rate = await rateLimited(supabase, `track:${clientIp(request)}`, 30, 60)
+    if (!rate.allowed) {
+      return rateLimitResponse(rate)
+    }
 
     const SELECT_WITH_DRIVER =
       "id, status, payment_status, payment_method, subtotal, discount, delivery_fee, total, scheduled_for, created_at, restore_token, cities(slug, name), delivery_drivers(name), order_items(quantity, unit_price, products(id, name, image_url, slug))"

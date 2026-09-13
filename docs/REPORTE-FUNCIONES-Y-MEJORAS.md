@@ -123,4 +123,6 @@ Marketplace mayorista B2B de insumos para restaurantes (México) + suite SaaS de
 - ✅ Refactor: módulo CSV consolidado en `src/lib/csv.ts` (el de comercialización ahora re-exporta, `@deprecated`).
 - Nota: la whitelist de `/api/orders` ya admite `spei`, `oxxo`, `mercado_pago` y `codi`; A1 requiere habilitar esos métodos en la cuenta de Stripe y la UI de confirmación.
 - Nota 2: B1 (importar prospectos CSV) y B4 (exportar comisiones) ya existían (`import-csv-modal.tsx`, "Exportar mes" en el dashboard de comercialización).
+- ✅ **C5 (ligero)**: bitácora de acciones admin — `src/lib/audit.ts` registra cambios de estado/pago/repartidor en `/api/orders/[id]/status` (log estructurado `[AUDIT]` + notificación `admin_audit` a todos los admins), feed "Bitácora de actividad" en el dashboard `/admin`, API `GET /api/admin/audit-log` (solo admins), tests unitarios + e2e de guards (`e2e/admin-audit.spec.ts`). Sin migración: reutiliza `notifications` (00073).
+- Nota 3: A4 ya estaba cubierto — `search-page-client.tsx` tiene toggle "Solo disponibles", rangos de precio y orden por precio/nombre. R3.4 (guards `/admin` sin sesión) ya estaba en `e2e/auth.spec.ts`; i18n del panel ya cubre las 5 páginas restantes.
 - Pendientes con credenciales externas: C1 (PAC para timbrado CFDI), A1 (Stripe MX para OXXO/SPEI).

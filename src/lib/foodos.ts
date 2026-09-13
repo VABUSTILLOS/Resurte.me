@@ -5,10 +5,13 @@
 // ============================================================
 
 import type {
+  FoodosBranchHours,
   FoodosCombo,
   FoodosCustomerSegment,
+  FoodosItemOptionGroup,
   FoodosMenuItem,
   FoodosOrderItem,
+  FoodosOrderItemModifier,
   FoodosUpsellRule,
 } from "@/types/foodos"
 
@@ -43,6 +46,99 @@ export function computeOrderTotals(
     discount: cappedDiscount,
     total: Math.max(0, subtotal - cappedDiscount + deliveryFee),
   }
+}
+
+// --- Modificadores ---
+
+/** Precio unitario de una línea: base + deltas de modificadores. */
+export function unitPriceWithModifiers(
+  basePrice: number,
+  modifiers: FoodosOrderItemModifier[] | undefined
+): number {
+  const deltas = (modifiers ?? []).reduce((s, m) => s + (Number(m.price_delta) || 0), 0)
+  return basePrice + deltas
+}
+
+/** Clave estable de una línea de carrito (ítem + set de modificadores). */
+export function cartLineKey(item: Pick<FoodosOrderItem, "item_id" | "combo_id" | "modifiers">): string {
+  if (item.combo_id) return `combo:${item.combo_id}`
+  const mods = (item.modifiers ?? [])
+    .map((m) => m.value_id)
+    .sort()
+    .join(",")
+  return `${item.item_id}|${mods}`
+}
+
+/** Texto corto de modificadores para listas (carrito, comanda, WhatsApp). */
+export function modifiersSummary(modifiers: FoodosOrderItemModifier[] | undefined): string {
+  return (modifiers ?? []).map((m) => m.value_name).join(", ")
+}
+
+/** Valida las selecciones de un modal de opciones contra sus grupos. */
+export function validateOptionSelection(
+  groups: FoodosItemOptionGroup[],
+  selected: Record<string, string[]> // group_id -> value_ids
+): string | null {
+  for (const g of groups) {
+    const count = (selected[g.id] ?? []).length
+    if (g.is_required && count < Math.max(1, g.min_select)) {
+      return `Selecciona al menos ${Math.max(1, g.min_select)} en "${g.name}"`
+    }
+    if (count < g.min_select) return `Faltan opciones en "${g.name}"`
+    if (count > g.max_select) return `Máximo ${g.max_select} en "${g.name}"`
+  }
+  return null
+}
+
+/** Construye las líneas "1× Nombre └ Mod (+$10)" estilo take.app para WhatsApp. */
+export function buildWhatsAppOrderMessage(input: {
+  orderRef: string
+  restaurantName: string
+  items: FoodosOrderItem[]
+  subtotal: number
+  deliveryFee: number
+  discount: number
+  total: number
+  fulfillment: string
+  tableNumber?: string | null
+  customerName: string
+  customerPhone: string
+  note?: string | null
+}): string {
+  const fmt = (n: number) => formatMoney(n)
+  const lines: string[] = [
+    `🍽️ *Nuevo pedido #${input.orderRef} — ${input.restaurantName}*`,
+    "",
+  ]
+  for (const item of input.items) {
+    lines.push(`${item.qty}× ${item.name} (${fmt(item.price * item.qty)})`)
+    for (const m of item.modifiers ?? []) {
+      const delta = Number(m.price_delta) ? ` (+${fmt(Number(m.price_delta))})` : ""
+      lines.push(`  └ ${m.value_name}${delta}`)
+    }
+  }
+  lines.push("")
+  lines.push(`Subtotal: ${fmt(input.subtotal)}`)
+  if (input.discount > 0) lines.push(`Descuento: -${fmt(input.discount)}`)
+  if (input.deliveryFee > 0) lines.push(`Envío: ${fmt(input.deliveryFee)}`)
+  lines.push(`*Total: ${fmt(input.total)}*`)
+  lines.push("")
+  const fulfillmentLabel =
+    input.fulfillment === "delivery"
+      ? "A domicilio"
+      : input.fulfillment === "dine_in"
+        ? `En el local${input.tableNumber ? ` · Mesa ${input.tableNumber}` : ""}`
+        : "Para llevar"
+  lines.push(`Servicio: ${fulfillmentLabel}`)
+  lines.push(`Cliente: ${input.customerName} · ${input.customerPhone}`)
+  if (input.note) lines.push(`Nota: ${input.note}`)
+  return lines.join("\n")
+}
+
+/** Deep link wa.me con el pedido estructurado. */
+export function buildWhatsAppOrderLink(phone: string, message: string): string {
+  const digits = (phone ?? "").replace(/\D/g, "")
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
 }
 
 function comboValue(combo: FoodosCombo): number {
@@ -214,4 +310,81 @@ export function itemMargin(item: FoodosMenuItem): number | null {
 
 export function normalizePhone(phone: string): string {
   return (phone ?? "").replace(/\D/g, "")
+}
+
+// --- Horarios de operación ---
+
+/** Hora local "HH:MM" y día de la semana en la zona del restaurante. */
+function localNow(timezone: string, now: Date): { day: number; minutes: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now)
+  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "Sun"
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0)
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0)
+  const days: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+  return { day: days[weekday] ?? 0, minutes: hour * 60 + minute }
+}
+
+function toMinutes(time: string | null): number | null {
+  if (!time) return null
+  const [h, m] = time.split(":").map(Number)
+  return (h || 0) * 60 + (m || 0)
+}
+
+export interface OpenStatus {
+  isOpen: boolean
+  /** true si la sucursal no tiene horarios configurados (siempre abierta). */
+  hasSchedule: boolean
+  /** Texto de la próxima apertura, ej. "Abre mañana 9:00". */
+  nextOpenLabel: string | null
+}
+
+const DAY_LABELS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"]
+
+/** Evalúa si una sucursal está abierta ahora según sus horarios. */
+export function getOpenStatus(
+  hours: FoodosBranchHours[],
+  timezone: string,
+  now = new Date()
+): OpenStatus {
+  if (!hours.length) return { isOpen: true, hasSchedule: false, nextOpenLabel: null }
+
+  const { day, minutes } = localNow(timezone, now)
+  const today = hours.find((h) => h.day_of_week === day)
+
+  if (today && !today.is_closed) {
+    const open = toMinutes(today.open_time)
+    const close = toMinutes(today.close_time)
+    if (open !== null && close !== null) {
+      const within = close > open
+        ? minutes >= open && minutes < close
+        : minutes >= open || minutes < close // horario que cruza medianoche
+      if (within) return { isOpen: true, hasSchedule: true, nextOpenLabel: null }
+    }
+  }
+
+  // Buscar la próxima apertura en los siguientes 7 días
+  for (let offset = 0; offset < 7; offset++) {
+    const d = (day + offset) % 7
+    const row = hours.find((h) => h.day_of_week === d)
+    if (!row || row.is_closed || !row.open_time) continue
+    const open = toMinutes(row.open_time)
+    if (open === null) continue
+    if (offset === 0 && open <= minutes) continue // ya pasó hoy
+    const hhmm = row.open_time.slice(0, 5)
+    const label =
+      offset === 0
+        ? `Abre hoy ${hhmm}`
+        : offset === 1
+          ? `Abre mañana ${hhmm}`
+          : `Abre el ${DAY_LABELS[d]} ${hhmm}`
+    return { isOpen: false, hasSchedule: true, nextOpenLabel: label }
+  }
+
+  return { isOpen: false, hasSchedule: true, nextOpenLabel: "Cerrado temporalmente" }
 }
