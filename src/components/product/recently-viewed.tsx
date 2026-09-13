@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { History } from "lucide-react"
 
 export interface RecentProduct {
@@ -52,13 +53,16 @@ export function RecentlyViewed({
   current: RecentProduct
   citySlug: string
 }) {
+  // Historial previo (sin el actual) calculado al render — es síncrono y
+  // local al navegador; el efecto solo registra la vista (efecto real).
   const [items, setItems] = useState<RecentProduct[]>([])
 
   useEffect(() => {
-    // 1) historial previo (sin el actual) para el rail
     const prev = readList().filter((p) => p.id !== current.id)
-    setItems(prev.slice(0, RAIL_ITEMS))
-    // 2) registrar el producto actual al frente del historial
+    const snapshot = prev.slice(0, RAIL_ITEMS)
+    // Diferido a microtask: ningún setState corre síncrono en el efecto.
+    void Promise.resolve().then(() => setItems(snapshot))
+    // Registrar el producto actual al frente del historial
     recordView(current)
     // Solo al montar o cambiar de producto.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -83,7 +87,7 @@ export function RecentlyViewed({
             >
               <div className="w-28 h-28 rounded-xl bg-[#faf8f5] border border-[#e0dbd2] overflow-hidden flex items-center justify-center">
                 {p.image_url ? (
-                  <img
+                  <Image
                     src={p.image_url}
                     alt={p.name}
                     loading="lazy"
