@@ -1,6 +1,6 @@
 # Auditoría SEO completa — Resurte.me (2026-09-12)
 
-**Alcance:** auditoría técnica, on-page, contenido y visibilidad en motores de IA (GEO) sobre el sitio en producción y el código fuente. Cambios implementados en el PR #9 (`seo/auditoria-2026-09`). **Fases 2-5 (misma rama, mismo día):** cierre del backlog de metadatos (31 menores), 15 guías nuevas (5 money/comparativas, 6 pilares/hubs, 1 de apertura, 3 de la serie por categoría de insumo), interlinking desde 8 posts existentes y sincronización de `llms.txt`.
+**Alcance:** auditoría técnica, on-page, contenido y visibilidad en motores de IA (GEO) sobre el sitio en producción y el código fuente. Cambios implementados en el PR #9 (`seo/auditoria-2026-09`). **Fases 2-6 (misma rama, mismo día):** cierre del backlog de metadatos (31 menores), 19 guías nuevas (5 money/comparativas, 6 pilares/hubs, 1 de apertura, 6 de la serie por categoría de insumo, 1 de decisión de canal), interlinking desde 8 posts existentes y sincronización de `llms.txt`.
 
 ---
 
@@ -22,10 +22,10 @@
 | 8 | 39 títulos >60c y 25 descriptions >160c en blog | Medio — truncamiento en SERP | ✅ 44 corregidos (13 graves + 31 menores) |
 | 9 | Copy inconsistente (envío gratis $3,000 vs $2,500; 6 vs 20 ciudades) | Bajo — confianza/E-E-A-T | ✅ Corregido en /faq |
 | 10 | HTML SSR pesado (396–573 KB por página) | Medio — LCP/INP en móvil | 📋 Recomendación |
-| 11 | Sin contenido "money" de comparación | Alto — keywords de alta intención sin cubrir | ✅ 5 guías creadas (fases 2-3) |
+| 11 | Sin contenido "money" de comparación | Alto — keywords de alta intención sin cubrir | ✅ 6 guías creadas (fases 2-3, 6) |
 | 12 | Cover 404 en `tendencias-consumo-restaurantes` (typo en nombre de imagen) | Bajo — og:image rota | ✅ Corregido en fase 2 |
 | 13 | Blog plano sin hubs temáticos | Medio — PageRank temático disperso | ✅ 6 de 6 pilares creadas (fases 3-4) |
-| 14 | Blog enlaza poco al catálogo transaccional | Medio — PageRank no fluye a páginas que convierten | 🔶 Iniciado en fase 5 (serie por insumo enlaza a `/cdmx/categoria/*`) |
+| 14 | Blog enlaza poco al catálogo transaccional | Medio — PageRank no fluye a páginas que convierten | ✅ Resuelto en fases 5-6 (serie por insumo enlaza a las 6 categorías) |
 
 ---
 
@@ -61,7 +61,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 
 ### 2.6 Arquitectura y enlazado interno — OK con mejora
 - Páginas de categoría a 2 clics del home; blog interligado con CTAs contextuales; breadcrumbs con schema.
-- **Mejora sugerida:** hub pages por tema en el blog (ver estrategia de contenidos) y enlazar las páginas de colección (`/coleccion/taquerias-antojitos`) desde los artículos relacionados — hoy el blog enlaza al Panel pero poco al catálogo transaccional. **Avance fases 3-5:** las 6 páginas pilar creadas con interlinking desde 8 posts existentes, y la fase 5 inició los enlaces directos a páginas transaccionales del catálogo: la serie por categoría de insumo enlaza a `/cdmx/categoria/frutas-verduras`, `/cdmx/categoria/carnes-aves-pescados` y `/cdmx/categoria/desechables`.
+- **Mejora sugerida:** hub pages por tema en el blog (ver estrategia de contenidos) y enlazar las páginas de colección (`/coleccion/taquerias-antojitos`) desde los artículos relacionados — hoy el blog enlaza al Panel pero poco al catálogo transaccional. **Avance fases 3-6:** las 6 páginas pilar creadas con interlinking desde 8 posts existentes, y la serie por categoría de insumo enlaza ahora a las 6 categorías transaccionales del catálogo (`/cdmx/categoria/frutas-verduras`, `carnes-aves-pescados`, `lacteos-huevos`, `bebidas`, `abarrotes`, `desechables`).
 
 ---
 
@@ -115,7 +115,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 
 **Brechas (ver estrategia de contenidos para el plan completo):**
 1. **Sin páginas de autor** — "Equipo Resurte.me" no es una entidad verificable. Crear `/about#equipo` con autores reales, credenciales y foto; enlazar desde cada post (mejora E-E-A-T directa).
-2. ~~**Sin contenido "money" de comparación**~~ — ✅ **cubierto**: fase 2 creó 3 guías (`central-de-abastos-vs-comprar-en-linea`, `cuanto-cuesta-surtir-restaurante-mes`, `mejores-proveedores-mayoreo-restaurantes`) y fase 3 agregó 2 más (`alternativas-sysco-clubes-precio`, `lista-insumos-abrir-restaurante`). Todas con FAQ schema, tablas con números en MXN e interlinking al clúster de proveeduría.
+2. ~~**Sin contenido "money" de comparación**~~ — ✅ **cubierto**: fases 2-3 crearon 5 guías (`central-de-abastos-vs-comprar-en-linea`, `cuanto-cuesta-surtir-restaurante-mes`, `mejores-proveedores-mayoreo-restaurantes`, `alternativas-sysco-clubes-precio`, `lista-insumos-abrir-restaurante`) y fase 6 agregó `formas-surtir-restaurante-mexico` (la pieza §3.2 de la estrategia). Todas con FAQ schema, tablas con números en MXN e interlinking.
 3. ~~**Sin páginas hub temáticas**~~ — ✅ **6 de 6 creadas (fases 3-4)**: `guia-proveeduria-restaurantes`, `guia-costos-restaurante`, `guia-operacion-cocina`, `guia-marketing-restaurantes`, `guia-legal-finanzas-restaurante` y `guia-crecer-restaurante`, cada una con sección hub que mapea su clúster. Pendiente: enlazar las pilares desde home/nav (cambio de UI, fuera de este PR).
 4. **Fechas de actualización** — los posts tienen `updatedAt`; verificar que se muestre visible en la página (señal de frescura). En fases 3-4 se refrescó el `updatedAt` de los posts que recibieron interlinking.
 
@@ -126,7 +126,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 | Táctica | Antes | Ahora |
 |---|---|---|
 | Crawlers IA en robots.txt | GPTBot bloqueado | 12 permitidos: GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-User, PerplexityBot, Perplexity-User, Google-Extended, Applebot-Extended, Meta-ExternalAgent, Amazonbot, CCBot |
-| `llms.txt` | No existía | Creado + actualizado en fases 2-5: guías pilar (6 hubs), comparativas money, serie por categoría de insumo y guías clásicas |
+| `llms.txt` | No existía | Creado + actualizado en fases 2-6: guías pilar (6 hubs), comparativas money, serie completa por categoría de insumo (6 guías) y guías clásicas |
 | FAQPage schema | Solo en posts | También en /faq (respuestas citables por AI Overviews) |
 | Datos consistentes | $3,000/$2,500, 6/20 ciudades | Unificados (clave: las IA amplifican contradicciones) |
 
@@ -149,7 +149,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 4. ✅ Metadatos del blog: 44/44 aplicados (13 graves en fase 1 + 31 menores en fase 2, Anexo A).
 5. ⬜ PageSpeed Insights en home, /cdmx y /blog tras el deploy; si LCP móvil > 2.5 s, atacar payload RSC y bundles.
 6. ⬜ Páginas de autor reales + `/about#equipo`.
-7. ✅ 4 páginas de comparación/alternativas creadas (3 en fase 2 + `alternativas-sysco-clubes-precio` en fase 3); adicional: `lista-insumos-abrir-restaurante` (brecha de apertura).
+7. ✅ 5 páginas de comparación/alternativas/decisión creadas (3 en fase 2 + alternativas Sysco en fase 3 + 5 formas de surtir en fase 6); adicional: `lista-insumos-abrir-restaurante` (brecha de apertura).
 
 ### Medio (meses 2–3)
 8. ✅ 6 hubs temáticos con página pilar creados (fases 3-4) + interlinking desde 8 posts existentes. Pendiente: enlazar pilares desde home/nav (UI).
@@ -266,6 +266,27 @@ Resuelve dos hallazgos a la vez: la brecha de keywords "proveedores de [insumo] 
 ### Veracidad
 
 Sin precios de mercado actuales (fluctúan y no eran verificables en la sesión): las guías enseñan a evaluar precio por kg útil tras rendimiento, comparar por costo por unidad y verificar calidad en recepción. El ejemplo numérico de carne ($180→$240→$48 por 200 g) es el ya publicado en la guía de food cost. Pendientes de la serie: lácteos/huevo, bebidas y abarrotes.
+
+---
+
+## Fase 6 (2026-09-12) — serie por insumo completa + la pieza de decisión de canal
+
+### Guías creadas
+
+| Slug | Keyword objetivo | Nota |
+|---|---|---|
+| proveedores-lacteos-huevo-restaurantes | "proveedores de lácteos para restaurantes" | Serie insumo 4/6; cadena de frío y "poco y seguido"; enlaza a `/cdmx/categoria/lacteos-huevos` (2×) |
+| proveedores-bebidas-mayoreo-restaurantes | "proveedores de bebidas al mayoreo para restaurantes" | Serie insumo 5/6; bar cost 20-25% separado, consignación con letra chica; enlaza a `/cdmx/categoria/bebidas` (2×) |
+| abarrotes-mayoreo-restaurantes | "abarrotes al mayoreo para restaurantes" | Serie insumo 6/6 — COMPLETA; la victoria rápida del canal mayorista; enlaza a `/cdmx/categoria/abarrotes` |
+| formas-surtir-restaurante-mexico | "formas de surtir un restaurante", "cómo surtir un restaurante en México" | Pieza §3.2 de la estrategia: tabla maestra de las 5 formas + decisión por etapa del negocio (arranque/crecimiento/escala) y por tipo de restaurante |
+
+### Veracidad
+
+Misma regla que fases anteriores: cero precios de mercado actuales y cero cifras de terceros no verificables (membresías, mínimos de Sysco). Los ejemplos de abarrotes van etiquetados como hipotéticos/ilustrativos; el costo oculto de la central se mantiene en el rango ya publicado (4-6 h, $950-1,400 MXN).
+
+### Con este cierre
+
+La serie por categoría de insumo queda completa (6/6 categorías del catálogo con su guía enlazando a su página transaccional) y la sección §3 de la estrategia (contenido de comparación) queda completa en sus 4 piezas.
 
 ---
 
