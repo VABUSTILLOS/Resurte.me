@@ -2,8 +2,12 @@ import { describe, it, expect } from "vitest"
 import {
   parseProductImportCsv,
   generateProductImportTemplate,
-  PRODUCT_IMPORT_HEADER,
 } from "./product-import"
+
+// Espejo del encabezado interno (no exportado): mismo orden de columnas.
+const PRODUCT_IMPORT_HEADER = [
+  "nombre", "slug", "precio", "precio_oferta", "marca", "categoria", "stock", "visible",
+] as const
 
 const HEADER = PRODUCT_IMPORT_HEADER.join(";")
 
