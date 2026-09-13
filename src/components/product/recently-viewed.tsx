@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { History } from "lucide-react"
 
 interface RecentProduct {
@@ -81,9 +82,9 @@ export function RecentlyViewed({
               href={`/${citySlug}/producto/${p.slug}`}
               className="w-28 shrink-0 group"
             >
-              <div className="w-28 h-28 rounded-xl bg-[#faf8f5] border border-[#e0dbd2] overflow-hidden flex items-center justify-center">
+              <div className="w-28 h-28 rounded-xl bg-[#faf8f5] border border-[#e0dbd2] overflow-hidden flex items-center justify-center relative">
                 {p.image_url ? (
-                  <img
+                  <Image
                     src={p.image_url}
                     alt={p.name}
                     loading="lazy"
