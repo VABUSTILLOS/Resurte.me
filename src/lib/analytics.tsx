@@ -20,7 +20,9 @@ import Script from "next/script"
 function sanitizeEnvId(value: string | undefined): string | undefined {
   if (!value) return undefined
   const clean = value.includes("=") ? value.split("=").pop() : value
-  return clean?.trim() || undefined
+  // También se han visto comillas/espacios al pegar el valor en dashboards de
+  // env vars ("G-XXX", 'G-XXX'); un ID con comillas rompe el snippet de gtag.
+  return clean?.trim().replace(/^["']+|["']+$/g, "") || undefined
 }
 
 const GA_ID = sanitizeEnvId(

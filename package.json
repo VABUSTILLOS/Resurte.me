@@ -59,7 +59,8 @@
   "knip": {
     "ignore": [
       "scripts/**",
-      "src/lib/ai/kie-ai-admin.ts"
+      "src/lib/ai/kie-ai-admin.ts",
+      "public/sw.js"
     ],
     "ignoreIssues": {
       "src/lib/panel-utils.ts": [

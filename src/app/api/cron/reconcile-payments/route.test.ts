@@ -32,7 +32,7 @@ function tableBuilder(
   singleResult?: TableResult
 ) {
   const builder: Record<string, unknown> = {}
-  for (const method of ["select", "eq", "in", "not", "lt", "update", "order", "limit"]) {
+  for (const method of ["select", "eq", "neq", "in", "not", "lt", "update", "order", "limit"]) {
     builder[method] = vi.fn().mockReturnValue(builder)
   }
   builder.insert = vi.fn().mockResolvedValue({ data: null, error: null })
