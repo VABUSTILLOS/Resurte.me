@@ -1,13 +1,12 @@
 "use client"
 
-import { Plus, Check, Minus, Heart, MessageCircle } from "lucide-react"
+import { Plus, Check, Heart } from "lucide-react"
 import Image from "next/image"
 import type { Product } from "@/types"
 import { useCart } from "@/contexts/cart-context"
 import { useFavorites } from "@/contexts/favorites-context"
 import { useToast } from "@/components/toast"
 import { cn, getProductTagline } from "@/lib/utils"
-import { haptic } from "@/lib/haptics"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { useState, memo } from "react"
 import Link from "next/link"
@@ -36,12 +35,11 @@ interface ProductCardProps {
 
 export const ProductCard = memo(function ProductCard({
   product,
-  whatsappNumber,
   citySlug,
   onAddToCart,
   priority = false,
 }: ProductCardProps) {
-  const { addItem, cart, updateQuantity } = useCart()
+  const { addItem } = useCart()
   const { toast } = useToast()
   const { toggle: toggleFavorite, isFavorite } = useFavorites()
   const [added, setAdded] = useState(false)
@@ -55,12 +53,6 @@ export const ProductCard = memo(function ProductCard({
   const outOfStock = product.stock_status === "out_of_stock"
   const lowStock = product.stock_status === "low_stock"
 
-  // ¿El producto ya está en el carrito? Entonces mostramos stepper (− N +)
-  // en lugar del botón Agregar: ajustar la cantidad de un pedido grande (30+
-  // insumos) sin abrir el drawer es la interacción más repetida del usuario
-  // B2B en móvil.
-  const cartItem = cart.items.find((i) => i.product_id === product.id)
-
   // Second image for hover swap effect
   const secondaryImage = product.images?.[1]
 
@@ -68,15 +60,6 @@ export const ProductCard = memo(function ProductCard({
   // Fallback: use the raw description (truncated by line-clamp) or a neutral
   // line so cards with little text stay visually full (Fase 10).
   const tagline = getProductTagline(product.description) ?? product.description?.trim() ?? null
-
-  // CTA "Avísame" para productos agotados: convierte una venta perdida en
-  // conversación de WhatsApp (y en lead para recompra cuando vuelva el stock).
-  const notifyMeUrl =
-    outOfStock && whatsappNumber
-      ? `https://wa.me/${whatsappNumber.replace(/\D/g, "")}?text=${encodeURIComponent(
-          `Hola, ¿me avisan cuando vuelva a haber *${product.name}*?`
-        )}`
-      : null
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -104,21 +87,9 @@ export const ProductCard = memo(function ProductCard({
       price,
     })
 
-    // Micro-vibración táctil: confirma el agregado en móvil aunque el usuario
-    // no esté viendo el toast (pantalla grande, pulgar sobre el toast).
-    haptic(10)
     toast(`${product.name} agregado al carrito`)
     setAdded(true)
     setTimeout(() => setAdded(false), 1200)
-  }
-
-  const handleStep = (e: React.MouseEvent, delta: 1 | -1) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!cartItem) return
-    haptic(8)
-    // quantity 0 elimina el item (lo maneja el reducer del contexto)
-    updateQuantity(product.id, cartItem.quantity + delta)
   }
 
   return (
@@ -252,37 +223,9 @@ export const ProductCard = memo(function ProductCard({
         />
       </button>
 
-      {/* Acción principal del card:
-          1) ya en carrito → stepper − N + (siempre visible, comunica el estado)
-          2) disponible    → quick-add
-          3) agotado       → "Avísame" por WhatsApp o spacer */}
-      {cartItem && !outOfStock ? (
-        <div
-          role="group"
-          aria-label={`${product.name}: ${cartItem.quantity} en el carrito`}
-          className="flex items-center justify-between w-[calc(100%-1.75rem)] mx-auto mt-2 mb-3 sm:mb-0 sm:w-auto sm:absolute sm:-bottom-2 sm:left-1/2 sm:-translate-x-1/2 sm:z-10 sm:min-w-[7.5rem] rounded-full bg-[#0E7A0E] text-white shadow-lg"
-        >
-          <button
-            type="button"
-            onClick={(e) => handleStep(e, -1)}
-            aria-label={cartItem.quantity === 1 ? `Quitar ${product.name} del carrito` : `Quitar una unidad de ${product.name}`}
-            className="p-2 sm:p-1.5 rounded-full hover:bg-white/15 transition-colors touch-target"
-          >
-            <Minus className="w-3.5 h-3.5" />
-          </button>
-          <span aria-live="polite" className="min-w-[1.5rem] text-center text-sm font-bold tabular-nums">
-            {cartItem.quantity}
-          </span>
-          <button
-            type="button"
-            onClick={(e) => handleStep(e, 1)}
-            aria-label={`Agregar otra unidad de ${product.name}`}
-            className="p-2 sm:p-1.5 rounded-full hover:bg-white/15 transition-colors touch-target"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ) : !outOfStock ? (
+      {/* Quick-add button — mobile: inline dentro del card (sin saliente que
+          pise la fila siguiente). ≥sm: Erewhon-style, flota bajo el card. */}
+      {!outOfStock ? (
         <button
           onClick={handleAdd}
           aria-label={`Agregar ${product.name} al carrito`}
@@ -303,20 +246,6 @@ export const ProductCard = memo(function ProductCard({
             </span>
           )}
         </button>
-      ) : notifyMeUrl ? (
-        /* Producto agotado con canal de WhatsApp: CTA "Avísame" para capturar
-           la demanda en lugar de perder la venta. Ocupa el mismo slot que el
-           quick-add para que el grid no se desacomode. */
-        <a
-          href={notifyMeUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          aria-label={`Avísame por WhatsApp cuando haya ${product.name}`}
-          className="flex items-center justify-center gap-1.5 w-[calc(100%-1.75rem)] mx-auto mt-2 mb-3 sm:mb-0 sm:w-auto sm:absolute sm:-bottom-2 sm:left-1/2 sm:-translate-x-1/2 sm:z-10 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-semibold border-[1.5px] border-[#0E7A0E] text-[#0E7A0E] bg-white hover:bg-[#F0FDF4] transition-all shadow-lg touch-target whitespace-nowrap"
-        >
-          <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" /> Avísame
-        </a>
       ) : (
         /* Cards agotadas: reservar la misma altura del botón en móvil para
            que las filas del grid 2-col no queden desparejas. ≥sm el botón
@@ -343,40 +272,25 @@ export function ProductCardGrid({
   if (products.length === 0) {
     return (
       <div className="text-center py-16">
-        <p className="text-5xl mb-3" aria-hidden="true">🥑</p>
-        <p className="text-gray-500 font-medium">No se encontraron productos.</p>
-        <p className="text-sm text-gray-400 mt-1 mb-5">
-          Prueba con otra categoría o revisa el catálogo completo.
-        </p>
-        <Link
-          href={`/${citySlug}`}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 text-white text-sm font-semibold rounded-full hover:bg-brand-700 transition-colors"
-        >
-          Ver catálogo completo
-        </Link>
+        <p className="text-gray-400">No se encontraron productos.</p>
       </div>
     )
   }
 
   return (
-    <ul
-      role="list"
-      aria-label={`${products.length} productos`}
-      className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4"
-    >
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
       {products.map((product, i) => (
-        <li key={product.id} className="flex">
-          <ProductCard
-            product={product}
-            whatsappNumber={whatsappNumber}
-            citySlug={citySlug}
-            onAddToCart={onAddToCart}
-            // Solo la primera fila (4 en desktop, 2×2 en móvil) precarga su
-            // imagen: el resto usa lazy por defecto para no competir con el LCP.
-            priority={i < 4}
-          />
-        </li>
+        <ProductCard
+          key={product.id}
+          product={product}
+          whatsappNumber={whatsappNumber}
+          citySlug={citySlug}
+          onAddToCart={onAddToCart}
+          // Solo la primera fila (4 en desktop, 2×2 en móvil) precarga su
+          // imagen: el resto usa lazy por defecto para no competir con el LCP.
+          priority={i < 4}
+        />
       ))}
-    </ul>
+    </div>
   )
 }
