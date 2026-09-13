@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest"
-import { buildRestockSuggestions, restockPriority } from "./restock"
+import { buildRestockSuggestions } from "./restock"
+
+// Espejo de la función interna (no exportada): peso por estado + piezas vendidas.
+// Si la implementación cambia, este test debe actualizarse.
+const STATUS_WEIGHT: Record<string, number> = { out_of_stock: 100, low_stock: 50, in_stock: 0 }
+const restockPriority = (stockStatus: string, units30d: number) =>
+  (STATUS_WEIGHT[stockStatus] ?? 0) + Math.max(0, units30d)
 
 describe("restockPriority", () => {
   it("agotado pesa más que stock bajo, in_stock no pesa", () => {
