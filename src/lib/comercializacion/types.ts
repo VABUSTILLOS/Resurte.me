@@ -145,6 +145,10 @@ export interface ClientToReorder {
   phone: string | null
   user_id: string
   last_order_at: string | null
+  /** Productos del último pedido (para sugerir reorden específico). */
+  last_order_items: string[]
+  /** Días desde el último pedido (null si nunca ha pedido). */
+  days_since_order: number | null
 }
 
 export interface AssistedOrderSummary {

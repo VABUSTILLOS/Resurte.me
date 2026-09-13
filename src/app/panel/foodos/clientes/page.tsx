@@ -9,6 +9,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   getFoodosPanelData,
+  getLoyaltyProgram,
+  upsertLoyaltyProgram,
+  adjustCustomerCredit,
+  listReviews,
+  setReviewVisibility,
   listAutomations,
   listCampaigns,
   upsertAutomation,
@@ -20,6 +25,8 @@ import {
 import { formatMoney, SEGMENT_META, segmentCustomer } from "@/lib/foodos"
 import StatCard from "@/components/panel/StatCard"
 import type {
+  FoodosLoyaltyProgram,
+  FoodosReview,
   FoodosRestaurant,
   FoodosCustomer,
   FoodosAutomation,
@@ -36,6 +43,7 @@ import {
   MessageSquare,
   Percent,
   CalendarClock,
+  Star,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { useEscapeKey } from "@/hooks/use-escape-key"
@@ -90,6 +98,13 @@ export default function ClientesPage() {
   const [saving, setSaving] = useState(false)
   const [sendingCampaign, setSendingCampaign] = useState<string | null>(null)
 
+  // Lealtad y reseñas
+  const [loyalty, setLoyalty] = useState<FoodosLoyaltyProgram | null>(null)
+  const [loyaltyForm, setLoyaltyForm] = useState({ points_per_100: "10", point_value: "1", is_active: false })
+  const [reviews, setReviews] = useState<FoodosReview[]>([])
+  const [creditDraft, setCreditDraft] = useState<string | null>(null) // customer_id en edición
+  const [creditAmount, setCreditAmount] = useState("")
+
   useEscapeKey(useCallback(() => setShowAutoForm(false), []), showAutoForm)
 
   const load = useCallback(async () => {
@@ -99,6 +114,18 @@ export default function ClientesPage() {
       setCustomers(cs)
       setAutomations(as)
       setCampaigns(cps)
+      if (r) {
+        const [prog, revs] = await Promise.all([getLoyaltyProgram(r.id), listReviews(r.id)])
+        setLoyalty(prog)
+        if (prog) {
+          setLoyaltyForm({
+            points_per_100: String(prog.points_per_100),
+            point_value: String(prog.point_value),
+            is_active: prog.is_active,
+          })
+        }
+        setReviews(revs)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : t("foodos.clientes.loadError"))
     } finally {
@@ -144,6 +171,38 @@ export default function ClientesPage() {
       avgTicket,
     }
   }, [customers, computedSegments])
+
+  async function handleSaveLoyalty() {
+    if (!restaurant) return
+    setSaving(true)
+    try {
+      await upsertLoyaltyProgram({
+        restaurant_id: restaurant.id,
+        points_per_100: Number(loyaltyForm.points_per_100) || 0,
+        point_value: Number(loyaltyForm.point_value) || 0,
+        is_active: loyaltyForm.is_active,
+      })
+      setLoyalty(await getLoyaltyProgram(restaurant.id))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al guardar lealtad")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleAdjustCredit(customerId: string) {
+    const amount = Number(creditAmount)
+    if (!amount) return
+    await adjustCustomerCredit(customerId, amount)
+    setCreditDraft(null)
+    setCreditAmount("")
+    await load()
+  }
+
+  async function handleToggleReview(id: string, isVisible: boolean) {
+    await setReviewVisibility(id, isVisible)
+    setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, is_visible: isVisible } : r)))
+  }
 
   async function handleSaveAuto(e: React.FormEvent) {
     e.preventDefault()
@@ -319,6 +378,31 @@ export default function ClientesPage() {
                         </span>
                         <p className="text-xs text-stone-500 mt-1">{t("foodos.clientes.ordersCount", { count: c.total_orders })}</p>
                         <p className="text-sm font-bold text-stone-900">{formatMoney(c.total_spend)}</p>
+                        {(c.loyalty_points > 0 || Number(c.store_credit) > 0) && (
+                          <p className="text-[11px] text-stone-400 mt-0.5">
+                            ⭐ {c.loyalty_points} pts{Number(c.store_credit) > 0 && ` · 💳 ${formatMoney(Number(c.store_credit))}`}
+                          </p>
+                        )}
+                        {creditDraft === c.id ? (
+                          <div className="flex items-center gap-1 mt-1 justify-end">
+                            <input
+                              type="number"
+                              value={creditAmount}
+                              onChange={(e) => setCreditAmount(e.target.value)}
+                              placeholder="±$"
+                              className="w-20 px-2 py-1 rounded-lg border border-stone-200 text-xs"
+                            />
+                            <button onClick={() => handleAdjustCredit(c.id)} className="text-xs font-bold text-emerald-700">OK</button>
+                            <button onClick={() => setCreditDraft(null)} className="text-xs text-stone-400">✕</button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setCreditDraft(c.id)}
+                            className="text-[11px] font-semibold text-stone-400 hover:text-emerald-700 mt-0.5"
+                          >
+                            Ajustar crédito
+                          </button>
+                        )}
                       </div>
                     </div>
                   )
@@ -412,6 +496,84 @@ export default function ClientesPage() {
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Programa de lealtad */}
+          <div className="bg-white border border-stone-200 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Star className="w-5 h-5 text-stone-500" />
+              <h2 className="font-bold text-stone-900">Programa de lealtad</h2>
+              {loyalty?.is_active && (
+                <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Activo</span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <label className="text-xs">
+                <span className="font-semibold text-stone-600 block mb-1">Puntos por $100</span>
+                <input
+                  type="number" min="0" step="1"
+                  value={loyaltyForm.points_per_100}
+                  onChange={(e) => setLoyaltyForm({ ...loyaltyForm, points_per_100: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm"
+                />
+              </label>
+              <label className="text-xs">
+                <span className="font-semibold text-stone-600 block mb-1">Valor del punto ($)</span>
+                <input
+                  type="number" min="0" step="0.1"
+                  value={loyaltyForm.point_value}
+                  onChange={(e) => setLoyaltyForm({ ...loyaltyForm, point_value: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm"
+                />
+              </label>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-stone-600 cursor-pointer mb-3">
+              <input
+                type="checkbox"
+                checked={loyaltyForm.is_active}
+                onChange={(e) => setLoyaltyForm({ ...loyaltyForm, is_active: e.target.checked })}
+                className="accent-emerald-600"
+              />
+              Programa activo (los clientes acumulan y canjean puntos)
+            </label>
+            <button
+              onClick={handleSaveLoyalty}
+              disabled={saving}
+              className="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"
+            >
+              Guardar programa
+            </button>
+          </div>
+
+          {/* Reseñas */}
+          <div className="bg-white border border-stone-200 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Star className="w-5 h-5 text-stone-500" />
+              <h2 className="font-bold text-stone-900">Reseñas recientes</h2>
+              <span className="ml-auto text-xs text-stone-400">{reviews.length}</span>
+            </div>
+            {reviews.length === 0 ? (
+              <p className="text-sm text-stone-400 py-4">Aún no hay reseñas. Los clientes las dejan desde la página de estado de su pedido.</p>
+            ) : (
+              <div className="space-y-2">
+                {reviews.slice(0, 10).map((r) => (
+                  <div key={r.id} className={`bg-stone-50 rounded-xl p-3 ${!r.is_visible ? "opacity-50" : ""}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold text-stone-900">
+                        {"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)} · {r.customer_name ?? "Cliente"}
+                      </p>
+                      <button
+                        onClick={() => handleToggleReview(r.id, !r.is_visible)}
+                        className="text-[11px] font-semibold text-stone-400 hover:text-stone-700"
+                      >
+                        {r.is_visible ? "Ocultar" : "Mostrar"}
+                      </button>
+                    </div>
+                    {r.comment && <p className="text-xs text-stone-500 mt-1">{r.comment}</p>}
                   </div>
                 ))}
               </div>

@@ -38,6 +38,11 @@ export function CheckoutView({
   setTipPct,
   customTip,
   setCustomTip,
+  loyalty,
+  redeemPoints,
+  setRedeemPoints,
+  useCredit,
+  setUseCredit,
   transferAvailable,
   onChangeQty,
   onRemoveItem,
@@ -78,6 +83,11 @@ export function CheckoutView({
   setTipPct: (v: 0 | 10 | 15 | "custom") => void
   customTip: string
   setCustomTip: (v: string) => void
+  loyalty: { active: boolean; points: number; credit: number; points_value: number } | null
+  redeemPoints: boolean
+  setRedeemPoints: (v: boolean) => void
+  useCredit: boolean
+  setUseCredit: (v: boolean) => void
   transferAvailable: boolean
   onChangeQty: (index: number, delta: number) => void
   onRemoveItem: (index: number) => void
@@ -329,6 +339,37 @@ export function CheckoutView({
               />
             )}
           </section>
+
+          {/* Lealtad: puntos y crédito */}
+          {loyalty?.active && (loyalty.points > 0 || loyalty.credit > 0) && (
+            <section className="bg-white border border-stone-200 rounded-2xl p-4">
+              <h2 className="font-bold text-stone-900 mb-3">Tus recompensas</h2>
+              <div className="space-y-2">
+                {loyalty.points > 0 && (
+                  <label className="flex items-center justify-between rounded-xl border-2 px-3 py-2.5 cursor-pointer text-sm font-semibold border-stone-200 text-stone-600 has-checked:border-emerald-500 has-checked:bg-emerald-50">
+                    <span>⭐ Usar {loyalty.points} puntos (−{formatMoney(loyalty.points_value)})</span>
+                    <input
+                      type="checkbox"
+                      checked={redeemPoints}
+                      onChange={(e) => setRedeemPoints(e.target.checked)}
+                      className="accent-emerald-600"
+                    />
+                  </label>
+                )}
+                {loyalty.credit > 0 && (
+                  <label className="flex items-center justify-between rounded-xl border-2 px-3 py-2.5 cursor-pointer text-sm font-semibold border-stone-200 text-stone-600 has-checked:border-emerald-500 has-checked:bg-emerald-50">
+                    <span>💳 Usar crédito en tienda (−{formatMoney(loyalty.credit)})</span>
+                    <input
+                      type="checkbox"
+                      checked={useCredit}
+                      onChange={(e) => setUseCredit(e.target.checked)}
+                      className="accent-emerald-600"
+                    />
+                  </label>
+                )}
+              </div>
+            </section>
+          )}
 
           {/* Pago */}
           <section className="bg-white border border-stone-200 rounded-2xl p-4">

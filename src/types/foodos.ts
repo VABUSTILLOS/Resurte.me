@@ -207,7 +207,18 @@ export type FoodosOrderStatus =
 
 export type FoodosOrderChannel = "web" | "qr" | "whatsapp"
 export type FoodosFulfillment = "delivery" | "pickup" | "dine_in"
-export type FoodosPaymentStatus = "pending" | "paid" | "failed" | "refunded"
+/**
+ * `processing` = el cliente ya recibió las instrucciones de un método
+ * asíncrono (OXXO/SPEI/CoDi) y el pago aún no se acredita.
+ * `expired` = el voucher/CLABE caducó sin pago.
+ */
+export type FoodosPaymentStatus =
+  | "pending"
+  | "processing"
+  | "paid"
+  | "failed"
+  | "expired"
+  | "refunded"
 
 /** Modificador elegido en una línea de pedido (snapshot con precio server-side). */
 export interface FoodosOrderItemModifier {

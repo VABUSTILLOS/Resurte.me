@@ -17,6 +17,7 @@ import type {
   FoodosItemOptionValue,
   FoodosBranchHours,
   FoodosBranchMenuOverride,
+  FoodosReview,
 } from "@/types/foodos"
 
 export interface PublicFoodosData {
@@ -30,6 +31,7 @@ export interface PublicFoodosData {
   optionValues: FoodosItemOptionValue[]
   branchHours: FoodosBranchHours[]
   overrides: FoodosBranchMenuOverride[]
+  reviews: FoodosReview[]
 }
 
 export interface PublicMarketplaceEntry {
@@ -52,7 +54,7 @@ async function fetchPublicRestaurantBySlug(slug: string): Promise<PublicFoodosDa
 
   if (error || !restaurant) return null
 
-  const [branches, categories, items, combos, rules, optionGroups, optionValues] = await Promise.all([
+  const [branches, categories, items, combos, rules, optionGroups, optionValues, reviews] = await Promise.all([
     supabase.from("foodos_branches").select("*").eq("restaurant_id", restaurant.id).order("name"),
     supabase
       .from("foodos_menu_categories")
@@ -77,6 +79,13 @@ async function fetchPublicRestaurantBySlug(slug: string): Promise<PublicFoodosDa
       .eq("restaurant_id", restaurant.id)
       .eq("is_available", true)
       .order("sort_order"),
+    supabase
+      .from("foodos_reviews")
+      .select("id, customer_name, rating, comment, created_at")
+      .eq("restaurant_id", restaurant.id)
+      .eq("is_visible", true)
+      .order("created_at", { ascending: false })
+      .limit(10),
   ])
 
   const branchIds = ((branches.data as FoodosBranch[]) ?? []).map((b) => b.id)
@@ -98,6 +107,7 @@ async function fetchPublicRestaurantBySlug(slug: string): Promise<PublicFoodosDa
     optionValues: (optionValues.data as FoodosItemOptionValue[]) ?? [],
     branchHours: (branchHours.data as FoodosBranchHours[]) ?? [],
     overrides: (overrides.data as FoodosBranchMenuOverride[]) ?? [],
+    reviews: (reviews.data as unknown as FoodosReview[]) ?? [],
   }
 }
 

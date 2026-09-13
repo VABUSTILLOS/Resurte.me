@@ -28,6 +28,7 @@ import type {
   FoodosItemOptionValue,
   FoodosBranchHours,
   FoodosBranchMenuOverride,
+  FoodosReview,
 } from "@/types/foodos"
 import { MenuView } from "./_components/menu-view"
 import { CheckoutView } from "./_components/checkout-view"
@@ -56,6 +57,7 @@ interface Props {
   optionValues: FoodosItemOptionValue[]
   branchHours: FoodosBranchHours[]
   overrides: FoodosBranchMenuOverride[]
+  reviews: FoodosReview[]
 }
 
 export function FoodosStorefront({
@@ -69,11 +71,33 @@ export function FoodosStorefront({
   optionValues,
   branchHours,
   overrides,
+  reviews,
 }: Props) {
   const [cart, setCart] = useState<FoodosOrderItem[]>([])
   const [view, setView] = useState<View>("menu")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [optionsItem, setOptionsItem] = useState<FoodosMenuItem | null>(null)
+
+  // Wishlist local por restaurante (favoritos del comensal)
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set()
+    try {
+      return new Set(JSON.parse(localStorage.getItem(`foodos-favs-${restaurant.slug}`) ?? "[]") as string[])
+    } catch {
+      return new Set()
+    }
+  })
+  const toggleFavorite = (itemId: string) => {
+    setFavorites((prev) => {
+      const next = new Set(prev)
+      if (next.has(itemId)) next.delete(itemId)
+      else next.add(itemId)
+      try {
+        localStorage.setItem(`foodos-favs-${restaurant.slug}`, JSON.stringify([...next]))
+      } catch { /* storage lleno o privado */ }
+      return next
+    })
+  }
 
   // Checkout state
   const [customerName, setCustomerName] = useState("")
@@ -102,6 +126,11 @@ export function FoodosStorefront({
   const [couponLoading, setCouponLoading] = useState(false)
   const [tipPct, setTipPct] = useState<0 | 10 | 15 | "custom">(0)
   const [customTip, setCustomTip] = useState("")
+
+  // Lealtad: puntos y crédito del cliente (se consulta al capturar teléfono)
+  const [loyalty, setLoyalty] = useState<{ active: boolean; points: number; credit: number; points_value: number } | null>(null)
+  const [redeemPoints, setRedeemPoints] = useState(false)
+  const [useCredit, setUseCredit] = useState(false)
 
   // Stripe flow
   const [clientSecret, setClientSecret] = useState<string | null>(null)
@@ -159,9 +188,19 @@ export function FoodosStorefront({
     return (cartSubtotal * tipPct) / 100
   }, [tipPct, customTip, cartSubtotal])
 
+  // Descuento total = cupón + puntos canjeados + crédito (tope: subtotal).
+  const loyaltyDiscount = useMemo(() => {
+    if (!loyalty?.active) return 0
+    const afterCoupon = cartSubtotal - (appliedCoupon?.discount ?? 0)
+    let d = 0
+    if (redeemPoints) d += Math.min(loyalty.points_value, afterCoupon)
+    if (useCredit) d += Math.min(loyalty.credit, afterCoupon - d)
+    return Math.max(0, d)
+  }, [loyalty, redeemPoints, useCredit, cartSubtotal, appliedCoupon])
+
   const totals = useMemo(
-    () => computeOrderTotals(cart, deliveryFee, appliedCoupon?.discount ?? 0, tipAmount),
-    [cart, deliveryFee, appliedCoupon, tipAmount]
+    () => computeOrderTotals(cart, deliveryFee, (appliedCoupon?.discount ?? 0) + loyaltyDiscount, tipAmount),
+    [cart, deliveryFee, appliedCoupon, loyaltyDiscount, tipAmount]
   )
 
   const recommendations = useMemo(
@@ -283,6 +322,8 @@ export function FoodosStorefront({
           table_number: fulfillment === "dine_in" ? tableNumber.trim() : null,
           coupon_code: appliedCoupon?.code ?? null,
           tip: tipAmount,
+          redeem_points: redeemPoints,
+          use_credit: useCredit,
         }),
       })
 
@@ -375,8 +416,23 @@ export function FoodosStorefront({
     setView("success")
   }
 
-  const applyCoupon = async () => {
-    if (!couponInput.trim()) return
+  /** Al capturar teléfono válido, consulta puntos/crédito del cliente. */
+  const handlePhoneChange = (v: string) => {
+    setCustomerPhone(v)
+    const digits = v.replace(/\D/g, "")
+    if (digits.length >= 10) {
+      fetch(`/api/foodos/loyalty?restaurant_id=${restaurant.id}&phone=${digits}`)
+        .then((r) => r.json())
+        .then((d) => setLoyalty(d))
+        .catch(() => {})
+    } else {
+      setLoyalty(null)
+      setRedeemPoints(false)
+      setUseCredit(false)
+    }
+  }
+
+  const applyCoupon = async () => {    if (!couponInput.trim()) return
     setCouponLoading(true)
     setCouponError(null)
     try {
@@ -474,6 +530,9 @@ export function FoodosStorefront({
             onGoToCart={() => setView("checkout")}
             itemHasOptions={itemHasOptions}
             priceFor={effectivePrice}
+            reviews={reviews}
+            favorites={favorites}
+            onToggleFavorite={toggleFavorite}
           />
         )}
 
@@ -487,7 +546,7 @@ export function FoodosStorefront({
             customerName={customerName}
             setCustomerName={setCustomerName}
             customerPhone={customerPhone}
-            setCustomerPhone={setCustomerPhone}
+            setCustomerPhone={handlePhoneChange}
             fulfillment={fulfillment}
             setFulfillment={setFulfillment}
             tableNumber={tableNumber}
@@ -509,6 +568,11 @@ export function FoodosStorefront({
             setTipPct={setTipPct}
             customTip={customTip}
             setCustomTip={setCustomTip}
+            loyalty={loyalty}
+            redeemPoints={redeemPoints}
+            setRedeemPoints={setRedeemPoints}
+            useCredit={useCredit}
+            setUseCredit={setUseCredit}
             transferAvailable={Boolean(restaurant.transfer_clabe)}
             onChangeQty={changeQty}
             onRemoveItem={removeItem}

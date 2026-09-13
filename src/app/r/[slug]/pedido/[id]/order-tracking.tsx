@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
-  Bike, CheckCircle2, ChefHat, Clock, Loader2, PackageCheck, Store, UtensilsCrossed, XCircle,
+  Bike, CheckCircle2, ChefHat, Clock, Loader2, PackageCheck, Star, Store, UtensilsCrossed, XCircle,
 } from "lucide-react"
 import { formatMoney, modifiersSummary } from "@/lib/foodos"
 import type { FoodosOrderItem, FoodosOrderStatus } from "@/types/foodos"
@@ -163,8 +163,7 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
         )}
 
         <div className="bg-white border border-stone-200 rounded-3xl p-6">
-          <h2 className="font-bold text-stone-900 mb-3">Tu pedido</h2>
-          <div className="space-y-2">
+          <h2 className="font-bold text-stone-900 mb-3">Tu pedido</h2>          <div className="space-y-2">
             {data.items.map((item, idx) => (
               <div key={idx} className="flex items-start justify-between gap-3 text-sm">
                 <div className="min-w-0">
@@ -188,6 +187,8 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
           )}
         </div>
 
+        {data.status === "delivered" && <ReviewForm orderId={orderId} />}
+
         <Link
           href={`/r/${slug}`}
           className="block text-center text-sm font-semibold text-emerald-700 hover:text-emerald-600"
@@ -195,6 +196,86 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
           ← Volver al menú
         </Link>
       </div>
+    </div>
+  )
+}
+
+/** Reseña post-entrega (una por pedido; el API lo valida). */
+function ReviewForm({ orderId }: { orderId: string }) {
+  const [rating, setRating] = useState(0)
+  const [comment, setComment] = useState("")
+  const [name, setName] = useState("")
+  const [sending, setSending] = useState(false)
+  const [done, setDone] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  if (done) {
+    return (
+      <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 text-center">
+        <p className="font-bold text-emerald-800">¡Gracias por tu reseña! ⭐</p>
+      </div>
+    )
+  }
+
+  const submit = async () => {
+    if (rating === 0) return
+    setSending(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/foodos/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: orderId, rating, comment, customer_name: name }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? "No se pudo enviar")
+        return
+      }
+      setDone(true)
+    } catch {
+      setError("Error de conexión")
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-3xl p-6">
+      <h2 className="font-bold text-stone-900 mb-2">¿Cómo estuvo tu pedido?</h2>
+      <div className="flex gap-1 mb-3">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            onClick={() => setRating(n)}
+            className="p-1"
+            aria-label={`${n} estrellas`}
+          >
+            <Star className={`w-7 h-7 ${n <= rating ? "text-amber-400 fill-amber-400" : "text-stone-300"}`} />
+          </button>
+        ))}
+      </div>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Tu nombre (opcional)"
+        className="w-full px-4 py-2.5 mb-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+      />
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="Cuéntanos más (opcional)"
+        rows={2}
+        className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+      />
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      <button
+        onClick={submit}
+        disabled={rating === 0 || sending}
+        className="mt-3 w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"
+      >
+        {sending ? "Enviando…" : "Enviar reseña"}
+      </button>
     </div>
   )
 }

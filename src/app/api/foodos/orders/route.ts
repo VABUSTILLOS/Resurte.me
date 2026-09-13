@@ -41,6 +41,8 @@ interface FoodosOrderBody {
   table_number?: string | null
   coupon_code?: string | null
   tip?: number
+  redeem_points?: boolean
+  use_credit?: boolean
 }
 
 /**
@@ -314,10 +316,50 @@ export async function POST(request: NextRequest) {
     }
 
     const serverTip = Math.min(Math.max(Number(body.tip) || 0, 0), baseTotals.subtotal)
+
+    // Lealtad: canje de puntos y store credit (server-side contra el CRM).
+    let loyaltyDiscount = 0
+    let redeemedPoints = 0
+    let usedCredit = 0
+    let loyaltyCustomerId: string | null = null
+    if ((body.redeem_points || body.use_credit) && customer_phone) {
+      const phone = customer_phone.replace(/\D/g, "")
+      const [programRes, customerRes] = await Promise.all([
+        supabase
+          .from("foodos_loyalty_programs")
+          .select("points_per_100, point_value, is_active")
+          .eq("restaurant_id", restaurant_id)
+          .eq("is_active", true)
+          .maybeSingle(),
+        supabase
+          .from("foodos_customers")
+          .select("id, loyalty_points, store_credit")
+          .eq("restaurant_id", restaurant_id)
+          .eq("phone", phone)
+          .maybeSingle(),
+      ])
+      const program = programRes.data
+      const customer = customerRes.data
+      if (program && customer) {
+        loyaltyCustomerId = customer.id
+        const afterCoupon = baseTotals.subtotal - couponDiscountValue
+        if (body.redeem_points && customer.loyalty_points > 0) {
+          const maxPointsValue = customer.loyalty_points * Number(program.point_value)
+          const applied = Math.min(maxPointsValue, afterCoupon)
+          redeemedPoints = Math.ceil(applied / Number(program.point_value))
+          loyaltyDiscount += redeemedPoints * Number(program.point_value)
+        }
+        if (body.use_credit && Number(customer.store_credit) > 0) {
+          usedCredit = Math.min(Number(customer.store_credit), afterCoupon - loyaltyDiscount)
+          loyaltyDiscount += usedCredit
+        }
+      }
+    }
+
     const { subtotal, discount: cappedDiscount, tip: cappedTip, total } = computeOrderTotals(
       cleanItems,
       serverDeliveryFee,
-      couponDiscountValue,
+      couponDiscountValue + loyaltyDiscount,
       serverTip
     )
 
@@ -330,6 +372,7 @@ export async function POST(request: NextRequest) {
       delivery_fee: serverDeliveryFee,
       tip: cappedTip,
       coupon_code: couponCode,
+      loyalty_points_redeemed: redeemedPoints,
       total,
       channel,
       fulfillment,
@@ -363,6 +406,24 @@ export async function POST(request: NextRequest) {
         p_restaurant_id: restaurant_id,
         p_code: couponCode,
       })
+    }
+
+    // Descontar puntos/crédito canjeados del balance del cliente.
+    if (loyaltyCustomerId && (redeemedPoints > 0 || usedCredit > 0)) {
+      const { data: cust } = await supabase
+        .from("foodos_customers")
+        .select("loyalty_points, store_credit")
+        .eq("id", loyaltyCustomerId)
+        .single()
+      if (cust) {
+        await supabase
+          .from("foodos_customers")
+          .update({
+            loyalty_points: Math.max(0, cust.loyalty_points - redeemedPoints),
+            store_credit: Math.max(0, Number(cust.store_credit) - usedCredit),
+          })
+          .eq("id", loyaltyCustomerId)
+      }
     }
 
     // El PaymentIntent de Stripe para tarjeta lo crea el storefront llamando a

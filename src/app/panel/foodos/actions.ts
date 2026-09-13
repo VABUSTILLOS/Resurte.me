@@ -31,6 +31,8 @@ import type {
   FoodosBranchHours,
   FoodosCoupon,
   FoodosBranchMenuOverride,
+  FoodosLoyaltyProgram,
+  FoodosReview,
 } from "@/types/foodos"
 
 // ------------------------------------------------------------
@@ -1020,4 +1022,90 @@ export async function markOrderPaid(orderId: string): Promise<void> {
     .eq("id", orderId)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/pedidos")
+}
+
+// ------------------------------------------------------------
+// Programa de lealtad + store credit
+// ------------------------------------------------------------
+
+export async function getLoyaltyProgram(
+  restaurantId: string
+): Promise<FoodosLoyaltyProgram | null> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_loyalty_programs")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as FoodosLoyaltyProgram | null) ?? null
+}
+
+export async function upsertLoyaltyProgram(input: {
+  restaurant_id: string
+  points_per_100: number
+  point_value: number
+  is_active: boolean
+}): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_loyalty_programs")
+    .upsert(
+      {
+        restaurant_id: input.restaurant_id,
+        points_per_100: Math.max(0, Number(input.points_per_100) || 0),
+        point_value: Math.max(0, Number(input.point_value) || 0),
+        is_active: input.is_active,
+      },
+      { onConflict: "restaurant_id" }
+    )
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/clientes")
+}
+
+/** Ajuste manual de store credit (ej. compensación por mala experiencia). */
+export async function adjustCustomerCredit(
+  customerId: string,
+  amount: number
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { data: customer, error: readErr } = await supabase
+    .from("foodos_customers")
+    .select("store_credit")
+    .eq("id", customerId)
+    .single()
+  if (readErr) throw new Error(readErr.message)
+  const next = Math.max(0, Number(customer.store_credit) + amount)
+  const { error } = await supabase
+    .from("foodos_customers")
+    .update({ store_credit: next })
+    .eq("id", customerId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/clientes")
+}
+
+// ------------------------------------------------------------
+// Reseñas (moderación)
+// ------------------------------------------------------------
+
+export async function listReviews(restaurantId: string): Promise<FoodosReview[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_reviews")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("created_at", { ascending: false })
+    .limit(50)
+  if (error) throw new Error(error.message)
+  return (data as FoodosReview[]) ?? []
+}
+
+export async function setReviewVisibility(id: string, isVisible: boolean): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_reviews")
+    .update({ is_visible: isVisible })
+    .eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/clientes")
 }
