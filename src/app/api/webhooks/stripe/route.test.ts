@@ -43,7 +43,7 @@ interface TableResult {
  */
 function tableBuilder(result: TableResult = { data: null, error: null }) {
   const builder: Record<string, unknown> = {}
-  for (const method of ["select", "eq", "in", "update", "order", "limit"]) {
+  for (const method of ["select", "eq", "in", "is", "not", "update", "order", "limit"]) {
     builder[method] = vi.fn().mockReturnValue(builder)
   }
   builder.insert = vi.fn().mockResolvedValue({ data: null, error: null })
@@ -374,6 +374,35 @@ describe("/api/webhooks/stripe", () => {
     expect(res.status).toBe(200)
     expect(foodos.update).toHaveBeenCalledWith(
       expect.objectContaining({ payment_status: "expired" })
+    )
+  })
+
+  it("account.updated refleja el estado de Connect en foodos_restaurants", async () => {
+    const restaurants = tableBuilder()
+    const from = mockSupabase({ foodos_restaurants: restaurants })
+    constructEvent.mockReturnValue(
+      stripeEvent("account.updated", {
+        id: "acct_1",
+        charges_enabled: true,
+        payouts_enabled: true,
+        details_submitted: true,
+        requirements: { currently_due: [], disabled_reason: null },
+      })
+    )
+
+    const res = await POST(webhookReq())
+
+    expect(res.status).toBe(200)
+    expect(from).toHaveBeenCalledWith("foodos_restaurants")
+    // Empareja por cuenta de Stripe: el evento no trae id de restaurante.
+    expect(restaurants.eq).toHaveBeenCalledWith("stripe_account_id", "acct_1")
+    expect(restaurants.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stripe_charges_enabled: true,
+        stripe_payouts_enabled: true,
+        stripe_details_submitted: true,
+        stripe_requirements_due: [],
+      })
     )
   })
 

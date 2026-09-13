@@ -104,6 +104,8 @@ Si el proyecto Vercel está en plan **Hobby**, el límite es **2 crons** — añ
 | `SERVICE_ROLE_KEY` | Sí | Server actions + endpoints con `createServiceClient` | **Nunca** exponer al browser. |
 | `STRIPE_SECRET_KEY` | Sí | Crear intents, confirmar pagos | `sk_live_...` en producción. |
 | `STRIPE_WEBHOOK_SECRET` | Sí | Validar webhooks Stripe | `whsec_...`. |
+| `STRIPE_CONNECT_ENABLED` | No | Enruta los cargos de tarjeta de FoodOS a la cuenta Connect del restaurante | `true` / `1`. **Por defecto apagado.** Requiere activar Connect antes en el Dashboard de Stripe (ver §11). |
+| `STRIPE_CONNECT_COUNTRY` | No | País de las cuentas Express | ISO-2, por defecto `MX`. |
 | `ADMIN_API_SECRET` | Sí | Endpoints admin (`x-admin-secret` header) | Sin fallback hardcodeado desde Fase 1. |
 
 ### Rotación de `CRON_SECRET`
@@ -433,12 +435,104 @@ En el SQL Editor de Supabase, en este orden:
 1. `00082_foodos_payment_proofs.sql` — sin ella subir un comprobante falla.
 2. `00083_foodos_order_notifications.sql` — sin ella los avisos se envían pero sin dedupe.
 3. `00084_foodos_orders_updated_at.sql` — sin ella nada se rompe, pero el timestamp queda congelado.
+4. `00085_stripe_connect.sql` — sin ella el panel de cobros falla al leer `stripe_*`.
+
+---
+
+## 11. Cobros con Stripe Connect Express
+
+Hasta `00085`, **todo** el dinero de FoodOS entraba a la cuenta Stripe de
+Resurte.me y había que dispersarlo a mano a cada restaurante: la plataforma
+custodiaba fondos de terceros. Con Connect cada restaurante tiene su propia
+cuenta Express y el cargo se hace como *destination charge*: Stripe liquida al
+restaurante y la plataforma nunca toca el dinero.
+
+### Interruptor de plataforma
+
+| Variable | Valores | Efecto |
+| --- | --- | --- |
+| `STRIPE_CONNECT_ENABLED` | `true` / `1` (cualquier otra cosa = apagado) | Enruta los cargos de tarjeta a la cuenta conectada del restaurante. **Por defecto apagado.** |
+| `STRIPE_CONNECT_COUNTRY` | ISO-2, por defecto `MX` | País de las cuentas Express. |
+
+`STRIPE_CONNECT_ENABLED` está apagado a propósito: Connect **debe activarse
+antes en el Dashboard de Stripe** (Settings → Connect). Si se enciende sin
+activarlo, los cargos fallan. Como el enrutamiento se decide en runtime, el
+operador puede apagarlo y volver al cobro contra la plataforma **sin desplegar
+código**.
+
+Con el interruptor apagado el comportamiento es idéntico al anterior: la cuenta
+conectada se sigue registrando y verificando, pero los cargos van a la
+plataforma.
+
+### Rollout restaurante por restaurante
+
+El enrutamiento no depende sólo del interruptor, sino de que la cuenta esté
+**cobrable**. `buildDestinationChargeParams()` devuelve `{}` —y el cargo se crea
+contra la plataforma— cuando:
+
+- el interruptor está apagado, o
+- el restaurante no tiene `stripe_account_id`, o
+- `stripe_charges_enabled` / `stripe_payouts_enabled` están en `false`, o
+- Stripe reporta `requirements.disabled_reason`.
+
+Por eso se puede encender el interruptor con restaurantes a medio verificar: los
+que ya están listos cobran directo a su banco y el resto sigue igual. El panel
+(`/panel/foodos/restaurante`, sección "Cobros en línea") avisa cuando un
+restaurante todavía está cobrando a la cuenta de la plataforma.
+
+### Comisión de la plataforma
+
+`foodos_restaurants.platform_fee_percent` (0–100, por defecto **0** = paridad
+con Take App). `computeApplicationFee()` calcula la comisión en centavos y
+devuelve `0` —omitiendo `application_fee_amount`— cuando el resultado sería `0`
+o `≥ total`, porque Stripe rechaza valores fuera de `0 < fee < amount` y una
+comisión del 100 % dejaría al restaurante sin nada.
+
+### Ciclo de vida
+
+1. El dueño entra a `/panel/foodos/restaurante` → "Conectar mis cobros".
+2. `startConnectOnboarding()` crea la cuenta Express (`accounts.create`) si no
+   existe, guarda `stripe_account_id` y devuelve un `account_onboarding` link.
+3. El dueño captura identidad y datos bancarios en el formulario de Stripe.
+4. Stripe regresa a `?connect=done` (o `?connect=refresh` si el link caducó); la
+   tarjeta limpia el parámetro y relee el estado contra Stripe.
+5. En paralelo, el webhook `account.updated` llama a
+   `handleConnectAccountUpdated()` → `syncConnectAccount()`, que escribe los
+   flags y sella `stripe_onboarded_at` una sola vez.
+6. Con `charges_enabled && payouts_enabled` la cuenta es cobrable y los
+   siguientes cargos van con `transfer_data.destination`.
+
+### ⚠️ Seguridad: las columnas `stripe_*` son de sólo lectura para el dueño
+
+La política RLS de `foodos_restaurants` ("Owner manages restaurants") es **a
+nivel de fila**, no de columna: sin nada más, un dueño podría hacer
+`update foodos_restaurants set stripe_account_id = '<cuenta de un tercero>'` y
+desviar los pagos de sus propios comensales a esa cuenta.
+
+Por eso `00085` hace un **`REVOKE UPDATE` a nivel de columna** de las 7 columnas
+`stripe_*` + `platform_fee_percent` sobre `authenticated` y `anon`. Las
+escrituras legítimas pasan por `createServiceClient()` en
+`src/lib/stripe-connect.ts`, `src/app/panel/foodos/connect-actions.ts` y
+`src/lib/payments.ts`. **No agregar estas columnas a `upsertRestaurant()` ni a
+ningún payload construido desde el cliente.**
+
+### Notas de implementación
+
+- **Los destination charges no cambian el webhook.** Un destination charge sigue
+  siendo un PaymentIntent normal sobre la cuenta de la plataforma, así que
+  `payment_intent.succeeded` llega con `metadata.foodos_order_id` intacto y los
+  handlers de §9/§10 funcionan igual.
+- **No escribir `updated_at` en `foodos_orders`** (ver el incidente de §10).
+- `application_fee_amount` y `connected_account_id` se persisten en
+  `foodos_orders` **sólo** cuando el cargo realmente se enrutó, para no dejar
+  registros de una comisión que nunca se cobró.
 
 ---
 
 ## Referencias
 
 - `vercel.json` (crons + headers de seguridad), `src/app/api/cron/*`, `src/app/api/workflows/*`, `src/app/api/foodos/campaigns/run`.
-- Migraciones: `supabase/migrations/00039_rate_limits.sql`, `00042_cleanup_guest_addresses.sql`, `00043_pg_cron_cleanup_guest_addresses.sql`, `00044_pg_cron_purge_rate_limits.sql`, `00055_panel_entries.sql`, `00056_panel_entries_realtime.sql`, `00057_panel_rows.sql`, `00058_panel_members.sql`, `00082_foodos_payment_proofs.sql`, `00083_foodos_order_notifications.sql`, `00084_foodos_orders_updated_at.sql`.
+- Migraciones: `supabase/migrations/00039_rate_limits.sql`, `00042_cleanup_guest_addresses.sql`, `00043_pg_cron_cleanup_guest_addresses.sql`, `00044_pg_cron_purge_rate_limits.sql`, `00055_panel_entries.sql`, `00056_panel_entries_realtime.sql`, `00057_panel_rows.sql`, `00058_panel_members.sql`, `00082_foodos_payment_proofs.sql`, `00083_foodos_order_notifications.sql`, `00084_foodos_orders_updated_at.sql`, `00085_stripe_connect.sql`.
 - Pagos FoodOS: `src/lib/payments.ts` (creación del PI), `src/lib/stripe-webhook-handlers.ts` (transiciones de estado), `src/lib/reconcile-payments.ts` (caducidad de vouchers), `src/lib/foodos-notifications.ts` (avisos al comensal), `src/lib/foodos-payment-reminders.ts` (recordatorios y cancelación).
+- Cobros Connect: `src/lib/stripe-connect.ts` (cuentas Express, destination charges, sincronización), `src/app/panel/foodos/connect-actions.ts` (server actions), `src/app/panel/foodos/restaurante/_components/connect-payments-card.tsx` (UI).
 - Relacionado: `docs/MOCKS.md` (contrato de fallback), `REPORTE.md`, `supabase/ESQUEMA.md`.

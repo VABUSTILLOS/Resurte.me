@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 import { BranchHoursModal } from "./_components/branch-hours-modal"
 import { WebhooksCard } from "./_components/webhooks-card"
+import { ConnectPaymentsCard } from "./_components/connect-payments-card"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
 
@@ -490,6 +491,8 @@ export default function RestaurantePage() {
         </div>
       </div>
 
+      {/* Cobros en línea (Stripe Connect Express) */}
+      {restaurant && <ConnectPaymentsCard restaurantId={restaurant.id} />}
 
       {/* Sucursales */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">

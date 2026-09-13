@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest"
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest"
 
 vi.mock("@/lib/stripe", () => ({ getStripe: vi.fn() }))
 vi.mock("@/lib/supabase/service", () => ({
@@ -13,18 +13,29 @@ import { createServiceClient } from "@/lib/supabase/service"
 function makeSupabase(opts: {
   order?: Record<string, unknown> | null
   foodosOrder?: Record<string, unknown> | null
+  restaurant?: Record<string, unknown> | null
   guestAddresses?: number[]
   addressGuestToken?: string | null
 } = {}) {
   const {
     order = { id: 42, user_id: "u1", payment_method: "card", payment_status: "pending", total: 150, address_id: 7, customer_email: "buyer@example.com" },
     foodosOrder = null,
+    restaurant = null,
     guestAddresses = [],
     addressGuestToken = null,
   } = opts
 
-  return {
-    from: vi.fn().mockImplementation((table: string) => {
+  // Mocks expuestos para poder asertar qué se persistió en foodos_orders.
+  const foodosOrderUpdate = vi.fn().mockReturnValue({
+    eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+  })
+  const restaurantSelect = vi.fn().mockReturnValue({
+    eq: vi.fn().mockReturnValue({
+      maybeSingle: vi.fn().mockResolvedValue({ data: restaurant, error: null }),
+    }),
+  })
+
+  const from = vi.fn().mockImplementation((table: string) => {
       if (table === "orders") {
         const eqForMaybeSingle = vi.fn().mockReturnValue({
           maybeSingle: vi.fn().mockResolvedValue({ data: order, error: null }),
@@ -73,12 +84,15 @@ function makeSupabase(opts: {
         const eq = vi.fn().mockReturnValue({
           maybeSingle: vi.fn().mockResolvedValue({ data: foodosOrder, error: null }),
         })
-        const update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) })
-        return { select: vi.fn().mockReturnValue({ eq }), update }
+        return { select: vi.fn().mockReturnValue({ eq }), update: foodosOrderUpdate }
+      }
+      if (table === "foodos_restaurants") {
+        return { select: restaurantSelect }
       }
       return { select: vi.fn().mockResolvedValue({ data: null, error: null }) }
-    }),
-  }
+  })
+
+  return { from, foodosOrderUpdate, restaurantSelect }
 }
 
 describe("createPaymentIntentForOrder — guardado de método de pago", () => {
@@ -184,5 +198,115 @@ describe("createPaymentIntentForOrder — guardado de método de pago", () => {
     await expect(
       createPaymentIntentForOrder({ type: "main", orderId: 42, userId: "u1" })
     ).rejects.toThrow("pago con tarjeta")
+  })
+})
+
+describe("createPaymentIntentForOrder — destination charges de Connect", () => {
+  const stripe = {
+    paymentIntents: { create: vi.fn() },
+    customers: { create: vi.fn() },
+  }
+
+  const verifiedRestaurant = {
+    stripe_account_id: "acct_r1",
+    stripe_charges_enabled: true,
+    stripe_payouts_enabled: true,
+    stripe_details_submitted: true,
+    stripe_requirements_due: [],
+    stripe_onboarded_at: "2026-01-01T00:00:00.000Z",
+    platform_fee_percent: 2,
+  }
+
+  function foodosOrder() {
+    return {
+      id: 9,
+      payment_method: "card",
+      payment_status: "pending",
+      total: 80,
+      restaurant_id: "r1",
+    }
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    delete process.env.STRIPE_CONNECT_ENABLED
+    vi.mocked(getStripe).mockReturnValue(stripe as never)
+    stripe.paymentIntents.create.mockResolvedValue({
+      id: "pi_123",
+      client_secret: "secret_123",
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  async function create(restaurant: Record<string, unknown> | null) {
+    const sb = makeSupabase({ foodosOrder: foodosOrder(), restaurant })
+    vi.mocked(createServiceClient).mockResolvedValue(sb as never)
+    await createPaymentIntentForOrder({ type: "foodos", orderId: 9 })
+    return sb
+  }
+
+  it("sin Connect encendido el cargo va a la plataforma y no se lee el restaurante", async () => {
+    const sb = await create(verifiedRestaurant)
+
+    const intent = stripe.paymentIntents.create.mock.calls[0]?.[0]
+    expect(intent.transfer_data).toBeUndefined()
+    expect(intent.application_fee_amount).toBeUndefined()
+    expect(sb.restaurantSelect).not.toHaveBeenCalled()
+    expect(sb.foodosOrderUpdate).toHaveBeenCalledWith({
+      stripe_payment_intent_id: "pi_123",
+    })
+  })
+
+  it("con Connect enrutado persiste el destino y la comisión", async () => {
+    vi.stubEnv("STRIPE_CONNECT_ENABLED", "true")
+    const sb = await create(verifiedRestaurant)
+
+    const intent = stripe.paymentIntents.create.mock.calls[0]?.[0]
+    expect(intent.transfer_data).toEqual({ destination: "acct_r1" })
+    expect(intent.application_fee_amount).toBe(160) // 2 % de $80.00
+    expect(intent.metadata).toEqual({
+      foodos_order_id: "9",
+      restaurant_id: "r1",
+      source: "resurte.me-foodos",
+    })
+    expect(sb.foodosOrderUpdate).toHaveBeenCalledWith({
+      stripe_payment_intent_id: "pi_123",
+      application_fee_amount: 160,
+      connected_account_id: "acct_r1",
+    })
+  })
+
+  it("un restaurante sin verificar sigue cobrando contra la plataforma", async () => {
+    vi.stubEnv("STRIPE_CONNECT_ENABLED", "true")
+    const sb = await create({
+      ...verifiedRestaurant,
+      stripe_payouts_enabled: false,
+    })
+
+    const intent = stripe.paymentIntents.create.mock.calls[0]?.[0]
+    expect(intent.transfer_data).toBeUndefined()
+    // Sin enrutamiento no se ensucian las columnas de conciliación.
+    expect(sb.foodosOrderUpdate).toHaveBeenCalledWith({
+      stripe_payment_intent_id: "pi_123",
+    })
+  })
+
+  it("un restaurante sin cuenta Express no enruta fondos", async () => {
+    vi.stubEnv("STRIPE_CONNECT_ENABLED", "true")
+    const sb = await create({
+      ...verifiedRestaurant,
+      stripe_account_id: null,
+      stripe_charges_enabled: false,
+      stripe_payouts_enabled: false,
+    })
+
+    const intent = stripe.paymentIntents.create.mock.calls[0]?.[0]
+    expect(intent.transfer_data).toBeUndefined()
+    expect(sb.foodosOrderUpdate).toHaveBeenCalledWith({
+      stripe_payment_intent_id: "pi_123",
+    })
   })
 })

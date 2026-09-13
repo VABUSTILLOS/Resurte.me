@@ -11,6 +11,7 @@ import {
   type StripePaymentIntentLike,
 } from "@/lib/stripe-webhook-handlers"
 import { logger } from "@/lib/logger"
+import { handleConnectAccountUpdated } from "@/lib/stripe-connect"
 /**
  * POST /api/webhooks/stripe
  *
@@ -94,6 +95,19 @@ export async function POST(request: NextRequest) {
       case "payment_intent.requires_action": {
         const supabase = await createServiceClient()
         await handlePaymentIntentProcessing(
+          supabase,
+          event.data.object as { id: string }
+        )
+        break
+      }
+
+      // Connect: Stripe avisa cada vez que cambia el estado de verificación
+      // de una cuenta Express (requisitos pendientes, habilitada, bloqueada).
+      // Es la fuente de verdad del enrutamiento de fondos: el restaurante no
+      // necesita volver al panel para que su cuenta quede habilitada.
+      case "account.updated": {
+        const supabase = await createServiceClient()
+        await handleConnectAccountUpdated(
           supabase,
           event.data.object as { id: string }
         )
