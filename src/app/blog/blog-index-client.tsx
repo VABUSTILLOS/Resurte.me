@@ -14,6 +14,7 @@ import { searchPosts } from "@/lib/blog-search"
 import { BLOG_CATEGORIES, BLOG_CONTENT_TYPES, getContentType } from "@/lib/blog-categories"
 import { BlogCard } from "@/components/blog/blog-card"
 import { FeaturedBlogCard } from "@/components/blog/featured-blog-card"
+import { useEscapeKey } from "@/hooks/use-escape-key"
 
 interface BlogIndexClientProps {
   posts: BlogPostMeta[]
@@ -84,8 +85,10 @@ export function BlogIndexClient({
   const [sortBy, setSortBy] = useState<SortKey>("date-desc")
   const [sortOpen, setSortOpen] = useState(false)
   const sortRef = useRef<HTMLDivElement>(null)
+  const resultsRef = useRef<HTMLDivElement>(null)
 
-  // Cierra el menú de orden al hacer clic fuera.
+  // Cierra el menú de orden al hacer clic fuera o con Escape.
+  useEscapeKey(() => setSortOpen(false), sortOpen)
   useEffect(() => {
     if (!sortOpen) return
     const onPointerDown = (e: PointerEvent) => {
@@ -128,6 +131,24 @@ export function BlogIndexClient({
     setSortBy(key)
     setSortOpen(false)
     setCurrentPage(1)
+  }
+
+  // Limpia búsqueda + categoría + tipo de una vez (recuperación rápida
+  // cuando un filtro combinado deja la vista vacía).
+  const hasActiveFilters =
+    query.trim() !== "" || activeCategory !== "all" || activeContentType !== "all"
+  const clearFilters = () => {
+    setQuery("")
+    setActiveCategory("all")
+    setActiveContentType("all")
+    setCurrentPage(1)
+  }
+
+  // Al cambiar de página, sube el scroll al inicio de los resultados (si no,
+  // en móvil el usuario queda viendo el pie de la página anterior).
+  const goToPage = (page: number) => {
+    setCurrentPage(page)
+    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
   const filtered = useMemo(() => {
@@ -180,6 +201,7 @@ export function BlogIndexClient({
             onChange={(e) => handleQueryChange(e.target.value)}
             placeholder="Buscar guías, herramientas, costos…"
             aria-label="Buscar en el blog"
+            enterKeyHint="search"
             className="w-full rounded-full border border-warm-200 bg-white py-3 pl-12 pr-10 text-sm text-warm-900 shadow-sm outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
           />
           {query && (
@@ -194,6 +216,13 @@ export function BlogIndexClient({
           )}
         </div>
       </div>
+
+      {/* Anuncio de resultados para lectores de pantalla */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {filtered.length === 0
+          ? "Sin resultados"
+          : `${filtered.length} ${filtered.length === 1 ? "artículo encontrado" : "artículos encontrados"}`}
+      </p>
 
       {/* Chips de categorías */}
       <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -214,8 +243,8 @@ export function BlogIndexClient({
               <span aria-hidden="true">{chip.emoji}</span>
               {chip.label}
             </button>
-          )
-        })}
+          )}
+        )}
       </div>
 
       {/* Chips de tipo de contenido */}
@@ -244,12 +273,12 @@ export function BlogIndexClient({
               <span aria-hidden="true">{chip.emoji}</span>
               {chip.label}
             </button>
-          )
-        })}
+          )}
+        )}
       </div>
 
       {/* Artículos destacados */}
-      {showFeatured && featured[0] && (
+      {showFeatured && (
         <div className="mt-14">
           <div className="flex items-center gap-3">
             <span className="h-8 w-1.5 rounded-full bg-brand-500" aria-hidden="true" />
@@ -264,7 +293,7 @@ export function BlogIndexClient({
           </div>
           <div className="mt-6 flex flex-col gap-6">
             <FeaturedBlogCard
-              post={featured[0]}
+              post={featured[0]!}
               size="large"
               priority
             />
@@ -278,7 +307,7 @@ export function BlogIndexClient({
       )}
 
       {/* Todos los artículos */}
-      <div className="mt-14 flex flex-wrap items-end justify-between gap-3">
+      <div ref={resultsRef} className="mt-14 flex flex-wrap items-end justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="h-8 w-1.5 rounded-full bg-brand-500" aria-hidden="true" />
           <div>
@@ -289,6 +318,16 @@ export function BlogIndexClient({
               {filtered.length} {filtered.length === 1 ? "artículo" : "artículos"}
             </p>
           </div>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-200 transition-colors"
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
+              Limpiar filtros
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -378,6 +417,16 @@ export function BlogIndexClient({
               ? `No hay artículos de tipo «${activeContentTypeInfo.label}». Prueba con otra palabra o explora todas las categorías.`
               : "Prueba con otra palabra o explora todas las categorías."}
           </p>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 transition-colors"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+              Limpiar filtros y ver todo
+            </button>
+          )}
         </div>
       )}
 
@@ -389,20 +438,22 @@ export function BlogIndexClient({
         >
           <button
             type="button"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            onClick={() => goToPage(Math.max(1, safePage - 1))}
             disabled={safePage <= 1}
+            aria-label={`Ir a la página ${Math.max(1, safePage - 1)}`}
             className="inline-flex items-center gap-1.5 rounded-full border border-warm-200 bg-white px-5 py-2.5 text-sm font-semibold text-warm-700 shadow-sm transition-colors hover:border-brand-400 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-warm-200 disabled:hover:text-warm-700"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
             Anterior
           </button>
-          <span className="text-sm font-medium text-[var(--text-secondary)]">
+          <span className="text-sm font-medium text-[var(--text-secondary)]" aria-current="page">
             {safePage} / {totalPages}
           </span>
           <button
             type="button"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => goToPage(Math.min(totalPages, safePage + 1))}
             disabled={safePage >= totalPages}
+            aria-label={`Ir a la página ${Math.min(totalPages, safePage + 1)}`}
             className="inline-flex items-center gap-1.5 rounded-full border border-warm-200 bg-white px-5 py-2.5 text-sm font-semibold text-warm-700 shadow-sm transition-colors hover:border-brand-400 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-warm-200 disabled:hover:text-warm-700"
           >
             Siguiente

@@ -10,7 +10,11 @@ export const metadata: Metadata = {
   title: "Blog de Resurte.me — Recursos para Restaurantes",
   description:
     "Aprende a costear tu menú, reducir mermas, comprar por mayoreo y hacer crecer tu restaurante. Guías prácticas para dueños de restaurantes en México.",
-  alternates: { canonical: "https://resurte.me/blog" },
+  alternates: {
+    canonical: "https://resurte.me/blog",
+    // Descubrimiento del feed RSS/Atom para lectores y crawlers.
+    types: { "application/rss+xml": "https://resurte.me/rss.xml" },
+  },
   openGraph: {
     title: "Blog de Resurte.me — Recursos para Restaurantes",
     description:
