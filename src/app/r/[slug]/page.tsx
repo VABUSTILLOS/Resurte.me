@@ -56,6 +56,9 @@ export default async function StorefrontPage({ params }: PageProps) {
       items={itemsAvailable}
       combos={combosActive}
       rules={data.rules.filter((r) => r.is_active)}
+      optionGroups={data.optionGroups}
+      optionValues={data.optionValues}
+      branchHours={data.branchHours}
     />
   )
 }

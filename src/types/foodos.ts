@@ -16,6 +16,7 @@ export interface FoodosRestaurant {
   collection_id: number | null
   status: FoodosRestaurantStatus
   currency: string
+  timezone: string
   created_at: string
   updated_at: string
 }
@@ -31,8 +32,46 @@ export interface FoodosBranch {
   phone: string | null
   pickup_active: boolean
   delivery_active: boolean
+  dine_in_active: boolean
   delivery_fee: number
   min_order: number
+  created_at: string
+}
+
+// --- Horarios de operación ---
+
+export interface FoodosBranchHours {
+  id: string
+  branch_id: string
+  day_of_week: number // 0=domingo … 6=sábado
+  open_time: string | null  // "HH:MM:SS"
+  close_time: string | null
+  is_closed: boolean
+  created_at: string
+}
+
+// --- Modificadores de platillos (paridad take.app) ---
+
+export interface FoodosItemOptionGroup {
+  id: string
+  restaurant_id: string
+  item_id: string
+  name: string
+  is_required: boolean
+  min_select: number
+  max_select: number
+  sort_order: number
+  created_at: string
+}
+
+export interface FoodosItemOptionValue {
+  id: string
+  group_id: string
+  restaurant_id: string
+  name: string
+  price_delta: number
+  is_available: boolean
+  sort_order: number
   created_at: string
 }
 
@@ -115,12 +154,23 @@ export type FoodosOrderChannel = "web" | "qr" | "whatsapp"
 export type FoodosFulfillment = "delivery" | "pickup" | "dine_in"
 export type FoodosPaymentStatus = "pending" | "paid" | "failed" | "refunded"
 
+/** Modificador elegido en una línea de pedido (snapshot con precio server-side). */
+export interface FoodosOrderItemModifier {
+  group_id: string
+  group_name: string
+  value_id: string
+  value_name: string
+  price_delta: number
+}
+
 export interface FoodosOrderItem {
   item_id: string
   name: string
+  /** Precio unitario final (base + modificadores), calculado en servidor. */
   price: number
   qty: number
   combo_id?: string | null
+  modifiers?: FoodosOrderItemModifier[]
 }
 
 export interface FoodosOrder {
@@ -143,6 +193,7 @@ export interface FoodosOrder {
   customer_name: string | null
   customer_phone: string | null
   note: string | null
+  table_number: string | null
   created_at: string
 }
 

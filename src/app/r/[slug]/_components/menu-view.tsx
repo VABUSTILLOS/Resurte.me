@@ -16,6 +16,7 @@ export function MenuView({
   onAddCombo,
   cartCount,
   onGoToCart,
+  itemHasOptions,
 }: {
   categories: FoodosMenuCategory[]
   items: FoodosMenuItem[]
@@ -26,6 +27,7 @@ export function MenuView({
   onAddCombo: (combo: FoodosCombo) => void
   cartCount: number
   onGoToCart: () => void
+  itemHasOptions: (itemId: string) => boolean
 }) {
   const featured = items.filter((i) => i.is_featured)
   const visibleCategories = selectedCategory
@@ -63,7 +65,7 @@ export function MenuView({
           <h2 className="text-lg font-black text-stone-900 mb-3">🔥 Favoritos</h2>
           <div className="grid gap-3">
             {featured.map((item) => (
-              <ItemCard key={item.id} item={item} onAdd={() => onAddItem(item)} />
+              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} onAdd={() => onAddItem(item)} />
             ))}
           </div>
         </section>
@@ -133,7 +135,7 @@ export function MenuView({
             {items
               .filter((i) => i.category_id === cat.id)
               .map((item) => (
-                <ItemCard key={item.id} item={item} onAdd={() => onAddItem(item)} />
+                <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} onAdd={() => onAddItem(item)} />
               ))}
           </div>
         </section>
@@ -144,7 +146,7 @@ export function MenuView({
           <h2 className="text-lg font-black text-stone-900 mb-3">Platillos</h2>
           <div className="grid gap-3">
             {uncategorized.map((item) => (
-              <ItemCard key={item.id} item={item} onAdd={() => onAddItem(item)} />
+              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} onAdd={() => onAddItem(item)} />
             ))}
           </div>
         </section>
@@ -167,7 +169,7 @@ export function MenuView({
   )
 }
 
-function ItemCard({ item, onAdd }: { item: FoodosMenuItem; onAdd: () => void }) {
+function ItemCard({ item, hasOptions, onAdd }: { item: FoodosMenuItem; hasOptions: boolean; onAdd: () => void }) {
   return (
     <div className="flex items-center justify-between gap-3 bg-white border border-stone-200 rounded-2xl p-4">
       <div className="min-w-0 flex-1">
@@ -184,7 +186,10 @@ function ItemCard({ item, onAdd }: { item: FoodosMenuItem; onAdd: () => void }) 
         {item.description && (
           <p className="text-sm text-stone-500 line-clamp-2">{item.description}</p>
         )}
-        <p className="text-sm font-bold text-stone-900 mt-1">{formatMoney(item.price)}</p>
+        <p className="text-sm font-bold text-stone-900 mt-1">
+          {formatMoney(item.price)}
+          {hasOptions && <span className="ml-2 text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Personalizable</span>}
+        </p>
       </div>
       {item.image_url ? (
         <div className="relative shrink-0">
