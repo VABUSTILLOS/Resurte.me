@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Search, Loader2, ShieldCheck, Store, User } from "lucide-react"
+import { Search, Loader2, ShieldCheck, Store, User, Download } from "lucide-react"
+import { toCsv, downloadCsv } from "@/lib/csv"
 import { MANAGED_ROLES } from "@/lib/admin-roles"
 import {
   listUsers,
@@ -59,6 +60,23 @@ export default function AdminUsuariosPage() {
     return () => clearTimeout(timer)
   }, [search, load])
 
+  // Exporta a CSV los usuarios cargados (respeta la búsqueda aplicada).
+  function exportCsv() {
+    const csv = toCsv(
+      ["Email", "Nombre", "Rol", "Registro", "Último acceso"],
+      users.map((u) => [
+        u.email ?? "",
+        u.full_name ?? "",
+        ROLE_META[u.role].label,
+        new Date(u.created_at).toLocaleDateString("es-MX"),
+        u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString("es-MX") : "",
+      ])
+    )
+    const stamp = new Date().toISOString().slice(0, 10)
+    downloadCsv(`usuarios-${stamp}.csv`, csv)
+    setNotice(`${users.length} usuario${users.length !== 1 ? "s" : ""} exportados a CSV.`)
+  }
+
   async function handleRoleChange(user: ManagedUser, role: ManagedUserRole) {
     if (role === user.role) return
 
@@ -97,15 +115,26 @@ export default function AdminUsuariosPage() {
             Gestiona los roles del sitio: admin, vendedor o cliente.
           </p>
         </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por email o nombre"
-            className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={users.length === 0 || loading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="h-4 w-4" />
+            Exportar CSV
+          </button>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por email o nombre"
+              className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
         </div>
       </div>
 
