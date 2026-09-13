@@ -28,7 +28,7 @@ Ya cubiertas por los 108 posts: food cost, merma, inventario, NOM-251, CFDI, cos
 3. **"central de abastos vs proveedor digital"** — comparativa directa (ver §3). ✅ Creada en fase 2: `central-de-abastos-vs-comprar-en-linea`.
 4. **"cómo funciona la compra por mayoreo en línea"** — educación de categoría. ✅ Creada en fase 5: `como-funciona-compra-mayoreo-en-linea`.
 5. **"precio del kilo de [insumo] hoy"** — la keyword de mayor volumen del segmento; se ataca con el Índice de precios (§5). ⬜ Pendiente (requiere exponer datos del catálogo).
-6. **"proveedores de [insumo específico] en [ciudad]"** — aguacate, tortilla, carne de cerdo… posts programáticos por insumo top. 🔶 Iniciada en fase 5 con 3 categorías (`proveedores-frutas-verduras-restaurantes`, `proveedores-carne-mayoreo-restaurantes`, `desechables-mayoreo-restaurantes`); pendientes lácteos/huevo, bebidas y abarrotes.
+6. **"proveedores de [insumo específico] en [ciudad]"** — aguacate, tortilla, carne de cerdo… posts programáticos por insumo top. ✅ Serie por categoría COMPLETA (fases 5-6): `proveedores-frutas-verduras-restaurantes`, `proveedores-carne-mayoreo-restaurantes`, `proveedores-lacteos-huevo-restaurantes`, `proveedores-bebidas-mayoreo-restaurantes`, `abarrotes-mayoreo-restaurantes`, `desechables-mayoreo-restaurantes`. Siguiente nivel (opcional): posts por insumo específico (aguacate, tortilla) si el volumen lo justifica.
 
 ---
 
@@ -54,7 +54,7 @@ Reorganizar el blog plano en 6 hubs. Cada hub: 1 página pilar (guía madre enla
 ## 3. Contenido de comparación (alto intent, baja competencia) — CREAR
 
 1. **"Resurte.me vs ir a la Central de Abastos: costo real comparado"** — tiempo, transporte, merma, precio. La keyword "central de abastos" tiene volumen enorme; esta página captura a quien ya considera el canal tradicional. ✅ Creada en fase 2: `central-de-abastos-vs-comprar-en-linea`.
-2. **"Las 5 formas de surtir tu restaurante en México (2026): costos y cuál conviene"** — mercado, central, distribuidor, SAM's/Costco, Resurte.me. Formato tabla = imán de citas de IA. 🔶 Parcialmente cubierta por `mejores-proveedores-mayoreo-restaurantes` (fase 2) y `alternativas-sysco-clubes-precio` (fase 3).
+2. **"Las 5 formas de surtir tu restaurante en México (2026): costos y cuál conviene"** — mercado, central, distribuidor, SAM's/Costco, Resurte.me. Formato tabla = imán de citas de IA. ✅ Creada en fase 6: `formas-surtir-restaurante-mexico` (tabla maestra + decisión por etapa del negocio).
 3. **"Alternativas a [principal competidor] para surtir tu restaurante"** — investigar competidores activos y crear una por cada uno con búsquedas. ✅ Creada en fase 3: `alternativas-sysco-clubes-precio` (con reglas de veracidad hedged: fuentes externas no verificables en la sesión, solo hechos verificados de Resurte.me afirmados).
 4. **"Cuánto cuesta surtir un restaurante al mes en México (desglose por tamaño)"** — con datos propios de ticket promedio. E-E-A-T + citas. ✅ Creada en fase 2: `cuanto-cuesta-surtir-restaurante-mes`.
 
@@ -73,7 +73,7 @@ Reorganizar el blog plano en 6 hubs. Cada hub: 1 página pilar (guía madre enla
 2. **Una tabla de datos por post mínimo** — las tablas son el formato #1 extraído por AI Overviews.
 3. **Números propios en MXN** — diferenciador E-E-A-T: cualquiera escribe "reduce tu merma"; nadie más dice "de 9% a 5% son $4,800/mes en compras de $120,000".
 4. **FAQ schema en todos** — ya lo hacen; validar con Rich Results Test tras cada publicación.
-5. **Enlaces internos: 3–5 por post** — 1 al hub/pilar, 1–2 a posts hermanos, 1 a una página de categoría/colección transaccional (hoy enlazan al Panel pero poco al catálogo; el catálogo es el que convierte). **Avance fase 5:** la serie por categoría de insumo ya enlaza a `/cdmx/categoria/{categoria}` (frutas-verduras, carnes-aves-pescados, desechables).
+5. **Enlaces internos: 3–5 por post** — 1 al hub/pilar, 1–2 a posts hermanos, 1 a una página de categoría/colección transaccional (hoy enlazan al Panel pero poco al catálogo; el catálogo es el que convierte). **Avance fases 5-6:** la serie por categoría de insumo ya enlaza a las 6 categorías transaccionales (`/cdmx/categoria/*`).
 6. **Actualizar > crear** — refrescar un post que ya rankeó (nueva fecha, dato nuevo, `updatedAt`) sube posiciones más rápido que publicar uno nuevo. Ritmo sugerido: 4 refreshes + 2 nuevos por mes.
 7. **Título ≤60c con keyword al frente y año cuando aplique** ("…en 2026"), description 140–160c con beneficio + CTA implícito.
 8. **Slug corto y estable** — nunca cambiarlo (el sitemap y los enlaces internos dependen de él).
