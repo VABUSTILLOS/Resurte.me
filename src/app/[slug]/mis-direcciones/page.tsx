@@ -37,10 +37,6 @@ const EMPTY_FORM: AddressForm = {
   references: "",
 }
 
-const INPUT_CLASS =
-  "w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-const LABEL_CLASS = "block text-sm font-medium text-gray-700 mb-1.5"
-
 export default function MisDireccionesPage() {
   const { city } = useCity()
   const [supabase] = useState(() =>
@@ -123,9 +119,6 @@ export default function MisDireccionesPage() {
     })
     setNotice(null)
     setError(null)
-    // Llevar el foco/scroll al formulario: en móvil la lista puede ser larga
-    // y el form queda fuera de pantalla al presionar "Editar".
-    document.getElementById("address-form")?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
   const handleNew = () => {
@@ -242,14 +235,14 @@ export default function MisDireccionesPage() {
       </div>
 
       {notice && (
-        <div role="status" className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4 flex items-center gap-2 text-sm text-green-700">
+        <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-4 flex items-center gap-2 text-sm text-green-700">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           {notice}
         </div>
       )}
 
       {error && (
-        <div role="alert" className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-sm text-red-700">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -265,14 +258,7 @@ export default function MisDireccionesPage() {
               className="bg-white rounded-xl border border-gray-200 p-4 flex items-start justify-between gap-3"
             >
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900">
-                  {addr.label}
-                  {addr.is_default && (
-                    <span className="ml-2 px-1.5 py-0.5 rounded-full bg-brand-50 text-brand-700 text-[10px] font-bold uppercase tracking-wide align-middle">
-                      Predeterminada
-                    </span>
-                  )}
-                </p>
+                <p className="text-sm font-semibold text-gray-900">{addr.label}</p>
                 <p className="text-sm text-gray-600">
                   {addr.street} {addr.number}
                   {addr.interior ? `, ${addr.interior}` : ""}
@@ -314,7 +300,7 @@ export default function MisDireccionesPage() {
       )}
 
       {/* Formulario agregar / editar */}
-      <div id="address-form" className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-gray-900">
             {editingId !== null ? "Editar dirección" : "Agregar dirección"}
@@ -332,14 +318,13 @@ export default function MisDireccionesPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <span className={LABEL_CLASS} id="addr-form-label-legend">Etiqueta</span>
-            <div className="flex gap-2" role="group" aria-labelledby="addr-form-label-legend">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Etiqueta</label>
+            <div className="flex gap-2">
               {["Casa", "Oficina", "Otro"].map((l) => (
                 <button
                   key={l}
                   type="button"
                   onClick={() => updateField("label", l)}
-                  aria-pressed={form.label === l}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     form.label === l
                       ? "bg-brand-600 text-white"
@@ -354,96 +339,76 @@ export default function MisDireccionesPage() {
 
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
-              <label htmlFor="dir-street" className={LABEL_CLASS}>Calle *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Calle *</label>
               <input
-                id="dir-street"
                 type="text"
                 value={form.street}
                 onChange={(e) => updateField("street", e.target.value)}
                 placeholder="Av. Insurgentes Sur"
-                autoComplete="address-line1"
-                enterKeyHint="next"
-                required
-                className={INPUT_CLASS}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
             </div>
             <div>
-              <label htmlFor="dir-number" className={LABEL_CLASS}>Número *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Número *</label>
               <input
-                id="dir-number"
                 type="text"
                 value={form.number}
                 onChange={(e) => updateField("number", e.target.value)}
                 placeholder="1234"
-                enterKeyHint="next"
-                required
-                className={INPUT_CLASS}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="dir-interior" className={LABEL_CLASS}>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Interior (opcional)
               </label>
               <input
-                id="dir-interior"
                 type="text"
                 value={form.interior}
                 onChange={(e) => updateField("interior", e.target.value)}
                 placeholder="Depto 4B"
-                autoComplete="address-line2"
-                enterKeyHint="next"
-                className={INPUT_CLASS}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
             </div>
             <div>
-              <label htmlFor="dir-neighborhood" className={LABEL_CLASS}>Colonia *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Colonia *</label>
               <input
-                id="dir-neighborhood"
                 type="text"
                 value={form.neighborhood}
                 onChange={(e) => updateField("neighborhood", e.target.value)}
                 placeholder="Roma Norte"
-                autoComplete="address-level3"
-                enterKeyHint="next"
-                required
-                className={INPUT_CLASS}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="dir-zip" className={LABEL_CLASS}>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Código Postal *
             </label>
             <input
-              id="dir-zip"
               type="text"
-              inputMode="numeric"
               value={form.zip_code}
               onChange={(e) => updateField("zip_code", e.target.value.replace(/\D/g, "").slice(0, 5))}
               placeholder="06700"
               maxLength={5}
-              autoComplete="postal-code"
-              enterKeyHint="next"
-              required
-              className={INPUT_CLASS}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
             />
           </div>
 
           <div>
-            <label htmlFor="dir-references" className={LABEL_CLASS}>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Referencias (opcional)
             </label>
             <textarea
-              id="dir-references"
               value={form.references}
               onChange={(e) => updateField("references", e.target.value)}
               placeholder="Entre calles, color de fachada, etc."
               rows={2}
-              className={`${INPUT_CLASS} resize-none`}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 resize-none"
             />
           </div>
 
