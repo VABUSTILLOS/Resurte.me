@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Fragment } from "react"
 import { usePathname } from "next/navigation"
 import { LayoutGrid, Lock, X } from "lucide-react"
+import { motion, useDragControls } from "framer-motion"
 import { TOOLS, TOOL_AREAS } from "@/components/panel/hub/hub-data"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { RestaurantCollection } from "@/types"
@@ -17,6 +18,7 @@ interface PanelMobileNavProps {
 
 export function PanelMobileNav({ open, onClose, selectedCollection }: PanelMobileNavProps) {
   const pathname = usePathname()
+  const dragControls = useDragControls()
 
   useEscapeKey(onClose, open)
 
@@ -30,14 +32,29 @@ export function PanelMobileNav({ open, onClose, selectedCollection }: PanelMobil
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/50 z-[65] lg:hidden" onClick={onClose} aria-hidden="true" />
 
-      {/* Bottom sheet */}
-      <div
+      {/* Bottom sheet — swipe-down desde el encabezado para cerrar */}
+      <motion.div
         role="dialog"
         aria-modal="true"
         aria-label={t("panel.title")}
+        drag="y"
+        dragListener={false}
+        dragControls={dragControls}
+        dragConstraints={{ top: 0 }}
+        dragElastic={{ top: 0, bottom: 0.5 }}
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 80 || info.velocity.y > 500) onClose()
+        }}
         className="fixed inset-x-0 bottom-0 z-[70] lg:hidden bg-white rounded-t-2xl shadow-2xl max-h-[80vh] overflow-y-auto animate-slide-up pb-[env(safe-area-inset-bottom)]"
       >
-        <div className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-100 p-4 flex items-center justify-between">
+        <div
+          className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-100 p-4 pt-2 flex items-center justify-between touch-none cursor-grab active:cursor-grabbing"
+          onPointerDown={(e) => dragControls.start(e)}
+        >
+          <span
+            aria-hidden="true"
+            className="absolute left-1/2 -translate-x-1/2 top-1.5 w-10 h-1 rounded-full bg-gray-200"
+          />
           <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
             <LayoutGrid className="w-5 h-5 text-[#0E7A0E]" />
             {t("panel.title")}
@@ -136,7 +153,7 @@ export function PanelMobileNav({ open, onClose, selectedCollection }: PanelMobil
             )
           })}
         </nav>
-      </div>
+      </motion.div>
     </>
   )
 }

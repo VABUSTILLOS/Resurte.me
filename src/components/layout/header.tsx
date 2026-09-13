@@ -10,6 +10,7 @@ import { CART_DRAWER_EVENT } from "@/components/cart/cart-drawer"
 import { MobileSearchOverlay, MOBILE_SEARCH_EVENT } from "@/components/search/mobile-search-overlay"
 import { useRouter } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
+import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import type { User as SupabaseUser, SupabaseClient } from "@supabase/supabase-js"
 
 export function Header() {
@@ -27,6 +28,19 @@ export function Header() {
   const [cashbackBalance, setCashbackBalance] = useState<number | null>(null)
   const [role, setRole] = useState<"admin" | "vendedor" | "cliente" | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Auto-hide: el header se desliza fuera al bajar y reaparece al subir.
+  // Con cualquier overlay/menú abierto se fuerza visible.
+  const overlayOpen = showCitySelector || showUserMenu || showMobileSearch
+  const scrollDirection = useScrollDirection({ forceVisible: overlayOpen })
+  const headerHidden = scrollDirection === "down" && !overlayOpen
+
+  // Publica el estado para que --header-top-offset colapse (barras sticky
+  // secundarias como la del panel suben al top cuando el header se oculta).
+  useEffect(() => {
+    document.body.classList.toggle("header-hidden", headerHidden)
+    return () => document.body.classList.remove("header-hidden")
+  }, [headerHidden])
 
   // Resolver el rol del usuario (server action) para navegación por sección
   useEffect(() => {
@@ -107,8 +121,11 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-50 glass-header print:hidden"
-      style={{ paddingTop: "var(--header-inset-top)" }}
+      className="sticky top-0 z-50 glass-header print:hidden transition-transform duration-300 motion-reduce:transition-none"
+      style={{
+        paddingTop: "var(--header-inset-top)",
+        transform: headerHidden ? "translateY(-100%)" : undefined,
+      }}
     >
       <div className="max-w-7xl mx-auto px-3 sm:px-6">
         <div className="flex items-center justify-between h-16 gap-2 sm:gap-3">

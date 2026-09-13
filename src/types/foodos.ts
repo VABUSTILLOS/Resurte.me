@@ -267,6 +267,27 @@ export interface FoodosOrder {
   created_at: string
 }
 
+/** Comprobante de pago manual (transferencia/OXXO/efectivo) subido por el comensal. */
+export type FoodosPaymentProofMethod = "transfer" | "oxxo" | "efectivo" | "otro"
+export type FoodosPaymentProofStatus = "pending" | "approved" | "rejected"
+
+export interface FoodosOrderPayment {
+  id: number
+  order_id: string
+  restaurant_id: string
+  method: FoodosPaymentProofMethod
+  amount: number | null
+  proof_path: string
+  reference: string | null
+  status: FoodosPaymentProofStatus
+  reviewed_by: string | null
+  reviewed_at: string | null
+  notes: string | null
+  created_at: string
+  /** URL firmada de corta vida, generada en el servidor al leer. */
+  proof_url?: string | null
+}
+
 export type FoodosAutomationType =
   | "order_confirmation"
   | "thank_you"

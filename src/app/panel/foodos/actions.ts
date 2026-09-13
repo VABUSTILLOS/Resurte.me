@@ -10,7 +10,9 @@ import { requireAuth, getCurrentUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { slugify } from "@/lib/foodos"
+import { notifyFoodosCustomer } from "@/lib/foodos-notifications"
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 import type {
   FoodosRestaurant,
   FoodosRestaurantStatus,
@@ -747,12 +749,32 @@ export async function updateOrderStatus(
   status: FoodosOrderStatus
 ): Promise<void> {
   const { supabase } = await requireAuth()
+
+  const { data: current, error: readError } = await supabase
+    .from("foodos_orders")
+    .select("status")
+    .eq("id", orderId)
+    .maybeSingle()
+  if (readError) throw new Error(readError.message)
+
+  // Sin cambio real no se reescribe ni se reavisa. Los botones de estado
+  // del panel y el tablero de cocina pueden dispararse dos veces con el
+  // mismo valor; el UPDATE es idempotente pero el aviso al comensal no.
+  if ((current as { status: string } | null)?.status === status) return
+
   const { error } = await supabase
     .from("foodos_orders")
     .update({ status })
     .eq("id", orderId)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/pedidos")
+
+  // after(): el aviso se manda después de responder para no dejar al
+  // dueño esperando al mensajero, pero dentro de la vida de la función
+  // (fire-and-forget se cancelaría al resolver la respuesta).
+  after(() => {
+    void notifyFoodosCustomer(orderId, `status:${status}`)
+  })
 }
 
 // ------------------------------------------------------------
@@ -1022,6 +1044,10 @@ export async function markOrderPaid(orderId: string): Promise<void> {
     .eq("id", orderId)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/pedidos")
+
+  after(() => {
+    void notifyFoodosCustomer(orderId, "payment:paid")
+  })
 }
 
 // ------------------------------------------------------------

@@ -66,7 +66,20 @@ const es = {
   transferTitle: "Transfiere para completar tu pedido",
   bank: "Banco",
   beneficiary: "Beneficiario",
-  transferProof: "Envía tu comprobante por WhatsApp al restaurante con tu referencia.",
+  transferProof: "Sube tu comprobante aquí para que el restaurante lo valide.",
+  proofUpload: "Subir comprobante de pago",
+  proofUploadHint: "JPG, PNG, WebP o PDF · máx. 5 MB",
+  proofChooseFile: "Elegir archivo",
+  proofReference: "Folio o autorización (opcional)",
+  proofAmount: "Monto pagado (opcional)",
+  proofSend: "Enviar comprobante",
+  proofSending: "Enviando…",
+  proofSent: "Comprobante enviado. El restaurante lo revisará y te confirmará.",
+  proofPending: "Comprobante en revisión por el restaurante.",
+  proofApproved: "Pago confirmado. ¡Gracias!",
+  proofRejected: "El restaurante rechazó el comprobante.",
+  proofError: "No se pudo enviar el comprobante. Intenta de nuevo.",
+  proofRetry: "Subir otro comprobante",
 } as const
 
 export type StorefrontKey = keyof typeof es
@@ -130,7 +143,20 @@ const en: Record<StorefrontKey, string> = {
   transferTitle: "Transfer to complete your order",
   bank: "Bank",
   beneficiary: "Beneficiary",
-  transferProof: "Send your receipt via WhatsApp to the restaurant with your reference.",
+  transferProof: "Upload your receipt here so the restaurant can verify it.",
+  proofUpload: "Upload payment receipt",
+  proofUploadHint: "JPG, PNG, WebP or PDF · max 5 MB",
+  proofChooseFile: "Choose file",
+  proofReference: "Reference or authorization (optional)",
+  proofAmount: "Amount paid (optional)",
+  proofSend: "Send receipt",
+  proofSending: "Sending…",
+  proofSent: "Receipt sent. The restaurant will review and confirm it.",
+  proofPending: "Receipt under review by the restaurant.",
+  proofApproved: "Payment confirmed. Thank you!",
+  proofRejected: "The restaurant rejected the receipt.",
+  proofError: "Could not send the receipt. Please try again.",
+  proofRetry: "Upload another receipt",
 }
 
 const DICTS: Record<StorefrontLang, Record<StorefrontKey, string>> = { es, en }

@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { getFoodosPanelData, listCoupons, upsertCoupon, deleteCoupon } from "../actions"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 import { formatMoney } from "@/lib/foodos"
 import type { FoodosCoupon, FoodosRestaurant } from "@/types/foodos"
 import { Ticket, Plus, Trash2, Loader2, Pencil, X } from "lucide-react"
@@ -181,11 +182,16 @@ export default function CuponesPage() {
       )}
 
       {/* Form modal */}
-      {form && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setForm(null)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+      <BottomSheet
+        open={form != null}
+        onClose={() => setForm(null)}
+        ariaLabelledby="coupon-form-title"
+        maxWidthClass="max-w-md"
+      >
+        {form && (
+          <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <h3 id="coupon-form-title" className="font-semibold text-gray-900 flex items-center gap-2">
                 <Ticket className="w-5 h-5 text-[#0E7A0E]" />
                 {form.id ? "Editar cupón" : "Nuevo cupón"}
               </h3>
@@ -264,8 +270,8 @@ export default function CuponesPage() {
               </div>
             </form>
           </div>
-        </div>
-      )}
+        )}
+      </BottomSheet>
       <ToolGuideHost toolKey="cupones" pathname="/panel/foodos/cupones" slug={null} icon="🎟️" title="Cupones" />
     </div>
   )

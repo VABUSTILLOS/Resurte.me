@@ -43,7 +43,7 @@ interface TableResult {
  */
 function tableBuilder(result: TableResult = { data: null, error: null }) {
   const builder: Record<string, unknown> = {}
-  for (const method of ["select", "eq", "update", "order", "limit"]) {
+  for (const method of ["select", "eq", "in", "update", "order", "limit"]) {
     builder[method] = vi.fn().mockReturnValue(builder)
   }
   builder.insert = vi.fn().mockResolvedValue({ data: null, error: null })
@@ -310,6 +310,70 @@ describe("/api/webhooks/stripe", () => {
     expect(res.status).toBe(200)
     expect(orders.update).toHaveBeenCalledWith(
       expect.objectContaining({ payment_status: "failed" })
+    )
+  })
+
+  it("payment_intent.processing marca el pedido como en proceso (no pagado)", async () => {
+    const orders = tableBuilder()
+    const foodos = tableBuilder()
+    mockSupabase({ orders, foodos_orders: foodos })
+    constructEvent.mockReturnValue(
+      stripeEvent("payment_intent.processing", { id: "pi_oxxo" })
+    )
+
+    const res = await POST(webhookReq())
+
+    expect(res.status).toBe(200)
+    expect(orders.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "processing" })
+    )
+    expect(foodos.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "processing" })
+    )
+    // Nunca se acredita dinero por un voucher generado.
+    expect(orders.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "paid" })
+    )
+    expect(confirmPaymentToCustomer).not.toHaveBeenCalled()
+  })
+
+  it("payment_intent.requires_action también marca processing", async () => {
+    const orders = tableBuilder()
+    const foodos = tableBuilder()
+    mockSupabase({ orders, foodos_orders: foodos })
+    constructEvent.mockReturnValue(
+      stripeEvent("payment_intent.requires_action", { id: "pi_codi" })
+    )
+
+    const res = await POST(webhookReq())
+
+    expect(res.status).toBe(200)
+    expect(orders.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "processing" })
+    )
+    expect(foodos.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "processing" })
+    )
+  })
+
+  it("payment_intent.canceled con motivo expired marca FoodOS expirado", async () => {
+    const foodos = tableBuilder({
+      data: { id: "f-1", payment_status: "processing" },
+      error: null,
+    })
+    mockSupabase({ foodos_orders: foodos })
+    constructEvent.mockReturnValue(
+      stripeEvent("payment_intent.canceled", {
+        id: "pi_oxxo_exp",
+        cancellation_reason: "expired",
+      })
+    )
+
+    const res = await POST(webhookReq())
+
+    expect(res.status).toBe(200)
+    expect(foodos.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "expired" })
     )
   })
 

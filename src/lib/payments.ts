@@ -3,6 +3,10 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { applyDiscount, round2 } from "@/lib/money"
 import { toCents } from "@/lib/payment-validation"
 import type Stripe from "stripe"
+import {
+  parsePaymentNextAction,
+  type PaymentNextAction,
+} from "@/lib/payment-next-action"
 import { logger } from "@/lib/logger"
 
 export class PaymentIntentError extends Error {
@@ -30,6 +34,15 @@ export interface PaymentIntentResult {
    * 1-click upsells). false en caso contrario.
    */
   saveCardEnabled: boolean
+  /**
+   * Instrucciones pendientes de un método local asíncrono (OXXO, SPEI, CoDi).
+   * `null` para tarjeta, que se confirma en el navegador.
+   *
+   * En el flujo actual el cliente confirma con Stripe Elements, así que este
+   * dato llega normalmente por el resultado de `confirmPayment`; se devuelve
+   * también aquí para el caso en que el intent ya venga en `requires_action`.
+   */
+  nextAction: PaymentNextAction | null
 }
 
 export type ProcessUpsellResult =
@@ -712,6 +725,7 @@ export async function createPaymentIntentForOrder(params: {
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
       saveCardEnabled,
+      nextAction: parsePaymentNextAction(paymentIntent.next_action),
     }
   }
 
@@ -746,10 +760,18 @@ export async function createPaymentIntentForOrder(params: {
     },
   })
 
-  await supabase
+  const { error: persistFoodosPiError } = await supabase
     .from("foodos_orders")
     .update({ stripe_payment_intent_id: paymentIntent.id })
     .eq("id", order.id)
+  if (persistFoodosPiError) {
+    // No bloquear el checkout: el PI lleva metadata.foodos_order_id y el
+    // webhook hace fallback por ella, así que el cobro se sigue reconociendo.
+    logger.error("payments: failed to persist foodos stripe_payment_intent_id", {
+      order: order.id,
+      error: persistFoodosPiError.message,
+    })
+  }
 
   if (!paymentIntent.client_secret) {
     throw new PaymentIntentError("Stripe no devolvió client_secret", 500)
@@ -758,5 +780,6 @@ export async function createPaymentIntentForOrder(params: {
     clientSecret: paymentIntent.client_secret,
     paymentIntentId: paymentIntent.id,
     saveCardEnabled: false, // FoodOS no ofrece upsells off-session
+    nextAction: parsePaymentNextAction(paymentIntent.next_action),
   }
 }

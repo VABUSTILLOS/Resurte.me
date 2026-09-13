@@ -4,6 +4,7 @@ import { CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import type { FoodosRestaurant } from "@/types/foodos"
 import { sf, type StorefrontLang } from "@/lib/foodos-i18n"
+import { PaymentProofUpload } from "./payment-proof-upload"
 
 export function SuccessScreen({
   restaurant,
@@ -41,6 +42,16 @@ export function SuccessScreen({
             <p className="text-xs text-amber-700 mt-2">
               {sf(lang, "transferProof")}
             </p>
+          </div>
+        )}
+        {showTransfer && (
+          <div className="mt-3">
+            <PaymentProofUpload
+              restaurantSlug={restaurant.slug}
+              orderId={orderId}
+              lang={lang}
+              defaultMethod="transfer"
+            />
           </div>
         )}
         <p className="text-sm text-stone-400 mt-4">{sf(lang, "reference")}: #{orderId.slice(0, 8).toUpperCase()}</p>

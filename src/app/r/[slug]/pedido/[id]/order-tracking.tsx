@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { formatMoney, modifiersSummary } from "@/lib/foodos"
 import type { FoodosOrderItem, FoodosOrderStatus } from "@/types/foodos"
+import { PaymentProofUpload } from "../../_components/payment-proof-upload"
 
 interface TrackData {
   id: string
@@ -127,7 +128,11 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
           <div className="bg-red-50 border border-red-200 rounded-2xl p-5 text-center">
             <XCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
             <p className="font-bold text-red-700">Pedido cancelado</p>
-            <p className="text-sm text-red-500 mt-1">Contacta al restaurante si crees que es un error.</p>
+            <p className="text-sm text-red-500 mt-1">
+              {data.payment_status === "expired"
+                ? "No registramos el pago dentro del plazo y el pedido se canceló solo. No hubo ningún cargo."
+                : "Contacta al restaurante si crees que es un error."}
+            </p>
           </div>
         ) : (
           <div className="bg-white border border-stone-200 rounded-3xl p-6">
@@ -228,6 +233,17 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
             </div>
           )}
         </div>
+
+        {(data.payment_status === "pending" ||
+          data.payment_status === "failed" ||
+          data.payment_status === "expired" ||
+          data.payment_status === "amount_mismatch") && (
+          <PaymentProofUpload
+            restaurantSlug={slug}
+            orderId={orderId}
+            defaultMethod="transfer"
+          />
+        )}
 
         {data.status === "delivered" && <ReviewForm orderId={orderId} />}
 

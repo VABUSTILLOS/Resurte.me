@@ -7,6 +7,7 @@ import {
   handlePaymentIntentRefunded,
   handlePaymentIntentFailed,
   handlePaymentIntentCanceled,
+  handlePaymentIntentProcessing,
   type StripePaymentIntentLike,
 } from "@/lib/stripe-webhook-handlers"
 import { logger } from "@/lib/logger"
@@ -74,7 +75,25 @@ export async function POST(request: NextRequest) {
 
       case "payment_intent.canceled": {
         const supabase = await createServiceClient()
-        await handlePaymentIntentCanceled(
+        const pi = event.data.object as {
+          id: string
+          cancellation_reason?: string | null
+        }
+        await handlePaymentIntentCanceled(supabase, {
+          id: pi.id,
+          cancellation_reason: pi.cancellation_reason ?? null,
+        })
+        break
+      }
+
+      // Métodos locales asíncronos (OXXO, SPEI, CoDi): el cliente ya tiene
+      // las instrucciones de pago y el dinero aún no se acredita.
+      // `requires_action` es el estado inmediatamente posterior a
+      // confirmar el intent; `processing` el que sigue.
+      case "payment_intent.processing":
+      case "payment_intent.requires_action": {
+        const supabase = await createServiceClient()
+        await handlePaymentIntentProcessing(
           supabase,
           event.data.object as { id: string }
         )

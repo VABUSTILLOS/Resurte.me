@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useSharedDishes } from "@/hooks/use-local-storage"
-import { useEscapeKey } from "@/hooks/use-escape-key"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 import {
   getFoodosPanelData,
   listCategories,
@@ -85,8 +85,6 @@ export default function MenuPage() {
   const [importing, setImporting] = useState(false)
   const [importingCsv, setImportingCsv] = useState(false)
 
-  const closeItemForm = useCallback(() => setShowItemForm(false), [])
-  useEscapeKey(closeItemForm, showItemForm)
 
   const [sharedDishes] = useSharedDishes(selectedCollection?.slug)
 
@@ -553,10 +551,15 @@ export default function MenuPage() {
       </div>
 
       {/* Form de item */}
-      {showItemForm && editingItem && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setShowItemForm(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+      <BottomSheet
+        open={showItemForm && editingItem != null}
+        onClose={() => setShowItemForm(false)}
+        ariaLabelledby="menu-item-form-title"
+        maxWidthClass="max-w-lg"
+      >
+        {editingItem && (
+          <div className="p-6">
+            <h3 id="menu-item-form-title" className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <UtensilsCrossed className="w-5 h-5 text-[#0E7A0E]" />
               {editingItem.id ? t("foodos.menu.editItem") : t("foodos.menu.newItem")}
             </h3>
@@ -666,8 +669,8 @@ export default function MenuPage() {
               </div>
             </form>
           </div>
-        </div>
-      )}
+        )}
+      </BottomSheet>
       {overridesItem && branches.length > 0 && (
         <ItemBranchOverrides
           item={overridesItem}

@@ -27,14 +27,19 @@ interface TableResult {
   error?: unknown
 }
 
-function tableBuilder(result: TableResult = { data: null, error: null }) {
+function tableBuilder(
+  result: TableResult = { data: null, error: null },
+  singleResult?: TableResult
+) {
   const builder: Record<string, unknown> = {}
-  for (const method of ["select", "eq", "not", "lt", "update", "order", "limit"]) {
+  for (const method of ["select", "eq", "in", "not", "lt", "update", "order", "limit"]) {
     builder[method] = vi.fn().mockReturnValue(builder)
   }
   builder.insert = vi.fn().mockResolvedValue({ data: null, error: null })
-  builder.maybeSingle = vi.fn().mockResolvedValue(result)
-  builder.single = vi.fn().mockResolvedValue(result)
+  // `maybeSingle()`/`single()` resuelven una fila, no un arreglo: en tablas
+  // cuyo barrido espera un arreglo (reconciliación) hay que pasar ambas formas.
+  builder.maybeSingle = vi.fn().mockResolvedValue(singleResult ?? result)
+  builder.single = vi.fn().mockResolvedValue(singleResult ?? result)
   builder.then = (resolve: (v: unknown) => void) => resolve(result)
   return builder as Record<string, ReturnType<typeof vi.fn>> & {
     maybeSingle: ReturnType<typeof vi.fn>
@@ -114,7 +119,7 @@ describe("/api/cron/reconcile-payments", () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({ checked: 1, updated: 1, errors: [] })
+    expect(body).toEqual({ checked: 1, updated: 1, errors: [], foodosChecked: 0, foodosUpdated: 0 })
     // El handler compartido marcó el pedido como pagado.
     expect(orders.update).toHaveBeenCalledWith(
       expect.objectContaining({ payment_status: "paid", status: "confirmed" })
@@ -131,7 +136,7 @@ describe("/api/cron/reconcile-payments", () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({ checked: 0, updated: 0, errors: [] })
+    expect(body).toEqual({ checked: 0, updated: 0, errors: [], foodosChecked: 0, foodosUpdated: 0 })
     expect(retrieve).not.toHaveBeenCalled()
     expect(logger.warn).toHaveBeenCalledWith(
       "reconcile-payments.skipped_no_pi",
@@ -158,7 +163,7 @@ describe("/api/cron/reconcile-payments", () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({ checked: 1, updated: 1, errors: [] })
+    expect(body).toEqual({ checked: 1, updated: 1, errors: [], foodosChecked: 0, foodosUpdated: 0 })
     expect(orders.update).toHaveBeenCalledWith(
       expect.objectContaining({ payment_status: "failed" })
     )
@@ -181,9 +186,115 @@ describe("/api/cron/reconcile-payments", () => {
     const res = await GET(cronReq("Bearer cron_secret_test"))
 
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ checked: 1, updated: 1, errors: [] })
+    expect(await res.json()).toEqual({ checked: 1, updated: 1, errors: [], foodosChecked: 0, foodosUpdated: 0 })
     expect(orders.update).toHaveBeenCalledWith(
       expect.objectContaining({ payment_status: "failed" })
+    )
+  })
+
+  it("expira un voucher FoodOS caducado sin last_payment_error", async () => {
+    const foodos = tableBuilder({
+      data: [
+        {
+          id: "f-stale",
+          stripe_payment_intent_id: "pi_oxxo_stale",
+          payment_status: "processing",
+          created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      ],
+      error: null,
+    })
+    mockSupabase({ data: [], error: null }, { foodos_orders: foodos })
+    // Stripe deja el intent en requires_payment_method y sin error: el único
+    // rastro de que el voucher caducó es la antigüedad del pedido.
+    retrieve.mockResolvedValueOnce({
+      id: "pi_oxxo_stale",
+      status: "requires_payment_method",
+      amount_received: 0,
+      currency: "mxn",
+      metadata: {},
+      payment_method: null,
+      customer: null,
+      receipt_email: null,
+      last_payment_error: null,
+    })
+
+    const res = await GET(cronReq("Bearer cron_secret_test"))
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.foodosChecked).toBe(1)
+    expect(body.foodosUpdated).toBe(1)
+    expect(foodos.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "expired" })
+    )
+  })
+
+  it("no expira un voucher FoodOS dentro de la ventana de 96h", async () => {
+    const foodos = tableBuilder({
+      data: [
+        {
+          id: "f-fresh",
+          stripe_payment_intent_id: "pi_oxxo_fresh",
+          payment_status: "processing",
+          created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        },
+      ],
+      error: null,
+    })
+    mockSupabase({ data: [], error: null }, { foodos_orders: foodos })
+    retrieve.mockResolvedValueOnce({
+      id: "pi_oxxo_fresh",
+      status: "requires_payment_method",
+      amount_received: 0,
+      currency: "mxn",
+      metadata: {},
+      payment_method: null,
+      customer: null,
+      receipt_email: null,
+      last_payment_error: null,
+    })
+
+    const res = await GET(cronReq("Bearer cron_secret_test"))
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.foodosChecked).toBe(1)
+    expect(body.foodosUpdated).toBe(0)
+    expect(foodos.update).not.toHaveBeenCalled()
+  })
+
+  it("marca paid un voucher FoodOS ya acreditado en Stripe", async () => {
+    const row = {
+      id: "f-paid",
+      stripe_payment_intent_id: "pi_oxxo_paid",
+      payment_status: "processing",
+      total: 100,
+      created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    }
+    const foodos = tableBuilder(
+      { data: [row], error: null },
+      { data: row, error: null }
+    )
+    mockSupabase({ data: [], error: null }, { foodos_orders: foodos })
+    retrieve.mockResolvedValueOnce({
+      id: "pi_oxxo_paid",
+      status: "succeeded",
+      amount_received: 10000,
+      amount: 10000,
+      currency: "mxn",
+      metadata: {},
+      payment_method: "pm_oxxo",
+      customer: null,
+      receipt_email: null,
+      last_payment_error: null,
+    })
+
+    const res = await GET(cronReq("Bearer cron_secret_test"))
+
+    expect(res.status).toBe(200)
+    expect(foodos.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "paid" })
     )
   })
 

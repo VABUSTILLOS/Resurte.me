@@ -1,6 +1,6 @@
 import { BookOpen } from "lucide-react"
 import RecipeCard from "./RecipeCard"
-import { useEscapeKey } from "@/hooks/use-escape-key"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 import { PRESET_RECIPES, type Recipe } from "./costeo-shared"
 
 export default function RecipePickerModal({
@@ -28,12 +28,10 @@ export default function RecipePickerModal({
   onClose: () => void
   normalizeName: (s: string) => string
 }) {
-  useEscapeKey(onClose, open)
-  if (!open) return null
   const presets = (PRESET_RECIPES[slug || ""] || []).filter((r) => normalizeName(r.name).includes(normalizeName(recipeSearch.trim())))
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <BottomSheet open={open} onClose={onClose} ariaLabel="Recetas para costear" maxWidthClass="max-w-2xl">
+      <div className="p-6 pt-3 max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between mb-4 shrink-0">
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-purple-600" />
@@ -98,6 +96,6 @@ export default function RecipePickerModal({
           </div>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

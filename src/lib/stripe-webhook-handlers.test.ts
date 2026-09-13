@@ -21,6 +21,8 @@ import {
   handlePaymentIntentRefunded,
   handlePaymentIntentFailed,
   handlePaymentIntentCanceled,
+  handlePaymentIntentProcessing,
+  handleFoodosPaymentIntentExpired,
   type ServiceClient,
 } from "./stripe-webhook-handlers"
 import { confirmPaymentToCustomer, notifyCustomerStatusUpdate } from "@/lib/workflows"
@@ -35,7 +37,7 @@ interface TableResult {
 /** Mismo patrón de builder que route.test.ts del webhook. */
 function tableBuilder(result: TableResult = { data: null, error: null }) {
   const builder: Record<string, unknown> = {}
-  for (const method of ["select", "eq", "update", "order", "limit"]) {
+  for (const method of ["select", "eq", "in", "update", "order", "limit"]) {
     builder[method] = vi.fn().mockReturnValue(builder)
   }
   builder.insert = vi.fn().mockResolvedValue({ data: null, error: null })
@@ -189,6 +191,116 @@ describe("stripe-webhook-handlers", () => {
     expect(orders.update).toHaveBeenCalledWith(
       expect.objectContaining({ payment_status: "failed" })
     )
+  })
+
+  it("canceled: cancellation_reason expired marca expired en FoodOS", async () => {
+    const foodos = tableBuilder({ data: { id: "f-1", payment_status: "pending" }, error: null })
+    const supabase = mockSupabase({ foodos_orders: foodos })
+
+    await handlePaymentIntentCanceled(supabase, {
+      id: "pi_oxxo_exp",
+      cancellation_reason: "expired",
+    })
+
+    expect(foodos.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "expired" })
+    )
+  })
+
+  it("canceled: motivo distinto marca failed en FoodOS", async () => {
+    const foodos = tableBuilder({ data: { id: "f-2", payment_status: "pending" }, error: null })
+    const supabase = mockSupabase({ foodos_orders: foodos })
+
+    await handlePaymentIntentCanceled(supabase, {
+      id: "pi_oxxo_dup",
+      cancellation_reason: "duplicate",
+    })
+
+    expect(foodos.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "failed" })
+    )
+  })
+
+  it("canceled: nunca degrada un pedido FoodOS ya pagado", async () => {
+    const foodos = tableBuilder({ data: { id: "f-3", payment_status: "paid" }, error: null })
+    const supabase = mockSupabase({ foodos_orders: foodos })
+
+    await handlePaymentIntentCanceled(supabase, {
+      id: "pi_oxxo_paid",
+      cancellation_reason: "expired",
+    })
+
+    expect(foodos.update).not.toHaveBeenCalled()
+  })
+
+  it("processing: marca processing solo desde pending (idempotente)", async () => {
+    const orders = tableBuilder()
+    const foodos = tableBuilder()
+    const supabase = mockSupabase({ orders, foodos_orders: foodos })
+
+    await handlePaymentIntentProcessing(supabase, { id: "pi_oxxo" })
+
+    expect(orders.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "processing" })
+    )
+    expect(foodos.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "processing" })
+    )
+    // El guard evita degradar un pedido ya pagado si Stripe re-entrega el
+    // evento fuera de orden.
+    expect(orders.eq).toHaveBeenCalledWith("payment_status", "pending")
+    expect(foodos.eq).toHaveBeenCalledWith("payment_status", "pending")
+  })
+
+  it("expired: solo degrada estados no terminales en FoodOS", async () => {
+    const foodos = tableBuilder()
+    const supabase = mockSupabase({ foodos_orders: foodos })
+
+    await handleFoodosPaymentIntentExpired(supabase, { id: "pi_oxxo_ttl" })
+
+    expect(foodos.update).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_status: "expired" })
+    )
+    expect(foodos.eq).toHaveBeenCalledWith("stripe_payment_intent_id", "pi_oxxo_ttl")
+    expect(foodos.in).toHaveBeenCalledWith("payment_status", ["pending", "processing"])
+  })
+
+  // Regresión: `foodos_orders` NO tiene columna `updated_at` (a diferencia de
+  // `orders`). PostgREST rechaza el UPDATE completo con PGRST204, y como el
+  // error no se inspeccionaba, el pedido se quedaba en `pending` para siempre
+  // aunque el cobro se hubiera acreditado. Ningún handler debe reintroducirlo.
+  it("ningún handler escribe updated_at en foodos_orders", async () => {
+    const foodos = tableBuilder({
+      data: { id: "f-x", total: 100, payment_status: "pending" },
+      error: null,
+    })
+    const supabase = mockSupabase({
+      orders: tableBuilder({
+        data: { id: 7, user_id: "u-1", total: 100, payment_status: "pending" },
+        error: null,
+      }),
+      foodos_orders: foodos,
+      order_upsells: tableBuilder(),
+    })
+
+    await handlePaymentIntentSucceeded(supabase, {
+      id: "pi_reg",
+      amount_received: 10000,
+      metadata: {},
+      payment_method: null,
+      customer: null,
+      receipt_email: null,
+    })
+    await handlePaymentIntentRefunded(supabase, { id: "pi_reg" })
+    await handlePaymentIntentFailed(supabase, { id: "pi_reg" })
+    await handlePaymentIntentCanceled(supabase, { id: "pi_reg" })
+    await handlePaymentIntentProcessing(supabase, { id: "pi_reg" })
+    await handleFoodosPaymentIntentExpired(supabase, { id: "pi_reg" })
+
+    expect(foodos.update).toHaveBeenCalled()
+    for (const call of foodos.update.mock.calls) {
+      expect(call[0]).not.toHaveProperty("updated_at")
+    }
   })
 
   it("succeeded sin orden ligada no falla ni dispara workflows", async () => {

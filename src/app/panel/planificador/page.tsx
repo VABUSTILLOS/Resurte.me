@@ -318,17 +318,15 @@ export default function PlanificadorPage() {
         priceFor={priceFor}
       />
 
-      {confirmImport && (
-        <ConfirmImportModal
-          confirmImport={confirmImport}
-          onCancel={() => setConfirmImport(null)}
-          onConfirm={() => {
-            const dish = sharedDishes.find((d) => d.name === confirmImport.dishName)
-            if (dish) doImportDish(dish)
-            setConfirmImport(null)
-          }}
-        />
-      )}
+      <ConfirmImportModal
+        confirmImport={confirmImport}
+        onCancel={() => setConfirmImport(null)}
+        onConfirm={() => {
+          const dish = sharedDishes.find((d) => d.name === confirmImport?.dishName)
+          if (dish) doImportDish(dish)
+          setConfirmImport(null)
+        }}
+      />
       <ToolGuideHost toolKey="planificador" pathname="/panel/planificador" slug={slug} icon="📅" title={t("planificador.guideTitle")} subtitle={collectionName} />
     </div>
   )
