@@ -14,21 +14,21 @@
 | frutas y verduras por mayoreo + [ciudad] | `/{ciudad}/categoria/frutas-verduras` | ✅ × 20 ciudades |
 | abarrotes por mayoreo + [ciudad] | `/{ciudad}/categoria/abarrotes` | ✅ × 20 |
 | carne por mayoreo + [ciudad] | `/{ciudad}/categoria/carnes-aves-pescados` | ✅ × 20 |
-| insumos para restaurantes / proveeduría para restaurantes | hub nuevo | ⬜ Crear |
+| insumos para restaurantes / proveeduría para restaurantes | `/blog/guia-proveeduria-restaurantes` | ✅ Creada (fase 3, PR #9) |
 | desechables para restaurantes mayoreo | `/{ciudad}/categoria/desechables` | ✅ × 20 |
 | insumos para taquería / pizzería / sushi… | `/{ciudad}/coleccion/*` | ✅ × 14 colecciones |
 | precios de central de abastos | post + página de precios | ⬜ Crear (ver Índice de precios) |
-| comprar por mayoreo en línea México | `/` | 🔶 Long-tail en blog |
+| comprar por mayoreo en línea México | `/blog/como-funciona-compra-mayoreo-en-linea` | ✅ Creada (fase 5) |
 
 ### Keywords informacionales (las que atraen y construyen autoridad)
 Ya cubiertas por los 108 posts: food cost, merma, inventario, NOM-251, CFDI, costeo, Google Maps para restaurantes, comisiones de apps, etc. **Brechas detectadas** (ninguna guía existente las cubre):
 
-1. **"cuánto cuesta surtir un restaurante al mes"** — alto intent, cero competencia seria.
-2. **"lista de insumos para abrir un restaurante"** — captura negocios nuevos = clientes nuevos de Resurte.
-3. **"central de abastos vs proveedor digital"** — comparativa directa (ver §3).
-4. **"cómo funciona la compra por mayoreo en línea"** — educación de categoría.
-5. **"precio del kilo de [insumo] hoy"** — la keyword de mayor volumen del segmento; se ataca con el Índice de precios (§5).
-6. **"proveedores de [insumo específico] en [ciudad]"** — aguacate, tortilla, carne de cerdo… posts programáticos por insumo top.
+1. **"cuánto cuesta surtir un restaurante al mes"** — alto intent, cero competencia seria. ✅ Creada en fase 2: `cuanto-cuesta-surtir-restaurante-mes`.
+2. **"lista de insumos para abrir un restaurante"** — captura negocios nuevos = clientes nuevos de Resurte. ✅ Creada en fase 3: `lista-insumos-abrir-restaurante`.
+3. **"central de abastos vs proveedor digital"** — comparativa directa (ver §3). ✅ Creada en fase 2: `central-de-abastos-vs-comprar-en-linea`.
+4. **"cómo funciona la compra por mayoreo en línea"** — educación de categoría. ✅ Creada en fase 5: `como-funciona-compra-mayoreo-en-linea`.
+5. **"precio del kilo de [insumo] hoy"** — la keyword de mayor volumen del segmento; se ataca con el Índice de precios (§5). ⬜ Pendiente (requiere exponer datos del catálogo).
+6. **"proveedores de [insumo específico] en [ciudad]"** — aguacate, tortilla, carne de cerdo… posts programáticos por insumo top. ✅ Serie por categoría COMPLETA (fases 5-6): `proveedores-frutas-verduras-restaurantes`, `proveedores-carne-mayoreo-restaurantes`, `proveedores-lacteos-huevo-restaurantes`, `proveedores-bebidas-mayoreo-restaurantes`, `abarrotes-mayoreo-restaurantes`, `desechables-mayoreo-restaurantes`. Siguiente nivel (opcional): posts por insumo específico (aguacate, tortilla) si el volumen lo justifica.
 
 ---
 
@@ -36,25 +36,27 @@ Ya cubiertas por los 108 posts: food cost, merma, inventario, NOM-251, CFDI, cos
 
 Reorganizar el blog plano en 6 hubs. Cada hub: 1 página pilar (guía madre enlazada desde el home/nav) + posts existentes enlazados hacia ella + ella enlazando a los posts.
 
-| Hub | Página pilar (nueva) | Posts existentes que alimenta |
+| Hub | Página pilar | Posts existentes que alimenta |
 |---|---|---|
-| 💰 Costos y rentabilidad | `/blog/guia-costos-restaurante` | food cost, costeo, márgenes, punto de equilibrio, utilidad, KPIs (~25 posts) |
-| 📦 Proveeduría y mayoreo | `/blog/guia-proveeduria-restaurantes` | elegir proveedor, negociación, mayoreo vs menudeo, ABC insumos, recepción (~18 posts) |
-| 🍳 Operación de cocina | `/blog/guia-operacion-cocina` | mermas, inventario, mise en place, NOM-251, almacenamiento (~15 posts) |
-| 📣 Marketing y clientes | `/blog/guia-marketing-restaurantes` | Google Maps, Instagram, reseñas, loyalty, delivery (~20 posts) |
-| 📋 Legal y finanzas | `/blog/guia-legal-finanzas-restaurante` | CFDI, impuestos, crédito, salarios, legislación (~12 posts) |
-| 🚀 Crecimiento | `/blog/guia-crecer-restaurante` | franquicias, food trucks, apertura, temporada (~12 posts) |
+| 💰 Costos y rentabilidad | `/blog/guia-costos-restaurante` ✅ creada (fase 3) | food cost, costeo, márgenes, punto de equilibrio, utilidad, KPIs (~25 posts) |
+| 📦 Proveeduría y mayoreo | `/blog/guia-proveeduria-restaurantes` ✅ creada (fase 3) | elegir proveedor, negociación, mayoreo vs menudeo, ABC insumos, recepción (~18 posts) |
+| 🍳 Operación de cocina | `/blog/guia-operacion-cocina` ✅ creada (fase 4) | mermas, inventario, mise en place, NOM-251, almacenamiento (~15 posts) |
+| 📣 Marketing y clientes | `/blog/guia-marketing-restaurantes` ✅ creada (fase 4) | Google Maps, Instagram, reseñas, loyalty, delivery (~20 posts) |
+| 📋 Legal y finanzas | `/blog/guia-legal-finanzas-restaurante` ✅ creada (fase 4) | CFDI, impuestos, crédito, salarios, legislación (~12 posts) |
+| 🚀 Crecimiento | `/blog/guia-crecer-restaurante` ✅ creada (fase 4) | franquicias, food trucks, apertura, temporada (~12 posts) |
 
 **Por qué:** los clusters consolidan PageRank temático — Google posiciona mejor "sitios sobre X" que "páginas sueltas sobre X". Con 108 posts ya tienen la materia prima; solo falta la estructura.
+
+**Estado:** 6/6 pilares creadas (fases 3-4) con interlinking desde 8 posts existentes hacia las guías nuevas. Pendiente: enlazar las pilares desde home/nav (requiere cambio de UI — evaluar en el PR de mejoras de sitio).
 
 ---
 
 ## 3. Contenido de comparación (alto intent, baja competencia) — CREAR
 
-1. **"Resurte.me vs ir a la Central de Abastos: costo real comparado"** — tiempo, transporte, merma, precio. La keyword "central de abastos" tiene volumen enorme; esta página captura a quien ya considera el canal tradicional.
-2. **"Las 5 formas de surtir tu restaurante en México (2026): costos y cuál conviene"** — mercado, central, distribuidor, SAM's/Costco, Resurte.me. Formato tabla = imán de citas de IA.
-3. **"Alternativas a [principal competidor] para surtir tu restaurante"** — investigar competidores activos y crear una por cada uno con búsquedas.
-4. **"Cuánto cuesta surtir un restaurante al mes en México (desglose por tamaño)"** — con datos propios de ticket promedio. E-E-A-T + citas.
+1. **"Resurte.me vs ir a la Central de Abastos: costo real comparado"** — tiempo, transporte, merma, precio. La keyword "central de abastos" tiene volumen enorme; esta página captura a quien ya considera el canal tradicional. ✅ Creada en fase 2: `central-de-abastos-vs-comprar-en-linea`.
+2. **"Las 5 formas de surtir tu restaurante en México (2026): costos y cuál conviene"** — mercado, central, distribuidor, SAM's/Costco, Resurte.me. Formato tabla = imán de citas de IA. ✅ Creada en fase 6: `formas-surtir-restaurante-mexico` (tabla maestra + decisión por etapa del negocio).
+3. **"Alternativas a [principal competidor] para surtir tu restaurante"** — investigar competidores activos y crear una por cada uno con búsquedas. ✅ Creada en fase 3: `alternativas-sysco-clubes-precio` (con reglas de veracidad hedged: fuentes externas no verificables en la sesión, solo hechos verificados de Resurte.me afirmados).
+4. **"Cuánto cuesta surtir un restaurante al mes en México (desglose por tamaño)"** — con datos propios de ticket promedio. E-E-A-T + citas. ✅ Creada en fase 2: `cuanto-cuesta-surtir-restaurante-mes`.
 
 **Tips de formato para estas páginas:**
 - Tabla comparativa arriba del fold (Google y las IA la extraen directo).
@@ -71,7 +73,7 @@ Reorganizar el blog plano en 6 hubs. Cada hub: 1 página pilar (guía madre enla
 2. **Una tabla de datos por post mínimo** — las tablas son el formato #1 extraído por AI Overviews.
 3. **Números propios en MXN** — diferenciador E-E-A-T: cualquiera escribe "reduce tu merma"; nadie más dice "de 9% a 5% son $4,800/mes en compras de $120,000".
 4. **FAQ schema en todos** — ya lo hacen; validar con Rich Results Test tras cada publicación.
-5. **Enlaces internos: 3–5 por post** — 1 al hub/pilar, 1–2 a posts hermanos, 1 a una página de categoría/colección transaccional (hoy enlazan al Panel pero poco al catálogo; el catálogo es el que convierte).
+5. **Enlaces internos: 3–5 por post** — 1 al hub/pilar, 1–2 a posts hermanos, 1 a una página de categoría/colección transaccional (hoy enlazan al Panel pero poco al catálogo; el catálogo es el que convierte). **Avance fases 5-6:** la serie por categoría de insumo ya enlaza a las 6 categorías transaccionales (`/cdmx/categoria/*`).
 6. **Actualizar > crear** — refrescar un post que ya rankeó (nueva fecha, dato nuevo, `updatedAt`) sube posiciones más rápido que publicar uno nuevo. Ritmo sugerido: 4 refreshes + 2 nuevos por mes.
 7. **Título ≤60c con keyword al frente y año cuando aplique** ("…en 2026"), description 140–160c con beneficio + CTA implícito.
 8. **Slug corto y estable** — nunca cambiarlo (el sitemap y los enlaces internos dependen de él).
