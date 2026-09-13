@@ -4,7 +4,7 @@
  * stock actual para priorizar qué reabastecer primero.
  */
 
-export type StockStatus = "in_stock" | "low_stock" | "out_of_stock"
+type StockStatus = "in_stock" | "low_stock" | "out_of_stock"
 
 export interface RestockCandidate {
   productId: number
@@ -31,7 +31,7 @@ const STATUS_WEIGHT: Record<StockStatus, number> = {
  * Un agotado con ventas altas encabeza la lista; un in_stock nunca se
  * sugiere (peso 0 y no aplica reabasto).
  */
-export function restockPriority(stockStatus: StockStatus, units30d: number): number {
+function restockPriority(stockStatus: StockStatus, units30d: number): number {
   return STATUS_WEIGHT[stockStatus] + Math.max(0, units30d)
 }
 
