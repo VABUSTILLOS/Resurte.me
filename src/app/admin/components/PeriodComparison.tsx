@@ -48,7 +48,8 @@ export function PeriodComparisonCard() {
   }, [])
 
   useEffect(() => {
-    void load(days)
+    // Diferido a microtask: ningún setState corre síncrono en el efecto.
+    void Promise.resolve().then(() => load(days))
   }, [days, load])
 
   function exportCsv() {
