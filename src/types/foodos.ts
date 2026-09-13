@@ -169,8 +169,32 @@ export interface FoodosCustomer {
   total_spend: number
   last_order_at: string | null
   segment: FoodosCustomerSegment
+  loyalty_points: number
+  store_credit: number
   created_at: string
   updated_at: string
+}
+
+export interface FoodosLoyaltyProgram {
+  id: string
+  restaurant_id: string
+  points_per_100: number
+  point_value: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface FoodosReview {
+  id: string
+  restaurant_id: string
+  order_id: string | null
+  customer_name: string | null
+  customer_phone: string | null
+  item_id: string | null
+  rating: number
+  comment: string | null
+  is_visible: boolean
+  created_at: string
 }
 
 export type FoodosOrderStatus =
@@ -227,6 +251,8 @@ export interface FoodosOrder {
   table_number: string | null
   tip: number
   coupon_code: string | null
+  loyalty_points_redeemed: number
+  loyalty_points_earned: number
   created_at: string
 }
 
