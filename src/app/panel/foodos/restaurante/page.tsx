@@ -29,6 +29,9 @@ export default function RestaurantePage() {
   const [error, setError] = useState<string | null>(null)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  // QR por mesa (dine-in)
+  const [tableCount, setTableCount] = useState("5")
+  const [tableQrs, setTableQrs] = useState<{ mesa: number; url: string }[]>([])
 
   // Formulario
   const [name, setName] = useState("")
@@ -143,6 +146,38 @@ export default function RestaurantePage() {
   async function handleRemoveBranch(id: string) {
     await deleteBranch(id)
     setBranches((prev) => prev.filter((b) => b.id !== id))
+  }
+
+  async function handleToggleDineIn(branch: FoodosBranch) {
+    await upsertBranch({
+      id: branch.id,
+      restaurant_id: branch.restaurant_id,
+      name: branch.name,
+      city: branch.city,
+      address: branch.address,
+      phone: branch.phone,
+      pickup_active: branch.pickup_active,
+      delivery_active: branch.delivery_active,
+      dine_in_active: !branch.dine_in_active,
+      delivery_fee: branch.delivery_fee,
+      min_order: branch.min_order,
+    })
+    setBranches((prev) =>
+      prev.map((b) => (b.id === branch.id ? { ...b, dine_in_active: !b.dine_in_active } : b))
+    )
+  }
+
+  // Genera un QR por mesa apuntando a /r/[slug]?mesa=N (dine-in estilo take.app).
+  async function handleGenerateTableQrs() {
+    if (!restaurant) return
+    const count = Math.min(Math.max(Number(tableCount) || 0, 1), 50)
+    const { toDataURL } = await import("qrcode")
+    const base = publicRestaurantUrl(restaurant.slug)
+    const results: { mesa: number; url: string }[] = []
+    for (let mesa = 1; mesa <= count; mesa++) {
+      results.push({ mesa, url: await toDataURL(`${base}?mesa=${mesa}`, { width: 256, margin: 2 }) })
+    }
+    setTableQrs(results)
   }
 
   function handleCopyUrl() {
@@ -348,6 +383,17 @@ export default function RestaurantePage() {
                         {b.delivery_active && (
                           <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{t("foodos.restaurante.deliveryBadge")}</span>
                         )}
+                        <button
+                          onClick={() => handleToggleDineIn(b)}
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
+                            b.dine_in_active
+                              ? "bg-purple-100 text-purple-700"
+                              : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                          }`}
+                          title="Activar/desactivar pedidos en mesa (dine-in)"
+                        >
+                          🍽️ En mesa {b.dine_in_active ? "activo" : "inactivo"}
+                        </button>
                       </div>
                     </div>
                     <button
@@ -397,6 +443,51 @@ export default function RestaurantePage() {
           </>
         )}
       </div>
+      {/* QR por mesa (dine-in) */}
+      {restaurant && branches.some((b) => b.dine_in_active) && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <QrCode className="w-5 h-5 text-[#0E7A0E]" />
+            <h2 className="font-semibold text-gray-900">QR por mesa</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">
+            Cada QR abre el menú en modo &quot;En el local&quot; con la mesa pre-seleccionada. Imprime y pega uno por mesa.
+          </p>
+          <div className="flex items-center gap-3 mb-4">
+            <input
+              type="number" min="1" max="50"
+              value={tableCount}
+              onChange={(e) => setTableCount(e.target.value)}
+              className="w-24 rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+            />
+            <button
+              onClick={handleGenerateTableQrs}
+              className="px-4 py-2.5 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e]"
+            >
+              Generar QRs
+            </button>
+          </div>
+          {tableQrs.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+              {tableQrs.map((q) => (
+                <div key={q.mesa} className="flex flex-col items-center rounded-xl border border-gray-200 p-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- QR generado en cliente como data URL */}
+                  <img src={q.url} alt={`QR mesa ${q.mesa}`} width={128} height={128} className="w-32 h-32" />
+                  <p className="text-xs font-bold text-gray-700 mt-2">Mesa {q.mesa}</p>
+                  <a
+                    href={q.url}
+                    download={`qr-mesa-${q.mesa}.png`}
+                    className="text-[11px] text-[#0E7A0E] font-semibold hover:underline mt-1"
+                  >
+                    Descargar
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <ToolGuideHost toolKey="restaurante" pathname="/panel/foodos/restaurante" slug={null} icon="🏪" title={t("foodos.restaurante.guideTitle")} />
     </div>
   )

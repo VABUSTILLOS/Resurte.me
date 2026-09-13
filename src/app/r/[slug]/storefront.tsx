@@ -8,6 +8,10 @@ import { Compass, ShoppingBag } from "lucide-react"
 import {
   computeOrderTotals,
   buildRecommendations,
+  buildWhatsAppOrderLink,
+  buildWhatsAppOrderMessage,
+  cartLineKey,
+  unitPriceWithModifiers,
 } from "@/lib/foodos"
 import type {
   FoodosRestaurant,
@@ -17,10 +21,14 @@ import type {
   FoodosCombo,
   FoodosUpsellRule,
   FoodosOrderItem,
+  FoodosOrderItemModifier,
+  FoodosItemOptionGroup,
+  FoodosItemOptionValue,
 } from "@/types/foodos"
 import { MenuView } from "./_components/menu-view"
 import { CheckoutView } from "./_components/checkout-view"
 import { SuccessScreen } from "./_components/success-screen"
+import { ItemOptionsModal } from "./_components/item-options-modal"
 
 // Stripe libs are heavy and only needed when the customer pays by card.
 const CardPaymentOverlay = dynamic(
@@ -40,6 +48,8 @@ interface Props {
   items: FoodosMenuItem[]
   combos: FoodosCombo[]
   rules: FoodosUpsellRule[]
+  optionGroups: FoodosItemOptionGroup[]
+  optionValues: FoodosItemOptionValue[]
 }
 
 export function FoodosStorefront({
@@ -49,17 +59,30 @@ export function FoodosStorefront({
   items,
   combos,
   rules,
+  optionGroups,
+  optionValues,
 }: Props) {
   const [cart, setCart] = useState<FoodosOrderItem[]>([])
   const [view, setView] = useState<View>("menu")
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [optionsItem, setOptionsItem] = useState<FoodosMenuItem | null>(null)
 
   // Checkout state
   const [customerName, setCustomerName] = useState("")
   const [customerPhone, setCustomerPhone] = useState("")
-  const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("pickup")
+  // QR por mesa: /r/[slug]?mesa=N abre directo en modo dine-in. Se lee en el
+  // inicializador (solo cliente); no afecta el primer render (vista "menú").
+  const [mesaParam] = useState(() =>
+    typeof window === "undefined"
+      ? null
+      : new URLSearchParams(window.location.search).get("mesa")
+  )
+  const [fulfillment, setFulfillment] = useState<"pickup" | "delivery" | "dine_in">(
+    mesaParam ? "dine_in" : "pickup"
+  )
+  const [tableNumber, setTableNumber] = useState(mesaParam ?? "")
   const [branchId, setBranchId] = useState<string | null>(branches[0]?.id ?? null)
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "branch">("branch")
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "branch" | "whatsapp">("branch")
   const [note, setNote] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -87,26 +110,50 @@ export function FoodosStorefront({
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0)
 
+  const itemHasOptions = (itemId: string) =>
+    optionGroups.some((g) => g.item_id === itemId)
+
   const addItem = (item: FoodosMenuItem) => {
+    if (itemHasOptions(item.id)) {
+      setOptionsItem(item)
+      return
+    }
+    pushCartLine({ item_id: item.id, name: item.name, price: item.price, qty: 1 })
+  }
+
+  const addItemWithModifiers = (modifiers: FoodosOrderItemModifier[]) => {
+    if (!optionsItem) return
+    pushCartLine({
+      item_id: optionsItem.id,
+      name: optionsItem.name,
+      price: unitPriceWithModifiers(optionsItem.price, modifiers),
+      qty: 1,
+      modifiers: modifiers.length ? modifiers : undefined,
+    })
+    setOptionsItem(null)
+  }
+
+  /** Agrega una línea fusionando con la existente (mismo ítem + mismos modificadores). */
+  const pushCartLine = (line: FoodosOrderItem) => {
     setCart((prev) => {
-      const existing = prev.find((i) => i.item_id === item.id)
+      const key = cartLineKey(line)
+      const existing = prev.find((i) => cartLineKey(i) === key)
       if (existing) {
-        return prev.map((i) => (i.item_id === item.id ? { ...i, qty: i.qty + 1 } : i))
+        return prev.map((i) =>
+          cartLineKey(i) === key ? { ...i, qty: i.qty + line.qty } : i
+        )
       }
-      return [...prev, { item_id: item.id, name: item.name, price: item.price, qty: 1 }]
+      return [...prev, line]
     })
   }
 
   const addCombo = (combo: FoodosCombo) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.combo_id === combo.id)
-      if (existing) {
-        return prev.map((i) => (i.combo_id === combo.id ? { ...i, qty: i.qty + 1 } : i))
-      }
-      return [
-        ...prev,
-        { item_id: combo.id, name: combo.name, price: combo.price, qty: 1, combo_id: combo.id },
-      ]
+    pushCartLine({
+      item_id: combo.id,
+      name: combo.name,
+      price: combo.price,
+      qty: 1,
+      combo_id: combo.id,
     })
   }
 
@@ -137,6 +184,10 @@ export function FoodosStorefront({
       setError("Selecciona una sucursal.")
       return
     }
+    if (fulfillment === "dine_in" && !tableNumber.trim()) {
+      setError("Indica tu número de mesa.")
+      return
+    }
 
     setLoading(true)
     try {
@@ -157,12 +208,13 @@ export function FoodosStorefront({
           items: cart,
           delivery_fee: deliveryFee,
           discount: 0,
-          channel: "web",
+          channel: paymentMethod === "whatsapp" ? "whatsapp" : tableNumber ? "qr" : "web",
           fulfillment,
           payment_method: paymentMethod === "card" ? "card" : null,
           customer_name: customerName.trim(),
           customer_phone: customerPhone.trim(),
           note: note.trim() || null,
+          table_number: fulfillment === "dine_in" ? tableNumber.trim() : null,
         }),
       })
 
@@ -180,6 +232,29 @@ export function FoodosStorefront({
       if (paymentMethod === "card") {
         await submitCardPayment(data.orderId)
         return
+      }
+
+      // WhatsApp (flujo take.app): abrir chat del restaurante con el pedido
+      // estructurado; el pedido ya quedó registrado con canal "whatsapp".
+      if (paymentMethod === "whatsapp") {
+        const branch = branches.find((b) => b.id === branchId)
+        if (branch?.phone) {
+          const message = buildWhatsAppOrderMessage({
+            orderRef: String(data.orderId).slice(0, 8).toUpperCase(),
+            restaurantName: restaurant.name,
+            items: cart,
+            subtotal: totals.subtotal,
+            deliveryFee,
+            discount: 0,
+            total: data.total,
+            fulfillment,
+            tableNumber: fulfillment === "dine_in" ? tableNumber.trim() : null,
+            customerName: customerName.trim(),
+            customerPhone: customerPhone.trim(),
+            note: note.trim() || null,
+          })
+          window.open(buildWhatsAppOrderLink(branch.phone, message), "_blank", "noopener")
+        }
       }
 
       setCart([])
@@ -281,6 +356,7 @@ export function FoodosStorefront({
             onAddCombo={addCombo}
             cartCount={cartCount}
             onGoToCart={() => setView("checkout")}
+            itemHasOptions={itemHasOptions}
           />
         )}
 
@@ -297,6 +373,8 @@ export function FoodosStorefront({
             setCustomerPhone={setCustomerPhone}
             fulfillment={fulfillment}
             setFulfillment={setFulfillment}
+            tableNumber={tableNumber}
+            setTableNumber={setTableNumber}
             branchId={branchId}
             setBranchId={setBranchId}
             paymentMethod={paymentMethod}
@@ -310,6 +388,16 @@ export function FoodosStorefront({
             onSubmit={submitOrder}
             loading={loading}
             error={error}
+          />
+        )}
+
+        {optionsItem && (
+          <ItemOptionsModal
+            item={optionsItem}
+            groups={optionGroups}
+            values={optionValues}
+            onConfirm={addItemWithModifiers}
+            onClose={() => setOptionsItem(null)}
           />
         )}
 

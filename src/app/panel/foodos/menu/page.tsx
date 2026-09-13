@@ -19,14 +19,17 @@ import {
   deleteMenuItem,
   bulkUpsertMenuItems,
 } from "../actions"
+import { ItemOptionsManager } from "./_components/item-options-manager"
 import { formatMoney, itemMargin } from "@/lib/foodos"
 import type {
   FoodosRestaurant,
   FoodosMenuCategory,
   FoodosMenuItem,
+  FoodosItemOptionGroup,
+  FoodosItemOptionValue,
 } from "@/types/foodos"
 import {
-  UtensilsCrossed, Plus, Pencil, Trash2, Download, Check, X, Star, Loader2, Tag,
+  UtensilsCrossed, Plus, Pencil, Trash2, Download, Check, X, Star, Loader2, Tag, ListPlus,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
@@ -61,6 +64,9 @@ export default function MenuPage() {
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
   const [categories, setCategories] = useState<FoodosMenuCategory[]>([])
   const [items, setItems] = useState<FoodosMenuItem[]>([])
+  const [optionGroups, setOptionGroups] = useState<FoodosItemOptionGroup[]>([])
+  const [optionValues, setOptionValues] = useState<FoodosItemOptionValue[]>([])
+  const [optionsItem, setOptionsItem] = useState<FoodosMenuItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -78,10 +84,12 @@ export default function MenuPage() {
 
   const load = useCallback(async () => {
     try {
-      const { restaurant: r, categories: cats, items: its } = await getFoodosPanelData()
+      const { restaurant: r, categories: cats, items: its, optionGroups: ogs, optionValues: ovs } = await getFoodosPanelData()
       setRestaurant(r)
       setCategories(cats)
       setItems(its)
+      setOptionGroups(ogs)
+      setOptionValues(ovs)
     } catch (e) {
       setError(e instanceof Error ? e.message : t("foodos.menu.loadError"))
     } finally {
@@ -334,6 +342,13 @@ export default function MenuPage() {
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
                         <button
+                          onClick={() => setOptionsItem(item)}
+                          className="p-1.5 rounded-md text-gray-400 hover:text-[#0E7A0E]"
+                          title="Opciones y extras"
+                        >
+                          <ListPlus className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={() => setEditingItem({
                             id: item.id, category_id: item.category_id, name: item.name,
                             description: item.description ?? "", price: String(item.price), cost: String(item.cost),
@@ -395,6 +410,13 @@ export default function MenuPage() {
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
                         <button
+                          onClick={() => setOptionsItem(item)}
+                          className="p-1.5 rounded-md text-gray-400 hover:text-[#0E7A0E]"
+                          title="Opciones y extras"
+                        >
+                          <ListPlus className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={() => setEditingItem({
                             id: item.id, category_id: item.category_id, name: item.name,
                             description: item.description ?? "", price: String(item.price), cost: String(item.cost),
@@ -411,9 +433,16 @@ export default function MenuPage() {
                     </div>
                     <div className="flex items-center justify-between mt-3">
                       <span className="text-sm font-bold text-gray-900">{formatMoney(item.price)}</span>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${item.is_available ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                        {item.is_available ? t("foodos.menu.available") : t("foodos.menu.unavailable")}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {optionGroups.some((g) => g.item_id === item.id) && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                            {optionGroups.filter((g) => g.item_id === item.id).length} opciones
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${item.is_available ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                          {item.is_available ? t("foodos.menu.available") : t("foodos.menu.unavailable")}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -545,6 +574,16 @@ export default function MenuPage() {
             </form>
           </div>
         </div>
+      )}
+      {optionsItem && restaurant && (
+        <ItemOptionsManager
+          item={optionsItem}
+          restaurantId={restaurant.id}
+          groups={optionGroups}
+          values={optionValues}
+          onChange={(ogs, ovs) => { setOptionGroups(ogs); setOptionValues(ovs) }}
+          onClose={() => setOptionsItem(null)}
+        />
       )}
       <ToolGuideHost toolKey="menu" pathname="/panel/foodos/menu" slug={null} icon="🍔" title={t("foodos.menu.guideTitle")} />
     </div>

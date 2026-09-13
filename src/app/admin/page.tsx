@@ -12,6 +12,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Clock,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react"
 import {
@@ -90,6 +91,11 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Bitácora: últimas acciones admin sobre pedidos (C5).
+  const [auditEntries, setAuditEntries] = useState<
+    { id: number; title: string; body: string | null; created_at: string }[]
+  >([])
+
   const fetchDashboard = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -126,6 +132,20 @@ export default function AdminDashboardPage() {
     // Diferido a microtask: ningún setState corre síncrono en el efecto.
     void Promise.resolve().then(fetchDashboard)
   }, [fetchDashboard])
+
+  // Bitácora admin (best-effort: si falla, el dashboard sigue funcionando)
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/admin/audit-log", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { entries?: { id: number; title: string; body: string | null; created_at: string }[] } | null) => {
+        if (!cancelled && data?.entries) setAuditEntries(data.entries)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const recentOrders = orders.slice(0, 5)
   const statCards: {
@@ -330,6 +350,36 @@ export default function AdminDashboardPage() {
           </table>
         </div>
       </div>
+
+      {/* Bitácora de actividad admin (C5) */}
+      {auditEntries.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mt-8">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+            <ClipboardList className="w-4 h-4 text-gray-400" />
+            <h2 className="font-semibold text-gray-900">Bitácora de actividad</h2>
+          </div>
+          <ul className="divide-y divide-gray-100">
+            {auditEntries.map((entry) => (
+              <li key={entry.id} className="flex items-baseline justify-between gap-4 px-5 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-gray-900 font-medium truncate">{entry.title}</p>
+                  {entry.body && (
+                    <p className="text-xs text-gray-500 truncate">{entry.body}</p>
+                  )}
+                </div>
+                <time className="text-xs text-gray-400 shrink-0">
+                  {new Date(entry.created_at).toLocaleString("es-MX", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </time>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

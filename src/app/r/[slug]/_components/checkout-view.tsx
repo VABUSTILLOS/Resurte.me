@@ -1,10 +1,10 @@
 "use client"
 
 import {
-  ArrowLeft, ArrowRight, Banknote, Bike, CreditCard, MapPin,
-  Minus, Plus, Sparkles, Store, Trash2,
+  ArrowLeft, ArrowRight, Banknote, Bike, CreditCard, MapPin, MessageCircle,
+  Minus, Plus, Sparkles, Store, Trash2, UtensilsCrossed,
 } from "lucide-react"
-import { buildRecommendations, formatMoney } from "@/lib/foodos"
+import { buildRecommendations, formatMoney, modifiersSummary } from "@/lib/foodos"
 import type { FoodosBranch, FoodosOrderItem } from "@/types/foodos"
 
 export function CheckoutView({
@@ -19,6 +19,8 @@ export function CheckoutView({
   setCustomerPhone,
   fulfillment,
   setFulfillment,
+  tableNumber,
+  setTableNumber,
   branchId,
   setBranchId,
   paymentMethod,
@@ -42,12 +44,14 @@ export function CheckoutView({
   setCustomerName: (v: string) => void
   customerPhone: string
   setCustomerPhone: (v: string) => void
-  fulfillment: "pickup" | "delivery"
-  setFulfillment: (v: "pickup" | "delivery") => void
+  fulfillment: "pickup" | "delivery" | "dine_in"
+  setFulfillment: (v: "pickup" | "delivery" | "dine_in") => void
+  tableNumber: string
+  setTableNumber: (v: string) => void
   branchId: string | null
   setBranchId: (v: string) => void
-  paymentMethod: "card" | "branch"
-  setPaymentMethod: (v: "card" | "branch") => void
+  paymentMethod: "card" | "branch" | "whatsapp"
+  setPaymentMethod: (v: "card" | "branch" | "whatsapp") => void
   note: string
   setNote: (v: string) => void
   onChangeQty: (index: number, delta: number) => void
@@ -77,6 +81,9 @@ export function CheckoutView({
                   <div key={`${item.item_id}-${idx}`} className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-stone-900 truncate">{item.name}</p>
+                      {item.modifiers && item.modifiers.length > 0 && (
+                        <p className="text-xs text-stone-500 truncate">{modifiersSummary(item.modifiers)}</p>
+                      )}
                       <div className="flex items-center gap-2 mt-1">
                         <button onClick={() => onChangeQty(idx, -1)} className="w-11 h-11 sm:w-8 sm:h-8 rounded-full bg-stone-100 flex items-center justify-center touch-target" aria-label="Menos">
                           <Minus className="w-4 h-4 sm:w-3 sm:h-3" />
@@ -157,7 +164,7 @@ export function CheckoutView({
           {/* Entrega */}
           <section className="bg-white border border-stone-200 rounded-2xl p-4">
             <h2 className="font-bold text-stone-900 mb-3">Entrega</h2>
-            <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className={`grid gap-2 mb-4 ${branches.some((b) => b.dine_in_active) ? "grid-cols-3" : "grid-cols-2"}`}>
               <button
                 onClick={() => setFulfillment("pickup")}
                 className={`flex flex-col items-center gap-1 rounded-xl p-3 border-2 text-sm font-semibold ${
@@ -176,7 +183,28 @@ export function CheckoutView({
                 <Bike className="w-5 h-5" />
                 A domicilio
               </button>
+              {branches.some((b) => b.dine_in_active) && (
+                <button
+                  onClick={() => setFulfillment("dine_in")}
+                  className={`flex flex-col items-center gap-1 rounded-xl p-3 border-2 text-sm font-semibold ${
+                    fulfillment === "dine_in" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-stone-200 text-stone-500"
+                  }`}
+                >
+                  <UtensilsCrossed className="w-5 h-5" />
+                  En el local
+                </button>
+              )}
             </div>
+
+            {fulfillment === "dine_in" && (
+              <input
+                value={tableNumber}
+                onChange={(e) => setTableNumber(e.target.value)}
+                placeholder="Número de mesa"
+                inputMode="numeric"
+                className="w-full px-4 py-3 mb-4 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            )}
 
             {branches.length > 0 && (
               <div className="grid gap-2">
@@ -227,7 +255,23 @@ export function CheckoutView({
                 <CreditCard className="w-5 h-5" />
                 Tarjeta
               </button>
+              {branches.find((b) => b.id === branchId)?.phone && (
+                <button
+                  onClick={() => setPaymentMethod("whatsapp")}
+                  className={`col-span-2 flex items-center justify-center gap-2 rounded-xl p-3 border-2 text-sm font-semibold ${
+                    paymentMethod === "whatsapp" ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-stone-200 text-stone-500"
+                  }`}
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  Enviar pedido por WhatsApp
+                </button>
+              )}
             </div>
+            {paymentMethod === "whatsapp" && (
+              <p className="mt-3 text-xs text-stone-500">
+                Al confirmar se abrirá WhatsApp con tu pedido listo para enviar al restaurante. El pago se acuerda por chat o al recoger.
+              </p>
+            )}
           </section>
         </div>
 
@@ -265,6 +309,11 @@ export function CheckoutView({
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Creando pedido...
+                </>
+              ) : paymentMethod === "whatsapp" ? (
+                <>
+                  <MessageCircle className="w-4 h-4" />
+                  Confirmar y abrir WhatsApp
                 </>
               ) : (
                 <>

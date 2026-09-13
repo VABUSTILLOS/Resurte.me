@@ -7,8 +7,10 @@
 import type {
   FoodosCombo,
   FoodosCustomerSegment,
+  FoodosItemOptionGroup,
   FoodosMenuItem,
   FoodosOrderItem,
+  FoodosOrderItemModifier,
   FoodosUpsellRule,
 } from "@/types/foodos"
 
@@ -43,6 +45,99 @@ export function computeOrderTotals(
     discount: cappedDiscount,
     total: Math.max(0, subtotal - cappedDiscount + deliveryFee),
   }
+}
+
+// --- Modificadores ---
+
+/** Precio unitario de una línea: base + deltas de modificadores. */
+export function unitPriceWithModifiers(
+  basePrice: number,
+  modifiers: FoodosOrderItemModifier[] | undefined
+): number {
+  const deltas = (modifiers ?? []).reduce((s, m) => s + (Number(m.price_delta) || 0), 0)
+  return basePrice + deltas
+}
+
+/** Clave estable de una línea de carrito (ítem + set de modificadores). */
+export function cartLineKey(item: Pick<FoodosOrderItem, "item_id" | "combo_id" | "modifiers">): string {
+  if (item.combo_id) return `combo:${item.combo_id}`
+  const mods = (item.modifiers ?? [])
+    .map((m) => m.value_id)
+    .sort()
+    .join(",")
+  return `${item.item_id}|${mods}`
+}
+
+/** Texto corto de modificadores para listas (carrito, comanda, WhatsApp). */
+export function modifiersSummary(modifiers: FoodosOrderItemModifier[] | undefined): string {
+  return (modifiers ?? []).map((m) => m.value_name).join(", ")
+}
+
+/** Valida las selecciones de un modal de opciones contra sus grupos. */
+export function validateOptionSelection(
+  groups: FoodosItemOptionGroup[],
+  selected: Record<string, string[]> // group_id -> value_ids
+): string | null {
+  for (const g of groups) {
+    const count = (selected[g.id] ?? []).length
+    if (g.is_required && count < Math.max(1, g.min_select)) {
+      return `Selecciona al menos ${Math.max(1, g.min_select)} en "${g.name}"`
+    }
+    if (count < g.min_select) return `Faltan opciones en "${g.name}"`
+    if (count > g.max_select) return `Máximo ${g.max_select} en "${g.name}"`
+  }
+  return null
+}
+
+/** Construye las líneas "1× Nombre └ Mod (+$10)" estilo take.app para WhatsApp. */
+export function buildWhatsAppOrderMessage(input: {
+  orderRef: string
+  restaurantName: string
+  items: FoodosOrderItem[]
+  subtotal: number
+  deliveryFee: number
+  discount: number
+  total: number
+  fulfillment: string
+  tableNumber?: string | null
+  customerName: string
+  customerPhone: string
+  note?: string | null
+}): string {
+  const fmt = (n: number) => formatMoney(n)
+  const lines: string[] = [
+    `🍽️ *Nuevo pedido #${input.orderRef} — ${input.restaurantName}*`,
+    "",
+  ]
+  for (const item of input.items) {
+    lines.push(`${item.qty}× ${item.name} (${fmt(item.price * item.qty)})`)
+    for (const m of item.modifiers ?? []) {
+      const delta = Number(m.price_delta) ? ` (+${fmt(Number(m.price_delta))})` : ""
+      lines.push(`  └ ${m.value_name}${delta}`)
+    }
+  }
+  lines.push("")
+  lines.push(`Subtotal: ${fmt(input.subtotal)}`)
+  if (input.discount > 0) lines.push(`Descuento: -${fmt(input.discount)}`)
+  if (input.deliveryFee > 0) lines.push(`Envío: ${fmt(input.deliveryFee)}`)
+  lines.push(`*Total: ${fmt(input.total)}*`)
+  lines.push("")
+  const fulfillmentLabel =
+    input.fulfillment === "delivery"
+      ? "A domicilio"
+      : input.fulfillment === "dine_in"
+        ? `En el local${input.tableNumber ? ` · Mesa ${input.tableNumber}` : ""}`
+        : "Para llevar"
+  lines.push(`Servicio: ${fulfillmentLabel}`)
+  lines.push(`Cliente: ${input.customerName} · ${input.customerPhone}`)
+  if (input.note) lines.push(`Nota: ${input.note}`)
+  return lines.join("\n")
+}
+
+/** Deep link wa.me con el pedido estructurado. */
+export function buildWhatsAppOrderLink(phone: string, message: string): string {
+  const digits = (phone ?? "").replace(/\D/g, "")
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
 }
 
 function comboValue(combo: FoodosCombo): number {

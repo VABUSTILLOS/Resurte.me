@@ -1,13 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { computeOrderTotals } from "@/lib/foodos"
-import type { FoodosOrderItem } from "@/types/foodos"
+import type { FoodosOrderItem, FoodosOrderItemModifier } from "@/types/foodos"
 import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 
 // Rate limiting durable (helper compartido en src/lib/rate-limit.ts).
 const RATE_LIMIT_MAX = 20
 const RATE_LIMIT_WINDOW_SECONDS = 60
+
+interface OptionGroupRow {
+  id: string
+  item_id: string
+  name: string
+  is_required: boolean
+  min_select: number
+  max_select: number
+}
+
+interface OptionValueRow {
+  id: string
+  group_id: string
+  name: string
+  price_delta: number
+  is_available: boolean
+}
 
 interface FoodosOrderBody {
   restaurant_id: string
@@ -21,6 +38,7 @@ interface FoodosOrderBody {
   customer_name?: string | null
   customer_phone?: string | null
   note?: string | null
+  table_number?: string | null
 }
 
 /**
@@ -53,6 +71,7 @@ export async function POST(request: NextRequest) {
       customer_name,
       customer_phone,
       note,
+      table_number,
     } = body
 
     const missing: string[] = []
@@ -82,7 +101,7 @@ export async function POST(request: NextRequest) {
     if (branch_id) {
       const { data: branch } = await supabase
         .from("foodos_branches")
-        .select("id, pickup_active, delivery_active, delivery_fee")
+        .select("id, pickup_active, delivery_active, dine_in_active, delivery_fee")
         .eq("id", branch_id)
         .eq("restaurant_id", restaurant_id)
         .maybeSingle()
@@ -98,6 +117,9 @@ export async function POST(request: NextRequest) {
       if (fulfillment === "pickup" && !branch.pickup_active) {
         return NextResponse.json({ error: "Esta sucursal no ofrece recolección" }, { status: 400 })
       }
+      if (fulfillment === "dine_in" && !branch.dine_in_active) {
+        return NextResponse.json({ error: "Esta sucursal no ofrece servicio en mesa" }, { status: 400 })
+      }
       serverDeliveryFee = fulfillment === "delivery" ? Number(branch.delivery_fee) || 0 : 0
     }
 
@@ -112,18 +134,42 @@ export async function POST(request: NextRequest) {
 
     const comboIds = [...new Set(items.filter((i) => i.combo_id).map((i) => i.combo_id as string))]
     const itemIds = [...new Set(items.filter((i) => !i.combo_id).map((i) => i.item_id))]
+    // Todos los value_ids de modificadores enviados por el cliente (se
+    // recalculan contra la BD; nunca se confía en el precio del cliente).
+    const modifierValueIds = [
+      ...new Set(items.flatMap((i) => (i.modifiers ?? []).map((m) => m.value_id))),
+    ]
 
-    const [combosRes, itemsRes] = await Promise.all([
+    const [combosRes, itemsRes, groupsRes, valuesRes] = await Promise.all([
       comboIds.length
         ? supabase.from("foodos_combos").select("id, price").in("id", comboIds)
         : Promise.resolve({ data: [] as { id: string; price: number }[], error: null }),
       itemIds.length
         ? supabase.from("foodos_menu_items").select("id, price").in("id", itemIds)
         : Promise.resolve({ data: [] as { id: string; price: number }[], error: null }),
+      itemIds.length
+        ? supabase
+            .from("foodos_item_option_groups")
+            .select("id, item_id, name, is_required, min_select, max_select")
+            .in("item_id", itemIds)
+        : Promise.resolve({ data: [] as OptionGroupRow[], error: null }),
+      modifierValueIds.length
+        ? supabase
+            .from("foodos_item_option_values")
+            .select("id, group_id, name, price_delta, is_available")
+            .in("id", modifierValueIds)
+        : Promise.resolve({ data: [] as OptionValueRow[], error: null }),
     ])
 
     const comboPrice = new Map((combosRes.data ?? []).map((c) => [c.id, Number(c.price)]))
     const itemPrice = new Map((itemsRes.data ?? []).map((i) => [i.id, Number(i.price)]))
+    const groupsByItem = new Map<string, OptionGroupRow[]>()
+    for (const g of groupsRes.data ?? []) {
+      const list = groupsByItem.get(g.item_id) ?? []
+      list.push(g)
+      groupsByItem.set(g.item_id, list)
+    }
+    const valueById = new Map((valuesRes.data ?? []).map((v) => [v.id, v]))
 
     const cleanItems: FoodosOrderItem[] = []
     for (const raw of items) {
@@ -144,18 +190,67 @@ export async function POST(request: NextRequest) {
           combo_id: raw.combo_id,
         })
       } else {
-        const price = itemPrice.get(raw.item_id)
-        if (price === undefined) {
+        const basePrice = itemPrice.get(raw.item_id)
+        if (basePrice === undefined) {
           return NextResponse.json(
             { error: "Platillo no válido en el pedido" },
             { status: 400 }
           )
         }
+
+        // Validar modificadores: pertenencia al ítem, disponibilidad y
+        // límites min/max por grupo. El precio se recalcula en servidor.
+        const groups = groupsByItem.get(raw.item_id) ?? []
+        const cleanModifiers: FoodosOrderItemModifier[] = []
+        const countByGroup = new Map<string, number>()
+        for (const m of raw.modifiers ?? []) {
+          const value = valueById.get(m.value_id)
+          if (!value || !value.is_available) {
+            return NextResponse.json(
+              { error: "Modificador no válido en el pedido" },
+              { status: 400 }
+            )
+          }
+          const group = groups.find((g) => g.id === value.group_id && g.id === m.group_id)
+          if (!group) {
+            return NextResponse.json(
+              { error: "Modificador no pertenece al platillo" },
+              { status: 400 }
+            )
+          }
+          countByGroup.set(group.id, (countByGroup.get(group.id) ?? 0) + 1)
+          cleanModifiers.push({
+            group_id: group.id,
+            group_name: group.name,
+            value_id: value.id,
+            value_name: value.name,
+            price_delta: Number(value.price_delta) || 0,
+          })
+        }
+        for (const g of groups) {
+          const count = countByGroup.get(g.id) ?? 0
+          if (g.is_required && count < Math.max(1, g.min_select)) {
+            return NextResponse.json(
+              { error: `Falta elegir "${g.name}" en un platillo` },
+              { status: 400 }
+            )
+          }
+          if (count > g.max_select) {
+            return NextResponse.json(
+              { error: `Demasiadas opciones en "${g.name}"` },
+              { status: 400 }
+            )
+          }
+        }
+
+        const price =
+          basePrice + cleanModifiers.reduce((s, m) => s + m.price_delta, 0)
         cleanItems.push({
           item_id: raw.item_id,
           name: raw.name ?? "Producto",
           price,
           qty,
+          modifiers: cleanModifiers.length ? cleanModifiers : undefined,
         })
       }
     }
@@ -182,6 +277,7 @@ export async function POST(request: NextRequest) {
       customer_name: customer_name || null,
       customer_phone: customer_phone || null,
       note: note || null,
+      table_number: fulfillment === "dine_in" ? (table_number || null) : null,
     }
 
     const { data: order, error: orderError } = await supabase

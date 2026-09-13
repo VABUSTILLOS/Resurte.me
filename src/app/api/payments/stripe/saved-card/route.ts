@@ -21,24 +21,31 @@ import { rateLimited, rateLimitResponse, clientIp } from "@/lib/rate-limit"
  * devuelve hasSavedCard: true sin last4/brand (el botón sigue funcionando).
  */
 export async function GET(request: NextRequest) {
-  const supabaseClient = await createClient()
-  const {
-    data: { user },
-  } = await supabaseClient.auth.getUser()
+  let user
+  try {
+    const supabaseClient = await createClient()
+    const {
+      data: { user: u },
+    } = await supabaseClient.auth.getUser()
+    user = u
+  } catch {
+    // Fail-open: si la auth no responde, comportarse como "sin tarjeta".
+    return NextResponse.json({ hasSavedCard: false })
+  }
 
   if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 })
   }
 
-  // Rate limit: 20 requests per minute per user
-  const ip = clientIp(request)
-  const rlKey = `saved-card:${user.id}:${ip}`
-  const rl = await rateLimited(await createServiceClient(), rlKey, 20, 60)
-  if (!rl.allowed) {
-    return rateLimitResponse(rl)
-  }
-
   try {
+    // Rate limit: 20 requests per minute per user
+    const ip = clientIp(request)
+    const rlKey = `saved-card:${user.id}:${ip}`
+    const rl = await rateLimited(await createServiceClient(), rlKey, 20, 60)
+    if (!rl.allowed) {
+      return rateLimitResponse(rl)
+    }
+
     const supabase = await createServiceClient()
     const { data: prior } = await supabase
       .from("orders")
