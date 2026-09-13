@@ -4,10 +4,13 @@ import {
   parseNotifPrefs,
   serializeNotifPrefs,
   pushEvent,
-  DEFAULT_NOTIF_PREFS,
-  MAX_NOTIFICATION_EVENTS,
   type AdminNotificationEvent,
 } from "./order-notifications"
+
+// Espejo de las constantes internas del módulo (no exportadas: solo las usa
+// la implementación). Si cambian, estos tests deben actualizarse.
+const DEFAULT_NOTIF_PREFS = { sound: true, browser: false }
+const MAX_NOTIFICATION_EVENTS = 20
 
 describe("buildNewOrderEvent", () => {
   it("primera carga (prev null) no genera evento", () => {
