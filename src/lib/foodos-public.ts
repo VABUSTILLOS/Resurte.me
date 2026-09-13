@@ -15,6 +15,7 @@ import type {
   FoodosUpsellRule,
   FoodosItemOptionGroup,
   FoodosItemOptionValue,
+  FoodosBranchHours,
 } from "@/types/foodos"
 
 export interface PublicFoodosData {
@@ -26,6 +27,7 @@ export interface PublicFoodosData {
   rules: FoodosUpsellRule[]
   optionGroups: FoodosItemOptionGroup[]
   optionValues: FoodosItemOptionValue[]
+  branchHours: FoodosBranchHours[]
 }
 
 export interface PublicMarketplaceEntry {
@@ -74,6 +76,23 @@ async function fetchPublicRestaurantBySlug(slug: string): Promise<PublicFoodosDa
       .eq("is_available", true)
       .order("sort_order"),
   ])
+
+  const branchIds = ((branches.data as FoodosBranch[]) ?? []).map((b) => b.id)
+  const branchHours = branchIds.length
+    ? await supabase.from("foodos_branch_hours").select("*").in("branch_id", branchIds)
+    : { data: [] as FoodosBranchHours[] }
+
+  return {
+    restaurant: restaurant as FoodosRestaurant,
+    branches: (branches.data as FoodosBranch[]) ?? [],
+    categories: (categories.data as FoodosMenuCategory[]) ?? [],
+    items: (items.data as FoodosMenuItem[]) ?? [],
+    combos: (combos.data as FoodosCombo[]) ?? [],
+    rules: (rules.data as FoodosUpsellRule[]) ?? [],
+    optionGroups: (optionGroups.data as FoodosItemOptionGroup[]) ?? [],
+    optionValues: (optionValues.data as FoodosItemOptionValue[]) ?? [],
+    branchHours: (branchHours.data as FoodosBranchHours[]) ?? [],
+  }
 
   return {
     restaurant: restaurant as FoodosRestaurant,

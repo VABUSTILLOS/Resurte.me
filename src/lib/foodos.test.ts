@@ -56,7 +56,7 @@ describe("cartLineKey", () => {
     }
     const mismoSet: FoodosOrderItem = {
       ...base,
-      modifiers: [reordenado.modifiers![1], reordenado.modifiers![0]],
+      modifiers: [...reordenado.modifiers!].reverse(),
     }
     expect(cartLineKey(reordenado)).toBe(cartLineKey(mismoSet))
   })

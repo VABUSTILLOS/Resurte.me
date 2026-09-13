@@ -5,6 +5,7 @@
 // ============================================================
 
 import type {
+  FoodosBranchHours,
   FoodosCombo,
   FoodosCustomerSegment,
   FoodosItemOptionGroup,
@@ -309,4 +310,81 @@ export function itemMargin(item: FoodosMenuItem): number | null {
 
 export function normalizePhone(phone: string): string {
   return (phone ?? "").replace(/\D/g, "")
+}
+
+// --- Horarios de operación ---
+
+/** Hora local "HH:MM" y día de la semana en la zona del restaurante. */
+function localNow(timezone: string, now: Date): { day: number; minutes: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now)
+  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "Sun"
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0)
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0)
+  const days: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+  return { day: days[weekday] ?? 0, minutes: hour * 60 + minute }
+}
+
+function toMinutes(time: string | null): number | null {
+  if (!time) return null
+  const [h, m] = time.split(":").map(Number)
+  return (h || 0) * 60 + (m || 0)
+}
+
+export interface OpenStatus {
+  isOpen: boolean
+  /** true si la sucursal no tiene horarios configurados (siempre abierta). */
+  hasSchedule: boolean
+  /** Texto de la próxima apertura, ej. "Abre mañana 9:00". */
+  nextOpenLabel: string | null
+}
+
+const DAY_LABELS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"]
+
+/** Evalúa si una sucursal está abierta ahora según sus horarios. */
+export function getOpenStatus(
+  hours: FoodosBranchHours[],
+  timezone: string,
+  now = new Date()
+): OpenStatus {
+  if (!hours.length) return { isOpen: true, hasSchedule: false, nextOpenLabel: null }
+
+  const { day, minutes } = localNow(timezone, now)
+  const today = hours.find((h) => h.day_of_week === day)
+
+  if (today && !today.is_closed) {
+    const open = toMinutes(today.open_time)
+    const close = toMinutes(today.close_time)
+    if (open !== null && close !== null) {
+      const within = close > open
+        ? minutes >= open && minutes < close
+        : minutes >= open || minutes < close // horario que cruza medianoche
+      if (within) return { isOpen: true, hasSchedule: true, nextOpenLabel: null }
+    }
+  }
+
+  // Buscar la próxima apertura en los siguientes 7 días
+  for (let offset = 0; offset < 7; offset++) {
+    const d = (day + offset) % 7
+    const row = hours.find((h) => h.day_of_week === d)
+    if (!row || row.is_closed || !row.open_time) continue
+    const open = toMinutes(row.open_time)
+    if (open === null) continue
+    if (offset === 0 && open <= minutes) continue // ya pasó hoy
+    const hhmm = row.open_time.slice(0, 5)
+    const label =
+      offset === 0
+        ? `Abre hoy ${hhmm}`
+        : offset === 1
+          ? `Abre mañana ${hhmm}`
+          : `Abre el ${DAY_LABELS[d]} ${hhmm}`
+    return { isOpen: false, hasSchedule: true, nextOpenLabel: label }
+  }
+
+  return { isOpen: false, hasSchedule: true, nextOpenLabel: "Cerrado temporalmente" }
 }

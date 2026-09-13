@@ -16,6 +16,7 @@ export interface FoodosRestaurant {
   collection_id: number | null
   status: FoodosRestaurantStatus
   currency: string
+  timezone: string
   created_at: string
   updated_at: string
 }
@@ -34,6 +35,18 @@ export interface FoodosBranch {
   dine_in_active: boolean
   delivery_fee: number
   min_order: number
+  created_at: string
+}
+
+// --- Horarios de operación ---
+
+export interface FoodosBranchHours {
+  id: string
+  branch_id: string
+  day_of_week: number // 0=domingo … 6=sábado
+  open_time: string | null  // "HH:MM:SS"
+  close_time: string | null
+  is_closed: boolean
   created_at: string
 }
 

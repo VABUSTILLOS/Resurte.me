@@ -11,7 +11,9 @@ import {
   buildWhatsAppOrderLink,
   buildWhatsAppOrderMessage,
   cartLineKey,
+  getOpenStatus,
   unitPriceWithModifiers,
+  type OpenStatus,
 } from "@/lib/foodos"
 import type {
   FoodosRestaurant,
@@ -24,6 +26,7 @@ import type {
   FoodosOrderItemModifier,
   FoodosItemOptionGroup,
   FoodosItemOptionValue,
+  FoodosBranchHours,
 } from "@/types/foodos"
 import { MenuView } from "./_components/menu-view"
 import { CheckoutView } from "./_components/checkout-view"
@@ -50,6 +53,7 @@ interface Props {
   rules: FoodosUpsellRule[]
   optionGroups: FoodosItemOptionGroup[]
   optionValues: FoodosItemOptionValue[]
+  branchHours: FoodosBranchHours[]
 }
 
 export function FoodosStorefront({
@@ -61,6 +65,7 @@ export function FoodosStorefront({
   rules,
   optionGroups,
   optionValues,
+  branchHours,
 }: Props) {
   const [cart, setCart] = useState<FoodosOrderItem[]>([])
   const [view, setView] = useState<View>("menu")
@@ -97,6 +102,12 @@ export function FoodosStorefront({
     const branch = branches.find((b) => b.id === branchId)
     return branch?.delivery_fee ?? 0
   }, [fulfillment, branchId, branches])
+
+  // Horario de la sucursal seleccionada (bloquea el checkout si está cerrada).
+  const openStatus: OpenStatus = useMemo(() => {
+    const hours = branchHours.filter((h) => h.branch_id === branchId)
+    return getOpenStatus(hours, restaurant.timezone)
+  }, [branchHours, branchId, restaurant.timezone])
 
   const totals = useMemo(
     () => computeOrderTotals(cart, deliveryFee, 0),
@@ -186,6 +197,10 @@ export function FoodosStorefront({
     }
     if (fulfillment === "dine_in" && !tableNumber.trim()) {
       setError("Indica tu número de mesa.")
+      return
+    }
+    if (!openStatus.isOpen) {
+      setError(openStatus.nextOpenLabel ?? "Esta sucursal está cerrada por ahora.")
       return
     }
 
