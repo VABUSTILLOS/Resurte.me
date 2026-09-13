@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Fragment, useEffect, useRef } from "react"
+import { Fragment } from "react"
 import { usePathname } from "next/navigation"
 import { LayoutGrid, Lock, X } from "lucide-react"
 import { TOOLS, TOOL_AREAS } from "@/components/panel/hub/hub-data"
@@ -17,20 +17,8 @@ interface PanelMobileNavProps {
 
 export function PanelMobileNav({ open, onClose, selectedCollection }: PanelMobileNavProps) {
   const pathname = usePathname()
-  const closeBtnRef = useRef<HTMLButtonElement>(null)
 
   useEscapeKey(onClose, open)
-
-  // Bloquea el scroll del fondo mientras el sheet está abierto y mueve el
-  // foco al botón de cerrar (patrón de diálogo modal accesible).
-  useEffect(() => {
-    if (!open) return
-    document.body.style.overflow = "hidden"
-    closeBtnRef.current?.focus()
-    return () => {
-      document.body.style.overflow = ""
-    }
-  }, [open])
 
   if (!open) return null
 
@@ -42,13 +30,12 @@ export function PanelMobileNav({ open, onClose, selectedCollection }: PanelMobil
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/50 z-[65] lg:hidden" onClick={onClose} aria-hidden="true" />
 
-      {/* Bottom sheet — overscroll-contain evita que el scroll de la lista
-          arrastre la página de fondo (scroll chaining) en iOS/Android. */}
+      {/* Bottom sheet */}
       <div
         role="dialog"
         aria-modal="true"
         aria-label={t("panel.title")}
-        className="fixed inset-x-0 bottom-0 z-[70] lg:hidden bg-white rounded-t-2xl shadow-2xl max-h-[80vh] overflow-y-auto overscroll-contain animate-slide-up pb-[env(safe-area-inset-bottom)]"
+        className="fixed inset-x-0 bottom-0 z-[70] lg:hidden bg-white rounded-t-2xl shadow-2xl max-h-[80vh] overflow-y-auto animate-slide-up pb-[env(safe-area-inset-bottom)]"
       >
         <div className="sticky top-0 bg-white rounded-t-2xl border-b border-gray-100 p-4 flex items-center justify-between">
           <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
@@ -56,7 +43,6 @@ export function PanelMobileNav({ open, onClose, selectedCollection }: PanelMobil
             {t("panel.title")}
           </h2>
           <button
-            ref={closeBtnRef}
             onClick={onClose}
             aria-label="Cerrar menú"
             className="p-2 rounded-xl hover:bg-gray-100 transition-colors touch-target"
@@ -69,7 +55,6 @@ export function PanelMobileNav({ open, onClose, selectedCollection }: PanelMobil
           <Link
             href="/panel"
             onClick={onClose}
-            aria-current={isActive("/panel") ? "page" : undefined}
             className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${
               isActive("/panel") ? "bg-[#F0FDF4]" : "hover:bg-gray-50"
             }`}
@@ -119,7 +104,6 @@ export function PanelMobileNav({ open, onClose, selectedCollection }: PanelMobil
                         else onClose()
                       }}
                       aria-disabled={locked}
-                      aria-current={active && !locked ? "page" : undefined}
                       className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${
                         active ? "bg-[#F0FDF4]" : "hover:bg-gray-50"
                       } ${locked ? "opacity-50" : ""}`}
