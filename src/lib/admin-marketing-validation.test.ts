@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest"
 import {
   validateBumpRuleInput,
   validateCouponInput,
+  validateCouponPatch,
+  suggestDuplicateCode,
 } from "./admin-marketing-validation"
 
 describe("validateBumpRuleInput", () => {
@@ -111,5 +113,49 @@ describe("validateCouponInput", () => {
         expires_at: "no-es-fecha",
       }).ok,
     ).toBe(false)
+  })
+})
+
+describe("validateCouponPatch", () => {
+  it("rechaza patch vacío", () => {
+    expect(validateCouponPatch({}).ok).toBe(false)
+  })
+
+  it("acepta campos parciales válidos", () => {
+    const r = validateCouponPatch({ discount_value: 15, max_uses: 100 })
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.value.discount_value).toBe(15)
+      expect(r.value.max_uses).toBe(100)
+      expect(r.value.min_order).toBeUndefined()
+    }
+  })
+
+  it("admite expires_at null explícito (quitar expiración)", () => {
+    const r = validateCouponPatch({ expires_at: null })
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.value.expires_at).toBeNull()
+  })
+
+  it("rechaza valores inválidos", () => {
+    expect(validateCouponPatch({ discount_value: -1 }).ok).toBe(false)
+    expect(validateCouponPatch({ min_order: -5 }).ok).toBe(false)
+    expect(validateCouponPatch({ max_uses: 1.5 }).ok).toBe(true) // trunca
+    expect(validateCouponPatch({ expires_at: "no-es-fecha" }).ok).toBe(false)
+  })
+})
+
+describe("suggestDuplicateCode", () => {
+  it("sugiere -COPIA cuando está libre", () => {
+    expect(suggestDuplicateCode("RESURTE10", [])).toBe("RESURTE10-COPIA")
+  })
+
+  it("incrementa el sufijo cuando la copia ya existe", () => {
+    expect(suggestDuplicateCode("ABC", ["RESURTE10-COPIA", "ABC-COPIA"])).toBe("ABC-COPIA2")
+  })
+
+  it("recorta códigos largos al máximo de 32", () => {
+    const long = "X".repeat(32)
+    expect(suggestDuplicateCode(long, [])).toHaveLength(32)
   })
 })

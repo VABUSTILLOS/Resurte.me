@@ -101,6 +101,8 @@ export default function AdminProductsPage() {
   )
 }
 
+import { RestockPanel } from "../components/RestockPanel"
+
 function AdminProductsContent() {
   // Lazy browser-only client: creating it during SSR would throw when
   // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
@@ -516,6 +518,14 @@ function AdminProductsContent() {
         </div>
       )}
 
+      {/* Fase 12 — sugerencias de reabasto + historial de ajustes */}
+      <RestockPanel
+        onRestocked={(productId) =>
+          setProducts((prev) =>
+            prev.map((p) => (p.id === productId ? { ...p, stock_status: "in_stock" } : p))
+          )
+        }
+      />
       {/* Alertas de stock: conteo de productos con stock bajo o agotado;
           cada chip filtra la tabla. */}
       {(stockCounts.low > 0 || stockCounts.out > 0) && (

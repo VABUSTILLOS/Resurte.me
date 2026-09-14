@@ -55,6 +55,10 @@ export interface AdminOrder {
 export interface AdminOrderFilters {
   status?: string
   search?: string
+  /** ISO timestamptz inclusive (inicio del rango de fechas) */
+  from?: string
+  /** ISO timestamptz EXCLUSIVE (fin del rango; ver normalizeDateRange) */
+  toExclusive?: string
 }
 
 /**
@@ -104,18 +108,27 @@ export async function getAdminOrders(
     query = query.eq("status", status)
   }
 
+  // Fase 9 — rango de fechas (día calendario; el límite superior ya viene
+  // exclusivo desde normalizeDateRange).
+  if (filters?.from) {
+    query = query.gte("created_at", filters.from)
+  }
+  if (filters?.toExclusive) {
+    query = query.lt("created_at", filters.toExclusive)
+  }
+
   const search = filters?.search?.trim()
   if (search) {
     const conditions: string[] = []
     if (/^\d+$/.test(search)) {
       conditions.push(`id.eq.${search}`)
     }
-    // Nombre de cliente: resolver ids de profiles primero (un join con
-    // filtro !inner excluiría pedidos de invitados).
+    // Nombre o teléfono de cliente: resolver ids de profiles primero (un
+    // join con filtro !inner excluiría pedidos de invitados).
     const { data: matchedProfiles } = await supabase
       .from("profiles")
       .select("id")
-      .ilike("full_name", `%${search}%`)
+      .or(`full_name.ilike.%${search}%,phone.ilike.%${search}%`)
       .limit(50)
     const matchedIds = (matchedProfiles ?? []).map((p) => p.id as string)
     if (matchedIds.length > 0) {
@@ -901,4 +914,146 @@ export async function getPendingOrdersCount(): Promise<number> {
     throw new Error("Error al cargar pedidos pendientes")
   }
   return count ?? 0
+}
+
+// ============================================================
+// FASE 12 — INVENTARIO PROACTIVO
+// ============================================================
+
+export interface StockAdjustmentEntry {
+  id: number
+  product_id: number
+  previous_status: string
+  new_status: string
+  note: string | null
+  created_at: string
+  product_name?: string
+}
+
+/**
+ * Ajusta el stock_status de un producto y registra el cambio en la
+ * bitácora stock_adjustments (migración 00077).
+ */
+export async function adjustProductStock(
+  productId: number,
+  newStatus: "in_stock" | "low_stock" | "out_of_stock",
+  note?: string
+): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+  if (!["in_stock", "low_stock", "out_of_stock"].includes(newStatus)) {
+    throw new Error("Estado de stock inválido")
+  }
+
+  const supabase = await createServiceClient()
+  const { data: product, error: readError } = await supabase
+    .from("products")
+    .select("id, stock_status")
+    .eq("id", productId)
+    .single()
+  if (readError || !product) {
+    throw new Error("Producto no encontrado")
+  }
+  if (product.stock_status === newStatus) return
+
+  const { error: updateError } = await supabase
+    .from("products")
+    .update({ stock_status: newStatus })
+    .eq("id", productId)
+  if (updateError) {
+    logger.error("[ADMIN-STOCK] Error updating stock:", updateError)
+    throw new Error("Error al actualizar el stock")
+  }
+
+  const { error: logError } = await supabase.from("stock_adjustments").insert({
+    product_id: productId,
+    previous_status: product.stock_status,
+    new_status: newStatus,
+    note: note?.trim() || null,
+    adjusted_by: user?.id ?? null,
+  })
+  if (logError) {
+    // No revertimos el ajuste: la bitácora es best-effort (p.ej. si la
+    // migración 00077 aún no se aplica en este entorno).
+    logger.error("[ADMIN-STOCK] Error logging adjustment:", logError)
+  }
+}
+
+/** Últimos ajustes de stock (bitácora), con nombre de producto. */
+export async function getStockAdjustments(limit = 20): Promise<StockAdjustmentEntry[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { data, error } = await supabase
+    .from("stock_adjustments")
+    .select("id, product_id, previous_status, new_status, note, created_at, products(name)")
+    .order("created_at", { ascending: false })
+    .limit(limit)
+  if (error) {
+    logger.error("[ADMIN-STOCK] Error fetching adjustments:", error)
+    throw new Error("Error al cargar el historial de stock")
+  }
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    product_id: row.product_id,
+    previous_status: row.previous_status,
+    new_status: row.new_status,
+    note: row.note,
+    created_at: row.created_at,
+    product_name: (row.products as { name?: string } | null)?.name,
+  }))
+}
+
+/**
+ * Sugerencias de reabasto: productos con stock bajo/agotado con ventas
+ * cobradas en los últimos 30 días, ordenados por prioridad.
+ */
+export async function getRestockSuggestions(limit = 10): Promise<
+  { productId: number; name: string; stockStatus: string; units30d: number; priority: number; reason: string }[]
+> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: items, error: itemsError } = await supabase
+    .from("order_items")
+    .select("product_id, quantity, orders!inner(created_at, payment_status)")
+    .gte("orders.created_at", since)
+    .eq("orders.payment_status", "paid")
+  if (itemsError) {
+    logger.error("[ADMIN-RESTOCK] Error fetching sales:", itemsError)
+    throw new Error("Error al calcular sugerencias de reabasto")
+  }
+
+  const unitsByProduct = new Map<number, number>()
+  for (const i of items ?? []) {
+    unitsByProduct.set(i.product_id, (unitsByProduct.get(i.product_id) ?? 0) + Number(i.quantity))
+  }
+
+  const productIds = Array.from(unitsByProduct.keys())
+  if (productIds.length === 0) return []
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, stock_status")
+    .in("id", productIds)
+
+  const { buildRestockSuggestions } = await import("@/lib/restock")
+  return buildRestockSuggestions(
+    (products ?? []).map((p) => ({
+      productId: p.id,
+      name: p.name,
+      stockStatus: p.stock_status as "in_stock" | "low_stock" | "out_of_stock",
+      units30d: unitsByProduct.get(p.id) ?? 0,
+    })),
+    limit
+  )
 }
