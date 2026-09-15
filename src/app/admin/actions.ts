@@ -489,28 +489,6 @@ export async function getAdminWhatsappCatalog(): Promise<{
   }
 }
 
-/** Actualiza show_in_whatsapp de un producto en la BD. */
-export async function setProductWhatsappVisibility(
-  productId: number,
-  showInWhatsapp: boolean
-): Promise<void> {
-  const { response: adminDenied } = await requireAdmin()
-  if (adminDenied) {
-    throw new Error("Acceso restringido a administradores")
-  }
-
-  const supabase = await createServiceClient()
-  const { error } = await supabase
-    .from("products")
-    .update({ show_in_whatsapp: showInWhatsapp, updated_at: new Date().toISOString() })
-    .eq("id", productId)
-
-  if (error) {
-    logger.error("[ADMIN-WHATSAPP] Error updating product:", error)
-    throw new Error("Error al actualizar el producto")
-  }
-}
-
 // ============================================================
 // FASE 1 — KPIs HOY VS AYER (deltas reales del dashboard)
 // ============================================================
