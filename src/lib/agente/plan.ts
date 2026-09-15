@@ -4,6 +4,8 @@
  * Solo datos y helpers puros: seguro para usar en server y client.
  */
 
+import { FREE_SHIPPING_MXN, MIN_ORDER_MXN, formatMxn } from "@/lib/commercial-facts"
+
 export interface Zone {
   id: string
   label: string
@@ -101,5 +103,5 @@ export const VALUE_PROPS = [
   "Crédito a 7/15/30 días sin aval, según historial",
   "Programa de Recompensas: del 5% (Verde) al 20% (Diamante) en cada compra, canjeables por marketing digital, fotografía y web — los únicos proveedores que te regresan crecimiento por surtirte. Resurte.me y crece",
   "Facturación CFDI 4.0 automática",
-  "Pedido mínimo de $500 MXN y envío gratis desde $3,000 MXN",
+  `Pedido mínimo de ${formatMxn(MIN_ORDER_MXN)} y envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}`,
 ]

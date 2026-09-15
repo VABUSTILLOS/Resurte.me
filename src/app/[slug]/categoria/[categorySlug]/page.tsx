@@ -10,6 +10,7 @@ import {
 import { Metadata } from "next"
 import { CATEGORY_FIRST_PAGE_SIZE } from "@/lib/catalog-preview"
 import { CategoryPageClient } from "./category-page-client"
+import { DatosClave } from "@/components/seo/datos-clave"
 
 // ISR: catálogo revalidado cada 5 min (alineado con src/lib/catalog-cache.ts).
 export const revalidate = 300
@@ -78,6 +79,12 @@ export default async function CategoryPage({ params }: Props) {
       category={category}
       products={products.slice(0, CATEGORY_FIRST_PAGE_SIZE)}
       totalCount={products.length}
+      datosClave={
+        <DatosClave
+          subject={`${category.name} en ${city.name}`}
+          className="mt-6"
+        />
+      }
     />
   )
 }

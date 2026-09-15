@@ -9,7 +9,7 @@ import {
   ArrowUpDown,
   Check,
 } from "lucide-react"
-import type { BlogPostMeta } from "@/lib/blog"
+import type { BlogIndexCard } from "@/lib/blog"
 import { searchPosts } from "@/lib/blog-search"
 import { BLOG_CATEGORIES, BLOG_CONTENT_TYPES, getContentType } from "@/lib/blog-categories"
 import { BlogCard } from "@/components/blog/blog-card"
@@ -17,7 +17,7 @@ import { FeaturedBlogCard } from "@/components/blog/featured-blog-card"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 
 interface BlogIndexClientProps {
-  posts: BlogPostMeta[]
+  posts: BlogIndexCard[]
   initialQuery?: string
   initialCategory?: string
   initialContentType?: string
@@ -42,7 +42,7 @@ const SORT_OPTIONS: { id: SortKey; label: string; description: string }[] = [
   { id: "title-desc", label: "Título Z-A", description: "Orden alfabético inverso" },
 ]
 
-function sortPosts(posts: BlogPostMeta[], key: SortKey): BlogPostMeta[] {
+function sortPosts(posts: BlogIndexCard[], key: SortKey): BlogIndexCard[] {
   const sorted = [...posts]
   switch (key) {
     case "date-desc":

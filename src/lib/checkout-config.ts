@@ -6,7 +6,12 @@
  * son configurables vía env (`NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD` y
  * `NEXT_PUBLIC_DELIVERY_FEE_FLAT`) para ajustarlos sin deploy de código;
  * al cambiarlos, alinear también `bump_rules.subtotal_min` en Supabase.
+ *
+ * El umbral por defecto sale de `commercial-facts.ts` para que el importe que
+ * se cobra y el que se publica en el sitio no puedan separarse: si se cambia
+ * `FREE_SHIPPING_MXN`, el checkout cambia con él.
  */
+import { FREE_SHIPPING_MXN } from "./commercial-facts"
 
 /** Lee un número positivo desde env con fallback (inválido → fallback). */
 function envNumber(name: string, fallback: number): number {
@@ -17,7 +22,7 @@ function envNumber(name: string, fallback: number): number {
 }
 
 /** Subtotal mínimo (MXN) para que el envío sea gratis. */
-export const FREE_SHIPPING_THRESHOLD = envNumber("NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD", 500)
+export const FREE_SHIPPING_THRESHOLD = envNumber("NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD", FREE_SHIPPING_MXN)
 
 /** Tarifa fija de envío a domicilio cuando NO aplica envío gratis. */
 export const DELIVERY_FEE_FLAT = envNumber("NEXT_PUBLIC_DELIVERY_FEE_FLAT", 35)

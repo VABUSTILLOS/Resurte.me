@@ -12,6 +12,10 @@
  *   - Custom events available via window.gtag()
  */
 import Script from "next/script"
+import { buildAiReferralScript } from "@/lib/ai-referrers"
+import { SITE_URL } from "@/lib/author"
+
+const SELF_HOSTS = [new URL(SITE_URL).hostname]
 
 // Sanea valores de env: en Vercel es común pegar por error
 // "NOMBRE_VAR=valor" completo como valor (pasó con GA: el tag de gtag quedó
@@ -31,6 +35,10 @@ const GA_ID = sanitizeEnvId(
 const PIXEL_ID = sanitizeEnvId(
   process.env.NEXT_PUBLIC_META_PIXEL_ID || process.env.FBPIXEL
 )
+
+const AI_REFERRAL_SCRIPT = GA_ID
+  ? buildAiReferralScript(GA_ID, SELF_HOSTS)
+  : ""
 
 declare global {
   interface Window {
@@ -60,6 +68,16 @@ export function Analytics({ nonce }: { nonce?: string | null }) {
                 send_page_view: true,
               });
             `}
+          </Script>
+          {/*
+            Atribución de citas de IA: si el visitante llega desde ChatGPT,
+            Perplexity, Gemini, Copilot, Claude y compañía, se emite `ai_referral`
+            con el motor de origen. Es la señal más directa de que un motor citó
+            a Resurte.me. El script se genera desde AI_ENGINES para no duplicar
+            la lista de motores.
+          */}
+          <Script id="ga4-ai-referral" strategy="afterInteractive" nonce={nonce ?? undefined}>
+            {AI_REFERRAL_SCRIPT}
           </Script>
         </>
       )}

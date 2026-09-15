@@ -2,11 +2,11 @@ import Link from "next/link"
 import Image from "next/image"
 import { Clock, ArrowUpRight } from "lucide-react"
 import { formatPostDate } from "@/lib/blog-format"
-import type { BlogPostMeta } from "@/lib/blog"
+import type { BlogIndexCard } from "@/lib/blog"
 import { getCategory } from "@/lib/blog-categories"
 
 interface BlogCardProps {
-  post: BlogPostMeta
+  post: BlogIndexCard
   priority?: boolean
 }
 

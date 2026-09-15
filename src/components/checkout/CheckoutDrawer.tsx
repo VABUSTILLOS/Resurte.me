@@ -14,7 +14,8 @@ import {
   CheckCircle2,
   Zap,
 } from "lucide-react"
-import { calcCheckoutTotals, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT, FREE_SHIPPING_THRESHOLD } from "@/lib/checkout-config"
+import { formatMxn } from "@/lib/commercial-facts"
 import {
   DEFAULT_ADDRESS_FORM,
   DELIVERY_TIMES,
@@ -440,7 +441,7 @@ export function CheckoutDrawer() {
                 <ArrowRight className="w-4 h-4" />
               </button>
               <p className="text-center text-xs text-gray-400">
-                Pago seguro con Stripe · Envío gratis desde $500 MXN
+                Pago seguro con Stripe · Envío gratis desde {formatMxn(FREE_SHIPPING_THRESHOLD)}
               </p>
             </div>
           )}

@@ -1,23 +1,19 @@
 import type { MetadataRoute } from "next"
+import { AI_SEARCH_CRAWLERS } from "@/lib/ai-crawlers"
 
 // Crawlers de búsqueda con IA (ChatGPT, Perplexity, Claude, Copilot, etc.).
 // Los permitimos explícitamente: queremos que Resurte.me aparezca citado en
 // las respuestas de los asistentes, no solo en los resultados clásicos de
 // Google. Antes GPTBot estaba bloqueado, lo que nos hacía invisibles ahí.
-const AI_SEARCH_CRAWLERS = [
-  "GPTBot",
-  "OAI-SearchBot",
-  "ChatGPT-User",
-  "ClaudeBot",
-  "Claude-User",
-  "PerplexityBot",
-  "Perplexity-User",
-  "Google-Extended",
-  "Applebot-Extended",
-  "Meta-ExternalAgent",
-  "Amazonbot",
-  "CCBot",
-]
+//
+// La lista vive en `src/lib/ai-crawlers.ts` (fuente única de verdad, compartida
+// con el panel /admin/seo-ia) y cubre tres familias: asistentes de respuesta
+// (GPTBot, ClaudeBot, PerplexityBot, MistralAI-User, YouBot, DuckAssistBot),
+// crawlers de entrenamiento/atribución (CCBot, Google-Extended,
+// Applebot-Extended, Meta-ExternalAgent, AI2Bot, cohere-ai, Timpibot,
+// Omgilibot, Diffbot, PetalBot, Bytespider) y crawlers de plataforma que
+// también alimentan superficies de IA (Applebot, Google-CloudVertexBot,
+// Amazonbot, ImagesiftBot).
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -33,7 +29,10 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: AI_SEARCH_CRAWLERS,
-        allow: "/",
+        // Los feeds JSON de /api/feed/ son superficie para agentes (llms.txt
+        // los enlaza). Se permiten explícitamente: en robots.txt gana la regla
+        // más específica, así que el Allow supera al Disallow de /api/.
+        allow: ["/", "/api/feed/"],
         disallow: ["/api/"],
       },
     ],

@@ -5,11 +5,14 @@ import { ChevronRight } from "lucide-react"
 import type { Metadata } from "next"
 import { compileMDX } from "next-mdx-remote/rsc"
 import remarkGfm from "remark-gfm"
+import { rehypeHeadingAnchors } from "@/lib/rehype-heading-anchors"
 import { getPostBySlug, getPostSlugs, getPostUrl, getPostCta } from "@/lib/blog"
 import {
   getBlogPostingSchema,
   getFAQSchema,
   getBlogBreadcrumbSchema,
+  getHowToSchema,
+  getSpeakableSpec,
 } from "@/lib/blog-schema"
 import { getCategory } from "@/lib/blog-categories"
 import { mdxComponents } from "@/components/blog/mdx-components"
@@ -21,8 +24,12 @@ import { ReadingProgress } from "@/components/blog/reading-progress"
 import { BlogShare } from "@/components/blog/blog-share"
 import { BlogShareRail } from "@/components/blog/blog-share-rail"
 import { BlogNewsletter } from "@/components/blog/blog-newsletter"
+import { FuentesMetodologia } from "@/components/seo/fuentes-metodologia"
 
 export const dynamicParams = false
+
+// Categorías cuyo contenido se apoya en el índice de precios publicado.
+const PRICE_INDEX_CATEGORIES = new Set(["costos", "proveeduria"])
 
 export function generateStaticParams() {
   return getPostSlugs().map((slug) => ({ slug }))
@@ -80,15 +87,39 @@ export default async function BlogPostPage({
 
   const { content } = await compileMDX({
     source: post.content,
-    options: { mdxOptions: { remarkPlugins: [remarkGfm] } },
+    options: {
+      mdxOptions: {
+        remarkPlugins: [remarkGfm],
+        // Da `id` a cada H2–H4. Los ids deben coincidir con los de
+        // extractHeadings() — lo verifica src/lib/heading-slug.test.ts.
+        rehypePlugins: [rehypeHeadingAnchors],
+      },
+    },
     components: mdxComponents,
   })
 
   const category = getCategory(post.data.category)
+  const quickAnswer = post.data.respuestaRapida?.trim() || null
   const faqSchema = getFAQSchema(post.data.faq ?? [])
+  const howToSchema =
+    post.data.contentType === "tutorial"
+      ? getHowToSchema(post.data, post.content)
+      : null
+  const esPiezaConCifras = PRICE_INDEX_CATEGORIES.has(post.data.category)
   const jsonLd = [
-    getBlogPostingSchema(post.data),
+    // `speakable` va dentro del BlogPosting: es donde el vocabulario lo
+    // define, y apunta a fragmentos que existen en el HTML de esta página.
+    {
+      ...getBlogPostingSchema(post.data),
+      speakable: getSpeakableSpec([
+        "#respuesta-rapida",
+        "#resumen-articulo",
+        "#contenido-articulo h2",
+        ...(esPiezaConCifras ? ["#fuentes-y-metodologia"] : []),
+      ]),
+    },
     getBlogBreadcrumbSchema("post", post.data.title),
+    ...(howToSchema ? [howToSchema] : []),
     ...(faqSchema ? [faqSchema] : []),
   ]
 
@@ -141,7 +172,25 @@ export default async function BlogPostPage({
         <h1 className="mt-4 text-3xl font-extrabold leading-tight tracking-tight text-warm-900 sm:text-4xl">
           {post.data.title}
         </h1>
-        <p className="mt-4 text-lg leading-relaxed text-warm-600">
+        {/*
+          Respuesta rápida: pasaje autocontenido de ≤50 palabras pensado para
+          que un motor de IA lo cite sin necesitar el resto del artículo.
+          Va antes que la descripción para que sea lo primero que se lee.
+        */}
+        {quickAnswer && quickAnswer !== post.data.description.trim() && (
+          <div
+            id="respuesta-rapida"
+            className="mt-6 rounded-2xl border border-brand-200 bg-brand-50 p-5"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
+              Respuesta rápida
+            </p>
+            <p className="mt-2 text-lg font-medium leading-relaxed text-warm-900">
+              {quickAnswer}
+            </p>
+          </div>
+        )}
+        <p id="resumen-articulo" className="mt-4 text-lg leading-relaxed text-warm-600">
           {post.data.description}
         </p>
         <div className="mt-6">
@@ -169,7 +218,9 @@ export default async function BlogPostPage({
       )}
 
       {/* Contenido MDX */}
-      <div className="mx-auto max-w-3xl px-4 pb-4 sm:px-6">{content}</div>
+      <div id="contenido-articulo" className="mx-auto max-w-3xl px-4 pb-4 sm:px-6">
+        {content}
+      </div>
 
       {/* FAQ desde frontmatter */}
       {post.data.faq && post.data.faq.length > 0 && (
@@ -178,12 +229,36 @@ export default async function BlogPostPage({
         </div>
       )}
 
+      {/* Fuentes y metodología: procedencia de las cifras citadas */}
+      {esPiezaConCifras && (
+        <div className="mx-auto max-w-3xl px-4 pb-4 sm:px-6">
+          <FuentesMetodologia subject={post.data.title} />
+        </div>
+      )}
+
+      {/* Índice de precios: enlaza el dato propio desde el contenido de costos y compras */}
+      {esPiezaConCifras && (
+        <div className="mx-auto max-w-3xl px-4 pb-8 sm:px-6">
+          <Link
+            href="/precios"
+            className="block rounded-[16px] border border-gray-200 p-6 transition-colors hover:border-brand-600"
+          >
+            <h2 className="mb-1 flex items-center gap-2 font-semibold text-gray-900">
+              Índice de precios de insumos
+              <span className="text-brand-600">&rarr;</span>
+            </h2>
+            <p className="text-sm leading-relaxed text-gray-600">
+              Consulta el precio de referencia de cada insumo por unidad y ciudad en México,
+              con fecha de corte, rango observado y número de tiendas comparadas.
+            </p>
+          </Link>
+        </div>
+      )}
+
       {/* Newsletter signup */}
       <div className="mx-auto max-w-3xl px-4 pb-8 sm:px-6">
         <BlogNewsletter />
-      </div>
-
-      {/* Caja CTA de cierre */}
+      </div>      {/* Caja CTA de cierre */}
       <PostCTA config={getPostCta(post.data)} />
 
       {/* Posts relacionados */}

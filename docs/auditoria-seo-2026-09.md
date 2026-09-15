@@ -26,6 +26,7 @@
 | 12 | Cover 404 en `tendencias-consumo-restaurantes` (typo en nombre de imagen) | Bajo — og:image rota | ✅ Corregido en fase 2 |
 | 13 | Blog plano sin hubs temáticos | Medio — PageRank temático disperso | ✅ 6 de 6 pilares creadas (fases 3-4) |
 | 14 | Blog enlaza poco al catálogo transaccional | Medio — PageRank no fluye a páginas que convierten | ✅ Resuelto en fases 5-6 (serie por insumo enlaza a las 6 categorías) |
+| 15 | Envío gratis: el checkout cobra desde $500, el sitio publica $2,500 | Medio-alto — contradicción verificable, la IA la amplifica | ⚠️ Requiere decisión de negocio (ver 3.3) |
 
 ---
 
@@ -103,6 +104,28 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 
 ### 3.3 Copy inconsistente — corregido
 - `/faq` decía envío gratis desde $3,000 (el resto del sitio: $2,500) y listaba 6 ciudades (son 20). Inconsistencias así erosionan E-E-A-T y confunden a los motores de IA que citan el sitio.
+- También se corrigieron dos superficies que repetían el umbral equivocado de **$3,000** y que ningún guard cubría: los prompts del Agente de Ventas IA (`src/lib/agente/templates.ts`, `src/lib/agente/plan.ts`), que redactan mensajes de WhatsApp a clientes, y la etiqueta del drawer de checkout (`CheckoutDrawer.tsx`), que se contradecía con el importe que cobraba.
+- **Fuente de verdad única:** `src/lib/commercial-facts.ts`. `llms.txt`, `llms-full.txt`, `/faq`, `/preguntas`, `/precios`, el schema JSON-LD, la autoría y los prompts del agente ahora **interpolan** las cifras en vez de escribirlas a mano.
+- **Guard anti-deriva:** `src/lib/commercial-facts.test.ts` audita de forma recursiva todo `src/` y falla si cualquier `gratis desde $N` / `mínimo de $N` publica un valor distinto al canónico, además de verificar que la lista de ciudades del FAQ coincide con la cobertura real. `src/lib/agente/templates.test.ts` cubre el prompt del agente, que antes no tenía ninguna prueba (por eso sobrevivió el $3,000).
+- **Guard de presencia:** el guard anterior detecta un valor *equivocado*, pero no un dato *ausente*. Se añadió en `commercial-facts.test.ts` una lista `SUPERFICIES_CITABLES` que exige que cada superficie citable (`llms.txt`, `llms-full.txt`, `/faq`, `/preguntas`, el schema JSON-LD y los componentes `DatosClave` / `FuentesMetodologia`) publique el umbral de envío gratis desde la fuente de verdad. Sin este guard, borrar la cifra de una superficie no rompía nada.
+
+### 3.3.1 Umbral de envío gratis: checkout alineado a lo publicado — RESUELTO ($2,500)
+- **Evidencia original:** `src/lib/checkout-config.ts` definía `FREE_SHIPPING_THRESHOLD = envNumber("NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD", 500)` y `npx vercel env ls` confirmó que esa variable **no estaba definida** en el proyecto `resurte-me`. Producción **cobraba envío desde $500 MXN** mientras todo el sitio publicaba **$2,500 MXN**.
+- **Impacto GEO:** es el tipo de dato contradictorio que un motor de IA detecta y resuelve citando la versión que le parezca autoritativa —o descartando el dato—. Afecta a la confianza en la entidad y al E-E-A-T.
+- **Resolución (decisión de negocio):** alinear el cobro con la promesa publicada, es decir **$2,500 MXN**. El checkout se corrigió, no el copy.
+- **Cambios aplicados:**
+  1. `checkout-config.ts` ya **no** tiene un literal propio: el fallback sale de `FREE_SHIPPING_MXN` (`commercial-facts.ts`). El importe que se cobra y el que se publica ahora son el mismo número; cambiarlo en un solo sitio propaga ambos.
+  2. Los tests de umbral (`checkout-config.test.ts`, `checkout-bdd-regression.test.ts`) dejaron de fijar `500` y ahora derivan sus fronteras de `FREE_SHIPPING_THRESHOLD`, así que siguen siendo válidos en cualquier umbral. Se añadió una aserción explícita de que el umbral por defecto coincide con `FREE_SHIPPING_MXN`.
+  3. Comentario desactualizado "gratis desde $500" en `cart-drawer.tsx` corregido.
+- **Acciones fuera del código (operación):**
+  - Definir `NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD=2500` en Vercel (Production y Preview) y **volver a desplegar**: las variables `NEXT_PUBLIC_*` se inlinean en build. Sin la variable el código ya usa $2,500 por defecto, pero dejarla explícita es la configuración prevista.
+  - Alinear `bump_rules.subtotal_min` en Supabase (lo advierte el comentario de `checkout-config.ts`); requiere acceso a la base de producción.
+
+### 3.3.2 El umbral no estaba en `llms.txt` — corregido
+- **Evidencia:** `curl https://resurte.me/llms.txt | grep -i envío` no devolvía nada. El mapa para agentes publicaba el pedido mínimo (`$500 MXN`) pero **omitía por completo** el umbral de envío gratis, aunque `/faq`, `/preguntas` y el schema JSON-LD sí lo publicaban.
+- **Impacto GEO:** el envío gratis es una de las preguntas más frecuentes sobre proveeduría al mayoreo y una de las que un motor de IA responde con más seguridad. Al no estar en el archivo que los asistentes leen primero, el modelo la respondía con supuestos genéricos del sector o con datos de la competencia en lugar de citar a Resurte.me.
+- **Cambios aplicados:** `src/app/llms.txt/route.ts` y `src/app/llms-full.txt/route.ts` ahora interpolan `FREE_SHIPPING_MXN` y `DELIVERY_FEE_FLAT` tanto en el bloque de presentación como en las secciones de cobertura y entidad, de modo que el dato aparece en los dos formatos que consumen los asistentes.
+- **Guard:** la lista `SUPERFICIES_CITABLES` de `commercial-facts.test.ts` impide que la cifra vuelva a desaparecer de cualquiera de estas superficies.
 
 ### 3.4 Cover 404 en tendencias-consumo-restaurantes — corregido (fase 2)
 - El frontmatter apuntaba a `/images/blog/tendencias-consumo-restaurantes.webp`, pero el archivo real en `public/images/blog/` se llama `tendeencias-consumo-restaurantes.webp` (typo con "ee"). Resultado: imagen de portada y `og:image` rotas (404). Corregido el frontmatter al nombre real del archivo.
@@ -114,7 +137,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 **Fortalezas:** 108 guías largas con tablas, números en MXN, FAQ schema propio por post, CTAs al producto, autor declarado ("Equipo Resurte.me — Especialistas en restaurantes"). Cobertura temática amplia: costos, proveeduría, mermas, marketing, NOM-251, CFDI.
 
 **Brechas (ver estrategia de contenidos para el plan completo):**
-1. **Sin páginas de autor** — "Equipo Resurte.me" no es una entidad verificable. Crear `/about#equipo` con autores reales, credenciales y foto; enlazar desde cada post (mejora E-E-A-T directa).
+1. ~~**Sin páginas de autor**~~ — ✅ **cubierto**: `src/lib/author.ts` define el perfil de Victor Bustillos (fundador), con `jobTitle`, `knowsAbout`, credenciales y `sameAs`; se publica en `/autor/victor-bustillos` y se referencia desde el schema `Article`/`Person` de cada post. Pendiente: añadir los perfiles externos verificables (LinkedIn, X, Wikidata) a `PENDING_PROFILES` en `src/lib/author.ts` — ver estrategia §8.2.
 2. ~~**Sin contenido "money" de comparación**~~ — ✅ **cubierto**: fases 2-3 crearon 5 guías (`central-de-abastos-vs-comprar-en-linea`, `cuanto-cuesta-surtir-restaurante-mes`, `mejores-proveedores-mayoreo-restaurantes`, `alternativas-sysco-clubes-precio`, `lista-insumos-abrir-restaurante`) y fase 6 agregó `formas-surtir-restaurante-mexico` (la pieza §3.2 de la estrategia). Todas con FAQ schema, tablas con números en MXN e interlinking.
 3. ~~**Sin páginas hub temáticas**~~ — ✅ **6 de 6 creadas (fases 3-4)**: `guia-proveeduria-restaurantes`, `guia-costos-restaurante`, `guia-operacion-cocina`, `guia-marketing-restaurantes`, `guia-legal-finanzas-restaurante` y `guia-crecer-restaurante`, cada una con sección hub que mapea su clúster. Pendiente: enlazar las pilares desde home/nav (cambio de UI, fuera de este PR).
 4. **Fechas de actualización** — los posts tienen `updatedAt`; verificar que se muestre visible en la página (señal de frescura). En fases 3-4 se refrescó el `updatedAt` de los posts que recibieron interlinking.
@@ -125,10 +148,13 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 
 | Táctica | Antes | Ahora |
 |---|---|---|
-| Crawlers IA en robots.txt | GPTBot bloqueado | 12 permitidos: GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-User, PerplexityBot, Perplexity-User, Google-Extended, Applebot-Extended, Meta-ExternalAgent, Amazonbot, CCBot |
-| `llms.txt` | No existía | Creado + actualizado en fases 2-6: guías pilar (6 hubs), comparativas money, serie completa por categoría de insumo (6 guías) y guías clásicas |
+| Crawlers IA en robots.txt | GPTBot bloqueado | 25 permitidos, clasificados en respuesta / entrenamiento / plataforma; 8 marcados como citables |
+| `llms.txt` | No existía | Creado + actualizado en fases 2-6: guías pilar (6 hubs), comparativas money, serie completa por categoría de insumo (6 guías) y guías clásicas. Publica pedido mínimo, umbral de envío gratis y tarifa de entrega (ver 3.3.2) |
+| `llms-full.txt` | No existía | Volcado completo citable (226 piezas) con presupuesto de bytes; mismo bloque de entidad y envío que `llms.txt` |
 | FAQPage schema | Solo en posts | También en /faq (respuestas citables por AI Overviews) |
-| Datos consistentes | $3,000/$2,500, 6/20 ciudades | Unificados (clave: las IA amplifican contradicciones) |
+| Entidad y autoría | Autor genérico | `Organization` + `Person` con `knowsAbout` y `sameAs`; página `/autor/victor-bustillos` |
+| Superficies de respuesta | No existían | `/preguntas` (respuestas con FAQPage + ItemList) y `/precios` (Dataset + CSV descargable) |
+| Datos consistentes | $3,000/$2,500, 6/20 ciudades | Unificados en `commercial-facts.ts` y protegidos por guard (clave: las IA amplifican contradicciones). El checkout cobraba desde $500 mientras el sitio publicaba $2,500: **resuelto a $2,500**, con el umbral del checkout derivado de `FREE_SHIPPING_MXN` (ver 3.3.1). |
 
 **Recomendaciones GEO adicionales (backlog):**
 - Respuestas auto-contenidas al inicio de cada guía (las IA citan el primer párrafo; ya lo hacen bien con el bold inicial — mantenerlo).

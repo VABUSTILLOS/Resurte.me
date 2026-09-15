@@ -1,6 +1,8 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, Leaf, Truck, Users, Shield, Building2 } from "lucide-react"
+import { ArrowRight, Leaf, Truck, Users, Shield, Building2, BadgeCheck } from "lucide-react"
+import { MEXICO_CITIES } from "@/lib/cities"
+import { PRIMARY_AUTHOR, getPersonSchema, ORGANIZATION_ID, SITE_URL, SITE_NAME } from "@/lib/author"
 
 export const metadata: Metadata = {
   title: "Sobre nosotros — Resurte.me",
@@ -11,13 +13,46 @@ export const metadata: Metadata = {
 const STATS = [
   { value: "5,000+", label: "Negocios activos" },
   { value: "98%", label: "Entregas a tiempo" },
-  { value: "6", label: "Ciudades con cobertura" },
+  // Se deriva de MEXICO_CITIES en vez de escribirlo a mano: antes decía "6"
+  // mientras el sitio ya cubría 20, y una cifra contradictoria en la propia
+  // página debilita la entidad ante los motores de respuesta.
+  { value: String(MEXICO_CITIES.length), label: "Ciudades con cobertura" },
   { value: "24h", label: "Respuesta en crédito" },
 ]
 
 export default function AboutPage() {
+  // `Person` + `AboutPage` con `mainEntity` apuntando a la organización: así
+  // "quiénes somos" deja de ser texto suelto y se vuelve la misma entidad
+  // `Organization` del layout, no una descripción paralela.
+  const jsonLd = [
+    getPersonSchema(PRIMARY_AUTHOR),
+    {
+      "@context": "https://schema.org",
+      "@type": "AboutPage",
+      "@id": `${SITE_URL}/about#webpage`,
+      url: `${SITE_URL}/about`,
+      name: `Sobre ${SITE_NAME}`,
+      inLanguage: "es-MX",
+      mainEntity: { "@id": ORGANIZATION_ID },
+      about: { "@id": ORGANIZATION_ID },
+      mentions: { "@id": PRIMARY_AUTHOR.id },
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Inicio", item: SITE_URL },
+        { "@type": "ListItem", position: 2, name: "Sobre nosotros", item: `${SITE_URL}/about` },
+      ],
+    },
+  ]
+
   return (
     <div className="min-h-screen bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Hero */}
       <section className="bg-gradient-to-b from-[#F0F7F0] to-white py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
@@ -135,6 +170,65 @@ export default function AboutPage() {
           Hoy más de 5,000 negocios nos confían su proveeduría. Y apenas vamos
           empezando.
         </p>
+      </section>
+
+      {/* Equipo / autoría */}
+      <section id="equipo" className="bg-[#F9FAFB] py-16 px-4">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center gap-3 mb-6">
+            <BadgeCheck className="w-6 h-6 text-[#0E7A0E]" />
+            <h2 className="text-2xl font-bold text-[#242529]">Quién está detrás</h2>
+          </div>
+          <div className="bg-white border border-[#E5E7EB] rounded-[20px] p-8">
+            <div className="flex items-center gap-4">
+              <span
+                aria-hidden="true"
+                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#E8F5E8] text-xl font-bold text-[#0E7A0E]"
+              >
+                {PRIMARY_AUTHOR.name
+                  .split(" ")
+                  .map((w) => w[0])
+                  .slice(0, 2)
+                  .join("")}
+              </span>
+              <div>
+                <h3 className="text-lg font-bold text-[#242529]">
+                  <Link
+                    href={`/autor/${PRIMARY_AUTHOR.slug}`}
+                    className="hover:text-[#0E7A0E] hover:underline"
+                  >
+                    {PRIMARY_AUTHOR.name}
+                  </Link>
+                </h3>
+                <p className="text-sm font-semibold text-[#0E7A0E]">
+                  {PRIMARY_AUTHOR.jobTitle}
+                </p>
+              </div>
+            </div>
+            <p className="mt-4 text-sm leading-relaxed text-[#5C6068]">
+              {PRIMARY_AUTHOR.bio[0]}
+            </p>
+            <ul className="mt-5 space-y-2.5">
+              {PRIMARY_AUTHOR.credentials.map((credential) => (
+                <li
+                  key={credential}
+                  className="flex gap-2.5 text-sm leading-relaxed text-[#5C6068]"
+                >
+                  <BadgeCheck
+                    className="mt-0.5 h-4 w-4 shrink-0 text-[#0E7A0E]"
+                    aria-hidden="true"
+                  />
+                  <span>{credential}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-5 text-xs text-[#9CA3AF]">
+              Todo el contenido editorial del blog está firmado por{" "}
+              {PRIMARY_AUTHOR.name}. Cada artículo se actualiza y se revisa contra
+              los precios y la operación reales de {SITE_NAME}.
+            </p>
+          </div>
+        </div>
       </section>
 
       {/* CTA */}

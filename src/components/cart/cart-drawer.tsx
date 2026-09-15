@@ -362,7 +362,7 @@ export function CartDrawer() {
               </div>
             )}
 
-            {/* Delivery fee (dinámico: gratis desde $500, igual que el checkout) */}
+            {/* Delivery fee (dinámico: gratis desde FREE_SHIPPING_THRESHOLD, igual que el checkout) */}
             <div className="flex items-center justify-between text-[13px] text-[var(--text-secondary)]">
               <span className="flex items-center gap-1.5">
                 <Truck className="w-3.5 h-3.5" />

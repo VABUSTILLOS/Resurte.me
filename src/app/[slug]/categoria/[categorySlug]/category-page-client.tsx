@@ -17,9 +17,11 @@ interface CategoryPageClientProps {
   category: { id: number; name: string; slug: string; icon: string; description?: string | null; parent_id?: number | null }
   products: Product[]
   totalCount: number
+  /** Bloque servido desde el servidor (datos clave citables) que se inserta en la cabecera. */
+  datosClave?: React.ReactNode
 }
 
-export function CategoryPageClient({ citySlug, cityName, category, products: initialProducts, totalCount }: CategoryPageClientProps) {
+export function CategoryPageClient({ citySlug, cityName, category, products: initialProducts, totalCount, datosClave }: CategoryPageClientProps) {
   // Products now have price/sale_price/stock_status directly
   const [products, setProducts] = useState(initialProducts)
   const [page, setPage] = useState(0)
@@ -62,6 +64,9 @@ export function CategoryPageClient({ citySlug, cityName, category, products: ini
               </div>
             </div>
           </ScrollReveal>
+
+          {/* Datos clave (servidos desde el servidor, citables) */}
+          {datosClave}
 
           {/* Search */}
           <div className="mt-5 max-w-md">
