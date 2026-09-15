@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import {
   Search, RefreshCw, ArrowUp, ArrowDown, Plus, Send,
-  Loader2, MapPin, Globe,
+  Loader2, MapPin, Globe, History, ListChecks, AlertTriangle, X,
 } from "lucide-react"
 import { getCategoryIcon } from "@/lib/utils"
 import {
@@ -20,11 +20,16 @@ import {
   setWaCatalogProduct,
   reorderWaCatalog,
   syncWaCatalog,
+  previewWaCatalogSync,
   sendWaCatalogToPhone,
+  getWaCatalogSyncHistory,
+  getWaCatalogQueueCount,
+  processWaSyncQueueNow,
   type AdminWhatsappProduct,
   type AdminWhatsappCategory,
   type WaCatalogSummary,
   type WaCatalogDetailItem,
+  type WaSyncRunSummary,
 } from "@/app/admin/actions"
 
 export default function AdminWhatsAppPage() {
@@ -42,6 +47,16 @@ export default function AdminWhatsAppPage() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
   const [newCityName, setNewCityName] = useState("")
   const [sendPhone, setSendPhone] = useState("")
+
+  // WA6 — previsualización del diff, historial y cola automática.
+  const [syncPreview, setSyncPreview] = useState<{
+    diff: { toCreate: string[]; toUpdate: string[]; stale: string[] }
+    metaTotal: number
+    invalid: { id: string; name: string; reasons: string[] }[]
+  } | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [history, setHistory] = useState<WaSyncRunSummary[]>([])
+  const [queueCount, setQueueCount] = useState(0)
 
   const load = useCallback(async () => {
     try {
@@ -62,7 +77,14 @@ export default function AdminWhatsAppPage() {
 
   const loadItems = useCallback(async () => {
     if (!selectedCatalog) return
-    setCatalogItems(await getWaCatalogItems(selectedCatalog.id))
+    const [items, runs, queued] = await Promise.all([
+      getWaCatalogItems(selectedCatalog.id),
+      getWaCatalogSyncHistory(selectedCatalog.id, 5).catch(() => [] as WaSyncRunSummary[]),
+      getWaCatalogQueueCount(selectedCatalog.id).catch(() => 0),
+    ])
+    setCatalogItems(items)
+    setHistory(runs)
+    setQueueCount(queued)
   }, [selectedCatalog])
 
   useEffect(() => {
@@ -137,12 +159,33 @@ export default function AdminWhatsAppPage() {
     })
 
   const handleSync = () =>
+    run(async () => {
+      if (!selectedCatalog) throw new Error("Selecciona un catálogo")
+      const preview = await previewWaCatalogSync(selectedCatalog.id)
+      setSyncPreview(preview)
+      setConfirmDelete(false)
+    })
+
+  const handleConfirmSync = () =>
     run(
       async () => {
         if (!selectedCatalog) throw new Error("Selecciona un catálogo")
-        return syncWaCatalog(selectedCatalog.id)
+        const result = await syncWaCatalog(selectedCatalog.id, { deleteUnknown: confirmDelete })
+        setSyncPreview(null)
+        return result
       },
-      (r) => `Catálogo "${selectedCatalog?.name}" sincronizado: ${r.added} en WhatsApp${r.removed ? ` (${r.removed} removidos)` : ""}.`
+      (r) =>
+        `Catálogo "${selectedCatalog?.name}" sincronizado: ${r.added} nuevos, ${r.updated} actualizados` +
+        (r.removed ? `, ${r.removed} eliminados de Meta` : "") +
+        (r.stale.length ? `. ${r.stale.length} productos en Meta fuera de la curaduría (sin borrar)` : "") +
+        (r.invalid.length ? `. ${r.invalid.length} excluidos por datos inválidos (revisa el detalle en una nueva previsualización)` : "") +
+        "."
+    )
+
+  const handleProcessQueue = () =>
+    run(
+      async () => processWaSyncQueueNow(),
+      (r) => `Cola procesada: ${r.synced} productos sincronizados en ${r.catalogs} catálogo(s)${r.failed ? ` (${r.failed} fallidos)` : ""}.`
     )
 
   const handleSend = (e: React.FormEvent) => {
@@ -187,14 +230,26 @@ export default function AdminWhatsAppPage() {
             Un catálogo por ciudad, con tu selección y <strong>tu orden exacto</strong>.
           </p>
         </div>
-        <button
-          onClick={handleSync}
-          disabled={busy || !selectedCatalog || curated.length === 0}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0F7A3D] text-white font-semibold rounded-full hover:bg-[#0F6B3A] transition-colors text-sm shadow-sm disabled:opacity-60"
-        >
-          <RefreshCw className={`w-4 h-4 ${busy ? "animate-spin" : ""}`} />
-          Sincronizar a WhatsApp
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {queueCount > 0 && (
+            <button
+              onClick={handleProcessQueue}
+              disabled={busy}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#0E7A0E]/40 text-[#0E7A0E] font-semibold rounded-full hover:bg-[#F2FBF5] transition-colors text-sm disabled:opacity-60"
+            >
+              <ListChecks className="w-4 h-4" />
+              Procesar cola ({queueCount})
+            </button>
+          )}
+          <button
+            onClick={handleSync}
+            disabled={busy || !selectedCatalog || curated.length === 0}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0F7A3D] text-white font-semibold rounded-full hover:bg-[#0F6B3A] transition-colors text-sm shadow-sm disabled:opacity-60"
+          >
+            <RefreshCw className={`w-4 h-4 ${busy ? "animate-spin" : ""}`} />
+            Sincronizar a WhatsApp
+          </button>
+        </div>
       </div>
 
       {message && (
@@ -311,6 +366,47 @@ export default function AdminWhatsAppPage() {
                 </button>
               </div>
             </form>
+
+            {/* Historial de syncs */}
+            {history.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-[#F0F1F2]">
+                <p className="text-xs font-semibold text-[#242529] mb-2 flex items-center gap-1.5">
+                  <History className="w-3.5 h-3.5" /> Historial de sincronización
+                </p>
+                <ul className="space-y-1.5">
+                  {history.map((run) => (
+                    <li key={run.id} className="text-xs flex items-start gap-2">
+                      <span
+                        className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
+                          run.status === "done"
+                            ? "bg-emerald-500"
+                            : run.status === "failed"
+                              ? "bg-red-500"
+                              : "bg-amber-400 animate-pulse"
+                        }`}
+                        aria-hidden="true"
+                      />
+                      <span className="text-[var(--text-secondary)]">
+                        <span className="font-semibold text-[#242529]">
+                          {new Date(run.started_at).toLocaleString("es-MX", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        {" · "}
+                        {run.trigger_kind === "auto" ? "automático" : "manual"}
+                        {run.status === "done" &&
+                          ` · ${run.added} nuevos, ${run.updated} act.${run.removed ? `, ${run.removed} elim.` : ""}${run.stale_count ? `, ${run.stale_count} ajenos` : ""}`}
+                        {run.status === "failed" && ` · error: ${run.error ?? "desconocido"}`}
+                        {run.status === "running" && " · en curso…"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* Productos disponibles */}
@@ -365,6 +461,100 @@ export default function AdminWhatsAppPage() {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: previsualización del sync (WA6) */}
+      {syncPreview && selectedCatalog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Previsualización de sincronización"
+        >
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="font-bold text-[#242529]">
+                Sincronizar “{selectedCatalog.name}”
+              </h3>
+              <button
+                onClick={() => setSyncPreview(null)}
+                className="p-1 text-[#B0B3B8] hover:text-[#242529]"
+                aria-label="Cerrar previsualización"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <ul className="space-y-2 text-sm text-[var(--text-secondary)] mb-4">
+              <li className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                <span><strong className="text-[#242529]">{syncPreview.diff.toCreate.length}</strong> productos nuevos se crearán en Meta</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-sky-500" aria-hidden="true" />
+                <span><strong className="text-[#242529]">{syncPreview.diff.toUpdate.length}</strong> productos existentes se actualizarán</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500 mt-1.5" aria-hidden="true" />
+                <span>
+                  <strong className="text-[#242529]">{syncPreview.diff.stale.length}</strong> productos están en Meta pero fuera de la curaduría
+                  {syncPreview.diff.stale.length > 0 && (
+                    <span className="block text-xs text-[#B0B3B8] mt-0.5">
+                      IDs: {syncPreview.diff.stale.slice(0, 10).join(", ")}{syncPreview.diff.stale.length > 10 ? "…" : ""}
+                    </span>
+                  )}
+                </span>
+              </li>
+            </ul>
+
+            {syncPreview.invalid.length > 0 && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 mb-4">
+                <p className="text-xs font-semibold text-red-800 mb-1">
+                  {syncPreview.invalid.length} producto(s) excluido(s) del sync por datos inválidos:
+                </p>
+                <ul className="text-xs text-red-700 space-y-1 max-h-32 overflow-y-auto">
+                  {syncPreview.invalid.map((p) => (
+                    <li key={p.id}>
+                      <strong>{p.name}</strong>: {p.reasons.join(", ")}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {syncPreview.diff.stale.length > 0 && (
+              <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 mb-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={confirmDelete}
+                  onChange={(e) => setConfirmDelete(e.target.checked)}
+                  className="mt-0.5 accent-[#0E7A0E]"
+                />
+                <span className="text-xs text-amber-800 flex items-start gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  Eliminar de Meta los {syncPreview.diff.stale.length} productos fuera de la curaduría. Si no lo marcas, se conservan intactos.
+                </span>
+              </label>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setSyncPreview(null)}
+                className="px-4 py-2 rounded-full text-sm font-semibold text-[var(--text-secondary)] hover:bg-[#F7F5F0]"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmSync}
+                disabled={busy}
+                className="inline-flex items-center gap-2 px-5 py-2 bg-[#0F7A3D] text-white text-sm font-bold rounded-full hover:bg-[#0F6B3A] disabled:opacity-60"
+              >
+                <RefreshCw className={`w-4 h-4 ${busy ? "animate-spin" : ""}`} />
+                Sincronizar ahora
+              </button>
             </div>
           </div>
         </div>

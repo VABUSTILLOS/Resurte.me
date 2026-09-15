@@ -15,6 +15,7 @@ export interface WaCatalog {
   city_id: number | null
   phone_number_id: string | null
   waba_id: string | null
+  catalog_id: string | null
   is_active: boolean
 }
 
@@ -40,6 +41,72 @@ export interface AdminProduct {
 /** Ordena la curaduría: visibles por posición, luego por nombre. */
 export function orderCatalogItems<T extends { position: number }>(items: T[]): T[] {
   return [...items].sort((a, b) => a.position - b.position)
+}
+
+export interface InvalidCatalogProduct {
+  id: string
+  name: string
+  reasons: string[]
+}
+
+/** Límites de Meta Commerce para items de catálogo. */
+export const META_NAME_MAX = 150
+export const META_DESCRIPTION_MAX = 5000
+
+/**
+ * Validación previa al sync (WA7): separa productos aptos de los que Meta
+ * rechazaría, con motivos legibles para listarlos en el admin.
+ */
+export function validateCatalogProducts(products: WhatsAppProduct[]): {
+  valid: WhatsAppProduct[]
+  invalid: InvalidCatalogProduct[]
+} {
+  const valid: WhatsAppProduct[] = []
+  const invalid: InvalidCatalogProduct[] = []
+  for (const p of products) {
+    const reasons: string[] = []
+    if (!p.name.trim()) reasons.push("nombre vacío")
+    if (p.name.length > META_NAME_MAX) reasons.push(`nombre > ${META_NAME_MAX} caracteres`)
+    if (p.price <= 0) reasons.push("precio debe ser mayor a 0")
+    if (p.description && p.description.length > META_DESCRIPTION_MAX) {
+      reasons.push(`descripción > ${META_DESCRIPTION_MAX} caracteres`)
+    }
+    if (p.image_url && !p.image_url.startsWith("https://")) {
+      reasons.push("imagen debe ser una URL pública https")
+    }
+    if (reasons.length > 0) {
+      invalid.push({ id: p.id, name: p.name || p.id, reasons })
+    } else {
+      valid.push(p)
+    }
+  }
+  return { valid, invalid }
+}
+
+export interface WaCatalogSyncDiff {
+  /** retailer_ids en la tienda pero no en Meta (se crearán). */
+  toCreate: string[]
+  /** retailer_ids en ambos lados (se actualizarán). */
+  toUpdate: string[]
+  /** retailer_ids en Meta pero no en la tienda (NO se borran sin confirmación). */
+  stale: string[]
+}
+
+/**
+ * Diff puro entre la curaduría deseada y el catálogo actual de Meta.
+ * Base del sync seguro (WA2) y de la previsualización en el admin (WA6).
+ */
+export function buildCatalogSyncDiff(
+  desired: WhatsAppProduct[],
+  metaProducts: { retailer_id: string }[]
+): WaCatalogSyncDiff {
+  const metaIds = new Set(metaProducts.map((p) => p.retailer_id).filter(Boolean))
+  const desiredIds = new Set(desired.map((p) => p.id))
+  return {
+    toCreate: desired.filter((p) => !metaIds.has(p.id)).map((p) => p.id),
+    toUpdate: desired.filter((p) => metaIds.has(p.id)).map((p) => p.id),
+    stale: [...metaIds].filter((id) => !desiredIds.has(id)),
+  }
 }
 
 /** Mapea la curaduría (items visibles ordenados) a productos de WhatsApp. */
@@ -109,12 +176,13 @@ export async function getCatalogWhatsAppConfig(
 ): Promise<{ config: WhatsAppConfig | null; catalog: WaCatalog | null }> {
   const { data: catalog } = await supabase
     .from("whatsapp_catalogs")
-    .select("id, slug, name, city_id, phone_number_id, waba_id, access_token_enc, is_active")
+    .select("id, slug, name, city_id, phone_number_id, waba_id, catalog_id, access_token_enc, is_active")
     .eq("id", catalogId)
     .maybeSingle()
   if (!catalog) return { config: null, catalog: null }
 
   const cat = catalog as WaCatalog & { access_token_enc: string | null }
+  const catalogIdMeta = cat.catalog_id ?? undefined
   if (cat.phone_number_id && cat.waba_id && cat.access_token_enc) {
     return {
       catalog: cat,
@@ -122,6 +190,7 @@ export async function getCatalogWhatsAppConfig(
         accessToken: decryptToken(cat.access_token_enc),
         phoneNumberId: cat.phone_number_id,
         wabaId: cat.waba_id,
+        catalogId: catalogIdMeta,
       },
     }
   }
@@ -139,6 +208,7 @@ export async function getCatalogWhatsAppConfig(
       accessToken: platformToken,
       phoneNumberId: platformPhoneId,
       wabaId: platformWaba,
+      catalogId: catalogIdMeta,
     },
   }
 }

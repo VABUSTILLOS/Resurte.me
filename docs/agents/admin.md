@@ -15,6 +15,11 @@
   (`describeSeries`) — el SVG solo no es accesible.
 - La subnav es scroll horizontal en móvil.
 - Errores con reintento (`error.tsx` del área + botón Reintentar en página).
+- Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
+  borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
+  producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
+  sync registra un run en `whatsapp_sync_runs`. Los productos de Meta viven
+  bajo el `catalog_id` (`items_batch`), no bajo la WABA.
 
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de

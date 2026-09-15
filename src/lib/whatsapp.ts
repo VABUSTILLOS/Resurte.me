@@ -20,6 +20,8 @@ export interface WhatsAppConfig {
   accessToken: string
   phoneNumberId: string
   wabaId: string
+  /** ID del catálogo de productos en Meta Commerce (default: env WHATSAPP_CATALOG_ID ?? wabaId). */
+  catalogId?: string
   businessId?: string
 }
 
@@ -31,6 +33,8 @@ export interface WhatsAppProduct {
   price: number
   currency?: string
   sale_price?: number | null
+  /** Disponibilidad en Meta (default: "in stock"). */
+  availability?: "in stock" | "out of stock"
 }
 
 export interface SendTemplateParams {
@@ -74,6 +78,7 @@ function getConfig(): WhatsAppConfig {
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN || "",
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
     wabaId: process.env.WHATSAPP_WABA_ID || "",
+    catalogId: process.env.WHATSAPP_CATALOG_ID || undefined,
     businessId: process.env.WHATSAPP_BUSINESS_ID || "",
   }
 }
@@ -90,6 +95,33 @@ const BASE_URL = `https://graph.facebook.com/${API_VERSION}`
 // HTTP helper
 // ============================================================
 
+// Reintentos: rate-limits de Meta (429 y códigos 4/17/32/613/80004) y 5xx.
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
+const RETRYABLE_ERROR_CODES = new Set([4, 17, 32, 613, 80004])
+const MAX_ATTEMPTS = 3
+const REQUEST_TIMEOUT_MS = 30_000
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** ¿Error de Meta reintentable? (parsea el cuerpo de error de la Graph API). */
+export function isRetryableMetaError(status: number, body: string): boolean {
+  if (RETRYABLE_STATUS.has(status)) return true
+  try {
+    const code = (JSON.parse(body) as { error?: { code?: number } })?.error?.code
+    return typeof code === "number" && RETRYABLE_ERROR_CODES.has(code)
+  } catch {
+    return false
+  }
+}
+
+/** Backoff exponencial con jitter, honrando Retry-After si viene. */
+export function retryDelayMs(attempt: number, retryAfterHeader: string | null): number {
+  const retryAfter = retryAfterHeader ? Number(retryAfterHeader) * 1000 : NaN
+  if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.min(retryAfter, 60_000)
+  const base = 500 * 2 ** attempt
+  return Math.min(base + Math.floor(Math.random() * 250), 10_000)
+}
+
 async function waFetch(
   path: string,
   options: RequestInit = {},
@@ -100,155 +132,253 @@ async function waFetch(
 
   const url = path.startsWith("http") ? path : `${BASE_URL}${path}`
 
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${cfg.accessToken}`,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  })
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0 && lastError) {
+      const retryAfter = (lastError as Error & { retryAfter?: string | null }).retryAfter ?? null
+      await sleep(retryDelayMs(attempt - 1, retryAfter))
+    }
 
-  if (!res.ok) {
+    let res: Response
+    try {
+      res = await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        headers: {
+          Authorization: `Bearer ${cfg.accessToken}`,
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
+      })
+    } catch (err) {
+      // Red caída o timeout: reintentable.
+      lastError = err instanceof Error ? err : new Error(String(err))
+      continue
+    }
+
+    if (res.ok) return res
+
     const body = await res.text()
+    if (isRetryableMetaError(res.status, body) && attempt < MAX_ATTEMPTS - 1) {
+      const err = new Error(`WhatsApp API error ${res.status}: ${body}`) as Error & { retryAfter?: string | null }
+      err.retryAfter = res.headers.get("retry-after")
+      lastError = err
+      continue
+    }
     throw new Error(`WhatsApp API error ${res.status}: ${body}`)
   }
 
-  return res
+  throw lastError ?? new Error("WhatsApp API error: agotados los reintentos")
 }
 
 // ============================================================
-// Catalog Management
+// Catalog Management (Meta Catalog API — items_batch)
+// ============================================================
+// Los productos viven bajo el CATÁLOGO de Meta Commerce
+// (`/{catalog_id}/items_batch`), no bajo la WABA. El sync usa
+// retailer_id como llave idempotente. El batch es asíncrono:
+// Meta devuelve "handles" consultables vía getBatchStatus.
 // ============================================================
 
-/**
- * Create or update a product in the WhatsApp Commerce catalog.
- * Uses the WABA-level catalog API.
- */
-async function upsertCatalogProduct(
-  product: WhatsAppProduct,
-  config?: WhatsAppConfig
-): Promise<{ id: string }> {
-  const cfg = config || getConfig()
+/** Resuelve el catalog_id de Meta: propio de la config, env, o waba_id. */
+export function resolveCatalogId(config: WhatsAppConfig): string {
+  return config.catalogId || process.env.WHATSAPP_CATALOG_ID || config.wabaId
+}
 
-  // WhatsApp catalog uses retailer_id for idempotency
-  const body = {
-    name: product.name,
-    description: product.description || product.name,
-    retailer_id: product.id,
-    images: product.image_url ? [product.image_url] : [],
-    ...(product.currency ? { currency: product.currency } : {}),
+/** Datos de un item del catálogo (precios en unidades menores: centavos). */
+export interface CatalogItemData {
+  name: string
+  description?: string
+  price: number
+  currency: string
+  sale_price?: number
+  sale_price_start_date?: string
+  image_url?: string
+  availability?: "in stock" | "out of stock"
+  url?: string
+}
+
+export interface CatalogBatchRequest {
+  method: "CREATE" | "UPDATE" | "DELETE"
+  retailer_id: string
+  data?: CatalogItemData
+}
+
+export interface CatalogProductInfo {
+  id: string
+  name: string
+  retailer_id: string
+  price?: string
+  currency?: string
+}
+
+const BATCH_CHUNK_SIZE = 100
+
+/**
+ * Mapea productos de la tienda a requests items_batch.
+ * Puro y testeable: precios se convierten a centavos aquí.
+ */
+export function buildCatalogBatchRequests(
+  products: WhatsAppProduct[],
+  method: "CREATE" | "UPDATE"
+): CatalogBatchRequest[] {
+  return products.map((p) => {
+    const priceCents = Math.round(p.price * 100)
+    const saleCents = p.sale_price ? Math.round(p.sale_price * 100) : null
+    const data: CatalogItemData = {
+      name: p.name,
+      description: p.description || p.name,
+      price: priceCents,
+      currency: p.currency || "MXN",
+      availability: p.availability ?? "in stock",
+      ...(p.image_url ? { image_url: p.image_url } : {}),
+      ...(saleCents && saleCents > 0 && saleCents < priceCents
+        ? {
+            sale_price: saleCents,
+            sale_price_start_date: new Date().toISOString().split("T")[0],
+          }
+        : {}),
+    }
+    return { method, retailer_id: p.id, data }
+  })
+}
+
+export interface BatchResult {
+  handles: string[]
+  chunks: number
+}
+
+/**
+ * Envía requests al catálogo en chunks vía items_batch.
+ * Devuelve los handles de Meta (procesamiento asíncrono).
+ */
+export async function batchCatalogItems(
+  requests: CatalogBatchRequest[],
+  config?: WhatsAppConfig
+): Promise<BatchResult> {
+  const cfg = config || getConfig()
+  if (requests.length === 0) return { handles: [], chunks: 0 }
+
+  const catalogId = resolveCatalogId(cfg)
+  const handles: string[] = []
+  let chunks = 0
+
+  for (let i = 0; i < requests.length; i += BATCH_CHUNK_SIZE) {
+    const chunk = requests.slice(i, i + BATCH_CHUNK_SIZE)
+    const res = await waFetch(
+      `/${catalogId}/items_batch`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          item_type: "PRODUCT_ITEM",
+          allow_upsert: true,
+          requests: chunk,
+        }),
+      },
+      cfg
+    )
+    const body = await res.json()
+    if (Array.isArray(body?.handles)) handles.push(...body.handles)
+    chunks++
   }
 
-  // Try to update existing product first, create if not found
-  const res = await waFetch(
-    `/${cfg.wabaId}/products`,
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-    },
-    cfg
-  )
+  return { handles, chunks }
+}
 
+/** Estado de un batch asíncrono de Meta (consulta por handle). */
+export async function getBatchStatus(
+  handle: string,
+  config?: WhatsAppConfig
+): Promise<{ status: string; errors_total?: number; errors?: unknown }> {
+  const cfg = config || getConfig()
+  const res = await waFetch(`/${handle}?fields=status,errors_total,errors`, {}, cfg)
   return res.json()
 }
 
 /**
- * Set the price for a product in the WhatsApp catalog.
- * Price API is separate from product creation in WhatsApp Commerce.
+ * Lista los productos actuales del catálogo de Meta (paginado completo).
  */
-async function setProductPrice(
-  productId: string,
-  price: number,
-  currency: string = "MXN",
-  salePrice?: number | null,
+export async function getCatalogProducts(
   config?: WhatsAppConfig
-): Promise<void> {
+): Promise<CatalogProductInfo[]> {
   const cfg = config || getConfig()
+  const catalogId = resolveCatalogId(cfg)
 
-  const body: {
-    price: number
-    currency: string
-    sale_price?: number
-    sale_price_start_date?: string
-  } = {
-    price: Math.round(price * 100), // WhatsApp uses cents
-    currency,
+  const all: CatalogProductInfo[] = []
+  let path: string | null =
+    `/${catalogId}/products?fields=id,name,retailer_id,price,currency&limit=500`
+
+  while (path) {
+    const res: Response = await waFetch(path, {}, cfg)
+    const body: {
+      data?: CatalogProductInfo[]
+      paging?: { next?: string }
+    } = await res.json()
+    all.push(...(body.data ?? []))
+    path = body.paging?.next ?? null
   }
 
-  if (salePrice) {
-    body.sale_price = Math.round(salePrice * 100)
-    body.sale_price_start_date = new Date().toISOString().split("T")[0]
-  }
+  return all
+}
 
-  await waFetch(
-    `/${productId}`,
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-    },
-    cfg
-  )
+export interface SyncCatalogResult {
+  /** Productos nuevos enviados a Meta (CREATE). */
+  added: number
+  /** Productos existentes actualizados (UPDATE). */
+  updated: number
+  /** Productos borrados en Meta (solo si deleteUnknown = true). */
+  removed: number
+  /** retailer_ids presentes en Meta pero no en la curaduría (NO borrados). */
+  stale: string[]
+  /** Handles de los batches enviados (procesamiento asíncrono de Meta). */
+  handles: string[]
 }
 
 /**
- * Delete a product from the WhatsApp Commerce catalog.
- */
-async function deleteCatalogProduct(
-  productId: string,
-  config?: WhatsAppConfig
-): Promise<void> {
-  const cfg = config || getConfig()
-  await waFetch(`/${productId}`, { method: "DELETE" }, cfg)
-}
-
-/**
- * Get all products currently in the WhatsApp catalog.
- */
-async function getCatalogProducts(config?: WhatsAppConfig): Promise<{
-  data: { id: string; name: string; retailer_id: string }[]
-}> {
-  const cfg = config || getConfig()
-  const res = await waFetch(`/${cfg.wabaId}/products`, {}, cfg)
-  return res.json()
-}
-
-/**
- * Sync entire curated product catalog to WhatsApp.
- * Compares current WhatsApp catalog with desired products, adds/removes as needed.
+ * Sync seguro Tienda → WhatsApp:
+ * - CREATE lo nuevo, UPDATE lo existente (vía items_batch).
+ * - NUNCA borra en Meta lo que no está en la curaduría salvo que se pida
+ *   explícitamente con `deleteUnknown: true`; siempre reporta los `stale`.
  */
 export async function syncCatalog(
   desiredProducts: WhatsAppProduct[],
-  config?: WhatsAppConfig
-): Promise<{ added: number; removed: number }> {
+  config?: WhatsAppConfig,
+  opts?: { deleteUnknown?: boolean }
+): Promise<SyncCatalogResult> {
   const cfg = config || getConfig()
   const current = await getCatalogProducts(cfg)
 
-  const desiredRetailerIds = new Set(desiredProducts.map((p) => p.id))
-  const currentMap = new Map(
-    current.data.map((p) => [p.retailer_id, p.id])
-  )
+  const currentRetailerIds = new Set(current.map((p) => p.retailer_id))
+  const desiredIds = new Set(desiredProducts.map((p) => p.id))
 
-  let added = 0
+  const toCreate = desiredProducts.filter((p) => !currentRetailerIds.has(p.id))
+  const toUpdate = desiredProducts.filter((p) => currentRetailerIds.has(p.id))
+  const stale = current
+    .filter((p) => p.retailer_id && !desiredIds.has(p.retailer_id))
+    .map((p) => p.retailer_id)
+
+  const handles: string[] = []
+  const created = await batchCatalogItems(buildCatalogBatchRequests(toCreate, "CREATE"), cfg)
+  const updated = await batchCatalogItems(buildCatalogBatchRequests(toUpdate, "UPDATE"), cfg)
+  handles.push(...created.handles, ...updated.handles)
+
   let removed = 0
-
-  // Add/update products
-  for (const product of desiredProducts) {
-    await upsertCatalogProduct(product, cfg)
-    const wpProductId = currentMap.get(product.id) || product.id
-    await setProductPrice(wpProductId, product.price, "MXN", product.sale_price, cfg)
-    added++
+  if (opts?.deleteUnknown && stale.length > 0) {
+    const deleted = await batchCatalogItems(
+      stale.map((retailer_id) => ({ method: "DELETE" as const, retailer_id })),
+      cfg
+    )
+    handles.push(...deleted.handles)
+    removed = stale.length
   }
 
-  // Remove products no longer desired
-  for (const [retailerId, wpId] of currentMap) {
-    if (!desiredRetailerIds.has(retailerId)) {
-      await deleteCatalogProduct(wpId, cfg)
-      removed++
-    }
+  return {
+    added: toCreate.length,
+    updated: toUpdate.length,
+    removed,
+    stale: opts?.deleteUnknown ? [] : stale,
+    handles,
   }
-
-  return { added, removed }
 }
 
 // ============================================================
@@ -460,7 +590,7 @@ export async function sendProductListMessage(params: {
           body: { text: params.bodyText ?? "Elige tus productos:" },
           footer: { text: params.footerText ?? "Resurte.me" },
           action: {
-            catalog_id: params.catalogId ?? cfg.wabaId,
+            catalog_id: params.catalogId ?? resolveCatalogId(cfg),
             sections: params.sections,
           },
         },

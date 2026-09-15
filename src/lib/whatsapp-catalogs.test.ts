@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest"
 import {
   buildAdminCatalogProducts,
   buildAdminProductListSections,
+  buildCatalogSyncDiff,
   orderCatalogItems,
+  validateCatalogProducts,
   type AdminProduct,
   type WaCatalogItemRow,
 } from "./whatsapp-catalogs"
@@ -76,5 +78,62 @@ describe("buildAdminProductListSections", () => {
       product_items: [{ product_retailer_id: "1" }, { product_retailer_id: "3" }],
     })
     expect(sections[1]?.title).toBe("Frutas")
+  })
+})
+
+describe("buildCatalogSyncDiff", () => {
+  it("clasifica crear, actualizar y stale sin borrar nada", () => {
+    const desired = [
+      { id: "1", name: "A", price: 10 },
+      { id: "2", name: "B", price: 20 },
+    ]
+    const diff = buildCatalogSyncDiff(desired, [
+      { retailer_id: "2" },
+      { retailer_id: "9" },
+    ])
+    expect(diff.toCreate).toEqual(["1"])
+    expect(diff.toUpdate).toEqual(["2"])
+    expect(diff.stale).toEqual(["9"])
+  })
+
+  it("ignora filas de Meta sin retailer_id", () => {
+    const diff = buildCatalogSyncDiff(
+      [{ id: "1", name: "A", price: 10 }],
+      [{ retailer_id: "" }]
+    )
+    expect(diff.stale).toEqual([])
+    expect(diff.toCreate).toEqual(["1"])
+  })
+})
+
+describe("validateCatalogProducts", () => {
+  const wa = (partial: Record<string, unknown> = {}) => ({
+    id: "1",
+    name: "Producto",
+    price: 50,
+    ...partial,
+  })
+
+  it("separa válidos de inválidos con motivos", () => {
+    const { valid, invalid } = validateCatalogProducts([
+      wa({ id: "ok" }),
+      wa({ id: "sin-precio", price: 0 }),
+      wa({ id: "img-relativa", image_url: "/img/p.png" }),
+      wa({ id: "nombre-largo", name: "x".repeat(151) }),
+    ])
+    expect(valid.map((p) => p.id)).toEqual(["ok"])
+    expect(invalid).toHaveLength(3)
+    expect(invalid.find((i) => i.id === "sin-precio")?.reasons[0]).toContain("precio")
+    expect(invalid.find((i) => i.id === "img-relativa")?.reasons[0]).toContain("https")
+    expect(invalid.find((i) => i.id === "nombre-largo")?.reasons[0]).toContain("150")
+  })
+
+  it("acepta imágenes https y productos sin imagen", () => {
+    const { valid, invalid } = validateCatalogProducts([
+      wa({ id: "a", image_url: "https://cdn.x/p.png" }),
+      wa({ id: "b" }),
+    ])
+    expect(invalid).toHaveLength(0)
+    expect(valid).toHaveLength(2)
   })
 })

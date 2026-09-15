@@ -457,6 +457,10 @@ function AdminProductsContent() {
     patchProduct(p.id, { show_in_whatsapp: !p.show_in_whatsapp })
   }
 
+  const toggleVisibility = (p: Product) => {
+    patchProduct(p.id, { is_visible: !p.is_visible })
+  }
+
   const startEditPrice = (p: Product) => {
     setEditingPrice(p.id)
     setDraftPrice(String(p.sale_price ?? p.price ?? ""))
@@ -702,7 +706,7 @@ function AdminProductsContent() {
                 <th className="px-5 py-3">Categoría</th>
                 <th className="px-5 py-3">Precio</th>
                 <th className="px-5 py-3">Stock</th>
-                <th className="px-5 py-3">Visible</th>
+                <th className="px-5 py-3">Estado</th>
                 <th className="px-5 py-3">WhatsApp</th>
                 <th className="px-5 py-3">Ciudades</th>
               </tr>
@@ -831,15 +835,36 @@ function AdminProductsContent() {
                       </button>
                     </td>
                     <td className="px-5 py-3">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                          product.is_visible
-                            ? "bg-green-50 text-green-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
+                      <button
+                        onClick={() => toggleVisibility(product)}
+                        disabled={saving.has(product.id)}
+                        title="Clic para publicar/despublicar en tienda"
+                        aria-label={`${product.is_visible ? "Despublicar" : "Publicar"} ${product.name}`}
+                        className="inline-flex items-center gap-2 disabled:opacity-50"
                       >
-                        {product.is_visible ? "Visible" : "Oculto"}
-                      </span>
+                        <span
+                          className={`relative w-9 h-5 rounded-full transition-colors ${
+                            product.is_visible ? "bg-green-500" : "bg-gray-300"
+                          }`}
+                        >
+                          {saving.has(product.id) ? (
+                            <Loader2 className="absolute top-0.5 left-0.5 w-4 h-4 text-gray-500 animate-spin" />
+                          ) : (
+                            <span
+                              className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                product.is_visible ? "translate-x-4" : "translate-x-0.5"
+                              }`}
+                            />
+                          )}
+                        </span>
+                        <span
+                          className={`text-xs font-medium ${
+                            product.is_visible ? "text-green-700" : "text-gray-500"
+                          }`}
+                        >
+                          {product.is_visible ? "Publicado" : "Despublicado"}
+                        </span>
+                      </button>
                     </td>
                     <td className="px-5 py-3">
                       <button

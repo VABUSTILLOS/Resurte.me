@@ -97,7 +97,17 @@
 | A1-A8 | Dashboard del PR #18: KPIs vs ayer, alertas, auto-refresh, CSV, badge pendientes, guard server-side | ✅ (PR #18) |
 | A9-A10 | Gráficas con `role=img` + resumen textual de la serie para lectores de pantalla | ✅ |
 | A11 | Error boundary del área /admin | ✅ |
+| WA1 | Sync catálogo WhatsApp: cliente Graph API a nivel catálogo (`items_batch`, precio en el payload, `whatsapp_product_id` persistido, `catalog_id` por catálogo) | ✅ |
+| WA2 | Sync seguro no destructivo: diff crear/actualizar/stale, borrado en Meta solo con confirmación explícita | ✅ |
+| WA3 | Batch en chunks de 100 + backoff exponencial (429/80004/5xx) + timeout; fallos parciales vía handles | ✅ |
+| WA4 | Historial de syncs: `whatsapp_sync_runs` + `whatsapp_sync_items`, registro en cada corrida | ✅ |
+| WA5 | Cola de sync automático (`whatsapp_sync_queue`): cambios de precio/imagen/stock/visibilidad/curaduría encolan sync incremental; job `whatsapp-sync-queue` en el cron diario | ✅ |
+| WA6 | UI /admin/whatsapp: previsualización del diff con confirmación de borrados, historial por catálogo, botón "Procesar cola"; endpoint legacy `/api/whatsapp/catalog/sync` retirado | ✅ |
+| WA7 | Validación previa al sync (imagen https, precio > 0, límites de Meta); inválidos excluidos y listados con motivo | ✅ |
 | A12 | Asignación de repartidor desde el dashboard | 🔜 |
+| A13 | Productos: operaciones masivas (precio/visibilidad/disponibilidad) con auditoría | 🔜 |
+| A14 | Pedidos: filtros guardados y acciones masivas de estado | 🔜 |
+| A15 | Dashboard: alertas accionables con deep-link al recurso | 🔜 |
 
 ## 9. Blog
 

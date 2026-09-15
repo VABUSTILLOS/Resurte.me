@@ -74,6 +74,10 @@ export async function PATCH(request: Request) {
       detail: updates as Record<string, unknown>,
     })
 
+    // WA5 — encolar sync incremental del catálogo WhatsApp (best-effort).
+    const { enqueueProductsForWaSync } = await import("@/lib/whatsapp-sync-queue")
+    await enqueueProductsForWaSync(supabase, [productId], "product_update")
+
     return NextResponse.json({ success: true, productId, ...updates })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error interno del servidor"

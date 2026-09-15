@@ -78,6 +78,15 @@ export async function GET(req: NextRequest) {
         return reconcileStalePayments()
       },
     ],
+    // WA5 — vaciar la cola de sync automático del catálogo WhatsApp
+    // (cambios de precio/imagen/stock/visibilidad encolados por admin).
+    [
+      "whatsapp-sync-queue",
+      async () => {
+        const { processWaSyncQueue } = await import("@/lib/whatsapp-sync-queue")
+        return processWaSyncQueue()
+      },
+    ],
   ]
 
   // Secuencial e independiente: un job que falla no detiene a los demás.
