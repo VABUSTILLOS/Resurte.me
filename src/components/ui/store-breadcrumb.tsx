@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 
-export interface StoreBreadcrumbItem {
+interface StoreBreadcrumbItem {
   label: string
   href: string
 }
