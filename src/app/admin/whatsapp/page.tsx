@@ -10,7 +10,7 @@ import Image from "next/image"
 import {
   Search, RefreshCw, ArrowUp, ArrowDown, Plus, Send,
   Loader2, MapPin, Globe, History, ListChecks, AlertTriangle, X,
-  ChevronDown, ChevronRight, RotateCcw,
+  ChevronDown, ChevronRight, RotateCcw, GripVertical, Eye,
 } from "lucide-react"
 import { getCategoryIcon } from "@/lib/utils"
 import {
@@ -31,6 +31,8 @@ import {
   removeWaQueueItem,
   retryWaSyncProduct,
   retryWaFailedProducts,
+  bulkAddWaCatalogProducts,
+  bulkRemoveWaCatalogProducts,
   type AdminWhatsappProduct,
   type AdminWhatsappCategory,
   type WaCatalogSummary,
@@ -89,6 +91,18 @@ export default function AdminWhatsAppPage() {
   const [runItems, setRunItems] = useState<Record<string, WaSyncItemDetail[]>>({})
   const [retryingKey, setRetryingKey] = useState<string | null>(null)
 
+  // WC5 — drag & drop de la curaduría.
+  const [dragId, setDragId] = useState<number | null>(null)
+  const [dragOverId, setDragOverId] = useState<number | null>(null)
+
+  // WC6 — vista previa como cliente.
+  const [showPreview, setShowPreview] = useState(false)
+
+  // WC7 — curaduría masiva.
+  const [armBulkAdd, setArmBulkAdd] = useState(false)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+
   const load = useCallback(async () => {
     try {
       const [data, cats] = await Promise.all([getAdminWhatsappCatalog(), listWaCatalogs()])
@@ -137,6 +151,26 @@ export default function AdminWhatsAppPage() {
   )
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
 
+  // WC6 — secciones del product_list tal como las recibiría el cliente
+  // (mismo criterio que buildAdminProductListSections: orden de curaduría,
+  // agrupado por categoría, máx 30 ítems).
+  const previewSections = useMemo(() => {
+    const catName = new Map(categories.map((c) => [c.id, c.name]))
+    const byCat = new Map<string, AdminWhatsappProduct[]>()
+    let count = 0
+    for (const item of curated) {
+      if (count >= 30) break
+      const p = productById.get(item.product_id)
+      if (!p) continue
+      count++
+      const title = (p.category_id ? catName.get(p.category_id) : null) ?? "Catálogo"
+      const list = byCat.get(title) ?? []
+      list.push(p)
+      byCat.set(title, list)
+    }
+    return [...byCat.entries()].map(([title, prods]) => ({ title: title.slice(0, 24), products: prods }))
+  }, [curated, productById, categories])
+
   const available = useMemo(
     () =>
       products.filter((p) => {
@@ -170,6 +204,46 @@ export default function AdminWhatsAppPage() {
       await setWaCatalogProduct(selectedCatalog.id, productId, true)
     })
 
+  // WC7 — agregar toda la vista filtrada (tope 50, doble clic de confirmación).
+  const BULK_ADD_CAP = 50
+  const handleBulkAdd = () => {
+    if (!armBulkAdd) {
+      setArmBulkAdd(true)
+      return
+    }
+    setArmBulkAdd(false)
+    run(
+      async () => {
+        if (!selectedCatalog) return 0
+        const ids = available.slice(0, BULK_ADD_CAP).map((p) => p.id)
+        return bulkAddWaCatalogProducts(selectedCatalog.id, ids)
+      },
+      (n) => `${n} productos agregados a la curaduría de ${selectedCatalog?.name}.`
+    )
+  }
+
+  // WC7 — quitar los seleccionados de la curaduría.
+  const handleBulkRemove = () =>
+    run(
+      async () => {
+        if (!selectedCatalog) return 0
+        const ids = [...selectedIds]
+        const n = await bulkRemoveWaCatalogProducts(selectedCatalog.id, ids)
+        setSelectedIds(new Set())
+        setSelectionMode(false)
+        return n
+      },
+      (n) => `${n} productos quitados de la curaduría.`
+    )
+
+  const toggleSelected = (productId: number) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(productId)) next.delete(productId)
+      else next.add(productId)
+      return next
+    })
+
   const handleRemove = (productId: number) =>
     run(async () => {
       if (!selectedCatalog) return
@@ -188,6 +262,18 @@ export default function AdminWhatsAppPage() {
       if (a === undefined || b === undefined) return
       ids[idx] = b
       ids[swap] = a
+      await reorderWaCatalog(selectedCatalog.id, ids)
+    })
+
+  // WC5 — soltar un producto sobre otro reordena la curaduría.
+  const handleDrop = (targetId: number) =>
+    run(async () => {
+      if (!selectedCatalog || dragId == null || dragId === targetId) return
+      const ids = curated.map((i) => i.product_id)
+      const from = ids.indexOf(dragId)
+      const to = ids.indexOf(targetId)
+      if (from < 0 || to < 0) return
+      ids.splice(to, 0, ...ids.splice(from, 1))
       await reorderWaCatalog(selectedCatalog.id, ids)
     })
 
@@ -306,6 +392,14 @@ export default function AdminWhatsAppPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowPreview(true)}
+            disabled={!selectedCatalog || curated.length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E8E9EB] text-[var(--text-secondary)] font-semibold rounded-full hover:bg-[#F7F5F0] transition-colors text-sm disabled:opacity-60"
+          >
+            <Eye className="w-4 h-4" />
+            Vista previa
+          </button>
           {queueCount > 0 && (
             <button
               onClick={() => setShowQueue((v) => !v)}
@@ -427,7 +521,24 @@ export default function AdminWhatsAppPage() {
               <h2 className="font-bold text-[#242529]">
                 Catálogo de {selectedCatalog.name}
               </h2>
-              <span className="text-xs text-[#B0B3B8]">{curated.length} productos</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#B0B3B8]">{curated.length} productos</span>
+                {curated.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setSelectionMode((v) => !v)
+                      setSelectedIds(new Set())
+                    }}
+                    className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
+                      selectionMode
+                        ? "bg-[#0E7A0E] text-white"
+                        : "bg-[#F5F3F0] text-[var(--text-secondary)] hover:bg-[#EDEAE4]"
+                    }`}
+                  >
+                    {selectionMode ? "Listo" : "Seleccionar"}
+                  </button>
+                )}
+              </div>
             </div>
             <p className="text-xs text-[var(--text-secondary)] mb-4">
               Este es el orden EXACTO que verá el cliente.
@@ -442,8 +553,56 @@ export default function AdminWhatsAppPage() {
                 {curated.map((item, idx) => {
                   const p = productById.get(item.product_id)
                   if (!p) return null
+                  if (selectionMode) {
+                    const checked = selectedIds.has(item.product_id)
+                    return (
+                      <label
+                        key={item.product_id}
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-2 cursor-pointer transition-colors ${
+                          checked ? "border-red-300 bg-red-50" : "border-[#25D366]/20 bg-[#F2FBF5]"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleSelected(item.product_id)}
+                          className="accent-red-600"
+                          aria-label={`Seleccionar ${p.name}`}
+                        />
+                        <span className="w-6 text-xs font-black text-[#0E7A0E]">{idx + 1}</span>
+                        <span className="flex-1 min-w-0 text-sm font-semibold text-[#242529] truncate">{p.name}</span>
+                      </label>
+                    )
+                  }
                   return (
-                    <div key={item.product_id} className="flex items-center gap-2 rounded-xl border border-[#25D366]/20 bg-[#F2FBF5] px-3 py-2">
+                    <div
+                      key={item.product_id}
+                      draggable
+                      onDragStart={() => setDragId(item.product_id)}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        if (dragOverId !== item.product_id) setDragOverId(item.product_id)
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        handleDrop(item.product_id).catch(() => {})
+                      }}
+                      onDragEnd={() => {
+                        setDragId(null)
+                        setDragOverId(null)
+                      }}
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors ${
+                        dragOverId === item.product_id && dragId !== item.product_id
+                          ? "border-[#0E7A0E] bg-[#E7F8EE] ring-2 ring-[#0E7A0E]/30"
+                          : "border-[#25D366]/20 bg-[#F2FBF5]"
+                      } ${dragId === item.product_id ? "opacity-50" : ""}`}
+                    >
+                      <span
+                        className="cursor-grab active:cursor-grabbing text-[#B0B3B8] hover:text-[#0E7A0E] touch-none"
+                        aria-label={`Arrastrar para reordenar ${p.name}`}
+                      >
+                        <GripVertical className="w-4 h-4" />
+                      </span>
                       <span className="w-6 text-xs font-black text-[#0E7A0E]">{idx + 1}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-[#242529] truncate">{p.name}</p>
@@ -466,6 +625,28 @@ export default function AdminWhatsAppPage() {
                     </div>
                   )
                 })}
+              </div>
+            )}
+
+            {/* Barra de acciones de selección múltiple (WC7) */}
+            {selectionMode && (
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  onClick={handleBulkRemove}
+                  disabled={busy || selectedIds.size === 0}
+                  className="px-4 py-2 rounded-full bg-red-600 text-white text-xs font-bold hover:bg-red-700 disabled:opacity-40"
+                >
+                  Quitar {selectedIds.size} seleccionado(s)
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectionMode(false)
+                    setSelectedIds(new Set())
+                  }}
+                  className="px-4 py-2 rounded-full text-xs font-semibold text-[var(--text-secondary)] hover:bg-[#F7F5F0]"
+                >
+                  Cancelar
+                </button>
               </div>
             )}
 
@@ -640,6 +821,23 @@ export default function AdminWhatsAppPage() {
               ))}
             </div>
 
+            {/* Agregado masivo de la vista filtrada (WC7) */}
+            {available.length > 0 && (
+              <button
+                onClick={handleBulkAdd}
+                disabled={busy}
+                className={`w-full mb-3 px-3 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-60 ${
+                  armBulkAdd
+                    ? "bg-[#0E7A0E] text-white hover:bg-[#0D720D]"
+                    : "bg-[#E7F8EE] text-[#0E7A0E] hover:bg-[#D5F1E0]"
+                }`}
+              >
+                {armBulkAdd
+                  ? `¿Confirmar? Agregar ${Math.min(available.length, BULK_ADD_CAP)} productos a la curaduría`
+                  : `Agregar toda la vista (${Math.min(available.length, BULK_ADD_CAP)}${available.length > BULK_ADD_CAP ? ` de ${available.length}` : ""})`}
+              </button>
+            )}
+
             <div className="space-y-1.5 max-h-[55vh] overflow-y-auto">
               {available.length === 0 ? (
                 <p className="text-sm text-[#B0B3B8] py-8 text-center">Sin productos por agregar.</p>
@@ -661,6 +859,70 @@ export default function AdminWhatsAppPage() {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: vista previa como cliente (WC6) */}
+      {showPreview && selectedCatalog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Vista previa del catálogo"
+        >
+          <div className="w-full max-w-sm bg-[#ECE5DD] rounded-2xl shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between bg-[#075E54] text-white px-4 py-3">
+              <h3 className="font-bold text-sm">Así lo verá tu cliente</h3>
+              <button
+                onClick={() => setShowPreview(false)}
+                className="p-1 text-white/70 hover:text-white"
+                aria-label="Cerrar vista previa"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-3 max-h-[70vh] overflow-y-auto">
+              {/* Burbuja del mensaje product_list */}
+              <div className="bg-white rounded-xl rounded-tl-none shadow-sm p-3 max-w-[95%]">
+                <p className="font-bold text-[#242529] text-sm">{selectedCatalog.name}</p>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5 mb-3">
+                  Elige tus productos y te los llevamos:
+                </p>
+                {previewSections.map((section) => (
+                  <div key={section.title} className="mb-3">
+                    <p className="text-[11px] font-bold text-[#0E7A0E] uppercase tracking-wide mb-1">
+                      {section.title}
+                    </p>
+                    <ul className="divide-y divide-[#F0F1F2]">
+                      {section.products.map((p) => (
+                        <li key={p.id} className="flex items-center gap-2 py-1.5">
+                          {p.image_url ? (
+                            <Image
+                              src={p.image_url}
+                              alt={p.name}
+                              width={32}
+                              height={32}
+                              className="w-8 h-8 rounded-lg object-cover shrink-0"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-[#F5F3F0] shrink-0" />
+                          )}
+                          <span className="flex-1 min-w-0 text-xs text-[#242529] truncate">{p.name}</span>
+                          <span className="text-xs font-semibold text-[#242529]">
+                            ${(p.sale_price ?? p.price ?? 0).toFixed(2)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                <p className="text-[10px] text-[#B0B3B8] mt-2">Resurte.me</p>
+              </div>
+              <p className="text-[11px] text-center text-[#8696A0] mt-3">
+                Máximo 30 productos por mensaje, en tu orden exacto.
+              </p>
             </div>
           </div>
         </div>

@@ -106,6 +106,16 @@ export async function GET(req: NextRequest) {
         return resolvePendingSyncRuns()
       },
     ],
+    // WC2 — motor de automatizaciones WhatsApp: carrito abandonado,
+    // reactivación, rating post-entrega, onboarding y cumpleaños,
+    // respetando la config persistida en whatsapp_automations.
+    [
+      "whatsapp-automations",
+      async () => {
+        const { runWhatsAppAutomations } = await import("@/lib/whatsapp-automations-engine")
+        return runWhatsAppAutomations()
+      },
+    ],
   ]
 
   // Secuencial e independiente: un job que falla no detiene a los demás.

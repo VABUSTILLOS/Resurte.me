@@ -145,7 +145,36 @@ export async function GET() {
         AUTOMATION_TEMPLATE_MAP[a.automation_type]?.name ||
         "unknown",
     })),
+    // WC3 — estadísticas de envíos por automatización (bitácora propia).
+    stats: await loadAutomationSendStats(supabase),
   })
+}
+
+/** Envíos por automatización: últimos 7 días + último envío (WC3). */
+async function loadAutomationSendStats(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>
+): Promise<Record<string, { sent7d: number; failed7d: number; lastSentAt: string | null }>> {
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString()
+  const { data, error } = await supabase
+    .from("whatsapp_automation_sends")
+    .select("automation_type, status, created_at")
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(1000)
+  if (error) {
+    logger.warn("WhatsApp automation stats error:", { error: error.message })
+    return {}
+  }
+
+  const stats: Record<string, { sent7d: number; failed7d: number; lastSentAt: string | null }> = {}
+  for (const row of data ?? []) {
+    const type = row.automation_type as string
+    const entry = (stats[type] ??= { sent7d: 0, failed7d: 0, lastSentAt: null })
+    if (row.status === "sent") entry.sent7d++
+    if (row.status === "failed") entry.failed7d++
+    if (!entry.lastSentAt && row.status === "sent") entry.lastSentAt = row.created_at as string
+  }
+  return stats
 }
 
 // ============================================================

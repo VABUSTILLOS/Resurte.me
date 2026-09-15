@@ -1428,6 +1428,64 @@ export async function setWaCatalogProduct(
   revalidatePath("/admin/whatsapp")
 }
 
+/** Agrega varios productos a la curaduría de una vez (WC7). */
+export async function bulkAddWaCatalogProducts(
+  catalogId: string,
+  productIds: number[]
+): Promise<number> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  if (productIds.length === 0) return 0
+  const supabase = await createServiceClient()
+
+  const { data: maxRow } = await supabase
+    .from("whatsapp_catalog_items")
+    .select("position")
+    .eq("catalog_id", catalogId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  let next = (maxRow?.position as number | undefined) ?? 0
+
+  const rows = productIds.map((product_id) => ({
+    catalog_id: catalogId,
+    product_id,
+    position: ++next,
+    is_visible: true,
+  }))
+  const { error } = await supabase
+    .from("whatsapp_catalog_items")
+    .upsert(rows, { onConflict: "catalog_id,product_id" })
+  if (error) throw new Error(error.message)
+
+  // WA5 — encolar para sync incremental.
+  const { enqueueProductsForWaSync } = await import("@/lib/whatsapp-sync-queue")
+  await enqueueProductsForWaSync(supabase, productIds, "catalog_curation_add")
+
+  revalidatePath("/admin/whatsapp")
+  return rows.length
+}
+
+/** Quita varios productos de la curaduría de una vez (WC7). */
+export async function bulkRemoveWaCatalogProducts(
+  catalogId: string,
+  productIds: number[]
+): Promise<number> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  if (productIds.length === 0) return 0
+  const supabase = await createServiceClient()
+
+  const { error } = await supabase
+    .from("whatsapp_catalog_items")
+    .delete()
+    .eq("catalog_id", catalogId)
+    .in("product_id", productIds)
+  if (error) throw new Error(error.message)
+  revalidatePath("/admin/whatsapp")
+  return productIds.length
+}
+
 /** Reordena la curaduría: array ordenado de product_ids (posiciones 1..N). */
 export async function reorderWaCatalog(
   catalogId: string,
