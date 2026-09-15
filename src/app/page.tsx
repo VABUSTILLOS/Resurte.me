@@ -7,6 +7,7 @@ import {
 import { buildLandingPreview } from "@/lib/catalog-preview"
 import type { Category, Product } from "@/types"
 import type { Metadata } from "next"
+import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 
 // ISR: la sesión se detecta en el cliente (CityLanding); leer cookies aquí
 // convertía la landing en SSR por request.
@@ -15,7 +16,7 @@ export const revalidate = 300
 export const metadata: Metadata = {
   title: "Resurte.me — Central de Abastos Digital para tu Negocio",
   description:
-    "Proveeduría para restaurantes, fondas y negocios. Frutas, verduras, carnes y abarrotes por mayoreo con envío gratis desde $2,500 MXN. Sin membresía.",
+    `Proveeduría para restaurantes, fondas y negocios. Frutas, verduras, carnes y abarrotes por mayoreo con envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}. Sin membresía.`,
   alternates: {
     canonical: "https://resurte.me",
   },

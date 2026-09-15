@@ -11,6 +11,7 @@ import {
   getCityAvailabilityForSlug,
 } from "@/lib/catalog-cache"
 import { getCityLandingSchema } from "@/lib/structured-data"
+import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 import { getCityBySlug } from "@/lib/data"
 import { buildLandingPreview } from "@/lib/catalog-preview"
 import type { Category, Product, RestaurantCollection, City } from "@/types"
@@ -53,7 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!city) return { title: "Ciudad no encontrada — Resurte.me" }
 
   const title = `Resurte.me en ${city.name} — Central de Abastos Digital`
-  const description = `Central de abastos en línea para tu negocio en ${city.name}, ${city.state}. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde $2,500 MXN.`
+  const description = `Central de abastos en línea para tu negocio en ${city.name}, ${city.state}. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`
 
   return {
     title,

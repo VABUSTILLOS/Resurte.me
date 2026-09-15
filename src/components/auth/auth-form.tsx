@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Eye, EyeOff } from "lucide-react"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { claimGuestAddresses } from "@/lib/guest-address"
+import { safeNextPath } from "@/lib/safe-next"
+import { rememberNextPath } from "@/lib/auth-next"
 
 interface AuthFormProps {
   mode: "login" | "register"
@@ -27,6 +29,9 @@ export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const referralCode = searchParams.get("ref")
+  // Destino original cuando el guard de una ruta privada mandó aquí
+  // (p. ej. /auth/login?next=/admin desde src/app/admin/layout.tsx).
+  const nextPath = safeNextPath(searchParams.get("next"))
   // Lazy browser-only client: creating it during SSR would throw when
   // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
   const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
@@ -47,8 +52,10 @@ export function AuthForm({ mode }: AuthFormProps) {
         // Vincula las direcciones de compras anónimas hechas en este navegador
         await claimGuestAddresses()
         router.refresh()
-        router.push("/")
+        router.push(nextPath)
       } else {
+        // El enlace de confirmación vuelve por /auth/callback sin `next`.
+        rememberNextPath(nextPath)
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -94,12 +101,13 @@ export function AuthForm({ mode }: AuthFormProps) {
           }
         }
 
-        // If session exists, user is auto-confirmed — redirect to home
+        // If session exists, user is auto-confirmed — redirect to the intended
+        // destination (o home si no hay `next`).
         if (data.session) {
           // Vincula las direcciones de compras anónimas hechas en este navegador
           await claimGuestAddresses()
           router.refresh()
-          router.push("/")
+          router.push(nextPath)
         } else {
           // Email confirmation required — show message to user
           setSuccessMessage(
@@ -120,6 +128,9 @@ export function AuthForm({ mode }: AuthFormProps) {
     setError(null)
 
     try {
+      // Supabase solo respeta la `redirectTo` registrada, así que el destino
+      // viaja en cookie para que el callback sepa a dónde volver.
+      rememberNextPath(nextPath)
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {

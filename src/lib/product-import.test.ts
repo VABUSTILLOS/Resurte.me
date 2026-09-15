@@ -6,7 +6,7 @@ import {
 
 // Espejo del encabezado interno (no exportado): mismo orden de columnas.
 const PRODUCT_IMPORT_HEADER = [
-  "nombre", "slug", "precio", "precio_oferta", "marca", "categoria", "stock", "visible",
+  "nombre", "slug", "precio", "precio_oferta", "marca", "categoria", "unidad", "stock", "visible", "imagen",
 ] as const
 
 const HEADER = PRODUCT_IMPORT_HEADER.join(";")
@@ -28,7 +28,7 @@ describe("parseProductImportCsv", () => {
 
   it("parsea filas válidas y deriva slug del nombre", () => {
     const { rows, errors } = parseProductImportCsv(
-      `${HEADER}\nAgua Mineral 600ml;;18.50;;Topo Chico;bebidas;in_stock;si`
+      `${HEADER}\nAgua Mineral 600ml;;18.50;;Topo Chico;bebidas;pieza;in_stock;si;`
     )
     expect(errors).toEqual([])
     expect(rows).toHaveLength(1)
@@ -39,6 +39,7 @@ describe("parseProductImportCsv", () => {
       sale_price: null,
       brand: "Topo Chico",
       category_slug: "bebidas",
+      unit: "pieza",
       stock_status: "in_stock",
       is_visible: true,
     })
@@ -63,7 +64,7 @@ describe("parseProductImportCsv", () => {
 
   it("interpreta visible=no como oculto y valida stock", () => {
     const { rows, errors } = parseProductImportCsv(
-      `${HEADER}\nOculto;;10;;;;;no\nMalo;;10;;;;agotado;si`
+      `${HEADER}\nOculto;;10;;;;;;no\nMalo;;10;;;;;agotado;si`
     )
     expect(rows[0]!.is_visible).toBe(false)
     expect(errors[0]!.message).toContain("stock inválido")

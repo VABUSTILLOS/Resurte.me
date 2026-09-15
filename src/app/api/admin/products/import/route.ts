@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   if (adminDenied) return adminDenied
 
   try {
-    const body = (await request.json()) as { rows?: ProductImportRow[] }
+    const body = (await request.json()) as { rows?: ProductImportRow[]; dryRun?: boolean }
     const rows = Array.isArray(body.rows) ? body.rows : []
     if (rows.length === 0) {
       return NextResponse.json({ error: "Sin filas para importar" }, { status: 400 })
@@ -57,6 +57,24 @@ export async function POST(request: NextRequest) {
       .in("slug", slugs)
     const existingBySlug = new Map((existing ?? []).map((p) => [p.slug, p.id]))
 
+    // Dry-run: clasifica sin escribir (vista previa crear/actualizar).
+    if (body.dryRun === true) {
+      const toCreate: { slug: string; name: string }[] = []
+      const toUpdate: { slug: string; name: string }[] = []
+      for (const row of rows) {
+        if (existingBySlug.has(row.slug)) toUpdate.push({ slug: row.slug, name: row.name })
+        else toCreate.push({ slug: row.slug, name: row.name })
+      }
+      return NextResponse.json({
+        dryRun: true,
+        created: toCreate.length,
+        updated: toUpdate.length,
+        toCreate,
+        toUpdate,
+        errors: [],
+      })
+    }
+
     let created = 0
     let updated = 0
     const errors: { slug: string; message: string }[] = []
@@ -68,9 +86,13 @@ export async function POST(request: NextRequest) {
         sale_price: row.sale_price,
         brand: row.brand,
         category_id: row.category_slug ? (categoryIdBySlug.get(row.category_slug) ?? null) : null,
+        unit: row.unit,
         stock_status: row.stock_status,
         is_visible: row.is_visible,
         updated_at: new Date().toISOString(),
+        // Solo pisa la imagen si la fila trae una (evita borrarla al
+        // re-importar sin la columna).
+        ...(row.image_url ? { image_url: row.image_url } : {}),
       }
       const existingId = existingBySlug.get(row.slug)
       if (existingId) {

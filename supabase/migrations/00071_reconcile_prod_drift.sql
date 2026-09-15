@@ -74,8 +74,10 @@ BEGIN
 END $$;
 
 -- ------------------------------------------------------------
--- 5. profiles.role: CHECK (cliente|vendedor) (00052)
---    Si prod creó la columna a mano sin el CHECK, se añade.
+-- 5. profiles.role: CHECK (cliente|vendedor|admin) (00052 + 00067)
+--    Si prod creó la columna a mano sin el CHECK, se añade. Debe incluir
+--    'admin': 00067 amplió el CHECK y esta migración corre DESPUÉS, así que
+--    recrearlo con solo dos valores dejaría prod sin poder promover admins.
 -- ------------------------------------------------------------
 DO $$
 BEGIN
@@ -85,7 +87,7 @@ BEGIN
              WHERE conrelid = 'public.profiles'::regclass
                AND conname = 'profiles_role_check') THEN
     ALTER TABLE public.profiles
-      ADD CONSTRAINT profiles_role_check CHECK (role IN ('cliente', 'vendedor'));
+      ADD CONSTRAINT profiles_role_check CHECK (role IN ('cliente', 'vendedor', 'admin'));
   END IF;
 END $$;
 

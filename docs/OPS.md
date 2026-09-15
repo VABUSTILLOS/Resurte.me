@@ -268,6 +268,41 @@ node scripts/make-admin.mjs tu-email@dominio.com
 
 **Gestión continua**: desde `/admin/usuarios` cualquier admin puede listar usuarios, buscarlos y asignar/quitar roles (admin / vendedor / cliente). Reglas: un admin no puede quitarse su propio rol y el sistema siempre conserva al menos un admin. El área `/admin` tiene guard server-side (layout) — sin sesión redirige a `/auth/login?next=/admin` y sin rol admin redirige a `/`.
 
+**Gestión por CLI** (`scripts/admin-credentials.mjs` / `npm run admin`):
+
+```bash
+npm run admin list                                   # quién es admin y por qué fuente
+npm run admin create tu@correo.com                   # crea cuenta confirmada + rol admin
+npm run admin promote tu@correo.com                  # promueve una cuenta existente
+npm run admin password tu@correo.com                 # cambia la contraseña
+```
+
+`create` y `password` generan una contraseña aleatoria (20 caracteres, sin `l/I/O/0/1`)
+si no se les pasa una, y la imprimen **una sola vez**: no se guarda en ningún lado
+porque en Supabase Auth solo queda el hash.
+
+Credenciales que necesitan los comandos: la URL del proyecto
+(`NEXT_PUBLIC_SUPABASE_URL`, o `SUPABASE_URL`) y una clave de servicio
+(`SUPABASE_SERVICE_ROLE_KEY`, o `SUPABASE_SECRET_KEY`).
+
+> ⚠️ **`vercel env pull` no sirve para esto.** Esas variables están marcadas como
+> *Sensitive* en Vercel, así que la CLI no puede descifrarlas: `env pull` escribe
+> `[SENSITIVE]` y `env run` directamente las omite. Hay que copiarlas a mano desde
+> el panel de Supabase (*Project Settings → API* → *Project URL* y clave
+> `service_role`) y pegarlas en `.env.local`.
+
+**Alternativa sin credenciales locales**: crea el usuario en el Dashboard de
+Supabase (*Authentication → Users → Add user*, con *Auto Confirm User*) y concédele
+el rol con `update profiles set role = 'admin' where id = '<uuid>';` o añadiendo su
+email a `ADMIN_EMAILS` en Vercel.
+
+> **Las contraseñas no están en el repositorio.** Ni `ADMIN_EMAILS` ni
+> `profiles.role` ni `admin_users` almacenan credenciales: el login lo valida
+> Supabase Auth contra un hash bcrypt irreversible. Para recuperar el acceso a
+> una cuenta admin existente hay que usar `password` o el Dashboard
+> (*Authentication → Users → Reset password*).
+
+
 ---
 
 ## 9. Migraciones de base de datos (workflow)

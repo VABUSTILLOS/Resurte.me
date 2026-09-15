@@ -25,7 +25,7 @@ function envNumber(name: string, fallback: number): number {
 export const FREE_SHIPPING_THRESHOLD = envNumber("NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD", FREE_SHIPPING_MXN)
 
 /** Tarifa fija de envío a domicilio cuando NO aplica envío gratis. */
-export const DELIVERY_FEE_FLAT = envNumber("NEXT_PUBLIC_DELIVERY_FEE_FLAT", 35)
+export const DELIVERY_FEE_FLAT = envNumber("NEXT_PUBLIC_DELIVERY_FEE_FLAT", 125)
 
 /** Máximo de order bumps mostrados simultáneamente en el drawer. */
 export const MAX_BUMPS = 3

@@ -17,7 +17,7 @@ import { MEXICO_CITIES } from "./cities"
 describe("commercial-facts", () => {
   it("usa las cifras comerciales verificadas", () => {
     expect(MIN_ORDER_MXN).toBe(500)
-    expect(FREE_SHIPPING_MXN).toBe(2500)
+    expect(FREE_SHIPPING_MXN).toBe(500)
     expect(MEMBERSHIP_FEE_MXN).toBe(0)
     expect(INVOICING).toBe("CFDI 4.0")
     expect([...CREDIT_DAYS]).toEqual([7, 15, 30])
@@ -63,7 +63,7 @@ describe("commercial-facts", () => {
       .map((f) => `${f.label} ${f.value} ${f.detail ?? ""}`)
       .join(" ")
     expect(texto).toContain("500")
-    expect(texto).toContain("2,500")
+    expect(texto).toContain(formatMxn(FREE_SHIPPING_MXN))
     expect(texto).toContain("CFDI 4.0")
     expect(texto).toContain("7, 15, 30 días")
     expect(texto).toContain(String(MEXICO_CITIES.length))
@@ -71,8 +71,8 @@ describe("commercial-facts", () => {
 
   it("el resumen en prosa cubre las mismas condiciones", () => {
     const resumen = getCommercialFactsSummary()
-    expect(resumen).toContain("$500 MXN")
-    expect(resumen).toContain("$2,500 MXN")
+    expect(resumen).toContain(formatMxn(MIN_ORDER_MXN))
+    expect(resumen).toContain(formatMxn(FREE_SHIPPING_MXN))
     expect(resumen).toContain("CFDI 4.0")
     expect(resumen).toContain("sin membresía")
     expect(resumen).toContain("7, 15, 30 días")
@@ -112,6 +112,7 @@ describe("superficies GEO sin cifras hardcodeadas", () => {
   const PATRONES = [
     /\$500\s*MXN/,
     /\$2,500\s*MXN/,
+    /\$35\s*MXN/,
     /CFDI\s*4\.0/,
     /\b20 ciudades\b/,
     /7,\s*15\s*o\s*30 días/,

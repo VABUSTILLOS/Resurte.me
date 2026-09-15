@@ -11,8 +11,12 @@ import { MEXICO_CITIES } from "./cities"
 /** Pedido mínimo en pesos mexicanos. */
 export const MIN_ORDER_MXN = 500
 
-/** Monto a partir del cual el envío corre por cuenta de Resurte.me. */
-export const FREE_SHIPPING_MXN = 2500
+/**
+ * Monto a partir del cual el envío corre por cuenta de Resurte.me.
+ * Hoy coincide con `MIN_ORDER_MXN`, así que la tarifa de envío solo alcanza a
+ * carritos por debajo del pedido mínimo.
+ */
+export const FREE_SHIPPING_MXN = 500
 
 /** Días de crédito disponibles para clientes frecuentes. */
 export const CREDIT_DAYS = [7, 15, 30] as const

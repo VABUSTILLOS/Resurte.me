@@ -44,9 +44,9 @@ function rule(overrides: Partial<BumpRuleRow> = {}): BumpRuleRow {
 // BDD: "Envío gratis al alcanzar el umbral" / "al superar el umbral"
 // -----------------------------------------------------------
 describe("BDD — envío gratis (barra de progreso)", () => {
-  it("un peso bajo el umbral → envío $35; en el umbral → envío $0 (frontera exacta)", () => {
-    expect(validDeliveryFee(1, FREE_SHIPPING_THRESHOLD - 1, 35)).toBe(35)
-    expect(validDeliveryFee(1, FREE_SHIPPING_THRESHOLD, 35)).toBe(0)
+  it("un peso bajo el umbral → envío $125; en el umbral → envío $0 (frontera exacta)", () => {
+    expect(validDeliveryFee(1, FREE_SHIPPING_THRESHOLD - 1, 125)).toBe(125)
+    expect(validDeliveryFee(1, FREE_SHIPPING_THRESHOLD, 125)).toBe(0)
   })
 
   it("el subtotal pagable usado para el envío incluye el descuento del cupón", () => {
@@ -55,9 +55,9 @@ describe("BDD — envío gratis (barra de progreso)", () => {
     const bruto = FREE_SHIPPING_THRESHOLD + 500
     const pagableConCupon = bruto - 600
     expect(pagableConCupon).toBeLessThan(FREE_SHIPPING_THRESHOLD)
-    expect(validDeliveryFee(1, pagableConCupon, 35)).toBe(35)
+    expect(validDeliveryFee(1, pagableConCupon, 125)).toBe(125)
     // El mismo bruto sin cupón sí alcanza el envío gratis.
-    expect(validDeliveryFee(1, bruto, 35)).toBe(0)
+    expect(validDeliveryFee(1, bruto, 125)).toBe(0)
   })
 
   it("mensajes exactos de la barra de progreso", () => {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { logger } from "@/lib/logger"
 import {
   MessageCircle,
@@ -116,39 +116,50 @@ export default function AdminAutomationsPage() {
   const [automations, setAutomations] = useState<AutomationUI[]>(DEFAULT_AUTOMATIONS)
   const [savingType, setSavingType] = useState<AutomationType | null>(null)
   const [savedMsg, setSavedMsg] = useState<{ type: AutomationType; ok: boolean; detail?: string } | null>(null)
+  // WC4 — carga real con estados (sin mocks como fuente) + stats WC3.
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [stats, setStats] = useState<Record<string, { sent7d: number; failed7d: number; lastSentAt: string | null }>>({})
+  const [noTemplate, setNoTemplate] = useState<Set<AutomationType>>(new Set())
 
-  // Load real automations from the API (fallback to defaults on error)
-  useEffect(() => {
-    let cancelled = false
-    fetch("/api/whatsapp/automations")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((data) => {
-        if (cancelled) return
-        const rows = (data.automations || []) as Array<{
-          automation_type: AutomationType
-          is_active: boolean
-          trigger_delay_hours: number
-          config: Record<string, unknown>
-          template_name?: string
-        }>
-        if (rows.length > 0) {
-          setAutomations((prev) =>
-            prev.map((a) => {
-              const row = rows.find((r) => r.automation_type === a.type)
-              return row
-                ? { ...a, isActive: row.is_active, delayHours: row.trigger_delay_hours ?? a.delayHours, config: row.config || a.config, templateName: row.template_name || a.templateName }
-                : a
-            })
-          )
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) logger.error("Failed to load automations:", err)
-      })
-    return () => {
-      cancelled = true
+  const load = useCallback(async () => {
+    setLoadError(null)
+    try {
+      const r = await fetch("/api/whatsapp/automations")
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const data = await r.json()
+      const rows = (data.automations || []) as Array<{
+        automation_type: AutomationType
+        is_active: boolean
+        trigger_delay_hours: number
+        config: Record<string, unknown>
+        template_name?: string
+        template_id?: number | null
+      }>
+      if (rows.length > 0) {
+        setAutomations((prev) =>
+          prev.map((a) => {
+            const row = rows.find((r) => r.automation_type === a.type)
+            return row
+              ? { ...a, isActive: row.is_active, delayHours: row.trigger_delay_hours ?? a.delayHours, config: row.config || a.config, templateName: row.template_name || a.templateName }
+              : a
+          })
+        )
+        setNoTemplate(new Set(rows.filter((r) => r.template_id == null).map((r) => r.automation_type)))
+      }
+      setStats(data.stats || {})
+    } catch (err) {
+      logger.error("Failed to load automations:", err)
+      setLoadError(err instanceof Error ? err.message : "Error al cargar")
+    } finally {
+      setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    const run = async () => { await load() }
+    run().catch(() => {})
+  }, [load])
 
   const toggleAutomation = (type: AutomationType) => {
     setAutomations((prev) =>
@@ -211,6 +222,22 @@ export default function AdminAutomationsPage() {
       </div>
 
       {/* Automations list */}
+      {loading ? (
+        <div className="py-16 text-center text-sm text-gray-400">Cargando automatizaciones…</div>
+      ) : loadError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+          <p className="text-sm text-red-700 mb-3">No se pudieron cargar las automatizaciones ({loadError}).</p>
+          <button
+            onClick={() => {
+              setLoading(true)
+              load().catch(() => {})
+            }}
+            className="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700"
+          >
+            Reintentar
+          </button>
+        </div>
+      ) : (
       <div className="space-y-4">
         {automations.map((auto) => (
           <div
@@ -231,6 +258,28 @@ export default function AdminAutomationsPage() {
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm">{auto.label}</h3>
                   <p className="text-xs text-gray-500 mt-0.5">{auto.description}</p>
+                  {/* WC3 — contadores de envíos */}
+                  {(() => {
+                    const s = stats[auto.type]
+                    if (!s || (s.sent7d === 0 && s.failed7d === 0)) return null
+                    return (
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        {s.sent7d} enviados (7 días)
+                        {s.failed7d > 0 && <span className="text-red-500"> · {s.failed7d} fallidos</span>}
+                        {s.lastSentAt && (
+                          <>
+                            {" · último "}
+                            {new Date(s.lastSentAt).toLocaleString("es-MX", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </>
+                        )}
+                      </p>
+                    )
+                  })()}
                 </div>
               </div>
               <button
@@ -266,6 +315,31 @@ export default function AdminAutomationsPage() {
                   <p className="text-[10px] text-gray-400 mt-1">
                     Nombre exacto de la plantilla aprobada en Meta Business Manager
                   </p>
+                  {noTemplate.has(auto.type) && (
+                    <p className="text-[10px] text-amber-600 font-semibold mt-1">
+                      ⚠ Sin plantilla registrada — los envíos usan texto libre (ventana de 24 h)
+                    </p>
+                  )}
+                </div>
+
+                {/* Delay editable */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    {auto.triggerLabel} ({auto.triggerUnit})
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={auto.delayHours}
+                    onChange={(e) =>
+                      setAutomations((prev) =>
+                        prev.map((a) =>
+                          a.type === auto.type ? { ...a, delayHours: Math.max(0, Number(e.target.value) || 0) } : a
+                        )
+                      )
+                    }
+                    className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                  />
                 </div>
 
                 {/* Trigger info */}
@@ -325,6 +399,7 @@ export default function AdminAutomationsPage() {
           </div>
         ))}
       </div>
+      )}
     </div>
   )
 }

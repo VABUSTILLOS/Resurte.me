@@ -10,6 +10,7 @@
  */
 
 import { registerDictionary, translate } from "./locale"
+import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 
 export const es = {
   common: {
@@ -324,7 +325,7 @@ export const es = {
     totalEstimated: "Total estimado",
     ctaTitle: "Tu primer pedido con Resurte.me",
     ctaDescription:
-      "Cuando estés listo para abrir, tu primer pedido de insumos está a un clic. Nuestro catálogo tiene todo lo que necesitas para {collection}, con envío gratis desde $2,500 MXN.",
+      `Cuando estés listo para abrir, tu primer pedido de insumos está a un clic. Nuestro catálogo tiene todo lo que necesitas para {collection}, con envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.`,
     ctaButton: "Crear cuenta y empezar",
   },
   comanda: {

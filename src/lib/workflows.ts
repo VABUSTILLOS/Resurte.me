@@ -560,11 +560,10 @@ export async function notifyFulfillmentUpdate(
 // Batch Operations (CRON Jobs)
 // ============================================================
 
-const REMINDER_INTERVALS = [1, 24, 48] // hours
-
 /**
  * Check all pending-payment orders and send reminders at the right intervals.
  * Called by Vercel Cron every hour.
+ * WC1: respeta whatsapp_automations (is_active + config.levels persistidos).
  */
 export async function checkAndSendPaymentReminders(): Promise<{
   checked: number
@@ -576,6 +575,18 @@ export async function checkAndSendPaymentReminders(): Promise<{
   const errors: string[] = []
   let reminded = 0
   let cancelled = 0
+
+  // WC1 — leer la config persistida; si el admin la desactivó, no enviar nada.
+  const { getAutomationConfig, effectiveAutomationConfig, resolveReminderLevels, isReminderDue } =
+    await import("@/lib/whatsapp-automations-engine")
+  const automationCfg = effectiveAutomationConfig(
+    await getAutomationConfig(supabase, "payment_recovery"),
+    "payment_recovery"
+  )
+  if (!automationCfg.is_active) {
+    return { checked: 0, reminded: 0, cancelled: 0, errors: [] }
+  }
+  const reminderLevels = resolveReminderLevels(automationCfg)
 
   // Get pending payment orders (bounded: select only what the loop uses and
   // cap the batch so an unbounded `select("*")` can't grow without limit).
@@ -614,18 +625,13 @@ export async function checkAndSendPaymentReminders(): Promise<{
       continue
     }
 
-    // Check if it's time for a reminder at this interval
-    // We check if hoursSinceCreation is "close enough" to one of our intervals
-    // Since the CRON runs hourly, we target ±30 minutes around the interval
-    for (const interval of REMINDER_INTERVALS) {
-      if (Math.abs(hoursSinceCreation - interval) <= 0.5) {
-        try {
-          await sendPaymentReminder(order.id)
-          reminded++
-        } catch (err) {
-          errors.push(`Failed to remind order ${order.id}: ${err instanceof Error ? err.message : "Unknown"}`)
-        }
-        break // Only send one reminder per check
+    // ¿Toca recordatorio en alguno de los niveles configurados?
+    if (isReminderDue(hoursSinceCreation, reminderLevels)) {
+      try {
+        await sendPaymentReminder(order.id)
+        reminded++
+      } catch (err) {
+        errors.push(`Failed to remind order ${order.id}: ${err instanceof Error ? err.message : "Unknown"}`)
       }
     }
   }

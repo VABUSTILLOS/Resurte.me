@@ -11,6 +11,11 @@
 - **Fuente única de totales**: `calcCheckoutTotals` (cliente) y su espejo en
   `POST /api/orders` (servidor). Cualquier cambio de regla (envío gratis, cupón
   sobre bumps) se hace en ambos lados el mismo día.
+- **Cifras comerciales**: el umbral de envío gratis vive en `commercial-facts.ts`
+  (`FREE_SHIPPING_MXN`) y la tarifa en `checkout-config.ts` (`DELIVERY_FEE_FLAT`).
+  Ninguna superficie publica la cifra a mano: la prosa interpola la constante y
+  `commercial-facts.test.ts` falla si alguna la escribe literal. Al mover una de
+  las dos, revisa también `bump_rules.subtotal_min` en Supabase.
 - El carrito persiste en localStorage con carga post-hidratación (`LOAD_CART`);
   no leer localStorage en el render inicial (mismatch #418).
 - El drawer es un diálogo: foco inicial, Escape, `aria-modal`, scroll lock del body

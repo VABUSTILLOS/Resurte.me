@@ -1431,7 +1431,7 @@ test.describe("Fase 12 móvil: tamaños de texto de lectura (13px)", () => {
     await expectFontGe13(page, total, "label Total")
 
     // Info de envío.
-    const delivery = page.getByText(/Envío gratis desde \$2,500/).first()
+    const delivery = page.getByText(/Envío gratis desde \$500/).first()
     await expectFontGe13(page, delivery, "info de envío")
   })
 

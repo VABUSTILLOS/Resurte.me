@@ -10,6 +10,7 @@ import {
   generateSitemapXml,
 } from "./structured-data"
 import { ORGANIZATION_ID, PRIMARY_AUTHOR, SITE_URL } from "./author"
+import { FREE_SHIPPING_MXN, MIN_ORDER_MXN, formatMxn } from "./commercial-facts"
 
 describe("getProductSchema", () => {
   it("usa la imagen real del producto cuando se pasa", () => {
@@ -106,8 +107,8 @@ describe("getWholesaleServiceSchema", () => {
   it("publica las condiciones comerciales que los asistentes citan", () => {
     const schema = getWholesaleServiceSchema()
     expect(schema.offers.priceCurrency).toBe("MXN")
-    expect(schema.description).toContain("$2,500")
-    expect(schema.description).toContain("$500")
+    expect(schema.description).toContain(formatMxn(MIN_ORDER_MXN))
+    expect(schema.description).toContain(formatMxn(FREE_SHIPPING_MXN))
   })
 })
 
