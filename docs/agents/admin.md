@@ -52,6 +52,12 @@
   sigue leyendo `stock_status`; `cost` (00102), `seo_*` (00104) y la función
   RPC `search_product_ids_fuzzy` (00103, pg_trgm) tienen fallback si la
   migración falta (degradan, no rompen).
+- Productos ronda 6: `product_stores` se gestiona con borrar-y-reinsertar
+  (override vacío = precio del catálogo); la pausa temporal (⏸) fija
+  `publish_at` en el MISMO PATCH que `is_visible=false` (la regla de
+  cancelar programación respeta fechas explícitas); la generación IA en
+  lote va en tandas de 10 secuenciales y el QR se genera client-side
+  (nunca en servidor).
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
