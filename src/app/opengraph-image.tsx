@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
+import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 
 // OG image estática 1200x630 generada con ImageResponse (F23).
 // Sustituye al /og-image.png inexistente que rompía las tarjetas de
@@ -70,7 +71,7 @@ export default async function Image() {
             marginTop: 8,
           }}
         >
-          Frutas, verduras, carnes y abarrotes por mayoreo · Envío gratis desde $2,500 MXN
+          Frutas, verduras, carnes y abarrotes por mayoreo · Envío gratis desde {formatMxn(FREE_SHIPPING_MXN)}
         </div>
       </div>
     ),

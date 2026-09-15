@@ -16,28 +16,28 @@ describe("checkout-config", () => {
     // sitio publica (FREE_SHIPPING_MXN en commercial-facts.ts).
     const override = process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD
     expect(FREE_SHIPPING_THRESHOLD).toBe(override ? Number(override) : FREE_SHIPPING_MXN)
-    expect(DELIVERY_FEE_FLAT).toBe(35)
+    expect(DELIVERY_FEE_FLAT).toBe(125)
     expect(MAX_BUMPS).toBe(3)
   })
 
   describe("validDeliveryFee", () => {
     it("devuelve 0 sin artículos", () => {
-      expect(validDeliveryFee(0, 100, 35)).toBe(0)
-      expect(validDeliveryFee(0, FREE_SHIPPING_THRESHOLD + 100, 35)).toBe(0)
+      expect(validDeliveryFee(0, 100, 125)).toBe(0)
+      expect(validDeliveryFee(0, FREE_SHIPPING_THRESHOLD + 100, 125)).toBe(0)
     })
 
     it("devuelve 0 al alcanzar el umbral de envío gratis", () => {
-      expect(validDeliveryFee(1, FREE_SHIPPING_THRESHOLD, 35)).toBe(0)
-      expect(validDeliveryFee(1, FREE_SHIPPING_THRESHOLD - 0.01, 35)).toBe(35)
+      expect(validDeliveryFee(1, FREE_SHIPPING_THRESHOLD, 125)).toBe(0)
+      expect(validDeliveryFee(1, FREE_SHIPPING_THRESHOLD - 0.01, 125)).toBe(125)
     })
 
     it("acepta la tarifa fija o 0 (whitelist retrocompatible)", () => {
-      expect(validDeliveryFee(2, 100, 35)).toBe(35)
+      expect(validDeliveryFee(2, 100, 125)).toBe(125)
       expect(validDeliveryFee(2, 100, 0)).toBe(0)
     })
 
     it("cae a la tarifa fija si recibe un valor inesperado", () => {
-      expect(validDeliveryFee(2, 100, 12)).toBe(35)
+      expect(validDeliveryFee(2, 100, 12)).toBe(125)
     })
   })
 
@@ -110,8 +110,8 @@ describe("checkout-config", () => {
       expect(t.discountAmount).toBe(0)
       expect(t.payableSubtotal).toBe(420)
       expect(t.allItemsCount).toBe(3)
-      expect(t.deliveryFee).toBe(35)
-      expect(t.total).toBe(455)
+      expect(t.deliveryFee).toBe(125)
+      expect(t.total).toBe(545)
     })
 
     it("aplica el cupón sobre subtotal + bumps (fórmula del servidor)", () => {
@@ -121,8 +121,8 @@ describe("checkout-config", () => {
       expect(t.payableSubtotal).toBe(450)
       expect(t.allItemsCount).toBe(4)
       // Con $450 pagable sigue pagando envío.
-      expect(t.deliveryFee).toBe(35)
-      expect(t.total).toBe(485)
+      expect(t.deliveryFee).toBe(125)
+      expect(t.total).toBe(575)
     })
 
     it("alcanzar el umbral da envío gratis", () => {
@@ -135,7 +135,7 @@ describe("checkout-config", () => {
       const t = calcCheckoutTotals(FREE_SHIPPING_THRESHOLD, 0, pctCoupon, 4, 0)
       expect(t.discountAmount).toBe(FREE_SHIPPING_THRESHOLD * 0.1)
       expect(t.payableSubtotal).toBe(FREE_SHIPPING_THRESHOLD * 0.9)
-      expect(t.deliveryFee).toBe(35)
+      expect(t.deliveryFee).toBe(125)
     })
 
     it("cuenta bumps en itemCount para el envío gratis", () => {
@@ -143,7 +143,7 @@ describe("checkout-config", () => {
       // falta envío, con el bump se alcanza el umbral.
       const base = FREE_SHIPPING_THRESHOLD - 40
       const sinBump = calcCheckoutTotals(base, 0, null, 3, 0)
-      expect(sinBump.deliveryFee).toBe(35)
+      expect(sinBump.deliveryFee).toBe(125)
 
       const t = calcCheckoutTotals(base, 40, null, 3, 1)
       expect(t.payableSubtotal).toBe(FREE_SHIPPING_THRESHOLD)

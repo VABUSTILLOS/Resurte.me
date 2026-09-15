@@ -13,7 +13,7 @@ describe("prompt del agente de ventas", () => {
   })
 
   it("no arrastra umbrales de envío obsoletos", () => {
-    expect(AGENT_SYSTEM_PROMPT).not.toMatch(/gratis desde \$(?!2,500)\d/)
+    expect(AGENT_SYSTEM_PROMPT).not.toMatch(/gratis desde \$(?!500)\d/)
   })
 
   it("menciona la facturación vigente", () => {
@@ -24,6 +24,6 @@ describe("prompt del agente de ventas", () => {
     const props = VALUE_PROPS.join(" ")
     expect(props).toContain(formatMxn(MIN_ORDER_MXN))
     expect(props).toContain(formatMxn(FREE_SHIPPING_MXN))
-    expect(props).not.toMatch(/gratis desde \$(?!2,500)\d/)
+    expect(props).not.toMatch(/gratis desde \$(?!500)\d/)
   })
 })

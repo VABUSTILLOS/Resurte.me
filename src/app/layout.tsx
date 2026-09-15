@@ -26,7 +26,11 @@ import {
   getWebSiteSchema,
   getWholesaleServiceSchema,
 } from "@/lib/structured-data"
+import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 import "./globals.css"
+
+/** Cifra de envío gratis en prosa: siempre sale de la fuente de verdad. */
+const freeShippingFrom = formatMxn(FREE_SHIPPING_MXN)
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -51,7 +55,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Resurte.me — Central de Abastos Digital",
   description:
-    "Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde $2,500 MXN.",
+    `Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde ${freeShippingFrom}.`,
   keywords: [
     "central de abastos",
     "mayoreo",
@@ -73,7 +77,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Resurte.me — Central de Abastos Digital",
     description:
-      "Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde $2,500 MXN.",
+      `Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Sin membresía, envío gratis desde ${freeShippingFrom}.`,
     url: "https://resurte.me",
     siteName: "Resurte.me",
     locale: "es_MX",
@@ -91,7 +95,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Resurte.me — Central de Abastos Digital",
     description:
-      "Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Envío gratis desde $2,500 MXN.",
+      `Central de abastos en línea para tu negocio. Abarrotes, frutas, verduras y carnes por mayoreo. Envío gratis desde ${freeShippingFrom}.`,
     images: ["https://resurte.me/opengraph-image"],
   },
   icons: {

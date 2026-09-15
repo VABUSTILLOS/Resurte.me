@@ -4,6 +4,7 @@
  */
 
 import { registerDictionary } from "./locale"
+import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 import type { Dictionary } from "./es"
 
 const en: Dictionary = {
@@ -319,7 +320,7 @@ const en: Dictionary = {
     totalEstimated: "Estimated total",
     ctaTitle: "Your first order with Resurte.me",
     ctaDescription:
-      "When you're ready to open, your first supply order is one click away. Our catalog has everything you need for {collection}, with free shipping from $2,500 MXN.",
+      `When you're ready to open, your first supply order is one click away. Our catalog has everything you need for {collection}, with free shipping from ${formatMxn(FREE_SHIPPING_MXN)}.`,
     ctaButton: "Create account and start",
   },
   comanda: {

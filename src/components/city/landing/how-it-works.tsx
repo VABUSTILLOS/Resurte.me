@@ -1,4 +1,5 @@
 import { Search, Store, Truck } from "lucide-react"
+import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 
 export function HowItWorks() {
   return (
@@ -50,7 +51,7 @@ export function HowItWorks() {
 
           {/* Trust bar — business-focused */}
           <div className="mt-3 sm:mt-14 flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-8 gap-y-1 text-[13px] sm:text-sm text-[var(--text-secondary)]">
-            {["Sin membresía", "Envío gratis desde $2,500", "Facturación electrónica", "Pago seguro", "Calidad garantizada"].map((label) => (
+            {["Sin membresía", `Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}`, "Facturación electrónica", "Pago seguro", "Calidad garantizada"].map((label) => (
               <span key={label} className="flex items-center gap-1.5">
                 <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-[#E9FBE9] flex items-center justify-center text-[#0E7A0E] text-[10px] sm:text-xs font-bold" aria-hidden="true">✓</span>
                 {label}

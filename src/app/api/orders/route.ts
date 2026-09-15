@@ -403,7 +403,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Delivery fee: 0 si hay envío gratis (subtotal con descuento >= umbral) o
-    // no hay items; si no, solo 0 (recoger) o 35 MXN (envío), whitelist.
+    // no hay items; si no, solo 0 (recoger) o 125 MXN (envío), whitelist.
     const computedDeliveryFee = validDeliveryFee(items.length, realSubtotal - discountAmount, delivery_fee)
 
     // El checkout envía total = subtotal - descuento + envío. Se exige que
