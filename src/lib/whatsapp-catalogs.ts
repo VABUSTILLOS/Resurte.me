@@ -17,6 +17,7 @@ export interface WaCatalog {
   phone_number_id: string | null
   waba_id: string | null
   catalog_id: string | null
+  display_phone: string | null
   is_active: boolean
 }
 
@@ -195,7 +196,7 @@ export async function getCatalogWhatsAppConfig(
 ): Promise<{ config: WhatsAppConfig | null; catalog: WaCatalog | null }> {
   const { data: catalog } = await supabase
     .from("whatsapp_catalogs")
-    .select("id, slug, name, city_id, phone_number_id, waba_id, catalog_id, access_token_enc, is_active")
+    .select("id, slug, name, city_id, phone_number_id, waba_id, catalog_id, display_phone, access_token_enc, is_active")
     .eq("id", catalogId)
     .maybeSingle()
   if (!catalog) return { config: null, catalog: null }

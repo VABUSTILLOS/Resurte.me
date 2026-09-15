@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react"
 import { ImagePlus, Loader2, Sparkles, Star, X } from "lucide-react"
+import { cropImageToSquare } from "@/lib/crop-image"
 
 interface Category {
   id: number
@@ -19,6 +20,9 @@ export interface ProductFormProduct {
   unit: string | null
   price: number | null
   sale_price: number | null
+  cost: number | null
+  stock_quantity: number | null
+  sort_order: number | null
   stock_status: "in_stock" | "low_stock" | "out_of_stock"
   is_visible: boolean
   show_in_whatsapp: boolean | null
@@ -27,6 +31,8 @@ export interface ProductFormProduct {
   publish_at: string | null
   unpublish_at: string | null
   admin_note: string | null
+  seo_title: string | null
+  seo_description: string | null
 }
 
 interface ProductFormModalProps {
@@ -66,6 +72,12 @@ export function ProductFormModal({
   const [salePrice, setSalePrice] = useState(
     product?.sale_price != null ? String(product.sale_price) : ""
   )
+  const [cost, setCost] = useState(product?.cost != null ? String(product.cost) : "")
+  const [stockQuantity, setStockQuantity] = useState(
+    product?.stock_quantity != null ? String(product.stock_quantity) : ""
+  )
+  const [seoTitle, setSeoTitle] = useState(product?.seo_title ?? "")
+  const [seoDescription, setSeoDescription] = useState(product?.seo_description ?? "")
   const [stockStatus, setStockStatus] = useState<ProductFormProduct["stock_status"]>(
     product?.stock_status ?? "in_stock"
   )
@@ -87,8 +99,17 @@ export function ProductFormModal({
     setUploadingImg(true)
     setError(null)
     try {
+      // Recorte 1:1 opcional (canvas, client-side) antes de subir.
+      let upload: File | Blob = file
+      if (window.confirm("¿Recortar la imagen a formato cuadrado (1:1)?\n\nAceptar = recortar · Cancelar = usar original")) {
+        try {
+          upload = await cropImageToSquare(file)
+        } catch {
+          // si el crop falla, sube el original
+        }
+      }
       const form = new FormData()
-      form.append("file", file)
+      form.append("file", upload, file.name)
       const res = await fetch("/api/admin/products/upload-image", { method: "POST", body: form })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.detail ?? data.error ?? "Error al subir la imagen")
@@ -270,6 +291,17 @@ export function ProductFormModal({
       setError("Precio de oferta inválido")
       return
     }
+    const parsedCost = cost.trim() === "" ? null : parseFloat(cost)
+    if (parsedCost !== null && (!Number.isFinite(parsedCost) || parsedCost < 0)) {
+      setError("Costo inválido")
+      return
+    }
+    const parsedQty =
+      stockQuantity.trim() === "" ? null : parseInt(stockQuantity, 10)
+    if (parsedQty !== null && (!Number.isInteger(parsedQty) || parsedQty < 0)) {
+      setError("Cantidad de stock inválida")
+      return
+    }
 
     setSaving(true)
     setError(null)
@@ -282,7 +314,11 @@ export function ProductFormModal({
         unit: unit.trim() || null,
         price: parsedPrice,
         sale_price: parsedSale,
+        cost: parsedCost,
+        stock_quantity: parsedQty,
         stock_status: stockStatus,
+        seo_title: seoTitle.trim() || null,
+        seo_description: seoDescription.trim() || null,
         is_visible: isVisible,
         show_in_whatsapp: showInWhatsapp,
         publish_at: publishAt ? new Date(publishAt).toISOString() : null,
@@ -620,8 +656,40 @@ export function ProductFormModal({
               />
             </div>
             <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-cost">
+                Costo
+              </label>
+              <input
+                id="pf-cost"
+                type="number"
+                min="0"
+                step="0.01"
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-qty">
+                Unidades disponibles
+              </label>
+              <input
+                id="pf-qty"
+                type="number"
+                min="0"
+                step="1"
+                value={stockQuantity}
+                onChange={(e) => setStockQuantity(e.target.value)}
+                placeholder="—"
+                className={inputCls}
+              />
+            </div>
+            <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-stock">
-                Stock
+                Estado de stock
               </label>
               <select
                 id="pf-stock"
@@ -637,6 +705,53 @@ export function ProductFormModal({
                   </option>
                 ))}
               </select>
+              <p className="mt-1 text-[10px] text-gray-400">
+                Si capturas unidades, el estado se deriva (0 → agotado, ≤5 → bajo).
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-seo-title">
+                  SEO: título
+                </label>
+                <span
+                  className={`text-[10px] ${seoTitle.length > 60 ? "text-amber-600" : "text-gray-400"}`}
+                >
+                  {seoTitle.length}/60
+                </span>
+              </div>
+              <input
+                id="pf-seo-title"
+                value={seoTitle}
+                onChange={(e) => setSeoTitle(e.target.value)}
+                placeholder={name || "Título para Google"}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-seo-desc">
+                  SEO: descripción
+                </label>
+                <span
+                  className={`text-[10px] ${
+                    seoDescription.length > 160 ? "text-amber-600" : "text-gray-400"
+                  }`}
+                >
+                  {seoDescription.length}/160
+                </span>
+              </div>
+              <textarea
+                id="pf-seo-desc"
+                value={seoDescription}
+                onChange={(e) => setSeoDescription(e.target.value)}
+                rows={2}
+                placeholder="Descripción para resultados de búsqueda"
+                className={`${inputCls} resize-y`}
+              />
             </div>
           </div>
 

@@ -46,6 +46,12 @@
   `deleted_at` por defecto. La generación con IA (descripción/imagen) es
   best-effort vía kie-ai: si KIE_AI_API_KEY falta, se muestra el error sin
   romper el modal.
+- Productos ronda 5: `sort_order` (00100) es el orden de la tienda (los ↑↓
+  normalizan a pasos de 10 solo cuando hay empates); `stock_quantity`
+  (00101) deriva `stock_status` al editarse (0=agotado, ≤5=bajo) — la tienda
+  sigue leyendo `stock_status`; `cost` (00102), `seo_*` (00104) y la función
+  RPC `search_product_ids_fuzzy` (00103, pg_trgm) tienen fallback si la
+  migración falta (degradan, no rompen).
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
@@ -70,6 +76,10 @@
   que existe en tienda SIEMPRE actualiza `products.stock_status` primero
   (DB fuente única) y luego empuja; productos "solo en Meta" se operan
   directo en Meta. Eliminar de Meta nunca borra el producto de la tienda.
+- Distribución (WF1-WF3): los enlaces wa.me usan `display_phone`
+  (normalizado por `normalizeMxPhoneForWaMe`); la difusión respeta
+  `marketing_consent`, tope de 200 y dedupe por día en
+  `whatsapp_automation_sends`.
 
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de

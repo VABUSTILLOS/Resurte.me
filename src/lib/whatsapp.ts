@@ -545,6 +545,31 @@ export async function testCatalogConnection(
 // Messaging — Send Templates
 // ============================================================
 
+export interface MetaMessageTemplate {
+  id: string
+  name: string
+  status: string // APPROVED | PENDING | REJECTED | PAUSED | ...
+  language: string
+  category?: string
+}
+
+/** Lista las plantillas de mensajes de la WABA (WF4). */
+export async function listMessageTemplates(
+  config?: WhatsAppConfig
+): Promise<MetaMessageTemplate[]> {
+  const cfg = config || getConfig()
+  const all: MetaMessageTemplate[] = []
+  let path: string | null =
+    `/${cfg.wabaId}/message_templates?fields=name,status,language,category&limit=200`
+  while (path) {
+    const res: Response = await waFetch(path, {}, cfg)
+    const body: { data?: MetaMessageTemplate[]; paging?: { next?: string } } = await res.json()
+    all.push(...(body.data ?? []))
+    path = body.paging?.next ?? null
+  }
+  return all
+}
+
 /**
  * Send a WhatsApp message template to a recipient.
  * Templates must be pre-approved by Meta.

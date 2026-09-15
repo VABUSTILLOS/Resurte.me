@@ -11,9 +11,14 @@ import {
   Search, RefreshCw, ArrowUp, ArrowDown, Plus, Send,
   Loader2, MapPin, Globe, History, ListChecks, AlertTriangle, X,
   ChevronDown, ChevronRight, RotateCcw, GripVertical, Eye, KeyRound, Radar,
-  Pause, Play, Trash2,
+  Pause, Play, Trash2, Share2, Copy, Check, FileText,
 } from "lucide-react"
 import { getCategoryIcon } from "@/lib/utils"
+import {
+  buildCatalogChatLink,
+  buildCatalogShareText,
+  buildCatalogShopLink,
+} from "@/lib/whatsapp-share"
 import {
   getAdminWhatsappCatalog,
   listWaCatalogs,
@@ -42,6 +47,13 @@ import {
   deleteWaMetaProduct,
   setWaMetaProductAvailability,
   fixAllWaCatalogIssues,
+  broadcastWaCatalog,
+  countWaBroadcastAudience,
+  listWaTemplates,
+  createWaTemplate,
+  setWaTemplateStatus,
+  deleteWaTemplate,
+  syncWaTemplatesFromMeta,
   type AdminWhatsappProduct,
   type AdminWhatsappCategory,
   type WaCatalogSummary,
@@ -50,6 +62,7 @@ import {
   type WaSyncItemDetail,
   type WaQueueItem,
   type WaMetaCatalogRow,
+  type WaTemplateRow,
 } from "@/app/admin/actions"
 
 // Antigüedad legible para la cola y el historial.
@@ -118,10 +131,30 @@ export default function AdminWhatsAppPage() {
   const [credsPhoneId, setCredsPhoneId] = useState("")
   const [credsWabaId, setCredsWabaId] = useState("")
   const [credsCatalogId, setCredsCatalogId] = useState("")
+  const [credsDisplayPhone, setCredsDisplayPhone] = useState("")
   const [credsToken, setCredsToken] = useState("")
   const [credsHasToken, setCredsHasToken] = useState(false)
   const [credsActive, setCredsActive] = useState(true)
   const [connTest, setConnTest] = useState<{ ok: boolean; text: string } | null>(null)
+
+  // WF2 — distribución: enlaces wa.me y QR del catálogo.
+  const [showShare, setShowShare] = useState(false)
+  const [sharePhone, setSharePhone] = useState("")
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+
+  // WF3 — difusión del catálogo.
+  const [bcAudience, setBcAudience] = useState<"city_customers" | "manual">("city_customers")
+  const [bcManual, setBcManual] = useState("")
+  const [bcCount, setBcCount] = useState<number | null>(null)
+  const [bcResult, setBcResult] = useState<string | null>(null)
+
+  // WF4 — plantillas de mensajes.
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [templates, setTemplates] = useState<WaTemplateRow[]>([])
+  const [tplName, setTplName] = useState("")
+  const [tplType, setTplType] = useState("broadcast")
+  const [tplLang, setTplLang] = useState("es_MX")
 
   // WD4 — explorador del catálogo vivo de Meta.
   const [showExplorer, setShowExplorer] = useState(false)
@@ -396,6 +429,7 @@ export default function AdminWhatsAppPage() {
         setCredsPhoneId(c.phone_number_id ?? "")
         setCredsWabaId(c.waba_id ?? "")
         setCredsCatalogId(c.catalog_id ?? "")
+        setCredsDisplayPhone(c.display_phone ?? "")
         setCredsHasToken(c.hasToken)
         setCredsActive(c.is_active)
         setCredsToken("")
@@ -412,6 +446,7 @@ export default function AdminWhatsAppPage() {
           phone_number_id: credsPhoneId.trim() || null,
           waba_id: credsWabaId.trim() || null,
           catalog_id: credsCatalogId.trim() || null,
+          display_phone: credsDisplayPhone.trim() || null,
           is_active: credsActive,
           ...(credsToken.trim() ? { accessToken: credsToken.trim() } : {}),
         })
@@ -560,6 +595,121 @@ export default function AdminWhatsAppPage() {
     ).finally(() => setFixingAll(false))
   }
 
+  // WF2 — abrir el panel de distribución y generar el QR.
+  const toggleShare = () => {
+    if (!selectedCatalog) return
+    if (showShare) {
+      setShowShare(false)
+      return
+    }
+    setShowShare(true)
+    getWaCatalogCredentials(selectedCatalog.id)
+      .then(async (c) => {
+        const phone = c.display_phone ?? ""
+        setSharePhone(phone)
+        const link = buildCatalogShopLink(phone)
+        if (link) {
+          const QRCode = (await import("qrcode")).default
+          setQrDataUrl(await QRCode.toDataURL(link, { width: 320, margin: 2 }))
+        } else {
+          setQrDataUrl(null)
+        }
+      })
+      .catch(() => setQrDataUrl(null))
+  }
+
+  const copyToClipboard = (key: string, text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedKey(key)
+      setTimeout(() => setCopiedKey((prev) => (prev === key ? null : prev)), 1500)
+    }).catch(() => {})
+  }
+
+  // WF3 — conteo previo de audiencia y envío de difusión.
+  useEffect(() => {
+    if (!showShare || !selectedCatalog || bcAudience !== "city_customers") return
+    const run = async () => {
+      setBcCount(null)
+      try {
+        setBcCount(await countWaBroadcastAudience(selectedCatalog.id))
+      } catch {
+        setBcCount(null)
+      }
+    }
+    run().catch(() => {})
+  }, [showShare, selectedCatalog, bcAudience])
+
+  // WF4 — plantillas: carga y acciones.
+  const loadTemplates = useCallback(async () => {
+    try {
+      setTemplates(await listWaTemplates())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cargar plantillas")
+    }
+  }, [])
+
+  const toggleTemplatesPanel = () => {
+    if (showTemplates) {
+      setShowTemplates(false)
+      return
+    }
+    setShowTemplates(true)
+    loadTemplates().catch(() => {})
+  }
+
+  const handleCreateTemplate = (e: React.FormEvent) => {
+    e.preventDefault()
+    run(
+      async () => {
+        await createWaTemplate({ template_name: tplName, template_type: tplType, language: tplLang })
+        setTplName("")
+        await loadTemplates()
+      },
+      () => `Plantilla "${tplName}" registrada (pendiente de aprobación en Meta).`
+    )
+  }
+
+  const handleTemplateStatus = (id: number, status: string) =>
+    run(async () => {
+      await setWaTemplateStatus(id, status)
+      await loadTemplates()
+    })
+
+  const handleDeleteTemplate = (id: number) =>
+    run(async () => {
+      await deleteWaTemplate(id)
+      await loadTemplates()
+    })
+
+  const handleSyncTemplates = () =>
+    run(
+      async () => {
+        const result = await syncWaTemplatesFromMeta()
+        await loadTemplates()
+        return result
+      },
+      (r) => `Plantillas sincronizadas desde Meta: ${r.created} nuevas, ${r.updated} actualizadas (${r.total} en Meta).`
+    )
+
+  const handleBroadcast = () => {
+    if (!selectedCatalog) return
+    setBcResult(null)
+    run(
+      async () => {
+        const result = await broadcastWaCatalog(selectedCatalog.id, {
+          audience: bcAudience,
+          manualPhones: bcAudience === "manual" ? bcManual.split(/[\n,;]+/) : undefined,
+        })
+        setBcResult(
+          `Difusión terminada: ${result.sent} enviados, ${result.skipped} ya contactados hoy, ${result.failed} fallidos` +
+            (result.errors.length ? `. Primer error: ${result.errors[0]}` : "")
+        )
+        return result
+      },
+      (r) => `${r.sent} catálogos enviados.`
+    )
+  }
+
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault()
     run(
@@ -612,6 +762,21 @@ export default function AdminWhatsAppPage() {
             Explorador Meta
           </button>
           <button
+            onClick={toggleTemplatesPanel}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E8E9EB] text-[var(--text-secondary)] font-semibold rounded-full hover:bg-[#F7F5F0] transition-colors text-sm"
+          >
+            <FileText className="w-4 h-4" />
+            Plantillas
+          </button>
+          <button
+            onClick={toggleShare}
+            disabled={!selectedCatalog}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E8E9EB] text-[var(--text-secondary)] font-semibold rounded-full hover:bg-[#F7F5F0] transition-colors text-sm disabled:opacity-60"
+          >
+            <Share2 className="w-4 h-4" />
+            Distribución
+          </button>
+          <button
             onClick={openCreds}
             disabled={!selectedCatalog}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E8E9EB] text-[var(--text-secondary)] font-semibold rounded-full hover:bg-[#F7F5F0] transition-colors text-sm disabled:opacity-60"
@@ -653,6 +818,260 @@ export default function AdminWhatsAppPage() {
       )}
       {error && (
         <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+      )}
+
+      {/* Panel de plantillas de mensajes (WF4) */}
+      {showTemplates && (
+        <div className="mb-6 bg-white rounded-2xl border border-[#E8E9EB] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="font-bold text-[#242529] flex items-center gap-2">
+                <FileText className="w-4 h-4 text-[#0E7A0E]" />
+                Plantillas de mensajes
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                Las automatizaciones y la difusión usan plantillas aprobadas por Meta.
+              </p>
+            </div>
+            <button
+              onClick={handleSyncTemplates}
+              disabled={busy}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[#0E7A0E]/40 text-[#0E7A0E] text-xs font-bold rounded-full hover:bg-[#F2FBF5] disabled:opacity-60"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${busy ? "animate-spin" : ""}`} />
+              Sincronizar desde Meta
+            </button>
+          </div>
+
+          {/* Alta manual */}
+          <form onSubmit={handleCreateTemplate} className="flex flex-wrap items-end gap-2 mb-4">
+            <div>
+              <label className="block text-[11px] font-semibold text-[#242529] mb-1">Nombre</label>
+              <input
+                value={tplName}
+                onChange={(e) => setTplName(e.target.value)}
+                placeholder="mi_plantilla"
+                className="w-44 px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-[#242529] mb-1">Tipo</label>
+              <select
+                value={tplType}
+                onChange={(e) => setTplType(e.target.value)}
+                className="px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+              >
+                <option value="broadcast">broadcast</option>
+                <option value="payment_reminder">payment_reminder</option>
+                <option value="birthday">birthday</option>
+                <option value="reactivation">reactivation</option>
+                <option value="rating">rating</option>
+                <option value="onboarding">onboarding</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-[#242529] mb-1">Idioma</label>
+              <input
+                value={tplLang}
+                onChange={(e) => setTplLang(e.target.value)}
+                className="w-24 px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={busy || !tplName.trim()}
+              className="px-4 py-2 bg-[#0F7A3D] text-white text-sm font-bold rounded-full hover:bg-[#0F6B3A] disabled:opacity-50"
+            >
+              Registrar
+            </button>
+          </form>
+
+          {/* Lista */}
+          {templates.length === 0 ? (
+            <p className="text-sm text-[#B0B3B8] py-4 text-center">
+              Sin plantillas registradas. Usa “Sincronizar desde Meta” o registra una manualmente.
+            </p>
+          ) : (
+            <ul className="space-y-1.5 max-h-72 overflow-y-auto">
+              {templates.map((tpl) => (
+                <li key={tpl.id} className="flex items-center gap-3 rounded-xl border border-[#F0F1F2] px-3 py-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#242529] truncate">{tpl.template_name}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">{tpl.template_type} · {tpl.language}</p>
+                  </div>
+                  <span
+                    className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      tpl.status === "approved"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : tpl.status === "rejected"
+                          ? "bg-red-50 text-red-700"
+                          : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {tpl.status === "approved" ? "aprobada" : tpl.status === "rejected" ? "rechazada" : "pendiente"}
+                  </span>
+                  {tpl.status !== "approved" && (
+                    <button
+                      onClick={() => handleTemplateStatus(tpl.id, "approved")}
+                      disabled={busy}
+                      className="shrink-0 p-1.5 text-[#0E7A0E] hover:bg-[#E7F8EE] rounded-lg disabled:opacity-40"
+                      aria-label={`Marcar ${tpl.template_name} como aprobada`}
+                      title="Marcar aprobada"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDeleteTemplate(tpl.id)}
+                    disabled={busy}
+                    className="shrink-0 p-1.5 text-[#B0B3B8] hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-40"
+                    aria-label={`Eliminar ${tpl.template_name}`}
+                    title="Eliminar"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Panel de distribución: enlaces wa.me + QR (WF2) */}
+      {showShare && selectedCatalog && (
+        <div className="mb-6 bg-white rounded-2xl border border-[#E8E9EB] p-5">
+          <h2 className="font-bold text-[#242529] flex items-center gap-2 mb-1">
+            <Share2 className="w-4 h-4 text-[#0E7A0E]" />
+            Distribución de {selectedCatalog.name}
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mb-4">
+            Comparte el catálogo con tus clientes: enlace directo, chat con mensaje precargado o código QR.
+          </p>
+
+          {!sharePhone.trim() ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Este catálogo no tiene <strong>número público</strong>. Configúralo en{" "}
+              <button
+                onClick={() => {
+                  setShowShare(false)
+                  if (!showCreds) openCreds()
+                }}
+                className="font-bold underline"
+              >
+                Credenciales
+              </button>{" "}
+              (campo “Número público”) para generar los enlaces y el QR.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 items-start">
+              {/* QR */}
+              <div className="flex flex-col items-center gap-2">
+                {qrDataUrl ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- data URL local */}
+                    <img
+                      src={qrDataUrl}
+                      alt={`QR del catálogo de ${selectedCatalog.name}`}
+                      className="w-40 h-40 rounded-xl border border-[#E8E9EB]"
+                    />
+                    <a
+                      href={qrDataUrl}
+                      download={`catalogo-${selectedCatalog.slug}.png`}
+                      className="text-xs font-semibold text-[#0E7A0E] hover:underline"
+                    >
+                      Descargar PNG
+                    </a>
+                  </>
+                ) : (
+                  <div className="w-40 h-40 rounded-xl bg-[#F5F3F0] flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin text-[#B0B3B8]" />
+                  </div>
+                )}
+              </div>
+
+              {/* Enlaces */}
+              <div className="space-y-3 min-w-0">
+                {(
+                  [
+                    ["shop", "Vista de catálogo (wa.me/c/)", buildCatalogShopLink(sharePhone)],
+                    ["chat", "Chat con mensaje precargado", buildCatalogChatLink(sharePhone, selectedCatalog.name)],
+                    ["text", "Texto para compartir", buildCatalogShareText(sharePhone, selectedCatalog.name)],
+                  ] as const
+                ).map(([key, label, value]) =>
+                  value ? (
+                    <div key={key} className="rounded-xl border border-[#F0F1F2] px-3 py-2.5">
+                      <p className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wide mb-1">{label}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="flex-1 min-w-0 text-xs text-[#242529] truncate">{value}</p>
+                        <button
+                          onClick={() => copyToClipboard(key, value)}
+                          className="shrink-0 p-1.5 text-[#0E7A0E] hover:bg-[#E7F8EE] rounded-lg"
+                          aria-label={`Copiar ${label}`}
+                        >
+                          {copiedKey === key ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null
+                )}
+              </div>
+            </div>
+          )}
+          {/* Difusión del catálogo (WF3) */}
+          <div className="mt-5 pt-4 border-t border-[#F0F1F2]">
+            <p className="text-xs font-bold text-[#242529] mb-2">Difundir el catálogo por WhatsApp</p>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <label className="flex items-center gap-1.5 text-xs text-[#242529]">
+                <input
+                  type="radio"
+                  name="bc-audience"
+                  checked={bcAudience === "city_customers"}
+                  onChange={() => setBcAudience("city_customers")}
+                  className="accent-[#0E7A0E]"
+                />
+                Clientes de la ciudad
+                {bcAudience === "city_customers" && bcCount != null && (
+                  <span className="text-[#0E7A0E] font-bold">({bcCount})</span>
+                )}
+              </label>
+              <label className="flex items-center gap-1.5 text-xs text-[#242529]">
+                <input
+                  type="radio"
+                  name="bc-audience"
+                  checked={bcAudience === "manual"}
+                  onChange={() => setBcAudience("manual")}
+                  className="accent-[#0E7A0E]"
+                />
+                Lista manual
+              </label>
+            </div>
+            {bcAudience === "manual" && (
+              <textarea
+                value={bcManual}
+                onChange={(e) => setBcManual(e.target.value)}
+                placeholder="Un teléfono por línea (10 dígitos)"
+                rows={3}
+                className="w-full mb-3 px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+              />
+            )}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBroadcast}
+                disabled={busy || curated.length === 0 || (bcAudience === "manual" && !bcManual.trim())}
+                className="inline-flex items-center gap-2 px-5 py-2 bg-[#25D366] text-white text-sm font-bold rounded-full hover:bg-[#1fb857] disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+                Enviar catálogo
+              </button>
+              <span className="text-[11px] text-[#B0B3B8]">Máx. 200 por corrida · no se repite al mismo número el mismo día</span>
+            </div>
+            {bcResult && (
+              <p className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2.5 text-xs text-emerald-800">
+                {bcResult}
+              </p>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Panel: explorador del catálogo vivo de Meta (WD4) */}
@@ -874,6 +1293,18 @@ export default function AdminWhatsAppPage() {
                 value={credsCatalogId}
                 onChange={(e) => setCredsCatalogId(e.target.value)}
                 placeholder="p. ej. 555666777"
+                className="w-full px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#242529] mb-1">
+                Número público <span className="font-normal text-[#B0B3B8]">(para enlaces wa.me y QR)</span>
+              </label>
+              <input
+                value={credsDisplayPhone}
+                onChange={(e) => setCredsDisplayPhone(e.target.value)}
+                placeholder="p. ej. 614 123 4567"
+                inputMode="tel"
                 className="w-full px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
               />
             </div>

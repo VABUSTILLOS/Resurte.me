@@ -48,6 +48,10 @@ export async function PATCH(request: Request) {
       "unpublish_at",
       "admin_note",
       "images",
+      "stock_quantity",
+      "cost",
+      "seo_title",
+      "seo_description",
     ] as const
     type AllowedField = (typeof allowed)[number]
     const updates: Partial<Record<AllowedField, unknown>> = {}
@@ -112,6 +116,32 @@ export async function PATCH(request: Request) {
           { error: "images debe ser un arreglo de URLs https o rutas locales" },
           { status: 400 }
         )
+      }
+    }
+    if ("stock_quantity" in updates) {
+      const q = updates.stock_quantity
+      if (q !== null && (typeof q !== "number" || !Number.isInteger(q) || q < 0)) {
+        return NextResponse.json(
+          { error: "stock_quantity debe ser un entero ≥ 0 o null" },
+          { status: 400 }
+        )
+      }
+      // La tienda lee stock_status: se deriva de la cantidad salvo que la
+      // misma petición fije un status explícito.
+      if (!("stock_status" in updates)) {
+        updates.stock_status =
+          q === null ? "in_stock" : q === 0 ? "out_of_stock" : q <= 5 ? "low_stock" : "in_stock"
+      }
+    }
+    if ("cost" in updates) {
+      const c = updates.cost
+      if (c !== null && (typeof c !== "number" || !Number.isFinite(c) || c < 0)) {
+        return NextResponse.json({ error: "cost debe ser un número ≥ 0 o null" }, { status: 400 })
+      }
+    }
+    for (const field of ["seo_title", "seo_description"] as const) {
+      if (field in updates && updates[field] !== null && typeof updates[field] !== "string") {
+        return NextResponse.json({ error: `${field} debe ser texto o null` }, { status: 400 })
       }
     }
     if ("category_id" in updates) {

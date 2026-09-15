@@ -41,12 +41,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!product) return { title: "Producto no encontrado — Resurte.me" }
 
+  // SEO por producto (00104): los campos dedicados ganan; si están vacíos
+  // se usa el título/descripción derivados como antes.
+  const title = product.seo_title?.trim()
+    ? product.seo_title.trim()
+    : `${product.name} en ${city.name} — Resurte.me`
+  const description =
+    product.seo_description?.trim() ||
+    product.description?.slice(0, 160) ||
+    `${product.name} por mayoreo en ${city.name}.`
+
   return {
-    title: `${product.name} en ${city.name} — Resurte.me`,
-    description: product.description?.slice(0, 160) ?? `${product.name} por mayoreo en ${city.name}.`,
+    title,
+    description,
     openGraph: {
-      title: `${product.name} en ${city.name}`,
-      description: product.description?.slice(0, 160) ?? `${product.name} por mayoreo en ${city.name}.`,
+      title,
+      description,
       images: product.image_url ? [product.image_url] : [],
       url: `https://resurte.me/${city.slug}/producto/${productSlug}`,
       siteName: "Resurte.me",
@@ -55,8 +65,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: `${product.name} en ${city.name}`,
-      description: product.description?.slice(0, 160) ?? `${product.name} por mayoreo en ${city.name}.`,
+      title,
+      description,
       images: product.image_url ? [product.image_url] : [],
     },
     alternates: {

@@ -41,9 +41,14 @@ import {
   ClipboardList,
   Activity,
   RotateCcw,
+  ChevronUp,
+  ChevronDown,
+  Minus,
+  Bookmark,
 } from "lucide-react"
 import { AUDIT_ACTION_LABEL, type AuditAction } from "@/lib/audit-log"
 import { createClient } from "@/lib/supabase/client"
+import { cropImageToSquare } from "@/lib/crop-image"
 
 interface Product {
   id: number
@@ -55,6 +60,9 @@ interface Product {
   unit: string | null
   price: number | null
   sale_price: number | null
+  cost: number | null
+  stock_quantity: number | null
+  sort_order: number | null
   stock_status: "in_stock" | "low_stock" | "out_of_stock"
   is_visible: boolean
   show_in_whatsapp: boolean | null
@@ -63,6 +71,8 @@ interface Product {
   publish_at: string | null
   unpublish_at: string | null
   admin_note: string | null
+  seo_title: string | null
+  seo_description: string | null
 }
 
 interface Category {
@@ -198,8 +208,17 @@ function AdminProductsContent() {
     setUploadingImageId(productId)
     setError(null)
     try {
+      // Recorte 1:1 opcional (canvas, client-side) antes de subir.
+      let upload: File | Blob = file
+      if (window.confirm("¿Recortar la imagen a formato cuadrado (1:1)?\n\nAceptar = recortar · Cancelar = usar original")) {
+        try {
+          upload = await cropImageToSquare(file)
+        } catch {
+          // si el crop falla, sube el original
+        }
+      }
       const form = new FormData()
-      form.append("file", file)
+      form.append("file", upload, file.name)
       const up = await fetch("/api/admin/products/upload-image", { method: "POST", body: form })
       const upData = await up.json()
       if (!up.ok) throw new Error(upData.detail ?? upData.error ?? "Error al subir la imagen")
@@ -237,6 +256,7 @@ function AdminProductsContent() {
   const [productForm, setProductForm] = useState<"new" | Product | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [reorderingId, setReorderingId] = useState<number | null>(null)
   // Historial de cambios (audit log) del producto.
   const [historyFor, setHistoryFor] = useState<Product | null>(null)
   // Acciones en lote extra: cambio de categoría y ajuste de precio %.
@@ -249,6 +269,9 @@ function AdminProductsContent() {
   const [bulkSaleOpen, setBulkSaleOpen] = useState(false)
   const [bulkSalePct, setBulkSalePct] = useState<string>("10")
   const [bulkSaleMode, setBulkSaleMode] = useState<"apply" | "remove">("apply")
+  // Unidad en lote.
+  const [bulkUnitOpen, setBulkUnitOpen] = useState(false)
+  const [bulkUnitValue, setBulkUnitValue] = useState("kg")
 
   // Atajos de teclado: "/" enfoca búsqueda, "n" nuevo producto, Esc cierra
   // el modal más superficial abierto.
@@ -888,16 +911,18 @@ function AdminProductsContent() {
     }
   }
 
-  /** Duplica un producto (la copia nace despublicada). */
+  /** Duplica un producto pidiendo el nombre de la copia (nace despublicada). */
   async function duplicateProduct(p: Product) {
     if (duplicatingId != null) return
+    const name = window.prompt("Nombre de la copia:", `${p.name} (copia)`)
+    if (name === null) return
     setDuplicatingId(p.id)
     setError(null)
     try {
       const res = await fetch("/api/admin/products/duplicate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: p.id }),
+        body: JSON.stringify({ productId: p.id, name: name.trim() || undefined }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? "Error al duplicar el producto")
@@ -908,6 +933,36 @@ function AdminProductsContent() {
     } finally {
       setDuplicatingId(null)
     }
+  }
+
+  /** Mueve el producto una posición ↑/↓ en el orden manual del catálogo. */
+  async function moveProduct(p: Product, direction: "up" | "down") {
+    if (reorderingId != null) return
+    setReorderingId(p.id)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/products/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: p.id, direction }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al reordenar")
+      if (data.moved) setToast("Orden del catálogo actualizado")
+      setReloadKey((k) => k + 1)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al reordenar")
+    } finally {
+      setReorderingId(null)
+    }
+  }
+
+  /** Ajusta el stock numérico; el servidor deriva stock_status. */
+  function adjustQuantity(p: Product, delta: number) {
+    const next = Math.max(0, (p.stock_quantity ?? 0) + delta)
+    const derived =
+      next === 0 ? "out_of_stock" : next <= 5 ? "low_stock" : "in_stock"
+    patchProduct(p.id, { stock_quantity: next, stock_status: derived })
   }
 
   /** Elimina un producto (soft delete: va a la papelera, se puede restaurar). */
@@ -1014,6 +1069,158 @@ function AdminProductsContent() {
       setToast(`${lines.length} producto${lines.length === 1 ? "" : "s"} copiado${lines.length === 1 ? "" : "s"}`)
     } catch {
       setError("No se pudo copiar al portapapeles")
+    }
+  }
+
+  // Reporte de ventas por rango de fechas.
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportFrom, setReportFrom] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`
+  })
+  const [reportTo, setReportTo] = useState(() => new Date().toISOString().slice(0, 10))
+  const [reportLoading, setReportLoading] = useState(false)
+
+  async function downloadSalesReport() {
+    if (reportLoading) return
+    setReportLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(
+        `/api/admin/products/sales-report?from=${reportFrom}&to=${reportTo}`
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? "Error al generar el reporte")
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `ventas-${reportFrom}_a_${reportTo}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      setReportOpen(false)
+      setToast("Reporte descargado")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al generar el reporte")
+    } finally {
+      setReportLoading(false)
+    }
+  }
+
+  // Vistas guardadas de filtros (localStorage).
+  interface SavedView {
+    name: string
+    params: Record<string, string>
+  }
+  const [savedViews, setSavedViews] = useState<SavedView[]>(() => {
+    if (typeof window === "undefined") return []
+    try {
+      return JSON.parse(localStorage.getItem("resurte-admin-product-views") ?? "[]")
+    } catch {
+      return []
+    }
+  })
+  const [viewsOpen, setViewsOpen] = useState(false)
+
+  function persistViews(views: SavedView[]) {
+    setSavedViews(views)
+    try {
+      localStorage.setItem("resurte-admin-product-views", JSON.stringify(views))
+    } catch {
+      // sin espacio / modo privado: la vista vive solo en memoria
+    }
+  }
+
+  function currentFilterParams(): Record<string, string> {
+    const params: Record<string, string> = {}
+    if (debouncedSearch) params.q = debouncedSearch
+    if (categoryFilter !== "all") params.category = categoryFilter
+    if (stockFilter !== "all") params.stock = stockFilter
+    if (statusFilter !== "all") params.status = statusFilter
+    if (onlyNoImage) params.noImage = "1"
+    if (onlyNoCities) params.noCities = "1"
+    if (onlyNoPrice) params.noPrice = "1"
+    if (onlyNoCategory) params.noCategory = "1"
+    if (onlyWaMismatch) params.waMismatch = "1"
+    if (onlyOnSale) params.onSale = "1"
+    if (onlyDupNames) params.dupNames = "1"
+    if (onlyTrash) params.trash = "1"
+    if (cityFilter !== "all") params.city = cityFilter
+    if (brandFilter !== "all") params.brand = brandFilter
+    if (view === "grid") params.view = "grid"
+    if (sort.key !== "name") params.sort = sort.key
+    if (sort.dir !== "asc") params.dir = sort.dir
+    return params
+  }
+
+  function saveCurrentView() {
+    const name = window.prompt("Nombre de la vista:")
+    if (!name?.trim()) return
+    const params = currentFilterParams()
+    if (Object.keys(params).length === 0) {
+      setError("No hay filtros activos para guardar")
+      return
+    }
+    persistViews([...savedViews.filter((v) => v.name !== name.trim()), { name: name.trim(), params }])
+    setToast(`Vista "${name.trim()}" guardada`)
+  }
+
+  function applyView(v: SavedView) {
+    updateFilters(() => {
+      setSearch(v.params.q ?? "")
+      setDebouncedSearch(v.params.q ?? "")
+      setCategoryFilter(v.params.category ?? "all")
+      setStockFilter((v.params.stock as StockStatus | "all") ?? "all")
+      setStatusFilter((v.params.status as "all" | "published" | "unpublished") ?? "all")
+      setOnlyNoImage(v.params.noImage === "1")
+      setOnlyNoCities(v.params.noCities === "1")
+      setOnlyNoPrice(v.params.noPrice === "1")
+      setOnlyNoCategory(v.params.noCategory === "1")
+      setOnlyWaMismatch(v.params.waMismatch === "1")
+      setOnlyOnSale(v.params.onSale === "1")
+      setOnlyDupNames(v.params.dupNames === "1")
+      setOnlyTrash(v.params.trash === "1")
+      setCityFilter(v.params.city ?? "all")
+      setBrandFilter(v.params.brand ?? "all")
+      setView(v.params.view === "grid" ? "grid" : "table")
+      setSort({
+        key: (v.params.sort as "name" | "price" | "stock") ?? "name",
+        dir: v.params.dir === "desc" ? "desc" : "asc",
+      })
+    })
+    setViewsOpen(false)
+    setToast(`Vista "${v.name}" aplicada`)
+  }
+  async function mergeSelected() {
+    if (selected.size !== 2 || bulkSaving) return
+    const [a, b] = [...selected].sort((x, y) => x - y)
+    const target = products.find((p) => p.id === a)
+    const source = products.find((p) => p.id === b)
+    if (
+      !window.confirm(
+        `Fusionar duplicados:\n\n✔ Se conserva: ${target?.name ?? `#${a}`} (#${a})\n✖ Va a la papelera: ${source?.name ?? `#${b}`} (#${b})\n\nSe copian disponibilidad e imágenes faltantes. ¿Continuar?`
+      )
+    )
+      return
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/products/merge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceId: b, targetId: a }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al fusionar")
+      setToast(`Productos fusionados (#${b} → #${a})`)
+      setSelected(new Set())
+      setReloadKey((k) => k + 1)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al fusionar")
+    } finally {
+      setBulkSaving(false)
     }
   }
 
@@ -1175,6 +1382,44 @@ function AdminProductsContent() {
       setSelected(new Set())
     } catch {
       setError("Error al actualizar ofertas en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  /** Asigna la unidad a toda la selección. */
+  async function bulkSetUnit() {
+    if (selected.size === 0 || bulkSaving) return
+    const unit = bulkUnitValue.trim() || null
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const ids = [...selected]
+      const results = await Promise.all(
+        ids.map(async (productId) => {
+          const res = await fetch("/api/admin/products/update", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId, unit }),
+          })
+          return res.ok
+        })
+      )
+      const succeededIds = ids.filter((_, i) => results[i])
+      setProducts((prev) =>
+        prev.map((p) => (succeededIds.includes(p.id) ? { ...p, unit } : p))
+      )
+      if (succeededIds.length > 0) {
+        setToast(`Unidad "${unit ?? "—"}" en ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`)
+      }
+      const failed = results.filter((ok) => !ok).length
+      if (failed > 0) {
+        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
+      }
+      setBulkUnitOpen(false)
+      setSelected(new Set())
+    } catch {
+      setError("Error al asignar la unidad en lote")
     } finally {
       setBulkSaving(false)
     }
@@ -1463,6 +1708,15 @@ function AdminProductsContent() {
           </button>
           <button
             type="button"
+            onClick={() => setReportOpen(true)}
+            title="Ventas por producto en un rango de fechas (CSV)"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm"
+          >
+            <Activity className="w-4 h-4" />
+            Reporte ventas
+          </button>
+          <button
+            type="button"
             onClick={() => setProductForm("new")}
             className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 transition-colors text-sm"
           >
@@ -1489,7 +1743,7 @@ function AdminProductsContent() {
         >
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>
-            Faltan migraciones por aplicar en Supabase (00096–00099). El panel funciona en modo
+            Faltan migraciones por aplicar en Supabase (00096–00104). El panel funciona en modo
             limitado (sin papelera, publicación programada ni nota interna) hasta aplicarlas con{" "}
             <code className="font-mono text-xs">npx supabase db push</code>.
           </span>
@@ -1860,6 +2114,59 @@ function AdminProductsContent() {
             {counts.trash}
           </span>
         </button>
+        {/* Vistas guardadas de filtros */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setViewsOpen((v) => !v)}
+            aria-expanded={viewsOpen}
+            title="Vistas guardadas de filtros"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <Bookmark className="w-3.5 h-3.5" />
+            Vistas
+          </button>
+          {viewsOpen && (
+            <div className="absolute z-30 mt-1 w-56 rounded-xl border border-gray-200 bg-white shadow-lg p-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewsOpen(false)
+                  saveCurrentView()
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold text-brand-600 hover:bg-brand-50"
+              >
+                ＋ Guardar vista actual
+              </button>
+              {savedViews.length === 0 ? (
+                <p className="px-3 py-2 text-[11px] text-gray-400">Sin vistas guardadas.</p>
+              ) : (
+                <ul className="mt-1 divide-y divide-gray-50">
+                  {savedViews.map((v) => (
+                    <li key={v.name} className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => applyView(v)}
+                        className="flex-1 text-left px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-gray-50 truncate"
+                        title={`Aplicar vista ${v.name}`}
+                      >
+                        {v.name}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => persistViews(savedViews.filter((s) => s.name !== v.name))}
+                        aria-label={`Borrar vista ${v.name}`}
+                        className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
         {/* Toggle tabla/grid */}
         <div className="ml-auto flex items-center gap-1 rounded-lg border border-gray-200 bg-white p-0.5">
           <button
@@ -1946,6 +2253,15 @@ function AdminProductsContent() {
               Categoría…
             </button>
             <button
+              onClick={() => setBulkUnitOpen(true)}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold hover:bg-teal-100 disabled:opacity-50"
+              title="Asignar unidad (kg, pieza…) a la selección"
+            >
+              <Package className="w-3.5 h-3.5" />
+              Unidad…
+            </button>
+            <button
               onClick={() => setBulkPriceOpen(true)}
               disabled={bulkSaving}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-xs font-semibold hover:bg-orange-100 disabled:opacity-50"
@@ -1990,6 +2306,17 @@ function AdminProductsContent() {
               <ClipboardList className="w-3.5 h-3.5" />
               Copiar
             </button>
+            {selected.size === 2 && (
+              <button
+                onClick={mergeSelected}
+                disabled={bulkSaving}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200 text-xs font-semibold hover:bg-fuchsia-100 disabled:opacity-50"
+                title="Fusionar: conserva el de menor id, el otro va a la papelera"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                Fusionar
+              </button>
+            )}
             <button
               onClick={bulkDuplicate}
               disabled={bulkSaving}
@@ -2056,6 +2383,9 @@ function AdminProductsContent() {
                   >
                     Precio {sortIcon("price")}
                   </button>
+                </th>
+                <th className="px-5 py-3" title="(precio de venta − costo) / precio de venta">
+                  Margen
                 </th>
                 <th className="px-5 py-3">
                   <button
@@ -2205,6 +2535,29 @@ function AdminProductsContent() {
                       )}
                     </td>
                     <td className="px-5 py-3">
+                      {(() => {
+                        const selling = product.sale_price ?? product.price
+                        if (selling == null || selling <= 0 || product.cost == null) {
+                          return <span className="text-xs text-gray-300">—</span>
+                        }
+                        const margin = ((selling - product.cost) / selling) * 100
+                        return (
+                          <span
+                            className={`text-xs font-semibold ${
+                              margin >= 30
+                                ? "text-green-700"
+                                : margin >= 10
+                                ? "text-amber-700"
+                                : "text-red-700"
+                            }`}
+                            title={`Costo $${product.cost.toFixed(2)} · venta $${selling.toFixed(2)}`}
+                          >
+                            {margin.toFixed(0)}%
+                          </span>
+                        )
+                      })()}
+                    </td>
+                    <td className="px-5 py-3">
                       <button
                         onClick={() => cycleStock(product)}
                         disabled={saving.has(product.id)}
@@ -2222,6 +2575,30 @@ function AdminProductsContent() {
                         ) : null}
                         {STOCK_LABELS[product.stock_status]}
                       </button>
+                      {/* Stock numérico (00101): ajuste ±, deriva el status */}
+                      <div className="mt-1 flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => adjustQuantity(product, -1)}
+                          disabled={saving.has(product.id) || (product.stock_quantity ?? 0) <= 0}
+                          aria-label={`Quitar 1 unidad de ${product.name}`}
+                          className="p-0.5 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-[11px] text-gray-500 min-w-8 text-center" title="Unidades disponibles">
+                          ×{product.stock_quantity ?? 0}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => adjustQuantity(product, 1)}
+                          disabled={saving.has(product.id)}
+                          aria-label={`Agregar 1 unidad de ${product.name}`}
+                          className="p-0.5 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
                     </td>
                     <td className="px-5 py-3">
                       <button
@@ -2332,6 +2709,30 @@ function AdminProductsContent() {
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => moveProduct(product, "up")}
+                          disabled={reorderingId === product.id}
+                          title="Subir en el orden del catálogo"
+                          aria-label={`Subir ${product.name} en el orden`}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors disabled:opacity-50"
+                        >
+                          {reorderingId === product.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <ChevronUp className="w-4 h-4" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveProduct(product, "down")}
+                          disabled={reorderingId === product.id}
+                          title="Bajar en el orden del catálogo"
+                          aria-label={`Bajar ${product.name} en el orden`}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors disabled:opacity-50"
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </button>
                         <button
                           type="button"
                           onClick={() => setProductForm(product)}
@@ -2945,6 +3346,138 @@ function AdminProductsContent() {
         </div>
       )}
 
+      {/* Modal: reporte de ventas por rango de fechas */}
+      {reportOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !reportLoading && setReportOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">Reporte de ventas</h2>
+              <button
+                onClick={() => setReportOpen(false)}
+                disabled={reportLoading}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-xs text-gray-500">
+                Unidades y monto por producto (pedidos no cancelados del rango).
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="rep-from">
+                    Desde
+                  </label>
+                  <input
+                    id="rep-from"
+                    type="date"
+                    value={reportFrom}
+                    onChange={(e) => setReportFrom(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="rep-to">
+                    Hasta
+                  </label>
+                  <input
+                    id="rep-to"
+                    type="date"
+                    value={reportTo}
+                    onChange={(e) => setReportTo(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setReportOpen(false)}
+                disabled={reportLoading}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={downloadSalesReport}
+                disabled={reportLoading || !reportFrom || !reportTo}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50"
+              >
+                {reportLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Descargar CSV
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: asignar unidad a la selección */}
+      {bulkUnitOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !bulkSaving && setBulkUnitOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">Asignar unidad</h2>
+              <button
+                onClick={() => setBulkUnitOpen(false)}
+                disabled={bulkSaving}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-xs text-gray-500 mb-3">
+                Se aplicará a {selected.size} producto{selected.size === 1 ? "" : "s"} (vacío =
+                sin unidad).
+              </p>
+              <input
+                value={bulkUnitValue}
+                onChange={(e) => setBulkUnitValue(e.target.value)}
+                placeholder="kg, pieza, litro…"
+                aria-label="Unidad"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500"
+              />
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setBulkUnitOpen(false)}
+                disabled={bulkSaving}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={bulkSetUnit}
+                disabled={bulkSaving}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50"
+              >
+                {bulkSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal: historial de cambios del producto (audit log) */}
       {historyFor && (
         <div
@@ -2968,6 +3501,40 @@ function AdminProductsContent() {
                 <X className="w-4 h-4" />
               </button>
             </div>
+            {/* Sparkline de precio: puntos de los cambios registrados en la bitácora */}
+            {(() => {
+              const pts = historyEntries
+                .filter((e) => typeof e.detail?.price === "number")
+                .map((e) => ({ at: e.created_at, price: Number(e.detail.price) }))
+                .reverse()
+              if (pts.length < 2) return null
+              const min = Math.min(...pts.map((p) => p.price))
+              const max = Math.max(...pts.map((p) => p.price))
+              const range = max - min || 1
+              const W = 220
+              const H = 40
+              const coords = pts
+                .map(
+                  (p, i) =>
+                    `${(i / (pts.length - 1)) * W},${H - ((p.price - min) / range) * (H - 4) - 2}`
+                )
+                .join(" ")
+              return (
+                <div className="px-5 py-3 border-b border-gray-100">
+                  <p className="text-[10px] font-semibold text-gray-500 mb-1">
+                    Historial de precio (${min.toFixed(2)} – ${max.toFixed(2)})
+                  </p>
+                  <svg
+                    width={W}
+                    height={H}
+                    role="img"
+                    aria-label={`Evolución del precio entre ${min.toFixed(2)} y ${max.toFixed(2)}`}
+                  >
+                    <polyline points={coords} fill="none" stroke="#7c3aed" strokeWidth="2" />
+                  </svg>
+                </div>
+              )
+            })()}
             <div className="overflow-y-auto px-5 py-3">
               {historyLoading ? (
                 <div className="flex items-center justify-center py-8 text-gray-400">

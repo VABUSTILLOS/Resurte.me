@@ -1735,6 +1735,7 @@ export interface WaCatalogCredentials {
   phone_number_id: string | null
   waba_id: string | null
   catalog_id: string | null
+  display_phone: string | null
   is_active: boolean
   hasToken: boolean
 }
@@ -1747,7 +1748,7 @@ export async function getWaCatalogCredentials(catalogId: string): Promise<WaCata
 
   const { data, error } = await supabase
     .from("whatsapp_catalogs")
-    .select("phone_number_id, waba_id, catalog_id, access_token_enc, is_active")
+    .select("phone_number_id, waba_id, catalog_id, display_phone, access_token_enc, is_active")
     .eq("id", catalogId)
     .maybeSingle()
   if (error) throw new Error(error.message)
@@ -1756,6 +1757,7 @@ export async function getWaCatalogCredentials(catalogId: string): Promise<WaCata
     phone_number_id: (data.phone_number_id as string | null) ?? null,
     waba_id: (data.waba_id as string | null) ?? null,
     catalog_id: (data.catalog_id as string | null) ?? null,
+    display_phone: (data.display_phone as string | null) ?? null,
     is_active: data.is_active as boolean,
     hasToken: Boolean(data.access_token_enc),
   }
@@ -1772,6 +1774,7 @@ export async function updateWaCatalogCredentials(
     phone_number_id?: string | null
     waba_id?: string | null
     catalog_id?: string | null
+    display_phone?: string | null
     is_active?: boolean
     accessToken?: string | null
   }
@@ -1784,6 +1787,7 @@ export async function updateWaCatalogCredentials(
   if ("phone_number_id" in fields) updates.phone_number_id = fields.phone_number_id || null
   if ("waba_id" in fields) updates.waba_id = fields.waba_id || null
   if ("catalog_id" in fields) updates.catalog_id = fields.catalog_id || null
+  if ("display_phone" in fields) updates.display_phone = fields.display_phone || null
   if ("is_active" in fields) updates.is_active = fields.is_active
   if (typeof fields.accessToken === "string") {
     const { encryptToken } = await import("@/lib/foodos-whatsapp")
@@ -1817,6 +1821,155 @@ export async function testWaCatalogConnection(catalogId: string): Promise<{
   const result = await testCatalogConnection(config)
   const usingPlatformFallback = !(catalog && (catalog as { access_token_enc?: string | null }).access_token_enc)
   return { ...result, usingPlatformFallback }
+}
+
+// ============================================================
+// WF4 — Plantillas de mensajes administrables
+// ============================================================
+
+export interface WaTemplateRow {
+  id: number
+  template_name: string
+  template_type: string
+  language: string
+  status: string
+}
+
+const WA_TEMPLATE_TYPES = new Set(["broadcast", "payment_reminder", "birthday", "reactivation", "rating", "onboarding"])
+
+/** Tienda de la plataforma para filas de whatsapp_templates. */
+async function platformStoreId(supabase: Awaited<ReturnType<typeof createServiceClient>>): Promise<number> {
+  const { data, error } = await supabase
+    .from("stores")
+    .select("id")
+    .eq("is_active", true)
+    .order("id")
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error("No hay tienda activa configurada")
+  return data.id as number
+}
+
+/** Lista las plantillas registradas (WF4). */
+export async function listWaTemplates(): Promise<WaTemplateRow[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const { data, error } = await supabase
+    .from("whatsapp_templates")
+    .select("id, template_name, template_type, language, status")
+    .order("template_name")
+  if (error) throw new Error(error.message)
+  return (data ?? []) as WaTemplateRow[]
+}
+
+/** Registra una plantilla manualmente (queda pendiente de Meta). */
+export async function createWaTemplate(fields: {
+  template_name: string
+  template_type: string
+  language?: string
+}): Promise<void> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const name = fields.template_name.trim().toLowerCase()
+  if (!/^[a-z0-9_]{2,60}$/.test(name)) {
+    throw new Error("El nombre debe ser minúsculas, números y guion bajo (2–60)")
+  }
+  if (!WA_TEMPLATE_TYPES.has(fields.template_type)) {
+    throw new Error("Tipo de plantilla inválido")
+  }
+  const supabase = await createServiceClient()
+  const storeId = await platformStoreId(supabase)
+
+  const { data: existing } = await supabase
+    .from("whatsapp_templates")
+    .select("id")
+    .eq("template_name", name)
+    .maybeSingle()
+  if (existing) throw new Error(`La plantilla "${name}" ya existe`)
+
+  const { error } = await supabase.from("whatsapp_templates").insert({
+    store_id: storeId,
+    template_name: name,
+    template_id: name,
+    template_type: fields.template_type,
+    language: fields.language?.trim() || "es_MX",
+    status: "pending",
+  })
+  if (error) throw new Error(error.message)
+  revalidatePath("/admin/whatsapp")
+}
+
+/** Cambia el estado de una plantilla (approved/pending/rejected). */
+export async function setWaTemplateStatus(id: number, status: string): Promise<void> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  if (!["approved", "pending", "rejected"].includes(status)) {
+    throw new Error("Estado inválido")
+  }
+  const supabase = await createServiceClient()
+  const { error } = await supabase.from("whatsapp_templates").update({ status }).eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/admin/whatsapp")
+}
+
+/** Elimina una plantilla del registro. */
+export async function deleteWaTemplate(id: number): Promise<void> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+  const { error } = await supabase.from("whatsapp_templates").delete().eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/admin/whatsapp")
+}
+
+/**
+ * Sincroniza el estado real de las plantillas desde Meta (WF4):
+ * trae /{waba}/message_templates y crea/actualiza las filas locales.
+ */
+export async function syncWaTemplatesFromMeta(): Promise<{ created: number; updated: number; total: number }> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+  const { listMessageTemplates } = await import("@/lib/whatsapp")
+
+  const metaTemplates = await listMessageTemplates()
+  const storeId = await platformStoreId(supabase)
+
+  let created = 0
+  let updated = 0
+  for (const tpl of metaTemplates) {
+    const status = tpl.status.toLowerCase()
+    const localStatus = status === "approved" ? "approved" : status === "rejected" ? "rejected" : "pending"
+    const { data: existing } = await supabase
+      .from("whatsapp_templates")
+      .select("id, status")
+      .eq("template_name", tpl.name)
+      .maybeSingle()
+
+    if (existing) {
+      if (existing.status !== localStatus) {
+        await supabase.from("whatsapp_templates").update({ status: localStatus }).eq("id", existing.id as number)
+        updated++
+      }
+    } else {
+      // Tipo por defecto: broadcast (el enum no tiene "utility/marketing").
+      await supabase.from("whatsapp_templates").insert({
+        store_id: storeId,
+        template_name: tpl.name,
+        template_id: tpl.id,
+        template_type: "broadcast",
+        language: tpl.language || "es_MX",
+        status: localStatus,
+      })
+      created++
+    }
+  }
+
+  revalidatePath("/admin/whatsapp")
+  return { created, updated, total: metaTemplates.length }
 }
 
 /** Agrega varios productos a la curaduría de una vez (WC7). */
@@ -2144,6 +2297,163 @@ export async function removeWaQueueItem(queueItemId: string): Promise<void> {
   const supabase = await createServiceClient()
   const { error } = await supabase.from("whatsapp_sync_queue").delete().eq("id", queueItemId)
   if (error) throw new Error(error.message)
+}
+
+/** Destinatarios de la difusión por ciudad (deduplicados, acotados). */
+async function resolveBroadcastAudience(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  catalogId: string,
+  limit: number
+): Promise<string[]> {
+  const { data: catalog } = await supabase
+    .from("whatsapp_catalogs")
+    .select("city_id")
+    .eq("id", catalogId)
+    .maybeSingle()
+  const phones = new Set<string>()
+
+  if (catalog?.city_id) {
+    const { data: orders } = await supabase
+      .from("orders")
+      .select("customer_phone")
+      .eq("city_id", catalog.city_id as number)
+      .not("customer_phone", "is", null)
+      .limit(2000)
+    for (const o of orders ?? []) {
+      const digits = String(o.customer_phone ?? "").replace(/\D/g, "")
+      if (digits.length >= 10) phones.add(digits)
+    }
+  }
+
+  // Perfiles con consentimiento de marketing (cualquier ciudad sin catálogo
+  // propio también recibe el catálogo global).
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("phone")
+    .eq("marketing_consent", true)
+    .not("phone", "is", null)
+    .limit(2000)
+  for (const p of profiles ?? []) {
+    const digits = String(p.phone ?? "").replace(/\D/g, "")
+    if (digits.length >= 10) phones.add(digits)
+  }
+
+  return [...phones].slice(0, limit)
+}
+
+/** Conteo previo de la audiencia de difusión (WF3). */
+export async function countWaBroadcastAudience(catalogId: string): Promise<number> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+  const phones = await resolveBroadcastAudience(supabase, catalogId, 10_000)
+  return phones.length
+}
+
+const BROADCAST_HARD_LIMIT = 200
+
+/**
+ * Difunde el catálogo (product_list) a una audiencia (WF3).
+ * audience "city_customers": pedidos de la ciudad + perfiles con
+ * marketing_consent. audience "manual": lista de teléfonos del admin.
+ * Bitácora por destinatario en whatsapp_automation_sends (dedupe por día).
+ */
+export async function broadcastWaCatalog(
+  catalogId: string,
+  opts: { audience: "city_customers" | "manual"; manualPhones?: string[]; limit?: number }
+): Promise<{ sent: number; skipped: number; failed: number; errors: string[] }> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const wa = await import("@/lib/whatsapp-catalogs")
+  const { sendProductListMessage } = await import("@/lib/whatsapp")
+
+  const { config, catalog } = await wa.getCatalogWhatsAppConfig(supabase, catalogId)
+  if (!config) throw new Error("No hay credenciales de WhatsApp configuradas")
+  if (!catalog) throw new Error("Catálogo no encontrado")
+
+  const limit = Math.min(opts.limit ?? BROADCAST_HARD_LIMIT, BROADCAST_HARD_LIMIT)
+
+  const recipients =
+    opts.audience === "manual"
+      ? (opts.manualPhones ?? [])
+          .map((p) => p.replace(/\D/g, ""))
+          .filter((d) => d.length >= 10)
+          .slice(0, limit)
+      : await resolveBroadcastAudience(supabase, catalogId, limit)
+
+  if (recipients.length === 0) throw new Error("La audiencia está vacía")
+
+  // Secciones del product_list en el orden exacto de la curaduría.
+  const [{ data: items }, { data: products }, { data: categories }] = await Promise.all([
+    supabase.from("whatsapp_catalog_items").select("catalog_id, product_id, position, is_visible").eq("catalog_id", catalogId),
+    supabase.from("products").select("id, name, brand, category_id, image_url, price, sale_price, unit"),
+    supabase.from("categories").select("id, name"),
+  ])
+  const catName = new Map((categories ?? []).map((c) => [c.id, c.name]))
+  const adminProducts = ((products ?? []) as WaCatalogs.AdminProduct[]).map((p) => ({
+    ...p,
+    category_name: p.category_id ? catName.get(p.category_id) ?? null : null,
+  }))
+  const sections = wa.buildAdminProductListSections(
+    (items ?? []) as WaCatalogs.WaCatalogItemRow[],
+    adminProducts
+  )
+  if (!sections.length) throw new Error("El catálogo está vacío")
+
+  const day = new Date().toISOString().slice(0, 10)
+  let sent = 0
+  let skipped = 0
+  let failed = 0
+  const errors: string[] = []
+
+  for (const phone of recipients) {
+    // Dedupe por día vía la bitácora de envíos.
+    const { count } = await supabase
+      .from("whatsapp_automation_sends")
+      .select("id", { count: "exact", head: true })
+      .eq("dedupe_key", `broadcast_catalog:${phone}:${day}`)
+    if ((count ?? 0) > 0) {
+      skipped++
+      continue
+    }
+
+    let status: "sent" | "failed" = "sent"
+    let detail: string | null = null
+    try {
+      const res = await sendProductListMessage(
+        {
+          to: phone,
+          sections,
+          headerText: catalog.name,
+          bodyText: "Elige tus productos y te los llevamos:",
+        },
+        config
+      )
+      detail = res.id
+      sent++
+    } catch (err) {
+      status = "failed"
+      failed++
+      const msg = err instanceof Error ? err.message : String(err)
+      detail = msg
+      if (errors.length < 5) errors.push(`${phone}: ${msg}`)
+    }
+
+    const { error: logError } = await supabase.from("whatsapp_automation_sends").insert({
+      automation_type: "broadcast_catalog",
+      recipient: phone,
+      dedupe_key: `broadcast_catalog:${phone}:${day}`,
+      status,
+      detail,
+    })
+    if (logError && logError.code !== "23505") {
+      logger.warn("No se pudo registrar el envío de difusión", { error: logError.message })
+    }
+  }
+
+  return { sent, skipped, failed, errors }
 }
 
 /** Previsualiza el diff del sync sin tocar Meta (WA2/WA6). */

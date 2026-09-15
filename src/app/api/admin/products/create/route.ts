@@ -56,6 +56,25 @@ export async function POST(request: Request) {
         ? body.category_id
         : null
 
+    const stockQuantity =
+      typeof body.stock_quantity === "number" &&
+      Number.isInteger(body.stock_quantity) &&
+      body.stock_quantity >= 0
+        ? body.stock_quantity
+        : null
+    const derivedStock =
+      stockQuantity === null
+        ? stockStatus
+        : stockQuantity === 0
+        ? "out_of_stock"
+        : stockQuantity <= 5
+        ? "low_stock"
+        : "in_stock"
+    const cost =
+      typeof body.cost === "number" && Number.isFinite(body.cost) && body.cost >= 0
+        ? body.cost
+        : null
+
     // Programación opcional: fechas ISO válidas o null.
     const schedule: { publish_at: string | null; unpublish_at: string | null } = {
       publish_at: null,
@@ -102,17 +121,21 @@ export async function POST(request: Request) {
         category_id: categoryId,
         price,
         sale_price: salePrice,
-        stock_status: stockStatus,
+        stock_status: derivedStock,
+        stock_quantity: stockQuantity,
+        cost,
         is_visible: body.is_visible === true,
         show_in_whatsapp: body.show_in_whatsapp === true,
         publish_at: schedule.publish_at,
         unpublish_at: schedule.unpublish_at,
         admin_note: typeof body.admin_note === "string" ? body.admin_note : null,
+        seo_title: typeof body.seo_title === "string" ? body.seo_title : null,
+        seo_description: typeof body.seo_description === "string" ? body.seo_description : null,
         image_url: imageUrl,
         images,
       })
       .select(
-        "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note"
+        "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description"
       )
       .single()
 

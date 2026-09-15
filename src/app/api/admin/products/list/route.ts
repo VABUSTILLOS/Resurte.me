@@ -3,10 +3,10 @@ import { requireAdmin } from "@/lib/admin-auth"
 import { NextResponse, type NextRequest } from "next/server"
 
 const COLS =
-  "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note"
+  "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description"
 
 /** Columnas que existen desde antes de la migración 00096: si las
- *  migraciones 00096-00099 aún no se aplican, el panel degrada a este set
+ *  migraciones 00096-00104 aún no se aplican, el panel degrada a este set
  *  (sin programación, nota interna ni papelera) en vez de fallar. */
 const COLS_LEGACY =
   "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,images"
@@ -135,16 +135,27 @@ async function applyFilters(
     // ilike no admite comodines del usuario; se escapan % _ y comas.
     const safe = p.q.replace(/[%_,()"]/g, "")
     if (safe) {
-      const { data: cats } = await supabase
-        .from("categories")
-        .select("id")
-        .ilike("name", `%${safe}%`)
-      const catIds = (cats ?? []).map((c) => c.id as number)
-      query = query.or(
-        catIds.length > 0
-          ? `name.ilike.%${safe}%,brand.ilike.%${safe}%,category_id.in.(${catIds.join(",")})`
-          : `name.ilike.%${safe}%,brand.ilike.%${safe}%`
+      // Búsqueda tolerante a typos vía pg_trgm (00103); si la función no
+      // existe todavía, cae a ilike clásico.
+      const { data: fuzzy, error: fuzzyErr } = await supabase.rpc(
+        "search_product_ids_fuzzy",
+        { term: safe }
       )
+      if (!fuzzyErr && Array.isArray(fuzzy)) {
+        const ids = (fuzzy as { id: number }[]).map((r) => r.id)
+        query = query.in("id", ids.length > 0 ? ids : [-1])
+      } else {
+        const { data: cats } = await supabase
+          .from("categories")
+          .select("id")
+          .ilike("name", `%${safe}%`)
+        const catIds = (cats ?? []).map((c) => c.id as number)
+        query = query.or(
+          catIds.length > 0
+            ? `name.ilike.%${safe}%,brand.ilike.%${safe}%,category_id.in.(${catIds.join(",")})`
+            : `name.ilike.%${safe}%,brand.ilike.%${safe}%`
+        )
+      }
     }
   }
   if (p.category !== "all") query = query.eq("category_id", Number(p.category))

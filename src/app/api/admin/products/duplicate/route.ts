@@ -19,7 +19,8 @@ export async function POST(request: Request) {
       return adminDenied
     }
 
-    const { productId } = await request.json()
+    const body = await request.json()
+    const { productId } = body
     if (!productId || typeof productId !== "number") {
       return NextResponse.json({ error: "Se requiere productId" }, { status: 400 })
     }
@@ -35,8 +36,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
     }
 
-    // Slug único para la copia.
-    const root = slugify(`${source.name} copia`) || "producto-copia"
+    // Slug único para la copia (nombre personalizado o "<nombre> (copia)").
+    const customName =
+      typeof body.name === "string" && body.name.trim() ? body.name.trim() : null
+    const copyName = customName ?? `${source.name} (copia)`
+    const root = slugify(copyName) || "producto-copia"
     const { data: slugRows } = await supabase
       .from("products")
       .select("slug")
@@ -58,14 +62,14 @@ export async function POST(request: Request) {
       .from("products")
       .insert({
         ...copyable,
-        name: `${source.name} (copia)`,
+        name: copyName,
         slug,
         // La copia nace despublicada y fuera del catálogo de WhatsApp.
         is_visible: false,
         show_in_whatsapp: false,
       })
       .select(
-        "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note"
+        "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description"
       )
       .single()
     if (insertError) {

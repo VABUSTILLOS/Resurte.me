@@ -17,6 +17,10 @@
   con `resolveCity()` (DB → estático) y el catálogo vía `catalog-cache` — nunca
   introducir `cookies()`/`headers()`.
 - El atajo `/` de búsqueda respeta campos enfocados (`isEditableTarget`).
+- El catálogo de la tienda ordena por `sort_order, name` (00100, orden manual
+  del admin) con fallback a solo `name` si la columna no existe; la metadata
+  de la página de producto prefiere `seo_title`/`seo_description` (00104)
+  con fallback al título/descripción derivados.
 - La búsqueda de ciudades es insensible a acentos (`fold()` con NFD).
 - `RecentlyViewed` persiste en localStorage (`resurte-recently-viewed`, tope 12) y
   se monta desde la página de producto (server) recibiendo el producto por props —
