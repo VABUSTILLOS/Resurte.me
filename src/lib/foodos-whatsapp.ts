@@ -138,3 +138,51 @@ export function buildProductListSections(
   }
   return sections
 }
+
+// --- Envío de catálogo ordenado (product_list) ----------------
+
+const GRAPH_MESSAGES = (phoneNumberId: string) => `${GRAPH_BASE}/${phoneNumberId}/messages`
+
+/**
+ * Envía el catálogo como mensaje interactivo `product_list`: secciones por
+ * categoría con el ORDEN EXACTO de la curaduría (Meta no lo reordena).
+ * Requiere que los productos ya estén en el catálogo nativo (sync Fase 1).
+ */
+export async function sendCatalogProductList(params: {
+  config: WhatsAppConfig
+  to: string
+  sections: ProductListSection[]
+  headerText?: string
+  bodyText?: string
+  catalogId?: string // catalog_id de la WABA (default: waba_id)
+}): Promise<{ id: string | null }> {
+  const { config, to, sections } = params
+  const res = await fetch(GRAPH_MESSAGES(config.phoneNumberId), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "product_list",
+        header: { type: "text", text: params.headerText ?? "Nuestro menú" },
+        body: { text: params.bodyText ?? "Elige tus platillos favoritos:" },
+        footer: { text: "Pedidos por WhatsApp" },
+        action: {
+          catalog_id: params.catalogId ?? config.wabaId,
+          sections,
+        },
+      },
+    }),
+  })
+  const body = await res.json()
+  if (!res.ok) {
+    throw new Error(body?.error?.message ?? `WhatsApp API error ${res.status}`)
+  }
+  return { id: body?.messages?.[0]?.id ?? null }
+}

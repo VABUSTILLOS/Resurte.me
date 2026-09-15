@@ -16,17 +16,21 @@ import {
   setItemWhatsAppVisible,
   reorderWhatsAppCatalog,
   syncWhatsAppCatalog,
+  sendCatalogToCustomer,
+  setAutoReplyCatalog,
+  broadcastWhatsAppSegment,
 } from "../actions"
 import { formatMoney } from "@/lib/foodos"
 import { orderedWhatsAppItems } from "@/lib/foodos-whatsapp"
 import type {
+  FoodosCustomerSegment,
   FoodosMenuItem,
   FoodosRestaurant,
   FoodosWhatsAppConnection,
 } from "@/types/foodos"
 import {
   MessageCircle, Loader2, CheckCircle2, XCircle, ArrowUp, ArrowDown,
-  RefreshCw, Trash2, ExternalLink, Eye, EyeOff,
+  RefreshCw, Trash2, ExternalLink, Eye, EyeOff, Send, Megaphone, Zap,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
@@ -45,6 +49,16 @@ export default function WhatsAppPage() {
   const [accessToken, setAccessToken] = useState("")
   const [showForm, setShowForm] = useState(false)
 
+  // Fase 2: envío directo, auto-respuesta y broadcast
+  const [sendPhone, setSendPhone] = useState("")
+  const [sendingCatalog, setSendingCatalog] = useState(false)
+  const [autoReply, setAutoReply] = useState(false)
+  const [autoReplyText, setAutoReplyText] = useState("")
+  const [bcSegment, setBcSegment] = useState<FoodosCustomerSegment | "all">("all")
+  const [bcTemplate, setBcTemplate] = useState("")
+  const [bcLang, setBcLang] = useState("es_MX")
+  const [broadcasting, setBroadcasting] = useState(false)
+
   const load = useCallback(async () => {
     try {
       const { restaurant: r, items: its } = await getFoodosPanelData()
@@ -56,6 +70,8 @@ export default function WhatsAppPage() {
         if (conn) {
           setPhoneNumberId(conn.phone_number_id)
           setWabaId(conn.waba_id)
+          setAutoReply(Boolean((conn as { auto_reply_catalog?: boolean }).auto_reply_catalog))
+          setAutoReplyText((conn as { auto_reply_text?: string | null }).auto_reply_text ?? "")
         }
       }
     } finally {
@@ -132,6 +148,54 @@ export default function WhatsAppPage() {
       const pos = ids.indexOf(i.id)
       return pos >= 0 ? { ...i, whatsapp_visible: true, whatsapp_position: pos + 1 } : i
     }))
+  }
+
+  async function handleSendCatalog(e: React.FormEvent) {
+    e.preventDefault()
+    if (!restaurant) return
+    setSendingCatalog(true)
+    setMessage(null)
+    try {
+      await sendCatalogToCustomer(restaurant.id, sendPhone)
+      setMessage({ ok: true, text: `Catálogo ordenado enviado a ${sendPhone}.` })
+      setSendPhone("")
+    } catch (err) {
+      setMessage({ ok: false, text: err instanceof Error ? err.message : "Error al enviar" })
+    } finally {
+      setSendingCatalog(false)
+    }
+  }
+
+  async function handleToggleAutoReply(next: boolean) {
+    if (!restaurant) return
+    setAutoReply(next)
+    await setAutoReplyCatalog(restaurant.id, next, autoReplyText || null)
+  }
+
+  async function handleSaveAutoReplyText() {
+    if (!restaurant) return
+    await setAutoReplyCatalog(restaurant.id, autoReply, autoReplyText || null)
+    setMessage({ ok: true, text: "Auto-respuesta actualizada." })
+  }
+
+  async function handleBroadcast(e: React.FormEvent) {
+    e.preventDefault()
+    if (!restaurant) return
+    setBroadcasting(true)
+    setMessage(null)
+    try {
+      const { sent, failed } = await broadcastWhatsAppSegment({
+        restaurant_id: restaurant.id,
+        segment: bcSegment,
+        template_name: bcTemplate,
+        language_code: bcLang,
+      })
+      setMessage({ ok: failed === 0, text: `Broadcast enviado: ${sent} entregados${failed ? `, ${failed} fallidos` : ""}.` })
+    } catch (err) {
+      setMessage({ ok: false, text: err instanceof Error ? err.message : "Error en el broadcast" })
+    } finally {
+      setBroadcasting(false)
+    }
   }
 
   async function handleSync() {
@@ -342,6 +406,117 @@ export default function WhatsAppPage() {
           {connection?.status !== "connected" && (
             <p className="mt-2 text-[11px] text-gray-400 text-center">Conecta tu WhatsApp Business para sincronizar.</p>
           )}
+        </div>
+      </div>
+
+      {/* Envío directo + auto-respuesta */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2 mb-1">
+            <Send className="w-5 h-5 text-[#0E7A0E]" />
+            Enviar catálogo ordenado
+          </h2>
+          <p className="text-xs text-gray-400 mb-4">
+            Mensaje interactivo con tus platillos <strong>en el orden exacto de tu curaduría</strong> (este orden sí lo respetamos al 100%).
+          </p>
+          <form onSubmit={handleSendCatalog} className="flex gap-2">
+            <input
+              value={sendPhone}
+              onChange={(e) => setSendPhone(e.target.value)}
+              placeholder="Teléfono del cliente (10 dígitos)"
+              inputMode="tel"
+              className="flex-1 rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+            />
+            <button
+              type="submit"
+              disabled={sendingCatalog || connection?.status !== "connected" || curated.length === 0}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-40"
+            >
+              {sendingCatalog ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Enviar
+            </button>
+          </form>
+
+          <div className="mt-5 pt-4 border-t border-gray-100">
+            <label className="flex items-center justify-between cursor-pointer">
+              <span className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                <Zap className="w-4 h-4 text-amber-500" />
+                Auto-responder con el catálogo
+              </span>
+              <input
+                type="checkbox"
+                checked={autoReply}
+                onChange={(e) => handleToggleAutoReply(e.target.checked)}
+                disabled={connection?.status !== "connected"}
+                className="accent-[#0E7A0E] w-5 h-5"
+              />
+            </label>
+            <p className="text-xs text-gray-400 mt-1">
+              Cuando un cliente escriba a tu número, recibe el menú ordenado automáticamente.
+            </p>
+            {autoReply && (
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={autoReplyText}
+                  onChange={(e) => setAutoReplyText(e.target.value)}
+                  placeholder="Texto del mensaje (opcional)"
+                  className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+                <button onClick={handleSaveAutoReplyText} className="px-3 py-2 rounded-xl bg-gray-900 text-white text-xs font-semibold">
+                  Guardar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Broadcast */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2 mb-1">
+            <Megaphone className="w-5 h-5 text-[#0E7A0E]" />
+            Broadcast a clientes
+          </h2>
+          <p className="text-xs text-gray-400 mb-4">
+            Plantilla aprobada en tu WABA, enviada a un segmento de tu CRM.
+          </p>
+          <form onSubmit={handleBroadcast} className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={bcSegment}
+                onChange={(e) => setBcSegment(e.target.value as FoodosCustomerSegment | "all")}
+                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
+              >
+                <option value="all">Todos los clientes</option>
+                <option value="vip">Solo VIP</option>
+                <option value="recurrente">Recurrentes</option>
+                <option value="nuevo">Nuevos</option>
+                <option value="inactivo">Inactivos (win-back)</option>
+              </select>
+              <input
+                value={bcLang}
+                onChange={(e) => setBcLang(e.target.value)}
+                placeholder="Idioma (es_MX)"
+                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm font-mono"
+              />
+            </div>
+            <input
+              value={bcTemplate}
+              onChange={(e) => setBcTemplate(e.target.value)}
+              placeholder="Nombre de la plantilla (aprobada en tu WABA)"
+              className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+            />
+            <button
+              type="submit"
+              disabled={broadcasting || connection?.status !== "connected" || !bcTemplate.trim()}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-40"
+            >
+              {broadcasting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />}
+              Enviar broadcast
+            </button>
+            <p className="text-[11px] text-gray-400">
+              Las plantillas se crean y aprueban en tu cuenta de Meta (WhatsApp → Plantillas de mensaje).
+            </p>
+          </form>
         </div>
       </div>
 
