@@ -3,7 +3,7 @@ import type { RestaurantCollection } from "@/types"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp, Calendar, ClipboardCheck,
   Package, Receipt, Flame, QrCode, UtensilsCrossed, Gift, Megaphone,
-  BarChart3, Compass, Users, Ticket,
+  BarChart3, Compass, Users, Ticket, MessageCircle, Inbox,
 } from "lucide-react"
 
 export type HubCollection = RestaurantCollection
@@ -315,6 +315,28 @@ export const TOOLS: Tool[] = [
     bgColor: "bg-pink-50",
     area: "sistema",
     short: "Cupones",
+    standalone: true,
+  },
+  {
+    title: "WhatsApp del restaurante",
+    description: "Catálogo nativo de WhatsApp ordenado a tu manera: tú eliges qué platillos aparecen y en qué orden, conexión con tu propio número y envío directo a clientes.",
+    icon: MessageCircle,
+    href: "/panel/foodos/whatsapp",
+    color: "text-green-600",
+    bgColor: "bg-green-50",
+    area: "sistema",
+    short: "WhatsApp",
+    standalone: true,
+  },
+  {
+    title: "Inbox de WhatsApp",
+    description: "Conversaciones de tus clientes en tu número de WhatsApp Business: lee y responde sin salir del panel.",
+    icon: Inbox,
+    href: "/panel/foodos/inbox",
+    color: "text-teal-600",
+    bgColor: "bg-teal-50",
+    area: "sistema",
+    short: "Inbox",
     standalone: true,
   },
   {

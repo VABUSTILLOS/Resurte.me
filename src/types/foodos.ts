@@ -47,6 +47,35 @@ export interface FoodosWebhook {
   created_at: string
 }
 
+// --- WhatsApp Business por restaurante ---
+
+export type FoodosWhatsAppStatus = "pending" | "connected" | "error"
+
+export interface FoodosWhatsAppConnection {
+  id: string
+  restaurant_id: string
+  phone_number_id: string
+  waba_id: string
+  display_phone: string | null
+  status: FoodosWhatsAppStatus
+  status_detail: string | null
+  verified_at: string | null
+  created_at: string
+}
+
+export interface FoodosWhatsAppMessage {
+  id: string
+  restaurant_id: string
+  wa_message_id: string | null
+  direction: "inbound" | "outbound"
+  customer_phone: string
+  type: string
+  content: string | null
+  status: string
+  read_at: string | null
+  created_at: string
+}
+
 export interface FoodosWebhookDelivery {
   id: string
   webhook_id: string
@@ -168,6 +197,8 @@ export interface FoodosMenuItem {
   is_available: boolean
   tags: string[]
   sort_order: number
+  whatsapp_visible: boolean
+  whatsapp_position: number | null
   created_at: string
 }
 

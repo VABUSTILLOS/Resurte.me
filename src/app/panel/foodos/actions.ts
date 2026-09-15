@@ -37,6 +37,8 @@ import type {
   FoodosReview,
   FoodosWebhook,
   FoodosWebhookDelivery,
+  FoodosWhatsAppConnection,
+  FoodosWhatsAppStatus,
 } from "@/types/foodos"
 
 // ------------------------------------------------------------
@@ -1269,4 +1271,140 @@ export async function listWebhookDeliveries(restaurantId: string): Promise<Foodo
     .limit(10)
   if (error) throw new Error(error.message)
   return (data as FoodosWebhookDelivery[]) ?? []
+}
+
+// ------------------------------------------------------------
+// WhatsApp Business del restaurante (conexión + curaduría)
+// ------------------------------------------------------------
+
+/** Conexión sin el token (nunca sale al cliente). */
+export async function getWhatsAppConnection(
+  restaurantId: string
+): Promise<FoodosWhatsAppConnection | null> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_whatsapp_connections")
+    .select("id, restaurant_id, phone_number_id, waba_id, display_phone, status, status_detail, verified_at, created_at")
+    .eq("restaurant_id", restaurantId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as FoodosWhatsAppConnection | null) ?? null
+}
+
+/** Guarda credenciales (cifradas) y las verifica contra Graph API. */
+export async function saveWhatsAppConnection(input: {
+  restaurant_id: string
+  phone_number_id: string
+  waba_id: string
+  access_token: string
+}): Promise<{ status: FoodosWhatsAppStatus; detail: string | null }> {
+  const { supabase } = await requireAuth()
+  const { encryptToken, verifyWhatsAppConnection } = await import("@/lib/foodos-whatsapp")
+
+  const config = {
+    accessToken: input.access_token.trim(),
+    phoneNumberId: input.phone_number_id.trim(),
+    wabaId: input.waba_id.trim(),
+  }
+  const check = await verifyWhatsAppConnection(config)
+
+  const { error } = await supabase
+    .from("foodos_whatsapp_connections")
+    .upsert(
+      {
+        restaurant_id: input.restaurant_id,
+        phone_number_id: config.phoneNumberId,
+        waba_id: config.wabaId,
+        access_token_enc: encryptToken(config.accessToken),
+        display_phone: check.displayPhone,
+        status: check.ok ? "connected" : "error",
+        status_detail: check.detail,
+        verified_at: new Date().toISOString(),
+      },
+      { onConflict: "restaurant_id" }
+    )
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/whatsapp")
+  return { status: check.ok ? "connected" : "error", detail: check.detail }
+}
+
+export async function deleteWhatsAppConnection(restaurantId: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_whatsapp_connections")
+    .delete()
+    .eq("restaurant_id", restaurantId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/whatsapp")
+}
+
+/** Curaduría: visibilidad individual en el catálogo de WhatsApp. */
+export async function setItemWhatsAppVisible(
+  itemId: string,
+  visible: boolean,
+  position?: number | null
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_menu_items")
+    .update({ whatsapp_visible: visible, whatsapp_position: position ?? null })
+    .eq("id", itemId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/whatsapp")
+}
+
+/** Reordena el catálogo: array ordenado de item_ids (posiciones 1..N). */
+export async function reorderWhatsAppCatalog(
+  restaurantId: string,
+  orderedItemIds: string[]
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  for (let i = 0; i < orderedItemIds.length; i++) {
+    const { error } = await supabase
+      .from("foodos_menu_items")
+      .update({ whatsapp_visible: true, whatsapp_position: i + 1 })
+      .eq("id", orderedItemIds[i])
+      .eq("restaurant_id", restaurantId)
+    if (error) throw new Error(error.message)
+  }
+  revalidatePath("/panel/foodos/whatsapp")
+}
+
+/**
+ * Sincroniza el catálogo curado (selección + orden) al catálogo nativo de
+ * WhatsApp Commerce del restaurante. Meta muestra primero los más recientes,
+ * así que se suben en orden inverso al deseado (best-effort; el orden
+ * garantizado es vía mensajes product_list).
+ */
+export async function syncWhatsAppCatalog(
+  restaurantId: string
+): Promise<{ added: number; removed: number }> {
+  const { supabase } = await requireAuth()
+
+  // Verificar propiedad y conexión
+  const { data: conn } = await supabase
+    .from("foodos_whatsapp_connections")
+    .select("status")
+    .eq("restaurant_id", restaurantId)
+    .maybeSingle()
+  if (!conn) throw new Error("Primero conecta tu WhatsApp Business")
+  if (conn.status !== "connected") throw new Error("La conexión de WhatsApp tiene un error; revísala")
+
+  const { data: items, error: itemsErr } = await supabase
+    .from("foodos_menu_items")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+  if (itemsErr) throw new Error(itemsErr.message)
+
+  const { getRestaurantWhatsAppConfig, buildCatalogProducts } = await import("@/lib/foodos-whatsapp")
+  const { createServiceClient } = await import("@/lib/supabase/service")
+  const { syncCatalog } = await import("@/lib/whatsapp")
+
+  const service = await createServiceClient()
+  const config = await getRestaurantWhatsAppConfig(service, restaurantId)
+  if (!config) throw new Error("No se pudieron leer las credenciales")
+
+  // Orden inverso: Meta lista primero lo último agregado.
+  const products = buildCatalogProducts((items as FoodosMenuItem[]) ?? []).reverse()
+  return syncCatalog(products, config)
 }
