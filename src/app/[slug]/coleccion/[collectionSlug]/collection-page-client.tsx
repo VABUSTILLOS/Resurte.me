@@ -39,6 +39,8 @@ interface CollectionPageClientProps {
   }
   products: Product[]
   allProducts?: MatchableProduct[]
+  /** Bloque servido desde el servidor (datos clave citables) insertado tras el hero. */
+  datosClave?: React.ReactNode
 }
 
 /**
@@ -55,7 +57,7 @@ function chunkProducts<T>(products: T[], chunks: number): T[][] {
   return result
 }
 
-export function CollectionPageClient({ citySlug, cityName, collection, products, allProducts }: CollectionPageClientProps) {
+export function CollectionPageClient({ citySlug, cityName, collection, products, allProducts, datosClave }: CollectionPageClientProps) {
   const icon = COLLECTION_ICONS[collection.slug] || "📦"
   const content = getCollectionContent(collection.slug)
   const recipes: CollectionRecipe[] = getCollectionRecipes(collection.slug).map((r, i) => ({
@@ -115,6 +117,13 @@ export function CollectionPageClient({ citySlug, cityName, collection, products,
           </div>
         </div>
       </div>
+
+      {/* ── 2.5 DATOS CLAVE — tabla citable servida desde el servidor ── */}
+      {datosClave && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8">
+          {datosClave}
+        </div>
+      )}
 
       {/* ── 3. OUR STORY — Narrative section ── */}
       <CollectionStorySection

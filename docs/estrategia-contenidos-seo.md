@@ -128,3 +128,89 @@ Reorganizar el blog plano en 6 hubs. Cada hub: 1 página pilar (guía madre enla
    - Top 10 en 10+ keywords "[categoría] por mayoreo [ciudad]".
    - Primera cita verificable de Resurte.me en ChatGPT/Perplexity para "proveedores de insumos para restaurantes en México".
 4. **Monitoreo GEO:** preguntar mensualmente a ChatGPT, Perplexity y Gemini las 10 queries del segmento y registrar si citan resurte.me. Con `llms.txt` + crawlers abiertos + datos consistentes, las citas llegan en 4–12 semanas.
+
+---
+
+## 8. Paquete de ejecución off-page (Fase 8)
+
+Todo lo de abajo **no se puede hacer desde el repo**: requiere cuentas y accesos de la
+empresa. Los valores ya están alineados con lo que el sitio declara hoy en JSON-LD
+(`src/lib/structured-data.ts` → `Organization`, `src/lib/author.ts` → `Person`), así que
+copiar y pegar mantiene la entidad consistente. **No inventar campos que no aparezcan aquí.**
+
+### 8.1 Ítem de Wikidata — el activo de mayor impacto
+
+Wikidata alimenta el Knowledge Graph y es la fuente que los LLM citan con más frecuencia
+para "¿qué es X?". Crear en https://www.wikidata.org/wiki/Special:NewItem
+
+**Etiquetas**
+| Campo | Valor |
+|---|---|
+| Label (es) | `Resurte.me` |
+| Label (en) | `Resurte.me` |
+| Description (es) | `central de abastos digital para restaurantes en México` |
+| Description (en) | `online wholesale food marketplace for restaurants in Mexico` |
+| Alias (es) | `Resurte`, `Resurte.me — Central de Abastos Digital` |
+
+**Declaraciones (statements)**
+| Propiedad | Valor | Nota |
+|---|---|---|
+| P31 instance of | Q4830453 (negocio) | o Q1664720 (marketplace) |
+| P17 country | Q96 (México) | |
+| P856 official website | `https://resurte.me` | |
+| P452 industry | Q1351216 (venta al mayoreo) | |
+| P571 inception | ⚠️ **confirmar** antes de publicar | no usar fecha aproximada |
+| P159 headquarters location | ⚠️ **confirmar** ciudad/estado | |
+| P112 founded by | ítem de Victor Bustillos (crearlo primero, ver 8.2) | |
+| P2002 X (Twitter) | ⚠️ solo si existe cuenta oficial | |
+| P2013 Facebook ID | `resurteme` | ya declarado en el sitio |
+| P2003 Instagram | `resurteme` | ya declarado en el sitio |
+| P2888 exact match | `https://resurte.me/#organization` | ata el `@id` del sitio al ítem |
+
+**Definición de hecho:** el ítem existe, tiene al menos P31/P17/P856, y la URL
+`https://www.wikidata.org/wiki/Special:EntityData/<QID>.json` resuelve. Después, añadir
+`https://www.wikidata.org/wiki/<QID>` a `BRAND_PROFILES` en `src/lib/structured-data.ts`
+y volver a desplegar.
+
+### 8.2 Ítem de Wikidata del autor (Victor Bustillos)
+
+Mismo procedimiento. `P31` → Q5 (ser humano) · `P106` → Q131524 (empresario) ·
+`P108` → ítem de Resurte.me · `P856`/`P2002`/`P2003` **solo si el perfil existe**.
+Después de crearlo, agregar la URL a `PENDING_PROFILES` en `src/lib/author.ts` (línea 45):
+el schema `Person` y la página `/autor/victor-bustillos` la toman automáticamente.
+
+> Un `sameAs` o un ítem con datos falsos **rompe** la verificación de entidad en lugar de
+> reforzarla. Si un dato no está confirmado, se omite; no se aproxima.
+
+### 8.3 Google Business Profile (perfil de servicio B2B)
+
+Crear en https://business.google.com. Tipo: **negocio de servicio con área de servicio**
+(sin dirección pública). Categoría principal: *Servicio de entrega de alimentos*.
+Categorías secundarias: *Mayorista*, *Proveedor de productos alimentarios*.
+
+- **Nombre:** `Resurte.me` (exactamente como en el sitio — la coincidencia nombre↔sitio es lo que enlaza la entidad).
+- **Sitio web:** `https://resurte.me`
+- **Área de servicio:** las 20 ciudades ya declaradas en `areaServed`.
+- **Teléfono:** el mismo `+52 1 614 533 7486` del `ContactPoint` y de `wa.me`.
+- **Descripción:** reutilizar el `description` del schema `Organization`.
+- **Atributos:** "Compra en línea", "Entrega a domicilio".
+
+### 8.4 Outreach (links y menciones)
+
+El activo que hace esto escalable es el **Índice de precios** (`/precios`): es el único
+dato del segmento que un medio puede citar. Orden de ataque:
+
+1. **Medios de economía/food MX** — pitch con "publicamos el precio semanal de los 30 insumos
+   más usados por restaurantes, por ciudad, con metodología abierta y CSV descargable".
+2. **CANIRAC + cámaras restauranteras estatales** — una por cada una de las 20 ciudades
+   (`areaServed`); pedir alta en su directorio de proveedores.
+3. **Directorios B2B de proveedores gastronómicos MX.**
+4. **Guest posts** en blogs de software POS / asociaciones de restauranteros.
+5. **Testimonios cruzados** con clientes B2B: que ellos enlacen "nuestro proveedor".
+
+### 8.5 Medición de resultado
+
+Correr el panel `/admin/seo-ia` y el prompt-panel mensual (`GEO_QUERIES` × `GEO_ENGINES`),
+y registrar el avance en `docs/medicion-seo-ia.md`. La primera cita verificable de
+Resurte.me en ChatGPT/Perplexity para *"proveedores de insumos para restaurantes en México"*
+es el indicador de que la Fase 8 funcionó.

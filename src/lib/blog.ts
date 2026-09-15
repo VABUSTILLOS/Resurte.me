@@ -1,6 +1,8 @@
 import fs from "node:fs"
 import path from "node:path"
 import matter from "gray-matter"
+import { resolveAuthor } from "./author"
+import { deriveQuickAnswer } from "./quick-answer"
 
 // ============================================================
 // BLOG DE RESURTE.ME — lectura de posts MDX locales
@@ -37,13 +39,63 @@ export interface BlogPostMeta {
   updatedAt: string
   author: string
   authorRole?: string
+  /** Slug de /autor/[slug] de la entidad que firma el post. */
+  authorSlug: string
   coverImage?: string
   coverAlt?: string
   tags: string[]
   featured?: boolean
   readingTime: number // minutos de lectura estimados
+  /**
+   * Respuesta citable de ≤50 palabras que se renderiza al inicio del post.
+   * Sale del frontmatter si existe; si no, se deriva del primer párrafo.
+   */
+  respuestaRapida?: string
   faq?: BlogFAQ[]
   cta?: BlogCTAConfig
+}
+
+/**
+ * Subconjunto de `BlogPostMeta` que necesita el índice del blog.
+ *
+ * `BlogIndexClient` es un componente de cliente: todo lo que recibe como prop se
+ * serializa en el payload RSC. Pasar el `BlogPostMeta` completo enviaba los 226
+ * artículos con su `faq` (≈550 KB) y su `respuestaRapida` (≈48 KB) al navegador
+ * sin que el índice los use — el `faq` es el 70 % del payload del índice.
+ *
+ * Los tipos son estructurales, así que `BlogPostMeta` sigue siendo asignable a
+ * `BlogIndexCard` y las tarjetas pueden usarse con el post completo en páginas
+ * que sí son de servidor.
+ */
+export interface BlogIndexCard {
+  slug: string
+  title: string
+  description: string
+  category: string
+  contentType?: string
+  date: string
+  tags: string[]
+  coverImage?: string
+  coverAlt?: string
+  featured?: boolean
+  readingTime: number
+}
+
+/** Proyecta un post al subconjunto que consume el índice del blog. */
+export function toBlogIndexCard(post: BlogPostMeta): BlogIndexCard {
+  return {
+    slug: post.slug,
+    title: post.title,
+    description: post.description,
+    category: post.category,
+    contentType: post.contentType,
+    date: post.date,
+    tags: post.tags,
+    coverImage: post.coverImage,
+    coverAlt: post.coverAlt,
+    featured: post.featured,
+    readingTime: post.readingTime,
+  }
 }
 
 interface BlogFrontmatter {
@@ -61,6 +113,7 @@ interface BlogFrontmatter {
   coverImage?: unknown
   coverAlt?: unknown
   featured?: unknown
+  respuestaRapida?: unknown
 }
 
 function normalizeFrontmatter(
@@ -110,6 +163,19 @@ function normalizeFrontmatter(
   const description = String(data.description ?? "")
   const readingTime = estimateReadingTime(body?.trim() || description)
 
+  // Respuesta citable: el frontmatter manda; si no hay, se deriva del primer
+  // párrafo del cuerpo para que las guías ya publicadas también la tengan.
+  const respuestaRapida = data.respuestaRapida
+    ? String(data.respuestaRapida).trim()
+    : (deriveQuickAnswer(body ?? "") ?? undefined)
+
+  // El autor del frontmatter se resuelve contra la entidad de src/lib/author.ts:
+  // así el byline, el JSON-LD y llms.txt nunca divergen, y ninguna firma
+  // histórica ("Equipo Resurte.me") queda sin `Person` verificable.
+  const author = resolveAuthor(
+    data.author ? String(data.author) : undefined
+  )
+
   return {
     slug,
     title,
@@ -118,13 +184,15 @@ function normalizeFrontmatter(
     contentType: data.contentType ? String(data.contentType) : undefined,
     date,
     updatedAt,
-    author: String(data.author ?? "Resurte.me"),
-    authorRole: data.authorRole ? String(data.authorRole) : undefined,
+    author: author.name,
+    authorRole: author.jobTitle,
+    authorSlug: author.slug,
     coverImage: data.coverImage ? String(data.coverImage) : undefined,
     coverAlt: data.coverAlt ? String(data.coverAlt) : undefined,
     tags,
     featured: data.featured === true,
     readingTime,
+    respuestaRapida,
     faq,
     cta,
   }

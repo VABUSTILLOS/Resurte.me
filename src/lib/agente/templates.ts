@@ -10,6 +10,7 @@
  */
 
 import type { MessageKind } from "./types"
+import { FREE_SHIPPING_MXN, MIN_ORDER_MXN, formatMxn } from "@/lib/commercial-facts"
 
 export interface TemplateContext {
   prospectName: string
@@ -103,7 +104,7 @@ export const AGENT_SYSTEM_PROMPT = `Eres el Agente de Ventas IA de Resurte.me en
 SOBRE RESURTE.ME:
 - Plataforma B2B de abasto para restaurantes: entrega en menos de 24 horas (pedido antes de 10 AM = entrega el mismo día).
 - Precios de central de abastos, crédito a 7/15/30 días sin aval, facturación CFDI 4.0 automática.
-- Pedido mínimo $500 MXN; envío gratis desde $3,000 MXN.
+- Pedido mínimo ${formatMxn(MIN_ORDER_MXN)}; envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.
 - Programa de Recompensas: cada compra genera recompensas según el nivel del cliente: 🟢 Verde 5% (empiezas aquí al registrarte) · 🥈 Plata 10% · 🥇 Oro 15% · 💎 Diamante 20% (se sube comprando con constancia semanal). Entre más compras, más ganas. Así de simple.
 - Las recompensas se canjean en la Tienda de Crecimiento por servicios reales: gestión de reseñas Google, optimización de Google Maps, fotografía profesional, gestión de redes sociales, Meta/Google Ads, TikTok, menú digital, tienda en línea, consultoría y desarrollo web.
 - Somos los ÚNICOS proveedores que regresan recompensas de marketing digital en las compras. Mensaje central: con Resurte.me no eliges entre surtir tu negocio o invertir en mercadotecnia y crecimiento — obtienes AMBOS.

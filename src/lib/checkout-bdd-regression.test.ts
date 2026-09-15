@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   validDeliveryFee,
   freeShippingProgress,
+  FREE_SHIPPING_THRESHOLD,
   MAX_BUMPS as CONFIG_MAX_BUMPS,
 } from "./checkout-config"
 import {
@@ -43,24 +44,26 @@ function rule(overrides: Partial<BumpRuleRow> = {}): BumpRuleRow {
 // BDD: "Envío gratis al alcanzar el umbral" / "al superar el umbral"
 // -----------------------------------------------------------
 describe("BDD — envío gratis (barra de progreso)", () => {
-  it("$499 → envío $35; $500 → envío $0 (frontera exacta del umbral)", () => {
-    expect(validDeliveryFee(1, 499, 35)).toBe(35)
-    expect(validDeliveryFee(1, 500, 35)).toBe(0)
+  it("un peso bajo el umbral → envío $35; en el umbral → envío $0 (frontera exacta)", () => {
+    expect(validDeliveryFee(1, FREE_SHIPPING_THRESHOLD - 1, 35)).toBe(35)
+    expect(validDeliveryFee(1, FREE_SHIPPING_THRESHOLD, 35)).toBe(0)
   })
 
   it("el subtotal pagable usado para el envío incluye el descuento del cupón", () => {
-    // Subtotal $520 − cupón 10% ($52) → $468 pagable → NO es gratis
-    expect(validDeliveryFee(1, 468, 35)).toBe(35)
-    // Subtotal $600 − cupón $120 → $480 pagable → NO gratis
-    expect(validDeliveryFee(1, 480, 35)).toBe(35)
-    // Subtotal $650 − cupón $100 → $550 pagable → gratis
-    expect(validDeliveryFee(1, 550, 35)).toBe(0)
+    // Subtotal bruto por encima del umbral, pero el cupón deja el pagable
+    // por debajo → se cobra envío.
+    const bruto = FREE_SHIPPING_THRESHOLD + 500
+    const pagableConCupon = bruto - 600
+    expect(pagableConCupon).toBeLessThan(FREE_SHIPPING_THRESHOLD)
+    expect(validDeliveryFee(1, pagableConCupon, 35)).toBe(35)
+    // El mismo bruto sin cupón sí alcanza el envío gratis.
+    expect(validDeliveryFee(1, bruto, 35)).toBe(0)
   })
 
   it("mensajes exactos de la barra de progreso", () => {
-    const near = freeShippingProgress(499.99)
+    const near = freeShippingProgress(FREE_SHIPPING_THRESHOLD - 0.01)
     expect(near.message).toBe("Agrega $0.01 más para envío gratis")
-    const free = freeShippingProgress(500)
+    const free = freeShippingProgress(FREE_SHIPPING_THRESHOLD)
     expect(free.message).toBe("🎉 Tienes envío gratis")
   })
 })

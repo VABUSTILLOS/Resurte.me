@@ -21,6 +21,7 @@ const ADMIN_NAV = [
   { href: "/admin/recompensas", label: "Recompensas", exact: false },
   { href: "/admin/emails", label: "Emails", exact: false },
   { href: "/admin/visibilidad", label: "Visibilidad", exact: false },
+  { href: "/admin/seo-ia", label: "SEO IA", exact: false },
   { href: "/admin/disponibilidad", label: "Por ciudad", exact: false },
   { href: "/admin/proveedores", label: "Proveedores", exact: false },
   { href: "/admin/whatsapp", label: "WhatsApp", exact: false },

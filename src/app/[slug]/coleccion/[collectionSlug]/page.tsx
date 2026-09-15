@@ -11,6 +11,7 @@ import {
 import { Metadata } from "next"
 import { toMatchableProduct } from "@/lib/catalog-preview"
 import { CollectionPageClient } from "./collection-page-client"
+import { DatosClave } from "@/components/seo/datos-clave"
 import type { Product } from "@/types"
 
 // ISR: catálogo revalidado cada 5 min (alineado con src/lib/catalog-cache.ts).
@@ -94,6 +95,9 @@ export default async function CollectionPage({ params }: Props) {
       collection={collection}
       products={products}
       allProducts={allProducts}
+      datosClave={
+        <DatosClave subject={`${collection.name} en ${city.name}`} />
+      }
     />
   )
 }

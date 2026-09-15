@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
-import { getAllPosts, getBlogIndexCta } from "@/lib/blog"
+import { getAllPosts, getBlogIndexCta, toBlogIndexCard } from "@/lib/blog"
 import { getBlogIndexSchema, getBlogBreadcrumbSchema } from "@/lib/blog-schema"
 import { BlogHero } from "@/components/blog/blog-hero"
 import { PostCTA } from "@/components/blog/post-cta"
@@ -64,7 +64,7 @@ export default async function BlogIndexPage() {
         subtitle="Guías prácticas, herramientas y datos para que tu restaurante gane más: food cost, mermas, proveeduría, marketing y tecnología. Escrito para dueños como tú, no para corporativos."
       />
       <Suspense fallback={null}>
-        <BlogIndexClient posts={posts} />
+        <BlogIndexClient posts={posts.map(toBlogIndexCard)} />
       </Suspense>
       <div className="pb-16">
         <PostCTA

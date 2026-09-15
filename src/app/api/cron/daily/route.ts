@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger"
  * corrían como crons separados en vercel.json (payment-reminders 8:00,
  * reactivation 9:00, abandoned-cart 12:00, foodos/campaigns 0:00), más
  * los que se añadieron después (reorder-reminders, retry-order-emails,
- * reconcile-payments, foodos-payment-reminders).
+ * reconcile-payments, foodos-payment-reminders, price-index).
  * Un solo cold start diario en vez de varios (ahorro de Active CPU).
  *
  * Protegido con el header Authorization: Bearer <CRON_SECRET> (Vercel Cron
@@ -59,6 +59,16 @@ export async function GET(req: NextRequest) {
     ],
     ["retry-order-emails", () => retryFailedOrderEmails()],
     ["foodos-campaigns", () => runDueFoodosCampaigns()],
+    // Índice público de precios (Fase 6). El snapshot se congela por semana
+    // ISO, así que correr a diario solo refresca el punto de la semana en
+    // curso con los precios de hoy (idempotente por fecha).
+    [
+      "price-index",
+      async () => {
+        const { refreshPriceIndex } = await import("@/lib/price-index-refresh")
+        return refreshPriceIndex()
+      },
+    ],
     // Reconciliación de pagos Stripe (antes cron */15 — Hobby solo permite
     // crons diarios; queda como job del consolidado + endpoint manual).
     [

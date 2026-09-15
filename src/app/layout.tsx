@@ -21,7 +21,11 @@ import { Analytics } from "@/lib/analytics"
 import { CookieConsent } from "@/components/ui/cookie-consent"
 import { ToastProvider } from "@/components/toast"
 import { OnboardingWizardGate } from "@/components/onboarding-wizard-gate"
-import { getOrganizationSchema } from "@/lib/structured-data"
+import {
+  getOrganizationSchema,
+  getWebSiteSchema,
+  getWholesaleServiceSchema,
+} from "@/lib/structured-data"
 import "./globals.css"
 
 const geistSans = Geist({
@@ -150,10 +154,20 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Resurte.me" />
+        {/* JSON-LD global: Organization + WebSite + Service en un solo
+            payload. Van juntos para que los `@id` se resuelvan en el mismo
+            documento y los motores de respuesta consoliden UNA entidad
+            "Resurte.me" en vez de tres objetos sueltos sin relación.
+            No agregar aquí schema dependiente de la ciudad o del post: eso
+            rompería el prerender estático de las rutas de ciudad. */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(getOrganizationSchema()),
+            __html: JSON.stringify([
+              getOrganizationSchema(),
+              getWebSiteSchema(),
+              getWholesaleServiceSchema(),
+            ]),
           }}
         />
         <Analytics />

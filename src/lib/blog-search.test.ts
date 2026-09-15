@@ -11,6 +11,7 @@ function makePost(overrides: Partial<BlogPostMeta>): BlogPostMeta {
     date: "2026-01-01",
     updatedAt: "2026-01-01",
     author: "Resurte",
+    authorSlug: "victor-bustillos",
     tags: [],
     readingTime: 5,
     ...overrides,

@@ -1,6 +1,8 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { Shield } from "lucide-react"
+import { PREGUNTAS } from "@/lib/preguntas"
+import { CREDIT_DAYS_PROSE, DELIVERY_CITIES, FREE_SHIPPING_MXN, INVOICING, MIN_ORDER_MXN, formatMxn } from "@/lib/commercial-facts"
 
 export const metadata: Metadata = {
   title: "Preguntas frecuentes — Resurte.me",
@@ -19,7 +21,7 @@ const FAQS = [
   },
   {
     q: "¿Hay pedido mínimo?",
-    a: "El mínimo son $500 MXN. Y si tu pedido supera los $2,500 MXN, el envío va por nuestra cuenta.",
+    a: `El mínimo son ${formatMxn(MIN_ORDER_MXN)}. Y si tu pedido supera los ${formatMxn(FREE_SHIPPING_MXN)}, el envío va por nuestra cuenta.`,
   },
   {
     q: "¿Qué pasa si algo llega mal?",
@@ -31,11 +33,11 @@ const FAQS = [
   },
   {
     q: "¿Me pueden dar crédito?",
-    a: "Claro. Si surtes con frecuencia, te abrimos línea de crédito a 7, 15 o 30 días. Sin aval, sin garantías rebuscadas. Evaluamos tu historial en la plataforma y en 24 horas tienes respuesta.",
+    a: `Claro. Si surtes con frecuencia, te abrimos línea de crédito a ${CREDIT_DAYS_PROSE} días. Sin aval, sin garantías rebuscadas. Evaluamos tu historial en la plataforma y en 24 horas tienes respuesta.`,
   },
   {
     q: "¿Facturan mis compras?",
-    a: "Todas. Cada pedido genera automáticamente tu CFDI 4.0. Solo registras tu RFC y uso de CFDI una vez, y de ahí en adelante nos encargamos de todo. Tus facturas listas para deducir, sin mover un dedo.",
+    a: `Todas. Cada pedido genera automáticamente tu ${INVOICING}. Solo registras tu RFC y uso de CFDI una vez, y de ahí en adelante nos encargamos de todo. Tus facturas listas para deducir, sin mover un dedo.`,
   },
   {
     q: "¿Cómo registro mi negocio?",
@@ -47,7 +49,7 @@ const FAQS = [
   },
   {
     q: "¿En qué ciudades entregan?",
-    a: "Estamos en 20 ciudades: CDMX, Guadalajara, Monterrey, Puebla, Toluca, Querétaro, León, Tijuana, Mérida, San Luis Potosí, Aguascalientes, Hermosillo, Saltillo, Culiacán, Morelia, Chihuahua, Veracruz, Villahermosa, Cancún y Torreón. Y cada mes sumamos zonas nuevas. Si la tuya aún no aparece, avísanos y te notificamos cuando lleguemos.",
+    a: `Estamos en ${DELIVERY_CITIES} ciudades: CDMX, Guadalajara, Monterrey, Puebla, Toluca, Querétaro, León, Tijuana, Mérida, San Luis Potosí, Aguascalientes, Hermosillo, Saltillo, Culiacán, Morelia, Chihuahua, Veracruz, Villahermosa, Cancún y Torreón. Y cada mes sumamos zonas nuevas. Si la tuya aún no aparece, avísanos y te notificamos cuando lleguemos.`,
   },
 ]
 
@@ -112,6 +114,39 @@ export default function FaqPage() {
             <p className="mt-4 text-[#5C6068] leading-relaxed">{a}</p>
           </details>
         ))}
+      </section>
+
+      <section className="max-w-3xl mx-auto px-4 pb-8 grid gap-4 sm:grid-cols-2">
+        <Link
+          href="/preguntas"
+          className="block border border-[#E5E7EB] rounded-[16px] p-6 hover:border-[#0E7A0E] transition-colors group"
+        >
+          <h2 className="font-semibold text-[#242529] mb-1 flex items-center gap-2">
+            ¿Buscas algo más específico?
+            <span className="text-[#0E7A0E] group-hover:translate-x-0.5 transition-transform">
+              &rarr;
+            </span>
+          </h2>
+          <p className="text-sm text-[#5C6068] leading-relaxed">
+            Tenemos {PREGUNTAS.length} respuestas directas sobre costos, proveeduría, operación,
+            inventario, marketing y herramientas para restaurantes.
+          </p>
+        </Link>
+        <Link
+          href="/precios"
+          className="block border border-[#E5E7EB] rounded-[16px] p-6 hover:border-[#0E7A0E] transition-colors group"
+        >
+          <h2 className="font-semibold text-[#242529] mb-1 flex items-center gap-2">
+            ¿Cuánto cuesta cada insumo?
+            <span className="text-[#0E7A0E] group-hover:translate-x-0.5 transition-transform">
+              &rarr;
+            </span>
+          </h2>
+          <p className="text-sm text-[#5C6068] leading-relaxed">
+            Consulta el índice de precios de referencia por insumo, unidad y ciudad, con fecha de
+            corte, rango observado y número de tiendas comparadas.
+          </p>
+        </Link>
       </section>
 
       {/* Guarantee highlight */}

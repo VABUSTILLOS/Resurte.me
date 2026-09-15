@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { FREE_SHIPPING_MXN } from "./commercial-facts"
 import {
   FREE_SHIPPING_THRESHOLD,
   DELIVERY_FEE_FLAT,
@@ -10,8 +11,11 @@ import {
 } from "./checkout-config"
 
 describe("checkout-config", () => {
-  it("define constantes de envío gratis y bumps", () => {
-    expect(FREE_SHIPPING_THRESHOLD).toBe(500)
+  it("el umbral por defecto sale de la fuente de verdad comercial", () => {
+    // Sin override en env, el importe que se cobra debe ser el mismo que el
+    // sitio publica (FREE_SHIPPING_MXN en commercial-facts.ts).
+    const override = process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD
+    expect(FREE_SHIPPING_THRESHOLD).toBe(override ? Number(override) : FREE_SHIPPING_MXN)
     expect(DELIVERY_FEE_FLAT).toBe(35)
     expect(MAX_BUMPS).toBe(3)
   })
@@ -19,12 +23,12 @@ describe("checkout-config", () => {
   describe("validDeliveryFee", () => {
     it("devuelve 0 sin artículos", () => {
       expect(validDeliveryFee(0, 100, 35)).toBe(0)
-      expect(validDeliveryFee(0, 600, 35)).toBe(0)
+      expect(validDeliveryFee(0, FREE_SHIPPING_THRESHOLD + 100, 35)).toBe(0)
     })
 
     it("devuelve 0 al alcanzar el umbral de envío gratis", () => {
-      expect(validDeliveryFee(1, 500, 35)).toBe(0)
-      expect(validDeliveryFee(1, 499.99, 35)).toBe(35)
+      expect(validDeliveryFee(1, FREE_SHIPPING_THRESHOLD, 35)).toBe(0)
+      expect(validDeliveryFee(1, FREE_SHIPPING_THRESHOLD - 0.01, 35)).toBe(35)
     })
 
     it("acepta la tarifa fija o 0 (whitelist retrocompatible)", () => {
@@ -66,16 +70,17 @@ describe("checkout-config", () => {
     })
   })
 
-  describe("freeShippingProgress (barra de envío gratis)", () => {    it("subtotal $499.99 → falta $0.01, no es gratis", () => {
-      const p = freeShippingProgress(499.99)
+  describe("freeShippingProgress (barra de envío gratis)", () => {
+    it("un centavo por debajo del umbral → falta $0.01, no es gratis", () => {
+      const p = freeShippingProgress(FREE_SHIPPING_THRESHOLD - 0.01)
       expect(p.isFree).toBe(false)
       expect(p.remaining).toBeCloseTo(0.01, 2)
       expect(p.message).toBe("Agrega $0.01 más para envío gratis")
       expect(p.percent).toBeLessThan(100)
     })
 
-    it("subtotal $500 → envío gratis", () => {
-      const p = freeShippingProgress(500)
+    it("alcanzar el umbral → envío gratis", () => {
+      const p = freeShippingProgress(FREE_SHIPPING_THRESHOLD)
       expect(p.isFree).toBe(true)
       expect(p.remaining).toBe(0)
       expect(p.message).toBe("🎉 Tienes envío gratis")
@@ -83,15 +88,15 @@ describe("checkout-config", () => {
     })
 
     it("subtotal muy alto se acota a 100%", () => {
-      expect(freeShippingProgress(900).percent).toBe(100)
-      expect(freeShippingProgress(900).isFree).toBe(true)
+      expect(freeShippingProgress(FREE_SHIPPING_THRESHOLD + 1000).percent).toBe(100)
+      expect(freeShippingProgress(FREE_SHIPPING_THRESHOLD + 1000).isFree).toBe(true)
     })
 
     it("subtotal vacío muestra el umbral completo", () => {
       const p = freeShippingProgress(0)
-      expect(p.remaining).toBe(500)
+      expect(p.remaining).toBe(FREE_SHIPPING_THRESHOLD)
       expect(p.percent).toBe(0)
-      expect(p.message).toBe("Agrega $500.00 más para envío gratis")
+      expect(p.message).toBe(`Agrega $${FREE_SHIPPING_THRESHOLD.toFixed(2)} más para envío gratis`)
     })
   })
 
@@ -120,21 +125,30 @@ describe("checkout-config", () => {
       expect(t.total).toBe(485)
     })
 
-    it("bumps + cupón cruzan el umbral de envío gratis", () => {
-      // $420 + bump $80 = $500; con cupón 10% → $450 pagable... sin cruzar.
-      // Usamos un cupón que lleve el pagable ≥ umbral para probar envío gratis.
-      const free = calcCheckoutTotals(520, 0, null, 4, 0)
+    it("alcanzar el umbral da envío gratis", () => {
+      const free = calcCheckoutTotals(FREE_SHIPPING_THRESHOLD, 0, null, 4, 0)
       expect(free.deliveryFee).toBe(0)
-      expect(free.total).toBe(520)
+      expect(free.total).toBe(FREE_SHIPPING_THRESHOLD)
+    })
+
+    it("un cupón puede dejar el pagable por debajo del umbral (y volver a cobrar envío)", () => {
+      const t = calcCheckoutTotals(FREE_SHIPPING_THRESHOLD, 0, pctCoupon, 4, 0)
+      expect(t.discountAmount).toBe(FREE_SHIPPING_THRESHOLD * 0.1)
+      expect(t.payableSubtotal).toBe(FREE_SHIPPING_THRESHOLD * 0.9)
+      expect(t.deliveryFee).toBe(35)
     })
 
     it("cuenta bumps en itemCount para el envío gratis", () => {
-      // Subtotal pagable 460 + bump total 40 → 500 con bumps. El umbral se
-      // evalúa sobre el pagable (incluye bumps), igual que el servidor.
-      const t = calcCheckoutTotals(460, 40, null, 3, 1)
-      expect(t.payableSubtotal).toBe(500)
+      // El umbral se evalúa sobre el pagable, que incluye bumps: sin el bump
+      // falta envío, con el bump se alcanza el umbral.
+      const base = FREE_SHIPPING_THRESHOLD - 40
+      const sinBump = calcCheckoutTotals(base, 0, null, 3, 0)
+      expect(sinBump.deliveryFee).toBe(35)
+
+      const t = calcCheckoutTotals(base, 40, null, 3, 1)
+      expect(t.payableSubtotal).toBe(FREE_SHIPPING_THRESHOLD)
       expect(t.deliveryFee).toBe(0)
-      expect(t.total).toBe(500)
+      expect(t.total).toBe(FREE_SHIPPING_THRESHOLD)
     })
 
     it("envío a 0 explícito se respeta (retrocompatible)", () => {

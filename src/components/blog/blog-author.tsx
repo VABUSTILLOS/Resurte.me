@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Clock, CalendarDays, UserRound } from "lucide-react"
 import { formatPostDate } from "@/lib/blog-format"
 import type { BlogPostMeta } from "@/lib/blog"
@@ -19,7 +20,14 @@ export function BlogAuthor({ post }: BlogAuthorProps) {
           <UserRound className="h-5 w-5" aria-hidden="true" />
         </span>
         <div>
-          <p className="text-sm font-semibold text-warm-900">{post.author}</p>
+          {/* El enlace a /autor/[slug] es lo que conecta el byline visible con
+              la entidad `Person` del JSON-LD: mismo `@id`, misma URL. */}
+          <Link
+            href={`/autor/${post.authorSlug}`}
+            className="text-sm font-semibold text-warm-900 hover:text-brand-600 hover:underline"
+          >
+            {post.author}
+          </Link>
           {post.authorRole && (
             <p className="text-xs text-[var(--text-secondary)]">{post.authorRole}</p>
           )}

@@ -22,6 +22,8 @@ export const FOOTER_LINKS = {
     { label: "Marketplace hoyquecomemos", href: "/comer" },
   ],
   Recursos: [
+    { label: "Índice de precios", href: "/precios" },
+    { label: "Respuestas directas", href: "/preguntas" },
     { label: "Blog", href: "/blog" },
     { label: "RSS", href: "/rss.xml" },
   ],

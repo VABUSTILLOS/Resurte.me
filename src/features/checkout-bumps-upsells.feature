@@ -10,7 +10,7 @@
 Característica: Checkout drawer con order bumps y upsells 1-click
 
   Antecedentes:
-    Dado que la tienda opera con envío gratis desde $500 MXN
+    Dado que la tienda opera con envío gratis desde $2,500 MXN
     Y un máximo de 3 order bumps simultáneos
 
   # -----------------------------------------------------------
@@ -29,13 +29,13 @@ Característica: Checkout drawer con order bumps y upsells 1-click
   # -----------------------------------------------------------
 
   Escenario: Envío gratis al alcanzar el umbral
-    Dado un carrito con subtotal de $499.99
+    Dado un carrito con subtotal de $2,499.99
     Cuando se calcula el envío
     Entonces el delivery_fee es $35
     Y la barra de progreso muestra "Agrega $0.01 más para envío gratis"
 
   Escenario: Envío gratis al superar el umbral
-    Dado un carrito con subtotal de $500
+    Dado un carrito con subtotal de $2,500
     Cuando se calcula el envío
     Entonces el delivery_fee es $0
     Y la barra de progreso muestra "🎉 Tienes envío gratis"

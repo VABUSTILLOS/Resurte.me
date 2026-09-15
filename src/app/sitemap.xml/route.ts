@@ -5,12 +5,19 @@ const BASE_URL = "https://resurte.me"
 
 export async function GET() {
   // Dynamic imports to avoid build-time evaluation when DB isn't ready
-  const [{ MEXICO_CITIES }, { getAllPosts }, { generateSitemapXml }] =
-    await Promise.all([
-      import("@/lib/cities"),
-      import("@/lib/blog"),
-      import("@/lib/structured-data"),
-    ])
+  const [
+    { MEXICO_CITIES },
+    { getAllPosts },
+    { generateSitemapXml },
+    { BLOG_CATEGORIES },
+    { getPriceIndexUrlSlugs },
+  ] = await Promise.all([
+    import("@/lib/cities"),
+    import("@/lib/blog"),
+    import("@/lib/structured-data"),
+    import("@/lib/blog-categories"),
+    import("@/lib/price-index"),
+  ])
 
   const entries: SitemapEntry[] = [
     { url: BASE_URL, changeFrequency: "daily", priority: 1.0 },
@@ -20,6 +27,7 @@ export async function GET() {
     { url: `${BASE_URL}/about`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE_URL}/contact`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE_URL}/faq`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${BASE_URL}/preguntas`, changeFrequency: "weekly", priority: 0.8 },
     { url: `${BASE_URL}/ciudades`, changeFrequency: "weekly", priority: 0.8 },
     { url: `${BASE_URL}/comercializacion`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE_URL}/recompensas`, changeFrequency: "monthly", priority: 0.6 },
@@ -83,6 +91,13 @@ export async function GET() {
 
   // Blog
   entries.push({ url: `${BASE_URL}/blog`, changeFrequency: "weekly", priority: 0.8 })
+  for (const category of BLOG_CATEGORIES) {
+    entries.push({
+      url: `${BASE_URL}/blog/categoria/${category.slug}`,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    })
+  }
   for (const post of getAllPosts()) {
     entries.push({
       url: `${BASE_URL}/blog/${post.slug}`,
@@ -94,6 +109,32 @@ export async function GET() {
 
   // Marketplace hoyquecomemos
   entries.push({ url: `${BASE_URL}/comer`, changeFrequency: "daily", priority: 0.9 })
+
+  // Índice de precios (Fase 6): el hub, una página por insumo publicado y una
+  // por ciudad. Los slugs salen de `getPriceIndexUrlSlugs`, congelado por
+  // despliegue, porque las páginas usan `dynamicParams = false`: el sitemap no
+  // puede anunciar slugs que no se prerenderizaron en el build. Si la tabla
+  // todavía no existe solo queda el hub, que igual responde con la metodología.
+  entries.push({ url: `${BASE_URL}/precios`, changeFrequency: "weekly", priority: 0.8 })
+  try {
+    const { insumos, ciudades } = await getPriceIndexUrlSlugs()
+    for (const insumoSlug of insumos) {
+      entries.push({
+        url: `${BASE_URL}/precios/${insumoSlug}`,
+        changeFrequency: "weekly",
+        priority: 0.6,
+      })
+    }
+    for (const ciudadSlug of ciudades) {
+      entries.push({
+        url: `${BASE_URL}/precios/ciudad/${ciudadSlug}`,
+        changeFrequency: "weekly",
+        priority: 0.6,
+      })
+    }
+  } catch {
+    // Supabase not configured — el hub de precios ya quedó en el sitemap
+  }
 
   const xml = generateSitemapXml(entries)
 
