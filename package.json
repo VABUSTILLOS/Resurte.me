@@ -69,6 +69,9 @@
       "src/lib/payment-validation.ts": [
         "exports"
       ],
+      "src/lib/geo-queries.ts": [
+        "exports"
+      ],
       "src/lib/foodos-campaigns.ts": [
         "exports"
       ],
@@ -79,10 +82,16 @@
       "src/lib/storage/storage-schemas.ts": [
         "exports"
       ],
+      "src/lib/geo-assets.ts": [
+        "exports"
+      ],
       "src/lib/exit-intent.ts": [
         "exports"
       ],
       "src/lib/foodos-whatsapp.ts": [
+        "exports"
+      ],
+      "src/lib/whatsapp-catalogs.ts": [
         "exports"
       ],
       "src/lib/order-bumps.ts": [
@@ -96,6 +105,9 @@
         "exports"
       ],
       "src/lib/admin-cohorts.ts": [
+        "exports"
+      ],
+      "src/lib/ai-referrers.ts": [
         "exports"
       ],
       "src/lib/audit.ts": [
@@ -124,6 +136,9 @@
       "src/lib/admin-errors.ts": [
         "types"
       ],
+      "src/lib/preguntas.ts": [
+        "exports"
+      ],
       "src/lib/payment-next-action.ts": [
         "exports"
       ],
@@ -144,6 +159,9 @@
         "exports",
         "types"
       ],
+      "src/lib/commercial-facts.ts": [
+        "exports"
+      ],
       "src/lib/catalog-cache.ts": [
         "exports"
       ],
@@ -160,6 +178,9 @@
       "src/lib/i18n/es.ts": [
         "exports"
       ],
+      "src/lib/price-index-refresh.ts": [
+        "exports"
+      ],
       "src/lib/panel-roles.ts": [
         "exports"
       ],
@@ -173,6 +194,9 @@
         "types"
       ],
       "src/lib/panel/foodos-sync.ts": [
+        "exports"
+      ],
+      "src/lib/quick-answer.ts": [
         "exports"
       ],
       "src/lib/search-terms.ts": [

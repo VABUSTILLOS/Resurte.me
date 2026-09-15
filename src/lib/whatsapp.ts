@@ -421,3 +421,53 @@ export const AUTOMATION_TEMPLATE_MAP: Record<string, { name: string; description
     description: "Onboarding post-primer pedido — 10% descuento",
   },
 }
+
+// ============================================================
+// Messaging — Catálogo ordenado (product_list interactivo)
+// ============================================================
+
+export interface ProductListMessageSection {
+  title: string
+  product_items: { product_retailer_id: string }[]
+}
+
+/**
+ * Envía un mensaje interactivo product_list: el orden de las secciones es
+ * exactamente el que se recibe (Meta no lo reordena, a diferencia del
+ * catálogo nativo).
+ */
+export async function sendProductListMessage(params: {
+  to: string
+  sections: ProductListMessageSection[]
+  headerText?: string
+  bodyText?: string
+  footerText?: string
+  catalogId?: string // default: waba_id de la config
+}, config?: WhatsAppConfig): Promise<{ id: string | null }> {
+  const cfg = config || getConfig()
+  const res = await waFetch(
+    `/${cfg.phoneNumberId}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: params.to,
+        type: "interactive",
+        interactive: {
+          type: "product_list",
+          header: { type: "text", text: params.headerText ?? "Catálogo" },
+          body: { text: params.bodyText ?? "Elige tus productos:" },
+          footer: { text: params.footerText ?? "Resurte.me" },
+          action: {
+            catalog_id: params.catalogId ?? cfg.wabaId,
+            sections: params.sections,
+          },
+        },
+      }),
+    },
+    cfg
+  )
+  const body = await res.json()
+  return { id: body?.messages?.[0]?.id ?? null }
+}

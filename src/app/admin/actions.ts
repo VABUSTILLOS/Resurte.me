@@ -1,6 +1,8 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { createServiceClient } from "@/lib/supabase/service"
+import type * as WaCatalogs from "@/lib/whatsapp-catalogs"
 import { logger } from "@/lib/logger"
 import { requireAdmin } from "@/lib/admin-auth"
 import { format } from "date-fns"
@@ -484,28 +486,6 @@ export async function getAdminWhatsappCatalog(): Promise<{
       icon: c.icon ?? null,
       slug: c.slug,
     })),
-  }
-}
-
-/** Actualiza show_in_whatsapp de un producto en la BD. */
-export async function setProductWhatsappVisibility(
-  productId: number,
-  showInWhatsapp: boolean
-): Promise<void> {
-  const { response: adminDenied } = await requireAdmin()
-  if (adminDenied) {
-    throw new Error("Acceso restringido a administradores")
-  }
-
-  const supabase = await createServiceClient()
-  const { error } = await supabase
-    .from("products")
-    .update({ show_in_whatsapp: showInWhatsapp, updated_at: new Date().toISOString() })
-    .eq("id", productId)
-
-  if (error) {
-    logger.error("[ADMIN-WHATSAPP] Error updating product:", error)
-    throw new Error("Error al actualizar el producto")
   }
 }
 
@@ -1288,4 +1268,252 @@ export async function getAdminAuditLog(filters?: {
     throw new Error("Error al cargar la bitácora")
   }
   return (data ?? []) as AuditLogEntry[]
+}
+
+// ------------------------------------------------------------
+// Multi-catálogo WhatsApp de la plataforma (master admin)
+// ------------------------------------------------------------
+
+export interface WaCatalogSummary {
+  id: string
+  slug: string
+  name: string
+  city_id: number | null
+  city_name: string | null
+  is_active: boolean
+  items_count: number
+}
+
+export interface WaCatalogDetailItem {
+  product_id: number
+  position: number
+  is_visible: boolean
+  available_in_city: boolean | null // null = catálogo global
+}
+
+export async function listWaCatalogs(): Promise<WaCatalogSummary[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const { data: catalogs, error } = await supabase
+    .from("whatsapp_catalogs")
+    .select("id, slug, name, city_id, is_active")
+    .order("created_at")
+  if (error) throw new Error(error.message)
+  if (!catalogs?.length) return []
+
+  const cityIds = [...new Set(catalogs.map((c) => c.city_id).filter(Boolean))] as number[]
+  const { data: cities } = cityIds.length
+    ? await supabase.from("cities").select("id, name").in("id", cityIds)
+    : { data: [] as { id: number; name: string }[] }
+  const cityName = new Map((cities ?? []).map((c) => [c.id, c.name]))
+
+  const { data: items } = await supabase
+    .from("whatsapp_catalog_items")
+    .select("catalog_id, is_visible")
+  const countByCatalog = new Map<string, number>()
+  for (const i of items ?? []) {
+    if (!i.is_visible) continue
+    countByCatalog.set(i.catalog_id, (countByCatalog.get(i.catalog_id) ?? 0) + 1)
+  }
+
+  return catalogs.map((c) => ({
+    id: c.id as string,
+    slug: c.slug as string,
+    name: c.name as string,
+    city_id: c.city_id as number | null,
+    city_name: c.city_id ? cityName.get(c.city_id as number) ?? null : null,
+    is_active: c.is_active as boolean,
+    items_count: countByCatalog.get(c.id as string) ?? 0,
+  }))
+}
+
+export async function createWaCatalog(name: string, cityId: number | null): Promise<void> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  let slug = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+  if (cityId) {
+    const { data: city } = await supabase.from("cities").select("slug").eq("id", cityId).maybeSingle()
+    if (city?.slug) slug = city.slug
+  }
+  const { error } = await supabase
+    .from("whatsapp_catalogs")
+    .upsert({ slug, name: name.trim(), city_id: cityId }, { onConflict: "slug" })
+  if (error) throw new Error(error.message)
+  revalidatePath("/admin/whatsapp")
+}
+
+/** Detalle del catálogo: curaduría completa (visibles y no visibles). */
+export async function getWaCatalogItems(catalogId: string): Promise<WaCatalogDetailItem[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const { data: catalog } = await supabase
+    .from("whatsapp_catalogs")
+    .select("city_id")
+    .eq("id", catalogId)
+    .maybeSingle()
+  if (!catalog) throw new Error("Catálogo no encontrado")
+
+  const { data: items, error } = await supabase
+    .from("whatsapp_catalog_items")
+    .select("product_id, position, is_visible")
+    .eq("catalog_id", catalogId)
+    .order("position")
+  if (error) throw new Error(error.message)
+
+  // Disponibilidad por ciudad (semántica opt-out de 00065)
+  let availability = new Map<number, boolean>()
+  if (catalog.city_id) {
+    const { data: rows } = await supabase
+      .from("product_city_availability")
+      .select("product_id, is_available")
+      .eq("city_id", catalog.city_id)
+    const withRows = new Set((rows ?? []).map((r) => r.product_id))
+    availability = new Map(
+      (rows ?? []).map((r) => [r.product_id, r.is_available])
+    )
+    // productos sin fila: disponibles en todas las ciudades
+    for (const i of items ?? []) {
+      if (!withRows.has(i.product_id)) availability.set(i.product_id, true)
+    }
+  }
+
+  return ((items ?? []) as { product_id: number; position: number; is_visible: boolean }[]).map((i) => ({
+    ...i,
+    available_in_city: catalog.city_id ? availability.get(i.product_id) ?? false : null,
+  }))
+}
+
+/** Agrega/quita un producto de la curaduría (visible). */
+export async function setWaCatalogProduct(
+  catalogId: string,
+  productId: number,
+  visible: boolean
+): Promise<void> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  if (visible) {
+    const { data: maxRow } = await supabase
+      .from("whatsapp_catalog_items")
+      .select("position")
+      .eq("catalog_id", catalogId)
+      .order("position", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const { error } = await supabase
+      .from("whatsapp_catalog_items")
+      .upsert(
+        { catalog_id: catalogId, product_id: productId, position: (maxRow?.position ?? 0) + 1, is_visible: true },
+        { onConflict: "catalog_id,product_id" }
+      )
+    if (error) throw new Error(error.message)
+  } else {
+    const { error } = await supabase
+      .from("whatsapp_catalog_items")
+      .delete()
+      .eq("catalog_id", catalogId)
+      .eq("product_id", productId)
+    if (error) throw new Error(error.message)
+  }
+  revalidatePath("/admin/whatsapp")
+}
+
+/** Reordena la curaduría: array ordenado de product_ids (posiciones 1..N). */
+export async function reorderWaCatalog(
+  catalogId: string,
+  orderedProductIds: number[]
+): Promise<void> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  for (let i = 0; i < orderedProductIds.length; i++) {
+    const { error } = await supabase
+      .from("whatsapp_catalog_items")
+      .update({ position: i + 1 })
+      .eq("catalog_id", catalogId)
+      .eq("product_id", orderedProductIds[i])
+    if (error) throw new Error(error.message)
+  }
+  revalidatePath("/admin/whatsapp")
+}
+
+/** Sincroniza la curaduría del catálogo al catálogo nativo de WhatsApp. */
+export async function syncWaCatalog(catalogId: string): Promise<{ added: number; removed: number }> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const wa = await import("@/lib/whatsapp-catalogs")
+  const { getCatalogWhatsAppConfig, buildAdminCatalogProducts } = wa
+  const { syncCatalog } = await import("@/lib/whatsapp")
+
+  const { config, catalog } = await getCatalogWhatsAppConfig(supabase, catalogId)
+  if (!config) throw new Error("No hay credenciales de WhatsApp configuradas")
+  if (!catalog) throw new Error("Catálogo no encontrado")
+
+  const { data: items } = await supabase
+    .from("whatsapp_catalog_items")
+    .select("catalog_id, product_id, position, is_visible")
+    .eq("catalog_id", catalogId)
+  const { data: products } = await supabase
+    .from("products")
+    .select("id, name, brand, category_id, image_url, price, sale_price, unit")
+
+  const desired = buildAdminCatalogProducts(
+    (items ?? []) as WaCatalogs.WaCatalogItemRow[],
+    (products ?? []) as WaCatalogs.AdminProduct[]
+  )
+  // Meta lista "más reciente primero": subir en orden inverso al deseado.
+  return syncCatalog(desired.reverse(), config)
+}
+
+/** Envía el catálogo ordenado (product_list) a un teléfono. */
+export async function sendWaCatalogToPhone(
+  catalogId: string,
+  toPhone: string
+): Promise<void> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const wa = await import("@/lib/whatsapp-catalogs")
+  const { sendProductListMessage } = await import("@/lib/whatsapp")
+  const { config, catalog } = await wa.getCatalogWhatsAppConfig(supabase, catalogId)
+  if (!config) throw new Error("No hay credenciales de WhatsApp configuradas")
+
+  const [{ data: items }, { data: products }, { data: categories }] = await Promise.all([
+    supabase.from("whatsapp_catalog_items").select("catalog_id, product_id, position, is_visible").eq("catalog_id", catalogId),
+    supabase.from("products").select("id, name, brand, category_id, image_url, price, sale_price, unit"),
+    supabase.from("categories").select("id, name"),
+  ])
+  const catName = new Map((categories ?? []).map((c) => [c.id, c.name]))
+  const adminProducts = ((products ?? []) as WaCatalogs.AdminProduct[]).map((p) => ({
+    ...p,
+    category_name: p.category_id ? catName.get(p.category_id) ?? null : null,
+  }))
+  const sections = wa.buildAdminProductListSections(
+    (items ?? []) as WaCatalogs.WaCatalogItemRow[],
+    adminProducts
+  )
+  if (!sections.length) throw new Error("El catálogo está vacío")
+
+  const digits = toPhone.replace(/\D/g, "")
+  if (digits.length < 10) throw new Error("Teléfono inválido")
+  await sendProductListMessage(
+    {
+      to: digits,
+      sections,
+      headerText: catalog?.name ?? "Catálogo",
+      bodyText: "Elige tus productos y te los llevamos:",
+    },
+    config
+  )
 }
