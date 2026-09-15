@@ -22,6 +22,7 @@ import { requireAdmin } from "@/lib/admin-auth"
 import { logAdminAction } from "@/lib/audit"
 import { onOrderStatusChange } from "@/lib/workflows"
 import { notifyUser } from "@/lib/notifications"
+import { logAdminAction } from "@/lib/audit-log"
 import type { OrderStatus, PaymentStatus } from "@/types"
 
 const VALID_STATUSES: OrderStatus[] = [
@@ -35,7 +36,7 @@ export async function PATCH(
   try {
     // Solo administradores pueden cambiar el estado de una orden o
     // confirmar el pago manualmente (esto dispara el abono de cashback).
-    const { user: adminUser, response: adminDenied } = await requireAdmin()
+    const { response: adminDenied, user: adminUser } = await requireAdmin()
     if (adminDenied) {
       return adminDenied
     }
@@ -169,6 +170,28 @@ export async function PATCH(
         { error: "Failed to update order", details: updateError.message },
         { status: 500 }
       )
+    }
+
+    // Fase 15 — bitácora de auditoría (best-effort, no bloquea la respuesta)
+    if (status && oldStatus !== status) {
+      await logAdminAction(supabase, {
+        actorId: adminUser?.id ?? null,
+        actorEmail: adminUser?.email ?? null,
+        action: "order_status",
+        entity: "orders",
+        entityId: orderId,
+        detail: { from: oldStatus, to: status },
+      })
+    }
+    if (payment_status === "paid" && oldPaymentStatus !== "paid") {
+      await logAdminAction(supabase, {
+        actorId: adminUser?.id ?? null,
+        actorEmail: adminUser?.email ?? null,
+        action: "order_payment",
+        entity: "orders",
+        entityId: orderId,
+        detail: { from: oldPaymentStatus, to: "paid" },
+      })
     }
 
     // Trigger WhatsApp workflow notifications (solo si cambió el status)

@@ -14,6 +14,7 @@ const ADMIN_NAV = [
   { href: "/admin/marketing", label: "Marketing", exact: false },
   { href: "/admin/pedidos", label: "Pedidos", exact: false },
   { href: "/admin/repartidores", label: "Repartidores", exact: false },
+  { href: "/admin/leads", label: "Leads", exact: false },
   { href: "/admin/productos", label: "Productos", exact: false },
   { href: "/admin/usuarios", label: "Usuarios", exact: false },
   { href: "/admin/facturas", label: "Facturas", exact: false },
@@ -24,6 +25,7 @@ const ADMIN_NAV = [
   { href: "/admin/proveedores", label: "Proveedores", exact: false },
   { href: "/admin/whatsapp", label: "WhatsApp", exact: false },
   { href: "/admin/workflows", label: "Workflows", exact: false },
+  { href: "/admin/auditoria", label: "Auditoría", exact: false },
 ]
 
 /**
