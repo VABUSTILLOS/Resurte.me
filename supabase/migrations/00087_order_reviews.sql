@@ -1,5 +1,5 @@
 -- ============================================================
--- 00066: Reseñas de pedidos (paridad take.app: reviews)
+-- 00087: Reseñas de pedidos (paridad take.app: reviews)
 -- ------------------------------------------------------------
 -- La automatización post_delivery_rating envía al cliente un
 -- enlace a /calificar 24 h después de la entrega. Hasta ahora

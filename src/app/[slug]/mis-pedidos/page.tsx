@@ -147,18 +147,7 @@ export default function OrderHistoryPage() {
       toast(`${available.length} producto${available.length !== 1 ? "s" : ""} agregados al carrito`)
     }
 
-      if (items.length === 0) {
-        // Nada disponible hoy: no ensuciar el carrito con precios obsoletos.
-        return
-      }
-      addOrderItems(items)
-      AnalyticsEvents.repeatOrder(order.id, items.length)
-    } catch {
-      // Si el lookup falla (offline, error 5xx), mejor el snapshot que nada.
-      addSnapshotItems()
-    } finally {
-      setTimeout(() => setReorderingId(null), 1500)
-    }
+    setTimeout(() => setReorderingId(null), 1500)
   }
 
   if (!city) {

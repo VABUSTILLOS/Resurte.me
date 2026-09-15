@@ -120,13 +120,6 @@ export function DashboardSidebar() {
           }))
         )
       })
-    // (M2) Conteo exacto de pedidos para la tarjeta "Pedidos" (head-only).
-    supabase
-      .from("orders")
-      .select("id", { count: "exact", head: true })
-      .then(({ count, error }) => {
-        if (!cancelled && !error && count !== null) setTotalOrders(count)
-      })
     return () => {
       cancelled = true
     }
