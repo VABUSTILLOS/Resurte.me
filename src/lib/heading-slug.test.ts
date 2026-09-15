@@ -109,7 +109,9 @@ describe("paridad HTML ↔ JSON-LD en los posts reales", () => {
     expect(files.length).toBeGreaterThan(100)
   })
 
-  it("extractHeadings devuelve exactamente los mismos ids que el HTML", () => {
+  // Corre el pipeline de remark sobre los 226 posts: ~1.3s en local, pero el
+  // runner de CI (2 núcleos) supera el default de 5s. Timeout holgado a propósito.
+  it("extractHeadings devuelve exactamente los mismos ids que el HTML", { timeout: 30_000 }, () => {
     const mismatches: string[] = []
     let totalHeadings = 0
 
