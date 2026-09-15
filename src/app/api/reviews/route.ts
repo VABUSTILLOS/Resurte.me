@@ -3,10 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
 import { rateLimited, clientIp, rateLimitResponse, type ServiceClient } from "@/lib/rate-limit"
+import { buildReviewUpsertPayload } from "@/lib/order-reviews"
 
 export const runtime = "nodejs"
-
-const MAX_COMMENT_LENGTH = 500
 
 interface ReviewOrderRow {
   id: number
@@ -113,8 +112,6 @@ export async function POST(request: NextRequest) {
     const orderId = Number(body?.order_id)
     const rating = Number(body?.rating)
     const token = typeof body?.token === "string" ? body.token : null
-    const comment =
-      typeof body?.comment === "string" ? body.comment.trim().slice(0, MAX_COMMENT_LENGTH) : ""
 
     if (!orderId || isNaN(orderId)) {
       return NextResponse.json({ error: "Pedido inválido" }, { status: 400 })
@@ -146,16 +143,12 @@ export async function POST(request: NextRequest) {
     } = await supabaseClient.auth.getUser()
     const userId = user && order.user_id === user.id ? user.id : null
 
-    const { error: upsertError } = await supabase.from("order_reviews").upsert(
-      {
-        order_id: orderId,
-        user_id: userId,
-        rating,
-        comment: comment || null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "order_id" }
-    )
+    const { error: upsertError } = await supabase
+      .from("order_reviews")
+      .upsert(
+        buildReviewUpsertPayload({ orderId, userId, rating, comment: body?.comment }),
+        { onConflict: "order_id" }
+      )
 
     if (upsertError) {
       logger.error("[REVIEWS] upsert error:", upsertError)
