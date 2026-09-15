@@ -1,391 +1,374 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+// ============================================================
+// Catálogos de WhatsApp de la plataforma — multi-catálogo por
+// ciudad con selección y ORDEN exacto (primero: Chihuahua).
+// ============================================================
+
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { Search, MessageCircle, Check, Eye, EyeOff, RefreshCw, ImageIcon } from "lucide-react"
+import {
+  Search, RefreshCw, ArrowUp, ArrowDown, Plus, Send,
+  Loader2, MapPin, Globe,
+} from "lucide-react"
 import { getCategoryIcon } from "@/lib/utils"
 import {
   getAdminWhatsappCatalog,
-  setProductWhatsappVisibility,
+  listWaCatalogs,
+  createWaCatalog,
+  getWaCatalogItems,
+  setWaCatalogProduct,
+  reorderWaCatalog,
+  syncWaCatalog,
+  sendWaCatalogToPhone,
   type AdminWhatsappProduct,
   type AdminWhatsappCategory,
+  type WaCatalogSummary,
+  type WaCatalogDetailItem,
 } from "@/app/admin/actions"
 
 export default function AdminWhatsAppPage() {
   const [products, setProducts] = useState<AdminWhatsappProduct[]>([])
   const [categories, setCategories] = useState<AdminWhatsappCategory[]>([])
+  const [catalogs, setCatalogs] = useState<WaCatalogSummary[]>([])
+  const [selectedCatalog, setSelectedCatalog] = useState<WaCatalogSummary | null>(null)
+  const [catalogItems, setCatalogItems] = useState<WaCatalogDetailItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [syncingId, setSyncingId] = useState<number | null>(null)
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
+
   const [search, setSearch] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null)
+  const [newCityName, setNewCityName] = useState("")
+  const [sendPhone, setSendPhone] = useState("")
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadCatalog() {
-      try {
-        const data = await getAdminWhatsappCatalog()
-        if (cancelled) return
-        setProducts(data.products)
-        setCategories(data.categories)
-        setError(null)
-      } catch (err) {
-        if (cancelled) return
-        setError(err instanceof Error ? err.message : "Error al cargar el catálogo")
-      } finally {
-        if (!cancelled) setLoading(false)
+  const load = useCallback(async () => {
+    try {
+      const [data, cats] = await Promise.all([getAdminWhatsappCatalog(), listWaCatalogs()])
+      setProducts(data.products)
+      setCategories(data.categories)
+      setCatalogs(cats)
+      if (cats.length > 0) {
+        const first = cats.find((c) => c.slug === "chihuahua") ?? cats[0] ?? null
+        setSelectedCatalog((prev) => prev ?? first)
       }
-    }
-
-    loadCatalog()
-    return () => {
-      cancelled = true
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cargar")
+    } finally {
+      setLoading(false)
     }
   }, [])
 
-  const filtered = useMemo(() => {
-    return products.filter((p) => {
-      if (selectedCategory && p.category_id !== selectedCategory) return false
-      if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
-      return true
-    })
-  }, [products, search, selectedCategory])
+  const loadItems = useCallback(async () => {
+    if (!selectedCatalog) return
+    setCatalogItems(await getWaCatalogItems(selectedCatalog.id))
+  }, [selectedCatalog])
 
-  const totalInCatalog = products.filter((p) => p.show_in_whatsapp).length
+  useEffect(() => {
+    const run = async () => { await load() }
+    run()
+  }, [load])
 
-  const toggleProduct = async (productId: number) => {
-    const product = products.find((p) => p.id === productId)
-    if (!product) return
-    const next = !product.show_in_whatsapp
-    setSyncingId(productId)
-    try {
-      await setProductWhatsappVisibility(productId, next)
-      setProducts((prev) =>
-        prev.map((p) => (p.id === productId ? { ...p, show_in_whatsapp: next } : p))
-      )
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al actualizar el producto")
-    } finally {
-      setSyncingId(null)
-    }
-  }
+  useEffect(() => {
+    const run = async () => { await loadItems() }
+    run().catch(() => {})
+  }, [loadItems])
 
-  const selectAll = async () => {
-    setSyncingId(-1)
-    try {
-      for (const p of products.filter((p) => !p.show_in_whatsapp)) {
-        await setProductWhatsappVisibility(p.id, true)
-      }
-      setProducts((prev) => prev.map((p) => ({ ...p, show_in_whatsapp: true })))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al actualizar los productos")
-    } finally {
-      setSyncingId(null)
-    }
-  }
+  const curatedIds = useMemo(() => new Set(catalogItems.map((i) => i.product_id)), [catalogItems])
+  const curated = useMemo(
+    () => catalogItems.filter((i) => i.is_visible).sort((a, b) => a.position - b.position),
+    [catalogItems]
+  )
+  const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
 
-  const deselectAll = async () => {
-    setSyncingId(-1)
-    try {
-      for (const p of products.filter((p) => p.show_in_whatsapp)) {
-        await setProductWhatsappVisibility(p.id, false)
-      }
-      setProducts((prev) => prev.map((p) => ({ ...p, show_in_whatsapp: false })))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al actualizar los productos")
-    } finally {
-      setSyncingId(null)
-    }
-  }
+  const available = useMemo(
+    () =>
+      products.filter((p) => {
+        if (curatedIds.has(p.id)) return false
+        if (selectedCategory && p.category_id !== selectedCategory) return false
+        if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
+        return true
+      }),
+    [products, curatedIds, selectedCategory, search]
+  )
 
-  const [syncingCatalog, setSyncingCatalog] = useState(false)
-  const [syncResult, setSyncResult] = useState<string | null>(null)
-
-  const syncCatalog = async () => {
-    if (syncingCatalog) return
-    setSyncingCatalog(true)
-    setSyncResult(null)
+  async function run<T>(fn: () => Promise<T>, okText?: (r: T) => string) {
+    setBusy(true)
+    setMessage(null)
     setError(null)
     try {
-      const selected = products
-        .filter((p) => p.show_in_whatsapp && (p.sale_price ?? p.price ?? 0) > 0)
-        .map((p) => ({
-          id: String(p.id),
-          name: p.name,
-          description: [p.brand, p.unit].filter(Boolean).join(" · ") || undefined,
-          image_url: p.image_url ?? undefined,
-          price: p.price ?? p.sale_price ?? 0,
-          currency: "MXN",
-          sale_price: p.sale_price ?? null,
-        }))
-      const res = await fetch("/api/whatsapp/catalog/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ products: selected }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail ?? data.error ?? "Error al sincronizar")
-      setSyncResult(
-        `Catálogo sincronizado: ${data.total_in_catalog} productos en WhatsApp (${data.added} agregados/actualizados, ${data.removed} removidos).`
-      )
+      const result = await fn()
+      if (okText) setMessage({ ok: true, text: okText(result) })
+      await loadItems()
+      await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al sincronizar el catálogo")
+      setError(err instanceof Error ? err.message : "Error")
     } finally {
-      setSyncingCatalog(false)
+      setBusy(false)
     }
+  }
+
+  const handleAdd = (productId: number) =>
+    run(async () => {
+      if (!selectedCatalog) return
+      await setWaCatalogProduct(selectedCatalog.id, productId, true)
+    })
+
+  const handleRemove = (productId: number) =>
+    run(async () => {
+      if (!selectedCatalog) return
+      await setWaCatalogProduct(selectedCatalog.id, productId, false)
+    })
+
+  const move = (item: WaCatalogDetailItem, delta: -1 | 1) =>
+    run(async () => {
+      if (!selectedCatalog) return
+      const ids = curated.map((i) => i.product_id)
+      const idx = ids.indexOf(item.product_id)
+      const swap = idx + delta
+      if (idx < 0 || swap < 0 || swap >= ids.length) return
+      const a = ids[idx]
+      const b = ids[swap]
+      if (a === undefined || b === undefined) return
+      ids[idx] = b
+      ids[swap] = a
+      await reorderWaCatalog(selectedCatalog.id, ids)
+    })
+
+  const handleSync = () =>
+    run(
+      async () => {
+        if (!selectedCatalog) throw new Error("Selecciona un catálogo")
+        return syncWaCatalog(selectedCatalog.id)
+      },
+      (r) => `Catálogo "${selectedCatalog?.name}" sincronizado: ${r.added} en WhatsApp${r.removed ? ` (${r.removed} removidos)` : ""}.`
+    )
+
+  const handleSend = (e: React.FormEvent) => {
+    e.preventDefault()
+    run(
+      async () => {
+        if (!selectedCatalog) throw new Error("Selecciona un catálogo")
+        await sendWaCatalogToPhone(selectedCatalog.id, sendPhone)
+      },
+      () => `Catálogo de ${selectedCatalog?.name} enviado a ${sendPhone} en el orden exacto.`
+    )
+    setSendPhone("")
+  }
+
+  const handleCreateCatalog = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newCityName.trim()) return
+    run(
+      async () => {
+        await createWaCatalog(newCityName.trim(), null)
+        setNewCityName("")
+      },
+      () => "Catálogo creado."
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="w-6 h-6 animate-spin text-[#0E7A0E]" />
+      </div>
+    )
   }
 
   return (
     <div>
-      {/* Header — Take App style */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#242529]">
-            Catálogo de WhatsApp
-          </h1>
+          <h1 className="text-2xl font-bold text-[#242529]">Catálogos de WhatsApp</h1>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
-            Elige qué productos mostrar en tu tienda de WhatsApp Business.
+            Un catálogo por ciudad, con tu selección y <strong>tu orden exacto</strong>.
           </p>
         </div>
         <button
-          onClick={syncCatalog}
-          disabled={syncingCatalog}
+          onClick={handleSync}
+          disabled={busy || !selectedCatalog || curated.length === 0}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0F7A3D] text-white font-semibold rounded-full hover:bg-[#0F6B3A] transition-colors text-sm shadow-sm disabled:opacity-60"
         >
-          <RefreshCw className={`w-4 h-4 ${syncingCatalog ? "animate-spin" : ""}`} />
-          {syncingCatalog ? "Sincronizando…" : "Sincronizar catálogo"}
+          <RefreshCw className={`w-4 h-4 ${busy ? "animate-spin" : ""}`} />
+          Sincronizar a WhatsApp
         </button>
       </div>
 
-      {syncResult && (
-        <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800">
-          {syncResult}
-        </div>
+      {message && (
+        <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800">{message.text}</div>
+      )}
+      {error && (
+        <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
 
-      {/* Info banner — Take App "Official Partner" style */}
-      <div className="bg-gradient-to-r from-[#E7F8EE] to-[#DCF5E6] border border-[#25D366]/20 rounded-2xl p-5 mb-6 flex items-start gap-4">
-        <div className="w-12 h-12 rounded-xl bg-[#128C4A]/10 flex items-center justify-center shrink-0">
-          <svg viewBox="0 0 24 24" className="w-6 h-6 fill-[#25D366]">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-          </svg>
-        </div>
-        <div>
-          <p className="text-sm font-bold text-[#1B5E20] mb-1">
-            Tú decides qué mostrar
-          </p>
-          <p className="text-sm text-[#2E7D32] leading-relaxed">
-            A diferencia de otras plataformas que publican automáticamente los productos más nuevos, aquí{" "}
-            <strong>tú eliges manualmente</strong> qué productos aparecen en el catálogo de WhatsApp.
-            Solo los productos activados se sincronizan con WhatsApp Cloud API.
-          </p>
-        </div>
-      </div>
-
-      {/* Stats — compact cards */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="bg-white rounded-xl border border-[#E8E9EB] p-4">
-          <p className="text-xs text-[#B0B3B8] mb-1">Total productos</p>
-          <p className="text-2xl font-bold text-[#242529]">{products.length}</p>
-        </div>
-        <div className="bg-[#E7F8EE] rounded-xl border border-[#25D366]/20 p-4">
-          <p className="text-xs text-[#2E7D32] mb-1">En WhatsApp</p>
-          <p className="text-2xl font-bold text-[#1B5E20]">{totalInCatalog}</p>
-        </div>
-        <div className="bg-[#F5F3F0] rounded-xl border border-[#E8E9EB] p-4">
-          <p className="text-xs text-[#B0B3B8] mb-1">Ocultos</p>
-          <p className="text-2xl font-bold text-[var(--text-secondary)]">{products.length - totalInCatalog}</p>
-        </div>
-      </div>
-
-      {/* Category + Search filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B0B3B8]" />
-          <input
-            type="text"
-            placeholder="Buscar producto..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E] focus:ring-2 focus:ring-[#0E7A0E]/10 transition-all"
-          />
-        </div>
-        <div className="flex gap-2 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0">
+      {/* Selector de catálogo */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        {catalogs.map((c) => (
           <button
-            onClick={() => setSelectedCategory(null)}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-medium transition-colors ${
-              selectedCategory === null
+            key={c.id}
+            onClick={() => setSelectedCatalog(c)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+              selectedCatalog?.id === c.id
                 ? "bg-[#0E7A0E] text-white"
                 : "bg-white border border-[#E8E9EB] text-[var(--text-secondary)] hover:bg-[#F7F5F0]"
             }`}
           >
-            Todas
+            {c.city_id ? <MapPin className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
+            {c.name}
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedCatalog?.id === c.id ? "bg-white/20" : "bg-[#F5F3F0]"}`}>
+              {c.items_count}
+            </span>
           </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-medium transition-colors ${
-                selectedCategory === cat.id
-                  ? "bg-[#0E7A0E] text-white"
-                  : "bg-white border border-[#E8E9EB] text-[var(--text-secondary)] hover:bg-[#F7F5F0]"
-              }`}
-            >
-              {getCategoryIcon(cat.icon ?? "", cat.slug)} {cat.name}
-            </button>
-          ))}
-        </div>
+        ))}
+        <form onSubmit={handleCreateCatalog} className="flex items-center gap-1.5">
+          <input
+            value={newCityName}
+            onChange={(e) => setNewCityName(e.target.value)}
+            placeholder="Nueva ciudad…"
+            className="w-32 px-3 py-2 bg-white border border-dashed border-[#0E7A0E]/40 rounded-full text-xs focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/20"
+          />
+          <button
+            type="submit"
+            disabled={busy || !newCityName.trim()}
+            className="p-2 rounded-full bg-[#0E7A0E] text-white hover:bg-[#0D720D] disabled:opacity-40"
+            aria-label="Crear catálogo"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </form>
       </div>
 
-      {/* Bulk actions */}
-      <div className="flex items-center gap-3 mb-4">
-        <button
-          onClick={selectAll}
-          disabled={syncingId !== null || loading}
-          className="text-xs font-medium text-[#0E7A0E] hover:text-[#0D720D] transition-colors flex items-center gap-1 disabled:opacity-50"
-        >
-          <Eye className="w-3.5 h-3.5" />
-          Publicar todos
-        </button>
-        <span className="text-[#E8E9EB]">|</span>
-        <button
-          onClick={deselectAll}
-          disabled={syncingId !== null || loading}
-          className="text-xs font-medium text-[var(--text-secondary)] hover:text-[#5C6068] transition-colors flex items-center gap-1 disabled:opacity-50"
-        >
-          <EyeOff className="w-3.5 h-3.5" />
-          Ocultar todos
-        </button>
-        <span className="text-xs text-[#B0B3B8] ml-auto">
-          {totalInCatalog} de {products.length} publicados
-        </span>
-      </div>
+      {selectedCatalog && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Curaduría ordenada */}
+          <div className="bg-white rounded-2xl border border-[#E8E9EB] p-5 h-fit">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="font-bold text-[#242529]">
+                Catálogo de {selectedCatalog.name}
+              </h2>
+              <span className="text-xs text-[#B0B3B8]">{curated.length} productos</span>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)] mb-4">
+              Este es el orden EXACTO que verá el cliente.
+            </p>
 
-      {/* Product list — single list with toggles */}
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-          {error}
+            {curated.length === 0 ? (
+              <p className="text-sm text-[#B0B3B8] py-8 text-center">
+                Catálogo vacío. Agrega productos de la lista de la derecha.
+              </p>
+            ) : (
+              <div className="space-y-1.5 max-h-[55vh] overflow-y-auto">
+                {curated.map((item, idx) => {
+                  const p = productById.get(item.product_id)
+                  if (!p) return null
+                  return (
+                    <div key={item.product_id} className="flex items-center gap-2 rounded-xl border border-[#25D366]/20 bg-[#F2FBF5] px-3 py-2">
+                      <span className="w-6 text-xs font-black text-[#0E7A0E]">{idx + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-[#242529] truncate">{p.name}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">
+                          ${(p.sale_price ?? p.price ?? 0).toFixed(2)}
+                          {item.available_in_city === false && (
+                            <span className="ml-2 text-amber-600 font-semibold">⚠ no disponible en la ciudad</span>
+                          )}
+                        </p>
+                      </div>
+                      <button onClick={() => move(item, -1)} disabled={busy || idx === 0} className="p-1.5 text-[#B0B3B8] hover:text-[#242529] disabled:opacity-30" aria-label={`Subir ${p.name}`}>
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => move(item, 1)} disabled={busy || idx === curated.length - 1} className="p-1.5 text-[#B0B3B8] hover:text-[#242529] disabled:opacity-30" aria-label={`Bajar ${p.name}`}>
+                        <ArrowDown className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleRemove(item.product_id)} disabled={busy} className="p-1.5 text-[#B0B3B8] hover:text-red-600" aria-label={`Quitar ${p.name}`}>
+                        ✕
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Enviar a teléfono */}
+            <form onSubmit={handleSend} className="mt-4 pt-4 border-t border-[#F0F1F2]">
+              <p className="text-xs font-semibold text-[#242529] mb-2">Probar con un cliente</p>
+              <div className="flex gap-2">
+                <input
+                  value={sendPhone}
+                  onChange={(e) => setSendPhone(e.target.value)}
+                  placeholder="Teléfono (10 dígitos)"
+                  inputMode="tel"
+                  className="flex-1 px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || curated.length === 0 || !sendPhone.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#25D366] text-white text-sm font-bold hover:bg-[#1fb857] disabled:opacity-40"
+                >
+                  <Send className="w-4 h-4" /> Enviar
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Productos disponibles */}
+          <div className="bg-white rounded-2xl border border-[#E8E9EB] p-5">
+            <h2 className="font-bold text-[#242529] mb-3">Agregar productos</h2>
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B0B3B8]" />
+              <input
+                type="text"
+                placeholder="Buscar producto..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+              />
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium ${selectedCategory === null ? "bg-[#0E7A0E] text-white" : "bg-[#F5F3F0] text-[var(--text-secondary)]"}`}
+              >
+                Todas
+              </button>
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium ${selectedCategory === cat.id ? "bg-[#0E7A0E] text-white" : "bg-[#F5F3F0] text-[var(--text-secondary)]"}`}
+                >
+                  {getCategoryIcon(cat.icon ?? "", cat.slug)} {cat.name}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-1.5 max-h-[55vh] overflow-y-auto">
+              {available.length === 0 ? (
+                <p className="text-sm text-[#B0B3B8] py-8 text-center">Sin productos por agregar.</p>
+              ) : (
+                available.map((p) => (
+                  <div key={p.id} className="flex items-center gap-3 rounded-xl border border-[#F0F1F2] px-3 py-2 hover:border-[#25D366]/40 transition-colors">
+                    {p.image_url ? (
+                      <Image src={p.image_url} alt={p.name} width={36} height={36} className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg bg-[#F5F3F0] shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-[#242529] truncate">{p.name}</p>
+                      <p className="text-xs text-[#B0B3B8]">${(p.sale_price ?? p.price ?? 0).toFixed(2)}{p.unit ? ` · ${p.unit}` : ""}</p>
+                    </div>
+                    <button onClick={() => handleAdd(p.id)} disabled={busy} className="p-1.5 text-[#0E7A0E] hover:bg-[#E7F8EE] rounded-lg" aria-label={`Agregar ${p.name}`}>
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
-
-      <div className="space-y-2">
-        {loading && (
-          <div className="text-center py-16 bg-white rounded-xl border border-[#E8E9EB]">
-            <RefreshCw className="w-10 h-10 text-[#D9D7D2] mx-auto mb-3 animate-spin" />
-            <p className="text-sm text-[var(--text-secondary)]">Cargando catálogo...</p>
-          </div>
-        )}
-
-        {!loading && filtered.map((product) => {
-          const category = categories.find((c) => c.id === product.category_id)
-          return (
-            <div
-              key={product.id}
-              className={`bg-white rounded-xl border p-4 flex items-center gap-4 transition-all ${
-                product.show_in_whatsapp
-                  ? "border-[#25D366]/30 shadow-sm"
-                  : "border-[#E8E9EB] hover:border-[#25D366]/20"
-              }`}
-            >
-              {/* Product image */}
-              <div className="w-12 h-12 rounded-lg bg-[#F7F5F0] flex items-center justify-center overflow-hidden shrink-0">
-                {product.image_url ? (
-                  <Image
-                    src={product.image_url}
-                    alt={product.name}
-                    width={48}
-                    height={48}
-                    className="w-full h-full object-contain p-1"
-                  />
-                ) : (
-                  <ImageIcon className="w-5 h-5 text-[#D9D7D2]" />
-                )}
-              </div>
-
-              {/* Product info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-[#242529] text-sm truncate">
-                    {product.name}
-                  </p>
-                  {product.show_in_whatsapp && (
-                    <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 bg-[#E7F8EE] text-[#1B5E20] text-[11px] font-medium rounded-full">
-                      <Check className="w-3 h-3" />
-                      Publicado
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-[#B0B3B8] mt-0.5">
-                  {getCategoryIcon(category?.icon, category?.slug)} {category?.name || "Sin categoría"}
-                  {product.brand ? ` · ${product.brand}` : ""}
-                  {product.unit ? ` · ${product.unit}` : ""}
-                </p>
-              </div>
-
-              {/* Price */}
-              <div className="text-right shrink-0">
-                <p className="text-sm font-bold text-[#242529]">
-                  ${((product.sale_price ?? product.price) ?? 0).toFixed(2)}
-                </p>
-                {product.sale_price != null && product.price != null && product.sale_price < product.price && (
-                  <p className="text-xs text-[#B0B3B8] line-through">
-                    ${product.price.toFixed(2)}
-                  </p>
-                )}
-              </div>
-
-              {/* Toggle */}
-              <button
-                onClick={() => toggleProduct(product.id)}
-                disabled={syncingId !== null}
-                className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium transition-all disabled:opacity-60 ${
-                  product.show_in_whatsapp
-                    ? "bg-[#F5F3F0] text-[var(--text-secondary)] hover:bg-[#EDEBE6]"
-                    : "bg-[#0F7A3D] text-white hover:bg-[#0F6B3A] shadow-sm"
-                }`}
-              >
-                {syncingId === product.id ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : product.show_in_whatsapp ? (
-                  <>
-                    <EyeOff className="w-3.5 h-3.5" />
-                    Ocultar
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-3.5 h-3.5" />
-                    Publicar
-                  </>
-                )}
-              </button>
-            </div>
-          )
-        })}
-
-        {!loading && filtered.length === 0 && (
-          <div className="text-center py-16 bg-white rounded-xl border border-[#E8E9EB]">
-            <Search className="w-10 h-10 text-[#D9D7D2] mx-auto mb-3" />
-            <p className="text-sm text-[var(--text-secondary)]">No se encontraron productos.</p>
-            <p className="text-xs text-[#B0B3B8] mt-1">Cambia los filtros para ver más resultados.</p>
-          </div>
-        )}
-      </div>
-
-      {/* How it works — bottom card */}
-      <div className="mt-8 p-5 bg-white rounded-2xl border border-[#E8E9EB]">
-        <h3 className="text-sm font-semibold text-[#242529] mb-3 flex items-center gap-2">
-          <MessageCircle className="w-4 h-4 text-[#0F7A3D]" />
-          ¿Cómo funciona?
-        </h3>
-        <ol className="text-sm text-[#5C6068] space-y-2 list-decimal list-inside leading-relaxed">
-          <li>Activa los productos que quieres mostrar en WhatsApp usando el botón <strong className="text-[#242529]">Publicar</strong>.</li>
-          <li>Haz clic en <strong className="text-[#242529]">Sincronizar catálogo</strong> para enviar los cambios a WhatsApp Cloud API.</li>
-          <li>Tus clientes verán los productos directamente en el catálogo de WhatsApp Business.</li>
-          <li>Pueden consultar precios, hacer preguntas y realizar pedidos sin salir de WhatsApp.</li>
-          <li>Cambia la selección cuando quieras — los cambios se reflejan al sincronizar.</li>
-        </ol>
-      </div>
     </div>
   )
 }
