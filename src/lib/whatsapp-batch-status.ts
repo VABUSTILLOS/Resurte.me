@@ -26,7 +26,7 @@ export function isOrphanRun(startedAt: string | Date, now: Date = new Date()): b
   return ageMs > ORPHAN_RUN_MAX_AGE_HOURS * 3_600_000
 }
 
-export interface ResolveRunResult {
+interface ResolveRunResult {
   runId: string
   /** true = todos los handles terminaron y los items quedaron resueltos. */
   resolved: boolean
@@ -40,7 +40,7 @@ export interface ResolveRunResult {
  * marca los items pending como ok/error (con el mensaje de Meta) y
  * anota un resumen en el run. Si falta alguno, no toca nada.
  */
-export async function resolveRunBatchHandles(
+async function resolveRunBatchHandles(
   supabase: SupabaseClient,
   runId: string,
   config: WhatsAppConfig

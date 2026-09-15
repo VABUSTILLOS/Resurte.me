@@ -181,15 +181,15 @@ export function buildCartAbandonmentText(p: { total: number }): string {
   return `🛒 Dejaste productos en tu carrito de Resurte.me (total: $${p.total.toFixed(2)} MXN). Completa tu pedido aquí: https://resurte.me/cart`
 }
 
-export function buildReactivationText(p: { coupon: string; amount: number }): string {
+function buildReactivationText(p: { coupon: string; amount: number }): string {
   return `¡Te extrañamos! Vuelve a surtir tu negocio con Resurte.me y usa el cupón ${p.coupon} por $${p.amount} MXN de descuento: https://resurte.me`
 }
 
-export function buildRatingText(p: { link: string }): string {
+function buildRatingText(p: { link: string }): string {
   return `Gracias por tu pedido en Resurte.me ⭐ ¿Nos ayudas con tu calificación? ${p.link}`
 }
 
-export function buildOnboardingText(p: { coupon: string; percent: number }): string {
+function buildOnboardingText(p: { coupon: string; percent: number }): string {
   return `¡Gracias por tu primer pedido en Resurte.me! En tu siguiente compra usa el cupón ${p.coupon} y obtén ${p.percent}% de descuento: https://resurte.me`
 }
 
@@ -217,7 +217,7 @@ async function resolveTemplateName(
  * bitácora en whatsapp_automation_sends. Plantilla si está asignada;
  * fallback a texto libre (ventana de servicio de 24 h).
  */
-export async function sendAutomationWhatsApp(
+async function sendAutomationWhatsApp(
   supabase: SupabaseClient,
   params: {
     type: string
