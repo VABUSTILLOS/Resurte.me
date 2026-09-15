@@ -34,5 +34,8 @@ ALTER TABLE public.order_reviews ENABLE ROW LEVEL SECURITY;
 
 -- Lectura pública; INSERT/UPDATE/DELETE solo vía service role (sin políticas
 -- de escritura → el rol authenticated/anon no puede escribir directamente).
+-- DROP antes de CREATE: la migración se aplica a mano y debe poder re-ejecutarse
+-- sin error si una corrida anterior quedó a medias (convención del repo).
+DROP POLICY IF EXISTS "Reviews are viewable by everyone" ON public.order_reviews;
 CREATE POLICY "Reviews are viewable by everyone" ON public.order_reviews
   FOR SELECT USING (true);
