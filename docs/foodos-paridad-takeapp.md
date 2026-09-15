@@ -79,6 +79,16 @@ Auditoría de funcionalidades de take.app y estado de cobertura en FoodOS
 - **Meta/TikTok Pixel** por restaurante
 - **Duplicar platillo** en el panel
 
+### WhatsApp Business por restaurante (supera a take.app)
+- **Catálogo curado y ORDENABLE** (`whatsapp_visible`/`whatsapp_position`):
+  el restaurante elige qué platillos aparecen y en qué orden — take.app solo
+  muestra los últimos sin control. Doble vía: sync al catálogo nativo de
+  WhatsApp Commerce y mensajes `product_list` con orden 100% garantizado
+- **Conexión WABA propia** (credenciales cifradas AES-GCM, verificación Graph API)
+- **Auto-respuesta** con el menú ordenado al escribir al número del restaurante
+- **Broadcast** a segmentos del CRM con plantillas de la WABA del restaurante
+- **Inbox** `/panel/foodos/inbox` con conversaciones realtime y respuesta 24h
+
 ## Brechas conscientes (fuera de alcance)
 
 - App POS nativa, impresoras térmicas/Bluetooth, TV menu board

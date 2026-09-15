@@ -82,6 +82,9 @@
       "src/lib/exit-intent.ts": [
         "exports"
       ],
+      "src/lib/foodos-whatsapp.ts": [
+        "exports"
+      ],
       "src/lib/order-bumps.ts": [
         "exports",
         "types"

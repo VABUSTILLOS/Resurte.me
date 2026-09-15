@@ -137,7 +137,7 @@ interface WhatsAppMessage {
 interface WhatsAppValue {
   messages?: WhatsAppMessage[]
   statuses?: WhatsAppStatus[]
-  metadata?: { display_phone_number?: string }
+  metadata?: { display_phone_number?: string; phone_number_id?: string }
 }
 
 interface WhatsAppStatus {
@@ -157,6 +157,94 @@ interface WhatsAppEntry {
 
 interface WhatsAppBody {
   entry?: WhatsAppEntry[]
+}
+
+// ============================================================
+// Routing FoodOS: mensajes a números de restaurantes conectados
+// ============================================================
+
+/**
+ * Si el phone_number_id destino pertenece a un restaurante FoodOS:
+ * 1. Guarda el mensaje en foodos_whatsapp_messages (su inbox).
+ * 2. Si tiene auto_reply_catalog activo, responde con el catálogo
+ *    ORDENADO (product_list) — solo una vez por conversación de 24h.
+ * Devuelve true si el mensaje fue manejado por FoodOS.
+ */
+async function handleFoodosIncoming(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  phoneNumberId: string,
+  from: string,
+  messageType: string,
+  content: string | null,
+  messageId: string | null
+): Promise<boolean> {
+  const { data: conn } = await supabase
+    .from("foodos_whatsapp_connections")
+    .select("restaurant_id, auto_reply_catalog, auto_reply_text")
+    .eq("phone_number_id", phoneNumberId)
+    .eq("status", "connected")
+    .maybeSingle()
+  if (!conn) return false
+
+  const { error } = await supabase.from("foodos_whatsapp_messages").insert({
+    restaurant_id: conn.restaurant_id,
+    wa_message_id: messageId,
+    direction: "inbound",
+    customer_phone: from,
+    type: messageType,
+    content,
+    status: "received",
+  })
+  if (error) {
+    logger.error("FoodOS webhook: failed to persist message:", error)
+  }
+
+  if (conn.auto_reply_catalog) {
+    try {
+      // Evitar loop de auto-respuestas: solo si no se respondió ya en 24h.
+      const since = new Date(Date.now() - 86_400_000).toISOString()
+      const { data: recent } = await supabase
+        .from("foodos_whatsapp_messages")
+        .select("id")
+        .eq("restaurant_id", conn.restaurant_id)
+        .eq("customer_phone", from)
+        .eq("direction", "outbound")
+        .gte("created_at", since)
+        .limit(1)
+      if (recent?.length) return true
+
+      const wa = await import("@/lib/foodos-whatsapp")
+      const [itemsRes, catsRes] = await Promise.all([
+        supabase.from("foodos_menu_items").select("*").eq("restaurant_id", conn.restaurant_id),
+        supabase.from("foodos_menu_categories").select("*").eq("restaurant_id", conn.restaurant_id),
+      ])
+      const sections = wa.buildProductListSections(itemsRes.data ?? [], catsRes.data ?? [])
+      if (!sections.length) return true
+
+      const config = await wa.getRestaurantWhatsAppConfig(supabase, conn.restaurant_id)
+      if (!config) return true
+
+      await wa.sendCatalogProductList({
+        config,
+        to: from.replace(/\D/g, ""),
+        sections,
+        headerText: "Nuestro menú",
+        bodyText: conn.auto_reply_text || "Elige tus platillos favoritos:",
+      })
+      await supabase.from("foodos_whatsapp_messages").insert({
+        restaurant_id: conn.restaurant_id,
+        direction: "outbound",
+        customer_phone: from,
+        type: "product_list",
+        content: `Catálogo auto-respuesta (${sections.reduce((s, x) => s + x.product_items.length, 0)} platillos)`,
+        status: "sent",
+      })
+    } catch (e) {
+      logger.error("FoodOS auto-reply error:", e)
+    }
+  }
+
+  return true
 }
 
 // ============================================================
@@ -181,10 +269,26 @@ async function handleIncomingMessage(message: WhatsAppMessage, value: WhatsAppVa
     content = JSON.stringify(message.interactive)
   }
 
+  const supabase = await createServiceClient()
+
+  // Routing FoodOS: si el phone_number_id destino pertenece a un restaurante
+  // conectado, el mensaje va a SU inbox (y puede disparar auto-respuesta con
+  // el catálogo ordenado). No interfiere con el flujo del marketplace.
+  if (metadata?.phone_number_id) {
+    const handled = await handleFoodosIncoming(
+      supabase,
+      metadata.phone_number_id,
+      from,
+      messageType,
+      content,
+      messageId
+    )
+    if (handled) return
+  }
+
   // Persistir el mensaje entrante en whatsapp_messages (service_role:
   // RLS 00034 restringe estas tablas a service client). store_id se
   // resuelve con el DEFAULT de la tienda activa (migración 00032).
-  const supabase = await createServiceClient()
   try {
     const { error } = await supabase.from("whatsapp_messages").insert({
       from_number: from,

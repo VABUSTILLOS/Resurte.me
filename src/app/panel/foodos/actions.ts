@@ -26,6 +26,7 @@ import type {
   FoodosOrder,
   FoodosOrderStatus,
   FoodosCustomer,
+  FoodosCustomerSegment,
   FoodosCampaign,
   FoodosCampaignStatus,
   FoodosItemOptionGroup,
@@ -37,6 +38,9 @@ import type {
   FoodosReview,
   FoodosWebhook,
   FoodosWebhookDelivery,
+  FoodosWhatsAppConnection,
+  FoodosWhatsAppMessage,
+  FoodosWhatsAppStatus,
 } from "@/types/foodos"
 
 // ------------------------------------------------------------
@@ -1269,4 +1273,329 @@ export async function listWebhookDeliveries(restaurantId: string): Promise<Foodo
     .limit(10)
   if (error) throw new Error(error.message)
   return (data as FoodosWebhookDelivery[]) ?? []
+}
+
+// ------------------------------------------------------------
+// WhatsApp Business del restaurante (conexión + curaduría)
+// ------------------------------------------------------------
+
+/** Conexión sin el token (nunca sale al cliente). */
+export async function getWhatsAppConnection(
+  restaurantId: string
+): Promise<FoodosWhatsAppConnection | null> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_whatsapp_connections")
+    .select("id, restaurant_id, phone_number_id, waba_id, display_phone, status, status_detail, verified_at, created_at")
+    .eq("restaurant_id", restaurantId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as FoodosWhatsAppConnection | null) ?? null
+}
+
+/** Guarda credenciales (cifradas) y las verifica contra Graph API. */
+export async function saveWhatsAppConnection(input: {
+  restaurant_id: string
+  phone_number_id: string
+  waba_id: string
+  access_token: string
+}): Promise<{ status: FoodosWhatsAppStatus; detail: string | null }> {
+  const { supabase } = await requireAuth()
+  const { encryptToken, verifyWhatsAppConnection } = await import("@/lib/foodos-whatsapp")
+
+  const config = {
+    accessToken: input.access_token.trim(),
+    phoneNumberId: input.phone_number_id.trim(),
+    wabaId: input.waba_id.trim(),
+  }
+  const check = await verifyWhatsAppConnection(config)
+
+  const { error } = await supabase
+    .from("foodos_whatsapp_connections")
+    .upsert(
+      {
+        restaurant_id: input.restaurant_id,
+        phone_number_id: config.phoneNumberId,
+        waba_id: config.wabaId,
+        access_token_enc: encryptToken(config.accessToken),
+        display_phone: check.displayPhone,
+        status: check.ok ? "connected" : "error",
+        status_detail: check.detail,
+        verified_at: new Date().toISOString(),
+      },
+      { onConflict: "restaurant_id" }
+    )
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/whatsapp")
+  return { status: check.ok ? "connected" : "error", detail: check.detail }
+}
+
+export async function deleteWhatsAppConnection(restaurantId: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_whatsapp_connections")
+    .delete()
+    .eq("restaurant_id", restaurantId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/whatsapp")
+}
+
+/** Curaduría: visibilidad individual en el catálogo de WhatsApp. */
+export async function setItemWhatsAppVisible(
+  itemId: string,
+  visible: boolean,
+  position?: number | null
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_menu_items")
+    .update({ whatsapp_visible: visible, whatsapp_position: position ?? null })
+    .eq("id", itemId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/whatsapp")
+}
+
+/** Reordena el catálogo: array ordenado de item_ids (posiciones 1..N). */
+export async function reorderWhatsAppCatalog(
+  restaurantId: string,
+  orderedItemIds: string[]
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  for (let i = 0; i < orderedItemIds.length; i++) {
+    const { error } = await supabase
+      .from("foodos_menu_items")
+      .update({ whatsapp_visible: true, whatsapp_position: i + 1 })
+      .eq("id", orderedItemIds[i])
+      .eq("restaurant_id", restaurantId)
+    if (error) throw new Error(error.message)
+  }
+  revalidatePath("/panel/foodos/whatsapp")
+}
+
+/**
+ * Sincroniza el catálogo curado (selección + orden) al catálogo nativo de
+ * WhatsApp Commerce del restaurante. Meta muestra primero los más recientes,
+ * así que se suben en orden inverso al deseado (best-effort; el orden
+ * garantizado es vía mensajes product_list).
+ */
+export async function syncWhatsAppCatalog(
+  restaurantId: string
+): Promise<{ added: number; removed: number }> {
+  const { supabase } = await requireAuth()
+
+  // Verificar propiedad y conexión
+  const { data: conn } = await supabase
+    .from("foodos_whatsapp_connections")
+    .select("status")
+    .eq("restaurant_id", restaurantId)
+    .maybeSingle()
+  if (!conn) throw new Error("Primero conecta tu WhatsApp Business")
+  if (conn.status !== "connected") throw new Error("La conexión de WhatsApp tiene un error; revísala")
+
+  const { data: items, error: itemsErr } = await supabase
+    .from("foodos_menu_items")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+  if (itemsErr) throw new Error(itemsErr.message)
+
+  const { getRestaurantWhatsAppConfig, buildCatalogProducts } = await import("@/lib/foodos-whatsapp")
+  const { createServiceClient } = await import("@/lib/supabase/service")
+  const { syncCatalog } = await import("@/lib/whatsapp")
+
+  const service = await createServiceClient()
+  const config = await getRestaurantWhatsAppConfig(service, restaurantId)
+  if (!config) throw new Error("No se pudieron leer las credenciales")
+
+  // Orden inverso: Meta lista primero lo último agregado.
+  const products = buildCatalogProducts((items as FoodosMenuItem[]) ?? []).reverse()
+  return syncCatalog(products, config)
+}
+
+/**
+ * Envía el catálogo ORDENADO (product_list) a un cliente por WhatsApp.
+ * El orden de las secciones es exactamente el de la curaduría.
+ */
+export async function sendCatalogToCustomer(
+  restaurantId: string,
+  toPhone: string
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { data: conn } = await supabase
+    .from("foodos_whatsapp_connections")
+    .select("status")
+    .eq("restaurant_id", restaurantId)
+    .maybeSingle()
+  if (conn?.status !== "connected") throw new Error("Conecta tu WhatsApp Business primero")
+
+  const [itemsRes, catsRes] = await Promise.all([
+    supabase.from("foodos_menu_items").select("*").eq("restaurant_id", restaurantId),
+    supabase.from("foodos_menu_categories").select("*").eq("restaurant_id", restaurantId),
+  ])
+  if (itemsRes.error) throw new Error(itemsRes.error.message)
+
+  const wa = await import("@/lib/foodos-whatsapp")
+  const sections = wa.buildProductListSections(
+    (itemsRes.data as FoodosMenuItem[]) ?? [],
+    (catsRes.data as FoodosMenuCategory[]) ?? []
+  )
+  if (sections.length === 0) throw new Error("Tu catálogo de WhatsApp está vacío")
+
+  const { createServiceClient } = await import("@/lib/supabase/service")
+  const service = await createServiceClient()
+  const config = await wa.getRestaurantWhatsAppConfig(service, restaurantId)
+  if (!config) throw new Error("No se pudieron leer las credenciales")
+
+  const digits = toPhone.replace(/\D/g, "")
+  if (digits.length < 10) throw new Error("Teléfono inválido")
+  await wa.sendCatalogProductList({
+    config,
+    to: digits,
+    sections,
+    headerText: "Nuestro menú",
+  })
+
+  await supabase.from("foodos_whatsapp_messages").insert({
+    restaurant_id: restaurantId,
+    direction: "outbound",
+    customer_phone: digits,
+    type: "product_list",
+    content: `Catálogo (${sections.reduce((s, x) => s + x.product_items.length, 0)} platillos)`,
+    status: "sent",
+  })
+}
+
+/** Activa/desactiva la auto-respuesta con el catálogo al recibir mensajes. */
+export async function setAutoReplyCatalog(
+  restaurantId: string,
+  enabled: boolean,
+  text?: string | null
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_whatsapp_connections")
+    .update({ auto_reply_catalog: enabled, auto_reply_text: text ?? null })
+    .eq("restaurant_id", restaurantId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/whatsapp")
+}
+
+/**
+ * Broadcast a un segmento del CRM con una plantilla aprobada en la WABA
+ * del restaurante. Registra la campaña en foodos_campaigns.
+ */
+export async function broadcastWhatsAppSegment(input: {
+  restaurant_id: string
+  segment: FoodosCustomerSegment | "all"
+  template_name: string
+  language_code?: string
+}): Promise<{ sent: number; failed: number }> {
+  const { supabase } = await requireAuth()
+  const { data: conn } = await supabase
+    .from("foodos_whatsapp_connections")
+    .select("status")
+    .eq("restaurant_id", input.restaurant_id)
+    .maybeSingle()
+  if (conn?.status !== "connected") throw new Error("Conecta tu WhatsApp Business primero")
+
+  let query = supabase
+    .from("foodos_customers")
+    .select("id, phone")
+    .eq("restaurant_id", input.restaurant_id)
+  if (input.segment !== "all") query = query.eq("segment", input.segment)
+  const { data: customers, error } = await query.limit(500)
+  if (error) throw new Error(error.message)
+  if (!customers?.length) throw new Error("No hay clientes en ese segmento")
+
+  const wa = await import("@/lib/foodos-whatsapp")
+  const { createServiceClient } = await import("@/lib/supabase/service")
+  const { sendBroadcast } = await import("@/lib/whatsapp")
+  const service = await createServiceClient()
+  const config = await wa.getRestaurantWhatsAppConfig(service, input.restaurant_id)
+  if (!config) throw new Error("No se pudieron leer las credenciales")
+
+  const result = await sendBroadcast(
+    {
+      recipients: customers.map((c) => c.phone),
+      templateName: input.template_name.trim(),
+      languageCode: input.language_code || "es_MX",
+    },
+    config
+  )
+
+  // Historial en foodos_campaigns (una fila por cliente)
+  await supabase.from("foodos_campaigns").insert(
+    customers.map((c) => ({
+      restaurant_id: input.restaurant_id,
+      customer_id: c.id,
+      status: "sent",
+      channel: "whatsapp",
+    }))
+  )
+
+  revalidatePath("/panel/foodos/clientes")
+  return result
+}
+
+// ------------------------------------------------------------
+// Inbox de WhatsApp del restaurante
+// ------------------------------------------------------------
+
+export async function listWaMessages(
+  restaurantId: string,
+  limit = 500
+): Promise<FoodosWhatsAppMessage[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_whatsapp_messages")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+  if (error) throw new Error(error.message)
+  return (data as FoodosWhatsAppMessage[]) ?? []
+}
+
+export async function markWaConversationRead(
+  restaurantId: string,
+  customerPhone: string
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_whatsapp_messages")
+    .update({ read_at: new Date().toISOString() })
+    .eq("restaurant_id", restaurantId)
+    .eq("customer_phone", customerPhone)
+    .eq("direction", "inbound")
+    .is("read_at", null)
+  if (error) throw new Error(error.message)
+}
+
+/** Responde texto a un cliente (ventana de 24h de WhatsApp). */
+export async function sendWaReply(
+  restaurantId: string,
+  customerPhone: string,
+  text: string
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  const trimmed = text.trim()
+  if (!trimmed) return
+
+  const wa = await import("@/lib/foodos-whatsapp")
+  const { createServiceClient } = await import("@/lib/supabase/service")
+  const { sendTextMessage } = await import("@/lib/whatsapp")
+  const service = await createServiceClient()
+  const config = await wa.getRestaurantWhatsAppConfig(service, restaurantId)
+  if (!config) throw new Error("Conecta tu WhatsApp Business primero")
+
+  const digits = customerPhone.replace(/\D/g, "")
+  await sendTextMessage({ to: digits, text: trimmed.slice(0, 4000) }, config)
+
+  await supabase.from("foodos_whatsapp_messages").insert({
+    restaurant_id: restaurantId,
+    direction: "outbound",
+    customer_phone: digits,
+    type: "text",
+    content: trimmed.slice(0, 4000),
+    status: "sent",
+  })
 }
