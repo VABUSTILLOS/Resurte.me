@@ -28,7 +28,7 @@ export default function KitchenMonitor({ comandas }: KitchenMonitorProps) {
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
-      <div className="grid grid-cols-3 gap-2 px-3 sm:px-4 pb-3 sm:pb-4">
+      <div className="grid grid-cols-1 min-[380px]:grid-cols-3 gap-2 px-3 sm:px-4 pb-3 sm:pb-4">
         <div className="bg-gray-50 rounded-xl p-3 text-center">
           <p className="text-[10px] text-gray-500">Pendientes</p>
           <p className="text-lg font-extrabold text-amber-600">{comandas.pendiente}</p>

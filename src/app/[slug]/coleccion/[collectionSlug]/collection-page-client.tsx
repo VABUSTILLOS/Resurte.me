@@ -5,6 +5,7 @@ import { ArrowLeft, ShoppingBag, Box, TrendingUp, Truck } from "lucide-react"
 import { ProductCard } from "@/components/product/product-card"
 import { SearchBar } from "@/components/search/search-bar"
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
+import { StoreBreadcrumb } from "@/components/ui/store-breadcrumb"
 import { CollectionHero } from "@/components/collections/collection-hero"
 import { CollectionStorySection } from "@/components/collections/collection-story-section"
 import { CollectionValueHighlight } from "@/components/collections/collection-value-highlight"
@@ -69,6 +70,11 @@ export function CollectionPageClient({ citySlug, cityName, collection, products,
 
   return (
     <div className="min-h-screen bg-[#faf8f5]">
+      {/* Breadcrumb con Atrás real + ruta Inicio / Todos / Colección */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
+        <StoreBreadcrumb citySlug={citySlug} homeLabel={cityName} current={collection.name} />
+      </div>
+
       {/* ── 1. HERO — Full-width Erewhon-style banner ── */}
       <CollectionHero
         collectionName={collection.name}

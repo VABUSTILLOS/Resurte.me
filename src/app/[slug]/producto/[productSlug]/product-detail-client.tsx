@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Plus, Minus, Check, ShoppingCart, Package } from "lucide-react"
+import { Plus, Minus, Check, ShoppingCart, Package } from "lucide-react"
 import Image from "next/image"
 import { useCart } from "@/contexts/cart-context"
 import { useToast } from "@/components/toast"
@@ -10,6 +10,7 @@ import { WhatsAppBadge, OrderByWhatsAppButton } from "@/components/whatsapp/what
 import { ScrollReveal } from "@/components/ui/scroll-reveal"
 import { AccordionItem } from "@/components/ui/accordion-item"
 import { useMediaQuery } from "@/hooks/use-media-query"
+import { StoreBreadcrumb } from "@/components/ui/store-breadcrumb"
 import Link from "next/link"
 import type { Category, Product } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
@@ -97,38 +98,12 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
   return (
     <div className="min-h-screen bg-[#faf8f5]">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-4 pb-28 sm:pt-8 sm:pb-8">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-1.5 text-xs sm:text-sm mb-4 sm:mb-8 overflow-x-auto whitespace-nowrap pb-1">
-          <Link
-            href={`/${citySlug}`}
-            className="text-[#6b6b6b] hover:text-[#0E7A0E] transition-colors flex items-center gap-1.5"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Volver
-          </Link>
-          <span className="text-[#c0bab0]">/</span>
-          <Link
-            href={`/${citySlug}`}
-            className="text-[#6b6b6b] hover:text-[#0E7A0E] transition-colors"
-          >
-            Inicio
-          </Link>
-          {category && (
-            <>
-              <span className="text-[#c0bab0]">/</span>
-              <Link
-                href={`/${citySlug}/categoria/${category.slug}`}
-                className="text-[#6b6b6b] hover:text-[#0E7A0E] transition-colors"
-              >
-                {category.name}
-              </Link>
-            </>
-          )}
-          <span className="text-[#c0bab0]">/</span>
-          <span className="text-[#1a1a1a] font-medium truncate max-w-[200px]">
-            {product.name}
-          </span>
-        </nav>
+        {/* Breadcrumb con Atrás real + ruta Inicio / Todos / Categoría */}
+        <StoreBreadcrumb
+          citySlug={citySlug}
+          trail={category ? [{ label: category.name, href: `/${citySlug}/categoria/${category.slug}` }] : []}
+          current={product.name}
+        />
 
         {/* Product detail — split layout */}
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-16">

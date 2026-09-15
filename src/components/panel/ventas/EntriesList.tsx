@@ -42,10 +42,11 @@ export default function EntriesList({
         )}
       </div>
       <div className="overflow-x-auto">
+        <p className="sm:hidden px-4 pt-2 text-[10px] text-gray-400" aria-hidden="true">Desliza para ver más columnas →</p>
         <table className="w-full text-xs" aria-label={t("ventas.title")}>
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/50">
-              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Platillo</th>
+              <th scope="col" className="sticky left-0 z-10 bg-gray-50 text-left px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Platillo</th>
               <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Cant.</th>
               <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Precio</th>
               <th scope="col" className="text-right px-4 py-3 font-semibold text-gray-400 text-[10px] uppercase tracking-wider">Costo</th>
@@ -70,7 +71,7 @@ export default function EntriesList({
                 const costStale = e.dishId && currentCost > 0 && Math.abs(currentCost - e.unitCost) > 0.01
                 return (
                   <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                    <td className="px-4 py-3">
+                    <td className="sticky left-0 z-10 bg-white px-4 py-3 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]">
                       <div className="flex items-center gap-1.5">
                         <p className="font-semibold text-gray-800">{e.dishName}</p>
                         {e.clienteId && (() => {
@@ -94,13 +95,13 @@ export default function EntriesList({
                         <button
                           onClick={() => onAdjustQty(e.id, -1)}
                           disabled={e.quantity <= 1}
-                          className="w-5 h-5 rounded bg-red-50 text-red-500 hover:bg-red-100 text-xs font-bold transition-colors disabled:opacity-40"
+                          className="w-5 h-5 rounded bg-red-50 text-red-500 hover:bg-red-100 text-xs font-bold transition-colors disabled:opacity-40 touch-target"
                           aria-label={`Reducir cantidad de ${e.dishName}`}
                         >−</button>
                         <span className="w-6 text-center font-bold text-gray-800">{e.quantity}</span>
                         <button
                           onClick={() => onAdjustQty(e.id, 1)}
-                          className="w-5 h-5 rounded bg-green-50 text-green-600 hover:bg-green-100 text-xs font-bold transition-colors"
+                          className="w-5 h-5 rounded bg-green-50 text-green-600 hover:bg-green-100 text-xs font-bold transition-colors touch-target"
                           aria-label={`Aumentar cantidad de ${e.dishName}`}
                         >+</button>
                       </div>
@@ -157,7 +158,7 @@ export default function EntriesList({
                       <div className="flex items-center justify-center">
                         <button
                           onClick={() => onDeleteClick(e.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors touch-target"
                           title="Eliminar venta"
                           aria-label={`Eliminar venta de ${e.dishName}`}
                         >

@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { FileText, Check, X, ExternalLink, RefreshCcw } from "lucide-react"
+import { FileText, Check, X, ExternalLink, RefreshCcw, Download } from "lucide-react"
+import { toCsv, downloadCsv } from "@/lib/csv"
 
 interface Submission {
   id: number
@@ -54,6 +55,29 @@ export default function AdminFacturasPage() {
     return load()
   }, [load])
 
+  // Exporta la cola de facturas cargada a CSV (C6).
+  function exportCsv() {
+    const STATUS_LABELS: Record<Submission["status"], string> = {
+      pending: "Pendiente",
+      approved: "Aprobada",
+      rejected: "Rechazada",
+    }
+    const csv = toCsv(
+      ["ID", "Email del cliente", "Total factura", "Créditos otorgados", "Estatus", "Notas", "Fecha"],
+      submissions.map((s) => [
+        s.id,
+        s.user_email ?? "",
+        s.total_amount != null ? s.total_amount.toFixed(2) : "",
+        s.credits_granted != null ? s.credits_granted : "",
+        STATUS_LABELS[s.status] ?? s.status,
+        s.notes ?? "",
+        new Date(s.created_at).toLocaleString("es-MX"),
+      ])
+    )
+    const stamp = new Date().toISOString().slice(0, 10)
+    downloadCsv(`facturas-${stamp}.csv`, csv)
+  }
+
   const review = async (id: number, action: "approve" | "reject") => {
     setBusyId(id)
     try {
@@ -92,13 +116,24 @@ export default function AdminFacturasPage() {
             créditos (5% del total por defecto).
           </p>
         </div>
-        <button
-          onClick={() => void reload()}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg"
-        >
-          <RefreshCcw className="w-3.5 h-3.5" />
-          Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={submissions.length === 0}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Exportar CSV
+          </button>
+          <button
+            onClick={() => void reload()}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg"
+          >
+            <RefreshCcw className="w-3.5 h-3.5" />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {error && (

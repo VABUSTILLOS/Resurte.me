@@ -8,17 +8,34 @@ Todos los endpoints cron están **protegidos con `CRON_SECRET`** (patrón fail-c
 
 | Job | Ruta | Schedule (UTC) | Hora MX (CST) | Qué hace |
 | --- | --- | --- | --- | --- |
-| Payment reminders | `/api/workflows/payment-reminders` | `0 8 * * *` | 2:00 a.m. | Envía recordatorios de pago para órdenes con pago pendiente (`checkAndSendPaymentReminders`) |
-| Abandoned cart | `/api/workflows/trigger?job=abandoned-cart` | `0 12 * * *` | 6:00 a.m. | Recuperación de carritos abandonados (`checkAbandonedCarts`) |
-| Reactivation | `/api/workflows/trigger?job=reactivation` | `0 9 * * *` | 3:00 a.m. | Reactivación de usuarios inactivos (`checkInactiveUsers`) |
-| FoodOS campaigns | `/api/foodos/campaigns/run` | `0 0 * * *` | 18:00 (día anterior) | Ejecuta campañas FoodOS programadas vencidas (mensajes WhatsApp a clientes objetivo) |
+| Daily consolidado | `/api/cron/daily` | `0 12 * * *` | 6:00 a.m. | Ejecuta **en secuencia** los jobs de abajo (`maxDuration = 300`, cada uno en su propio try/catch) |
+
+> **Los jobs individuales ya no tienen cron propio.** Antes eran cuatro crons
+> separados (`payment-reminders` 8:00, `reactivation` 9:00, `abandoned-cart`
+> 12:00, `foodos/campaigns` 0:00); hoy viven dentro del consolidado para hacer
+> un solo cold start diario. Vercel Hobby solo permite **crons diarios**, así
+> que `reconcile-payments` (antes `*/15`) también bajó a una vez al día.
+
+Jobs dentro de `/api/cron/daily`, en orden de ejecución:
+
+| Job | Qué hace |
+| --- | --- |
+| `payment-reminders` | Recordatorios de pago de órdenes **marketplace** (`checkAndSendPaymentReminders`, `src/lib/workflows.ts`) |
+| `foodos-payment-reminders` | Recordatorios (1 h / 24 h) y cancelación por falta de pago (72 h) de pedidos **FoodOS** (`checkAndSendFoodosPaymentReminders`, `src/lib/foodos-payment-reminders.ts`). Ver §10 |
+| `abandoned-cart` | Recuperación de carritos abandonados (`checkAbandonedCarts`) |
+| `reactivation` | Reactivación de usuarios inactivos (`checkInactiveUsers`) |
+| `reorder-reminders` | Recordatorio de recompra (`checkReorderReminders`) |
+| `retry-order-emails` | Reintento de correos de pedido fallidos (`retryFailedOrderEmails`) |
+| `foodos-campaigns` | Campañas FoodOS programadas vencidas (`runDueFoodosCampaigns`) |
+| `reconcile-payments` | Reconciliación de pagos Stripe y caducidad de vouchers (`reconcileStalePayments`) |
 
 > Los schedules están en **UTC**. Las horas MX mostradas asumen CST (UTC−6); ajustar en verano (CDT, UTC−5) según la zona del negocio.
 
 > ⚠️ **Además** hay 2 jobs de mantenimiento en **pg_cron (Supabase)**, no en Vercel: `cleanup-guest-addresses` (domingos 04:00 UTC, retención 30 días — ver §2) y `purge-rate-limits` (diario 04:17 UTC, retención 24h — ver §4). La tabla anterior solo lista los crons de Vercel.
 
 ### Implementación (referencia)
-- `src/app/api/workflows/payment-reminders/route.ts` — GET, `checkAndSendPaymentReminders()`
+- `src/app/api/cron/daily/route.ts` — GET, lista secuencial de jobs; fail-closed sin `CRON_SECRET`
+- `src/app/api/workflows/payment-reminders/route.ts` — GET, `checkAndSendPaymentReminders()` (endpoint manual)
 - `src/app/api/workflows/trigger/route.ts` — GET con `?job=abandoned-cart|reactivation` (imports dinámicos de `@/lib/email-workflows`); POST manual (admin/autenticado)
 - `src/app/api/foodos/campaigns/run/route.ts` — GET, `runDueFoodosCampaigns()`
 
@@ -81,12 +98,14 @@ Si el proyecto Vercel está en plan **Hobby**, el límite es **2 crons** — añ
 
 | Variable | Obligatoria | Uso | Notas |
 | --- | --- | --- | --- |
-| `CRON_SECRET` | **Sí (crons)** | Autoriza los 4 endpoints cron | Fail-closed: sin ella los crons devuelven 401. Rotar vía Vercel dashboard → Settings → Environment Variables. |
+| `CRON_SECRET` | **Sí (crons)** | Autoriza los endpoints cron (`/api/cron/daily`, `/api/cron/reconcile-payments`, `/api/cron/cleanup-guest-addresses`) | Fail-closed: sin ella los crons devuelven 401. Rotar vía Vercel dashboard → Settings → Environment Variables. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Sí | Cliente Supabase (browser + server) | Pública. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Sí | Cliente browser | Pública; RLS protege las tablas. |
 | `SERVICE_ROLE_KEY` | Sí | Server actions + endpoints con `createServiceClient` | **Nunca** exponer al browser. |
 | `STRIPE_SECRET_KEY` | Sí | Crear intents, confirmar pagos | `sk_live_...` en producción. |
 | `STRIPE_WEBHOOK_SECRET` | Sí | Validar webhooks Stripe | `whsec_...`. |
+| `STRIPE_CONNECT_ENABLED` | No | Enruta los cargos de tarjeta de FoodOS a la cuenta Connect del restaurante | `true` / `1`. **Por defecto apagado.** Requiere activar Connect antes en el Dashboard de Stripe (ver §11). |
+| `STRIPE_CONNECT_COUNTRY` | No | País de las cuentas Express | ISO-2, por defecto `MX`. |
 | `ADMIN_API_SECRET` | Sí | Endpoints admin (`x-admin-secret` header) | Sin fallback hardcodeado desde Fase 1. |
 
 ### Rotación de `CRON_SECRET`
@@ -295,8 +314,225 @@ dashboard. Eso fue la causa del drift histórico (ver `supabase/ESQUEMA.md`).
 
 ---
 
+## 9. Métodos de pago locales asíncronos (OXXO, SPEI, CoDi)
+
+> **P6-1.** Estos métodos **no se habilitan desde el código**: Stripe los
+> publica o los retira por cuenta, desde el Dashboard. El código ya soporta el
+> ciclo completo; activarlos es un cambio de configuración.
+
+### Habilitarlos
+
+1. Stripe Dashboard → **Settings → Payment methods**.
+2. Activar `OXXO`, `SPEI` y/o `CoDi`. Requiere cuenta Stripe con entidad
+   mexicana (`MX`) y que Stripe haya aprobado cada método.
+3. Verificar que la cuenta tenga **MXN** como moneda de liquidación.
+4. Repetir en modo test y en modo live (son configuraciones separadas).
+
+El `PaymentIntent` se crea con `automatic_payment_methods: { enabled: true }`
+en `src/lib/payments.ts`, así que en cuanto el método esté activo en la cuenta
+aparece en el formulario sin desplegar código. `paymentMethodOrder` en
+`src/components/stripe/stripe-payment-form.tsx` solo controla el orden en que
+se listan.
+
+### Cómo se ve el ciclo de vida
+
+| Evento Stripe | `payment_status` FoodOS | Notas |
+| --- | --- | --- |
+| `payment_intent.processing` | `processing` | El cliente ya recibió voucher/CLABE/QR. **No** acredita el pedido. |
+| `payment_intent.requires_action` | `processing` | Igual que el anterior. |
+| `payment_intent.succeeded` | `paid` | Único evento que acredita el pago. |
+| `payment_intent.payment_failed` | `failed` | Rechazo explícito del emisor. |
+| `payment_intent.canceled` (`cancellation_reason: "expired"`) | `expired` | Voucher caducado. |
+| `payment_intent.canceled` (otro motivo) | `failed` | |
+| *(ninguno)* | `expired` | Lo detecta el cron de reconciliación (ver abajo). |
+
+### Por qué existe el cron de reconciliación
+
+Stripe **no emite ningún evento** cuando un voucher OXXO o una CLABE SPEI
+caduca: deja el intent en `requires_payment_method` sin `last_payment_error` y
+sin webhook. Sin el barrido, el pedido se quedaría en `processing` para
+siempre y el panel lo mostraría como pendiente de cobro.
+
+`src/lib/reconcile-payments.ts` barre `foodos_orders` con PI no terminal y más
+de 15 minutos de antigüedad, y aplica `FOODOS_VOUCHER_TTL_HOURS = 96` (4 días,
+el máximo de Stripe para OXXO) para declarar `expired`. Corre dentro del cron
+consolidado `/api/cron/daily` (job `reconcile-payments`); el endpoint
+`/api/cron/reconcile-payments` sigue disponible para dispararlo a mano.
+
+### Probar el flujo sin dinero real
+
+1. Modo test de Stripe, con OXXO/SPEI habilitados en la cuenta de test.
+2. Pedido en `/r/<slug>` → **Tarjeta** → elegir OXXO.
+3. Aparecen las instrucciones locales (`local-payment-instructions.tsx`) con
+   la referencia y el código de barras.
+4. En Stripe Dashboard → el PI en modo test → **Succeed the payment**.
+5. El webhook llega y el pedido pasa a `paid`; `/r/<slug>/pedido/<id>` lo
+   refleja en el siguiente poll (cada 20 s) o con el botón
+   *"Ya pagué, revisar estado"*.
+
+> **`return_url`.** Los métodos asíncronos obligan a Stripe a tener una URL de
+> retorno. El formulario ahora siempre la envía
+> (`returnUrl || window.location.href`); antes iba `undefined`, lo que
+> rompía el checkout en cuanto se habilitara un método con redirección. El
+> storefront apunta al seguimiento del pedido.
+
+---
+
+## 10. Recordatorios y cancelación de pedidos FoodOS sin pago
+
+> **P6-4.** `src/lib/foodos-payment-reminders.ts`, job
+> `foodos-payment-reminders` dentro de `/api/cron/daily` (§1).
+
+### Reglas
+
+| Situación | Qué pasa |
+| --- | --- |
+| `payment_status` en `pending`/`processing`, ≥ 1 h de antigüedad | Recordatorio `payment:reminder_1h` (WhatsApp) |
+| ≥ 24 h y el de 1 h ya salió | Recordatorio `payment:reminder_24h` (WhatsApp **y** correo) |
+| ≥ 72 h, pago en `pending`, pedido en `status = 'pending'`, sin comprobante en revisión | Se cancela: `status = 'cancelled'` + `payment_status = 'expired'` + aviso `payment:expired` |
+| `payment_status = 'processing'` | **Nunca** se cancela: el voucher tiene 96 h (§9) |
+| Pedido ya aceptado por el restaurante (`status <> 'pending'`) | **Nunca** se cancela automáticamente |
+| Comprobante esperando revisión en `foodos_order_payments` | Ni recordatorio ni cancelación: el comensal ya hizo su parte |
+
+Un solo recordatorio por corrida (el umbral más avanzado que aplique), y la
+dedupe real es el índice único `(order_id, event, channel)` de
+`foodos_order_notifications` — correr el job dos veces no duplica mensajes.
+
+### ⚠️ La cadencia real es diaria
+
+El cron consolidado corre **una vez al día** (`0 12 * * *`). Los umbrales de
+1 h / 24 h / 72 h significan "en algún momento del barrido diario siguiente",
+no un instante exacto. El copy de los avisos está redactado para no prometer
+horas precisas. Si se necesita precisión horaria hay que mover el proyecto a
+Vercel Pro (crons por hora) o programar el barrido en **pg_cron** de Supabase
+(§2, §4).
+
+### Historial de incidentes
+
+**`foodos_orders.updated_at` (2026).** La tabla se creó en
+`00023_foodos.sql` **sin** columna `updated_at`, pero 8 handlers de
+`src/lib/stripe-webhook-handlers.ts` escribían `{ payment_status, updated_at }`
+sobre ella. PostgREST valida el payload completo del UPDATE, así que rechazaba
+la sentencia entera con `PGRST204` y **cero filas cambiaban**; los handlers no
+inspeccionaban el `error`, así que fallaba en silencio. Efecto: **ningún pago
+con tarjeta de FoodOS pasaba a `paid`**, y como `listOrdersForSync` filtra por
+`payment_status = 'paid'`, los pedidos pagados nunca llegaban a ventas del panel.
+
+Arreglado en dos capas: se quitaron los 8 `updated_at` de los updates a
+`foodos_orders` (los de `orders`/`order_upsells` intactos) y se añadió
+`supabase/migrations/00084_foodos_orders_updated_at.sql` (columna + trigger
+`trg_touch_foodos_orders` + índice `idx_foodos_orders_payment_created`).
+
+**Al escribir handlers nuevos: usar solo columnas que existan en `00023` +
+`00078` + `00080` + `00081` + `00084`, y revisar siempre el `error` del
+update.** Hay una guardia de regresión en `stripe-webhook-handlers.test.ts`
+(`"ningún handler escribe updated_at en foodos_orders"`).
+
+### Migraciones pendientes de aplicar a mano
+
+En el SQL Editor de Supabase, en este orden:
+
+1. `00082_foodos_payment_proofs.sql` — sin ella subir un comprobante falla.
+2. `00083_foodos_order_notifications.sql` — sin ella los avisos se envían pero sin dedupe.
+3. `00084_foodos_orders_updated_at.sql` — sin ella nada se rompe, pero el timestamp queda congelado.
+4. `00085_stripe_connect.sql` — sin ella el panel de cobros falla al leer `stripe_*`.
+
+---
+
+## 11. Cobros con Stripe Connect Express
+
+Hasta `00085`, **todo** el dinero de FoodOS entraba a la cuenta Stripe de
+Resurte.me y había que dispersarlo a mano a cada restaurante: la plataforma
+custodiaba fondos de terceros. Con Connect cada restaurante tiene su propia
+cuenta Express y el cargo se hace como *destination charge*: Stripe liquida al
+restaurante y la plataforma nunca toca el dinero.
+
+### Interruptor de plataforma
+
+| Variable | Valores | Efecto |
+| --- | --- | --- |
+| `STRIPE_CONNECT_ENABLED` | `true` / `1` (cualquier otra cosa = apagado) | Enruta los cargos de tarjeta a la cuenta conectada del restaurante. **Por defecto apagado.** |
+| `STRIPE_CONNECT_COUNTRY` | ISO-2, por defecto `MX` | País de las cuentas Express. |
+
+`STRIPE_CONNECT_ENABLED` está apagado a propósito: Connect **debe activarse
+antes en el Dashboard de Stripe** (Settings → Connect). Si se enciende sin
+activarlo, los cargos fallan. Como el enrutamiento se decide en runtime, el
+operador puede apagarlo y volver al cobro contra la plataforma **sin desplegar
+código**.
+
+Con el interruptor apagado el comportamiento es idéntico al anterior: la cuenta
+conectada se sigue registrando y verificando, pero los cargos van a la
+plataforma.
+
+### Rollout restaurante por restaurante
+
+El enrutamiento no depende sólo del interruptor, sino de que la cuenta esté
+**cobrable**. `buildDestinationChargeParams()` devuelve `{}` —y el cargo se crea
+contra la plataforma— cuando:
+
+- el interruptor está apagado, o
+- el restaurante no tiene `stripe_account_id`, o
+- `stripe_charges_enabled` / `stripe_payouts_enabled` están en `false`, o
+- Stripe reporta `requirements.disabled_reason`.
+
+Por eso se puede encender el interruptor con restaurantes a medio verificar: los
+que ya están listos cobran directo a su banco y el resto sigue igual. El panel
+(`/panel/foodos/restaurante`, sección "Cobros en línea") avisa cuando un
+restaurante todavía está cobrando a la cuenta de la plataforma.
+
+### Comisión de la plataforma
+
+`foodos_restaurants.platform_fee_percent` (0–100, por defecto **0** = paridad
+con Take App). `computeApplicationFee()` calcula la comisión en centavos y
+devuelve `0` —omitiendo `application_fee_amount`— cuando el resultado sería `0`
+o `≥ total`, porque Stripe rechaza valores fuera de `0 < fee < amount` y una
+comisión del 100 % dejaría al restaurante sin nada.
+
+### Ciclo de vida
+
+1. El dueño entra a `/panel/foodos/restaurante` → "Conectar mis cobros".
+2. `startConnectOnboarding()` crea la cuenta Express (`accounts.create`) si no
+   existe, guarda `stripe_account_id` y devuelve un `account_onboarding` link.
+3. El dueño captura identidad y datos bancarios en el formulario de Stripe.
+4. Stripe regresa a `?connect=done` (o `?connect=refresh` si el link caducó); la
+   tarjeta limpia el parámetro y relee el estado contra Stripe.
+5. En paralelo, el webhook `account.updated` llama a
+   `handleConnectAccountUpdated()` → `syncConnectAccount()`, que escribe los
+   flags y sella `stripe_onboarded_at` una sola vez.
+6. Con `charges_enabled && payouts_enabled` la cuenta es cobrable y los
+   siguientes cargos van con `transfer_data.destination`.
+
+### ⚠️ Seguridad: las columnas `stripe_*` son de sólo lectura para el dueño
+
+La política RLS de `foodos_restaurants` ("Owner manages restaurants") es **a
+nivel de fila**, no de columna: sin nada más, un dueño podría hacer
+`update foodos_restaurants set stripe_account_id = '<cuenta de un tercero>'` y
+desviar los pagos de sus propios comensales a esa cuenta.
+
+Por eso `00085` hace un **`REVOKE UPDATE` a nivel de columna** de las 7 columnas
+`stripe_*` + `platform_fee_percent` sobre `authenticated` y `anon`. Las
+escrituras legítimas pasan por `createServiceClient()` en
+`src/lib/stripe-connect.ts`, `src/app/panel/foodos/connect-actions.ts` y
+`src/lib/payments.ts`. **No agregar estas columnas a `upsertRestaurant()` ni a
+ningún payload construido desde el cliente.**
+
+### Notas de implementación
+
+- **Los destination charges no cambian el webhook.** Un destination charge sigue
+  siendo un PaymentIntent normal sobre la cuenta de la plataforma, así que
+  `payment_intent.succeeded` llega con `metadata.foodos_order_id` intacto y los
+  handlers de §9/§10 funcionan igual.
+- **No escribir `updated_at` en `foodos_orders`** (ver el incidente de §10).
+- `application_fee_amount` y `connected_account_id` se persisten en
+  `foodos_orders` **sólo** cuando el cargo realmente se enrutó, para no dejar
+  registros de una comisión que nunca se cobró.
+
+---
+
 ## Referencias
 
 - `vercel.json` (crons + headers de seguridad), `src/app/api/cron/*`, `src/app/api/workflows/*`, `src/app/api/foodos/campaigns/run`.
-- Migraciones: `supabase/migrations/00039_rate_limits.sql`, `00042_cleanup_guest_addresses.sql`, `00043_pg_cron_cleanup_guest_addresses.sql`, `00044_pg_cron_purge_rate_limits.sql`, `00055_panel_entries.sql`, `00056_panel_entries_realtime.sql`, `00057_panel_rows.sql`, `00058_panel_members.sql`.
+- Migraciones: `supabase/migrations/00039_rate_limits.sql`, `00042_cleanup_guest_addresses.sql`, `00043_pg_cron_cleanup_guest_addresses.sql`, `00044_pg_cron_purge_rate_limits.sql`, `00055_panel_entries.sql`, `00056_panel_entries_realtime.sql`, `00057_panel_rows.sql`, `00058_panel_members.sql`, `00082_foodos_payment_proofs.sql`, `00083_foodos_order_notifications.sql`, `00084_foodos_orders_updated_at.sql`, `00085_stripe_connect.sql`.
+- Pagos FoodOS: `src/lib/payments.ts` (creación del PI), `src/lib/stripe-webhook-handlers.ts` (transiciones de estado), `src/lib/reconcile-payments.ts` (caducidad de vouchers), `src/lib/foodos-notifications.ts` (avisos al comensal), `src/lib/foodos-payment-reminders.ts` (recordatorios y cancelación).
+- Cobros Connect: `src/lib/stripe-connect.ts` (cuentas Express, destination charges, sincronización), `src/app/panel/foodos/connect-actions.ts` (server actions), `src/app/panel/foodos/restaurante/_components/connect-payments-card.tsx` (UI).
 - Relacionado: `docs/MOCKS.md` (contrato de fallback), `REPORTE.md`, `supabase/ESQUEMA.md`.

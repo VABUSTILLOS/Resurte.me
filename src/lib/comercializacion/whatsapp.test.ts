@@ -4,6 +4,7 @@ import {
   buildWhatsappLink,
   weeklyReminderMessage,
   firstContactMessage,
+  reorderSuggestionMessage,
 } from "./whatsapp"
 
 describe("sanitizePhoneNumber", () => {
@@ -59,5 +60,23 @@ describe("mensajes prellenados", () => {
     expect(msg).toContain("Luis")
     expect(msg).toContain("Taquería El Sol")
     expect(msg).toContain("Ana")
+  })
+})
+
+
+describe("reorderSuggestionMessage", () => {
+  it("incluye los productos del último pedido cuando hay historial", () => {
+    const msg = reorderSuggestionMessage("Ana", "Taquería El Sol", ["2× Frijol", "1× Queso menonita"])
+    expect(msg).toContain("Ana")
+    expect(msg).toContain("Taquería El Sol")
+    expect(msg).toContain("2× Frijol")
+    expect(msg).toContain("1× Queso menonita")
+    expect(msg).toContain("¿Te lo repito igual o ajustamos algo?")
+  })
+
+  it("sin historial, ofrece armar la lista", () => {
+    const msg = reorderSuggestionMessage("Ana", null, [])
+    expect(msg).toContain("¿Te armo tu lista de esta semana?")
+    expect(msg).not.toContain("Tu último pedido fue")
   })
 })

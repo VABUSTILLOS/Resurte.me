@@ -8,6 +8,10 @@ import {
 import { useState, type FormEvent } from "react"
 import { CreditCard, Lock, AlertCircle, ShieldCheck } from "lucide-react"
 import { stripeErrorMessage } from "@/lib/stripe-errors"
+import {
+  parsePaymentNextAction,
+  type PaymentNextAction,
+} from "@/lib/payment-next-action"
 
 interface StripePaymentFormProps {
   /** Total amount being charged (for display only) */
@@ -23,6 +27,20 @@ interface StripePaymentFormProps {
    * previo del drawer y se envía vía `save_card` al crear el PaymentIntent.
    */
   saveCardConsent?: boolean
+  /**
+   * URL a la que Stripe devuelve al cliente cuando el método de pago exige
+   * salir del navegador (CoDi, 3DS de la tarjeta). Sin ella `confirmPayment`
+   * falla para esos métodos, así que los flujos que los habilitan deben
+   * pasarla. Si se omite se usa la URL actual.
+   */
+  returnUrl?: string
+  /**
+   * Se invoca cuando el intent queda pendiente de una acción asíncrona
+   * (voucher OXXO, CLABE SPEI) en lugar de confirmarse al instante. Si no se
+   * pasa, se muestra un error: dejar al cliente sin instrucciones sería
+   * peor que fallar de forma visible.
+   */
+  onNextAction?: (action: PaymentNextAction, paymentIntentId: string) => void
 }
 
 /**
@@ -41,6 +59,8 @@ export function StripePaymentForm({
   onSuccess,
   onBack,
   saveCardConsent = false,
+  returnUrl,
+  onNextAction,
 }: StripePaymentFormProps) {
   const stripe = useStripe()
   const elements = useElements()
@@ -69,7 +89,11 @@ export function StripePaymentForm({
       const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: undefined, // handle inline, no redirect
+          // Stripe exige una return_url para los métodos que salen del
+          // navegador (CoDi, y 3DS cuando no se puede resolver inline).
+          // Pasarla siempre es seguro: con `redirect: "if_required"` Stripe
+          // no redirige cuando no hace falta.
+          return_url: returnUrl || window.location.href,
         },
         redirect: "if_required",
       })
@@ -80,12 +104,44 @@ export function StripePaymentForm({
         return
       }
 
-      if (paymentIntent?.status === "succeeded" || paymentIntent?.status === "processing") {
-        onSuccess(paymentIntent.id)
-      } else {
-        setError(`El pago quedó en estado: ${paymentIntent?.status ?? "desconocido"}. Contacta a soporte.`)
+      if (!paymentIntent) {
+        setError("Stripe no devolvió el estado del pago. Contacta a soporte.")
         setIsLoading(false)
+        return
       }
+
+      if (paymentIntent.status === "succeeded") {
+        onSuccess(paymentIntent.id)
+        return
+      }
+
+      // Método local asíncrono (OXXO/SPEI/CoDi): el cliente ya tiene las
+      // instrucciones y el dinero se acredita después. Se delegan a quien
+      // las renderiza; el estado real lo confirma el webhook.
+      if (
+        paymentIntent.status === "requires_action" ||
+        paymentIntent.status === "processing"
+      ) {
+        const action = parsePaymentNextAction(paymentIntent.next_action)
+        if (onNextAction && action) {
+          onNextAction(action, paymentIntent.id)
+          return
+        }
+        if (paymentIntent.status === "processing") {
+          // Sin acción que mostrar pero el cobro ya está en curso: se trata
+          // como confirmado; el webhook cierra el ciclo.
+          onSuccess(paymentIntent.id)
+          return
+        }
+        setError(
+          "Tu método de pago requiere pasos adicionales que no pudimos mostrar. Contacta a soporte."
+        )
+        setIsLoading(false)
+        return
+      }
+
+      setError(`El pago quedó en estado: ${paymentIntent.status}. Contacta a soporte.`)
+      setIsLoading(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error inesperado al procesar el pago.")
       setIsLoading(false)
@@ -104,7 +160,18 @@ export function StripePaymentForm({
       <PaymentElement
         options={{
           layout: "tabs",
-          paymentMethodOrder: ["card", "link", "applePay", "googlePay"],
+          // Los métodos no listados (si están habilitados en el Dashboard de
+          // Stripe) se muestran después de los listados, así que el orden no
+          // oculta ninguno.
+          paymentMethodOrder: [
+            "card",
+            "oxxo",
+            "spei",
+            "codi",
+            "link",
+            "applePay",
+            "googlePay",
+          ],
           wallets: { applePay: "auto", googlePay: "auto" },
         }}
       />

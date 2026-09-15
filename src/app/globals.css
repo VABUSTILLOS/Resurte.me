@@ -146,11 +146,17 @@ body.cookie-consent-visible .city-detector {
   }
 }
 
-/* Panel: la barra inferior de accesos rápidos (PanelQuickNav, lg:hidden) ocupa
-   el carril inferior en móvil; el cookie banner y el toast flotan por encima
-   de ella con el mismo patrón de body class que `cart-bar-active`. */
+/* Panel: el FAB de herramientas (lg:hidden) ocupa la esquina inferior derecha
+   en móvil; el cookie banner y el toast flotan por encima de él con el mismo
+   patrón de body class que `cart-bar-active`. */
 body.has-panel-bottom-nav {
   --floating-bottom-offset: calc(4.5rem + var(--inset-bottom));
+}
+
+/* Header auto-hide: al ocultarse el header global, las barras sticky
+   secundarias (top bar del panel, sidebar del dashboard) suben al top. */
+body.header-hidden {
+  --header-top-offset: 0px;
 }
 
 /* Theme toggle (light/dark/system) — explicit data-theme wins */

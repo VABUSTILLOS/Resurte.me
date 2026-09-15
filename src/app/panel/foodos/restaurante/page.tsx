@@ -16,8 +16,11 @@ import {
 import { publicRestaurantUrl } from "@/lib/foodos"
 import type { FoodosRestaurant, FoodosBranch } from "@/types/foodos"
 import {
-  Store, MapPin, Plus, Trash2, QrCode, Copy, Check, ExternalLink, Loader2, Building2,
+  Store, MapPin, Plus, Trash2, QrCode, Copy, Check, ExternalLink, Loader2, Building2, Clock,
 } from "lucide-react"
+import { BranchHoursModal } from "./_components/branch-hours-modal"
+import { WebhooksCard } from "./_components/webhooks-card"
+import { ConnectPaymentsCard } from "./_components/connect-payments-card"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
 
@@ -29,6 +32,10 @@ export default function RestaurantePage() {
   const [error, setError] = useState<string | null>(null)
   const [qrUrl, setQrUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  // QR por mesa (dine-in)
+  const [tableCount, setTableCount] = useState("5")
+  const [tableQrs, setTableQrs] = useState<{ mesa: number; url: string }[]>([])
+  const [hoursBranch, setHoursBranch] = useState<FoodosBranch | null>(null)
 
   // Formulario
   const [name, setName] = useState("")
@@ -36,6 +43,12 @@ export default function RestaurantePage() {
   const [description, setDescription] = useState("")
   const [logoUrl, setLogoUrl] = useState("")
   const [currency, setCurrency] = useState("MXN")
+  const [themeColor, setThemeColor] = useState("")
+  const [metaPixel, setMetaPixel] = useState("")
+  const [tiktokPixel, setTiktokPixel] = useState("")
+  const [transferClabe, setTransferClabe] = useState("")
+  const [transferBank, setTransferBank] = useState("")
+  const [transferBeneficiary, setTransferBeneficiary] = useState("")
 
   // Nueva sucursal
   const [branchName, setBranchName] = useState("")
@@ -53,6 +66,12 @@ export default function RestaurantePage() {
         setDescription(r.description ?? "")
         setLogoUrl(r.logo_url ?? "")
         setCurrency(r.currency)
+        setThemeColor(r.theme_color ?? "")
+        setMetaPixel(r.meta_pixel_id ?? "")
+        setTiktokPixel(r.tiktok_pixel_id ?? "")
+        setTransferClabe(r.transfer_clabe ?? "")
+        setTransferBank(r.transfer_bank ?? "")
+        setTransferBeneficiary(r.transfer_beneficiary ?? "")
         setBranches(b)
       }
     } catch (e) {
@@ -103,6 +122,12 @@ export default function RestaurantePage() {
         description,
         logo_url: logoUrl || null,
         currency,
+        theme_color: themeColor || null,
+        meta_pixel_id: metaPixel || null,
+        tiktok_pixel_id: tiktokPixel || null,
+        transfer_clabe: transferClabe || null,
+        transfer_bank: transferBank || null,
+        transfer_beneficiary: transferBeneficiary || null,
       })
       setRestaurant(saved)
     } catch (err) {
@@ -143,6 +168,83 @@ export default function RestaurantePage() {
   async function handleRemoveBranch(id: string) {
     await deleteBranch(id)
     setBranches((prev) => prev.filter((b) => b.id !== id))
+  }
+
+  async function handleToggleDineIn(branch: FoodosBranch) {
+    await upsertBranch({
+      id: branch.id,
+      restaurant_id: branch.restaurant_id,
+      name: branch.name,
+      city: branch.city,
+      address: branch.address,
+      phone: branch.phone,
+      pickup_active: branch.pickup_active,
+      delivery_active: branch.delivery_active,
+      dine_in_active: !branch.dine_in_active,
+      scheduled_orders_active: branch.scheduled_orders_active,
+      lead_minutes: branch.lead_minutes,
+      delivery_fee: branch.delivery_fee,
+      min_order: branch.min_order,
+    })
+    setBranches((prev) =>
+      prev.map((b) => (b.id === branch.id ? { ...b, dine_in_active: !b.dine_in_active } : b))
+    )
+  }
+
+  async function handleToggleScheduled(branch: FoodosBranch) {
+    await upsertBranch({
+      id: branch.id,
+      restaurant_id: branch.restaurant_id,
+      name: branch.name,
+      city: branch.city,
+      address: branch.address,
+      phone: branch.phone,
+      pickup_active: branch.pickup_active,
+      delivery_active: branch.delivery_active,
+      dine_in_active: branch.dine_in_active,
+      scheduled_orders_active: !branch.scheduled_orders_active,
+      lead_minutes: branch.lead_minutes,
+      delivery_fee: branch.delivery_fee,
+      min_order: branch.min_order,
+    })
+    setBranches((prev) =>
+      prev.map((b) => (b.id === branch.id ? { ...b, scheduled_orders_active: !b.scheduled_orders_active } : b))
+    )
+  }
+
+  async function handleLeadMinutes(branch: FoodosBranch, value: string) {
+    const minutes = Math.max(0, Number(value) || 30)
+    await upsertBranch({
+      id: branch.id,
+      restaurant_id: branch.restaurant_id,
+      name: branch.name,
+      city: branch.city,
+      address: branch.address,
+      phone: branch.phone,
+      pickup_active: branch.pickup_active,
+      delivery_active: branch.delivery_active,
+      dine_in_active: branch.dine_in_active,
+      scheduled_orders_active: branch.scheduled_orders_active,
+      lead_minutes: minutes,
+      delivery_fee: branch.delivery_fee,
+      min_order: branch.min_order,
+    })
+    setBranches((prev) =>
+      prev.map((b) => (b.id === branch.id ? { ...b, lead_minutes: minutes } : b))
+    )
+  }
+
+  // Genera un QR por mesa apuntando a /r/[slug]?mesa=N (dine-in estilo take.app).
+  async function handleGenerateTableQrs() {
+    if (!restaurant) return
+    const count = Math.min(Math.max(Number(tableCount) || 0, 1), 50)
+    const { toDataURL } = await import("qrcode")
+    const base = publicRestaurantUrl(restaurant.slug)
+    const results: { mesa: number; url: string }[] = []
+    for (let mesa = 1; mesa <= count; mesa++) {
+      results.push({ mesa, url: await toDataURL(`${base}?mesa=${mesa}`, { width: 256, margin: 2 }) })
+    }
+    setTableQrs(results)
   }
 
   function handleCopyUrl() {
@@ -254,6 +356,73 @@ export default function RestaurantePage() {
                 </select>
               </div>
             </div>
+
+            {/* Personalización + transferencia */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Color del menú (tema)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={themeColor || "#059669"}
+                    onChange={(e) => setThemeColor(e.target.value)}
+                    className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer"
+                  />
+                  <input
+                    value={themeColor}
+                    onChange={(e) => setThemeColor(e.target.value)}
+                    placeholder="#059669 (por defecto)"
+                    className="flex-1 rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Meta Pixel ID (opcional)</label>
+                <input
+                  value={metaPixel}
+                  onChange={(e) => setMetaPixel(e.target.value.replace(/\D/g, ""))}
+                  placeholder="1234567890"
+                  inputMode="numeric"
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">TikTok Pixel ID (opcional)</label>
+                <input
+                  value={tiktokPixel}
+                  onChange={(e) => setTiktokPixel(e.target.value)}
+                  placeholder="C4A5B6C7D8E9F0"
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                />
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4 space-y-3">
+              <p className="text-xs font-semibold text-gray-500">Pago por transferencia (opcional)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  value={transferClabe}
+                  onChange={(e) => setTransferClabe(e.target.value.replace(/\D/g, "").slice(0, 18))}
+                  placeholder="CLABE (18 dígitos)"
+                  inputMode="numeric"
+                  className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                />
+                <input
+                  value={transferBank}
+                  onChange={(e) => setTransferBank(e.target.value)}
+                  placeholder="Banco"
+                  className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                />
+                <input
+                  value={transferBeneficiary}
+                  onChange={(e) => setTransferBeneficiary(e.target.value)}
+                  placeholder="Beneficiario"
+                  className="rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                />
+              </div>
+              <p className="text-[11px] text-gray-400">
+                Si capturas la CLABE, el checkout ofrece &quot;Transferencia&quot; y muestra estos datos al confirmar.
+              </p>
+            </div>
             <div className="flex items-center gap-3 pt-1">
               <button
                 type="submit"
@@ -322,6 +491,9 @@ export default function RestaurantePage() {
         </div>
       </div>
 
+      {/* Cobros en línea (Stripe Connect Express) */}
+      {restaurant && <ConnectPaymentsCard restaurantId={restaurant.id} />}
+
       {/* Sucursales */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <div className="flex items-center gap-2 mb-5">
@@ -348,8 +520,46 @@ export default function RestaurantePage() {
                         {b.delivery_active && (
                           <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{t("foodos.restaurante.deliveryBadge")}</span>
                         )}
+                        <button
+                          onClick={() => handleToggleDineIn(b)}
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
+                            b.dine_in_active
+                              ? "bg-purple-100 text-purple-700"
+                              : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                          }`}
+                          title="Activar/desactivar pedidos en mesa (dine-in)"
+                        >
+                          🍽️ En mesa {b.dine_in_active ? "activo" : "inactivo"}
+                        </button>
+                        <button
+                          onClick={() => handleToggleScheduled(b)}
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors ${
+                            b.scheduled_orders_active
+                              ? "bg-indigo-100 text-indigo-700"
+                              : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                          }`}
+                          title="Aceptar pedidos programados (fecha/hora)"
+                        >
+                          📅 Programados {b.scheduled_orders_active ? "sí" : "no"}
+                        </button>
+                        {b.scheduled_orders_active && (
+                          <input
+                            type="number" min="0" step="5"
+                            defaultValue={b.lead_minutes ?? 30}
+                            onBlur={(e) => handleLeadMinutes(b, e.target.value)}
+                            title="Minutos de anticipación mínima (lead time)"
+                            className="w-14 text-[10px] px-1.5 py-0.5 rounded-lg border border-gray-200"
+                          />
+                        )}
                       </div>
                     </div>
+                    <button
+                      onClick={() => setHoursBranch(b)}
+                      className="flex items-center gap-1 p-2 rounded-lg text-gray-400 hover:text-[#0E7A0E] hover:bg-[#F0FDF4] transition-colors"
+                      title="Horario de la sucursal"
+                    >
+                      <Clock className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => handleRemoveBranch(b.id)}
                       className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
@@ -397,6 +607,58 @@ export default function RestaurantePage() {
           </>
         )}
       </div>
+      {/* QR por mesa (dine-in) */}
+      {restaurant && branches.some((b) => b.dine_in_active) && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <QrCode className="w-5 h-5 text-[#0E7A0E]" />
+            <h2 className="font-semibold text-gray-900">QR por mesa</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">
+            Cada QR abre el menú en modo &quot;En el local&quot; con la mesa pre-seleccionada. Imprime y pega uno por mesa.
+          </p>
+          <div className="flex items-center gap-3 mb-4">
+            <input
+              type="number" min="1" max="50"
+              value={tableCount}
+              onChange={(e) => setTableCount(e.target.value)}
+              className="w-24 rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+            />
+            <button
+              onClick={handleGenerateTableQrs}
+              className="px-4 py-2.5 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e]"
+            >
+              Generar QRs
+            </button>
+          </div>
+          {tableQrs.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+              {tableQrs.map((q) => (
+                <div key={q.mesa} className="flex flex-col items-center rounded-xl border border-gray-200 p-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- QR generado en cliente como data URL */}
+                  <img src={q.url} alt={`QR mesa ${q.mesa}`} width={128} height={128} className="w-32 h-32" />
+                  <p className="text-xs font-bold text-gray-700 mt-2">Mesa {q.mesa}</p>
+                  <a
+                    href={q.url}
+                    download={`qr-mesa-${q.mesa}.png`}
+                    className="text-[11px] text-[#0E7A0E] font-semibold hover:underline mt-1"
+                  >
+                    Descargar
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Webhooks salientes */}
+      {restaurant && <WebhooksCard restaurantId={restaurant.id} />}
+
+      {hoursBranch && (
+        <BranchHoursModal branch={hoursBranch} onClose={() => setHoursBranch(null)} />
+      )}
+
       <ToolGuideHost toolKey="restaurante" pathname="/panel/foodos/restaurante" slug={null} icon="🏪" title={t("foodos.restaurante.guideTitle")} />
     </div>
   )

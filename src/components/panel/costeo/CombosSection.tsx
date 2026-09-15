@@ -200,7 +200,7 @@ export default function CombosSection({
           </div>
 
           {newComboItems.length >= 2 && (
-            <div className="mb-3 bg-amber-50 rounded-xl px-3 py-2.5 grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="mb-3 bg-amber-50 rounded-xl px-3 py-2.5 grid grid-cols-1 min-[380px]:grid-cols-3 gap-2 text-center text-xs">
               <div>
                 <p className="text-amber-700/70">Costo combo</p>
                 <p className="font-bold text-gray-900">${comboCost(newComboItems).toFixed(2)}</p>

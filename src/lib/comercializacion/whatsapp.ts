@@ -30,6 +30,22 @@ export function weeklyReminderMessage(sellerName: string, restaurantName?: strin
   return `¡Hola${restaurantName ? `, ${restaurantName}` : ""}! 👋 Soy ${sellerName}, tu asesor de Resurte.me.\n\nTe recordamos que esta semana es momento de tu pedido de insumos. 🛒\n\n¿Te armo tu lista o prefieres pedir tú directo en resurte.me?`
 }
 
+/**
+ * Mensaje de reorden específico: incluye los productos del último pedido del
+ * cliente para que el reorden sea de un toque (B3).
+ */
+export function reorderSuggestionMessage(
+  sellerName: string,
+  restaurantName: string | null,
+  lastOrderItems: string[]
+): string {
+  const items =
+    lastOrderItems.length > 0
+      ? `\n\nTu último pedido fue:\n${lastOrderItems.map((i) => `· ${i}`).join("\n")}\n\n¿Te lo repito igual o ajustamos algo?`
+      : `\n\n¿Te armo tu lista de esta semana?`
+  return `¡Hola${restaurantName ? `, ${restaurantName}` : ""}! 👋 Soy ${sellerName}, tu asesor de Resurte.me.\n\nEs momento de tu reorden semanal. 🛒${items}\n\nConfírmame y te lo dejo programado. ✅`
+}
+
 /** Mensaje de presentación inicial (prospecto nuevo). */
 export function firstContactMessage(
   sellerName: string,

@@ -18,8 +18,10 @@ export const STATUS_COLOR: Record<string, string> = {
 
 export const PAYMENT_STATUS_LABEL: Record<string, string> = {
   pending: "Pendiente",
+  processing: "En proceso",
   paid: "Pagado",
   failed: "Fallido",
+  expired: "Expirado",
   refunded: "Reembolsado",
   amount_mismatch: "Monto incorrecto",
 }

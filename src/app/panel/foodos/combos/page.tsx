@@ -17,7 +17,7 @@ import {
   deleteUpsellRule,
 } from "../actions"
 import { formatMoney } from "@/lib/foodos"
-import { useEscapeKey } from "@/hooks/use-escape-key"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 import type {
   FoodosRestaurant,
   FoodosMenuItem,
@@ -79,11 +79,6 @@ export default function CombosPage() {
   const [comboForm, setComboForm] = useState<ComboForm>(EMPTY_COMBO)
   const [showRuleForm, setShowRuleForm] = useState(false)
   const [ruleForm, setRuleForm] = useState<RuleForm>(EMPTY_RULE)
-
-  const closeComboForm = useCallback(() => setShowComboForm(false), [])
-  const closeRuleForm = useCallback(() => setShowRuleForm(false), [])
-  useEscapeKey(closeComboForm, showComboForm)
-  useEscapeKey(closeRuleForm, showRuleForm && !showComboForm)
 
   const load = useCallback(async () => {
     try {
@@ -306,10 +301,14 @@ export default function CombosPage() {
       </section>
 
       {/* Modal combo */}
-      {showComboForm && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setShowComboForm(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-amber-500" /> {t("foodos.combos.newCombo")}</h3>
+      <BottomSheet
+        open={showComboForm}
+        onClose={() => setShowComboForm(false)}
+        ariaLabelledby="combo-form-title"
+        maxWidthClass="max-w-lg"
+      >
+        <div className="p-6">
+          <h3 id="combo-form-title" className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-amber-500" /> {t("foodos.combos.newCombo")}</h3>
             <form onSubmit={handleSaveCombo} className="space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-3">
@@ -351,15 +350,18 @@ export default function CombosPage() {
                 <button type="submit" disabled={!comboForm.name.trim() || comboForm.item_ids.length === 0} className="px-5 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50">{t("common.save")}</button>
               </div>
             </form>
-          </div>
         </div>
-      )}
+      </BottomSheet>
 
       {/* Modal regla */}
-      {showRuleForm && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center p-4" onClick={() => setShowRuleForm(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><Wand2 className="w-5 h-5 text-[#0E7A0E]" /> {t("foodos.combos.newRuleTitle")}</h3>
+      <BottomSheet
+        open={showRuleForm}
+        onClose={() => setShowRuleForm(false)}
+        ariaLabelledby="rule-form-title"
+        maxWidthClass="max-w-lg"
+      >
+        <div className="p-6">
+          <h3 id="rule-form-title" className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><Wand2 className="w-5 h-5 text-[#0E7A0E]" /> {t("foodos.combos.newRuleTitle")}</h3>
             <form onSubmit={handleSaveRule} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">{t("foodos.combos.nameLabel")}</label>
@@ -427,9 +429,8 @@ export default function CombosPage() {
                 <button type="submit" disabled={!ruleForm.name.trim() || ruleForm.suggested_items.length === 0} className="px-5 py-2 rounded-xl bg-[#0E7A0E] text-white text-sm font-semibold hover:bg-[#0e7a0e] disabled:opacity-50">{t("common.save")}</button>
               </div>
             </form>
-          </div>
         </div>
-      )}
+      </BottomSheet>
       <ToolGuideHost toolKey="combos" pathname="/panel/foodos/combos" slug={null} icon="🎁" title={t("foodos.combos.guideTitle")} />
     </div>
   )

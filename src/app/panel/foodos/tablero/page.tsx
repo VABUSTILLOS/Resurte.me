@@ -25,6 +25,7 @@ import {
   Users,
   Percent,
   Sparkles,
+  Download,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
@@ -142,6 +143,63 @@ export default function TableroPage() {
     () => Math.max(...metrics.byDay.map((d) => d.count), 1),
     [metrics.byDay]
   )
+
+  // Cierre diario: pedidos de hoy (no cancelados) desglosados.
+  const dailyClose = useMemo(() => {
+    const today = new Date().toLocaleDateString("en-CA") // YYYY-MM-DD local
+    const todays = orders.filter((o) => {
+      const d = new Date(o.created_at)
+      return d.toLocaleDateString("en-CA") === today && o.status !== "cancelled"
+    })
+    const byPayment = new Map<string, { count: number; total: number }>()
+    const byChannel = new Map<string, number>()
+    const byFulfillment = new Map<string, number>()
+    let revenue = 0
+    let tips = 0
+    let discounts = 0
+    let pending = 0
+    for (const o of todays) {
+      revenue += o.total
+      tips += o.tip ?? 0
+      discounts += o.discount ?? 0
+      if (o.payment_status !== "paid") pending += o.total
+      const pm = o.payment_method ?? "sucursal"
+      const cur = byPayment.get(pm) ?? { count: 0, total: 0 }
+      cur.count += 1
+      cur.total += o.total
+      byPayment.set(pm, cur)
+      byChannel.set(o.channel, (byChannel.get(o.channel) ?? 0) + 1)
+      byFulfillment.set(o.fulfillment, (byFulfillment.get(o.fulfillment) ?? 0) + 1)
+    }
+    return { count: todays.length, revenue, tips, discounts, pending, byPayment, byChannel, byFulfillment, todays }
+  }, [orders])
+
+  const exportDailyClose = () => {
+    const header = "pedido,hora,canal,cumplimiento,metodo_pago,estado_pago,subtotal,descuento,envio,propina,total"
+    const rows = dailyClose.todays.map((o) =>
+      [
+        o.id.slice(0, 8),
+        new Date(o.created_at).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+        o.channel,
+        o.fulfillment,
+        o.payment_method ?? "sucursal",
+        o.payment_status,
+        o.subtotal,
+        o.discount,
+        o.delivery_fee,
+        o.tip ?? 0,
+        o.total,
+      ].join(",")
+    )
+    const csv = [header, ...rows].join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `cierre-${new Date().toLocaleDateString("en-CA")}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   if (!restaurant) {
     if (loading) {
@@ -303,6 +361,63 @@ export default function TableroPage() {
           </div>
         </Card>
       )}
+      {/* Cierre diario */}
+      <Card title="Cierre del día" className="mt-6">
+        {dailyClose.count === 0 ? (
+          <p className="text-sm text-stone-400 py-6 text-center">Sin pedidos hoy todavía.</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <CloseStat label="Pedidos" value={String(dailyClose.count)} />
+              <CloseStat label="Ventas" value={formatMoney(dailyClose.revenue)} />
+              <CloseStat label="Propinas" value={formatMoney(dailyClose.tips)} />
+              <CloseStat label="Descuentos" value={formatMoney(dailyClose.discounts)} />
+              <CloseStat label="Por cobrar" value={formatMoney(dailyClose.pending)} accent={dailyClose.pending > 0} />
+            </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">Por método de pago</p>
+                <div className="space-y-1.5">
+                  {[...dailyClose.byPayment.entries()].map(([pm, v]) => (
+                    <div key={pm} className="flex justify-between text-sm">
+                      <span className="text-stone-600 capitalize">{pm === "card" ? "Tarjeta" : pm === "transfer" ? "Transferencia" : "En sucursal"}</span>
+                      <span className="font-semibold text-stone-900">{v.count} · {formatMoney(v.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">Por canal</p>
+                <div className="space-y-1.5">
+                  {[...dailyClose.byChannel.entries()].map(([ch, count]) => (
+                    <div key={ch} className="flex justify-between text-sm">
+                      <span className="text-stone-600">{CANAL_LABEL[ch] ?? ch}</span>
+                      <span className="font-semibold text-stone-900">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">Por servicio</p>
+                <div className="space-y-1.5">
+                  {[...dailyClose.byFulfillment.entries()].map(([f, count]) => (
+                    <div key={f} className="flex justify-between text-sm">
+                      <span className="text-stone-600">{f === "delivery" ? "A domicilio" : f === "dine_in" ? "En el local" : "Para llevar"}</span>
+                      <span className="font-semibold text-stone-900">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={exportDailyClose}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900 text-white text-sm font-semibold hover:bg-stone-700"
+            >
+              <Download className="w-4 h-4" /> Exportar cierre (CSV)
+            </button>
+          </div>
+        )}
+      </Card>
       <ToolGuideHost toolKey="tablero" pathname="/panel/foodos/tablero" slug={null} icon="📊" title={t("foodos.tablero.guideTitle")} />
     </div>
   )
@@ -324,6 +439,15 @@ function Kpi({
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 ${accent}`}>{icon}</div>
       <p className="text-xl font-black text-stone-900 truncate">{value}</p>
       <p className="text-xs text-stone-500">{label}</p>
+    </div>
+  )
+}
+
+function CloseStat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className={`rounded-xl p-3 ${accent ? "bg-amber-50 border border-amber-200" : "bg-stone-50"}`}>
+      <p className="text-base font-black text-stone-900 truncate">{value}</p>
+      <p className="text-[11px] text-stone-500">{label}</p>
     </div>
   )
 }

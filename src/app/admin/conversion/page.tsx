@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { TrendingUp, ShoppingCart, Mail, Zap, Package, Globe, Download } from "lucide-react"
+import { TrendingUp, ShoppingCart, Mail, Zap, Package, Globe, Download, Repeat } from "lucide-react"
 import { toCsv, downloadCsv } from "@/lib/csv"
+import type { CohortRow } from "@/lib/admin-cohorts"
 
 interface FunnelData {
   days: number
@@ -36,6 +37,7 @@ export default function ConversionDashboardPage() {
   const [data, setData] = useState<FunnelData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [cohorts, setCohorts] = useState<CohortRow[] | null>(null)
 
   const fetchFunnel = useCallback(async () => {
     try {
@@ -53,6 +55,20 @@ export default function ConversionDashboardPage() {
     // Diferido a microtask: ningún setState de fetchFunnel corre síncrono en el efecto.
     void Promise.resolve().then(fetchFunnel)
   }, [fetchFunnel])
+
+  // Cohortes de recompra (independiente del funnel; best-effort).
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/admin/cohorts?months=12", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d: { cohorts?: CohortRow[] } | null) => {
+        if (!cancelled && d?.cohorts) setCohorts(d.cohorts)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Exporta el funnel completo del período a CSV (resumen + toques + UTM).
   function exportCsv() {
@@ -210,6 +226,47 @@ export default function ConversionDashboardPage() {
               </ul>
             )}
           </div>
+          {/* Cohortes de recompra */}
+          {cohorts && cohorts.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-4 mt-6">
+              <h2 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                <Repeat className="w-4 h-4 text-brand-600" />
+                Cohortes de recompra
+              </h2>
+              <p className="text-xs text-gray-500 mb-3">
+                % de clientes de cada cohorte (mes de su primer pedido) que
+                volvieron a comprar N meses después.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-gray-600">
+                  <thead>
+                    <tr className="text-left text-gray-400">
+                      <th className="py-1 pr-4 font-medium">Cohorte</th>
+                      <th className="py-1 pr-4 font-medium">Clientes</th>
+                      {Array.from({ length: cohorts[0]?.retentions.length ?? 0 }, (_, i) => (
+                        <th key={i} className="py-1 pr-3 font-medium text-right">
+                          M+{i + 1}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cohorts.map((c) => (
+                      <tr key={c.month} className="border-t border-gray-100">
+                        <td className="py-1 pr-4 font-medium text-gray-900">{c.month}</td>
+                        <td className="py-1 pr-4">{c.size}</td>
+                        {c.retentions.map((r, i) => (
+                          <td key={i} className="py-1 pr-3 text-right">
+                            {r === null ? "—" : `${r}%`}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

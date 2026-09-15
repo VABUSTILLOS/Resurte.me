@@ -2,10 +2,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }))
+vi.mock("@/lib/rate-limit", () => ({
+  rateLimited: vi.fn().mockResolvedValue({ allowed: true, remaining: 29, retry_after_seconds: 0 }),
+  clientIp: vi.fn(() => "127.0.0.1"),
+  rateLimitResponse: vi.fn(
+    (rate: { retry_after_seconds: number }) =>
+      new Response(JSON.stringify({ error: "Demasiadas solicitudes" }), {
+        status: 429,
+        headers: { "Retry-After": String(rate.retry_after_seconds) },
+      })
+  ),
+}))
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
 
 import { GET } from "./route"
 import { createServiceClient } from "@/lib/supabase/service"
+import { rateLimited } from "@/lib/rate-limit"
 
 const ORDER_ROW = {
   id: 42,
@@ -40,7 +52,17 @@ function req(url: string) {
 const params42 = Promise.resolve({ id: "42" })
 
 describe("GET /api/orders/[id]/track", () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(rateLimited).mockResolvedValue({ allowed: true, remaining: 29, retry_after_seconds: 0 })
+  })
+
+  it("429 cuando el rate limit no permite", async () => {
+    vi.mocked(rateLimited).mockResolvedValue({ allowed: false, remaining: 0, retry_after_seconds: 42 })
+    const res = await GET(req("http://localhost/api/orders/42/track?t=tok-1"), { params: params42 })
+    expect(res.status).toBe(429)
+    expect(res.headers.get("retry-after")).toBe("42")
+  })
 
   it("400 sin token", async () => {
     const res = await GET(req("http://localhost/api/orders/42/track"), { params: params42 })

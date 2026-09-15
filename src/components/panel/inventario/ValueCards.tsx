@@ -32,7 +32,7 @@ export default function ValueCards({ totalValue, weeklyCost, okStock, lowStock, 
       {itemCount > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 p-4 mb-6">
           <p className="text-[10px] text-gray-400 mb-2">Valor por estado</p>
-          <div className="grid grid-cols-3 gap-3 text-center text-xs">
+          <div className="grid grid-cols-1 min-[380px]:grid-cols-3 gap-3 text-center text-xs">
             <div className="bg-green-50 rounded-lg py-2">
               <p className="text-gray-500">🟢 Suficiente</p>
               <p className="font-bold text-green-700">${okStock.reduce((s, i) => s + i.stock * i.pricePerUnit, 0).toFixed(0)}</p>

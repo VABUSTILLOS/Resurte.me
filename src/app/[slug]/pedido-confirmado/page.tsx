@@ -7,11 +7,14 @@ import Link from "next/link"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { trackActiveExperimentsConversion } from "@/lib/checkout-experiments"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
+import { PaymentInstructions } from "@/components/checkout/payment-instructions"
 import type { RepurchaseCouponInfo } from "@/types"
 
 interface LastOrderSnapshot {
   orderId: number | null
   trackingToken: string | null
+  paymentMethod: string | null
+  total: number | null
   cashback: { credits: number; tier: string | null } | null
   repurchaseCoupon: RepurchaseCouponInfo | null
 }
@@ -20,6 +23,8 @@ function readLastOrder(): LastOrderSnapshot {
   const empty: LastOrderSnapshot = {
     orderId: null,
     trackingToken: null,
+    paymentMethod: null,
+    total: null,
     cashback: null,
     repurchaseCoupon: null,
   }
@@ -30,6 +35,8 @@ function readLastOrder(): LastOrderSnapshot {
     return {
       orderId: typeof parsed?.orderId === "number" ? parsed.orderId : null,
       trackingToken: typeof parsed?.trackingToken === "string" ? parsed.trackingToken : null,
+      paymentMethod: typeof parsed?.paymentMethod === "string" ? parsed.paymentMethod : null,
+      total: typeof parsed?.total === "number" ? parsed.total : null,
       cashback:
         parsed?.cashbackCredits > 0
           ? { credits: parsed.cashbackCredits, tier: parsed.cashbackTier ?? null }
@@ -116,6 +123,17 @@ export default function OrderConfirmedPage() {
           )}
         </p>
       </div>
+
+      {/* Instrucciones de pago para métodos manuales (SPEI / OXXO) */}
+      {(lastOrder.paymentMethod === "spei" || lastOrder.paymentMethod === "oxxo") && (
+        <div className="mb-8">
+          <PaymentInstructions
+            method={lastOrder.paymentMethod}
+            amount={lastOrder.total}
+            orderRef={orderId}
+          />
+        </div>
+      )}
 
       {/* Order info cards */}
       <div className="space-y-4 mb-8">

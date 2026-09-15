@@ -19,6 +19,7 @@ import { logger } from "@/lib/logger"
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logAdminAction as logAdminAudit } from "@/lib/audit"
 import { onOrderStatusChange } from "@/lib/workflows"
 import { notifyUser } from "@/lib/notifications"
 import { logAdminAction } from "@/lib/audit-log"
@@ -237,6 +238,34 @@ export async function PATCH(
           .update({ used_count: coupon.used_count - 1 })
           .eq("id", coupon.id)
           .eq("used_count", coupon.used_count)
+      }
+    }
+
+    // Bitácora admin (best-effort): qué cambió y quién lo cambió.
+    if (adminUser) {
+      if (status && oldStatus !== status) {
+        void logAdminAudit({
+          actorId: adminUser.id,
+          action: "order_status_changed",
+          orderId,
+          detail: `${oldStatus} → ${status}`,
+        })
+      }
+      if (payment_status === "paid" && oldPaymentStatus !== "paid") {
+        void logAdminAudit({
+          actorId: adminUser.id,
+          action: "order_payment_confirmed",
+          orderId,
+          detail: `${oldPaymentStatus} → paid`,
+        })
+      }
+      if (hasDriverField) {
+        void logAdminAudit({
+          actorId: adminUser.id,
+          action: driverId ? "order_driver_assigned" : "order_driver_unassigned",
+          orderId,
+          detail: driverId ? `driver_id=${driverId}` : "driver_id=null",
+        })
       }
     }
 

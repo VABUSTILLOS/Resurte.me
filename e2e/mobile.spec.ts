@@ -1752,19 +1752,34 @@ test.describe("Fase 16 — Hub del panel des-saturado en móvil y barra de acces
     await expect(page.getByText("Incluido gratis")).toBeVisible()
   })
 
-  test("la barra inferior de accesos rápidos tiene 5 destinos y navega", async ({ page }) => {
+  test("el FAB abre el sheet de herramientas y navega a Ventas", async ({ page }) => {
     await selectCollection(page)
 
-    const nav = page.getByRole("navigation", { name: "Accesos rápidos del panel" })
-    await expect(nav).toBeVisible({ timeout: 8000 })
+    // Despeja overlays que cubren la esquina del FAB en contexto limpio.
+    const closeGuide = page.getByRole("button", { name: "Cerrar guía" })
+    if (await closeGuide.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await closeGuide.tap()
+      await page.waitForTimeout(300)
+    }
+    const acceptCookies = page.getByRole("button", { name: "Aceptar todas" })
+    if (await acceptCookies.isVisible().catch(() => false)) {
+      await page.waitForTimeout(700)
+      await acceptCookies.tap()
+    }
 
-    for (const label of ["Inicio", "Ventas", "Costeo", "Mermas", "Menú digital"]) {
-      await expect(nav.getByText(label, { exact: true })).toBeVisible()
+    const fab = page.getByRole("button", { name: "Abrir herramientas" })
+    await expect(fab).toBeVisible({ timeout: 8000 })
+    await fab.tap()
+
+    const sheet = page.getByRole("dialog", { name: /mi restaurante/i })
+    await expect(sheet).toBeVisible()
+    for (const label of ["Ventas", "Costeo", "Mermas", "Menú digital"]) {
+      await expect(sheet.getByText(label, { exact: true }).first()).toBeVisible()
     }
 
     // Tap en "Ventas" navega a /panel/ventas
     for (let attempt = 0; attempt < 3; attempt++) {
-      await nav.getByText("Ventas", { exact: true }).tap()
+      await sheet.getByText("Ventas", { exact: true }).first().tap()
       try {
         await page.waitForURL(/\/panel\/ventas$/, { timeout: 8000 })
         break
@@ -1775,24 +1790,28 @@ test.describe("Fase 16 — Hub del panel des-saturado en móvil y barra de acces
     expect(page.url()).toMatch(/\/panel\/ventas$/)
   })
 
-  test("sin overflow del viewport y el último tool queda visible sobre la barra", async ({ page }) => {
+  test("sin overflow del viewport y el último tool queda descubierto al bajar", async ({ page }) => {
     await selectCollection(page)
 
     const grid = page.locator("div.flex.flex-col.gap-2").first()
     const lastTool = grid.locator("a").last()
     await lastTool.scrollIntoViewIfNeeded()
-    // Scrollear hasta el fondo: el wrapper del hub tiene pb-24, así el último tool
-    // queda por encima de la barra inferior (que mide ~72px).
+    // Scrollear hasta el fondo: el FAB se auto-oculta al bajar, así el último
+    // tool queda completamente visible dentro del viewport.
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
-    await page.waitForTimeout(400)
+    await page.waitForTimeout(600)
 
     const toolBox = await boundingBoxSettled(lastTool)
-    const nav = page.getByRole("navigation", { name: "Accesos rápidos del panel" })
-    const navBox = await boundingBoxSettled(nav)
+    const fab = page.getByRole("button", { name: "Abrir herramientas" })
+    const fabBox = await fab.boundingBox().catch(() => null)
     expect(toolBox).toBeTruthy()
-    expect(navBox).toBeTruthy()
-    // El último tool no queda tapado por la barra inferior.
-    expect(toolBox!.y + toolBox!.height).toBeLessThanOrEqual(navBox!.y + 2)
+    // El último tool está dentro del viewport y el FAB (oculto) no lo tapa.
+    const viewportH = await page.evaluate(() => window.innerHeight)
+    expect(toolBox!.y + toolBox!.height).toBeLessThanOrEqual(viewportH + 2)
+    if (fabBox) {
+      const fabHidden = await fab.evaluate((el) => el.classList.contains("pointer-events-none"))
+      expect(fabHidden || toolBox!.y + toolBox!.height <= fabBox.y + 2).toBeTruthy()
+    }
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth
@@ -1801,10 +1820,10 @@ test.describe("Fase 16 — Hub del panel des-saturado en móvil y barra de acces
   })
 })
 
-test.describe("Fase 16 — PanelQuickNav solo en móvil", () => {
+test.describe("Fase 16 — FAB del panel solo en móvil", () => {
   test.use({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false })
 
-  test("en desktop la barra inferior de accesos rápidos no se renderiza", async ({ page }) => {
+  test("en desktop el FAB de herramientas no se renderiza", async ({ page }) => {
     await page.goto("/panel", { waitUntil: "domcontentloaded" })
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
 
@@ -1812,7 +1831,7 @@ test.describe("Fase 16 — PanelQuickNav solo en móvil", () => {
     await pickerBtn.tap().catch(() => {})
     await page.waitForTimeout(800)
 
-    await expect(page.getByRole("navigation", { name: "Accesos rápidos del panel" })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Abrir herramientas" })).toHaveCount(0)
   })
 })
 
@@ -1825,8 +1844,8 @@ test.describe("Fase 17 — Panel: banner oculto, ThemeToggle con feedback, foote
   })
 
   async function selectCollection(page: import("@playwright/test").Page) {
-    const nav = page.getByRole("navigation", { name: "Accesos rápidos del panel" })
-    if (await nav.isVisible().catch(() => false)) return
+    const fab = page.getByRole("button", { name: "Abrir herramientas" })
+    if (await fab.isVisible().catch(() => false)) return
     const pickerBtn = page.locator("button", { hasText: /Hamburguesas y Hot Dogs/ }).first()
     await pickerBtn.tap().catch(() => {})
     await page.waitForTimeout(800)
@@ -1875,7 +1894,7 @@ test.describe("Fase 17 — Panel: banner oculto, ThemeToggle con feedback, foote
       const pb = parseFloat(getComputedStyle(inner).paddingBottom)
       return { total: el.getBoundingClientRect().height, pb }
     })
-    // Altura visual del footer (sin el clearance de PanelQuickNav) < 260px
+    // Altura visual del footer (sin el clearance del FAB) < 260px
     // (el footer global de páginas públicas mide ~551px).
     expect(metrics.total - metrics.pb, "footer compacto").toBeLessThan(260)
   })

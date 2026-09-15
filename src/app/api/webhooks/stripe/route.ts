@@ -7,11 +7,13 @@ import {
   handlePaymentIntentRefunded,
   handlePaymentIntentFailed,
   handlePaymentIntentCanceled,
+  handlePaymentIntentProcessing,
   handleChargeRefunded,
   handleChargeDisputeCreated,
   type StripePaymentIntentLike,
 } from "@/lib/stripe-webhook-handlers"
 import { logger } from "@/lib/logger"
+import { handleConnectAccountUpdated } from "@/lib/stripe-connect"
 /**
  * POST /api/webhooks/stripe
  *
@@ -76,7 +78,38 @@ export async function POST(request: NextRequest) {
 
       case "payment_intent.canceled": {
         const supabase = await createServiceClient()
-        await handlePaymentIntentCanceled(
+        const pi = event.data.object as {
+          id: string
+          cancellation_reason?: string | null
+        }
+        await handlePaymentIntentCanceled(supabase, {
+          id: pi.id,
+          cancellation_reason: pi.cancellation_reason ?? null,
+        })
+        break
+      }
+
+      // Métodos locales asíncronos (OXXO, SPEI, CoDi): el cliente ya tiene
+      // las instrucciones de pago y el dinero aún no se acredita.
+      // `requires_action` es el estado inmediatamente posterior a
+      // confirmar el intent; `processing` el que sigue.
+      case "payment_intent.processing":
+      case "payment_intent.requires_action": {
+        const supabase = await createServiceClient()
+        await handlePaymentIntentProcessing(
+          supabase,
+          event.data.object as { id: string }
+        )
+        break
+      }
+
+      // Connect: Stripe avisa cada vez que cambia el estado de verificación
+      // de una cuenta Express (requisitos pendientes, habilitada, bloqueada).
+      // Es la fuente de verdad del enrutamiento de fondos: el restaurante no
+      // necesita volver al panel para que su cuenta quede habilitada.
+      case "account.updated": {
+        const supabase = await createServiceClient()
+        await handleConnectAccountUpdated(
           supabase,
           event.data.object as { id: string }
         )

@@ -4,7 +4,7 @@
 -- panel admin (quién, cuándo, de qué a qué, nota opcional).
 -- ============================================================
 
-CREATE TABLE stock_adjustments (
+CREATE TABLE IF NOT EXISTS stock_adjustments (
   id              BIGSERIAL PRIMARY KEY,
   product_id      BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   previous_status stock_status NOT NULL,
@@ -14,13 +14,14 @@ CREATE TABLE stock_adjustments (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_stock_adjustments_product ON stock_adjustments(product_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_stock_adjustments_product ON stock_adjustments(product_id, created_at DESC);
 
 ALTER TABLE stock_adjustments ENABLE ROW LEVEL SECURITY;
 
 -- Solo administradores leen/escriben la bitácora (mismo patrón que otras
 -- tablas admin: el chequeo fino lo hace requireAdmin en el server action;
 -- aquí se exige profiles.role = 'admin', único rol admin según 00067).
+DROP POLICY IF EXISTS "Admins can read stock adjustments" ON stock_adjustments;
 CREATE POLICY "Admins can read stock adjustments" ON stock_adjustments
   FOR SELECT USING (
     EXISTS (
@@ -30,6 +31,7 @@ CREATE POLICY "Admins can read stock adjustments" ON stock_adjustments
     )
   );
 
+DROP POLICY IF EXISTS "Admins can insert stock adjustments" ON stock_adjustments;
 CREATE POLICY "Admins can insert stock adjustments" ON stock_adjustments
   FOR INSERT WITH CHECK (
     EXISTS (

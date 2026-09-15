@@ -10,7 +10,9 @@ import { requireAuth, getCurrentUser } from "@/lib/auth"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { slugify } from "@/lib/foodos"
+import { notifyFoodosCustomer } from "@/lib/foodos-notifications"
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 import type {
   FoodosRestaurant,
   FoodosRestaurantStatus,
@@ -26,6 +28,15 @@ import type {
   FoodosCustomer,
   FoodosCampaign,
   FoodosCampaignStatus,
+  FoodosItemOptionGroup,
+  FoodosItemOptionValue,
+  FoodosBranchHours,
+  FoodosCoupon,
+  FoodosBranchMenuOverride,
+  FoodosLoyaltyProgram,
+  FoodosReview,
+  FoodosWebhook,
+  FoodosWebhookDelivery,
 } from "@/types/foodos"
 
 // ------------------------------------------------------------
@@ -62,10 +73,12 @@ export async function getFoodosPanelData() {
       rules: [],
       automations: [],
       campaigns: [],
+      optionGroups: [],
+      optionValues: [],
     }
   }
 
-  const [branches, orders, customers, categories, items, combos, rules, automations, campaigns] =
+  const [branches, orders, customers, categories, items, combos, rules, automations, campaigns, optionGroups, optionValues] =
     await Promise.all([
       supabase.from("foodos_branches").select("*").eq("restaurant_id", r.id).order("name"),
       supabase.from("foodos_orders").select("*").eq("restaurant_id", r.id).order("created_at", { ascending: false }).limit(200),
@@ -76,9 +89,11 @@ export async function getFoodosPanelData() {
       supabase.from("foodos_upsell_rules").select("*").eq("restaurant_id", r.id).order("created_at"),
       supabase.from("foodos_automations").select("*").eq("restaurant_id", r.id).order("created_at"),
       supabase.from("foodos_campaigns").select("*").eq("restaurant_id", r.id).order("created_at", { ascending: false }).limit(200),
+      supabase.from("foodos_item_option_groups").select("*").eq("restaurant_id", r.id).order("sort_order"),
+      supabase.from("foodos_item_option_values").select("*").eq("restaurant_id", r.id).order("sort_order"),
     ])
 
-  for (const q of [branches, orders, customers, categories, items, combos, rules, automations, campaigns]) {
+  for (const q of [branches, orders, customers, categories, items, combos, rules, automations, campaigns, optionGroups, optionValues]) {
     if (q.error) throw new Error(q.error.message)
   }
 
@@ -93,6 +108,8 @@ export async function getFoodosPanelData() {
     rules: (rules.data as FoodosUpsellRule[]) ?? [],
     automations: (automations.data as FoodosAutomation[]) ?? [],
     campaigns: (campaigns.data as FoodosCampaign[]) ?? [],
+    optionGroups: (optionGroups.data as FoodosItemOptionGroup[]) ?? [],
+    optionValues: (optionValues.data as FoodosItemOptionValue[]) ?? [],
   }
 }
 
@@ -105,6 +122,12 @@ export async function upsertRestaurant(input: {
   status?: FoodosRestaurantStatus
   currency?: string
   collection_id?: number | null
+  theme_color?: string | null
+  meta_pixel_id?: string | null
+  tiktok_pixel_id?: string | null
+  transfer_clabe?: string | null
+  transfer_bank?: string | null
+  transfer_beneficiary?: string | null
 }): Promise<FoodosRestaurant> {
   const { supabase, user } = await requireAuth()
 
@@ -131,6 +154,12 @@ export async function upsertRestaurant(input: {
     status: input.status ?? "draft",
     currency: input.currency || "MXN",
     collection_id: input.collection_id ?? null,
+    theme_color: input.theme_color || null,
+    meta_pixel_id: input.meta_pixel_id || null,
+    tiktok_pixel_id: input.tiktok_pixel_id || null,
+    transfer_clabe: input.transfer_clabe || null,
+    transfer_bank: input.transfer_bank || null,
+    transfer_beneficiary: input.transfer_beneficiary || null,
   }
 
   let result
@@ -197,6 +226,9 @@ export async function upsertBranch(input: {
   phone?: string | null
   pickup_active: boolean
   delivery_active: boolean
+  dine_in_active?: boolean
+  scheduled_orders_active?: boolean
+  lead_minutes?: number
   delivery_fee: number
   min_order: number
 }): Promise<void> {
@@ -219,6 +251,9 @@ export async function upsertBranch(input: {
     phone: input.phone || null,
     pickup_active: input.pickup_active,
     delivery_active: input.delivery_active,
+    dine_in_active: input.dine_in_active ?? false,
+    scheduled_orders_active: input.scheduled_orders_active ?? false,
+    lead_minutes: Math.max(0, Number(input.lead_minutes) || 30),
     delivery_fee: Number(input.delivery_fee) || 0,
     min_order: Number(input.min_order) || 0,
   }
@@ -233,6 +268,50 @@ export async function upsertBranch(input: {
 export async function deleteBranch(id: string): Promise<void> {
   const { supabase } = await requireAuth()
   const { error } = await supabase.from("foodos_branches").delete().eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/restaurante")
+}
+
+// ------------------------------------------------------------
+// Horarios de sucursal
+// ------------------------------------------------------------
+
+export async function listBranchHours(
+  branchId: string
+): Promise<FoodosBranchHours[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_branch_hours")
+    .select("*")
+    .eq("branch_id", branchId)
+    .order("day_of_week")
+  if (error) throw new Error(error.message)
+  return (data as FoodosBranchHours[]) ?? []
+}
+
+/** Reemplaza el horario semanal completo de una sucursal (7 días). */
+export async function upsertBranchHours(
+  branchId: string,
+  days: Array<{
+    day_of_week: number
+    open_time: string | null
+    close_time: string | null
+    is_closed: boolean
+  }>
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  const rows = days
+    .filter((d) => d.day_of_week >= 0 && d.day_of_week <= 6)
+    .map((d) => ({
+      branch_id: branchId,
+      day_of_week: d.day_of_week,
+      open_time: d.is_closed ? null : d.open_time,
+      close_time: d.is_closed ? null : d.close_time,
+      is_closed: d.is_closed,
+    }))
+  const { error } = await supabase
+    .from("foodos_branch_hours")
+    .upsert(rows, { onConflict: "branch_id,day_of_week" })
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/restaurante")
 }
@@ -373,6 +452,114 @@ export async function bulkUpsertMenuItems(
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/menu")
   return { added: rows.length }
+}
+
+// ------------------------------------------------------------
+// Modificadores de platillos (grupos de opciones + valores)
+// ------------------------------------------------------------
+
+export async function listOptionGroups(
+  restaurantId: string
+): Promise<FoodosItemOptionGroup[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_item_option_groups")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("sort_order")
+  if (error) throw new Error(error.message)
+  return (data as FoodosItemOptionGroup[]) ?? []
+}
+
+export async function listOptionValues(
+  restaurantId: string
+): Promise<FoodosItemOptionValue[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_item_option_values")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("sort_order")
+  if (error) throw new Error(error.message)
+  return (data as FoodosItemOptionValue[]) ?? []
+}
+
+export async function upsertOptionGroup(input: {
+  id?: string
+  restaurant_id: string
+  item_id: string
+  name: string
+  is_required?: boolean
+  min_select?: number
+  max_select?: number
+  sort_order?: number
+}): Promise<void> {
+  const { supabase } = await requireAuth()
+  const payload = {
+    restaurant_id: input.restaurant_id,
+    item_id: input.item_id,
+    name: input.name,
+    is_required: input.is_required ?? false,
+    min_select: Math.max(0, Number(input.min_select) || 0),
+    max_select: Math.max(1, Number(input.max_select) || 1),
+    sort_order: Number(input.sort_order) || 0,
+  }
+  const { error } = input.id
+    ? await supabase
+        .from("foodos_item_option_groups")
+        .update(payload)
+        .eq("id", input.id)
+    : await supabase.from("foodos_item_option_groups").insert(payload)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/menu")
+}
+
+export async function deleteOptionGroup(id: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_item_option_groups")
+    .delete()
+    .eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/menu")
+}
+
+export async function upsertOptionValue(input: {
+  id?: string
+  group_id: string
+  restaurant_id: string
+  name: string
+  price_delta?: number
+  is_available?: boolean
+  sort_order?: number
+}): Promise<void> {
+  const { supabase } = await requireAuth()
+  const payload = {
+    group_id: input.group_id,
+    restaurant_id: input.restaurant_id,
+    name: input.name,
+    price_delta: Number(input.price_delta) || 0,
+    is_available: input.is_available ?? true,
+    sort_order: Number(input.sort_order) || 0,
+  }
+  const { error } = input.id
+    ? await supabase
+        .from("foodos_item_option_values")
+        .update(payload)
+        .eq("id", input.id)
+    : await supabase.from("foodos_item_option_values").insert(payload)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/menu")
+}
+
+export async function deleteOptionValue(id: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_item_option_values")
+    .delete()
+    .eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/menu")
 }
 
 // ------------------------------------------------------------
@@ -572,12 +759,32 @@ export async function updateOrderStatus(
   status: FoodosOrderStatus
 ): Promise<void> {
   const { supabase } = await requireAuth()
+
+  const { data: current, error: readError } = await supabase
+    .from("foodos_orders")
+    .select("status")
+    .eq("id", orderId)
+    .maybeSingle()
+  if (readError) throw new Error(readError.message)
+
+  // Sin cambio real no se reescribe ni se reavisa. Los botones de estado
+  // del panel y el tablero de cocina pueden dispararse dos veces con el
+  // mismo valor; el UPDATE es idempotente pero el aviso al comensal no.
+  if ((current as { status: string } | null)?.status === status) return
+
   const { error } = await supabase
     .from("foodos_orders")
     .update({ status })
     .eq("id", orderId)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/pedidos")
+
+  // after(): el aviso se manda después de responder para no dejar al
+  // dueño esperando al mensajero, pero dentro de la vida de la función
+  // (fire-and-forget se cancelaría al resolver la respuesta).
+  after(() => {
+    void notifyFoodosCustomer(orderId, `status:${status}`)
+  })
 }
 
 // ------------------------------------------------------------
@@ -737,4 +944,329 @@ export async function deleteCampaign(id: string): Promise<void> {
   const { error } = await supabase.from("foodos_campaigns").delete().eq("id", id)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/clientes")
+}
+
+// ------------------------------------------------------------
+// Cupones del restaurante
+// ------------------------------------------------------------
+
+export async function listCoupons(restaurantId: string): Promise<FoodosCoupon[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_coupons")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("created_at", { ascending: false })
+  if (error) throw new Error(error.message)
+  return (data as FoodosCoupon[]) ?? []
+}
+
+export async function upsertCoupon(input: {
+  id?: string
+  restaurant_id: string
+  code: string
+  type: "percent" | "fixed"
+  value: number
+  min_order?: number
+  max_uses?: number | null
+  is_active?: boolean
+  expires_at?: string | null
+}): Promise<void> {
+  const { supabase } = await requireAuth()
+  const payload = {
+    restaurant_id: input.restaurant_id,
+    code: input.code.trim().toUpperCase(),
+    type: input.type,
+    value: Number(input.value) || 0,
+    min_order: Number(input.min_order) || 0,
+    max_uses: input.max_uses ?? null,
+    is_active: input.is_active ?? true,
+    expires_at: input.expires_at || null,
+  }
+  const { error } = input.id
+    ? await supabase.from("foodos_coupons").update(payload).eq("id", input.id)
+    : await supabase.from("foodos_coupons").insert(payload)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/cupones")
+}
+
+export async function deleteCoupon(id: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase.from("foodos_coupons").delete().eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/cupones")
+}
+
+// ------------------------------------------------------------
+// Overrides de menú por sucursal
+// ------------------------------------------------------------
+
+export async function listBranchMenuOverrides(
+  branchId: string
+): Promise<FoodosBranchMenuOverride[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_branch_menu_overrides")
+    .select("*")
+    .eq("branch_id", branchId)
+  if (error) throw new Error(error.message)
+  return (data as FoodosBranchMenuOverride[]) ?? []
+}
+
+/** Guarda (o borra, si ambos campos son null) el override de un ítem en una sucursal. */
+export async function upsertBranchMenuOverride(input: {
+  branch_id: string
+  item_id: string
+  price?: number | null
+  is_available?: boolean | null
+}): Promise<void> {
+  const { supabase } = await requireAuth()
+  const price = input.price ?? null
+  const isAvailable = input.is_available ?? null
+  if (price === null && isAvailable === null) {
+    const { error } = await supabase
+      .from("foodos_branch_menu_overrides")
+      .delete()
+      .eq("branch_id", input.branch_id)
+      .eq("item_id", input.item_id)
+    if (error) throw new Error(error.message)
+  } else {
+    const { error } = await supabase
+      .from("foodos_branch_menu_overrides")
+      .upsert(
+        { branch_id: input.branch_id, item_id: input.item_id, price, is_available: isAvailable },
+        { onConflict: "branch_id,item_id" }
+      )
+    if (error) throw new Error(error.message)
+  }
+  revalidatePath("/panel/foodos/menu")
+}
+
+// ------------------------------------------------------------
+// Pedidos: confirmar pago manual (transferencia/efectivo)
+// ------------------------------------------------------------
+
+export async function markOrderPaid(orderId: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_orders")
+    .update({ payment_status: "paid" })
+    .eq("id", orderId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/pedidos")
+
+  after(() => {
+    void notifyFoodosCustomer(orderId, "payment:paid")
+  })
+}
+
+// ------------------------------------------------------------
+// Programa de lealtad + store credit
+// ------------------------------------------------------------
+
+export async function getLoyaltyProgram(
+  restaurantId: string
+): Promise<FoodosLoyaltyProgram | null> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_loyalty_programs")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as FoodosLoyaltyProgram | null) ?? null
+}
+
+export async function upsertLoyaltyProgram(input: {
+  restaurant_id: string
+  points_per_100: number
+  point_value: number
+  is_active: boolean
+}): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_loyalty_programs")
+    .upsert(
+      {
+        restaurant_id: input.restaurant_id,
+        points_per_100: Math.max(0, Number(input.points_per_100) || 0),
+        point_value: Math.max(0, Number(input.point_value) || 0),
+        is_active: input.is_active,
+      },
+      { onConflict: "restaurant_id" }
+    )
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/clientes")
+}
+
+/** Ajuste manual de store credit (ej. compensación por mala experiencia). */
+export async function adjustCustomerCredit(
+  customerId: string,
+  amount: number
+): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { data: customer, error: readErr } = await supabase
+    .from("foodos_customers")
+    .select("store_credit")
+    .eq("id", customerId)
+    .single()
+  if (readErr) throw new Error(readErr.message)
+  const next = Math.max(0, Number(customer.store_credit) + amount)
+  const { error } = await supabase
+    .from("foodos_customers")
+    .update({ store_credit: next })
+    .eq("id", customerId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/clientes")
+}
+
+// ------------------------------------------------------------
+// Reseñas (moderación)
+// ------------------------------------------------------------
+
+export async function listReviews(restaurantId: string): Promise<FoodosReview[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_reviews")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("created_at", { ascending: false })
+    .limit(50)
+  if (error) throw new Error(error.message)
+  return (data as FoodosReview[]) ?? []
+}
+
+export async function setReviewVisibility(id: string, isVisible: boolean): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_reviews")
+    .update({ is_visible: isVisible })
+    .eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/clientes")
+}
+
+// ------------------------------------------------------------
+// Importación CSV del menú
+// ------------------------------------------------------------
+
+/**
+ * Importa filas de CSV (categoria,nombre,descripcion,precio,costo,tags).
+ * Crea las categorías faltantes por nombre y agrega los platillos.
+ */
+export async function importMenuCsv(
+  restaurantId: string,
+  rows: Array<{
+    category_name?: string | null
+    name: string
+    description?: string | null
+    price: number
+    cost?: number
+    tags?: string[]
+  }>
+): Promise<{ added: number; categories: number }> {
+  const { supabase } = await requireAuth()
+
+  // Categorías existentes por nombre (lowercase)
+  const { data: cats, error: catErr } = await supabase
+    .from("foodos_menu_categories")
+    .select("id, name, sort_order")
+    .eq("restaurant_id", restaurantId)
+  if (catErr) throw new Error(catErr.message)
+
+  const byName = new Map((cats ?? []).map((c) => [c.name.trim().toLowerCase(), c.id]))
+  let sortOrder = (cats ?? []).length
+  let createdCategories = 0
+
+  // Crear categorías faltantes
+  const wanted = [...new Set(rows.map((r) => r.category_name?.trim().toLowerCase()).filter(Boolean))] as string[]
+  for (const name of wanted) {
+    if (byName.has(name)) continue
+    const displayName = rows.find((r) => r.category_name?.trim().toLowerCase() === name)?.category_name?.trim() ?? name
+    const { data, error } = await supabase
+      .from("foodos_menu_categories")
+      .insert({ restaurant_id: restaurantId, name: displayName, sort_order: sortOrder++ })
+      .select("id")
+      .single()
+    if (error) throw new Error(error.message)
+    byName.set(name, data.id)
+    createdCategories++
+  }
+
+  const itemRows = rows.map((r) => ({
+    restaurant_id: restaurantId,
+    category_id: r.category_name ? byName.get(r.category_name.trim().toLowerCase()) ?? null : null,
+    name: r.name.trim(),
+    description: r.description?.trim() || null,
+    price: Number(r.price) || 0,
+    cost: Number(r.cost) || 0,
+    tags: r.tags ?? [],
+    is_available: true,
+  }))
+  const { error } = await supabase.from("foodos_menu_items").insert(itemRows)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/menu")
+  return { added: itemRows.length, categories: createdCategories }
+}
+
+// ------------------------------------------------------------
+// Webhooks salientes (notificaciones de pedido a URL externa)
+// ------------------------------------------------------------
+
+export async function listWebhooks(restaurantId: string): Promise<FoodosWebhook[]> {
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_webhooks")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .order("created_at")
+  if (error) throw new Error(error.message)
+  return (data as FoodosWebhook[]) ?? []
+}
+
+export async function addWebhook(restaurantId: string, url: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const parsed = new URL(url) // lanza si no es URL válida
+  if (parsed.protocol !== "https:") throw new Error("La URL del webhook debe ser HTTPS")
+  const { error } = await supabase
+    .from("foodos_webhooks")
+    .insert({ restaurant_id: restaurantId, url })
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/restaurante")
+}
+
+export async function toggleWebhook(id: string, isActive: boolean): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_webhooks")
+    .update({ is_active: isActive })
+    .eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/restaurante")
+}
+
+export async function deleteWebhook(id: string): Promise<void> {
+  const { supabase } = await requireAuth()
+  const { error } = await supabase.from("foodos_webhooks").delete().eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/restaurante")
+}
+
+export async function listWebhookDeliveries(restaurantId: string): Promise<FoodosWebhookDelivery[]> {
+  const { supabase } = await requireAuth()
+  const { data: hooks, error: hErr } = await supabase
+    .from("foodos_webhooks")
+    .select("id")
+    .eq("restaurant_id", restaurantId)
+  if (hErr) throw new Error(hErr.message)
+  const ids = (hooks ?? []).map((h) => h.id)
+  if (!ids.length) return []
+  const { data, error } = await supabase
+    .from("foodos_webhook_deliveries")
+    .select("*")
+    .in("webhook_id", ids)
+    .order("attempted_at", { ascending: false })
+    .limit(10)
+  if (error) throw new Error(error.message)
+  return (data as FoodosWebhookDelivery[]) ?? []
 }

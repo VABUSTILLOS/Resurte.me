@@ -209,10 +209,13 @@ export async function getClientsToReorder(): Promise<ClientToReorder[]> {
 
   if (clients.length === 0) return []
 
+  const clientIds = clients.map((c) => c.user_id)
+
+  // Pedidos pagados de la semana (para saber quién ya pidió).
   const { data: orders } = await supabase
     .from("orders")
     .select("user_id, created_at, total, payment_status")
-    .in("user_id", clients.map((c) => c.user_id))
+    .in("user_id", clientIds)
     .eq("payment_status", "paid")
     .neq("status", "cancelled")
     .gte("created_at", week.startISO)
@@ -227,8 +230,51 @@ export async function getClientsToReorder(): Promise<ClientToReorder[]> {
     }
   }
 
+  // Último pedido (con items) por cliente, para sugerir el reorden específico.
+  // Se consulta el pedido pagado más reciente de cada uno (sin acotar a la semana).
+  const { data: lastOrders } = await supabase
+    .from("orders")
+    .select("user_id, created_at, order_items(quantity, products(name))")
+    .in("user_id", clientIds)
+    .eq("payment_status", "paid")
+    .neq("status", "cancelled")
+    .order("created_at", { ascending: false })
+
+  const lastOrderByUser = new Map<
+    string,
+    { created_at: string; items: string[] }
+  >()
+  for (const o of lastOrders ?? []) {
+    const uid = String(o.user_id)
+    if (lastOrderByUser.has(uid)) continue // ya tomamos el más reciente
+    const rawItems = (o as { order_items?: unknown }).order_items
+    const items: string[] = Array.isArray(rawItems)
+      ? rawItems
+          .map((ri) => {
+            const row = ri as { quantity?: number; products?: { name?: string } | { name?: string }[] | null }
+            const prod = Array.isArray(row.products) ? row.products[0] : row.products
+            const name = prod?.name
+            return name ? `${row.quantity ?? 1}× ${name}` : null
+          })
+          .filter((x): x is string => Boolean(x))
+      : []
+    lastOrderByUser.set(uid, { created_at: String(o.created_at), items })
+  }
+
+  const now = Date.now()
   return clients
     .filter((c) => !orderedThisWeek.has(c.user_id))
-    .map((c) => ({ ...c, last_order_at: weekByUser.get(c.user_id) ?? null }))
+    .map((c) => {
+      const last = lastOrderByUser.get(c.user_id)
+      const lastAt = last?.created_at ?? weekByUser.get(c.user_id) ?? null
+      return {
+        ...c,
+        last_order_at: lastAt,
+        last_order_items: last?.items ?? [],
+        days_since_order: lastAt
+          ? Math.floor((now - new Date(lastAt).getTime()) / (1000 * 60 * 60 * 24))
+          : null,
+      }
+    })
 }
 

@@ -7,7 +7,7 @@ interface Props {
 
 export default function StatsRow({ itemCount, okCount, lowCount, outCount }: Props) {
   return (
-    <div className="grid grid-cols-4 gap-3 mb-6">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
       <div className="bg-white rounded-xl border border-gray-100 p-3 text-center">
         <p className="text-2xl font-extrabold text-gray-800">{itemCount}</p>
         <p className="text-[10px] text-gray-400">Productos</p>

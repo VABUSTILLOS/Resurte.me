@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { BottomSheet } from "@/components/ui/bottom-sheet"
 
 interface ConfirmDialogProps {
   open: boolean
@@ -23,27 +23,9 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel()
-    }
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [open, onCancel])
-
-  if (!open) return null
-
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-      onClick={onCancel}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-dialog-title"
-    >
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <BottomSheet open={open} onClose={onCancel} ariaLabelledby="confirm-dialog-title" maxWidthClass="max-w-sm">
+      <div className="p-6">
         <h4 id="confirm-dialog-title" className="font-bold text-gray-900 mb-2">{title}</h4>
         {message && <p className="text-sm text-gray-500 mb-4">{message}</p>}
         <div className="flex gap-3">
@@ -63,6 +45,6 @@ export default function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   )
 }

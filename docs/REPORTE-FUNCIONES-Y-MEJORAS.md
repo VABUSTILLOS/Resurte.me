@@ -123,4 +123,13 @@ Marketplace mayorista B2B de insumos para restaurantes (México) + suite SaaS de
 - ✅ Refactor: módulo CSV consolidado en `src/lib/csv.ts` (el de comercialización ahora re-exporta, `@deprecated`).
 - Nota: la whitelist de `/api/orders` ya admite `spei`, `oxxo`, `mercado_pago` y `codi`; A1 requiere habilitar esos métodos en la cuenta de Stripe y la UI de confirmación.
 - Nota 2: B1 (importar prospectos CSV) y B4 (exportar comisiones) ya existían (`import-csv-modal.tsx`, "Exportar mes" en el dashboard de comercialización).
-- Pendientes con credenciales externas: C1 (PAC para timbrado CFDI), A1 (Stripe MX para OXXO/SPEI).
+- ✅ **C5 (ligero)**: bitácora de acciones admin — `src/lib/audit.ts` registra cambios de estado/pago/repartidor en `/api/orders/[id]/status` (log estructurado `[AUDIT]` + notificación `admin_audit` a todos los admins), feed "Bitácora de actividad" en el dashboard `/admin`, API `GET /api/admin/audit-log` (solo admins), tests unitarios + e2e de guards (`e2e/admin-audit.spec.ts`). Sin migración: reutiliza `notifications` (00073).
+- Nota 3: A4 ya estaba cubierto — `search-page-client.tsx` tiene toggle "Solo disponibles", rangos de precio y orden por precio/nombre. R3.4 (guards `/admin` sin sesión) ya estaba en `e2e/auth.spec.ts`; i18n del panel ya cubre las 5 páginas restantes.
+- ✅ **B2**: agente IA transaccional — `getDailyBriefing` (resumen del día con IA + fallback) + `BriefingModal` (copiar/compartir WhatsApp) + atajo "Hacer pedido" en la cola (commit `d06091e`).
+- ✅ **A4**: "Mi canasta" — listas de compra recurrentes en localStorage (`shopping-lists.ts`), guardar carrito como lista, Mis listas con reordenar/renombrar/borrar en `/carrito` (commit `081e186`, 6 tests).
+- ✅ **B3**: alertas de reorden específicas — `getClientsToReorder` con productos del último pedido + días sin pedir, badge de inactividad >14d, mensaje WhatsApp con el detalle (commit `081e186`, 2 tests).
+- ✅ **A1 (parcial)**: instrucciones de pago SPEI/OXXO en `pedido-confirmado` (CLABE/referencia por env `NEXT_PUBLIC_SPEI_CLABE`/`_BENEFICIARIO`/`_OXXO_REFERENCIA`); el admin confirma el cobro manualmente (commit `081e186`).
+- ✅ **E2**: `/admin/errores` — salud de la app leyendo `error_logs` (conteos por severidad, filtro por fuente client/server/edge, export CSV), sin Sentry. Link en sub-nav (commit `9d679cb`).
+- ✅ **C6**: export CSV de la cola de facturas en `/admin/facturas` (commit `9d679cb`).
+- ⏸️ **C2 prueba de entrega**: pospuesta (requiere migración `orders.delivery_proof_url`; el usuario decidió no tocar la BD por ahora).
+- Pendientes con credenciales externas: C1 (PAC para timbrado CFDI), A1 completo (confirmación Stripe OXXO/SPEI en la cuenta).

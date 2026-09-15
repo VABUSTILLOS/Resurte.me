@@ -13,6 +13,11 @@ import type {
   FoodosMenuItem,
   FoodosCombo,
   FoodosUpsellRule,
+  FoodosItemOptionGroup,
+  FoodosItemOptionValue,
+  FoodosBranchHours,
+  FoodosBranchMenuOverride,
+  FoodosReview,
 } from "@/types/foodos"
 
 export interface PublicFoodosData {
@@ -22,6 +27,11 @@ export interface PublicFoodosData {
   items: FoodosMenuItem[]
   combos: FoodosCombo[]
   rules: FoodosUpsellRule[]
+  optionGroups: FoodosItemOptionGroup[]
+  optionValues: FoodosItemOptionValue[]
+  branchHours: FoodosBranchHours[]
+  overrides: FoodosBranchMenuOverride[]
+  reviews: FoodosReview[]
 }
 
 export interface PublicMarketplaceEntry {
@@ -44,7 +54,7 @@ async function fetchPublicRestaurantBySlug(slug: string): Promise<PublicFoodosDa
 
   if (error || !restaurant) return null
 
-  const [branches, categories, items, combos, rules] = await Promise.all([
+  const [branches, categories, items, combos, rules, optionGroups, optionValues, reviews] = await Promise.all([
     supabase.from("foodos_branches").select("*").eq("restaurant_id", restaurant.id).order("name"),
     supabase
       .from("foodos_menu_categories")
@@ -58,7 +68,33 @@ async function fetchPublicRestaurantBySlug(slug: string): Promise<PublicFoodosDa
       .order("sort_order"),
     supabase.from("foodos_combos").select("*").eq("restaurant_id", restaurant.id),
     supabase.from("foodos_upsell_rules").select("*").eq("restaurant_id", restaurant.id),
+    supabase
+      .from("foodos_item_option_groups")
+      .select("*")
+      .eq("restaurant_id", restaurant.id)
+      .order("sort_order"),
+    supabase
+      .from("foodos_item_option_values")
+      .select("*")
+      .eq("restaurant_id", restaurant.id)
+      .eq("is_available", true)
+      .order("sort_order"),
+    supabase
+      .from("foodos_reviews")
+      .select("id, customer_name, rating, comment, created_at")
+      .eq("restaurant_id", restaurant.id)
+      .eq("is_visible", true)
+      .order("created_at", { ascending: false })
+      .limit(10),
   ])
+
+  const branchIds = ((branches.data as FoodosBranch[]) ?? []).map((b) => b.id)
+  const [branchHours, overrides] = branchIds.length
+    ? await Promise.all([
+        supabase.from("foodos_branch_hours").select("*").in("branch_id", branchIds),
+        supabase.from("foodos_branch_menu_overrides").select("*").in("branch_id", branchIds),
+      ])
+    : [{ data: [] as FoodosBranchHours[] }, { data: [] as FoodosBranchMenuOverride[] }]
 
   return {
     restaurant: restaurant as FoodosRestaurant,
@@ -67,6 +103,11 @@ async function fetchPublicRestaurantBySlug(slug: string): Promise<PublicFoodosDa
     items: (items.data as FoodosMenuItem[]) ?? [],
     combos: (combos.data as FoodosCombo[]) ?? [],
     rules: (rules.data as FoodosUpsellRule[]) ?? [],
+    optionGroups: (optionGroups.data as FoodosItemOptionGroup[]) ?? [],
+    optionValues: (optionValues.data as FoodosItemOptionValue[]) ?? [],
+    branchHours: (branchHours.data as FoodosBranchHours[]) ?? [],
+    overrides: (overrides.data as FoodosBranchMenuOverride[]) ?? [],
+    reviews: (reviews.data as unknown as FoodosReview[]) ?? [],
   }
 }
 

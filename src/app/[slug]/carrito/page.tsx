@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { CouponInput } from "@/components/cart/coupon-input"
+import { ShoppingLists } from "@/components/cart/shopping-lists"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
 import { calcCheckoutTotals, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
 import { BumpCards } from "@/components/checkout/BumpCards"
@@ -294,6 +295,9 @@ export default function CartPage() {
 
             {/* Coupon */}
             <CouponInput />
+
+            {/* Mi canasta: listas de compra recurrentes */}
+            <ShoppingLists />
           </div>
         </div>
       </div>

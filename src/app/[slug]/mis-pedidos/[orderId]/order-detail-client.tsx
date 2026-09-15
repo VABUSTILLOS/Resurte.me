@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ArrowLeft, Package, MapPin, Clock, CreditCard, DollarSign, Store, Truck, CheckCircle2, Circle } from "lucide-react"
 import Link from "next/link"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
+import { CompletePaymentButton } from "@/components/stripe/complete-payment-button"
 import type { OrderStatus, OrderWithCashback, OrderItem } from "@/types"
 
 const ORDER_STATUSES: OrderStatus[] = ["pending", "confirmed", "preparing", "out_for_delivery", "delivered"]
@@ -287,6 +288,18 @@ export function OrderDetailClient() {
           </div>
         </div>
       </div>
+
+      {/* Pago pendiente con tarjeta: permite completar el cobro aquí mismo */}
+      {order.payment_status === "pending" &&
+        order.payment_method === "card" &&
+        order.status !== "cancelled" && (
+          <div className="mb-4">
+            <CompletePaymentButton orderId={order.id} amount={order.total} />
+            <p className="mt-2 text-xs text-center text-gray-400">
+              Tu pedido se confirma cuando el pago se complete.
+            </p>
+          </div>
+        )}
 
       <div className="flex gap-3">
         {order.status === "delivered" && (
