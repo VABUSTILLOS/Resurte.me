@@ -35,6 +35,9 @@ import {
   HeartPulse,
   Trash2,
   History,
+  ExternalLink,
+  CheckCircle2,
+  StickyNote,
 } from "lucide-react"
 import { AUDIT_ACTION_LABEL, type AuditAction } from "@/lib/audit-log"
 import { createClient } from "@/lib/supabase/client"
@@ -53,8 +56,10 @@ interface Product {
   is_visible: boolean
   show_in_whatsapp: boolean | null
   image_url: string | null
+  images: string[] | null
   publish_at: string | null
   unpublish_at: string | null
+  admin_note: string | null
 }
 
 interface Category {
@@ -86,7 +91,8 @@ const STOCK_LABELS: Record<StockStatus, string> = {
 }
 
 /** Fase 5 — paginación del catálogo (424+ productos). */
-const PAGE_SIZE = 50
+const DEFAULT_PAGE_SIZE = 50
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200]
 
 const STOCK_FILTERS: { label: string; value: StockStatus | "all" }[] = [
   { label: "Todo el stock", value: "all" },
@@ -148,6 +154,13 @@ function AdminProductsContent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<Set<number>>(new Set())
   const [error, setError] = useState<string | null>(null)
+  // Toast de éxito temporal (todas las acciones, no solo errores).
+  const [toast, setToast] = useState<string | null>(null)
+  useEffect(() => {
+    if (!toast) return
+    const id = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(id)
+  }, [toast])
 
   // Deep-link: los filtros se inicializan desde la URL y se sincronizan de
   // vuelta (vistas compartibles; las alertas del dashboard enlazan con ?stock=).
@@ -198,6 +211,7 @@ function AdminProductsContent() {
       setProducts((prev) =>
         prev.map((p) => (p.id === productId ? { ...p, image_url: upData.url } : p))
       )
+      setToast("Imagen actualizada")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al subir la imagen")
     } finally {
@@ -212,6 +226,7 @@ function AdminProductsContent() {
   const [cityModalOpen, setCityModalOpen] = useState(false)
   const [draftCities, setDraftCities] = useState<Set<number>>(new Set())
   const [bulkSaving, setBulkSaving] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
   // Fase 16 — importación masiva vía CSV
   const [importOpen, setImportOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
@@ -227,6 +242,37 @@ function AdminProductsContent() {
   const [bulkPriceOpen, setBulkPriceOpen] = useState(false)
   const [bulkPricePct, setBulkPricePct] = useState<string>("10")
   const [bulkPriceMode, setBulkPriceMode] = useState<"increase" | "decrease">("increase")
+
+  // Atajos de teclado: "/" enfoca búsqueda, "n" nuevo producto, Esc cierra
+  // el modal más superficial abierto.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement
+      const typing =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable
+      if (e.key === "Escape") {
+        if (lightbox) setLightbox(null)
+        else if (historyFor) setHistoryFor(null)
+        else if (productForm !== null) setProductForm(null)
+        else if (bulkCategoryOpen) setBulkCategoryOpen(false)
+        else if (bulkPriceOpen) setBulkPriceOpen(false)
+        else if (cityModalOpen && !bulkSaving) setCityModalOpen(false)
+        return
+      }
+      if (typing || e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === "/") {
+        e.preventDefault()
+        searchRef.current?.focus()
+      } else if (e.key === "n") {
+        setProductForm("new")
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [lightbox, historyFor, productForm, bulkCategoryOpen, bulkPriceOpen, cityModalOpen, bulkSaving])
 
   // Fase 5 — filtros de categoría/stock (con deep-link ?stock= desde las
   // alertas del dashboard) y paginación.
@@ -250,6 +296,10 @@ function AdminProductsContent() {
   const [onlyNoPrice, setOnlyNoPrice] = useState(searchParams.get("noPrice") === "1")
   const [onlyNoCategory, setOnlyNoCategory] = useState(searchParams.get("noCategory") === "1")
   const [onlyWaMismatch, setOnlyWaMismatch] = useState(searchParams.get("waMismatch") === "1")
+  // Filtros por ciudad y marca (server-side).
+  const [cityFilter, setCityFilter] = useState(searchParams.get("city") ?? "all")
+  const [brandFilter, setBrandFilter] = useState(searchParams.get("brand") ?? "all")
+  const [brands, setBrands] = useState<string[]>([])
   // Vista tabla/grid (también viaja en la URL).
   const [view, setView] = useState<"table" | "grid">(
     searchParams.get("view") === "grid" ? "grid" : "table"
@@ -259,9 +309,16 @@ function AdminProductsContent() {
     key: initialSort === "price" || initialSort === "stock" ? initialSort : "name",
     dir: searchParams.get("dir") === "desc" ? "desc" : "asc",
   })
-  // Deshacer de la última acción de visibilidad en lote (banner temporal).
-  const [undoBulk, setUndoBulk] = useState<{ ids: number[]; restore: boolean } | null>(null)
+  // Deshacer genérico de la última acción en lote (banner temporal).
+  const [undoAction, setUndoAction] = useState<{
+    message: string
+    run: () => Promise<void>
+  } | null>(null)
   const [page, setPage] = useState(Math.max(1, Number(searchParams.get("page")) || 1))
+  const initialPageSize = Number(searchParams.get("pageSize"))
+  const [pageSize, setPageSize] = useState(
+    PAGE_SIZE_OPTIONS.includes(initialPageSize) ? initialPageSize : DEFAULT_PAGE_SIZE
+  )
 
   // Sincroniza los filtros activos a la URL (sin recargar ni scroll).
   useEffect(() => {
@@ -275,10 +332,13 @@ function AdminProductsContent() {
     if (onlyNoPrice) sp.set("noPrice", "1")
     if (onlyNoCategory) sp.set("noCategory", "1")
     if (onlyWaMismatch) sp.set("waMismatch", "1")
+    if (cityFilter !== "all") sp.set("city", cityFilter)
+    if (brandFilter !== "all") sp.set("brand", brandFilter)
     if (view === "grid") sp.set("view", "grid")
     if (sort.key !== "name") sp.set("sort", sort.key)
     if (sort.dir !== "asc") sp.set("dir", sort.dir)
     if (page > 1) sp.set("page", String(page))
+    if (pageSize !== DEFAULT_PAGE_SIZE) sp.set("pageSize", String(pageSize))
     const qs = sp.toString()
     router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false })
   }, [
@@ -291,9 +351,12 @@ function AdminProductsContent() {
     onlyNoPrice,
     onlyNoCategory,
     onlyWaMismatch,
+    cityFilter,
+    brandFilter,
     view,
     sort,
     page,
+    pageSize,
     router,
   ])
 
@@ -315,6 +378,8 @@ function AdminProductsContent() {
   // Metadatos por fila: sync WA pendiente y última edición (audit log).
   const [waPending, setWaPending] = useState<Set<number>>(new Set())
   const [lastEdit, setLastEdit] = useState<Record<number, { at: string; email: string | null }>>({})
+  // Unidades vendidas por producto (columna Ventas, display only).
+  const [sales, setSales] = useState<Record<number, number>>({})
 
   /** Query string compartida por la tabla, select-all y export. */
   const listParams = (extra: Record<string, string>) => {
@@ -328,6 +393,8 @@ function AdminProductsContent() {
       noPrice: onlyNoPrice ? "1" : "0",
       noCategory: onlyNoCategory ? "1" : "0",
       waMismatch: onlyWaMismatch ? "1" : "0",
+      city: cityFilter,
+      brand: brandFilter,
       sort: sort.key,
       dir: sort.dir,
       ...extra,
@@ -364,7 +431,7 @@ function AdminProductsContent() {
       try {
         setRefreshing(true)
         const res = await fetch(
-          `/api/admin/products/list?${listParams({ page: String(page), pageSize: String(PAGE_SIZE) })}`
+          `/api/admin/products/list?${listParams({ page: String(page), pageSize: String(pageSize) })}`
         )
         const data = await res.json().catch(() => ({}))
         if (cancelled) return
@@ -375,6 +442,7 @@ function AdminProductsContent() {
         setProducts(data.rows ?? [])
         setTotal(data.total ?? 0)
         if (data.counts) setCounts(data.counts)
+        if (data.brands) setBrands(data.brands)
         // Metadatos por fila (sync WA + última edición), best-effort.
         const ids = (data.rows ?? []).map((r: Product) => r.id)
         if (ids.length > 0) {
@@ -387,10 +455,16 @@ function AdminProductsContent() {
               byId[Number(id)] = v as { at: string; email: string | null }
             }
             setLastEdit(byId)
+            const salesById: Record<number, number> = {}
+            for (const [id, v] of Object.entries(meta.sales ?? {})) {
+              salesById[Number(id)] = v as number
+            }
+            setSales(salesById)
           }
         } else if (!cancelled) {
           setWaPending(new Set())
           setLastEdit({})
+          setSales({})
         }
       } finally {
         if (!cancelled) {
@@ -414,8 +488,11 @@ function AdminProductsContent() {
     onlyNoPrice,
     onlyNoCategory,
     onlyWaMismatch,
+    cityFilter,
+    brandFilter,
     sort,
     page,
+    pageSize,
   ])
 
   const categoryName = (id: number | null) =>
@@ -436,7 +513,7 @@ function AdminProductsContent() {
     )
 
   // Paginación server-side: las filas actuales son la página completa.
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pageItems = products
 
@@ -542,6 +619,7 @@ function AdminProductsContent() {
         throw new Error(data.error ?? "Error al actualizar disponibilidad")
       }
       setAvailability(apply)
+      setToast("Disponibilidad actualizada")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al actualizar disponibilidad")
     } finally {
@@ -631,6 +709,9 @@ function AdminProductsContent() {
       if (failed > 0) {
         setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
       }
+      if (succeededIds.length > 0) {
+        setToast(`${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"} actualizado${succeededIds.length === 1 ? "" : "s"} en WhatsApp`)
+      }
       setSelected(new Set())
     } catch {
       setError("Error al actualizar WhatsApp en lote")
@@ -647,9 +728,19 @@ function AdminProductsContent() {
     try {
       const succeededIds = await applyVisibilityToIds([...selected], isVisible)
       setSelected(new Set())
-      // Ofrece deshacer la acción durante unos segundos.
       if (succeededIds.length > 0) {
-        setUndoBulk({ ids: succeededIds, restore: !isVisible })
+        setToast(
+          `${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"} ${
+            isVisible ? "publicado" : "despublicado"
+          }${succeededIds.length === 1 ? "" : "s"}`
+        )
+        // Ofrece deshacer la acción durante unos segundos.
+        setUndoAction({
+          message: `Se actualizaron ${succeededIds.length} producto${
+            succeededIds.length === 1 ? "" : "s"
+          }.`,
+          run: () => applyVisibilityToIds(succeededIds, !isVisible).then(() => {}),
+        })
       }
     } catch {
       setError("Error al actualizar la visibilidad en lote")
@@ -658,17 +749,18 @@ function AdminProductsContent() {
     }
   }
 
-  /** Revierte la última acción de visibilidad en lote. */
-  async function undoBulkVisibility() {
-    if (!undoBulk || bulkSaving) return
-    const { ids, restore } = undoBulk
-    setUndoBulk(null)
+  /** Revierte la última acción en lote. */
+  async function runUndo() {
+    if (!undoAction || bulkSaving) return
+    const action = undoAction
+    setUndoAction(null)
     setBulkSaving(true)
     setError(null)
     try {
-      await applyVisibilityToIds(ids, restore)
+      await action.run()
+      setToast("Cambios revertidos")
     } catch {
-      setError("Error al deshacer la visibilidad en lote")
+      setError("Error al deshacer la acción en lote")
     } finally {
       setBulkSaving(false)
     }
@@ -676,10 +768,10 @@ function AdminProductsContent() {
 
   // El banner de deshacer expira a los 10 segundos.
   useEffect(() => {
-    if (!undoBulk) return
-    const id = setTimeout(() => setUndoBulk(null), 10_000)
+    if (!undoAction) return
+    const id = setTimeout(() => setUndoAction(null), 10_000)
     return () => clearTimeout(id)
-  }, [undoBulk])
+  }, [undoAction])
 
   /** Exporta los productos filtrados a un CSV re-importable (mismas columnas
    *  que acepta la importación masiva). Pide todas las páginas al servidor. */
@@ -731,6 +823,7 @@ function AdminProductsContent() {
    *  disponibilidad por ciudad; la edición se aplica localmente. */
   function handleFormSaved(saved: Product, created: boolean) {
     setProductForm(null)
+    setToast(created ? `Producto creado: ${saved.name}` : "Cambios guardados")
     if (created) {
       setReloadKey((k) => k + 1)
     } else {
@@ -751,6 +844,7 @@ function AdminProductsContent() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? "Error al duplicar el producto")
+      setToast(`Copia creada: ${data.product?.name ?? p.name}`)
       setReloadKey((k) => k + 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al duplicar el producto")
@@ -773,6 +867,7 @@ function AdminProductsContent() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? "Error al eliminar el producto")
+      setToast(`Producto eliminado: ${p.name}`)
       setReloadKey((k) => k + 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al eliminar el producto")
@@ -800,6 +895,80 @@ function AdminProductsContent() {
     }
   }
 
+  /** Elimina la selección respetando la protección por pedidos (409). */
+  async function bulkDelete() {
+    if (selected.size === 0 || bulkSaving) return
+    if (
+      !window.confirm(
+        `¿Eliminar ${selected.size} producto${selected.size === 1 ? "" : "s"}? Los que tengan pedidos se omitirán. Esta acción no se puede deshacer.`
+      )
+    )
+      return
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const ids = [...selected]
+      let deleted = 0
+      let skipped = 0
+      let failed = 0
+      for (const productId of ids) {
+        const res = await fetch("/api/admin/products/delete", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId }),
+        })
+        if (res.ok) deleted++
+        else if (res.status === 409) skipped++
+        else failed++
+      }
+      setSelected(new Set())
+      setReloadKey((k) => k + 1)
+      setToast(
+        `${deleted} eliminado${deleted === 1 ? "" : "s"}` +
+          (skipped > 0 ? ` · ${skipped} omitido${skipped === 1 ? "" : "s"} (tienen pedidos)` : "")
+      )
+      if (failed > 0) {
+        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron eliminar`)
+      }
+    } catch {
+      setError("Error al eliminar en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  /** Duplica la selección (las copias nacen despublicadas). */
+  async function bulkDuplicate() {
+    if (selected.size === 0 || bulkSaving) return
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const ids = [...selected]
+      const results = await Promise.all(
+        ids.map(async (productId) => {
+          const res = await fetch("/api/admin/products/duplicate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId }),
+          })
+          return res.ok
+        })
+      )
+      const ok = results.filter(Boolean).length
+      const failed = results.filter((r) => !r).length
+      setSelected(new Set())
+      setReloadKey((k) => k + 1)
+      setToast(`${ok} copia${ok === 1 ? "" : "s"} creada${ok === 1 ? "" : "s"} (despublicadas)`)
+      if (failed > 0) {
+        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron duplicar`)
+      }
+    } catch {
+      setError("Error al duplicar en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
   /** Cambia la categoría de todos los productos seleccionados. */
   async function bulkSetCategory() {
     if (selected.size === 0 || bulkSaving) return
@@ -808,6 +977,12 @@ function AdminProductsContent() {
     setError(null)
     try {
       const ids = [...selected]
+      // Estado previo para el Deshacer (la selección puede estar en otra página).
+      const prevRes = await fetch(`/api/admin/products/list?ids=${ids.join(",")}`)
+      const prevData = await prevRes.json().catch(() => ({}))
+      const prevCategories = new Map<number, number | null>(
+        (prevData.rows ?? []).map((r: Product) => [r.id, r.category_id])
+      )
       const results = await Promise.all(
         ids.map(async (productId) => {
           const res = await fetch("/api/admin/products/update", {
@@ -825,6 +1000,36 @@ function AdminProductsContent() {
       const failed = results.filter((ok) => !ok).length
       if (failed > 0) {
         setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
+      }
+      if (succeededIds.length > 0) {
+        setToast(`Categoría actualizada en ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`)
+        setUndoAction({
+          message: `Categoría actualizada en ${succeededIds.length} producto${
+            succeededIds.length === 1 ? "" : "s"
+          }.`,
+          run: async () => {
+            await Promise.all(
+              succeededIds.map(async (productId) => {
+                const res = await fetch("/api/admin/products/update", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    productId,
+                    category_id: prevCategories.get(productId) ?? null,
+                  }),
+                })
+                return res.ok
+              })
+            )
+            setProducts((prev) =>
+              prev.map((p) =>
+                succeededIds.includes(p.id)
+                  ? { ...p, category_id: prevCategories.get(p.id) ?? null }
+                  : p
+              )
+            )
+          },
+        })
       }
       setBulkCategoryOpen(false)
       setSelected(new Set())
@@ -883,6 +1088,38 @@ function AdminProductsContent() {
       if (failed > 0) {
         setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
       }
+      if (succeededIds.length > 0) {
+        setToast(`Precios ajustados en ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`)
+        setUndoAction({
+          message: `Precios ajustados en ${succeededIds.length} producto${
+            succeededIds.length === 1 ? "" : "s"
+          }.`,
+          run: async () => {
+            await Promise.all(
+              succeededIds.map(async (productId) => {
+                const prev = current.get(productId)
+                if (!prev) return false
+                const res = await fetch("/api/admin/products/update", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    productId,
+                    price: prev.price,
+                    sale_price: prev.sale_price,
+                  }),
+                })
+                return res.ok
+              })
+            )
+            setProducts((prevList) =>
+              prevList.map((p) => {
+                const old = succeededIds.includes(p.id) ? current.get(p.id) : undefined
+                return old ? { ...p, price: old.price, sale_price: old.sale_price } : p
+              })
+            )
+          },
+        })
+      }
       setBulkPriceOpen(false)
       setSelected(new Set())
     } catch {
@@ -910,6 +1147,7 @@ function AdminProductsContent() {
       setProducts((prev) =>
         prev.map((p) => (p.id === productId ? { ...p, ...fields } : p))
       )
+      setToast("Cambio guardado")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al actualizar")
     } finally {
@@ -1020,15 +1258,21 @@ function AdminProductsContent() {
         </div>
       )}
 
-      {/* Deshacer de la última acción de visibilidad en lote */}
-      {undoBulk && (
+      {/* Toast de éxito (fijo, expira solo) */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 bg-green-600 text-white text-sm font-semibold rounded-xl shadow-lg">
+          <CheckCircle2 className="w-4 h-4" />
+          {toast}
+        </div>
+      )}
+
+      {/* Deshacer de la última acción en lote */}
+      {undoAction && (
         <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-brand-50 text-brand-900 text-sm rounded-xl border border-brand-200">
-          <span>
-            Se actualizaron {undoBulk.ids.length} producto{undoBulk.ids.length === 1 ? "" : "s"}.
-          </span>
+          <span>{undoAction.message}</span>
           <button
             type="button"
-            onClick={undoBulkVisibility}
+            onClick={runUndo}
             disabled={bulkSaving}
             className="flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline disabled:opacity-50"
           >
@@ -1037,7 +1281,7 @@ function AdminProductsContent() {
           </button>
           <button
             type="button"
-            onClick={() => setUndoBulk(null)}
+            onClick={() => setUndoAction(null)}
             className="ml-auto p-1 rounded-lg text-brand-400 hover:bg-brand-100"
             aria-label="Cerrar aviso"
           >
@@ -1103,8 +1347,9 @@ function AdminProductsContent() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
+            ref={searchRef}
             type="text"
-            placeholder="Buscar producto o categoría..."
+            placeholder="Buscar producto o categoría... ( / )"
             value={search}
             onChange={(e) => updateFilters(() => setSearch(e.target.value))}
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
@@ -1135,6 +1380,34 @@ function AdminProductsContent() {
             </option>
           ))}
         </select>
+        <select
+          value={cityFilter}
+          onChange={(e) => updateFilters(() => setCityFilter(e.target.value))}
+          className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+          aria-label="Filtrar por ciudad disponible"
+        >
+          <option value="all">Todas las ciudades</option>
+          {cities.map((c) => (
+            <option key={c.id} value={String(c.id)}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        {brands.length > 0 && (
+          <select
+            value={brandFilter}
+            onChange={(e) => updateFilters(() => setBrandFilter(e.target.value))}
+            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+            aria-label="Filtrar por marca"
+          >
+            <option value="all">Todas las marcas</option>
+            {brands.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Salud del catálogo: problemas detectados; cada chip aplica su filtro */}
@@ -1391,6 +1664,24 @@ function AdminProductsContent() {
               WA no
             </button>
             <button
+              onClick={bulkDuplicate}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-xs font-semibold hover:bg-sky-100 disabled:opacity-50"
+              title="Duplicar la selección (las copias nacen despublicadas)"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              Duplicar
+            </button>
+            <button
+              onClick={bulkDelete}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-semibold hover:bg-red-100 disabled:opacity-50"
+              title="Eliminar la selección (los que tengan pedidos se omiten)"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Eliminar
+            </button>
+            <button
               onClick={() => setSelected(new Set())}
               disabled={bulkSaving}
               className="px-2 py-1.5 text-xs font-semibold text-gray-500 hover:underline disabled:opacity-50"
@@ -1452,6 +1743,9 @@ function AdminProductsContent() {
                 <th className="px-5 py-3">Estado</th>
                 <th className="px-5 py-3">WhatsApp</th>
                 <th className="px-5 py-3">Ciudades</th>
+                <th className="px-5 py-3" title="Unidades vendidas (histórico)">
+                  Ventas
+                </th>
                 <th className="px-5 py-3">Acciones</th>
               </tr>
             </thead>
@@ -1508,7 +1802,15 @@ function AdminProductsContent() {
                           )}
                         </button>
                         <div>
-                          <p className="font-medium text-gray-900">{product.name}</p>
+                          <p className="font-medium text-gray-900">
+                            {product.name}
+                            {product.admin_note && (
+                              <StickyNote
+                                className="inline w-3.5 h-3.5 ml-1.5 text-amber-500 align-text-top"
+                                aria-label={`Nota interna: ${product.admin_note}`}
+                              />
+                            )}
+                          </p>
                           <p className="text-xs text-gray-400">{product.brand ?? "—"}</p>
                           {edit && (
                             <p className="text-[10px] text-gray-400">
@@ -1687,6 +1989,15 @@ function AdminProductsContent() {
                       </button>
                     </td>
                     <td className="px-5 py-3">
+                      <span
+                        className={`text-xs font-semibold ${
+                          (sales[product.id] ?? 0) > 0 ? "text-gray-900" : "text-gray-300"
+                        }`}
+                      >
+                        {sales[product.id] ?? 0}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
@@ -1720,6 +2031,17 @@ function AdminProductsContent() {
                         >
                           <History className="w-4 h-4" />
                         </button>
+                        {cities[0] && (
+                          <Link
+                            href={`/${cities[0].slug}/producto/${product.slug}`}
+                            target="_blank"
+                            title={`Ver ${product.name} en la tienda`}
+                            aria-label={`Ver ${product.name} en la tienda`}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </Link>
+                        )}
                         <button
                           type="button"
                           onClick={() => deleteProduct(product)}
@@ -1866,6 +2188,17 @@ function AdminProductsContent() {
                         >
                           <History className="w-4 h-4" />
                         </button>
+                        {cities[0] && (
+                          <Link
+                            href={`/${cities[0].slug}/producto/${product.slug}`}
+                            target="_blank"
+                            title={`Ver ${product.name} en la tienda`}
+                            aria-label={`Ver ${product.name} en la tienda`}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </Link>
+                        )}
                         <button
                           type="button"
                           onClick={() => deleteProduct(product)}
@@ -1891,11 +2224,11 @@ function AdminProductsContent() {
       )}
 
       {/* Fase 5 — paginación (compartida por ambas vistas) */}
-      {total > PAGE_SIZE && (
+      {total > pageSize && (
         <div className="mt-3 flex items-center justify-between px-5 py-3 bg-white rounded-xl border border-gray-200">
             <p className="text-xs text-gray-400">
-              Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–
-              {Math.min(currentPage * PAGE_SIZE, total)} de {total}
+              Mostrando {(currentPage - 1) * pageSize + 1}–
+              {Math.min(currentPage * pageSize, total)} de {total}
             </p>
             <div className="flex items-center gap-1">
               <button
@@ -1917,6 +2250,18 @@ function AdminProductsContent() {
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
+              <select
+                value={pageSize}
+                onChange={(e) => updateFilters(() => setPageSize(Number(e.target.value)))}
+                aria-label="Productos por página"
+                className="ml-2 px-2 py-1 border border-gray-200 rounded-lg text-xs text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n} / página
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         )}

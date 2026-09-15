@@ -34,6 +34,12 @@
   00096) se aplica en el job `scheduled-publishing` del cron diario ANTES
   del `whatsapp-sync-queue`, y el toggle manual de visibilidad limpia la
   programación pendiente.
+- Productos ronda 3: feedback con toasts de éxito (no solo errores); Deshacer
+  genérico del bulk (visibilidad/categoría/precio, 10 s); bulk delete omite
+  productos con pedidos (misma regla 409 que el delete individual);
+  `admin_note` (00098) es solo-admin — nunca exponerla en APIs públicas;
+  la galería `products.images` es admin-only (la tienda no la renderiza):
+  marcar ★ sincroniza `image_url`.
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
@@ -43,6 +49,13 @@
   resuelven vía handles → `whatsapp_sync_items` (ok/error por producto); los
   errores se reintentan individualmente desde el historial; runs `running`
   > 6 h se marcan `failed` (huérfanos) en el cron diario.
+- Automatizaciones (WC1-WC4): el motor (`whatsapp-automations-engine.ts`)
+  SIEMPRE lee `whatsapp_automations` antes de enviar (is_active, delays,
+  config); dedupe por `whatsapp_automation_sends.dedupe_key`; marketing
+  (reactivation, birthday) respeta `marketing_consent`.
+- Credenciales por catálogo (WC8): el token se cifra con `encryptToken`
+  (AES-GCM) y nunca sale del servidor; vacío = fallback a la WABA de
+  plataforma.
 
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de

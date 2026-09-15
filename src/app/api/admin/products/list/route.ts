@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/admin-auth"
 import { NextResponse, type NextRequest } from "next/server"
 
 const COLS =
-  "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,publish_at,unpublish_at"
+  "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note"
 
 const MAX_PAGE_SIZE = 1000
 
@@ -19,6 +19,8 @@ interface ListParams {
   noPrice: boolean
   noCategory: boolean
   waMismatch: boolean
+  city: string
+  brand: string
   sort: "name" | "price" | "stock"
   dir: "asc" | "desc"
   page: number
@@ -39,6 +41,8 @@ function parseParams(req: NextRequest): ListParams {
     noPrice: sp.get("noPrice") === "1",
     noCategory: sp.get("noCategory") === "1",
     waMismatch: sp.get("waMismatch") === "1",
+    city: sp.get("city") ?? "all",
+    brand: sp.get("brand") ?? "all",
     sort: rawSort === "price" || rawSort === "stock" ? rawSort : "name",
     dir: sp.get("dir") === "desc" ? "desc" : "asc",
     page: Math.max(1, Number(sp.get("page")) || 1),
@@ -94,6 +98,20 @@ async function applyFilters(
   if (p.noPrice) query = query.is("price", null)
   if (p.noCategory) query = query.is("category_id", null)
   if (p.waMismatch) query = query.eq("show_in_whatsapp", true).eq("is_visible", false)
+  if (p.brand !== "all") query = query.eq("brand", p.brand)
+  if (p.city !== "all") {
+    // Disponible en la ciudad = no tiene fila is_available=false para ella
+    // (global, sin filas, cuenta como disponible).
+    const { data: rows } = await supabase
+      .from("product_city_availability")
+      .select("product_id")
+      .eq("city_id", Number(p.city))
+      .eq("is_available", false)
+    const unavailable = (rows ?? []).map((r) => r.product_id as number)
+    if (unavailable.length > 0) {
+      query = query.not("id", "in", `(${unavailable.join(",")})`)
+    }
+  }
   if (p.noCities) {
     const ids = await noCitiesProductIds(supabase)
     if (ids.length === 0) {
@@ -205,9 +223,24 @@ export async function GET(request: NextRequest) {
         .eq("is_visible", false),
     ])
 
+    // Marcas distintas para el filtro (dedup en JS; catálogo acotado).
+    const { data: brandRows } = await supabase
+      .from("products")
+      .select("brand")
+      .not("brand", "is", null)
+      .limit(MAX_PAGE_SIZE)
+    const brands = [
+      ...new Set(
+        (brandRows ?? [])
+          .map((r) => (r.brand as string | null)?.trim() ?? "")
+          .filter((b) => b.length > 0)
+      ),
+    ].sort((a, b) => a.localeCompare(b, "es"))
+
     return NextResponse.json({
       rows: data ?? [],
       total: count ?? 0,
+      brands,
       counts: {
         catalogTotal: catalogTotal.count ?? 0,
         published: published.count ?? 0,

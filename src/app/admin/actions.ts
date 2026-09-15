@@ -1428,6 +1428,94 @@ export async function setWaCatalogProduct(
   revalidatePath("/admin/whatsapp")
 }
 
+export interface WaCatalogCredentials {
+  phone_number_id: string | null
+  waba_id: string | null
+  catalog_id: string | null
+  is_active: boolean
+  hasToken: boolean
+}
+
+/** Credenciales de un catálogo (sin el token; solo indicador). WC8. */
+export async function getWaCatalogCredentials(catalogId: string): Promise<WaCatalogCredentials> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const { data, error } = await supabase
+    .from("whatsapp_catalogs")
+    .select("phone_number_id, waba_id, catalog_id, access_token_enc, is_active")
+    .eq("id", catalogId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error("Catálogo no encontrado")
+  return {
+    phone_number_id: (data.phone_number_id as string | null) ?? null,
+    waba_id: (data.waba_id as string | null) ?? null,
+    catalog_id: (data.catalog_id as string | null) ?? null,
+    is_active: data.is_active as boolean,
+    hasToken: Boolean(data.access_token_enc),
+  }
+}
+
+/**
+ * Guarda credenciales de un catálogo (WC8). El token se cifra con AES-GCM
+ * y NUNCA se devuelve; "" lo borra (fallback a la WABA de plataforma);
+ * undefined lo deja intacto.
+ */
+export async function updateWaCatalogCredentials(
+  catalogId: string,
+  fields: {
+    phone_number_id?: string | null
+    waba_id?: string | null
+    catalog_id?: string | null
+    is_active?: boolean
+    accessToken?: string | null
+  }
+): Promise<void> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const updates: Record<string, unknown> = {}
+  if ("phone_number_id" in fields) updates.phone_number_id = fields.phone_number_id || null
+  if ("waba_id" in fields) updates.waba_id = fields.waba_id || null
+  if ("catalog_id" in fields) updates.catalog_id = fields.catalog_id || null
+  if ("is_active" in fields) updates.is_active = fields.is_active
+  if (typeof fields.accessToken === "string") {
+    const { encryptToken } = await import("@/lib/foodos-whatsapp")
+    updates.access_token_enc = fields.accessToken.trim() ? encryptToken(fields.accessToken.trim()) : null
+  }
+  if (Object.keys(updates).length === 0) return
+
+  const { error } = await supabase.from("whatsapp_catalogs").update(updates).eq("id", catalogId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/admin/whatsapp")
+}
+
+/** Prueba la conexión a Meta con las credenciales efectivas (WC9). */
+export async function testWaCatalogConnection(catalogId: string): Promise<{
+  ok: boolean
+  latencyMs: number
+  catalogName: string | null
+  error: string | null
+  usingPlatformFallback: boolean
+}> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const wa = await import("@/lib/whatsapp-catalogs")
+  const { testCatalogConnection } = await import("@/lib/whatsapp")
+  const { config, catalog } = await wa.getCatalogWhatsAppConfig(supabase, catalogId)
+  if (!config) {
+    return { ok: false, latencyMs: 0, catalogName: null, error: "Sin credenciales configuradas", usingPlatformFallback: false }
+  }
+  const result = await testCatalogConnection(config)
+  const usingPlatformFallback = !(catalog && (catalog as { access_token_enc?: string | null }).access_token_enc)
+  return { ...result, usingPlatformFallback }
+}
+
 /** Agrega varios productos a la curaduría de una vez (WC7). */
 export async function bulkAddWaCatalogProducts(
   catalogId: string,

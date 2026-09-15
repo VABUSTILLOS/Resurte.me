@@ -10,7 +10,7 @@ import Image from "next/image"
 import {
   Search, RefreshCw, ArrowUp, ArrowDown, Plus, Send,
   Loader2, MapPin, Globe, History, ListChecks, AlertTriangle, X,
-  ChevronDown, ChevronRight, RotateCcw, GripVertical, Eye,
+  ChevronDown, ChevronRight, RotateCcw, GripVertical, Eye, KeyRound,
 } from "lucide-react"
 import { getCategoryIcon } from "@/lib/utils"
 import {
@@ -33,6 +33,9 @@ import {
   retryWaFailedProducts,
   bulkAddWaCatalogProducts,
   bulkRemoveWaCatalogProducts,
+  getWaCatalogCredentials,
+  updateWaCatalogCredentials,
+  testWaCatalogConnection,
   type AdminWhatsappProduct,
   type AdminWhatsappCategory,
   type WaCatalogSummary,
@@ -102,6 +105,16 @@ export default function AdminWhatsAppPage() {
   const [armBulkAdd, setArmBulkAdd] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+
+  // WC8/WC9 — credenciales del catálogo y prueba de conexión.
+  const [showCreds, setShowCreds] = useState(false)
+  const [credsPhoneId, setCredsPhoneId] = useState("")
+  const [credsWabaId, setCredsWabaId] = useState("")
+  const [credsCatalogId, setCredsCatalogId] = useState("")
+  const [credsToken, setCredsToken] = useState("")
+  const [credsHasToken, setCredsHasToken] = useState(false)
+  const [credsActive, setCredsActive] = useState(true)
+  const [connTest, setConnTest] = useState<{ ok: boolean; text: string } | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -349,6 +362,72 @@ export default function AdminWhatsAppPage() {
   const handleRemoveQueueItem = (queueItemId: string) =>
     run(async () => removeWaQueueItem(queueItemId))
 
+  // WC8 — cargar credenciales del catálogo al abrir el panel.
+  const openCreds = () => {
+    if (!selectedCatalog) return
+    setConnTest(null)
+    if (showCreds) {
+      setShowCreds(false)
+      return
+    }
+    setShowCreds(true)
+    getWaCatalogCredentials(selectedCatalog.id)
+      .then((c) => {
+        setCredsPhoneId(c.phone_number_id ?? "")
+        setCredsWabaId(c.waba_id ?? "")
+        setCredsCatalogId(c.catalog_id ?? "")
+        setCredsHasToken(c.hasToken)
+        setCredsActive(c.is_active)
+        setCredsToken("")
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Error al cargar credenciales"))
+  }
+
+  const handleSaveCreds = (e: React.FormEvent) => {
+    e.preventDefault()
+    run(
+      async () => {
+        if (!selectedCatalog) return
+        await updateWaCatalogCredentials(selectedCatalog.id, {
+          phone_number_id: credsPhoneId.trim() || null,
+          waba_id: credsWabaId.trim() || null,
+          catalog_id: credsCatalogId.trim() || null,
+          is_active: credsActive,
+          ...(credsToken.trim() ? { accessToken: credsToken.trim() } : {}),
+        })
+        setCredsToken("")
+        setCredsHasToken((prev) => prev || Boolean(credsToken.trim()))
+      },
+      () => "Credenciales guardadas."
+    )
+  }
+
+  const handleClearToken = () =>
+    run(
+      async () => {
+        if (!selectedCatalog) return
+        await updateWaCatalogCredentials(selectedCatalog.id, { accessToken: "" })
+        setCredsHasToken(false)
+        setCredsToken("")
+      },
+      () => "Token eliminado: el catálogo usa la WABA de la plataforma."
+    )
+
+  // WC9 — probar la conexión a Meta con las credenciales efectivas.
+  const handleTestConnection = () =>
+    run(async () => {
+      if (!selectedCatalog) return
+      const r = await testWaCatalogConnection(selectedCatalog.id)
+      setConnTest(
+        r.ok
+          ? {
+              ok: true,
+              text: `Conexión OK en ${r.latencyMs} ms${r.catalogName ? ` — catálogo "${r.catalogName}"` : ""}${r.usingPlatformFallback ? " (WABA plataforma)" : " (credenciales propias)"}.`,
+            }
+          : { ok: false, text: `Falló la conexión (${r.latencyMs} ms): ${r.error ?? "error desconocido"}` }
+      )
+    })
+
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault()
     run(
@@ -393,6 +472,14 @@ export default function AdminWhatsAppPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
+            onClick={openCreds}
+            disabled={!selectedCatalog}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E8E9EB] text-[var(--text-secondary)] font-semibold rounded-full hover:bg-[#F7F5F0] transition-colors text-sm disabled:opacity-60"
+          >
+            <KeyRound className="w-4 h-4" />
+            Credenciales
+          </button>
+          <button
             onClick={() => setShowPreview(true)}
             disabled={!selectedCatalog || curated.length === 0}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E8E9EB] text-[var(--text-secondary)] font-semibold rounded-full hover:bg-[#F7F5F0] transition-colors text-sm disabled:opacity-60"
@@ -426,6 +513,102 @@ export default function AdminWhatsAppPage() {
       )}
       {error && (
         <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+      )}
+
+      {/* Panel de credenciales del catálogo (WC8/WC9) */}
+      {showCreds && selectedCatalog && (
+        <div className="mb-6 bg-white rounded-2xl border border-[#E8E9EB] p-5">
+          <h2 className="font-bold text-[#242529] flex items-center gap-2 mb-1">
+            <KeyRound className="w-4 h-4 text-[#0E7A0E]" />
+            Credenciales de {selectedCatalog.name}
+          </h2>
+          <p className="text-xs text-[var(--text-secondary)] mb-4">
+            Vacías = usa la WABA de la plataforma (variables de entorno). El token se cifra y nunca se muestra.
+          </p>
+          <form onSubmit={handleSaveCreds} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-[#242529] mb-1">Phone Number ID</label>
+              <input
+                value={credsPhoneId}
+                onChange={(e) => setCredsPhoneId(e.target.value)}
+                placeholder="p. ej. 1234567890"
+                className="w-full px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#242529] mb-1">WABA ID</label>
+              <input
+                value={credsWabaId}
+                onChange={(e) => setCredsWabaId(e.target.value)}
+                placeholder="p. ej. 9876543210"
+                className="w-full px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#242529] mb-1">Catalog ID de Meta</label>
+              <input
+                value={credsCatalogId}
+                onChange={(e) => setCredsCatalogId(e.target.value)}
+                placeholder="p. ej. 555666777"
+                className="w-full px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#242529] mb-1">
+                Access token {credsHasToken && <span className="text-[#0E7A0E]">✓ configurado</span>}
+              </label>
+              <input
+                type="password"
+                value={credsToken}
+                onChange={(e) => setCredsToken(e.target.value)}
+                placeholder={credsHasToken ? "•••••••• (escribe para reemplazar)" : "Pegar token de Meta"}
+                autoComplete="off"
+                className="w-full px-3 py-2 bg-white border border-[#E8E9EB] rounded-xl text-sm focus:outline-none focus:border-[#0E7A0E]"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-[#242529] sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={credsActive}
+                onChange={(e) => setCredsActive(e.target.checked)}
+                className="accent-[#0E7A0E]"
+              />
+              Catálogo activo (participa en syncs automáticos)
+            </label>
+            <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+              <button
+                type="submit"
+                disabled={busy}
+                className="px-5 py-2 bg-[#0F7A3D] text-white text-sm font-bold rounded-full hover:bg-[#0F6B3A] disabled:opacity-60"
+              >
+                Guardar
+              </button>
+              <button
+                type="button"
+                onClick={handleTestConnection}
+                disabled={busy}
+                className="px-4 py-2 bg-white border border-[#0E7A0E]/40 text-[#0E7A0E] text-sm font-semibold rounded-full hover:bg-[#F2FBF5] disabled:opacity-60"
+              >
+                Probar conexión
+              </button>
+              {credsHasToken && (
+                <button
+                  type="button"
+                  onClick={handleClearToken}
+                  disabled={busy}
+                  className="px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-full disabled:opacity-60"
+                >
+                  Quitar token (usar plataforma)
+                </button>
+              )}
+            </div>
+          </form>
+          {connTest && (
+            <p className={`mt-3 rounded-xl px-4 py-2.5 text-sm ${connTest.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
+              {connTest.text}
+            </p>
+          )}
+        </div>
       )}
 
       {/* Panel de cola de sync automático (WB4) */}

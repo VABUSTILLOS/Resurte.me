@@ -443,6 +443,26 @@ export async function syncCatalog(
   }
 }
 
+/** Prueba la conexión a Meta con las credenciales efectivas (WC9). */
+export async function testCatalogConnection(
+  config?: WhatsAppConfig
+): Promise<{ ok: boolean; latencyMs: number; catalogName: string | null; error: string | null }> {
+  const cfg = config || getConfig()
+  const start = Date.now()
+  try {
+    const res = await waFetch(`/${resolveCatalogId(cfg)}?fields=id,name`, {}, cfg)
+    const body = (await res.json()) as { name?: string }
+    return { ok: true, latencyMs: Date.now() - start, catalogName: body?.name ?? null, error: null }
+  } catch (err) {
+    return {
+      ok: false,
+      latencyMs: Date.now() - start,
+      catalogName: null,
+      error: err instanceof Error ? err.message : String(err),
+    }
+  }
+}
+
 // ============================================================
 // Messaging — Send Templates
 // ============================================================

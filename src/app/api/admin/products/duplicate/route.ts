@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         show_in_whatsapp: false,
       })
       .select(
-        "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,publish_at,unpublish_at"
+        "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note"
       )
       .single()
     if (insertError) {

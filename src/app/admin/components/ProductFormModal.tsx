@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Loader2, X } from "lucide-react"
+import { useRef, useState } from "react"
+import { ImagePlus, Loader2, Star, X } from "lucide-react"
 
 interface Category {
   id: number
@@ -23,8 +23,10 @@ export interface ProductFormProduct {
   is_visible: boolean
   show_in_whatsapp: boolean | null
   image_url: string | null
+  images: string[] | null
   publish_at: string | null
   unpublish_at: string | null
+  admin_note: string | null
 }
 
 interface ProductFormModalProps {
@@ -73,6 +75,40 @@ export function ProductFormModal({
   const toLocalInput = (iso: string | null | undefined) => (iso ? iso.slice(0, 16) : "")
   const [publishAt, setPublishAt] = useState(toLocalInput(product?.publish_at))
   const [unpublishAt, setUnpublishAt] = useState(toLocalInput(product?.unpublish_at))
+  const [adminNote, setAdminNote] = useState(product?.admin_note ?? "")
+  // Galería de imágenes (products.images jsonb) + principal (image_url).
+  const [gallery, setGallery] = useState<string[]>(product?.images ?? [])
+  const [mainImage, setMainImage] = useState<string | null>(product?.image_url ?? null)
+  const [uploadingImg, setUploadingImg] = useState(false)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
+
+  async function uploadGalleryImage(file: File | undefined | null) {
+    if (!file || uploadingImg) return
+    setUploadingImg(true)
+    setError(null)
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      const res = await fetch("/api/admin/products/upload-image", { method: "POST", body: form })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.detail ?? data.error ?? "Error al subir la imagen")
+      const url = data.url as string
+      setGallery((prev) => [...prev, url])
+      if (!mainImage) setMainImage(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al subir la imagen")
+    } finally {
+      setUploadingImg(false)
+      if (galleryInputRef.current) galleryInputRef.current.value = ""
+    }
+  }
+
+  function removeGalleryImage(url: string) {
+    setGallery((prev) => prev.filter((u) => u !== url))
+    if (mainImage === url) {
+      setMainImage(gallery.filter((u) => u !== url)[0] ?? null)
+    }
+  }
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Alta inline de categoría.
@@ -138,6 +174,9 @@ export function ProductFormModal({
         show_in_whatsapp: showInWhatsapp,
         publish_at: publishAt ? new Date(publishAt).toISOString() : null,
         unpublish_at: unpublishAt ? new Date(unpublishAt).toISOString() : null,
+        admin_note: adminNote.trim() || null,
+        image_url: mainImage,
+        images: gallery,
       }
       const res = isEdit
         ? await fetch("/api/admin/products/update", {
@@ -299,6 +338,89 @@ export function ProductFormModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
+              className={`${inputCls} resize-y`}
+            />
+          </div>
+
+          {/* Galería de imágenes: la marcada con ★ es la principal (image_url) */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="block text-xs font-semibold text-gray-600">
+                Imágenes {gallery.length > 0 && `(${gallery.length})`}
+              </span>
+              <button
+                type="button"
+                onClick={() => galleryInputRef.current?.click()}
+                disabled={uploadingImg}
+                className="flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:underline disabled:opacity-50"
+              >
+                {uploadingImg ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <ImagePlus className="w-3.5 h-3.5" />
+                )}
+                Agregar
+              </button>
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                className="hidden"
+                onChange={(e) => void uploadGalleryImage(e.target.files?.[0])}
+                aria-label="Agregar imagen a la galería"
+              />
+            </div>
+            {gallery.length === 0 ? (
+              <p className="text-[11px] text-gray-400">Sin imágenes todavía.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {gallery.map((url) => (
+                  <div
+                    key={url}
+                    className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 ${
+                      mainImage === url ? "border-brand-500" : "border-gray-200"
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- thumbs admin, URLs dinámicas de Storage */}
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/40 px-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setMainImage(url)}
+                        title="Marcar como imagen principal"
+                        aria-label="Marcar como imagen principal"
+                        className={`p-0.5 ${
+                          mainImage === url ? "text-yellow-300" : "text-white/70 hover:text-white"
+                        }`}
+                      >
+                        <Star className="w-3.5 h-3.5" fill={mainImage === url ? "currentColor" : "none"} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeGalleryImage(url)}
+                        title="Quitar de la galería"
+                        aria-label="Quitar de la galería"
+                        className="p-0.5 text-white/70 hover:text-red-300"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-note">
+              Nota interna (solo visible en el panel)
+            </label>
+            <textarea
+              id="pf-note"
+              value={adminNote}
+              onChange={(e) => setAdminNote(e.target.value)}
+              rows={2}
+              placeholder="Ej. proveedor, condiciones de compra…"
               className={`${inputCls} resize-y`}
             />
           </div>

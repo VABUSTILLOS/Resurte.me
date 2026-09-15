@@ -74,6 +74,20 @@ export async function POST(request: Request) {
       }
     }
 
+    // Imagen principal y galería (opcionales).
+    const imageUrl =
+      typeof body.image_url === "string" &&
+      (body.image_url.startsWith("https://") || body.image_url.startsWith("/"))
+        ? body.image_url
+        : null
+    const images = Array.isArray(body.images)
+      ? body.images.filter(
+          (u: unknown) =>
+            typeof u === "string" &&
+            ((u as string).startsWith("https://") || (u as string).startsWith("/"))
+        )
+      : []
+
     const supabase = await createServiceClient()
     const slug = await uniqueSlug(supabase, name)
 
@@ -93,9 +107,12 @@ export async function POST(request: Request) {
         show_in_whatsapp: body.show_in_whatsapp === true,
         publish_at: schedule.publish_at,
         unpublish_at: schedule.unpublish_at,
+        admin_note: typeof body.admin_note === "string" ? body.admin_note : null,
+        image_url: imageUrl,
+        images,
       })
       .select(
-        "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,publish_at,unpublish_at"
+        "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note"
       )
       .single()
 

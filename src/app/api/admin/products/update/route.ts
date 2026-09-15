@@ -46,6 +46,8 @@ export async function PATCH(request: Request) {
       "unit",
       "publish_at",
       "unpublish_at",
+      "admin_note",
+      "images",
     ] as const
     type AllowedField = (typeof allowed)[number]
     const updates: Partial<Record<AllowedField, unknown>> = {}
@@ -88,6 +90,29 @@ export async function PATCH(request: Request) {
     if ("is_visible" in updates) {
       updates.publish_at = null
       updates.unpublish_at = null
+    }
+    if (
+      "admin_note" in updates &&
+      updates.admin_note !== null &&
+      typeof updates.admin_note !== "string"
+    ) {
+      return NextResponse.json({ error: "admin_note debe ser texto o null" }, { status: 400 })
+    }
+    // images: galería de URLs https públicas o rutas locales.
+    if ("images" in updates) {
+      const imgs = updates.images
+      if (
+        !Array.isArray(imgs) ||
+        imgs.some(
+          (u) =>
+            typeof u !== "string" || (!u.startsWith("https://") && !u.startsWith("/"))
+        )
+      ) {
+        return NextResponse.json(
+          { error: "images debe ser un arreglo de URLs https o rutas locales" },
+          { status: 400 }
+        )
+      }
     }
     if ("category_id" in updates) {
       const cid = updates.category_id
