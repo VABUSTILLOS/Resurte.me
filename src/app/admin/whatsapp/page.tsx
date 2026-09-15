@@ -10,6 +10,7 @@ import Image from "next/image"
 import {
   Search, RefreshCw, ArrowUp, ArrowDown, Plus, Send,
   Loader2, MapPin, Globe, History, ListChecks, AlertTriangle, X,
+  ChevronDown, ChevronRight, RotateCcw,
 } from "lucide-react"
 import { getCategoryIcon } from "@/lib/utils"
 import {
@@ -25,12 +26,35 @@ import {
   getWaCatalogSyncHistory,
   getWaCatalogQueueCount,
   processWaSyncQueueNow,
+  getWaRunItems,
+  getWaCatalogQueue,
+  removeWaQueueItem,
+  retryWaSyncProduct,
+  retryWaFailedProducts,
   type AdminWhatsappProduct,
   type AdminWhatsappCategory,
   type WaCatalogSummary,
   type WaCatalogDetailItem,
   type WaSyncRunSummary,
+  type WaSyncItemDetail,
+  type WaQueueItem,
 } from "@/app/admin/actions"
+
+// Antigüedad legible para la cola y el historial.
+function ageText(iso: string): string {
+  const mins = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000))
+  if (mins < 60) return `hace ${mins} min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `hace ${hours} h`
+  return `hace ${Math.floor(hours / 24)} d`
+}
+
+const QUEUE_REASON_LABELS: Record<string, string> = {
+  product_update: "cambio de producto",
+  visibility: "visibilidad",
+  city_availability: "disponibilidad por ciudad",
+  catalog_curation_add: "alta en curaduría",
+}
 
 export default function AdminWhatsAppPage() {
   const [products, setProducts] = useState<AdminWhatsappProduct[]>([])
@@ -58,6 +82,13 @@ export default function AdminWhatsAppPage() {
   const [history, setHistory] = useState<WaSyncRunSummary[]>([])
   const [queueCount, setQueueCount] = useState(0)
 
+  // WB4 — detalle de corridas y vista de cola.
+  const [queueItems, setQueueItems] = useState<WaQueueItem[]>([])
+  const [showQueue, setShowQueue] = useState(false)
+  const [expandedRun, setExpandedRun] = useState<string | null>(null)
+  const [runItems, setRunItems] = useState<Record<string, WaSyncItemDetail[]>>({})
+  const [retryingKey, setRetryingKey] = useState<string | null>(null)
+
   const load = useCallback(async () => {
     try {
       const [data, cats] = await Promise.all([getAdminWhatsappCatalog(), listWaCatalogs()])
@@ -77,14 +108,16 @@ export default function AdminWhatsAppPage() {
 
   const loadItems = useCallback(async () => {
     if (!selectedCatalog) return
-    const [items, runs, queued] = await Promise.all([
+    const [items, runs, queued, queueList] = await Promise.all([
       getWaCatalogItems(selectedCatalog.id),
       getWaCatalogSyncHistory(selectedCatalog.id, 5).catch(() => [] as WaSyncRunSummary[]),
       getWaCatalogQueueCount(selectedCatalog.id).catch(() => 0),
+      getWaCatalogQueue(selectedCatalog.id).catch(() => [] as WaQueueItem[]),
     ])
     setCatalogItems(items)
     setHistory(runs)
     setQueueCount(queued)
+    setQueueItems(queueList)
   }, [selectedCatalog])
 
   useEffect(() => {
@@ -188,6 +221,48 @@ export default function AdminWhatsAppPage() {
       (r) => `Cola procesada: ${r.synced} productos sincronizados en ${r.catalogs} catálogo(s)${r.failed ? ` (${r.failed} fallidos)` : ""}.`
     )
 
+  // WB4 — expandir corrida y cargar su detalle por producto (lazy).
+  const toggleRun = (runId: string) => {
+    if (expandedRun === runId) {
+      setExpandedRun(null)
+      return
+    }
+    setExpandedRun(runId)
+    if (!runItems[runId]) {
+      getWaRunItems(runId)
+        .then((items) => setRunItems((prev) => ({ ...prev, [runId]: items })))
+        .catch(() => {})
+    }
+  }
+
+  const handleRetryProduct = (runId: string, productId: number) => {
+    const key = `${runId}:${productId}`
+    setRetryingKey(key)
+    run(
+      async () => {
+        const result = await retryWaSyncProduct(runId, productId)
+        if (!result.ok) throw new Error(result.error ?? "Reintento fallido")
+        setRunItems((prev) => ({ ...prev, [runId]: [] }))
+        getWaRunItems(runId)
+          .then((items) => setRunItems((prev) => ({ ...prev, [runId]: items })))
+          .catch(() => {})
+      },
+      () => "Producto reenviado a Meta. El estado se confirmará al resolver el batch."
+    ).finally(() => setRetryingKey(null))
+  }
+
+  const handleRetryFailed = () =>
+    run(
+      async () => {
+        if (!selectedCatalog) throw new Error("Selecciona un catálogo")
+        return retryWaFailedProducts(selectedCatalog.id)
+      },
+      (r) => `Reintentos enviados: ${r.retried}${r.failed ? ` (${r.failed} con error: ${r.errors[0] ?? ""})` : ""}.`
+    )
+
+  const handleRemoveQueueItem = (queueItemId: string) =>
+    run(async () => removeWaQueueItem(queueItemId))
+
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault()
     run(
@@ -233,12 +308,12 @@ export default function AdminWhatsAppPage() {
         <div className="flex flex-wrap items-center gap-2">
           {queueCount > 0 && (
             <button
-              onClick={handleProcessQueue}
+              onClick={() => setShowQueue((v) => !v)}
               disabled={busy}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#0E7A0E]/40 text-[#0E7A0E] font-semibold rounded-full hover:bg-[#F2FBF5] transition-colors text-sm disabled:opacity-60"
             >
               <ListChecks className="w-4 h-4" />
-              Procesar cola ({queueCount})
+              Cola de sync ({queueCount})
             </button>
           )}
           <button
@@ -257,6 +332,54 @@ export default function AdminWhatsAppPage() {
       )}
       {error && (
         <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+      )}
+
+      {/* Panel de cola de sync automático (WB4) */}
+      {showQueue && selectedCatalog && (
+        <div className="mb-6 bg-white rounded-2xl border border-[#E8E9EB] p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-[#242529] flex items-center gap-2">
+              <ListChecks className="w-4 h-4 text-[#0E7A0E]" />
+              Cola de {selectedCatalog.name}
+            </h2>
+            <button
+              onClick={handleProcessQueue}
+              disabled={busy || queueItems.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#0F7A3D] text-white text-xs font-bold rounded-full hover:bg-[#0F6B3A] disabled:opacity-60"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${busy ? "animate-spin" : ""}`} />
+              Procesar ahora
+            </button>
+          </div>
+          {queueItems.length === 0 ? (
+            <p className="text-sm text-[#B0B3B8] py-4 text-center">Cola vacía.</p>
+          ) : (
+            <ul className="space-y-1.5 max-h-72 overflow-y-auto">
+              {queueItems.map((q) => (
+                <li key={q.id} className="flex items-center gap-3 rounded-xl border border-[#F0F1F2] px-3 py-2 text-sm">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-[#242529] truncate">{q.product_name}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      {QUEUE_REASON_LABELS[q.reason] ?? q.reason} · {ageText(q.queued_at)}
+                      {q.attempts > 0 && <span className="ml-1 text-amber-600">· intento {q.attempts + 1}</span>}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleRemoveQueueItem(q.id)}
+                    disabled={busy}
+                    className="p-1.5 text-[#B0B3B8] hover:text-red-600"
+                    aria-label={`Quitar ${q.product_name} de la cola`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-xs text-[#B0B3B8] mt-3">
+            La cola también se vacía automáticamente con el cron diario.
+          </p>
+        </div>
       )}
 
       {/* Selector de catálogo */}
@@ -374,36 +497,113 @@ export default function AdminWhatsAppPage() {
                   <History className="w-3.5 h-3.5" /> Historial de sincronización
                 </p>
                 <ul className="space-y-1.5">
-                  {history.map((run) => (
-                    <li key={run.id} className="text-xs flex items-start gap-2">
-                      <span
-                        className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
-                          run.status === "done"
-                            ? "bg-emerald-500"
-                            : run.status === "failed"
-                              ? "bg-red-500"
-                              : "bg-amber-400 animate-pulse"
-                        }`}
-                        aria-hidden="true"
-                      />
-                      <span className="text-[var(--text-secondary)]">
-                        <span className="font-semibold text-[#242529]">
-                          {new Date(run.started_at).toLocaleString("es-MX", {
-                            day: "numeric",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                        {" · "}
-                        {run.trigger_kind === "auto" ? "automático" : "manual"}
-                        {run.status === "done" &&
-                          ` · ${run.added} nuevos, ${run.updated} act.${run.removed ? `, ${run.removed} elim.` : ""}${run.stale_count ? `, ${run.stale_count} ajenos` : ""}`}
-                        {run.status === "failed" && ` · error: ${run.error ?? "desconocido"}`}
-                        {run.status === "running" && " · en curso…"}
-                      </span>
-                    </li>
-                  ))}
+                  {history.map((run) => {
+                    const expanded = expandedRun === run.id
+                    const items = runItems[run.id]
+                    const errorCount = items?.filter((i) => i.status === "error").length ?? 0
+                    return (
+                      <li key={run.id} className="text-xs">
+                        <button
+                          onClick={() => toggleRun(run.id)}
+                          className="w-full flex items-start gap-2 text-left rounded-lg px-1 py-0.5 hover:bg-[#F7F5F0]"
+                          aria-expanded={expanded}
+                        >
+                          {expanded ? (
+                            <ChevronDown className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#B0B3B8]" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#B0B3B8]" />
+                          )}
+                          <span
+                            className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
+                              run.status === "done"
+                                ? "bg-emerald-500"
+                                : run.status === "failed"
+                                  ? "bg-red-500"
+                                  : "bg-amber-400 animate-pulse"
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <span className="text-[var(--text-secondary)]">
+                            <span className="font-semibold text-[#242529]">
+                              {new Date(run.started_at).toLocaleString("es-MX", {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                            {" · "}
+                            {run.trigger_kind === "auto" ? "automático" : "manual"}
+                            {run.status === "done" &&
+                              ` · ${run.added} nuevos, ${run.updated} act.${run.removed ? `, ${run.removed} elim.` : ""}${run.stale_count ? `, ${run.stale_count} ajenos` : ""}`}
+                            {run.status === "failed" && " · falló"}
+                            {run.status === "running" && " · en curso…"}
+                            {run.error && <span className="block text-red-600 mt-0.5">{run.error}</span>}
+                          </span>
+                        </button>
+
+                        {expanded && (
+                          <div className="ml-7 mt-1 mb-2 rounded-xl border border-[#F0F1F2] bg-[#FAFAF8] p-2.5">
+                            {!items || items.length === 0 ? (
+                              <p className="text-[#B0B3B8] py-1">
+                                {items ? "Sin detalle por producto (anterior a WB2)." : "Cargando detalle…"}
+                              </p>
+                            ) : (
+                              <>
+                                <ul className="space-y-1 max-h-48 overflow-y-auto">
+                                  {items.map((item) => (
+                                    <li key={item.product_id} className="flex items-center gap-2">
+                                      <span
+                                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                          item.status === "ok"
+                                            ? "bg-emerald-500"
+                                            : item.status === "error"
+                                              ? "bg-red-500"
+                                              : "bg-amber-400"
+                                        }`}
+                                        aria-hidden="true"
+                                      />
+                                      <span className="flex-1 min-w-0 truncate text-[#242529]">
+                                        {item.product_name}
+                                        <span className="text-[#B0B3B8]"> · {item.action}</span>
+                                        {item.error && (
+                                          <span className="block text-red-600 truncate">{item.error}</span>
+                                        )}
+                                      </span>
+                                      {item.status === "error" && (
+                                        <button
+                                          onClick={() => handleRetryProduct(run.id, item.product_id)}
+                                          disabled={busy || retryingKey === `${run.id}:${item.product_id}`}
+                                          className="p-1 text-[#0E7A0E] hover:bg-[#E7F8EE] rounded disabled:opacity-40"
+                                          aria-label={`Reintentar ${item.product_name}`}
+                                        >
+                                          {retryingKey === `${run.id}:${item.product_id}` ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                          ) : (
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                          )}
+                                        </button>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                                {errorCount > 0 && (
+                                  <button
+                                    onClick={handleRetryFailed}
+                                    disabled={busy}
+                                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0E7A0E] text-white font-bold hover:bg-[#0D720D] disabled:opacity-40"
+                                  >
+                                    <RotateCcw className="w-3 h-3" />
+                                    Reintentar {errorCount} fallido(s)
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             )}

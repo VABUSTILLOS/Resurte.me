@@ -7,7 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { createServiceClient } from "@/lib/supabase/service"
-import { getCatalogWhatsAppConfig, validateCatalogProducts, type AdminProduct } from "@/lib/whatsapp-catalogs"
+import { getCatalogWhatsAppConfig, toWhatsAppProduct, validateCatalogProducts, type AdminProduct } from "@/lib/whatsapp-catalogs"
 import {
   batchCatalogItems,
   buildCatalogBatchRequests,
@@ -66,21 +66,6 @@ export async function enqueueProductsForWaSync(
       error: err instanceof Error ? err.message : String(err),
     })
     return 0
-  }
-}
-
-function toWhatsAppProduct(p: AdminProduct & { stock_status?: string | null }): WhatsAppProduct | null {
-  const price = p.sale_price ?? p.price ?? 0
-  if (price <= 0) return null
-  return {
-    id: String(p.id),
-    name: p.name,
-    description: [p.brand, p.unit].filter(Boolean).join(" · ") || undefined,
-    image_url: p.image_url ?? undefined,
-    price,
-    currency: "MXN",
-    sale_price: p.sale_price ?? null,
-    availability: p.stock_status === "out_of_stock" ? "out of stock" : "in stock",
   }
 }
 
@@ -157,7 +142,7 @@ export async function processWaSyncQueue(): Promise<{
         .filter((p): p is WhatsAppProduct => p !== null)
 
       // WA7: excluir productos que Meta rechazaría.
-      const { valid } = validateCatalogProducts(waProducts)
+      const { valid, invalid: invalidQueued } = validateCatalogProducts(waProducts)
 
       const requests = buildCatalogBatchRequests(valid, "UPDATE")
       const result = await batchCatalogItems(requests, config)
@@ -172,6 +157,22 @@ export async function processWaSyncQueue(): Promise<{
             finished_at: new Date().toISOString(),
           })
           .eq("id", runId)
+
+        // WB2 — detalle por producto (pending hasta resolver handles).
+        const itemRows = [
+          ...valid.map((p) => ({ run_id: runId, product_id: Number(p.id), action: "update", status: "pending" })),
+          ...invalidQueued.map((p) => ({
+            run_id: runId,
+            product_id: Number(p.id),
+            action: "skipped",
+            status: "error",
+            error: p.reasons.join(", "),
+          })),
+        ]
+        if (itemRows.length > 0) {
+          const { error: itemsError } = await supabase.from("whatsapp_sync_items").insert(itemRows)
+          if (itemsError) logger.warn("No se pudieron registrar los items del sync auto", { error: itemsError.message })
+        }
       }
       synced += valid.length
       await markProcessed(true)

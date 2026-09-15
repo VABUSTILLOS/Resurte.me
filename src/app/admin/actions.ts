@@ -1496,11 +1496,205 @@ export async function getWaCatalogQueueCount(catalogId: string): Promise<number>
 }
 
 /** Procesa manualmente la cola de sync automático (admin). */
-export async function processWaSyncQueueNow(): Promise<{ catalogs: number; synced: number; failed: number }> {
+export async function processWaSyncQueueNow(): Promise<{
+  catalogs: number
+  synced: number
+  failed: number
+  resolvedRuns: number
+  orphansFailed: number
+}> {
   const { response: adminDenied } = await requireAdmin()
   if (adminDenied) throw new Error("Acceso restringido a administradores")
   const { processWaSyncQueue } = await import("@/lib/whatsapp-sync-queue")
-  return processWaSyncQueue()
+  const { resolvePendingSyncRuns } = await import("@/lib/whatsapp-batch-status")
+  const queue = await processWaSyncQueue()
+  // WB2/WB5 — también resolver handles pendientes y runs huérfanos.
+  const resolution = await resolvePendingSyncRuns().catch(() => null)
+  return {
+    ...queue,
+    resolvedRuns: resolution?.runsResolved ?? 0,
+    orphansFailed: resolution?.orphansFailed ?? 0,
+  }
+}
+
+/** Núcleo de reintento de UN producto de un run (upsert directo + nuevo handle). */
+async function retryWaProductCore(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  runId: string,
+  productId: number
+): Promise<{ ok: boolean; error?: string }> {
+  const wa = await import("@/lib/whatsapp-catalogs")
+  const { batchCatalogItems, buildCatalogBatchRequests } = await import("@/lib/whatsapp")
+
+  const { data: run } = await supabase
+    .from("whatsapp_sync_runs")
+    .select("id, catalog_id, handles")
+    .eq("id", runId)
+    .maybeSingle()
+  if (!run) return { ok: false, error: "Corrida no encontrada" }
+
+  const { config } = await wa.getCatalogWhatsAppConfig(supabase, run.catalog_id as string)
+  if (!config) return { ok: false, error: "Sin credenciales de WhatsApp" }
+
+  const { data: product } = await supabase
+    .from("products")
+    .select("id, name, brand, category_id, image_url, price, sale_price, unit, stock_status")
+    .eq("id", productId)
+    .maybeSingle()
+  if (!product) return { ok: false, error: "Producto no encontrado" }
+
+  const waProduct = wa.toWhatsAppProduct(product as WaCatalogs.AdminProduct & { stock_status?: string | null })
+  if (!waProduct) return { ok: false, error: "Precio inválido" }
+
+  const { valid, invalid } = wa.validateCatalogProducts([waProduct])
+  if (valid.length === 0) {
+    return { ok: false, error: invalid[0]?.reasons.join(", ") ?? "Datos inválidos" }
+  }
+
+  const result = await batchCatalogItems(buildCatalogBatchRequests(valid, "UPDATE"), config)
+
+  // El item vuelve a pending y el run acumula el nuevo handle para que el
+  // resolvedor (cron / Procesar cola) confirme el resultado con Meta.
+  await supabase
+    .from("whatsapp_sync_items")
+    .upsert(
+      { run_id: runId, product_id: productId, action: "update", status: "pending", error: null },
+      { onConflict: "run_id,product_id", ignoreDuplicates: false }
+    )
+  const handles = Array.isArray(run.handles) ? (run.handles as string[]) : []
+  await supabase
+    .from("whatsapp_sync_runs")
+    .update({ handles: [...handles, ...result.handles], error: null })
+    .eq("id", runId)
+
+  return { ok: true }
+}
+
+/** Reintenta UN producto fallido de una corrida (WB3). */
+export async function retryWaSyncProduct(
+  runId: string,
+  productId: number
+): Promise<{ ok: boolean; error?: string }> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+  return retryWaProductCore(supabase, runId, productId)
+}
+
+/** Reintenta todos los productos con error de un run (WB3). */
+export async function retryWaFailedProducts(
+  catalogId: string,
+  runId?: string
+): Promise<{ retried: number; failed: number; errors: string[] }> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  let targetRunId = runId
+  if (!targetRunId) {
+    const { data: lastRun } = await supabase
+      .from("whatsapp_sync_runs")
+      .select("id")
+      .eq("catalog_id", catalogId)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    targetRunId = lastRun?.id as string | undefined
+  }
+  if (!targetRunId) return { retried: 0, failed: 0, errors: ["Sin corridas para este catálogo"] }
+
+  const { data: errorItems } = await supabase
+    .from("whatsapp_sync_items")
+    .select("product_id")
+    .eq("run_id", targetRunId)
+    .eq("status", "error")
+  const productIds = [...new Set((errorItems ?? []).map((i) => i.product_id as number))]
+
+  let retried = 0
+  const errors: string[] = []
+  for (const productId of productIds) {
+    const result = await retryWaProductCore(supabase, targetRunId, productId)
+    if (result.ok) retried++
+    else errors.push(`${productId}: ${result.error}`)
+  }
+  return { retried, failed: productIds.length - retried, errors }
+}
+
+export interface WaSyncItemDetail {
+  product_id: number
+  product_name: string
+  action: string
+  status: string
+  error: string | null
+}
+
+/** Items (detalle por producto) de una corrida de sync (WB4). */
+export async function getWaRunItems(runId: string): Promise<WaSyncItemDetail[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const { data: items, error } = await supabase
+    .from("whatsapp_sync_items")
+    .select("product_id, action, status, error")
+    .eq("run_id", runId)
+    .order("product_id")
+  if (error) throw new Error(error.message)
+
+  const productIds = (items ?? []).map((i) => i.product_id as number)
+  const { data: products } = productIds.length
+    ? await supabase.from("products").select("id, name").in("id", productIds)
+    : { data: [] as { id: number; name: string }[] }
+  const nameById = new Map((products ?? []).map((p) => [p.id, p.name]))
+
+  return ((items ?? []) as { product_id: number; action: string; status: string; error: string | null }[]).map((i) => ({
+    ...i,
+    product_name: nameById.get(i.product_id) ?? `#${i.product_id}`,
+  }))
+}
+
+export interface WaQueueItem {
+  id: string
+  product_id: number
+  product_name: string
+  reason: string
+  attempts: number
+  queued_at: string
+}
+
+/** Pendientes de la cola de sync automático con nombre de producto (WB4). */
+export async function getWaCatalogQueue(catalogId: string): Promise<WaQueueItem[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const { data: rows, error } = await supabase
+    .from("whatsapp_sync_queue")
+    .select("id, product_id, reason, attempts, queued_at")
+    .eq("catalog_id", catalogId)
+    .is("processed_at", null)
+    .order("queued_at")
+  if (error) throw new Error(error.message)
+
+  const productIds = (rows ?? []).map((r) => r.product_id as number)
+  const { data: products } = productIds.length
+    ? await supabase.from("products").select("id, name").in("id", productIds)
+    : { data: [] as { id: number; name: string }[] }
+  const nameById = new Map((products ?? []).map((p) => [p.id, p.name]))
+
+  return ((rows ?? []) as Omit<WaQueueItem, "product_name">[]).map((r) => ({
+    ...r,
+    product_name: nameById.get(r.product_id) ?? `#${r.product_id}`,
+  }))
+}
+
+/** Quita un item de la cola de sync (admin, WB4). */
+export async function removeWaQueueItem(queueItemId: string): Promise<void> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+  const { error } = await supabase.from("whatsapp_sync_queue").delete().eq("id", queueItemId)
+  if (error) throw new Error(error.message)
 }
 
 /** Previsualiza el diff del sync sin tocar Meta (WA2/WA6). */
@@ -1630,6 +1824,31 @@ async function runWaCatalogSync(
         })
         .eq("id", runId)
       if (error) logger.warn("No se pudo cerrar el run de sync", { error: error.message })
+
+      // WB2 — detalle por producto: enviados como pending (Meta los resuelve
+      // vía handles) y los excluidos por validación como error/skipped.
+      try {
+        const itemRows = [
+          ...result.createdIds.map((id) => ({ run_id: runId, product_id: Number(id), action: "create", status: "pending" })),
+          ...result.updatedIds.map((id) => ({ run_id: runId, product_id: Number(id), action: "update", status: "pending" })),
+          ...result.removedIds.map((id) => ({ run_id: runId, product_id: Number(id), action: "delete", status: "pending" })),
+          ...invalid.map((p) => ({
+            run_id: runId,
+            product_id: Number(p.id),
+            action: "skipped",
+            status: "error",
+            error: p.reasons.join(", "),
+          })),
+        ]
+        if (itemRows.length > 0) {
+          const { error: itemsError } = await supabase.from("whatsapp_sync_items").insert(itemRows)
+          if (itemsError) logger.warn("No se pudieron registrar los items del sync", { error: itemsError.message })
+        }
+      } catch (itemsErr) {
+        logger.warn("Registro de items del sync falló (best-effort)", {
+          error: itemsErr instanceof Error ? itemsErr.message : String(itemsErr),
+        })
+      }
     }
 
     return {

@@ -285,11 +285,66 @@ export async function batchCatalogItems(
   return { handles, chunks }
 }
 
+/** Estado de un batch asíncrono de Meta (respuesta de /{handle}). */
+export interface BatchStatusResponse {
+  status: string
+  errors_total?: number
+  errors?: unknown
+}
+
+export interface BatchItemError {
+  retailer_id: string | null
+  message: string
+}
+
+/** ¿El batch terminó de procesarse en Meta? */
+export function isBatchFinished(status: string): boolean {
+  return status.toLowerCase() === "finished"
+}
+
+/**
+ * Parseo defensivo de los errores de un batch de Meta: el shape del campo
+ * `errors` puede variar (array directo, { data: [...] }, campos anidados).
+ * Devuelve siempre un array plano { retailer_id, message }.
+ */
+export function parseBatchErrors(body: BatchStatusResponse | null | undefined): BatchItemError[] {
+  if (!body || body.errors == null) return []
+  const raw: unknown = Array.isArray(body.errors)
+    ? body.errors
+    : typeof body.errors === "object" && body.errors !== null && Array.isArray((body.errors as { data?: unknown[] }).data)
+      ? (body.errors as { data: unknown[] }).data
+      : []
+  if (!Array.isArray(raw)) return []
+
+  const result: BatchItemError[] = []
+  for (const entry of raw) {
+    if (typeof entry === "string") {
+      result.push({ retailer_id: null, message: entry })
+      continue
+    }
+    if (typeof entry !== "object" || entry === null) continue
+    const e = entry as Record<string, unknown>
+    const retailerId =
+      typeof e.retailer_id === "string" ? e.retailer_id
+      : typeof (e.item as Record<string, unknown> | undefined)?.retailer_id === "string"
+        ? (e.item as Record<string, unknown>).retailer_id as string
+        : null
+    const message =
+      typeof e.message === "string" ? e.message
+      : typeof e.error === "string" ? e.error
+      : typeof (e.error as Record<string, unknown> | undefined)?.message === "string"
+        ? (e.error as Record<string, unknown>).message as string
+        : JSON.stringify(e).slice(0, 300)
+    result.push({ retailer_id: retailerId, message })
+  }
+  return result
+}
+
 /** Estado de un batch asíncrono de Meta (consulta por handle). */
 export async function getBatchStatus(
   handle: string,
   config?: WhatsAppConfig
-): Promise<{ status: string; errors_total?: number; errors?: unknown }> {
+): Promise<BatchStatusResponse> {
   const cfg = config || getConfig()
   const res = await waFetch(`/${handle}?fields=status,errors_total,errors`, {}, cfg)
   return res.json()
@@ -332,6 +387,10 @@ export interface SyncCatalogResult {
   stale: string[]
   /** Handles de los batches enviados (procesamiento asíncrono de Meta). */
   handles: string[]
+  /** retailer_ids por acción (detalle por producto, WB2). */
+  createdIds: string[]
+  updatedIds: string[]
+  removedIds: string[]
 }
 
 /**
@@ -378,6 +437,9 @@ export async function syncCatalog(
     removed,
     stale: opts?.deleteUnknown ? [] : stale,
     handles,
+    createdIds: toCreate.map((p) => p.id),
+    updatedIds: toUpdate.map((p) => p.id),
+    removedIds: opts?.deleteUnknown ? stale : [],
   }
 }
 

@@ -16,6 +16,13 @@ interface ImportResponse {
   error?: string
 }
 
+interface DryRunPlan {
+  created: number
+  updated: number
+  toCreate: { slug: string; name: string }[]
+  toUpdate: { slug: string; name: string }[]
+}
+
 /**
  * Fase 16 — modal de importación masiva de productos: plantilla
  * descargable, pegar/subir CSV, preview con validación y confirmación.
@@ -31,6 +38,9 @@ export function ImportProductsModal({
   const [parsed, setParsed] = useState<ProductImportResult | null>(null)
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<ImportResponse | null>(null)
+  // Dry-run: clasificación servidor (crear/actualizar) antes de aplicar.
+  const [plan, setPlan] = useState<DryRunPlan | null>(null)
+  const [planning, setPlanning] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEscapeKey(onClose, true)
@@ -48,6 +58,7 @@ export function ImportProductsModal({
   function preview(value: string) {
     setText(value)
     setResult(null)
+    setPlan(null)
     setParsed(value.trim() ? parseProductImportCsv(value) : null)
   }
 
@@ -55,6 +66,31 @@ export function ImportProductsModal({
     const file = e.target.files?.[0]
     if (!file) return
     preview(await file.text())
+  }
+
+  /** Paso 1: dry-run — el servidor clasifica crear/actualizar sin escribir. */
+  async function dryRun() {
+    if (!parsed || parsed.rows.length === 0) return
+    setPlanning(true)
+    try {
+      const res = await fetch("/api/admin/products/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: parsed.rows, dryRun: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "Error al previsualizar")
+      setPlan({
+        created: data.created ?? 0,
+        updated: data.updated ?? 0,
+        toCreate: data.toCreate ?? [],
+        toUpdate: data.toUpdate ?? [],
+      })
+    } catch (err) {
+      setResult({ error: err instanceof Error ? err.message : "Error de conexión" })
+    } finally {
+      setPlanning(false)
+    }
   }
 
   async function doImport() {
@@ -69,6 +105,7 @@ export function ImportProductsModal({
       const data = (await res.json()) as ImportResponse
       setResult(data)
       if (res.ok && ((data.created ?? 0) > 0 || (data.updated ?? 0) > 0)) {
+        setPlan(null)
         onImported()
       }
     } catch {
@@ -175,6 +212,42 @@ export function ImportProductsModal({
           </div>
         )}
 
+        {plan && (
+          <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+            <p className="font-semibold">
+              Vista previa: {plan.created} nuevos · {plan.updated} se actualizarán
+            </p>
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+              {plan.toCreate.length > 0 && (
+                <ul className="rounded-lg bg-white/70 border border-blue-100 p-2 space-y-0.5">
+                  <li className="text-[10px] font-bold text-green-700 uppercase">Nuevos</li>
+                  {plan.toCreate.slice(0, 10).map((r) => (
+                    <li key={r.slug} className="text-[11px] text-gray-700">
+                      {r.name}
+                    </li>
+                  ))}
+                  {plan.toCreate.length > 10 && (
+                    <li className="text-[11px] text-gray-400">…y {plan.toCreate.length - 10} más</li>
+                  )}
+                </ul>
+              )}
+              {plan.toUpdate.length > 0 && (
+                <ul className="rounded-lg bg-white/70 border border-blue-100 p-2 space-y-0.5">
+                  <li className="text-[10px] font-bold text-amber-700 uppercase">Se actualizan</li>
+                  {plan.toUpdate.slice(0, 10).map((r) => (
+                    <li key={r.slug} className="text-[11px] text-gray-700">
+                      {r.name}
+                    </li>
+                  ))}
+                  {plan.toUpdate.length > 10 && (
+                    <li className="text-[11px] text-gray-400">…y {plan.toUpdate.length - 10} más</li>
+                  )}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+
         {result && (
           <div
             className={`mt-3 rounded-lg border p-3 text-xs ${
@@ -208,14 +281,27 @@ export function ImportProductsModal({
           >
             Cerrar
           </button>
-          <button
-            type="button"
-            onClick={() => void doImport()}
-            disabled={!parsed || parsed.rows.length === 0 || importing}
-            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
-          >
-            {importing ? "Importando..." : `Importar ${parsed?.rows.length ?? 0} productos`}
-          </button>
+          {plan === null ? (
+            <button
+              type="button"
+              onClick={() => void dryRun()}
+              disabled={!parsed || parsed.rows.length === 0 || planning}
+              className="rounded-lg bg-white border border-brand-300 text-brand-700 px-4 py-2 text-sm font-semibold hover:bg-brand-50 disabled:opacity-50 transition-colors"
+            >
+              {planning ? "Analizando..." : "Vista previa"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void doImport()}
+              disabled={importing}
+              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+            >
+              {importing
+                ? "Importando..."
+                : `Confirmar: ${plan.created} nuevos, ${plan.updated} actualizados`}
+            </button>
+          )}
         </div>
       </div>
     </div>

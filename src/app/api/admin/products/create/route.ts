@@ -56,6 +56,24 @@ export async function POST(request: Request) {
         ? body.category_id
         : null
 
+    // Programación opcional: fechas ISO válidas o null.
+    const schedule: { publish_at: string | null; unpublish_at: string | null } = {
+      publish_at: null,
+      unpublish_at: null,
+    }
+    for (const field of ["publish_at", "unpublish_at"] as const) {
+      const v = body[field]
+      if (v !== null && v !== undefined) {
+        if (typeof v !== "string" || Number.isNaN(new Date(v).getTime())) {
+          return NextResponse.json(
+            { error: `${field} debe ser una fecha ISO válida o null` },
+            { status: 400 }
+          )
+        }
+        schedule[field] = v
+      }
+    }
+
     const supabase = await createServiceClient()
     const slug = await uniqueSlug(supabase, name)
 
@@ -65,6 +83,7 @@ export async function POST(request: Request) {
         name,
         slug,
         description: typeof body.description === "string" ? body.description : null,
+        unit: typeof body.unit === "string" && body.unit.trim() ? body.unit.trim() : null,
         brand: typeof body.brand === "string" ? body.brand : null,
         category_id: categoryId,
         price,
@@ -72,9 +91,11 @@ export async function POST(request: Request) {
         stock_status: stockStatus,
         is_visible: body.is_visible === true,
         show_in_whatsapp: body.show_in_whatsapp === true,
+        publish_at: schedule.publish_at,
+        unpublish_at: schedule.unpublish_at,
       })
       .select(
-        "id,name,slug,brand,category_id,description,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url"
+        "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,publish_at,unpublish_at"
       )
       .single()
 

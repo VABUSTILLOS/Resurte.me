@@ -43,6 +43,9 @@ export async function PATCH(request: Request) {
       "brand",
       "category_id",
       "description",
+      "unit",
+      "publish_at",
+      "unpublish_at",
     ] as const
     type AllowedField = (typeof allowed)[number]
     const updates: Partial<Record<AllowedField, unknown>> = {}
@@ -65,6 +68,26 @@ export async function PATCH(request: Request) {
       typeof updates.description !== "string"
     ) {
       return NextResponse.json({ error: "description debe ser texto o null" }, { status: 400 })
+    }
+    if ("unit" in updates && updates.unit !== null && typeof updates.unit !== "string") {
+      return NextResponse.json({ error: "unit debe ser texto o null" }, { status: 400 })
+    }
+    // publish_at / unpublish_at: ISO 8601 válido o null (limpiar programación).
+    for (const field of ["publish_at", "unpublish_at"] as const) {
+      if (field in updates) {
+        const v = updates[field]
+        if (v !== null && (typeof v !== "string" || Number.isNaN(new Date(v).getTime()))) {
+          return NextResponse.json(
+            { error: `${field} debe ser una fecha ISO válida o null` },
+            { status: 400 }
+          )
+        }
+      }
+    }
+    // Publicar/despublicar manual cancela la programación pendiente.
+    if ("is_visible" in updates) {
+      updates.publish_at = null
+      updates.unpublish_at = null
     }
     if ("category_id" in updates) {
       const cid = updates.category_id

@@ -1,7 +1,7 @@
 "use client"
 
 import { Suspense, useState, useEffect, useRef } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
   Search,
@@ -30,7 +30,13 @@ import {
   SquarePen,
   Percent,
   Plus,
+  LayoutGrid,
+  LayoutList,
+  HeartPulse,
+  Trash2,
+  History,
 } from "lucide-react"
+import { AUDIT_ACTION_LABEL, type AuditAction } from "@/lib/audit-log"
 import { createClient } from "@/lib/supabase/client"
 
 interface Product {
@@ -40,12 +46,15 @@ interface Product {
   brand: string | null
   category_id: number | null
   description: string | null
+  unit: string | null
   price: number | null
   sale_price: number | null
   stock_status: "in_stock" | "low_stock" | "out_of_stock"
   is_visible: boolean
   show_in_whatsapp: boolean | null
   image_url: string | null
+  publish_at: string | null
+  unpublish_at: string | null
 }
 
 interface Category {
@@ -139,8 +148,13 @@ function AdminProductsContent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<Set<number>>(new Set())
   const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  // Deep-link: los filtros se inicializan desde la URL y se sincronizan de
+  // vuelta (vistas compartibles; las alertas del dashboard enlazan con ?stock=).
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [search, setSearch] = useState(searchParams.get("q") ?? "")
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get("q") ?? "")
 
   // Debounce: filtrar cientos de filas en cada tecla re-renderiza toda la tabla.
   useEffect(() => {
@@ -154,6 +168,8 @@ function AdminProductsContent() {
   const [uploadingImageId, setUploadingImageId] = useState<number | null>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const imageTargetRef = useRef<number | null>(null)
+  // Vista previa grande de la imagen del producto.
+  const [lightbox, setLightbox] = useState<{ id: number; url: string; name: string } | null>(null)
 
   const startImageUpload = (productId: number) => {
     imageTargetRef.current = productId
@@ -202,6 +218,9 @@ function AdminProductsContent() {
   // Alta/edición completa de producto y duplicado.
   const [productForm, setProductForm] = useState<"new" | Product | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  // Historial de cambios (audit log) del producto.
+  const [historyFor, setHistoryFor] = useState<Product | null>(null)
   // Acciones en lote extra: cambio de categoría y ajuste de precio %.
   const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false)
   const [bulkCategoryId, setBulkCategoryId] = useState<string>("")
@@ -211,26 +230,72 @@ function AdminProductsContent() {
 
   // Fase 5 — filtros de categoría/stock (con deep-link ?stock= desde las
   // alertas del dashboard) y paginación.
-  const searchParams = useSearchParams()
   const initialStock = searchParams.get("stock")
-  const [categoryFilter, setCategoryFilter] = useState<string>("all")
+  const initialSort = searchParams.get("sort")
+  const [categoryFilter, setCategoryFilter] = useState<string>(
+    searchParams.get("category") ?? "all"
+  )
   const [stockFilter, setStockFilter] = useState<StockStatus | "all">(
     initialStock === "in_stock" || initialStock === "low_stock" || initialStock === "out_of_stock"
       ? initialStock
       : "all"
   )
   // Chips de estado de publicación + filtros de catálogo incompleto.
-  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "unpublished">("all")
-  const [onlyNoImage, setOnlyNoImage] = useState(false)
-  const [onlyNoCities, setOnlyNoCities] = useState(false)
+  const initialStatus = searchParams.get("status")
+  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "unpublished">(
+    initialStatus === "published" || initialStatus === "unpublished" ? initialStatus : "all"
+  )
+  const [onlyNoImage, setOnlyNoImage] = useState(searchParams.get("noImage") === "1")
+  const [onlyNoCities, setOnlyNoCities] = useState(searchParams.get("noCities") === "1")
+  const [onlyNoPrice, setOnlyNoPrice] = useState(searchParams.get("noPrice") === "1")
+  const [onlyNoCategory, setOnlyNoCategory] = useState(searchParams.get("noCategory") === "1")
+  const [onlyWaMismatch, setOnlyWaMismatch] = useState(searchParams.get("waMismatch") === "1")
+  // Vista tabla/grid (también viaja en la URL).
+  const [view, setView] = useState<"table" | "grid">(
+    searchParams.get("view") === "grid" ? "grid" : "table"
+  )
   // Orden de la tabla (por defecto nombre asc, como la consulta inicial).
   const [sort, setSort] = useState<{ key: "name" | "price" | "stock"; dir: "asc" | "desc" }>({
-    key: "name",
-    dir: "asc",
+    key: initialSort === "price" || initialSort === "stock" ? initialSort : "name",
+    dir: searchParams.get("dir") === "desc" ? "desc" : "asc",
   })
   // Deshacer de la última acción de visibilidad en lote (banner temporal).
   const [undoBulk, setUndoBulk] = useState<{ ids: number[]; restore: boolean } | null>(null)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(Math.max(1, Number(searchParams.get("page")) || 1))
+
+  // Sincroniza los filtros activos a la URL (sin recargar ni scroll).
+  useEffect(() => {
+    const sp = new URLSearchParams()
+    if (debouncedSearch) sp.set("q", debouncedSearch)
+    if (categoryFilter !== "all") sp.set("category", categoryFilter)
+    if (stockFilter !== "all") sp.set("stock", stockFilter)
+    if (statusFilter !== "all") sp.set("status", statusFilter)
+    if (onlyNoImage) sp.set("noImage", "1")
+    if (onlyNoCities) sp.set("noCities", "1")
+    if (onlyNoPrice) sp.set("noPrice", "1")
+    if (onlyNoCategory) sp.set("noCategory", "1")
+    if (onlyWaMismatch) sp.set("waMismatch", "1")
+    if (view === "grid") sp.set("view", "grid")
+    if (sort.key !== "name") sp.set("sort", sort.key)
+    if (sort.dir !== "asc") sp.set("dir", sort.dir)
+    if (page > 1) sp.set("page", String(page))
+    const qs = sp.toString()
+    router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false })
+  }, [
+    debouncedSearch,
+    categoryFilter,
+    stockFilter,
+    statusFilter,
+    onlyNoImage,
+    onlyNoCities,
+    onlyNoPrice,
+    onlyNoCategory,
+    onlyWaMismatch,
+    view,
+    sort,
+    page,
+    router,
+  ])
 
   // Paginación server-side: total + conteos de chips vienen del API.
   const [total, setTotal] = useState(0)
@@ -242,6 +307,9 @@ function AdminProductsContent() {
     lowStock: 0,
     outStock: 0,
     noCities: 0,
+    noPrice: 0,
+    noCategory: 0,
+    waMismatch: 0,
   })
   const [refreshing, setRefreshing] = useState(false)
   // Metadatos por fila: sync WA pendiente y última edición (audit log).
@@ -257,6 +325,9 @@ function AdminProductsContent() {
       status: statusFilter,
       noImage: onlyNoImage ? "1" : "0",
       noCities: onlyNoCities ? "1" : "0",
+      noPrice: onlyNoPrice ? "1" : "0",
+      noCategory: onlyNoCategory ? "1" : "0",
+      waMismatch: onlyWaMismatch ? "1" : "0",
       sort: sort.key,
       dir: sort.dir,
       ...extra,
@@ -340,6 +411,9 @@ function AdminProductsContent() {
     statusFilter,
     onlyNoImage,
     onlyNoCities,
+    onlyNoPrice,
+    onlyNoCategory,
+    onlyWaMismatch,
     sort,
     page,
   ])
@@ -530,6 +604,41 @@ function AdminProductsContent() {
     return succeededIds
   }
 
+  /** Muestra/oculta en el catálogo de WhatsApp toda la selección. */
+  async function bulkSetWhatsApp(show: boolean) {
+    if (selected.size === 0 || bulkSaving) return
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const ids = [...selected]
+      const results = await Promise.all(
+        ids.map(async (productId) => {
+          const res = await fetch("/api/admin/products/update", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId, show_in_whatsapp: show }),
+          })
+          return res.ok
+        })
+      )
+      const succeededIds = ids.filter((_, i) => results[i])
+      setProducts((prev) =>
+        prev.map((p) =>
+          succeededIds.includes(p.id) ? { ...p, show_in_whatsapp: show } : p
+        )
+      )
+      const failed = results.filter((ok) => !ok).length
+      if (failed > 0) {
+        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
+      }
+      setSelected(new Set())
+    } catch {
+      setError("Error al actualizar WhatsApp en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
   /** Fase 5 — muestra/oculta en tienda todos los productos seleccionados. */
   async function bulkSetVisibility(isVisible: boolean) {
     if (selected.size === 0 || bulkSaving) return
@@ -647,6 +756,47 @@ function AdminProductsContent() {
       setError(err instanceof Error ? err.message : "Error al duplicar el producto")
     } finally {
       setDuplicatingId(null)
+    }
+  }
+
+  /** Elimina un producto (el servidor rechaza si tiene pedidos asociados). */
+  async function deleteProduct(p: Product) {
+    if (deletingId != null) return
+    if (!window.confirm(`¿Eliminar "${p.name}"? Esta acción no se puede deshacer.`)) return
+    setDeletingId(p.id)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/products/delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: p.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al eliminar el producto")
+      setReloadKey((k) => k + 1)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al eliminar el producto")
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  // Historial (audit log) del producto abierto en el modal.
+  const [historyEntries, setHistoryEntries] = useState<
+    { action: string; actor_email: string | null; created_at: string; detail: Record<string, unknown> }[]
+  >([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+
+  async function openHistory(p: Product) {
+    setHistoryFor(p)
+    setHistoryEntries([])
+    setHistoryLoading(true)
+    try {
+      const res = await fetch(`/api/admin/products/audit?productId=${p.id}`)
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) setHistoryEntries(data.entries ?? [])
+    } finally {
+      setHistoryLoading(false)
     }
   }
 
@@ -987,36 +1137,12 @@ function AdminProductsContent() {
         </select>
       </div>
 
-      {/* Chips de estado de publicación y catálogo incompleto (con conteos) */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        {(
-          [
-            { label: "Todos", value: "all" as const, count: counts.catalogTotal },
-            { label: "Publicados", value: "published" as const, count: counts.published },
-            { label: "Despublicados", value: "unpublished" as const, count: counts.unpublished },
-          ]
-        ).map((chip) => (
-          <button
-            key={chip.value}
-            type="button"
-            onClick={() => updateFilters(() => setStatusFilter(chip.value))}
-            aria-pressed={statusFilter === chip.value}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              statusFilter === chip.value
-                ? "bg-brand-600 text-white"
-                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            {chip.label}
-            <span
-              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                statusFilter === chip.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
-              }`}
-            >
-              {chip.count}
-            </span>
-          </button>
-        ))}
+      {/* Salud del catálogo: problemas detectados; cada chip aplica su filtro */}
+      {counts.noImage + counts.noCities + counts.noPrice + counts.noCategory + counts.waMismatch > 0 && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <HeartPulse className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="text-sm font-semibold text-amber-800">Salud del catálogo:</span>
         <button
           type="button"
           onClick={() => updateFilters(() => setOnlyNoImage((v) => !v))}
@@ -1057,6 +1183,126 @@ function AdminProductsContent() {
             {counts.noCities}
           </span>
         </button>
+        <button
+          type="button"
+          onClick={() => updateFilters(() => setOnlyNoPrice((v) => !v))}
+          aria-pressed={onlyNoPrice}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            onlyNoPrice
+              ? "bg-amber-600 text-white"
+              : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
+          }`}
+        >
+          <Tag className="w-3.5 h-3.5" />
+          Sin precio
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              onlyNoPrice ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+            }`}
+          >
+            {counts.noPrice}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => updateFilters(() => setOnlyNoCategory((v) => !v))}
+          aria-pressed={onlyNoCategory}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            onlyNoCategory
+              ? "bg-amber-600 text-white"
+              : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
+          }`}
+        >
+          <Package className="w-3.5 h-3.5" />
+          Sin categoría
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              onlyNoCategory ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+            }`}
+          >
+            {counts.noCategory}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => updateFilters(() => setOnlyWaMismatch((v) => !v))}
+          aria-pressed={onlyWaMismatch}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            onlyWaMismatch
+              ? "bg-red-600 text-white"
+              : "bg-white border border-red-200 text-red-700 hover:bg-red-50"
+          }`}
+          title="Activos en el catálogo de WhatsApp pero despublicados en tienda"
+        >
+          <AlertTriangle className="w-3.5 h-3.5" />
+          WA sin publicar
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              onlyWaMismatch ? "bg-white/20 text-white" : "bg-red-50 text-red-600"
+            }`}
+          >
+            {counts.waMismatch}
+          </span>
+        </button>
+          </div>
+        </div>
+      )}
+
+      {/* Chips de estado de publicación y catálogo incompleto (con conteos) */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {(
+          [
+            { label: "Todos", value: "all" as const, count: counts.catalogTotal },
+            { label: "Publicados", value: "published" as const, count: counts.published },
+            { label: "Despublicados", value: "unpublished" as const, count: counts.unpublished },
+          ]
+        ).map((chip) => (
+          <button
+            key={chip.value}
+            type="button"
+            onClick={() => updateFilters(() => setStatusFilter(chip.value))}
+            aria-pressed={statusFilter === chip.value}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              statusFilter === chip.value
+                ? "bg-brand-600 text-white"
+                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            {chip.label}
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                statusFilter === chip.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {chip.count}
+            </span>
+          </button>
+        ))}
+        {/* Toggle tabla/grid */}
+        <div className="ml-auto flex items-center gap-1 rounded-lg border border-gray-200 bg-white p-0.5">
+          <button
+            type="button"
+            onClick={() => setView("table")}
+            aria-pressed={view === "table"}
+            title="Vista de tabla"
+            className={`p-1.5 rounded-md transition-colors ${
+              view === "table" ? "bg-brand-600 text-white" : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            <LayoutList className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("grid")}
+            aria-pressed={view === "grid"}
+            title="Vista de tarjetas"
+            className={`p-1.5 rounded-md transition-colors ${
+              view === "grid" ? "bg-brand-600 text-white" : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Barra de acciones para la selección */}
@@ -1127,6 +1373,24 @@ function AdminProductsContent() {
               Precio %…
             </button>
             <button
+              onClick={() => bulkSetWhatsApp(true)}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
+              title="Mostrar la selección en el catálogo de WhatsApp"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              WA sí
+            </button>
+            <button
+              onClick={() => bulkSetWhatsApp(false)}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
+              title="Ocultar la selección del catálogo de WhatsApp"
+            >
+              <EyeOff className="w-3.5 h-3.5" />
+              WA no
+            </button>
+            <button
               onClick={() => setSelected(new Set())}
               disabled={bulkSaving}
               className="px-2 py-1.5 text-xs font-semibold text-gray-500 hover:underline disabled:opacity-50"
@@ -1138,7 +1402,8 @@ function AdminProductsContent() {
         </div>
       )}
 
-      {/* Products table */}
+      {/* Products: tabla o grid */}
+      {view === "table" ? (
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -1215,10 +1480,18 @@ function AdminProductsContent() {
                       <div className="flex items-center gap-3">
                         <button
                           type="button"
-                          onClick={() => startImageUpload(product.id)}
+                          onClick={() =>
+                            product.image_url
+                              ? setLightbox({
+                                  id: product.id,
+                                  url: product.image_url,
+                                  name: product.name,
+                                })
+                              : startImageUpload(product.id)
+                          }
                           disabled={uploadingImageId === product.id}
-                          title={product.image_url ? "Cambiar imagen" : "Subir imagen"}
-                          aria-label={product.image_url ? `Cambiar imagen de ${product.name}` : `Subir imagen para ${product.name}`}
+                          title={product.image_url ? "Ver imagen" : "Subir imagen"}
+                          aria-label={product.image_url ? `Ver imagen de ${product.name}` : `Subir imagen para ${product.name}`}
                           className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-brand-300 transition-shadow disabled:opacity-50"
                         >
                           {uploadingImageId === product.id ? (
@@ -1351,6 +1624,20 @@ function AdminProductsContent() {
                           {product.is_visible ? "Publicado" : "Despublicado"}
                         </span>
                       </button>
+                      {(product.publish_at || product.unpublish_at) && (
+                        <p
+                          className="mt-1 text-[10px] font-medium text-purple-600"
+                          title={
+                            product.publish_at
+                              ? `Se publicará el ${new Date(product.publish_at).toLocaleString("es-MX")}`
+                              : product.unpublish_at
+                              ? `Se despublicará el ${new Date(product.unpublish_at).toLocaleString("es-MX")}`
+                              : ""
+                          }
+                        >
+                          ⏱ {product.publish_at ? "Publicación" : "Despublicación"} programada
+                        </p>
+                      )}
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-1.5">
@@ -1424,6 +1711,29 @@ function AdminProductsContent() {
                             <Copy className="w-4 h-4" />
                           )}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => openHistory(product)}
+                          title={`Historial de cambios de ${product.name}`}
+                          aria-label={`Historial de ${product.name}`}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                        >
+                          <History className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteProduct(product)}
+                          disabled={deletingId === product.id}
+                          title={`Eliminar ${product.name}`}
+                          aria-label={`Eliminar ${product.name}`}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          {deletingId === product.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -1437,10 +1747,152 @@ function AdminProductsContent() {
             </div>
           )}
         </div>
+      </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          {total === 0 && !refreshing ? (
+            <div className="px-5 py-12 text-center text-gray-400 text-sm">
+              No se encontraron productos
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              {pageItems.map((product) => (
+                <div
+                  key={product.id}
+                  className={`relative rounded-xl border transition-colors overflow-hidden ${
+                    selected.has(product.id)
+                      ? "border-brand-400 ring-2 ring-brand-100"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(product.id)}
+                    onChange={() => toggleSelect(product.id)}
+                    aria-label={`Seleccionar ${product.name}`}
+                    className="absolute top-2 left-2 z-10 w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      product.image_url
+                        ? setLightbox({ id: product.id, url: product.image_url, name: product.name })
+                        : startImageUpload(product.id)
+                    }
+                    title={product.image_url ? "Ver imagen" : "Subir imagen"}
+                    className="w-full aspect-square bg-gray-50 flex items-center justify-center overflow-hidden"
+                  >
+                    {product.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- thumb admin, URL dinámica de Storage
+                      <img src={product.image_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImagePlus className="w-6 h-6 text-gray-300" />
+                    )}
+                  </button>
+                  <div className="p-3">
+                    <p className="text-sm font-medium text-gray-900 truncate" title={product.name}>
+                      {product.name}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">{product.brand ?? "—"}</p>
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-900">
+                        ${Number(product.sale_price ?? product.price ?? 0).toFixed(2)}
+                        {product.unit ? (
+                          <span className="text-xs font-normal text-gray-400">/{product.unit}</span>
+                        ) : null}
+                      </span>
+                      <span
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                          product.stock_status === "in_stock"
+                            ? "bg-green-50 text-green-700"
+                            : product.stock_status === "low_stock"
+                            ? "bg-amber-50 text-amber-700"
+                            : "bg-red-50 text-red-700"
+                        }`}
+                      >
+                        {STOCK_LABELS[product.stock_status]}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <button
+                        onClick={() => toggleVisibility(product)}
+                        disabled={saving.has(product.id)}
+                        title="Clic para publicar/despublicar en tienda"
+                        className="disabled:opacity-50"
+                      >
+                        <span
+                          className={`relative inline-block w-8 h-4.5 rounded-full transition-colors ${
+                            product.is_visible ? "bg-green-500" : "bg-gray-300"
+                          }`}
+                          style={{ height: "1.125rem" }}
+                        >
+                          <span
+                            className={`absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full shadow transition-transform ${
+                              product.is_visible ? "translate-x-3.5" : "translate-x-0.5"
+                            }`}
+                          />
+                        </span>
+                      </button>
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setProductForm(product)}
+                          title={`Editar ${product.name}`}
+                          aria-label={`Editar ${product.name}`}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                        >
+                          <SquarePen className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => duplicateProduct(product)}
+                          disabled={duplicatingId === product.id}
+                          title={`Duplicar ${product.name} (nace despublicado)`}
+                          aria-label={`Duplicar ${product.name}`}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors disabled:opacity-50"
+                        >
+                          {duplicatingId === product.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openHistory(product)}
+                          title={`Historial de ${product.name}`}
+                          aria-label={`Historial de ${product.name}`}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                        >
+                          <History className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteProduct(product)}
+                          disabled={deletingId === product.id}
+                          title={`Eliminar ${product.name}`}
+                          aria-label={`Eliminar ${product.name}`}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                          {deletingId === product.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* Fase 5 — paginación */}
-        {total > PAGE_SIZE && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
+      {/* Fase 5 — paginación (compartida por ambas vistas) */}
+      {total > PAGE_SIZE && (
+        <div className="mt-3 flex items-center justify-between px-5 py-3 bg-white rounded-xl border border-gray-200">
             <p className="text-xs text-gray-400">
               Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–
               {Math.min(currentPage * PAGE_SIZE, total)} de {total}
@@ -1468,7 +1920,6 @@ function AdminProductsContent() {
             </div>
           </div>
         )}
-      </div>
 
       {/* Input oculto para subir imagen de producto */}
       <input
@@ -1478,6 +1929,49 @@ function AdminProductsContent() {
         className="hidden"
         onChange={(e) => void handleImageFile(e.target.files?.[0])}
       />
+
+      {/* Lightbox: vista previa grande de la imagen */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <h2 className="text-sm font-bold text-gray-900 truncate">{lightbox.name}</h2>
+              <button
+                onClick={() => setLightbox(null)}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element -- preview admin, URL dinámica de Storage */}
+            <img
+              src={lightbox.url}
+              alt={lightbox.name}
+              className="w-full max-h-[60vh] object-contain bg-gray-50"
+            />
+            <div className="flex justify-end px-5 py-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => {
+                  startImageUpload(lightbox.id)
+                  setLightbox(null)
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700"
+              >
+                <ImagePlus className="w-4 h-4" />
+                Cambiar imagen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal: elegir ciudades para la selección */}
       {cityModalOpen && (
@@ -1595,6 +2089,64 @@ function AdminProductsContent() {
         />
       )}
 
+      {/* Modal: historial de cambios del producto (audit log) */}
+      {historyFor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setHistoryFor(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white shadow-xl max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Historial de cambios</h2>
+                <p className="text-xs text-gray-500">{historyFor.name}</p>
+              </div>
+              <button
+                onClick={() => setHistoryFor(null)}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-5 py-3">
+              {historyLoading ? (
+                <div className="flex items-center justify-center py-8 text-gray-400">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Cargando…
+                </div>
+              ) : historyEntries.length === 0 ? (
+                <p className="py-8 text-center text-sm text-gray-400">
+                  Sin cambios registrados.
+                </p>
+              ) : (
+                <ul className="divide-y divide-gray-50">
+                  {historyEntries.map((entry, i) => (
+                    <li key={i} className="py-2.5">
+                      <p className="text-sm font-medium text-gray-900">
+                        {AUDIT_ACTION_LABEL[entry.action as AuditAction] ?? entry.action}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {timeAgo(entry.created_at)}
+                        {entry.actor_email ? ` · ${entry.actor_email}` : ""}
+                      </p>
+                      {Object.keys(entry.detail ?? {}).length > 0 && (
+                        <p className="mt-0.5 text-[10px] font-mono text-gray-400 break-all">
+                          {JSON.stringify(entry.detail)}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Alta / edición completa de producto */}
       {productForm !== null && (
         <ProductFormModal
@@ -1602,6 +2154,9 @@ function AdminProductsContent() {
           product={productForm === "new" ? null : productForm}
           onClose={() => setProductForm(null)}
           onSaved={handleFormSaved}
+          onCategoryCreated={(cat) =>
+            setCategories((prev) => [...prev, cat].sort((a, b) => a.name.localeCompare(b.name, "es")))
+          }
         />
       )}
 

@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/admin-auth"
 import { NextResponse, type NextRequest } from "next/server"
 
 const COLS =
-  "id,name,slug,brand,category_id,description,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url"
+  "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,publish_at,unpublish_at"
 
 const MAX_PAGE_SIZE = 1000
 
@@ -16,6 +16,9 @@ interface ListParams {
   status: string
   noImage: boolean
   noCities: boolean
+  noPrice: boolean
+  noCategory: boolean
+  waMismatch: boolean
   sort: "name" | "price" | "stock"
   dir: "asc" | "desc"
   page: number
@@ -33,6 +36,9 @@ function parseParams(req: NextRequest): ListParams {
     status: sp.get("status") ?? "all",
     noImage: sp.get("noImage") === "1",
     noCities: sp.get("noCities") === "1",
+    noPrice: sp.get("noPrice") === "1",
+    noCategory: sp.get("noCategory") === "1",
+    waMismatch: sp.get("waMismatch") === "1",
     sort: rawSort === "price" || rawSort === "stock" ? rawSort : "name",
     dir: sp.get("dir") === "desc" ? "desc" : "asc",
     page: Math.max(1, Number(sp.get("page")) || 1),
@@ -85,6 +91,9 @@ async function applyFilters(
   if (p.status === "published") query = query.eq("is_visible", true)
   if (p.status === "unpublished") query = query.eq("is_visible", false)
   if (p.noImage) query = query.is("image_url", null)
+  if (p.noPrice) query = query.is("price", null)
+  if (p.noCategory) query = query.is("category_id", null)
+  if (p.waMismatch) query = query.eq("show_in_whatsapp", true).eq("is_visible", false)
   if (p.noCities) {
     const ids = await noCitiesProductIds(supabase)
     if (ids.length === 0) {
@@ -158,25 +167,43 @@ export async function GET(request: NextRequest) {
 
     // Conteos globales para los chips (independientes de los filtros activos,
     // salvo noCities que se deriva de disponibilidad completa).
-    const [catalogTotal, published, noImage, lowStock, outStock, noCitiesIds] = await Promise.all(
-      [
-        supabase.from("products").select("id", { count: "exact", head: true }),
-        supabase
-          .from("products")
-          .select("id", { count: "exact", head: true })
-          .eq("is_visible", true),
-        supabase.from("products").select("id", { count: "exact", head: true }).is("image_url", null),
-        supabase
-          .from("products")
-          .select("id", { count: "exact", head: true })
-          .eq("stock_status", "low_stock"),
-        supabase
-          .from("products")
-          .select("id", { count: "exact", head: true })
-          .eq("stock_status", "out_of_stock"),
-        noCitiesProductIds(supabase),
-      ]
-    )
+    const [
+      catalogTotal,
+      published,
+      noImage,
+      lowStock,
+      outStock,
+      noCitiesIds,
+      noPrice,
+      noCategory,
+      waMismatch,
+    ] = await Promise.all([
+      supabase.from("products").select("id", { count: "exact", head: true }),
+      supabase
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .eq("is_visible", true),
+      supabase.from("products").select("id", { count: "exact", head: true }).is("image_url", null),
+      supabase
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .eq("stock_status", "low_stock"),
+      supabase
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .eq("stock_status", "out_of_stock"),
+      noCitiesProductIds(supabase),
+      supabase.from("products").select("id", { count: "exact", head: true }).is("price", null),
+      supabase
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .is("category_id", null),
+      supabase
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .eq("show_in_whatsapp", true)
+        .eq("is_visible", false),
+    ])
 
     return NextResponse.json({
       rows: data ?? [],
@@ -189,6 +216,9 @@ export async function GET(request: NextRequest) {
         lowStock: lowStock.count ?? 0,
         outStock: outStock.count ?? 0,
         noCities: noCitiesIds.length,
+        noPrice: noPrice.count ?? 0,
+        noCategory: noCategory.count ?? 0,
+        waMismatch: waMismatch.count ?? 0,
       },
     })
   } catch (error) {

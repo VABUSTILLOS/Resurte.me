@@ -16,12 +16,15 @@ export interface ProductFormProduct {
   brand: string | null
   category_id: number | null
   description: string | null
+  unit: string | null
   price: number | null
   sale_price: number | null
   stock_status: "in_stock" | "low_stock" | "out_of_stock"
   is_visible: boolean
   show_in_whatsapp: boolean | null
   image_url: string | null
+  publish_at: string | null
+  unpublish_at: string | null
 }
 
 interface ProductFormModalProps {
@@ -30,6 +33,8 @@ interface ProductFormModalProps {
   product: ProductFormProduct | null
   onClose: () => void
   onSaved: (product: ProductFormProduct, created: boolean) => void
+  /** Alta inline de categoría: el padre la agrega a su lista. */
+  onCategoryCreated?: (category: Category) => void
 }
 
 const STOCK_OPTIONS = [
@@ -40,7 +45,13 @@ const STOCK_OPTIONS = [
 
 /** Modal de alta/edición completa de producto (nombre, marca, categoría,
  *  descripción, precios, stock y flags de publicación). */
-export function ProductFormModal({ categories, product, onClose, onSaved }: ProductFormModalProps) {
+export function ProductFormModal({
+  categories,
+  product,
+  onClose,
+  onSaved,
+  onCategoryCreated,
+}: ProductFormModalProps) {
   const isEdit = product !== null
   const [name, setName] = useState(product?.name ?? "")
   const [brand, setBrand] = useState(product?.brand ?? "")
@@ -48,6 +59,7 @@ export function ProductFormModal({ categories, product, onClose, onSaved }: Prod
     product?.category_id != null ? String(product.category_id) : ""
   )
   const [description, setDescription] = useState(product?.description ?? "")
+  const [unit, setUnit] = useState(product?.unit ?? "")
   const [price, setPrice] = useState(product?.price != null ? String(product.price) : "")
   const [salePrice, setSalePrice] = useState(
     product?.sale_price != null ? String(product.sale_price) : ""
@@ -57,8 +69,40 @@ export function ProductFormModal({ categories, product, onClose, onSaved }: Prod
   )
   const [isVisible, setIsVisible] = useState(product?.is_visible ?? false)
   const [showInWhatsapp, setShowInWhatsapp] = useState(product?.show_in_whatsapp ?? false)
+  // Programación de publicación (00096): datetime-local → ISO al guardar.
+  const toLocalInput = (iso: string | null | undefined) => (iso ? iso.slice(0, 16) : "")
+  const [publishAt, setPublishAt] = useState(toLocalInput(product?.publish_at))
+  const [unpublishAt, setUnpublishAt] = useState(toLocalInput(product?.unpublish_at))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Alta inline de categoría.
+  const [newCatOpen, setNewCatOpen] = useState(false)
+  const [newCatName, setNewCatName] = useState("")
+  const [creatingCat, setCreatingCat] = useState(false)
+
+  async function createCategory() {
+    const name = newCatName.trim()
+    if (!name || creatingCat) return
+    setCreatingCat(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/categories/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al crear la categoría")
+      onCategoryCreated?.(data.category as Category)
+      setCategoryId(String((data.category as Category).id))
+      setNewCatName("")
+      setNewCatOpen(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al crear la categoría")
+    } finally {
+      setCreatingCat(false)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -86,11 +130,14 @@ export function ProductFormModal({ categories, product, onClose, onSaved }: Prod
         brand: brand.trim() || null,
         category_id: categoryId === "" ? null : Number(categoryId),
         description: description.trim() || null,
+        unit: unit.trim() || null,
         price: parsedPrice,
         sale_price: parsedSale,
         stock_status: stockStatus,
         is_visible: isVisible,
         show_in_whatsapp: showInWhatsapp,
+        publish_at: publishAt ? new Date(publishAt).toISOString() : null,
+        unpublish_at: unpublishAt ? new Date(unpublishAt).toISOString() : null,
       }
       const res = isEdit
         ? await fetch("/api/admin/products/update", {
@@ -168,6 +215,18 @@ export function ProductFormModal({ categories, product, onClose, onSaved }: Prod
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-unit">
+                Unidad (kg, pieza, litro…)
+              </label>
+              <input
+                id="pf-unit"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                placeholder="kg"
+                className={inputCls}
+              />
+            </div>
+            <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-brand">
                 Marca
               </label>
@@ -178,26 +237,56 @@ export function ProductFormModal({ categories, product, onClose, onSaved }: Prod
                 className={inputCls}
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label
-                className="block text-xs font-semibold text-gray-600 mb-1"
-                htmlFor="pf-category"
-              >
-                Categoría
-              </label>
-              <select
-                id="pf-category"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className={`${inputCls} bg-white`}
-              >
-                <option value="">Sin categoría</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-category">
+                  Categoría
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setNewCatOpen((v) => !v)}
+                  className="text-[11px] font-semibold text-brand-600 hover:underline"
+                >
+                  {newCatOpen ? "Cancelar" : "＋ Nueva"}
+                </button>
+              </div>
+              {newCatOpen ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    placeholder="Nombre de la categoría"
+                    aria-label="Nombre de la nueva categoría"
+                    className={inputCls}
+                  />
+                  <button
+                    type="button"
+                    onClick={createCategory}
+                    disabled={creatingCat || !newCatName.trim()}
+                    className="shrink-0 flex items-center gap-1 px-3 py-2.5 rounded-xl bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    {creatingCat && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Crear
+                  </button>
+                </div>
+              ) : (
+                <select
+                  id="pf-category"
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className={`${inputCls} bg-white`}
+                >
+                  <option value="">Sin categoría</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
@@ -263,6 +352,43 @@ export function ProductFormModal({ categories, product, onClose, onSaved }: Prod
               </select>
             </div>
           </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label
+                className="block text-xs font-semibold text-gray-600 mb-1"
+                htmlFor="pf-publish-at"
+              >
+                Publicar automáticamente
+              </label>
+              <input
+                id="pf-publish-at"
+                type="datetime-local"
+                value={publishAt}
+                onChange={(e) => setPublishAt(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-xs font-semibold text-gray-600 mb-1"
+                htmlFor="pf-unpublish-at"
+              >
+                Despublicar automáticamente
+              </label>
+              <input
+                id="pf-unpublish-at"
+                type="datetime-local"
+                value={unpublishAt}
+                onChange={(e) => setUnpublishAt(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400 -mt-2">
+            Se aplica en la corrida diaria del cron; publicar/despublicar a mano cancela la
+            programación.
+          </p>
 
           <div className="flex flex-wrap gap-6">
             <label className="flex items-center gap-2 cursor-pointer">

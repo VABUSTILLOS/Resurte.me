@@ -43,6 +43,24 @@ export function orderCatalogItems<T extends { position: number }>(items: T[]): T
   return [...items].sort((a, b) => a.position - b.position)
 }
 
+/** Mapea un producto admin a producto WhatsApp (null si precio inválido). */
+export function toWhatsAppProduct(
+  p: AdminProduct & { stock_status?: string | null }
+): WhatsAppProduct | null {
+  const price = p.sale_price ?? p.price ?? 0
+  if (price <= 0) return null
+  return {
+    id: String(p.id),
+    name: p.name,
+    description: [p.brand, p.unit].filter(Boolean).join(" · ") || undefined,
+    image_url: p.image_url ?? undefined,
+    price,
+    currency: "MXN",
+    sale_price: p.sale_price ?? null,
+    availability: p.stock_status === "out_of_stock" ? "out of stock" : "in stock",
+  }
+}
+
 export interface InvalidCatalogProduct {
   id: string
   name: string

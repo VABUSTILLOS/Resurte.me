@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   if (adminDenied) return adminDenied
 
   try {
-    const body = (await request.json()) as { rows?: ProductImportRow[] }
+    const body = (await request.json()) as { rows?: ProductImportRow[]; dryRun?: boolean }
     const rows = Array.isArray(body.rows) ? body.rows : []
     if (rows.length === 0) {
       return NextResponse.json({ error: "Sin filas para importar" }, { status: 400 })
@@ -56,6 +56,24 @@ export async function POST(request: NextRequest) {
       .select("id, slug")
       .in("slug", slugs)
     const existingBySlug = new Map((existing ?? []).map((p) => [p.slug, p.id]))
+
+    // Dry-run: clasifica sin escribir (vista previa crear/actualizar).
+    if (body.dryRun === true) {
+      const toCreate: { slug: string; name: string }[] = []
+      const toUpdate: { slug: string; name: string }[] = []
+      for (const row of rows) {
+        if (existingBySlug.has(row.slug)) toUpdate.push({ slug: row.slug, name: row.name })
+        else toCreate.push({ slug: row.slug, name: row.name })
+      }
+      return NextResponse.json({
+        dryRun: true,
+        created: toCreate.length,
+        updated: toUpdate.length,
+        toCreate,
+        toUpdate,
+        errors: [],
+      })
+    }
 
     let created = 0
     let updated = 0
