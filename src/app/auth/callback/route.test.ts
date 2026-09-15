@@ -72,4 +72,35 @@ describe("GET /auth/callback", () => {
       "https://resurte.me/auth/login?error=auth_callback_error"
     )
   })
+
+  it("usa la cookie de destino cuando OAuth vuelve sin ?next=", async () => {
+    const res = await GET(
+      get("?code=abc", { cookie: "resurte_auth_next=%2Fadmin" })
+    )
+    expect(res.headers.get("location")).toBe("https://resurte.me/admin")
+  })
+
+  it("prefiere ?next= sobre la cookie", async () => {
+    const res = await GET(
+      get("?code=abc&next=/cuenta", { cookie: "resurte_auth_next=%2Fadmin" })
+    )
+    expect(res.headers.get("location")).toBe("https://resurte.me/cuenta")
+  })
+
+  it("sanea la cookie igual que el parámetro (open redirect)", async () => {
+    const res = await GET(
+      get("?code=abc", {
+        cookie: "resurte_auth_next=https%3A%2F%2Fevil.example.com",
+      })
+    )
+    expect(res.headers.get("location")).toBe("https://resurte.me/")
+  })
+
+  it("borra la cookie de destino tras consumirla", async () => {
+    const res = await GET(
+      get("?code=abc", { cookie: "resurte_auth_next=%2Fadmin" })
+    )
+    expect(res.headers.get("set-cookie")).toContain("resurte_auth_next=;")
+    expect(res.headers.get("set-cookie")).toContain("Max-Age=0")
+  })
 })

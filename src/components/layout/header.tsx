@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package, Search, Handshake, LayoutGrid } from "lucide-react"
+import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package, Search, Handshake, LayoutGrid, ShieldCheck } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
@@ -312,6 +312,17 @@ export function Header() {
                       >
                         <Handshake className="w-4 h-4" aria-hidden="true" />
                         Comercialización
+                      </Link>
+                    )}
+                    {role === "admin" && (
+                      <Link
+                        role="menuitem"
+                        href="/admin"
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-[#0E7A0E] hover:bg-[#F7F5F0] transition-colors"
+                      >
+                        <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                        Panel admin
                       </Link>
                     )}
                     <button

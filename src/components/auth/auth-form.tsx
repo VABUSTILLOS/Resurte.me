@@ -8,6 +8,7 @@ import { Eye, EyeOff } from "lucide-react"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { claimGuestAddresses } from "@/lib/guest-address"
 import { safeNextPath } from "@/lib/safe-next"
+import { rememberNextPath } from "@/lib/auth-next"
 
 interface AuthFormProps {
   mode: "login" | "register"
@@ -53,6 +54,8 @@ export function AuthForm({ mode }: AuthFormProps) {
         router.refresh()
         router.push(nextPath)
       } else {
+        // El enlace de confirmación vuelve por /auth/callback sin `next`.
+        rememberNextPath(nextPath)
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -125,6 +128,9 @@ export function AuthForm({ mode }: AuthFormProps) {
     setError(null)
 
     try {
+      // Supabase solo respeta la `redirectTo` registrada, así que el destino
+      // viaja en cookie para que el callback sepa a dónde volver.
+      rememberNextPath(nextPath)
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {

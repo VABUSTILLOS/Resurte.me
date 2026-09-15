@@ -2,11 +2,19 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { safeNextPath } from "@/lib/safe-next"
+import { clearNextCookie, readNextPath } from "@/lib/auth-next"
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get("code")
-  const next = safeNextPath(searchParams.get("next"))
+  // OAuth y el enlace mágico vuelven sin `next` en la query (Supabase solo
+  // respeta la `redirectTo` registrada), así que el destino viaja en cookie.
+  const fromQuery = searchParams.get("next")
+  const next = safeNextPath(
+    fromQuery && fromQuery.length > 0
+      ? fromQuery
+      : readNextPath(request.headers.get("cookie"))
+  )
 
   if (code) {
     const supabase = await createClient()
@@ -15,12 +23,16 @@ export async function GET(request: Request) {
       // Log técnico para debugging interno; el usuario solo ve un mensaje amigable.
       logger.error("Auth callback error:", error.message)
       const friendlyMessage = mapAuthError(error)
-      return NextResponse.redirect(`${origin}/auth/login?error=${encodeURIComponent(friendlyMessage)}`)
+      const failure = NextResponse.redirect(`${origin}/auth/login?error=${encodeURIComponent(friendlyMessage)}`)
+      failure.headers.append("Set-Cookie", clearNextCookie())
+      return failure
     }
     // Successful sign-in — redirect to intended destination
     const forwardedHost = request.headers.get("x-forwarded-host")
     const targetOrigin = forwardedHost ? `https://${forwardedHost}` : origin
-    return NextResponse.redirect(`${targetOrigin}${next}`)
+    const response = NextResponse.redirect(`${targetOrigin}${next}`)
+    response.headers.append("Set-Cookie", clearNextCookie())
+    return response
   }
 
   // No code — redirect to login
