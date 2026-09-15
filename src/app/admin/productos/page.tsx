@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useState, useEffect, useMemo, useRef } from "react"
+import { Suspense, useState, useEffect, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
@@ -21,6 +21,15 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  Download,
+  Undo2,
+  Copy,
+  SquarePen,
+  Percent,
+  Plus,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -30,6 +39,7 @@ interface Product {
   slug: string
   brand: string | null
   category_id: number | null
+  description: string | null
   price: number | null
   sale_price: number | null
   stock_status: "in_stock" | "low_stock" | "out_of_stock"
@@ -76,8 +86,20 @@ const STOCK_FILTERS: { label: string; value: StockStatus | "all" }[] = [
   { label: "Agotados", value: "out_of_stock" },
 ]
 
-function buildMap(rows: AvailabilityRow[]): AvailabilityMap {
-  const map: AvailabilityMap = new Map()
+/** Tiempo relativo en español para "última edición" de la fila. */
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return "ahora"
+  if (m < 60) return `hace ${m} min`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `hace ${h} h`
+  const d = Math.floor(h / 24)
+  if (d < 30) return `hace ${d} d`
+  return new Date(iso).toLocaleDateString("es-MX")
+}
+
+function buildMap(rows: AvailabilityRow[]): AvailabilityMap {  const map: AvailabilityMap = new Map()
   for (const row of rows) {
     const inner = map.get(row.product_id) ?? new Map<number, boolean>()
     inner.set(row.city_id, row.is_available)
@@ -103,6 +125,7 @@ export default function AdminProductsPage() {
 
 import { RestockPanel } from "../components/RestockPanel"
 import { ImportProductsModal } from "../components/ImportProductsModal"
+import { ProductFormModal } from "../components/ProductFormModal"
 
 function AdminProductsContent() {
   // Lazy browser-only client: creating it during SSR would throw when
@@ -176,6 +199,15 @@ function AdminProductsContent() {
   // Fase 16 — importación masiva vía CSV
   const [importOpen, setImportOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  // Alta/edición completa de producto y duplicado.
+  const [productForm, setProductForm] = useState<"new" | Product | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
+  // Acciones en lote extra: cambio de categoría y ajuste de precio %.
+  const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false)
+  const [bulkCategoryId, setBulkCategoryId] = useState<string>("")
+  const [bulkPriceOpen, setBulkPriceOpen] = useState(false)
+  const [bulkPricePct, setBulkPricePct] = useState<string>("10")
+  const [bulkPriceMode, setBulkPriceMode] = useState<"increase" | "decrease">("increase")
 
   // Fase 5 — filtros de categoría/stock (con deep-link ?stock= desde las
   // alertas del dashboard) y paginación.
@@ -187,19 +219,57 @@ function AdminProductsContent() {
       ? initialStock
       : "all"
   )
+  // Chips de estado de publicación + filtros de catálogo incompleto.
+  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "unpublished">("all")
+  const [onlyNoImage, setOnlyNoImage] = useState(false)
+  const [onlyNoCities, setOnlyNoCities] = useState(false)
+  // Orden de la tabla (por defecto nombre asc, como la consulta inicial).
+  const [sort, setSort] = useState<{ key: "name" | "price" | "stock"; dir: "asc" | "desc" }>({
+    key: "name",
+    dir: "asc",
+  })
+  // Deshacer de la última acción de visibilidad en lote (banner temporal).
+  const [undoBulk, setUndoBulk] = useState<{ ids: number[]; restore: boolean } | null>(null)
   const [page, setPage] = useState(1)
 
+  // Paginación server-side: total + conteos de chips vienen del API.
+  const [total, setTotal] = useState(0)
+  const [counts, setCounts] = useState({
+    catalogTotal: 0,
+    published: 0,
+    unpublished: 0,
+    noImage: 0,
+    lowStock: 0,
+    outStock: 0,
+    noCities: 0,
+  })
+  const [refreshing, setRefreshing] = useState(false)
+  // Metadatos por fila: sync WA pendiente y última edición (audit log).
+  const [waPending, setWaPending] = useState<Set<number>>(new Set())
+  const [lastEdit, setLastEdit] = useState<Record<number, { at: string; email: string | null }>>({})
+
+  /** Query string compartida por la tabla, select-all y export. */
+  const listParams = (extra: Record<string, string>) => {
+    const sp = new URLSearchParams({
+      q: debouncedSearch,
+      category: categoryFilter,
+      stock: stockFilter,
+      status: statusFilter,
+      noImage: onlyNoImage ? "1" : "0",
+      noCities: onlyNoCities ? "1" : "0",
+      sort: sort.key,
+      dir: sort.dir,
+      ...extra,
+    })
+    return sp.toString()
+  }
+
+  // Datos estáticos: categorías, ciudades y disponibilidad por ciudad.
   useEffect(() => {
     if (!supabase) return
     let cancelled = false
     ;(async () => {
-      const [prodRes, catRes, cityRes, availRes] = await Promise.all([
-        supabase
-          .from("products")
-          .select(
-            "id,name,slug,brand,category_id,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url"
-          )
-          .order("name"),
+      const [catRes, cityRes, availRes] = await Promise.all([
         supabase.from("categories").select("id,name,slug").order("name"),
         supabase.from("cities").select("id,name,slug,state").eq("is_active", true).order("name"),
         supabase
@@ -207,51 +277,94 @@ function AdminProductsContent() {
           .select("product_id,city_id,is_available"),
       ])
       if (cancelled) return
-      if (prodRes.error) setError(prodRes.error.message)
-      if (prodRes.data) setProducts(prodRes.data)
       if (catRes.data) setCategories(catRes.data)
       if (cityRes.data) setCities(cityRes.data)
       if (availRes.data) setAvailability(buildMap(availRes.data as AvailabilityRow[]))
-      setLoading(false)
     })()
     return () => {
       cancelled = true
     }
   }, [supabase, reloadKey])
 
+  // Filas de la tabla: búsqueda/filtros/orden/paginación en el servidor.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        setRefreshing(true)
+        const res = await fetch(
+          `/api/admin/products/list?${listParams({ page: String(page), pageSize: String(PAGE_SIZE) })}`
+        )
+        const data = await res.json().catch(() => ({}))
+        if (cancelled) return
+        if (!res.ok) {
+          setError(data.error ?? "Error al cargar productos")
+          return
+        }
+        setProducts(data.rows ?? [])
+        setTotal(data.total ?? 0)
+        if (data.counts) setCounts(data.counts)
+        // Metadatos por fila (sync WA + última edición), best-effort.
+        const ids = (data.rows ?? []).map((r: Product) => r.id)
+        if (ids.length > 0) {
+          const metaRes = await fetch(`/api/admin/products/row-meta?ids=${ids.join(",")}`)
+          const meta = await metaRes.json().catch(() => ({}))
+          if (!cancelled && metaRes.ok) {
+            setWaPending(new Set(meta.waPending ?? []))
+            const byId: Record<number, { at: string; email: string | null }> = {}
+            for (const [id, v] of Object.entries(meta.lastEdit ?? {})) {
+              byId[Number(id)] = v as { at: string; email: string | null }
+            }
+            setLastEdit(byId)
+          }
+        } else if (!cancelled) {
+          setWaPending(new Set())
+          setLastEdit({})
+        }
+      } finally {
+        if (!cancelled) {
+          setRefreshing(false)
+          setLoading(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    reloadKey,
+    debouncedSearch,
+    categoryFilter,
+    stockFilter,
+    statusFilter,
+    onlyNoImage,
+    onlyNoCities,
+    sort,
+    page,
+  ])
+
   const categoryName = (id: number | null) =>
     categories.find((c) => c.id === id)?.name ?? "Sin categoría"
 
-  const stockCounts = useMemo(() => {
-    let low = 0
-    let out = 0
-    for (const p of products) {
-      if (p.stock_status === "low_stock") low++
-      else if (p.stock_status === "out_of_stock") out++
-    }
-    return { low, out }
-  }, [products])
+  const toggleSort = (key: "name" | "price" | "stock") =>
+    setSort((prev) =>
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }
+    )
 
-  const filtered = useMemo(() => {
-    const q = debouncedSearch.toLowerCase()
-    const categoryName = (id: number | null) =>
-      categories.find((c) => c.id === id)?.name ?? "Sin categoría"
-    return products.filter((p) => {
-      if (categoryFilter !== "all" && String(p.category_id ?? "") !== categoryFilter) return false
-      if (stockFilter !== "all" && p.stock_status !== stockFilter) return false
-      if (!q) return true
-      return (
-        p.name.toLowerCase().includes(q) ||
-        (p.brand ?? "").toLowerCase().includes(q) ||
-        categoryName(p.category_id).toLowerCase().includes(q)
-      )
-    })
-  }, [products, debouncedSearch, categories, categoryFilter, stockFilter])
+  const sortIcon = (key: "name" | "price" | "stock") =>
+    sort.key !== key ? (
+      <ArrowUpDown className="w-3 h-3 text-gray-300" />
+    ) : sort.dir === "asc" ? (
+      <ArrowUp className="w-3 h-3 text-brand-600" />
+    ) : (
+      <ArrowDown className="w-3 h-3 text-brand-600" />
+    )
 
-  // Fase 5 — paginación sobre los resultados filtrados
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  // Paginación server-side: las filas actuales son la página completa.
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
-  const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const pageItems = products
 
   function updateFilters(next: () => void) {
     next()
@@ -282,19 +395,28 @@ function AdminProductsContent() {
     })
   }
 
-  const allFilteredSelected =
-    filtered.length > 0 && filtered.every((p) => selected.has(p.id))
+  // "Seleccionar todo" abarca TODOS los resultados del filtro (todas las
+  // páginas): los ids se piden al servidor.
+  const allFilteredSelected = total > 0 && selected.size >= total
 
-  const toggleSelectAllFiltered = () => {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (allFilteredSelected) {
-        for (const p of filtered) next.delete(p.id)
-      } else {
-        for (const p of filtered) next.add(p.id)
-      }
-      return next
-    })
+  const toggleSelectAllFiltered = async () => {
+    if (allFilteredSelected) {
+      setSelected(new Set())
+      return
+    }
+    const ids: number[] = []
+    let pageIdx = 1
+    for (;;) {
+      const res = await fetch(
+        `/api/admin/products/list?${listParams({ idsOnly: "1", page: String(pageIdx), pageSize: "1000" })}`
+      )
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) break
+      ids.push(...(data.ids ?? []))
+      if (ids.length >= (data.total ?? 0) || (data.ids ?? []).length === 0) break
+      pageIdx++
+    }
+    setSelected(new Set(ids))
   }
 
   // ---------- Modal de ciudades ----------
@@ -385,9 +507,153 @@ function AdminProductsContent() {
     setCityModalOpen(false)
   }
 
+  /** Aplica is_visible a un conjunto de ids; devuelve los que se guardaron. */
+  async function applyVisibilityToIds(ids: number[], isVisible: boolean): Promise<number[]> {
+    const results = await Promise.all(
+      ids.map(async (productId) => {
+        const res = await fetch("/api/admin/products/update", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId, is_visible: isVisible }),
+        })
+        return res.ok
+      })
+    )
+    const succeededIds = ids.filter((_, i) => results[i])
+    setProducts((prev) =>
+      prev.map((p) => (succeededIds.includes(p.id) ? { ...p, is_visible: isVisible } : p))
+    )
+    const failed = results.filter((ok) => !ok).length
+    if (failed > 0) {
+      setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
+    }
+    return succeededIds
+  }
+
   /** Fase 5 — muestra/oculta en tienda todos los productos seleccionados. */
   async function bulkSetVisibility(isVisible: boolean) {
     if (selected.size === 0 || bulkSaving) return
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const succeededIds = await applyVisibilityToIds([...selected], isVisible)
+      setSelected(new Set())
+      // Ofrece deshacer la acción durante unos segundos.
+      if (succeededIds.length > 0) {
+        setUndoBulk({ ids: succeededIds, restore: !isVisible })
+      }
+    } catch {
+      setError("Error al actualizar la visibilidad en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  /** Revierte la última acción de visibilidad en lote. */
+  async function undoBulkVisibility() {
+    if (!undoBulk || bulkSaving) return
+    const { ids, restore } = undoBulk
+    setUndoBulk(null)
+    setBulkSaving(true)
+    setError(null)
+    try {
+      await applyVisibilityToIds(ids, restore)
+    } catch {
+      setError("Error al deshacer la visibilidad en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  // El banner de deshacer expira a los 10 segundos.
+  useEffect(() => {
+    if (!undoBulk) return
+    const id = setTimeout(() => setUndoBulk(null), 10_000)
+    return () => clearTimeout(id)
+  }, [undoBulk])
+
+  /** Exporta los productos filtrados a un CSV re-importable (mismas columnas
+   *  que acepta la importación masiva). Pide todas las páginas al servidor. */
+  async function exportCsv() {
+    const rows: Product[] = []
+    let pageIdx = 1
+    for (;;) {
+      const res = await fetch(
+        `/api/admin/products/list?${listParams({ page: String(pageIdx), pageSize: "1000" })}`
+      )
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error ?? "Error al exportar")
+        return
+      }
+      rows.push(...(data.rows ?? []))
+      if (rows.length >= (data.total ?? 0) || (data.rows ?? []).length === 0) break
+      pageIdx++
+    }
+    if (rows.length === 0) return
+    const esc = (v: string) => (/[",;\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
+    const catSlug = (id: number | null) => categories.find((c) => c.id === id)?.slug ?? ""
+    const header = "nombre,slug,marca,categoria,precio,precio_oferta,stock,visible"
+    const lines = rows.map((p) =>
+      [
+        esc(p.name),
+        p.slug,
+        esc(p.brand ?? ""),
+        catSlug(p.category_id),
+        p.price ?? "",
+        p.sale_price ?? "",
+        p.stock_status,
+        p.is_visible ? "si" : "no",
+      ].join(",")
+    )
+    // BOM para que Excel respete los acentos.
+    const blob = new Blob(["﻿" + [header, ...lines].join("\n")], {
+      type: "text/csv;charset=utf-8",
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `productos-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  /** Alta/edición completa: creación y duplicado recargan para traer
+   *  disponibilidad por ciudad; la edición se aplica localmente. */
+  function handleFormSaved(saved: Product, created: boolean) {
+    setProductForm(null)
+    if (created) {
+      setReloadKey((k) => k + 1)
+    } else {
+      setProducts((prev) => prev.map((p) => (p.id === saved.id ? { ...p, ...saved } : p)))
+    }
+  }
+
+  /** Duplica un producto (la copia nace despublicada). */
+  async function duplicateProduct(p: Product) {
+    if (duplicatingId != null) return
+    setDuplicatingId(p.id)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/products/duplicate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: p.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al duplicar el producto")
+      setReloadKey((k) => k + 1)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al duplicar el producto")
+    } finally {
+      setDuplicatingId(null)
+    }
+  }
+
+  /** Cambia la categoría de todos los productos seleccionados. */
+  async function bulkSetCategory() {
+    if (selected.size === 0 || bulkSaving) return
+    const categoryId = bulkCategoryId === "" ? null : Number(bulkCategoryId)
     setBulkSaving(true)
     setError(null)
     try {
@@ -397,22 +663,80 @@ function AdminProductsContent() {
           const res = await fetch("/api/admin/products/update", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, is_visible: isVisible }),
+            body: JSON.stringify({ productId, category_id: categoryId }),
           })
           return res.ok
         })
       )
-      const failed = results.filter((ok) => !ok).length
       const succeededIds = ids.filter((_, i) => results[i])
       setProducts((prev) =>
-        prev.map((p) => (succeededIds.includes(p.id) ? { ...p, is_visible: isVisible } : p))
+        prev.map((p) => (succeededIds.includes(p.id) ? { ...p, category_id: categoryId } : p))
       )
-      setSelected(new Set())
+      const failed = results.filter((ok) => !ok).length
       if (failed > 0) {
         setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
       }
+      setBulkCategoryOpen(false)
+      setSelected(new Set())
     } catch {
-      setError("Error al actualizar la visibilidad en lote")
+      setError("Error al cambiar la categoría en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  /** Ajusta el precio (y oferta, si existe) de la selección en ±%. */
+  async function bulkAdjustPrice() {
+    if (selected.size === 0 || bulkSaving) return
+    const pct = parseFloat(bulkPricePct)
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+      setError("El porcentaje debe estar entre 0 y 100")
+      return
+    }
+    const factor = bulkPriceMode === "increase" ? 1 + pct / 100 : 1 - pct / 100
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const ids = [...selected]
+      // Los seleccionados pueden estar en otras páginas: precios frescos del servidor.
+      const listRes = await fetch(`/api/admin/products/list?ids=${ids.join(",")}`)
+      const listData = await listRes.json().catch(() => ({}))
+      if (!listRes.ok) throw new Error(listData.error ?? "Error al leer precios actuales")
+      const current = new Map<number, Product>(
+        (listData.rows ?? []).map((r: Product) => [r.id, r])
+      )
+      const newPrices = new Map<number, { price: number | null; sale_price: number | null }>()
+      const results = await Promise.all(
+        ids.map(async (productId) => {
+          const p = current.get(productId)
+          if (!p) return false
+          const price = p.price != null ? Math.round(p.price * factor * 100) / 100 : null
+          const salePrice =
+            p.sale_price != null ? Math.round(p.sale_price * factor * 100) / 100 : null
+          newPrices.set(productId, { price, sale_price: salePrice })
+          const res = await fetch("/api/admin/products/update", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId, price, sale_price: salePrice }),
+          })
+          return res.ok
+        })
+      )
+      const succeededIds = ids.filter((_, i) => results[i])
+      setProducts((prev) =>
+        prev.map((p) => {
+          const next = succeededIds.includes(p.id) ? newPrices.get(p.id) : undefined
+          return next ? { ...p, ...next } : p
+        })
+      )
+      const failed = results.filter((ok) => !ok).length
+      if (failed > 0) {
+        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
+      }
+      setBulkPriceOpen(false)
+      setSelected(new Set())
+    } catch {
+      setError("Error al ajustar precios en lote")
     } finally {
       setBulkSaving(false)
     }
@@ -496,9 +820,10 @@ function AdminProductsContent() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Productos</h1>
           <p className="text-sm text-gray-500">
-            {filtered.length === products.length
-              ? `${products.length} productos registrados`
-              : `${filtered.length} de ${products.length} productos`}
+            {total === counts.catalogTotal
+              ? `${counts.catalogTotal} productos registrados`
+              : `${total} de ${counts.catalogTotal} productos`}
+            {refreshing && <Loader2 className="inline w-3.5 h-3.5 ml-2 animate-spin text-brand-500" />}
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -519,11 +844,21 @@ function AdminProductsContent() {
             Importar CSV
           </button>
           <button
-            disabled
-            title="Próximamente"
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 transition-colors text-sm opacity-60 cursor-not-allowed"
+            type="button"
+            onClick={exportCsv}
+            disabled={total === 0}
+            title="Descarga los productos filtrados en CSV (re-importable)"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm disabled:opacity-50"
           >
-            <Package className="w-4 h-4" />
+            <Download className="w-4 h-4" />
+            Exportar CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => setProductForm("new")}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4" />
             Nuevo producto
           </button>
         </div>
@@ -532,6 +867,32 @@ function AdminProductsContent() {
       {error && (
         <div className="mb-4 px-4 py-3 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200">
           {error}
+        </div>
+      )}
+
+      {/* Deshacer de la última acción de visibilidad en lote */}
+      {undoBulk && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-brand-50 text-brand-900 text-sm rounded-xl border border-brand-200">
+          <span>
+            Se actualizaron {undoBulk.ids.length} producto{undoBulk.ids.length === 1 ? "" : "s"}.
+          </span>
+          <button
+            type="button"
+            onClick={undoBulkVisibility}
+            disabled={bulkSaving}
+            className="flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline disabled:opacity-50"
+          >
+            <Undo2 className="w-4 h-4" />
+            Deshacer
+          </button>
+          <button
+            type="button"
+            onClick={() => setUndoBulk(null)}
+            className="ml-auto p-1 rounded-lg text-brand-400 hover:bg-brand-100"
+            aria-label="Cerrar aviso"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -545,7 +906,7 @@ function AdminProductsContent() {
       />
       {/* Alertas de stock: conteo de productos con stock bajo o agotado;
           cada chip filtra la tabla. */}
-      {(stockCounts.low > 0 || stockCounts.out > 0) && (
+      {(counts.lowStock > 0 || counts.outStock > 0) && (
         <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
           <span className="text-sm font-semibold text-amber-800">Alertas de inventario:</span>
@@ -560,7 +921,7 @@ function AdminProductsContent() {
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            {stockCounts.low} con stock bajo
+            {counts.lowStock} con stock bajo
           </button>
           <button
             type="button"
@@ -573,7 +934,7 @@ function AdminProductsContent() {
             }`}
           >
             <PackageX className="w-3.5 h-3.5" />
-            {stockCounts.out} agotado{stockCounts.out === 1 ? "" : "s"}
+            {counts.outStock} agotado{counts.outStock === 1 ? "" : "s"}
           </button>
           {stockFilter !== "all" && (
             <button
@@ -626,6 +987,78 @@ function AdminProductsContent() {
         </select>
       </div>
 
+      {/* Chips de estado de publicación y catálogo incompleto (con conteos) */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {(
+          [
+            { label: "Todos", value: "all" as const, count: counts.catalogTotal },
+            { label: "Publicados", value: "published" as const, count: counts.published },
+            { label: "Despublicados", value: "unpublished" as const, count: counts.unpublished },
+          ]
+        ).map((chip) => (
+          <button
+            key={chip.value}
+            type="button"
+            onClick={() => updateFilters(() => setStatusFilter(chip.value))}
+            aria-pressed={statusFilter === chip.value}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              statusFilter === chip.value
+                ? "bg-brand-600 text-white"
+                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            {chip.label}
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                statusFilter === chip.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {chip.count}
+            </span>
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => updateFilters(() => setOnlyNoImage((v) => !v))}
+          aria-pressed={onlyNoImage}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            onlyNoImage
+              ? "bg-amber-600 text-white"
+              : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
+          }`}
+        >
+          <ImagePlus className="w-3.5 h-3.5" />
+          Sin imagen
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              onlyNoImage ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+            }`}
+          >
+            {counts.noImage}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => updateFilters(() => setOnlyNoCities((v) => !v))}
+          aria-pressed={onlyNoCities}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            onlyNoCities
+              ? "bg-amber-600 text-white"
+              : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
+          }`}
+        >
+          <MapPin className="w-3.5 h-3.5" />
+          Sin ciudades
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              onlyNoCities ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+            }`}
+          >
+            {counts.noCities}
+          </span>
+        </button>
+      </div>
+
       {/* Barra de acciones para la selección */}
       {selected.size > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
@@ -676,6 +1109,24 @@ function AdminProductsContent() {
               Ocultar de tienda
             </button>
             <button
+              onClick={() => setBulkCategoryOpen(true)}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold hover:bg-purple-100 disabled:opacity-50"
+              title="Cambiar la categoría de la selección"
+            >
+              <Tag className="w-3.5 h-3.5" />
+              Categoría…
+            </button>
+            <button
+              onClick={() => setBulkPriceOpen(true)}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-xs font-semibold hover:bg-orange-100 disabled:opacity-50"
+              title="Ajustar precios de la selección en ±%"
+            >
+              <Percent className="w-3.5 h-3.5" />
+              Precio %…
+            </button>
+            <button
               onClick={() => setSelected(new Set())}
               disabled={bulkSaving}
               className="px-2 py-1.5 text-xs font-semibold text-gray-500 hover:underline disabled:opacity-50"
@@ -702,19 +1153,48 @@ function AdminProductsContent() {
                     className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                   />
                 </th>
-                <th className="px-3 py-3">Producto</th>
+                <th className="px-3 py-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("name")}
+                    className="inline-flex items-center gap-1 hover:text-gray-600"
+                    aria-label="Ordenar por nombre"
+                  >
+                    Producto {sortIcon("name")}
+                  </button>
+                </th>
                 <th className="px-5 py-3">Categoría</th>
-                <th className="px-5 py-3">Precio</th>
-                <th className="px-5 py-3">Stock</th>
+                <th className="px-5 py-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("price")}
+                    className="inline-flex items-center gap-1 hover:text-gray-600"
+                    aria-label="Ordenar por precio"
+                  >
+                    Precio {sortIcon("price")}
+                  </button>
+                </th>
+                <th className="px-5 py-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("stock")}
+                    className="inline-flex items-center gap-1 hover:text-gray-600"
+                    aria-label="Ordenar por stock"
+                  >
+                    Stock {sortIcon("stock")}
+                  </button>
+                </th>
                 <th className="px-5 py-3">Estado</th>
                 <th className="px-5 py-3">WhatsApp</th>
                 <th className="px-5 py-3">Ciudades</th>
+                <th className="px-5 py-3">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {pageItems.map((product) => {
                 const global = isGlobal(product.id)
                 const cityCount = citiesAvailableCount(product.id)
+                const edit = lastEdit[product.id]
                 return (
                   <tr
                     key={product.id}
@@ -757,6 +1237,12 @@ function AdminProductsContent() {
                         <div>
                           <p className="font-medium text-gray-900">{product.name}</p>
                           <p className="text-xs text-gray-400">{product.brand ?? "—"}</p>
+                          {edit && (
+                            <p className="text-[10px] text-gray-400">
+                              Editado {timeAgo(edit.at)}
+                              {edit.email ? ` por ${edit.email}` : ""}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -867,19 +1353,27 @@ function AdminProductsContent() {
                       </button>
                     </td>
                     <td className="px-5 py-3">
-                      <button
-                        onClick={() => toggleWhatsApp(product)}
-                        disabled={saving.has(product.id)}
-                        className={`relative w-9 h-5 rounded-full transition-colors ${
-                          product.show_in_whatsapp ? "bg-green-500" : "bg-gray-300"
-                        }`}
-                      >
-                        <span
-                          className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                            product.show_in_whatsapp ? "translate-x-4" : "translate-x-0.5"
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => toggleWhatsApp(product)}
+                          disabled={saving.has(product.id)}
+                          className={`relative w-9 h-5 rounded-full transition-colors ${
+                            product.show_in_whatsapp ? "bg-green-500" : "bg-gray-300"
                           }`}
-                        />
-                      </button>
+                        >
+                          <span
+                            className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                              product.show_in_whatsapp ? "translate-x-4" : "translate-x-0.5"
+                            }`}
+                          />
+                        </button>
+                        {waPending.has(product.id) && (
+                          <span
+                            title="Cambios pendientes de sincronizar con WhatsApp"
+                            className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"
+                          />
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-3">
                       <button
@@ -905,12 +1399,39 @@ function AdminProductsContent() {
                         )}
                       </button>
                     </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setProductForm(product)}
+                          title={`Editar ${product.name}`}
+                          aria-label={`Editar ${product.name}`}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                        >
+                          <SquarePen className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => duplicateProduct(product)}
+                          disabled={duplicatingId === product.id}
+                          title={`Duplicar ${product.name} (nace despublicado)`}
+                          aria-label={`Duplicar ${product.name}`}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors disabled:opacity-50"
+                        >
+                          {duplicatingId === product.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
-          {filtered.length === 0 && (
+          {total === 0 && !refreshing && (
             <div className="px-5 py-12 text-center text-gray-400 text-sm">
               No se encontraron productos
             </div>
@@ -918,11 +1439,11 @@ function AdminProductsContent() {
         </div>
 
         {/* Fase 5 — paginación */}
-        {filtered.length > PAGE_SIZE && (
+        {total > PAGE_SIZE && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
             <p className="text-xs text-gray-400">
               Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–
-              {Math.min(currentPage * PAGE_SIZE, filtered.length)} de {filtered.length}
+              {Math.min(currentPage * PAGE_SIZE, total)} de {total}
             </p>
             <div className="flex items-center gap-1">
               <button
@@ -1072,6 +1593,163 @@ function AdminProductsContent() {
           onClose={() => setImportOpen(false)}
           onImported={() => setReloadKey((k) => k + 1)}
         />
+      )}
+
+      {/* Alta / edición completa de producto */}
+      {productForm !== null && (
+        <ProductFormModal
+          categories={categories}
+          product={productForm === "new" ? null : productForm}
+          onClose={() => setProductForm(null)}
+          onSaved={handleFormSaved}
+        />
+      )}
+
+      {/* Modal: cambiar categoría de la selección */}
+      {bulkCategoryOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !bulkSaving && setBulkCategoryOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">Cambiar categoría</h2>
+              <button
+                onClick={() => setBulkCategoryOpen(false)}
+                disabled={bulkSaving}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-xs text-gray-500 mb-3">
+                Se aplicará a {selected.size} producto{selected.size === 1 ? "" : "s"}.
+              </p>
+              <select
+                value={bulkCategoryId}
+                onChange={(e) => setBulkCategoryId(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:border-brand-500"
+                aria-label="Nueva categoría"
+              >
+                <option value="">Sin categoría</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setBulkCategoryOpen(false)}
+                disabled={bulkSaving}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={bulkSetCategory}
+                disabled={bulkSaving}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50"
+              >
+                {bulkSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: ajuste de precio porcentual de la selección */}
+      {bulkPriceOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !bulkSaving && setBulkPriceOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">Ajustar precios</h2>
+              <button
+                onClick={() => setBulkPriceOpen(false)}
+                disabled={bulkSaving}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-xs text-gray-500">
+                Se aplicará a {selected.size} producto{selected.size === 1 ? "" : "s"} (precio y
+                precio de oferta, si existe).
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBulkPriceMode("increase")}
+                  aria-pressed={bulkPriceMode === "increase"}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    bulkPriceMode === "increase"
+                      ? "bg-green-600 text-white"
+                      : "bg-green-50 text-green-700 border border-green-200 hover:bg-green-100"
+                  }`}
+                >
+                  Aumentar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkPriceMode("decrease")}
+                  aria-pressed={bulkPriceMode === "decrease"}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    bulkPriceMode === "decrease"
+                      ? "bg-red-600 text-white"
+                      : "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                  }`}
+                >
+                  Disminuir
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  value={bulkPricePct}
+                  onChange={(e) => setBulkPricePct(e.target.value)}
+                  className="w-24 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500"
+                  aria-label="Porcentaje de ajuste"
+                />
+                <span className="text-sm text-gray-500">%</span>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setBulkPriceOpen(false)}
+                disabled={bulkSaving}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={bulkAdjustPrice}
+                disabled={bulkSaving}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50"
+              >
+                {bulkSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

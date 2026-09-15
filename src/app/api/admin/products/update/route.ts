@@ -7,9 +7,10 @@ import { NextResponse } from "next/server"
 
 /**
  * PATCH /api/admin/products/update
- * Actualiza precio/stock/visibilidad/whatsapp de un producto (superadmin).
+ * Actualiza campos de un producto (superadmin).
  * Acepta un subconjunto de campos: price, sale_price, stock_status,
- * is_visible, show_in_whatsapp.
+ * is_visible, show_in_whatsapp, image_url, name, brand, category_id,
+ * description.
  */
 export async function PATCH(request: Request) {
   try {
@@ -29,12 +30,50 @@ export async function PATCH(request: Request) {
       )
     }
 
-    // Whitelist de campos actualizables
-    const allowed = ["price", "sale_price", "stock_status", "is_visible", "show_in_whatsapp", "image_url"] as const
+    // Whitelist de campos actualizables. Nota: el slug NO se toca al editar
+    // el nombre — regenerarlo rompería URLs ya indexadas/compartidas.
+    const allowed = [
+      "price",
+      "sale_price",
+      "stock_status",
+      "is_visible",
+      "show_in_whatsapp",
+      "image_url",
+      "name",
+      "brand",
+      "category_id",
+      "description",
+    ] as const
     type AllowedField = (typeof allowed)[number]
     const updates: Partial<Record<AllowedField, unknown>> = {}
     for (const field of allowed) {
       if (field in fields) updates[field] = fields[field]
+    }
+    // Validaciones de tipos de los campos nuevos.
+    if ("name" in updates) {
+      if (typeof updates.name !== "string" || !updates.name.trim()) {
+        return NextResponse.json({ error: "name no puede estar vacío" }, { status: 400 })
+      }
+      updates.name = updates.name.trim()
+    }
+    if ("brand" in updates && updates.brand !== null && typeof updates.brand !== "string") {
+      return NextResponse.json({ error: "brand debe ser texto o null" }, { status: 400 })
+    }
+    if (
+      "description" in updates &&
+      updates.description !== null &&
+      typeof updates.description !== "string"
+    ) {
+      return NextResponse.json({ error: "description debe ser texto o null" }, { status: 400 })
+    }
+    if ("category_id" in updates) {
+      const cid = updates.category_id
+      if (cid !== null && (typeof cid !== "number" || !Number.isInteger(cid))) {
+        return NextResponse.json(
+          { error: "category_id debe ser un entero o null" },
+          { status: 400 }
+        )
+      }
     }
     // image_url: solo URLs https públicas (o rutas locales del sitio).
     if ("image_url" in updates) {

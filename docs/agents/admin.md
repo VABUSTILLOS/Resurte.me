@@ -15,6 +15,16 @@
   (`describeSeries`) — el SVG solo no es accesible.
 - La subnav es scroll horizontal en móvil.
 - Errores con reintento (`error.tsx` del área + botón Reintentar en página).
+- Productos (`/admin/productos`): la tabla es server-side
+  (`GET /api/admin/products/list` con búsqueda/filtros/orden/paginación y
+  conteos para los chips); "seleccionar todo" abarca todas las páginas vía
+  `idsOnly=1`; el export CSV usa las mismas columnas que la importación
+  (re-importable); crear/editar/duplicar pasan por
+  `POST /api/admin/products/create|duplicate` y el PATCH con whitelist —
+  el slug NUNCA se regenera al editar el nombre (rompería URLs indexadas);
+  el duplicado nace despublicado y copia la disponibilidad por ciudad.
+  Metadatos por fila (sync WA pendiente, última edición) vía
+  `GET /api/admin/products/row-meta`.
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
