@@ -45,6 +45,19 @@ interface ProductFormModalProps {
   onCategoryCreated?: (category: Category) => void
 }
 
+interface SpeechRecognitionLike {
+  lang: string
+  interimResults: boolean
+  continuous: boolean
+  onresult:
+    | ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void)
+    | null
+  onend: (() => void) | null
+  onerror: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+
 const STOCK_OPTIONS = [
   { value: "in_stock", label: "En stock" },
   { value: "low_stock", label: "Stock bajo" },
@@ -78,6 +91,49 @@ export function ProductFormModal({
   )
   const [seoTitle, setSeoTitle] = useState(product?.seo_title ?? "")
   const [seoDescription, setSeoDescription] = useState(product?.seo_description ?? "")
+  const [generatingSeo, setGeneratingSeo] = useState(false)
+
+  async function generateSeo() {
+    if (!name.trim()) {
+      setError("Escribe el nombre del producto primero")
+      return
+    }
+    setGeneratingSeo(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/kie-ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "system",
+              content:
+                'Eres especialista SEO de una tienda de abarrotes mexicana. Responde SOLO con JSON válido: {"title": "...", "description": "..."}. title máx 60 caracteres, description máx 160, orientados a búsqueda local, sin emojis.',
+            },
+            {
+              role: "user",
+              content: `Producto: ${name.trim()}${brand.trim() ? `, marca ${brand.trim()}` : ""}${
+                description.trim() ? `. Descripción: ${description.trim().slice(0, 200)}` : ""
+              }`,
+            },
+          ],
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al generar SEO")
+      const content = (data.content ?? "").trim()
+      const match = content.match(/\{[\s\S]*\}/)
+      if (!match) throw new Error("La IA no devolvió JSON válido")
+      const parsed = JSON.parse(match[0]) as { title?: string; description?: string }
+      if (parsed.title) setSeoTitle(parsed.title.slice(0, 70))
+      if (parsed.description) setSeoDescription(parsed.description.slice(0, 170))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al generar SEO")
+    } finally {
+      setGeneratingSeo(false)
+    }
+  }
   const [stockStatus, setStockStatus] = useState<ProductFormProduct["stock_status"]>(
     product?.stock_status ?? "in_stock"
   )
@@ -176,6 +232,42 @@ export function ProductFormModal({
     }
   }
 
+  // Dictado por voz con la Web Speech API nativa (es-MX).
+  const [dictating, setDictating] = useState(false)
+  const recognitionRef = useRef<{ stop: () => void } | null>(null)
+
+  function toggleDictation() {
+    if (dictating) {
+      recognitionRef.current?.stop()
+      setDictating(false)
+      return
+    }
+    const W = window as unknown as {
+      SpeechRecognition?: new () => SpeechRecognitionLike
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike
+    }
+    const Ctor = W.SpeechRecognition ?? W.webkitSpeechRecognition
+    if (!Ctor) return
+    const rec = new Ctor()
+    rec.lang = "es-MX"
+    rec.interimResults = false
+    rec.continuous = false
+    rec.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map((r) => r[0]?.transcript ?? "")
+        .join(" ")
+        .trim()
+      if (transcript) {
+        setDescription((prev) => (prev ? `${prev} ${transcript}` : transcript))
+      }
+    }
+    rec.onend = () => setDictating(false)
+    rec.onerror = () => setDictating(false)
+    recognitionRef.current = rec
+    rec.start()
+    setDictating(true)
+  }
+
   /** Extrae la primera URL https del record de la tarea (resultUrls/resultJson). */
   function extractImageUrl(record: Record<string, unknown>): string | null {
     const candidates: unknown[] = []
@@ -249,6 +341,27 @@ export function ProductFormModal({
   const [newCatOpen, setNewCatOpen] = useState(false)
   const [newCatName, setNewCatName] = useState("")
   const [creatingCat, setCreatingCat] = useState(false)
+  // Imagen por URL pegada.
+  const [urlOpen, setUrlOpen] = useState(false)
+  const [urlValue, setUrlValue] = useState("")
+
+  function addImageByUrl() {
+    const url = urlValue.trim()
+    if (!url) return
+    if (!url.startsWith("https://") && !url.startsWith("/")) {
+      setError("La URL debe ser https o una ruta local (/)")
+      return
+    }
+    if (gallery.includes(url)) {
+      setError("Esa imagen ya está en la galería")
+      return
+    }
+    setGallery((prev) => [...prev, url])
+    if (!mainImage) setMainImage(url)
+    setUrlValue("")
+    setUrlOpen(false)
+    setError(null)
+  }
 
   async function createCategory() {
     const name = newCatName.trim()
@@ -483,20 +596,37 @@ export function ProductFormModal({
               <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-desc">
                 Descripción
               </label>
-              <button
-                type="button"
-                onClick={generateDescription}
-                disabled={generatingDesc}
-                title="Genera una propuesta con IA (editable antes de guardar)"
-                className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:underline disabled:opacity-50"
-              >
-                {generatingDesc ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5" />
-                )}
-                Generar con IA
-              </button>
+              <div className="flex items-center gap-3">
+                {typeof window !== "undefined" &&
+                  ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) && (
+                    <button
+                      type="button"
+                      onClick={toggleDictation}
+                      disabled={dictating}
+                      title="Dictar la descripción por voz (español)"
+                      className={`flex items-center gap-1 text-[11px] font-semibold hover:underline disabled:opacity-50 ${
+                        dictating ? "text-red-600" : "text-gray-500"
+                      }`}
+                    >
+                      <span className={dictating ? "animate-pulse" : ""}>🎤</span>
+                      {dictating ? "Escuchando… (clic para parar)" : "Dictar"}
+                    </button>
+                  )}
+                <button
+                  type="button"
+                  onClick={generateDescription}
+                  disabled={generatingDesc}
+                  title="Genera una propuesta con IA (editable antes de guardar)"
+                  className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:underline disabled:opacity-50"
+                >
+                  {generatingDesc ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5" />
+                  )}
+                  Generar con IA
+                </button>
+              </div>
             </div>
             <textarea
               id="pf-desc"
@@ -541,6 +671,14 @@ export function ProductFormModal({
                   )}
                   Agregar
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setUrlOpen((v) => !v)}
+                  title="Agregar imagen pegando una URL"
+                  className="text-[11px] font-semibold text-gray-500 hover:underline"
+                >
+                  Por URL
+                </button>
               </div>
               <input
                 ref={galleryInputRef}
@@ -551,6 +689,25 @@ export function ProductFormModal({
                 aria-label="Agregar imagen a la galería"
               />
             </div>
+            {urlOpen && (
+              <div className="mb-2 flex items-center gap-2">
+                <input
+                  value={urlValue}
+                  onChange={(e) => setUrlValue(e.target.value)}
+                  placeholder="https://… o /ruta/local"
+                  aria-label="URL de la imagen"
+                  className={inputCls}
+                />
+                <button
+                  type="button"
+                  onClick={addImageByUrl}
+                  disabled={!urlValue.trim()}
+                  className="shrink-0 px-3 py-2.5 rounded-xl bg-gray-700 text-white text-xs font-semibold hover:bg-gray-800 disabled:opacity-50"
+                >
+                  Agregar
+                </button>
+              </div>
+            )}
             {aiImageOpen && (
               <div className="mb-2 flex items-center gap-2">
                 <input
@@ -712,6 +869,23 @@ export function ProductFormModal({
           </div>
 
           <div className="grid grid-cols-1 gap-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-600">SEO del producto</span>
+              <button
+                type="button"
+                onClick={generateSeo}
+                disabled={generatingSeo}
+                title="Genera título y descripción SEO con IA"
+                className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:underline disabled:opacity-50"
+              >
+                {generatingSeo ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                Generar con IA
+              </button>
+            </div>
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-seo-title">

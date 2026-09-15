@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
         sale_price: row.sale_price,
         brand: row.brand,
         category_id: row.category_slug ? (categoryIdBySlug.get(row.category_slug) ?? null) : null,
+        unit: row.unit,
         stock_status: row.stock_status,
         is_visible: row.is_visible,
         updated_at: new Date().toISOString(),

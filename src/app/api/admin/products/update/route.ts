@@ -90,8 +90,9 @@ export async function PATCH(request: Request) {
         }
       }
     }
-    // Publicar/despublicar manual cancela la programación pendiente.
-    if ("is_visible" in updates) {
+    // Publicar/despublicar manual cancela la programación pendiente, salvo
+    // que la misma petición fije una nueva fecha (p. ej. pausa temporal).
+    if ("is_visible" in updates && !("publish_at" in updates) && !("unpublish_at" in updates)) {
       updates.publish_at = null
       updates.unpublish_at = null
     }

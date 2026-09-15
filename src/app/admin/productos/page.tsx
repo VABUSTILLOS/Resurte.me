@@ -45,6 +45,9 @@ import {
   ChevronDown,
   Minus,
   Bookmark,
+  QrCode,
+  Sparkles,
+  Store,
 } from "lucide-react"
 import { AUDIT_ACTION_LABEL, type AuditAction } from "@/lib/audit-log"
 import { createClient } from "@/lib/supabase/client"
@@ -73,6 +76,7 @@ interface Product {
   admin_note: string | null
   seo_title: string | null
   seo_description: string | null
+  created_at: string | null
 }
 
 interface Category {
@@ -125,6 +129,12 @@ function timeAgo(iso: string): string {
   const d = Math.floor(h / 24)
   if (d < 30) return `hace ${d} d`
   return new Date(iso).toLocaleDateString("es-MX")
+}
+
+/** Badge ✨ Nuevo: producto creado en los últimos 7 días. */
+function isNewProduct(p: { created_at: string | null }): boolean {
+  if (!p.created_at) return false
+  return Date.now() - new Date(p.created_at).getTime() < 7 * 24 * 60 * 60 * 1000
 }
 
 function buildMap(rows: AvailabilityRow[]): AvailabilityMap {  const map: AvailabilityMap = new Map()
@@ -272,6 +282,9 @@ function AdminProductsContent() {
   // Unidad en lote.
   const [bulkUnitOpen, setBulkUnitOpen] = useState(false)
   const [bulkUnitValue, setBulkUnitValue] = useState("kg")
+  // Oferta por margen objetivo (requiere cost).
+  const [bulkMarginOpen, setBulkMarginOpen] = useState(false)
+  const [bulkMarginPct, setBulkMarginPct] = useState("25")
 
   // Atajos de teclado: "/" enfoca búsqueda, "n" nuevo producto, Esc cierra
   // el modal más superficial abierto.
@@ -874,7 +887,7 @@ function AdminProductsContent() {
     if (rows.length === 0) return
     const esc = (v: string) => (/[",;\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
     const catSlug = (id: number | null) => categories.find((c) => c.id === id)?.slug ?? ""
-    const header = "nombre,slug,marca,categoria,precio,precio_oferta,stock,visible"
+    const header = "nombre,slug,marca,categoria,precio,precio_oferta,unidad,stock,visible"
     const lines = rows.map((p) =>
       [
         esc(p.name),
@@ -883,6 +896,7 @@ function AdminProductsContent() {
         catSlug(p.category_id),
         p.price ?? "",
         p.sale_price ?? "",
+        p.unit ?? "",
         p.stock_status,
         p.is_visible ? "si" : "no",
       ].join(",")
@@ -911,18 +925,37 @@ function AdminProductsContent() {
     }
   }
 
-  /** Duplica un producto pidiendo el nombre de la copia (nace despublicada). */
+  /** Duplica un producto pidiendo nombre y categoría de la copia. */
   async function duplicateProduct(p: Product) {
     if (duplicatingId != null) return
     const name = window.prompt("Nombre de la copia:", `${p.name} (copia)`)
     if (name === null) return
+    const catInput = window.prompt(
+      `Categoría de la copia (número de la lista, vacío = misma):\n${categories
+        .map((c, i) => `${i + 1}. ${c.name}`)
+        .join("\n")}`
+    )
+    let categoryId: number | undefined
+    if (catInput?.trim()) {
+      const idx = parseInt(catInput.trim(), 10)
+      const chosen = categories[idx - 1]
+      if (!Number.isInteger(idx) || !chosen) {
+        setError("Categoría inválida")
+        return
+      }
+      categoryId = chosen.id
+    }
     setDuplicatingId(p.id)
     setError(null)
     try {
       const res = await fetch("/api/admin/products/duplicate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: p.id, name: name.trim() || undefined }),
+        body: JSON.stringify({
+          productId: p.id,
+          name: name.trim() || undefined,
+          category_id: categoryId,
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? "Error al duplicar el producto")
@@ -963,6 +996,200 @@ function AdminProductsContent() {
     const derived =
       next === 0 ? "out_of_stock" : next <= 5 ? "low_stock" : "in_stock"
     patchProduct(p.id, { stock_quantity: next, stock_status: derived })
+  }
+
+  /** Pausa temporal: despublica hoy y programa republicación en N días. */
+  async function pauseProduct(p: Product) {
+    const daysInput = window.prompt("¿En cuántos días se republica? (7, 14, 30…)", "7")
+    if (daysInput === null) return
+    const days = parseInt(daysInput.trim(), 10)
+    if (!Number.isInteger(days) || days <= 0 || days > 365) {
+      setError("Días inválidos (1-365)")
+      return
+    }
+    const publishAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
+    setError(null)
+    try {
+      await patchProduct(p.id, { is_visible: false, publish_at: publishAt })
+      setToast(`${p.name} en pausa; se republica en ${days} días`)
+    } catch {
+      // patchProduct ya reporta el error
+    }
+  }
+
+  // Overrides de precio por tienda (product_stores).
+  const [storePricesFor, setStorePricesFor] = useState<Product | null>(null)
+  const [storeList, setStoreList] = useState<{ id: number; name: string }[]>([])
+  const [storePrices, setStorePrices] = useState<Record<number, { price: string; sale: string }>>({})
+  const [storePricesLoading, setStorePricesLoading] = useState(false)
+  const [storePricesSaving, setStorePricesSaving] = useState(false)
+
+  async function openStorePrices(p: Product) {
+    setStorePricesFor(p)
+    setStorePricesLoading(true)
+    try {
+      const res = await fetch(`/api/admin/products/store-prices?productId=${p.id}`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al cargar tiendas")
+      setStoreList(data.stores ?? [])
+      const byStore: Record<number, { price: string; sale: string }> = {}
+      for (const row of data.prices ?? []) {
+        byStore[row.store_id] = {
+          price: String(row.price ?? ""),
+          sale: row.sale_price != null ? String(row.sale_price) : "",
+        }
+      }
+      setStorePrices(byStore)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cargar tiendas")
+      setStorePricesFor(null)
+    } finally {
+      setStorePricesLoading(false)
+    }
+  }
+
+  async function saveStorePrices() {
+    if (!storePricesFor || storePricesSaving) return
+    setStorePricesSaving(true)
+    setError(null)
+    try {
+      const prices = storeList.map((s) => {
+        const row = storePrices[s.id]
+        const price = row?.price?.trim()
+        return {
+          store_id: s.id,
+          price: price ? parseFloat(price) : null,
+          sale_price: row?.sale?.trim() ? parseFloat(row.sale) : null,
+        }
+      })
+      const res = await fetch("/api/admin/products/store-prices", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: storePricesFor.id, prices }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al guardar")
+      setToast(`Precios por tienda guardados (${data.overrides ?? 0} overrides)`)
+      setStorePricesFor(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al guardar")
+    } finally {
+      setStorePricesSaving(false)
+    }
+  }
+
+  /** Extrae la primera URL https de un record de tarea kie-ai. */
+  function extractKieImageUrl(record: Record<string, unknown>): string | null {
+    const candidates: unknown[] = []
+    if (record.resultUrls) candidates.push(record.resultUrls)
+    if (record.resultJson) candidates.push(record.resultJson)
+    for (const c of candidates) {
+      try {
+        const parsed = typeof c === "string" ? JSON.parse(c) : c
+        const urls: unknown = Array.isArray(parsed)
+          ? parsed
+          : (parsed as Record<string, unknown>).resultUrls ??
+            (parsed as Record<string, unknown>).urls
+        if (Array.isArray(urls)) {
+          const first = urls.find((u) => typeof u === "string" && u.startsWith("https://"))
+          if (first) return first as string
+        }
+        if (typeof urls === "string" && urls.startsWith("https://")) return urls
+      } catch {
+        // sigue con el siguiente candidato
+      }
+    }
+    return null
+  }
+
+  /** Genera con IA la imagen de los productos SIN imagen de la selección
+   *  (secuencial, máx 10 por corrida para no quemar rate limits). */
+  const [bulkAiBusy, setBulkAiBusy] = useState(false)
+  async function bulkGenerateImages() {
+    if (selected.size === 0 || bulkAiBusy) return
+    // Los sin imagen pueden estar en otras páginas: datos frescos del servidor.
+    setBulkAiBusy(true)
+    setError(null)
+    try {
+      const ids = [...selected]
+      const listRes = await fetch(`/api/admin/products/list?ids=${ids.join(",")}`)
+      const listData = await listRes.json().catch(() => ({}))
+      if (!listRes.ok) throw new Error(listData.error ?? "Error al leer la selección")
+      const missing = ((listData.rows ?? []) as Product[])
+        .filter((p) => !p.image_url)
+        .slice(0, 10)
+      if (missing.length === 0) {
+        setToast("Todos los seleccionados ya tienen imagen")
+        return
+      }
+      let done = 0
+      let failed = 0
+      for (const p of missing) {
+        try {
+          const res = await fetch("/api/admin/kie-ai/image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: `Foto de producto: ${p.name}, fondo blanco, estudio, alta calidad`,
+            }),
+          })
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok) throw new Error(data.error ?? "error al crear tarea")
+          const taskId = data.taskId as string
+          const deadline = Date.now() + 90_000
+          let url: string | null = null
+          for (;;) {
+            await new Promise((r) => setTimeout(r, 3000))
+            const st = await fetch(`/api/admin/kie-ai/status?taskId=${encodeURIComponent(taskId)}`)
+            const stData = await st.json().catch(() => ({}))
+            const record = stData.record ?? {}
+            if (record.state === "success" || record.state === "completed") {
+              url = extractKieImageUrl(record)
+              break
+            }
+            if (record.state === "fail" || record.state === "failed" || Date.now() > deadline) break
+          }
+          if (!url) throw new Error("sin imagen generada")
+          const patch = await fetch("/api/admin/products/update", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId: p.id, image_url: url, images: [url] }),
+          })
+          if (!patch.ok) throw new Error("error al guardar la imagen")
+          done++
+          setToast(`Imágenes IA: ${done}/${missing.length}…`)
+        } catch {
+          failed++
+        }
+      }
+      setReloadKey((k) => k + 1)
+      setSelected(new Set())
+      setToast(`Imágenes IA: ${done} generada${done === 1 ? "" : "s"}`)
+      if (failed > 0) {
+        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron generar`)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error en la generación en lote")
+    } finally {
+      setBulkAiBusy(false)
+    }
+  }
+
+  /** Descarga un QR PNG que apunta a la página pública del producto. */
+  async function downloadQr(p: Product) {
+    if (!cities[0]) return
+    try {
+      const QRCode = (await import("qrcode")).default
+      const url = `https://resurte.me/${cities[0].slug}/producto/${p.slug}`
+      const dataUrl = await QRCode.toDataURL(url, { width: 512, margin: 2 })
+      const a = document.createElement("a")
+      a.href = dataUrl
+      a.download = `qr-${p.slug}.png`
+      a.click()
+      setToast("QR descargado")
+    } catch {
+      setError("No se pudo generar el QR")
+    }
   }
 
   /** Elimina un producto (soft delete: va a la papelera, se puede restaurar). */
@@ -1062,7 +1289,10 @@ function AdminProductsContent() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? "Error al leer la selección")
       const lines = (data.rows ?? []).map(
-        (p: Product) => `${p.name} — $${Number(p.sale_price ?? p.price ?? 0).toFixed(2)}`
+        (p: Product) =>
+          `${p.name} — $${Number(p.sale_price ?? p.price ?? 0).toFixed(2)}${
+            p.unit ? `/${p.unit}` : ""
+          }`
       )
       if (lines.length === 0) return
       await navigator.clipboard.writeText(lines.join("\n"))
@@ -1382,6 +1612,72 @@ function AdminProductsContent() {
       setSelected(new Set())
     } catch {
       setError("Error al actualizar ofertas en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  /** Oferta por margen objetivo: sale_price = cost / (1 - margen). */
+  async function bulkMarginSale() {
+    if (selected.size === 0 || bulkSaving) return
+    const margin = parseFloat(bulkMarginPct)
+    if (!Number.isFinite(margin) || margin <= 0 || margin >= 100) {
+      setError("El margen debe estar entre 1 y 99")
+      return
+    }
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const ids = [...selected]
+      const listRes = await fetch(`/api/admin/products/list?ids=${ids.join(",")}`)
+      const listData = await listRes.json().catch(() => ({}))
+      if (!listRes.ok) throw new Error(listData.error ?? "Error al leer costos")
+      const current = new Map<number, Product>(
+        (listData.rows ?? []).map((r: Product) => [r.id, r])
+      )
+      const newSalePrices = new Map<number, number>()
+      const results = await Promise.all(
+        ids.map(async (productId) => {
+          const p = current.get(productId)
+          if (!p || p.cost == null || p.cost <= 0) return false
+          // Precio mínimo para conservar el margen objetivo; solo aplica si
+          // queda por debajo del precio base (si no, no es oferta).
+          const minPrice = p.cost / (1 - margin / 100)
+          const salePrice = Math.round(minPrice * 100) / 100
+          if (p.price != null && salePrice >= p.price) return false
+          newSalePrices.set(productId, salePrice)
+          const res = await fetch("/api/admin/products/update", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId, sale_price: salePrice }),
+          })
+          return res.ok
+        })
+      )
+      const succeededIds = ids.filter((_, i) => results[i])
+      setProducts((prev) =>
+        prev.map((p) => {
+          const sp = succeededIds.includes(p.id) ? newSalePrices.get(p.id) : undefined
+          return sp !== undefined ? { ...p, sale_price: sp } : p
+        })
+      )
+      const skipped = results.filter((ok) => !ok).length
+      if (succeededIds.length > 0) {
+        setToast(
+          `Oferta con margen ≥${margin}% en ${succeededIds.length} producto${
+            succeededIds.length === 1 ? "" : "s"
+          }`
+        )
+      }
+      if (skipped > 0) {
+        setError(
+          `${skipped} omitido${skipped === 1 ? "" : "s"} (sin costo o el precio ya está por debajo del mínimo)`
+        )
+      }
+      setBulkMarginOpen(false)
+      setSelected(new Set())
+    } catch {
+      setError("Error al aplicar oferta por margen")
     } finally {
       setBulkSaving(false)
     }
@@ -2280,6 +2576,15 @@ function AdminProductsContent() {
               Oferta…
             </button>
             <button
+              onClick={() => setBulkMarginOpen(true)}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-lime-50 text-lime-700 border border-lime-200 text-xs font-semibold hover:bg-lime-100 disabled:opacity-50"
+              title="Oferta calculada para conservar un margen mínimo (requiere costo)"
+            >
+              <Percent className="w-3.5 h-3.5" />
+              Margen…
+            </button>
+            <button
               onClick={() => bulkSetWhatsApp(true)}
               disabled={bulkSaving}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
@@ -2305,6 +2610,19 @@ function AdminProductsContent() {
             >
               <ClipboardList className="w-3.5 h-3.5" />
               Copiar
+            </button>
+            <button
+              onClick={bulkGenerateImages}
+              disabled={bulkAiBusy}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold hover:bg-purple-100 disabled:opacity-50"
+              title="Generar imagen con IA para los seleccionados sin imagen (máx 10)"
+            >
+              {bulkAiBusy ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              Imágenes IA
             </button>
             {selected.size === 2 && (
               <button
@@ -2467,6 +2785,14 @@ function AdminProductsContent() {
                                 className="inline w-3.5 h-3.5 ml-1.5 text-amber-500 align-text-top"
                                 aria-label={`Nota interna: ${product.admin_note}`}
                               />
+                            )}
+                            {isNewProduct(product) && product.created_at && (
+                              <span
+                                className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200"
+                                title={`Creado el ${new Date(product.created_at).toLocaleDateString("es-MX")}`}
+                              >
+                                ✨ Nuevo
+                              </span>
                             )}
                           </p>
                           <p className="text-xs text-gray-400">{product.brand ?? "—"}</p>
@@ -2792,20 +3118,50 @@ function AdminProductsContent() {
                             )}
                           </button>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => deleteProduct(product)}
-                            disabled={deletingId === product.id}
-                            title={`Eliminar ${product.name}`}
-                            aria-label={`Eliminar ${product.name}`}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                          >
-                            {deletingId === product.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => pauseProduct(product)}
+                              disabled={saving.has(product.id)}
+                              title={`Pausar ${product.name} y republicar en N días`}
+                              aria-label={`Pausar ${product.name}`}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors disabled:opacity-50"
+                            >
+                              <span className="text-sm leading-none">⏸</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => downloadQr(product)}
+                              title={`Descargar QR de ${product.name}`}
+                              aria-label={`Descargar QR de ${product.name}`}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                            >
+                              <QrCode className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openStorePrices(product)}
+                              title={`Precios por tienda de ${product.name}`}
+                              aria-label={`Precios por tienda de ${product.name}`}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                            >
+                              <Store className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteProduct(product)}
+                              disabled={deletingId === product.id}
+                              title={`Eliminar ${product.name}`}
+                              aria-label={`Eliminar ${product.name}`}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                            >
+                              {deletingId === product.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -3423,6 +3779,68 @@ function AdminProductsContent() {
         </div>
       )}
 
+      {/* Modal: oferta por margen objetivo */}
+      {bulkMarginOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !bulkSaving && setBulkMarginOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">Oferta por margen</h2>
+              <button
+                onClick={() => setBulkMarginOpen(false)}
+                disabled={bulkSaving}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-xs text-gray-500">
+                La oferta se calcula como <code className="font-mono">costo / (1 − margen)</code>{" "}
+                en {selected.size} producto{selected.size === 1 ? "" : "s"}. Se omiten los que no
+                tienen costo capturado o cuyo precio ya queda por debajo.
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  step="1"
+                  value={bulkMarginPct}
+                  onChange={(e) => setBulkMarginPct(e.target.value)}
+                  className="w-24 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500"
+                  aria-label="Margen mínimo objetivo"
+                />
+                <span className="text-sm text-gray-500">% de margen mínimo</span>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setBulkMarginOpen(false)}
+                disabled={bulkSaving}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={bulkMarginSale}
+                disabled={bulkSaving}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50"
+              >
+                {bulkSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal: asignar unidad a la selección */}
       {bulkUnitOpen && (
         <div
@@ -3472,6 +3890,104 @@ function AdminProductsContent() {
               >
                 {bulkSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                 Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: precios por tienda (product_stores) */}
+      {storePricesFor && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !storePricesSaving && setStorePricesFor(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white shadow-xl max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Precios por tienda</h2>
+                <p className="text-xs text-gray-500">
+                  {storePricesFor.name} · vacío = usa el precio del catálogo
+                </p>
+              </div>
+              <button
+                onClick={() => setStorePricesFor(null)}
+                disabled={storePricesSaving}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-5 py-3">
+              {storePricesLoading ? (
+                <div className="flex items-center justify-center py-8 text-gray-400">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Cargando…
+                </div>
+              ) : storeList.length === 0 ? (
+                <p className="py-8 text-center text-sm text-gray-400">No hay tiendas activas.</p>
+              ) : (
+                <ul className="divide-y divide-gray-50">
+                  {storeList.map((store) => {
+                    const row = storePrices[store.id] ?? { price: "", sale: "" }
+                    return (
+                      <li key={store.id} className="py-2.5 grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                        <span className="text-sm text-gray-900">{store.name}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={row.price}
+                          onChange={(e) =>
+                            setStorePrices((prev) => ({
+                              ...prev,
+                              [store.id]: { ...row, price: e.target.value },
+                            }))
+                          }
+                          placeholder="Precio"
+                          aria-label={`Precio en ${store.name}`}
+                          className="w-24 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-500"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={row.sale}
+                          onChange={(e) =>
+                            setStorePrices((prev) => ({
+                              ...prev,
+                              [store.id]: { ...row, sale: e.target.value },
+                            }))
+                          }
+                          placeholder="Oferta"
+                          aria-label={`Precio de oferta en ${store.name}`}
+                          className="w-24 px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-500"
+                        />
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setStorePricesFor(null)}
+                disabled={storePricesSaving}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveStorePrices}
+                disabled={storePricesSaving || storePricesLoading}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50"
+              >
+                {storePricesSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Guardar
               </button>
             </div>
           </div>

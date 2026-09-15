@@ -40,6 +40,10 @@ export async function POST(request: Request) {
     const customName =
       typeof body.name === "string" && body.name.trim() ? body.name.trim() : null
     const copyName = customName ?? `${source.name} (copia)`
+    const overrideCategoryId =
+      typeof body.category_id === "number" && Number.isInteger(body.category_id)
+        ? body.category_id
+        : null
     const root = slugify(copyName) || "producto-copia"
     const { data: slugRows } = await supabase
       .from("products")
@@ -64,6 +68,7 @@ export async function POST(request: Request) {
         ...copyable,
         name: copyName,
         slug,
+        category_id: overrideCategoryId ?? source.category_id,
         // La copia nace despublicada y fuera del catálogo de WhatsApp.
         is_visible: false,
         show_in_whatsapp: false,

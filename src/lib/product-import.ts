@@ -12,6 +12,7 @@ const PRODUCT_IMPORT_HEADER = [
   "precio_oferta",
   "marca",
   "categoria",
+  "unidad",
   "stock",
   "visible",
   "imagen",
@@ -24,6 +25,7 @@ export interface ProductImportRow {
   sale_price: number | null
   brand: string | null
   category_slug: string | null
+  unit: string | null
   stock_status: "in_stock" | "low_stock" | "out_of_stock"
   is_visible: boolean
   image_url: string | null
@@ -49,6 +51,7 @@ export function generateProductImportTemplate(): string {
     "",
     "Topo Chico",
     "bebidas",
+    "pieza",
     "in_stock",
     "si",
     "",
@@ -169,6 +172,7 @@ export function parseProductImportCsv(text: string): ProductImportResult {
       sale_price: salePrice,
       brand: get("marca") || null,
       category_slug: get("categoria") || null,
+      unit: get("unidad") || null,
       stock_status: stockRaw as ProductImportRow["stock_status"],
       is_visible: isVisible,
       image_url: imageRaw || null,

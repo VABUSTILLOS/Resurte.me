@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/admin-auth"
 import { NextResponse, type NextRequest } from "next/server"
 
 const COLS =
-  "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description"
+  "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,created_at"
 
 /** Columnas que existen desde antes de la migración 00096: si las
  *  migraciones 00096-00104 aún no se aplican, el panel degrada a este set
