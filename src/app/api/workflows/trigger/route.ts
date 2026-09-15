@@ -11,6 +11,7 @@ import { logger } from "@/lib/logger"
  */
 
 import { NextRequest, NextResponse } from "next/server"
+import { safeSecretEqual } from "@/lib/secret-equal"
 import {
   notifyStaffNewOrder,
   confirmOrderToCustomer,
@@ -36,7 +37,7 @@ export async function GET(req: NextRequest) {
     const authHeader = req.headers.get("authorization")
     const cronSecret = process.env.CRON_SECRET
     // Fail closed: sin CRON_SECRET configurado el endpoint no se expone.
-    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret || !safeSecretEqual(authHeader, `Bearer ${cronSecret}`)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

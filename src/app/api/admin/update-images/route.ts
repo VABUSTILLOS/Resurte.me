@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
+import { safeSecretEqual } from "@/lib/secret-equal"
 
 // Requerido: ADMIN_API_SECRET debe estar definido en el entorno (ver .env.local.example).
 // Sin fallback hardcodeado: si falta la env, el endpoint no opera (fail-closed).
@@ -319,7 +320,7 @@ export async function POST(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const secret = headerSecret ?? searchParams.get("secret")
 
-    if (!secret || secret !== ADMIN_SECRET) {
+    if (!safeSecretEqual(secret, ADMIN_SECRET)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
