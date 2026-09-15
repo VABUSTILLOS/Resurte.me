@@ -1057,3 +1057,184 @@ export async function getRestockSuggestions(limit = 10): Promise<
     limit
   )
 }
+
+// ============================================================
+// FASE 13 — CRM OPERATIVO (/admin/leads)
+// ============================================================
+
+export interface AdminLeadRow {
+  id: number
+  email: string
+  phone: string | null
+  source: string
+  coupon_code: string | null
+  created_at: string
+}
+
+/** Leads web capturados (checkout drawer / exit intent), más recientes primero. */
+export async function getAdminLeads(limit = 100): Promise<AdminLeadRow[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { data, error } = await supabase
+    .from("leads")
+    .select("id, email, phone, source, coupon_code, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit)
+  if (error) {
+    logger.error("[ADMIN-LEADS] Error fetching leads:", error)
+    throw new Error("Error al cargar los leads")
+  }
+  return data ?? []
+}
+
+/** Tablero CRM: todos los prospectos con sus campos de seguimiento. */
+export async function getAdminCrmBoard(): Promise<import("@/lib/crm-pipeline").CrmProspect[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { data, error } = await supabase
+    .from("crm_prospects")
+    .select("id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at")
+    .order("created_at", { ascending: false })
+    .limit(500)
+  if (error) {
+    logger.error("[ADMIN-CRM] Error fetching prospects:", error)
+    throw new Error("Error al cargar el pipeline CRM")
+  }
+  return data ?? []
+}
+
+async function patchCrmProspect(
+  id: number,
+  patch: Record<string, unknown>,
+  alsoTouchLastContact = false
+): Promise<void> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  if (alsoTouchLastContact) {
+    patch.last_contact_at = new Date().toISOString()
+  }
+  patch.updated_at = new Date().toISOString()
+  const { error } = await supabase.from("crm_prospects").update(patch).eq("id", id)
+  if (error) {
+    logger.error("[ADMIN-CRM] Error updating prospect:", error)
+    throw new Error("Error al actualizar el prospecto")
+  }
+}
+
+export async function updateCrmProspectStatus(id: number, status: string): Promise<void> {
+  const { isCrmStatus } = await import("@/lib/crm-pipeline")
+  if (!isCrmStatus(status)) {
+    throw new Error("Estado CRM inválido")
+  }
+  await patchCrmProspect(id, { status }, true)
+}
+
+export async function updateCrmProspectNotes(id: number, notes: string): Promise<void> {
+  await patchCrmProspect(id, { notes: notes.trim() || null })
+}
+
+export async function setCrmProspectFollowUp(id: number, followUpAt: string | null): Promise<void> {
+  if (followUpAt !== null && Number.isNaN(new Date(followUpAt).getTime())) {
+    throw new Error("Fecha de seguimiento inválida")
+  }
+  await patchCrmProspect(id, { next_follow_up_at: followUpAt })
+}
+
+// ============================================================
+// FASE 14 — ANALÍTICA COMPARATIVA POR PERIODO
+// ============================================================
+
+export interface PeriodComparison {
+  days: number
+  orders: { current: number; previous: number; deltaPct: number | null; direction: "up" | "down" | "flat" }
+  revenue: { current: number; previous: number; deltaPct: number | null; direction: "up" | "down" | "flat" }
+  avgTicket: { current: number; previous: number; deltaPct: number | null; direction: "up" | "down" | "flat" }
+  newCustomers: number
+  recurringCustomers: number
+  prevNewCustomers: number
+  prevRecurringCustomers: number
+}
+
+/** Comparativa del periodo (7/30/90 días) contra el periodo anterior de igual duración. */
+export async function getAdminPeriodComparison(days: number): Promise<PeriodComparison> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const { isPeriodDays, periodBounds, compareMetric, splitNewVsRecurring } = await import(
+    "@/lib/analytics-periods"
+  )
+  if (!isPeriodDays(days)) {
+    throw new Error("Periodo inválido (7, 30 o 90 días)")
+  }
+
+  const { since, prevSince } = periodBounds(days)
+  const supabase = await createServiceClient()
+
+  const [currentRes, prevRes, priorUsersRes] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("id, total, payment_status, user_id")
+      .gte("created_at", since.toISOString()),
+    supabase
+      .from("orders")
+      .select("id, total, payment_status, user_id")
+      .gte("created_at", prevSince.toISOString())
+      .lt("created_at", since.toISOString()),
+    // user_ids con pedidos ANTES del periodo actual (para nuevo vs recurrente)
+    supabase
+      .from("orders")
+      .select("user_id")
+      .lt("created_at", since.toISOString())
+      .not("user_id", "is", null)
+      .limit(5000),
+  ])
+
+  if (currentRes.error || prevRes.error) {
+    logger.error("[ADMIN-COMPARE] Error fetching orders:", currentRes.error ?? prevRes.error)
+    throw new Error("Error al cargar la comparativa")
+  }
+
+  const current = currentRes.data ?? []
+  const previous = prevRes.data ?? []
+  const paidRevenue = (rows: typeof current) =>
+    rows.filter((o) => o.payment_status === "paid").reduce((s, o) => s + Number(o.total), 0)
+
+  const curRevenue = Math.round(paidRevenue(current) * 100) / 100
+  const prevRevenue = Math.round(paidRevenue(previous) * 100) / 100
+  const curPaidCount = current.filter((o) => o.payment_status === "paid").length
+  const prevPaidCount = previous.filter((o) => o.payment_status === "paid").length
+
+  const priorUserIds = new Set(
+    (priorUsersRes.data ?? []).map((r) => r.user_id as string)
+  )
+  const curSplit = splitNewVsRecurring(current, priorUserIds)
+  const prevSplit = splitNewVsRecurring(previous, priorUserIds)
+
+  return {
+    days,
+    orders: compareMetric(current.length, previous.length),
+    revenue: compareMetric(curRevenue, prevRevenue),
+    avgTicket: compareMetric(
+      curPaidCount > 0 ? Math.round((curRevenue / curPaidCount) * 100) / 100 : 0,
+      prevPaidCount > 0 ? Math.round((prevRevenue / prevPaidCount) * 100) / 100 : 0
+    ),
+    newCustomers: curSplit.newCustomers,
+    recurringCustomers: curSplit.recurringCustomers,
+    prevNewCustomers: prevSplit.newCustomers,
+    prevRecurringCustomers: prevSplit.recurringCustomers,
+  }
+}
