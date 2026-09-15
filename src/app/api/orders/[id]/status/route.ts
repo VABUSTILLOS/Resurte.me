@@ -19,7 +19,7 @@ import { logger } from "@/lib/logger"
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
-import { logAdminAction } from "@/lib/audit"
+import { logAdminAction as logAdminAudit } from "@/lib/audit"
 import { onOrderStatusChange } from "@/lib/workflows"
 import { notifyUser } from "@/lib/notifications"
 import { logAdminAction } from "@/lib/audit-log"
@@ -244,7 +244,7 @@ export async function PATCH(
     // Bitácora admin (best-effort): qué cambió y quién lo cambió.
     if (adminUser) {
       if (status && oldStatus !== status) {
-        void logAdminAction({
+        void logAdminAudit({
           actorId: adminUser.id,
           action: "order_status_changed",
           orderId,
@@ -252,7 +252,7 @@ export async function PATCH(
         })
       }
       if (payment_status === "paid" && oldPaymentStatus !== "paid") {
-        void logAdminAction({
+        void logAdminAudit({
           actorId: adminUser.id,
           action: "order_payment_confirmed",
           orderId,
@@ -260,7 +260,7 @@ export async function PATCH(
         })
       }
       if (hasDriverField) {
-        void logAdminAction({
+        void logAdminAudit({
           actorId: adminUser.id,
           action: driverId ? "order_driver_assigned" : "order_driver_unassigned",
           orderId,
