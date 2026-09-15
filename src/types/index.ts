@@ -107,6 +107,8 @@ export interface Product {
   unit?: string
   tags?: string[]
   is_visible?: boolean
+  seo_title?: string | null
+  seo_description?: string | null
 }
 
 export interface CollectionRecipe {

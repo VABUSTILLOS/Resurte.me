@@ -110,7 +110,7 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     // $250 → faltan $250 para envío gratis
     const drawer = page.getByLabel("Checkout", { exact: true })
     await expect(drawer.getByText("Agrega $250.00 más para envío gratis").filter({ visible: true })).toBeVisible()
-    await expect(drawer.getByText("$35.00").filter({ visible: true })).toBeVisible() // envío con cargo
+    await expect(drawer.getByText("$125.00").filter({ visible: true })).toBeVisible() // envío con cargo
   })
 
   test("carrito vacío: botón de continuar deshabilitado (retrocompatibilidad)", async ({ page }) => {

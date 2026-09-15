@@ -9,7 +9,8 @@
     "lint": "eslint --max-warnings 0",
     "test": "vitest run",
     "test:e2e": "playwright test --grep @ci",
-    "test:e2e:all": "playwright test"
+    "test:e2e:all": "playwright test",
+    "admin": "node scripts/admin-credentials.mjs"
   },
   "dependencies": {
     "@playwright/test": "^1.62.1",
@@ -92,6 +93,24 @@
         "exports"
       ],
       "src/lib/whatsapp-catalogs.ts": [
+        "exports",
+        "types"
+      ],
+      "src/lib/whatsapp-automations-engine.ts": [
+        "exports",
+        "types"
+      ],
+      "src/lib/whatsapp-batch-status.ts": [
+        "exports"
+      ],
+      "src/lib/whatsapp-share.ts": [
+        "exports"
+      ],
+      "src/lib/whatsapp.ts": [
+        "exports",
+        "types"
+      ],
+      "src/lib/auth-next.ts": [
         "exports"
       ],
       "src/lib/order-bumps.ts": [

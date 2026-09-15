@@ -78,6 +78,44 @@ export async function GET(req: NextRequest) {
         return reconcileStalePayments()
       },
     ],
+    // Publicación programada de productos (00095): aplica publish_at /
+    // unpublish_at vencidos; va ANTES del sync WA para que la cola recoja
+    // los cambios de visibilidad recién aplicados.
+    [
+      "scheduled-publishing",
+      async () => {
+        const { applyScheduledPublishing } = await import("@/lib/scheduled-publishing")
+        return applyScheduledPublishing()
+      },
+    ],
+    // WA5 — vaciar la cola de sync automático del catálogo WhatsApp
+    // (cambios de precio/imagen/stock/visibilidad encolados por admin).
+    [
+      "whatsapp-sync-queue",
+      async () => {
+        const { processWaSyncQueue } = await import("@/lib/whatsapp-sync-queue")
+        return processWaSyncQueue()
+      },
+    ],
+    // WB2/WB5 — resolver handles asíncronos de Meta (errores por producto)
+    // y marcar runs huérfanos en 'running'.
+    [
+      "whatsapp-batch-status",
+      async () => {
+        const { resolvePendingSyncRuns } = await import("@/lib/whatsapp-batch-status")
+        return resolvePendingSyncRuns()
+      },
+    ],
+    // WC2 — motor de automatizaciones WhatsApp: carrito abandonado,
+    // reactivación, rating post-entrega, onboarding y cumpleaños,
+    // respetando la config persistida en whatsapp_automations.
+    [
+      "whatsapp-automations",
+      async () => {
+        const { runWhatsAppAutomations } = await import("@/lib/whatsapp-automations-engine")
+        return runWhatsAppAutomations()
+      },
+    ],
   ]
 
   // Secuencial e independiente: un job que falla no detiene a los demás.

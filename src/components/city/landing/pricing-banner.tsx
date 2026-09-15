@@ -1,3 +1,5 @@
+import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
+
 export function PricingBanner() {
   return (
       <section className="bg-[#0E7A0E] text-white py-8">
@@ -15,7 +17,7 @@ export function PricingBanner() {
             <div className="flex flex-wrap gap-4 text-sm font-medium">
               <span className="flex items-center gap-1.5 bg-black/15 rounded-full px-4 py-2">
                 <span className="w-2 h-2 rounded-full bg-[#3CC73C]" />
-                Envío gratis desde $2,500
+                Envío gratis desde {formatMxn(FREE_SHIPPING_MXN)}
               </span>
               <span className="flex items-center gap-1.5 bg-black/15 rounded-full px-4 py-2">
                 <span className="w-2 h-2 rounded-full bg-[#3CC73C]" />

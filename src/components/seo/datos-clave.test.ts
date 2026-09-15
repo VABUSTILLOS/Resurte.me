@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { DatosClave } from "./datos-clave"
-import { getCommercialFacts } from "@/lib/commercial-facts"
+import { FREE_SHIPPING_MXN, MIN_ORDER_MXN, formatMxn, getCommercialFacts } from "@/lib/commercial-facts"
 
 /**
  * La tabla es la parte de la página que un motor de IA puede citar, así que se
@@ -35,8 +35,8 @@ describe("DatosClave", () => {
   })
 
   it("incluye los datos que más se citan", () => {
-    expect(html).toContain("$500 MXN")
-    expect(html).toContain("$2,500 MXN")
+    expect(html).toContain(formatMxn(MIN_ORDER_MXN))
+    expect(html).toContain(formatMxn(FREE_SHIPPING_MXN))
     expect(html).toContain("CFDI 4.0")
     expect(html).toContain("Sin membresía ni suscripción")
   })

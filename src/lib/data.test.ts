@@ -114,10 +114,18 @@ describe("getProductsByCollection fallback en memoria", () => {
       }
       if (table === "products") {
         return {
-          select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: PRODUCTS }) }) }),
+          select: () => ({
+            eq: () => ({
+              order: () => ({ order: () => Promise.resolve({ data: PRODUCTS, error: null }) }),
+            }),
+          }),
         }
       }
-      return { select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: [] }) }) }) }
+      return {
+        select: () => ({
+          eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        }),
+      }
     })
 
     const result = await getProductsByCollection("carne-asada")
@@ -141,10 +149,18 @@ describe("getProductsByCollection fallback en memoria", () => {
       }
       if (table === "products") {
         return {
-          select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: PRODUCTS }) }) }),
+          select: () => ({
+            eq: () => ({
+              order: () => ({ order: () => Promise.resolve({ data: PRODUCTS, error: null }) }),
+            }),
+          }),
         }
       }
-      return { select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: [] }) }) }) }
+      return {
+        select: () => ({
+          eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        }),
+      }
     })
 
     const result = await getProductsByCollection("no-existe")

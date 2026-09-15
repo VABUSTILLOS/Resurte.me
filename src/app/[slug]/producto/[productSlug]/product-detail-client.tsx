@@ -15,6 +15,7 @@ import Link from "next/link"
 import type { Category, Product } from "@/types"
 import { getCategoryIcon } from "@/lib/utils"
 import { AnalyticsEvents } from "@/lib/analytics"
+import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
 
 interface ProductDetailClientProps {
   product: Product
@@ -323,7 +324,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
 
               <AccordionItem title="Envíos y Devoluciones">
                 <p className="text-sm text-[#6b6b6b] leading-relaxed">
-                  Envío gratis en pedidos superiores a $2,500 MXN en {cityName}. Entregas el mismo día. Productos perecederos cuentan con garantía de frescura. Facturación electrónica incluida.
+                  Envío gratis en pedidos de {formatMxn(FREE_SHIPPING_MXN)} o más en {cityName}. Entregas el mismo día. Productos perecederos cuentan con garantía de frescura. Facturación electrónica incluida.
                 </p>
               </AccordionItem>
             </div>
@@ -339,7 +340,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                     Entrega en {cityName}
                   </p>
                   <p className="text-[13px] text-[#6b6b6b] mt-0.5 leading-relaxed">
-                    Envío gratis desde $2,500 MXN. Entrega el mismo día.
+                    Envío gratis desde {formatMxn(FREE_SHIPPING_MXN)}. Entrega el mismo día.
                     Facturación electrónica incluida.
                   </p>
                 </div>

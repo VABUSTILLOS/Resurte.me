@@ -282,23 +282,23 @@ describe("/api/orders POST sesión, cupón y fallbacks", () => {
     coupons.then = ((resolve: (v: unknown) => void) =>
       resolve({ data: [{ id: 1 }], error: null })) as unknown as (typeof coupons)["then"]
     const orders = tableBuilder({
-      data: { id: 7, cashback_credits: 5, cashback_tier: "Verde", total: 125, restore_token: "tok" },
+      data: { id: 7, cashback_credits: 5, cashback_tier: "Verde", total: 215, restore_token: "tok" },
       error: null,
     })
     mockFlow({ coupons, orders })
 
-    // subtotal 100 − 10% = 90 + envío 35 = 125
+    // subtotal 100 − 10% = 90 + envío 125 = 215
     const res = await POST(
-      orderReq({ ...validBody, coupon_code: "diez", delivery_fee: 35, total: 125 })
+      orderReq({ ...validBody, coupon_code: "diez", delivery_fee: 125, total: 215 })
     )
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.total).toBe(125)
+    expect(body.total).toBe(215)
     expect(body.trackingToken).toBe("tok")
     // El descuento y el código real del cupón se persisten en la orden
     expect(orders.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ discount: 10, coupon_code: "DIEZ", subtotal: 100, delivery_fee: 35, total: 125 })
+      expect.objectContaining({ discount: 10, coupon_code: "DIEZ", subtotal: 100, delivery_fee: 125, total: 215 })
     )
     // El uso del cupón se reservó (used_count + 1 condicional)
     expect(coupons.update).toHaveBeenCalledWith({ used_count: 1 })

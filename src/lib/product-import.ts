@@ -12,8 +12,10 @@ const PRODUCT_IMPORT_HEADER = [
   "precio_oferta",
   "marca",
   "categoria",
+  "unidad",
   "stock",
   "visible",
+  "imagen",
 ] as const
 
 export interface ProductImportRow {
@@ -23,8 +25,10 @@ export interface ProductImportRow {
   sale_price: number | null
   brand: string | null
   category_slug: string | null
+  unit: string | null
   stock_status: "in_stock" | "low_stock" | "out_of_stock"
   is_visible: boolean
+  image_url: string | null
 }
 
 interface ProductImportError {
@@ -47,8 +51,10 @@ export function generateProductImportTemplate(): string {
     "",
     "Topo Chico",
     "bebidas",
+    "pieza",
     "in_stock",
     "si",
+    "",
   ].join(";")
   return "﻿" + PRODUCT_IMPORT_HEADER.join(";") + "\r\n" + example + "\r\n"
 }
@@ -143,6 +149,15 @@ export function parseProductImportCsv(text: string): ProductImportResult {
     const visibleRaw = (get("visible") || "si").toLowerCase()
     const isVisible = !["no", "0", "false"].includes(visibleRaw)
 
+    const imageRaw = get("imagen")
+    if (imageRaw && !imageRaw.startsWith("https://") && !imageRaw.startsWith("/")) {
+      errors.push({
+        line: lineNo,
+        message: `imagen inválida: "${imageRaw}" (debe ser URL https o ruta local)`,
+      })
+      continue
+    }
+
     const slugRaw = get("slug")
     const slug = slugRaw ? slugify(slugRaw) : slugify(name)
     if (!slug) {
@@ -157,8 +172,10 @@ export function parseProductImportCsv(text: string): ProductImportResult {
       sale_price: salePrice,
       brand: get("marca") || null,
       category_slug: get("categoria") || null,
+      unit: get("unidad") || null,
       stock_status: stockRaw as ProductImportRow["stock_status"],
       is_visible: isVisible,
+      image_url: imageRaw || null,
     })
   }
 

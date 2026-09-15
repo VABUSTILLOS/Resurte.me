@@ -99,14 +99,27 @@ export async function getProducts(
     query = query.eq("is_visible", true)
   }
 
-  query = query.order("name")
+  query = query.order("sort_order", { ascending: true, nullsFirst: false }).order("name")
 
   if (categoryId) {
     query = query.eq("category_id", categoryId)
   }
 
-  const { data } = await query
-  return (data as Product[]) ?? []
+  const { data, error } = await query
+  let rows = data
+  if (error) {
+    // sort_order (00100) aún no aplicado: ordenar solo por nombre.
+    let fallback = supabase.from("products").select("*")
+    if (!includeHidden) {
+      fallback = fallback.eq("is_visible", true)
+    }
+    fallback = fallback.order("name")
+    if (categoryId) {
+      fallback = fallback.eq("category_id", categoryId)
+    }
+    ;({ data: rows } = await fallback)
+  }
+  return (rows as Product[]) ?? []
 }
 
 const PAGE_SIZE = 24
@@ -134,13 +147,30 @@ export async function getProductsPaginated(
     query = query.eq("is_visible", true)
   }
 
-  query = query.order("name").range(from, to)
+  query = query
+    .order("sort_order", { ascending: true, nullsFirst: false })
+    .order("name")
+    .range(from, to)
 
   if (categoryId) {
     query = query.eq("category_id", categoryId)
   }
 
-  const { data, count } = await query
+  let { data, count } = await query
+  if (!data && !count) {
+    // sort_order (00100) aún no aplicado: ordenar solo por nombre.
+    let fallback = supabase
+      .from("products")
+      .select("*", { count: "exact", head: false })
+    if (!includeHidden) {
+      fallback = fallback.eq("is_visible", true)
+    }
+    fallback = fallback.order("name").range(from, to)
+    if (categoryId) {
+      fallback = fallback.eq("category_id", categoryId)
+    }
+    ;({ data, count } = await fallback)
+  }
 
   const products = (data as Product[]) ?? []
   const total = count ?? products.length

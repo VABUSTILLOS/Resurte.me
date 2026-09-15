@@ -120,6 +120,7 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 - **Acciones fuera del código (operación):**
   - Definir `NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD=2500` en Vercel (Production y Preview) y **volver a desplegar**: las variables `NEXT_PUBLIC_*` se inlinean en build. Sin la variable el código ya usa $2,500 por defecto, pero dejarla explícita es la configuración prevista.
   - Alinear `bump_rules.subtotal_min` en Supabase (lo advierte el comentario de `checkout-config.ts`); requiere acceso a la base de producción.
+- **Actualización posterior (decisión de negocio):** el umbral volvió a moverse a **$500 MXN** y la tarifa de envío a **$125 MXN** (`FREE_SHIPPING_MXN` y `DELIVERY_FEE_FLAT` en la fuente de verdad). Al coincidir ahora el umbral con el pedido mínimo (`MIN_ORDER_MXN = 500`), la tarifa solo alcanza a carritos por debajo del mínimo —o cuando un cupón baja el pagable por debajo de $500—. Las referencias a `$2,500` de este informe quedan como registro histórico del diagnóstico; la configuración vigente es la del código, y sigue sin requerir variables de entorno (`NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD` no está definida).
 
 ### 3.3.2 El umbral no estaba en `llms.txt` — corregido
 - **Evidencia:** `curl https://resurte.me/llms.txt | grep -i envío` no devolvía nada. El mapa para agentes publicaba el pedido mínimo (`$500 MXN`) pero **omitía por completo** el umbral de envío gratis, aunque `/faq`, `/preguntas` y el schema JSON-LD sí lo publicaban.
