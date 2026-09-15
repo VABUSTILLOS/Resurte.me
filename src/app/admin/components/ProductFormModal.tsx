@@ -33,6 +33,7 @@ export interface ProductFormProduct {
   admin_note: string | null
   seo_title: string | null
   seo_description: string | null
+  created_at: string | null
 }
 
 interface ProductFormModalProps {
@@ -439,6 +440,9 @@ export function ProductFormModal({
         admin_note: adminNote.trim() || null,
         image_url: mainImage,
         images: gallery,
+        // created_at no forma parte del form: el servidor la asigna; en
+        // edición el padre conserva el valor existente.
+        created_at: null,
       }
       const res = isEdit
         ? await fetch("/api/admin/products/update", {
@@ -455,7 +459,7 @@ export function ProductFormModal({
       if (!res.ok) throw new Error(data.error ?? "Error al guardar el producto")
 
       if (isEdit) {
-        onSaved({ ...product, ...payload }, false)
+        onSaved({ ...product, ...payload, created_at: product.created_at ?? null }, false)
       } else {
         onSaved(data.product as ProductFormProduct, true)
       }

@@ -71,7 +71,7 @@ export default async function Image() {
             marginTop: 8,
           }}
         >
-          Frutas, verduras, carnes y abarrotes por mayoreo · Envío gratis desde {formatMxn(FREE_SHIPPING_MXN)}
+          {`Frutas, verduras, carnes y abarrotes por mayoreo · Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}`}
         </div>
       </div>
     ),
