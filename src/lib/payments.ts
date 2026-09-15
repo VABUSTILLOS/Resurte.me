@@ -608,6 +608,13 @@ async function findOrCreateStripeCustomer(params: {
  * cliente), de modo que el webhook pueda validar `amount_received` contra el
  * mismo valor sin confiar en el frontend.
  *
+ * Idempotencia (A1): si la orden ya tiene un PaymentIntent, se reconcilia
+ * contra Stripe en lugar de crear otro — dos intents confirmables para el
+ * mismo pedido pueden cobrar dos veces al cliente (dos pestañas, reintento
+ * tras un 3DS fallido en otro dispositivo). Se reutiliza el client_secret
+ * del intent vigente; los intents cancelados o con monto distinto se
+ * cancelan y se crea uno nuevo.
+ *
  * Cuando `saveCardConsent` es true y el pedido usa tarjeta, se crea/reutiliza
  * un Stripe Customer y se fija `setup_future_usage: "off_session"` para poder
  * cobrar los 1-click upsells sin pedir la tarjeta de nuevo. Si el guardado no
@@ -783,7 +790,7 @@ export async function createPaymentIntentForOrder(params: {
   // de nuevo, así que no hay superficie de abuso monetario.
   const { data: order, error } = await supabase
     .from("foodos_orders")
-    .select("id, payment_method, payment_status, total, restaurant_id")
+    .select("id, payment_method, payment_status, total, restaurant_id, stripe_payment_intent_id")
     .eq("id", params.orderId)
     .maybeSingle()
 
@@ -811,6 +818,42 @@ export async function createPaymentIntentForOrder(params: {
   const connectParams = connectStatus
     ? buildDestinationChargeParams({ status: connectStatus, amountCents })
     : {}
+
+  // Idempotencia: mismo patrón que createPaymentIntentForOrder. Sin esto, cada
+  // llamada creaba un PI nuevo y sobrescribía foodos_orders.stripe_payment_intent_id
+  // sin cancelar el anterior → dos PIs confirmables para el mismo pedido.
+  if (order.stripe_payment_intent_id) {
+    let existing: Stripe.PaymentIntent | null = null
+    try {
+      existing = await stripe.paymentIntents.retrieve(order.stripe_payment_intent_id)
+    } catch {
+      existing = null
+    }
+    if (existing) {
+      if (existing.status === "succeeded" || existing.status === "processing") {
+        throw new PaymentIntentError("El pedido ya no está pendiente de pago", 409, "order_not_pending")
+      }
+      const reusable =
+        existing.status === "requires_payment_method" ||
+        existing.status === "requires_confirmation" ||
+        existing.status === "requires_action"
+      if (reusable && existing.client_secret && existing.amount === amountCents) {
+        return {
+          clientSecret: existing.client_secret,
+          paymentIntentId: existing.id,
+          saveCardEnabled: false,
+          nextAction: parsePaymentNextAction(existing.next_action),
+        }
+      }
+      if (existing.status !== "canceled") {
+        try {
+          await stripe.paymentIntents.cancel(existing.id)
+        } catch {
+          // Ya no es cancelable — el webhook valida el monto del nuevo PI.
+        }
+      }
+    }
+  }
 
   const paymentIntent = await stripe.paymentIntents.create({
     amount: amountCents,

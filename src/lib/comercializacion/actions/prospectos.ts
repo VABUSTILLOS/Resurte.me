@@ -8,7 +8,7 @@ import {
   type Prospect,
   type ProspectStatus,
 } from "../types"
-import { escapeIlike, digitsOf, validateProspectContact, mapProspect } from "./helpers"
+import { escapeOrTerm, digitsOf, validateProspectContact, mapProspect } from "./helpers"
 
 export type DuplicateMatch = {
   /** Dígitos del teléfono buscado que coincidió. */
@@ -100,9 +100,11 @@ export async function getProspects(
     query = query.eq("status", filters.status)
   }
   if (filters.q) {
-    const q = escapeIlike(filters.q.trim())
+    const q = escapeOrTerm(filters.q.trim())
+    // Valores entre comillas dobles (ver escapeOrTerm): el parser de
+    // PostgREST solo respeta los caracteres reservados dentro de citas.
     query = query.or(
-      `name.ilike.%${q}%,restaurant_name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`
+      `name.ilike."%${q}%",restaurant_name.ilike."%${q}%",phone.ilike."%${q}%",email.ilike."%${q}%"`
     )
   }
 
@@ -125,6 +127,7 @@ export async function getProspects(
 
   return prospects
 }
+
 
 export interface ProspectInput {
   name: string
@@ -302,4 +305,3 @@ export async function bulkCreateProspects(rows: BulkProspectRow[]): Promise<{
   }
   return { created: toInsert.length, errors: [] }
 }
-

@@ -273,7 +273,7 @@ export function DashboardSidebar() {
                   <Coins className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   <span className="font-medium leading-tight">Puntos de Recompensa</span>
                 </div>
-                <p className="text-xl font-bold text-gray-900">${cashback}</p>
+                <p className="text-xl font-bold text-gray-900">${cashback.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</p>
               </div>
             </div>
           </div>
@@ -467,7 +467,7 @@ export function DashboardSidebar() {
                     <Coins className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     <span className="font-medium leading-tight">Puntos de Recompensa</span>
                   </div>
-                  <p className="text-xl font-bold text-gray-900">${cashback}</p>
+                  <p className="text-xl font-bold text-gray-900">${cashback.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</p>
                 </div>
               </div>
 

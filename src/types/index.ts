@@ -176,6 +176,7 @@ export type PaymentStatus =
   | 'failed'
   | 'expired'
   | 'refunded'
+  | 'disputed'
   | 'amount_mismatch'
 
 export interface OrderItem {
@@ -334,6 +335,8 @@ export interface OrderWithCashback {
   cashback_tier: CashbackTier | null
   week_of_month: number | null
   month_year: string | null
+  /** Ruta del comprobante de pago SPEI/OXXO en el bucket payment-proofs. */
+  payment_proof_path?: string | null
   created_at: string
 }
 

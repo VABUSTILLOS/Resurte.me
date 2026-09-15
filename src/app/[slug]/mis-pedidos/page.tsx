@@ -60,6 +60,7 @@ export default function OrderHistoryPage() {
   const handleRepeatOrder = async (order: OrderWithItems, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    if (reorderingId !== null) return
     setReorderingId(order.id)
 
     // Rehidratar con el catálogo ACTUAL (precio, oferta, stock, slug): el
@@ -240,7 +241,7 @@ export default function OrderHistoryPage() {
                   )}
                   {/* Repeat Order button */}
                   <button
-                    onClick={(e) => handleRepeatOrder(order, e)}
+                    onClick={(e) => void handleRepeatOrder(order, e)}
                     disabled={reorderingId === order.id}
                     aria-label={`Repetir pedido #${order.id} (${order.items.length} productos)`}
                     className="flex items-center gap-1.5 px-3.5 py-2 sm:px-2.5 sm:py-1.5 sm:text-xs text-sm font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors disabled:opacity-50 touch-target"
