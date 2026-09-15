@@ -6,11 +6,13 @@ import { logAdminAction } from "@/lib/audit-log"
 import { NextResponse } from "next/server"
 
 /**
- * DELETE /api/admin/products/delete
- * Elimina un producto (superadmin). PROTECCIÓN: order_items.product_id es
- * NOT NULL ON DELETE CASCADE, así que borrar un producto con pedidos
- * destruiría historial de ventas — se rechaza con 409 y se sugiere
- * despublicar en su lugar.
+ * DELETE /api/admin/products/delete        { productId }
+ * POST   /api/admin/products/delete        { productId, restore: true }
+ *
+ * Papelera (soft delete, 00099): eliminar marca deleted_at y fuerza
+ * is_visible=false. La fila sigue existiendo, así que el historial de
+ * pedidos (order_items) se preserva — ya no hay 409 por pedidos.
+ * Restaurar limpia deleted_at y el producto queda despublicado.
  */
 export async function DELETE(request: Request) {
   try {
@@ -26,30 +28,17 @@ export async function DELETE(request: Request) {
 
     const supabase = await createServiceClient()
 
-    // ¿Tiene pedidos? Entonces no se borra: el historial de ventas manda.
-    const { count } = await supabase
-      .from("order_items")
-      .select("id", { count: "exact", head: true })
-      .eq("product_id", productId)
-    if ((count ?? 0) > 0) {
-      return NextResponse.json(
-        {
-          error: `No se puede eliminar: el producto tiene ${count} pedido${
-            count === 1 ? "" : "s"
-          } asociado${count === 1 ? "" : "s"}. Despublícalo para quitarlo de la tienda sin perder el historial.`,
-          orderCount: count,
-        },
-        { status: 409 }
-      )
-    }
-
     const { data: product } = await supabase
       .from("products")
       .select("name, slug")
       .eq("id", productId)
       .single()
 
-    const { error } = await supabase.from("products").delete().eq("id", productId)
+    // Soft delete: la fila permanece para el historial de pedidos.
+    const { error } = await supabase
+      .from("products")
+      .update({ deleted_at: new Date().toISOString(), is_visible: false })
+      .eq("id", productId)
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
@@ -64,6 +53,54 @@ export async function DELETE(request: Request) {
       entity: "products",
       entityId: productId,
       detail: { name: product?.name ?? null, slug: product?.slug ?? null },
+    })
+
+    // WA5 — la baja se propaga al catálogo de WhatsApp (best-effort).
+    try {
+      const { enqueueProductsForWaSync } = await import("@/lib/whatsapp-sync-queue")
+      await enqueueProductsForWaSync(supabase, [productId], "product_delete")
+    } catch {
+      // silencioso por diseño
+    }
+
+    return NextResponse.json({ success: true, productId })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error interno del servidor"
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+/** Restaura un producto de la papelera (queda despublicado). */
+export async function POST(request: Request) {
+  try {
+    const { response: adminDenied, user: adminUser } = await requireAdmin()
+    if (adminDenied) {
+      return adminDenied
+    }
+
+    const { productId, restore } = await request.json()
+    if (!productId || typeof productId !== "number" || restore !== true) {
+      return NextResponse.json({ error: "Se requiere productId y restore: true" }, { status: 400 })
+    }
+
+    const supabase = await createServiceClient()
+    const { error } = await supabase
+      .from("products")
+      .update({ deleted_at: null, is_visible: false })
+      .eq("id", productId)
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    revalidateCatalogCache()
+    resetCatalogCache()
+
+    await logAdminAction(supabase, {
+      actorId: adminUser?.id ?? null,
+      actorEmail: adminUser?.email ?? null,
+      action: "product_restore",
+      entity: "products",
+      entityId: productId,
     })
 
     return NextResponse.json({ success: true, productId })

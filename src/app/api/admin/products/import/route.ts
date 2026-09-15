@@ -89,6 +89,9 @@ export async function POST(request: NextRequest) {
         stock_status: row.stock_status,
         is_visible: row.is_visible,
         updated_at: new Date().toISOString(),
+        // Solo pisa la imagen si la fila trae una (evita borrarla al
+        // re-importar sin la columna).
+        ...(row.image_url ? { image_url: row.image_url } : {}),
       }
       const existingId = existingBySlug.get(row.slug)
       if (existingId) {

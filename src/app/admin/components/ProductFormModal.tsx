@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { ImagePlus, Loader2, Star, X } from "lucide-react"
+import { ImagePlus, Loader2, Sparkles, Star, X } from "lucide-react"
 
 interface Category {
   id: number
@@ -107,6 +107,119 @@ export function ProductFormModal({
     setGallery((prev) => prev.filter((u) => u !== url))
     if (mainImage === url) {
       setMainImage(gallery.filter((u) => u !== url)[0] ?? null)
+    }
+  }
+
+  // ---- IA (Kie.ai): descripción e imagen generadas (best-effort) ----
+  const [generatingDesc, setGeneratingDesc] = useState(false)
+  const [aiImageOpen, setAiImageOpen] = useState(false)
+  const [aiImagePrompt, setAiImagePrompt] = useState("")
+  const [generatingImg, setGeneratingImg] = useState(false)
+
+  async function generateDescription() {
+    if (!name.trim()) {
+      setError("Escribe el nombre del producto primero")
+      return
+    }
+    setGeneratingDesc(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/kie-ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: "system",
+              content:
+                "Eres copywriter de una tienda de abarrotes mexicana. Escribe descripciones de producto cortas (máx 280 caracteres), claras y vendedoras, sin emojis ni encabezados. Responde solo con la descripción.",
+            },
+            {
+              role: "user",
+              content: `Producto: ${name.trim()}${brand.trim() ? `, marca ${brand.trim()}` : ""}${
+                unit.trim() ? `, presentación por ${unit.trim()}` : ""
+              }`,
+            },
+          ],
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al generar la descripción")
+      const content = (data.content ?? "").trim()
+      if (!content) throw new Error("La IA no devolvió texto")
+      setDescription(content)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al generar la descripción")
+    } finally {
+      setGeneratingDesc(false)
+    }
+  }
+
+  /** Extrae la primera URL https del record de la tarea (resultUrls/resultJson). */
+  function extractImageUrl(record: Record<string, unknown>): string | null {
+    const candidates: unknown[] = []
+    if (record.resultUrls) candidates.push(record.resultUrls)
+    if (record.resultJson) candidates.push(record.resultJson)
+    for (const c of candidates) {
+      try {
+        const parsed = typeof c === "string" ? JSON.parse(c) : c
+        const urls: unknown = Array.isArray(parsed)
+          ? parsed
+          : (parsed as Record<string, unknown>).resultUrls ??
+            (parsed as Record<string, unknown>).urls
+        if (Array.isArray(urls)) {
+          const first = urls.find((u) => typeof u === "string" && u.startsWith("https://"))
+          if (first) return first as string
+        }
+        if (typeof urls === "string" && urls.startsWith("https://")) return urls
+      } catch {
+        // sigue con el siguiente candidato
+      }
+    }
+    return null
+  }
+
+  async function generateImage() {
+    const prompt = aiImagePrompt.trim() || `Foto de producto: ${name.trim()}, fondo blanco, estudio`
+    if (generatingImg) return
+    setGeneratingImg(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/kie-ai/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al crear la tarea de imagen")
+      const taskId = data.taskId as string
+
+      // Polling hasta estado terminal (máx ~90 s).
+      const deadline = Date.now() + 90_000
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 3000))
+        const st = await fetch(`/api/admin/kie-ai/status?taskId=${encodeURIComponent(taskId)}`)
+        const stData = await st.json().catch(() => ({}))
+        if (!st.ok) throw new Error(stData.error ?? "Error al consultar la tarea")
+        const record = stData.record ?? {}
+        if (record.state === "success" || record.state === "completed") {
+          const url = extractImageUrl(record)
+          if (!url) throw new Error("La tarea terminó sin URL de imagen")
+          setGallery((prev) => [...prev, url])
+          setMainImage((prev) => prev ?? url)
+          setAiImageOpen(false)
+          setAiImagePrompt("")
+          break
+        }
+        if (record.state === "fail" || record.state === "failed") {
+          throw new Error(record.failMsg ?? "La generación falló")
+        }
+        if (Date.now() > deadline) throw new Error("La generación tardó demasiado")
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al generar la imagen")
+    } finally {
+      setGeneratingImg(false)
     }
   }
   const [saving, setSaving] = useState(false)
@@ -330,9 +443,25 @@ export function ProductFormModal({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-desc">
-              Descripción
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-desc">
+                Descripción
+              </label>
+              <button
+                type="button"
+                onClick={generateDescription}
+                disabled={generatingDesc}
+                title="Genera una propuesta con IA (editable antes de guardar)"
+                className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:underline disabled:opacity-50"
+              >
+                {generatingDesc ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                Generar con IA
+              </button>
+            </div>
             <textarea
               id="pf-desc"
               value={description}
@@ -348,19 +477,35 @@ export function ProductFormModal({
               <span className="block text-xs font-semibold text-gray-600">
                 Imágenes {gallery.length > 0 && `(${gallery.length})`}
               </span>
-              <button
-                type="button"
-                onClick={() => galleryInputRef.current?.click()}
-                disabled={uploadingImg}
-                className="flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:underline disabled:opacity-50"
-              >
-                {uploadingImg ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <ImagePlus className="w-3.5 h-3.5" />
-                )}
-                Agregar
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setAiImageOpen((v) => !v)}
+                  disabled={generatingImg}
+                  title="Genera una imagen con IA"
+                  className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:underline disabled:opacity-50"
+                >
+                  {generatingImg ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5" />
+                  )}
+                  Generar con IA
+                </button>
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  disabled={uploadingImg}
+                  className="flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:underline disabled:opacity-50"
+                >
+                  {uploadingImg ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ImagePlus className="w-3.5 h-3.5" />
+                  )}
+                  Agregar
+                </button>
+              </div>
               <input
                 ref={galleryInputRef}
                 type="file"
@@ -370,6 +515,26 @@ export function ProductFormModal({
                 aria-label="Agregar imagen a la galería"
               />
             </div>
+            {aiImageOpen && (
+              <div className="mb-2 flex items-center gap-2">
+                <input
+                  value={aiImagePrompt}
+                  onChange={(e) => setAiImagePrompt(e.target.value)}
+                  placeholder={`Foto de producto: ${name || "…"}, fondo blanco`}
+                  aria-label="Prompt para generar imagen"
+                  className={inputCls}
+                />
+                <button
+                  type="button"
+                  onClick={generateImage}
+                  disabled={generatingImg}
+                  className="shrink-0 flex items-center gap-1 px-3 py-2.5 rounded-xl bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {generatingImg && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Generar
+                </button>
+              </div>
+            )}
             {gallery.length === 0 ? (
               <p className="text-[11px] text-gray-400">Sin imágenes todavía.</p>
             ) : (

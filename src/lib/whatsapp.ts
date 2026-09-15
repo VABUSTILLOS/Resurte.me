@@ -185,12 +185,14 @@ export function resolveCatalogId(config: WhatsAppConfig): string {
   return config.catalogId || process.env.WHATSAPP_CATALOG_ID || config.wabaId
 }
 
-/** Datos de un item del catálogo (precios en unidades menores: centavos). */
+/** Datos de un item del catálogo (precios en unidades menores: centavos).
+ *  name/price/currency son opcionales para permitir UPDATEs parciales
+ *  (p. ej. solo availability). */
 export interface CatalogItemData {
-  name: string
+  name?: string
   description?: string
-  price: number
-  currency: string
+  price?: number
+  currency?: string
   sale_price?: number
   sale_price_start_date?: string
   image_url?: string
@@ -209,7 +211,30 @@ export interface CatalogProductInfo {
   name: string
   retailer_id: string
   price?: string
+  sale_price?: string
   currency?: string
+  availability?: string
+  image_url?: string
+  review_status?: string
+}
+
+/**
+ * Parser defensivo de precios de Meta (WD1): según el endpoint, el precio
+ * llega como string en unidades menores ("4990" = $49.90) o con punto
+ * decimal ("49.90"). Devuelve unidades mayores o null si no es parseable.
+ */
+export function parseMetaPriceToMajor(raw: string | number | null | undefined): number | null {
+  if (raw == null) return null
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  if (trimmed.includes(".")) {
+    const value = Number(trimmed)
+    return Number.isFinite(value) ? value : null
+  }
+  const cents = Number(trimmed)
+  if (!Number.isFinite(cents)) return null
+  return cents / 100
 }
 
 const BATCH_CHUNK_SIZE = 100
@@ -361,7 +386,7 @@ export async function getCatalogProducts(
 
   const all: CatalogProductInfo[] = []
   let path: string | null =
-    `/${catalogId}/products?fields=id,name,retailer_id,price,currency&limit=500`
+    `/${catalogId}/products?fields=id,name,retailer_id,price,sale_price,currency,availability,image_url,review_status&limit=500`
 
   while (path) {
     const res: Response = await waFetch(path, {}, cfg)
@@ -441,6 +466,59 @@ export async function syncCatalog(
     updatedIds: toUpdate.map((p) => p.id),
     removedIds: opts?.deleteUnknown ? stale : [],
   }
+}
+
+// ============================================================
+// Operaciones individuales sobre el catálogo (WE1)
+// ============================================================
+
+/**
+ * Elimina productos de Meta por retailer_id (uno o varios).
+ * Wrapper del batch DELETE con el mismo contrato de handles.
+ */
+export async function deleteCatalogProductsByRetailer(
+  retailerIds: string[],
+  config?: WhatsAppConfig
+): Promise<BatchResult> {
+  const cfg = config || getConfig()
+  if (retailerIds.length === 0) return { handles: [], chunks: 0 }
+  return batchCatalogItems(
+    retailerIds.map((retailer_id) => ({ method: "DELETE" as const, retailer_id })),
+    cfg
+  )
+}
+
+/**
+ * Cambia la disponibilidad de UN producto en Meta.
+ * Si se conoce el producto de tienda, el UPDATE incluye nombre/precio/
+ * imagen (payload completo defensivo); si es un producto "solo en Meta",
+ * se manda el mínimo (retailer_id + availability).
+ */
+export async function setCatalogProductAvailability(
+  retailerId: string,
+  availability: "in stock" | "out of stock",
+  storeProduct?: WhatsAppProduct | null,
+  config?: WhatsAppConfig
+): Promise<BatchResult> {
+  const cfg = config || getConfig()
+
+  let request: CatalogBatchRequest
+  if (storeProduct) {
+    const [full] = buildCatalogBatchRequests(
+      [{ ...storeProduct, availability }],
+      "UPDATE"
+    )
+    request = full ?? { method: "UPDATE", retailer_id: retailerId, data: {
+      name: storeProduct.name,
+      price: Math.round(storeProduct.price * 100),
+      currency: storeProduct.currency || "MXN",
+      availability,
+    } }
+  } else {
+    request = { method: "UPDATE", retailer_id: retailerId, data: { availability } }
+  }
+
+  return batchCatalogItems([request], cfg)
 }
 
 /** Prueba la conexión a Meta con las credenciales efectivas (WC9). */

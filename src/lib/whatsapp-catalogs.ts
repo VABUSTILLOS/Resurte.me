@@ -5,7 +5,8 @@
 // ============================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { WhatsAppConfig, WhatsAppProduct } from "@/lib/whatsapp"
+import type { CatalogProductInfo, WhatsAppConfig, WhatsAppProduct } from "@/lib/whatsapp"
+import { parseMetaPriceToMajor } from "@/lib/whatsapp"
 import { decryptToken } from "@/lib/foodos-whatsapp"
 
 export interface WaCatalog {
@@ -228,5 +229,156 @@ export async function getCatalogWhatsAppConfig(
       wabaId: platformWaba,
       catalogId: catalogIdMeta,
     },
+  }
+}
+
+// ============================================================
+// WD2 — Comparador tienda vs Meta (explorador del catálogo)
+// ============================================================
+
+export type MetaStoreMatchStatus =
+  | "match"
+  | "price_diff"
+  | "sale_price_diff"
+  | "image_missing_meta"
+  | "only_meta"
+  | "only_store"
+
+export interface MetaStoreComparison {
+  retailer_id: string
+  status: MetaStoreMatchStatus
+  metaPrice: number | null
+  storePrice: number | null
+  metaSalePrice: number | null
+  storeSalePrice: number | null
+  metaImageUrl: string | null
+  storeImageUrl: string | null
+  metaAvailability: string | null
+  metaReviewStatus: string | null
+}
+
+/** ¿Mismo precio? Tolerancia de 1 centavo por redondeos de centavos. */
+function samePrice(a: number | null, b: number | null): boolean {
+  if (a == null && b == null) return true
+  if (a == null || b == null) return false
+  return Math.abs(a - b) < 0.011
+}
+
+/**
+ * Cruza el catálogo vivo de Meta con los productos de la tienda.
+ * Prioridad de estado: only_* > price_diff > sale_price_diff >
+ * image_missing_meta > match.
+ */
+export function compareMetaVsStore(
+  meta: CatalogProductInfo[],
+  store: WhatsAppProduct[]
+): MetaStoreComparison[] {
+  const storeById = new Map(store.map((p) => [p.id, p]))
+  const metaById = new Map(meta.filter((p) => p.retailer_id).map((p) => [p.retailer_id, p]))
+  const result: MetaStoreComparison[] = []
+
+  for (const [retailerId, mp] of metaById) {
+    const sp = storeById.get(retailerId)
+    const base: MetaStoreComparison = {
+      retailer_id: retailerId,
+      status: "match",
+      metaPrice: parseMetaPriceToMajor(mp.price),
+      storePrice: sp?.price ?? null,
+      metaSalePrice: parseMetaPriceToMajor(mp.sale_price),
+      storeSalePrice: sp?.sale_price ?? null,
+      metaImageUrl: mp.image_url ?? null,
+      storeImageUrl: sp?.image_url ?? null,
+      metaAvailability: mp.availability ?? null,
+      metaReviewStatus: mp.review_status ?? null,
+    }
+    if (!sp) {
+      result.push({ ...base, status: "only_meta" })
+      continue
+    }
+    if (!samePrice(base.metaPrice, base.storePrice)) {
+      result.push({ ...base, status: "price_diff" })
+      continue
+    }
+    if (!samePrice(base.metaSalePrice, base.storeSalePrice)) {
+      result.push({ ...base, status: "sale_price_diff" })
+      continue
+    }
+    if (base.storeImageUrl && !base.metaImageUrl) {
+      result.push({ ...base, status: "image_missing_meta" })
+      continue
+    }
+    result.push(base)
+  }
+
+  for (const [retailerId, sp] of storeById) {
+    if (metaById.has(retailerId)) continue
+    result.push({
+      retailer_id: retailerId,
+      status: "only_store",
+      metaPrice: null,
+      storePrice: sp.price,
+      metaSalePrice: null,
+      storeSalePrice: sp.sale_price ?? null,
+      metaImageUrl: null,
+      storeImageUrl: sp.image_url ?? null,
+      metaAvailability: null,
+      metaReviewStatus: null,
+    })
+  }
+
+  return result
+}
+
+// ============================================================
+// WE3 — Salud del catálogo (score + issues por severidad)
+// ============================================================
+
+export type CatalogIssueSeverity = "alta" | "media" | "info"
+
+export interface CatalogHealthIssue {
+  retailer_id: string
+  kind: MetaStoreMatchStatus
+  severity: CatalogIssueSeverity
+}
+
+export interface CatalogHealth {
+  /** 0–100: % de ítems sanos (match) sobre el total comparado. */
+  score: number
+  total: number
+  healthy: number
+  issues: CatalogHealthIssue[]
+}
+
+const ISSUE_SEVERITY: Record<Exclude<MetaStoreMatchStatus, "match">, CatalogIssueSeverity> = {
+  price_diff: "alta",
+  sale_price_diff: "alta",
+  image_missing_meta: "media",
+  only_store: "media",
+  only_meta: "info",
+}
+
+/** Severidad de un estado de comparación (pure). */
+export function issueSeverity(status: MetaStoreMatchStatus): CatalogIssueSeverity | null {
+  return status === "match" ? null : ISSUE_SEVERITY[status]
+}
+
+/** Salud del catálogo a partir de la comparación tienda vs Meta (pure). */
+export function computeCatalogHealth(comparison: MetaStoreComparison[]): CatalogHealth {
+  const issues: CatalogHealthIssue[] = []
+  let healthy = 0
+  for (const row of comparison) {
+    const severity = issueSeverity(row.status)
+    if (severity === null) {
+      healthy++
+    } else {
+      issues.push({ retailer_id: row.retailer_id, kind: row.status, severity })
+    }
+  }
+  const total = comparison.length
+  return {
+    score: total === 0 ? 100 : Math.round((healthy / total) * 100),
+    total,
+    healthy,
+    issues,
   }
 }

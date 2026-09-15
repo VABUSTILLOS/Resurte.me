@@ -1428,6 +1428,309 @@ export async function setWaCatalogProduct(
   revalidatePath("/admin/whatsapp")
 }
 
+export interface WaMetaCatalogRow {
+  retailer_id: string
+  name: string
+  status: WaCatalogs.MetaStoreMatchStatus
+  metaPrice: number | null
+  storePrice: number | null
+  metaSalePrice: number | null
+  storeSalePrice: number | null
+  imageUrl: string | null
+  metaAvailability: string | null
+  metaReviewStatus: string | null
+}
+
+/**
+ * Explorador del catálogo Meta (WD3): catálogo vivo cruzado con la
+ * curaduría de la tienda, listo para la UI.
+ */
+export async function getWaMetaCatalog(catalogId: string): Promise<{
+  rows: WaMetaCatalogRow[]
+  metaTotal: number
+}> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const wa = await import("@/lib/whatsapp-catalogs")
+  const { getCatalogProducts } = await import("@/lib/whatsapp")
+
+  const { config, catalog } = await wa.getCatalogWhatsAppConfig(supabase, catalogId)
+  if (!config) throw new Error("No hay credenciales de WhatsApp configuradas")
+  if (!catalog) throw new Error("Catálogo no encontrado")
+
+  const [{ data: items }, { data: products }, metaProducts] = await Promise.all([
+    supabase
+      .from("whatsapp_catalog_items")
+      .select("catalog_id, product_id, position, is_visible")
+      .eq("catalog_id", catalogId),
+    supabase.from("products").select("id, name, brand, category_id, image_url, price, sale_price, unit"),
+    getCatalogProducts(config),
+  ])
+
+  const desired = wa.buildAdminCatalogProducts(
+    (items ?? []) as WaCatalogs.WaCatalogItemRow[],
+    (products ?? []) as WaCatalogs.AdminProduct[]
+  )
+  const comparison = wa.compareMetaVsStore(metaProducts, desired)
+
+  const nameById = new Map<string, string>()
+  for (const p of products ?? []) nameById.set(String(p.id), p.name as string)
+  for (const mp of metaProducts) {
+    if (mp.retailer_id && !nameById.has(mp.retailer_id)) nameById.set(mp.retailer_id, mp.name)
+  }
+
+  return {
+    rows: comparison.map((c) => ({
+      retailer_id: c.retailer_id,
+      name: nameById.get(c.retailer_id) ?? `#${c.retailer_id}`,
+      status: c.status,
+      metaPrice: c.metaPrice,
+      storePrice: c.storePrice,
+      metaSalePrice: c.metaSalePrice,
+      storeSalePrice: c.storeSalePrice,
+      imageUrl: c.metaImageUrl ?? c.storeImageUrl,
+      metaAvailability: c.metaAvailability,
+      metaReviewStatus: c.metaReviewStatus,
+    })),
+    metaTotal: metaProducts.length,
+  }
+}
+
+/**
+ * Re-subida individual desde el explorador (WD3): corrige una diferencia
+ * empujando el producto con los datos actuales de la tienda. Registra run
+ * + item pending para que el resolvedor de handles confirme con Meta.
+ */
+export async function pushWaProductToMeta(
+  catalogId: string,
+  productId: number
+): Promise<{ ok: boolean; error?: string }> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const wa = await import("@/lib/whatsapp-catalogs")
+  const { batchCatalogItems, buildCatalogBatchRequests } = await import("@/lib/whatsapp")
+
+  const { config } = await wa.getCatalogWhatsAppConfig(supabase, catalogId)
+  if (!config) return { ok: false, error: "Sin credenciales de WhatsApp" }
+
+  const { data: product } = await supabase
+    .from("products")
+    .select("id, name, brand, category_id, image_url, price, sale_price, unit, stock_status")
+    .eq("id", productId)
+    .maybeSingle()
+  if (!product) return { ok: false, error: "Producto no encontrado" }
+
+  const waProduct = wa.toWhatsAppProduct(product as WaCatalogs.AdminProduct & { stock_status?: string | null })
+  if (!waProduct) return { ok: false, error: "Precio inválido" }
+  const { valid, invalid } = wa.validateCatalogProducts([waProduct])
+  if (valid.length === 0) {
+    return { ok: false, error: invalid[0]?.reasons.join(", ") ?? "Datos inválidos" }
+  }
+
+  const result = await batchCatalogItems(buildCatalogBatchRequests(valid, "UPDATE"), config)
+
+  // Run ligero para que el cron resuelva el handle y confirme el resultado.
+  try {
+    const { data: run } = await supabase
+      .from("whatsapp_sync_runs")
+      .insert({ catalog_id: catalogId, trigger_kind: "auto", status: "done", updated: 1, handles: result.handles, finished_at: new Date().toISOString() })
+      .select("id")
+      .single()
+    if (run?.id) {
+      await supabase.from("whatsapp_sync_items").insert({
+        run_id: run.id as string,
+        product_id: productId,
+        action: "update",
+        status: "pending",
+      })
+    }
+  } catch (err) {
+    logger.warn("No se pudo registrar el run del push individual", {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+
+  return { ok: true }
+}
+
+/**
+ * Elimina UN producto del catálogo de Meta (WE2). No toca la tienda:
+ * si el producto sigue curado, volverá en el próximo sync (aparecerá
+ * como diferencia "solo en tienda" hasta entonces).
+ */
+export async function deleteWaMetaProduct(
+  catalogId: string,
+  retailerId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const wa = await import("@/lib/whatsapp-catalogs")
+  const { deleteCatalogProductsByRetailer } = await import("@/lib/whatsapp")
+
+  const { config } = await wa.getCatalogWhatsAppConfig(supabase, catalogId)
+  if (!config) return { ok: false, error: "Sin credenciales de WhatsApp" }
+
+  const result = await deleteCatalogProductsByRetailer([retailerId], config)
+
+  // Trazabilidad: run ligero con el item delete pending.
+  try {
+    const productId = Number(retailerId)
+    const { data: run } = await supabase
+      .from("whatsapp_sync_runs")
+      .insert({ catalog_id: catalogId, trigger_kind: "manual", status: "done", removed: 1, handles: result.handles, finished_at: new Date().toISOString() })
+      .select("id")
+      .single()
+    if (run?.id && Number.isFinite(productId)) {
+      await supabase.from("whatsapp_sync_items").insert({
+        run_id: run.id as string,
+        product_id: productId,
+        action: "delete",
+        status: "pending",
+      })
+    }
+  } catch (err) {
+    logger.warn("No se pudo registrar el run del delete individual", {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+
+  return { ok: true }
+}
+
+/**
+ * Cambia la disponibilidad de un producto en Meta (WE2).
+ * Si existe en la tienda, la DB sigue siendo fuente única: se actualiza
+ * products.stock_status y se empuja el producto completo. Si es un
+ * producto "solo en Meta", el UPDATE va solo a Meta.
+ */
+export async function setWaMetaProductAvailability(
+  catalogId: string,
+  retailerId: string,
+  inStock: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const wa = await import("@/lib/whatsapp-catalogs")
+  const { setCatalogProductAvailability } = await import("@/lib/whatsapp")
+
+  const { config } = await wa.getCatalogWhatsAppConfig(supabase, catalogId)
+  if (!config) return { ok: false, error: "Sin credenciales de WhatsApp" }
+
+  const availability = inStock ? "in stock" : "out of stock"
+  const productId = Number(retailerId)
+
+  let storeProduct: WaCatalogs.AdminProduct | null = null
+  if (Number.isFinite(productId)) {
+    const { data: product } = await supabase
+      .from("products")
+      .select("id, name, brand, category_id, image_url, price, sale_price, unit, stock_status")
+      .eq("id", productId)
+      .maybeSingle()
+    if (product) {
+      storeProduct = product as WaCatalogs.AdminProduct
+      // DB fuente única: reflejar el cambio en la tienda también.
+      const { error } = await supabase
+        .from("products")
+        .update({ stock_status: inStock ? "in_stock" : "out_of_stock" })
+        .eq("id", productId)
+      if (error) logger.warn("No se pudo actualizar stock_status", { productId, error: error.message })
+    }
+  }
+
+  const waProduct = storeProduct
+    ? wa.toWhatsAppProduct(storeProduct as WaCatalogs.AdminProduct & { stock_status?: string | null })
+    : null
+
+  await setCatalogProductAvailability(
+    retailerId,
+    availability,
+    waProduct ? { ...waProduct, availability } : null,
+    config
+  )
+
+  return { ok: true }
+}
+
+/**
+ * Corrige TODAS las diferencias del explorador de una vez (WE2):
+ * re-sube los productos con price_diff, sale_price_diff,
+ * image_missing_meta y only_store en un solo batch y un solo run.
+ */
+export async function fixAllWaCatalogIssues(catalogId: string): Promise<{
+  fixed: number
+  skipped: number
+  error?: string
+}> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) throw new Error("Acceso restringido a administradores")
+  const supabase = await createServiceClient()
+
+  const wa = await import("@/lib/whatsapp-catalogs")
+  const { batchCatalogItems, buildCatalogBatchRequests, getCatalogProducts } = await import("@/lib/whatsapp")
+
+  const { config, catalog } = await wa.getCatalogWhatsAppConfig(supabase, catalogId)
+  if (!config) return { fixed: 0, skipped: 0, error: "Sin credenciales de WhatsApp" }
+  if (!catalog) return { fixed: 0, skipped: 0, error: "Catálogo no encontrado" }
+
+  const [{ data: items }, { data: products }, metaProducts] = await Promise.all([
+    supabase.from("whatsapp_catalog_items").select("catalog_id, product_id, position, is_visible").eq("catalog_id", catalogId),
+    supabase.from("products").select("id, name, brand, category_id, image_url, price, sale_price, unit, stock_status"),
+    getCatalogProducts(config),
+  ])
+
+  const desired = wa.buildAdminCatalogProducts(
+    (items ?? []) as WaCatalogs.WaCatalogItemRow[],
+    (products ?? []) as WaCatalogs.AdminProduct[]
+  )
+  const comparison = wa.compareMetaVsStore(metaProducts, desired)
+
+  const FIXABLE = new Set(["price_diff", "sale_price_diff", "image_missing_meta", "only_store"])
+  const fixableIds = comparison
+    .filter((c) => FIXABLE.has(c.status))
+    .map((c) => Number(c.retailer_id))
+    .filter((n) => Number.isFinite(n))
+  if (fixableIds.length === 0) return { fixed: 0, skipped: 0 }
+
+  const productById = new Map((products ?? []).map((p) => [p.id as number, p]))
+  const waProducts = fixableIds
+    .map((id) => productById.get(id))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p))
+    .map((p) => wa.toWhatsAppProduct(p as WaCatalogs.AdminProduct & { stock_status?: string | null }))
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+  const { valid } = wa.validateCatalogProducts(waProducts)
+  if (valid.length === 0) return { fixed: 0, skipped: fixableIds.length }
+
+  const result = await batchCatalogItems(buildCatalogBatchRequests(valid, "UPDATE"), config)
+
+  // Un solo run con todos los items pending.
+  try {
+    const { data: run } = await supabase
+      .from("whatsapp_sync_runs")
+      .insert({ catalog_id: catalogId, trigger_kind: "manual", status: "done", updated: valid.length, handles: result.handles, finished_at: new Date().toISOString() })
+      .select("id")
+      .single()
+    if (run?.id) {
+      await supabase.from("whatsapp_sync_items").insert(
+        valid.map((p) => ({ run_id: run.id as string, product_id: Number(p.id), action: "update", status: "pending" }))
+      )
+    }
+  } catch (err) {
+    logger.warn("No se pudo registrar el run del fix-all", {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+
+  return { fixed: valid.length, skipped: fixableIds.length - valid.length }
+}
+
 export interface WaCatalogCredentials {
   phone_number_id: string | null
   waba_id: string | null

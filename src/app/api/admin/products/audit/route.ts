@@ -7,7 +7,8 @@ const MAX_ROWS = 50
 /**
  * GET /api/admin/products/audit?productId=123
  * Últimas N acciones de la bitácora sobre un producto (timeline del modal
- * de historial en /admin/productos).
+ * de historial en /admin/productos). Sin productId devuelve las últimas 30
+ * acciones de products en general (drawer de actividad reciente).
  */
 export async function GET(request: NextRequest) {
   const { response: adminDenied } = await requireAdmin()
@@ -15,11 +16,21 @@ export async function GET(request: NextRequest) {
 
   try {
     const productId = Number(request.nextUrl.searchParams.get("productId"))
+    const supabase = await createServiceClient()
+
     if (!Number.isInteger(productId) || productId <= 0) {
-      return NextResponse.json({ error: "Se requiere productId" }, { status: 400 })
+      const { data, error } = await supabase
+        .from("admin_audit_log")
+        .select("action,actor_email,created_at,detail,entity_id")
+        .eq("entity", "products")
+        .order("created_at", { ascending: false })
+        .limit(30)
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+      return NextResponse.json({ entries: data ?? [] })
     }
 
-    const supabase = await createServiceClient()
     const { data, error } = await supabase
       .from("admin_audit_log")
       .select("action,actor_email,created_at,detail")

@@ -40,7 +40,10 @@ export async function GET(request: NextRequest) {
         .in("entity_id", ids.map(String))
         .order("created_at", { ascending: false })
         .limit(500),
-      supabase.from("order_items").select("product_id,quantity").in("product_id", ids),
+      supabase
+        .from("order_items")
+        .select("product_id,quantity,unit_price")
+        .in("product_id", ids),
     ])
 
     const waPending = [...new Set((queueRes.data ?? []).map((r) => r.product_id as number))]
@@ -53,13 +56,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Unidades vendidas por producto (display en la columna Ventas).
+    // Unidades y monto vendido por producto (columna Ventas).
     const sales: Record<string, number> = {}
+    const salesAmount: Record<string, number> = {}
     for (const row of salesRes.data ?? []) {
       sales[row.product_id] = (sales[row.product_id] ?? 0) + (row.quantity ?? 0)
+      salesAmount[row.product_id] =
+        (salesAmount[row.product_id] ?? 0) + (row.quantity ?? 0) * Number(row.unit_price ?? 0)
     }
 
-    return NextResponse.json({ waPending, lastEdit, sales })
+    return NextResponse.json({ waPending, lastEdit, sales, salesAmount })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error interno del servidor"
     return NextResponse.json({ error: message }, { status: 500 })

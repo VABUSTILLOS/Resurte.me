@@ -38,6 +38,9 @@ import {
   ExternalLink,
   CheckCircle2,
   StickyNote,
+  ClipboardList,
+  Activity,
+  RotateCcw,
 } from "lucide-react"
 import { AUDIT_ACTION_LABEL, type AuditAction } from "@/lib/audit-log"
 import { createClient } from "@/lib/supabase/client"
@@ -242,6 +245,10 @@ function AdminProductsContent() {
   const [bulkPriceOpen, setBulkPriceOpen] = useState(false)
   const [bulkPricePct, setBulkPricePct] = useState<string>("10")
   const [bulkPriceMode, setBulkPriceMode] = useState<"increase" | "decrease">("increase")
+  // Ofertas en lote: descuento % sobre el precio base (sale_price).
+  const [bulkSaleOpen, setBulkSaleOpen] = useState(false)
+  const [bulkSalePct, setBulkSalePct] = useState<string>("10")
+  const [bulkSaleMode, setBulkSaleMode] = useState<"apply" | "remove">("apply")
 
   // Atajos de teclado: "/" enfoca búsqueda, "n" nuevo producto, Esc cierra
   // el modal más superficial abierto.
@@ -296,6 +303,10 @@ function AdminProductsContent() {
   const [onlyNoPrice, setOnlyNoPrice] = useState(searchParams.get("noPrice") === "1")
   const [onlyNoCategory, setOnlyNoCategory] = useState(searchParams.get("noCategory") === "1")
   const [onlyWaMismatch, setOnlyWaMismatch] = useState(searchParams.get("waMismatch") === "1")
+  const [onlyOnSale, setOnlyOnSale] = useState(searchParams.get("onSale") === "1")
+  const [onlyDupNames, setOnlyDupNames] = useState(searchParams.get("dupNames") === "1")
+  // Papelera (soft delete, 00099).
+  const [onlyTrash, setOnlyTrash] = useState(searchParams.get("trash") === "1")
   // Filtros por ciudad y marca (server-side).
   const [cityFilter, setCityFilter] = useState(searchParams.get("city") ?? "all")
   const [brandFilter, setBrandFilter] = useState(searchParams.get("brand") ?? "all")
@@ -332,6 +343,9 @@ function AdminProductsContent() {
     if (onlyNoPrice) sp.set("noPrice", "1")
     if (onlyNoCategory) sp.set("noCategory", "1")
     if (onlyWaMismatch) sp.set("waMismatch", "1")
+    if (onlyOnSale) sp.set("onSale", "1")
+    if (onlyDupNames) sp.set("dupNames", "1")
+    if (onlyTrash) sp.set("trash", "1")
     if (cityFilter !== "all") sp.set("city", cityFilter)
     if (brandFilter !== "all") sp.set("brand", brandFilter)
     if (view === "grid") sp.set("view", "grid")
@@ -351,6 +365,9 @@ function AdminProductsContent() {
     onlyNoPrice,
     onlyNoCategory,
     onlyWaMismatch,
+    onlyOnSale,
+    onlyDupNames,
+    onlyTrash,
     cityFilter,
     brandFilter,
     view,
@@ -373,13 +390,20 @@ function AdminProductsContent() {
     noPrice: 0,
     noCategory: 0,
     waMismatch: 0,
+    onSale: 0,
+    dupNames: 0,
+    trash: 0,
   })
   const [refreshing, setRefreshing] = useState(false)
+  // true cuando la BD aún no tiene las migraciones 00096-00099: el panel
+  // degrada (sin papelera, programación ni nota interna) en vez de fallar.
+  const [schemaDrift, setSchemaDrift] = useState(false)
   // Metadatos por fila: sync WA pendiente y última edición (audit log).
   const [waPending, setWaPending] = useState<Set<number>>(new Set())
   const [lastEdit, setLastEdit] = useState<Record<number, { at: string; email: string | null }>>({})
   // Unidades vendidas por producto (columna Ventas, display only).
   const [sales, setSales] = useState<Record<number, number>>({})
+  const [salesAmount, setSalesAmount] = useState<Record<number, number>>({})
 
   /** Query string compartida por la tabla, select-all y export. */
   const listParams = (extra: Record<string, string>) => {
@@ -393,6 +417,9 @@ function AdminProductsContent() {
       noPrice: onlyNoPrice ? "1" : "0",
       noCategory: onlyNoCategory ? "1" : "0",
       waMismatch: onlyWaMismatch ? "1" : "0",
+      onSale: onlyOnSale ? "1" : "0",
+      dupNames: onlyDupNames ? "1" : "0",
+      trash: onlyTrash ? "1" : "0",
       city: cityFilter,
       brand: brandFilter,
       sort: sort.key,
@@ -443,6 +470,7 @@ function AdminProductsContent() {
         setTotal(data.total ?? 0)
         if (data.counts) setCounts(data.counts)
         if (data.brands) setBrands(data.brands)
+        setSchemaDrift(data.schemaDrift === true)
         // Metadatos por fila (sync WA + última edición), best-effort.
         const ids = (data.rows ?? []).map((r: Product) => r.id)
         if (ids.length > 0) {
@@ -460,11 +488,17 @@ function AdminProductsContent() {
               salesById[Number(id)] = v as number
             }
             setSales(salesById)
+            const amountsById: Record<number, number> = {}
+            for (const [id, v] of Object.entries(meta.salesAmount ?? {})) {
+              amountsById[Number(id)] = v as number
+            }
+            setSalesAmount(amountsById)
           }
         } else if (!cancelled) {
           setWaPending(new Set())
           setLastEdit({})
           setSales({})
+          setSalesAmount({})
         }
       } finally {
         if (!cancelled) {
@@ -488,6 +522,9 @@ function AdminProductsContent() {
     onlyNoPrice,
     onlyNoCategory,
     onlyWaMismatch,
+    onlyOnSale,
+    onlyDupNames,
+    onlyTrash,
     cityFilter,
     brandFilter,
     sort,
@@ -537,7 +574,27 @@ function AdminProductsContent() {
   }
 
   // ---------- Selección ----------
-  const toggleSelect = (id: number) => {
+  const lastSelectedRef = useRef<number | null>(null)
+  const toggleSelect = (id: number, shift: boolean) => {
+    // Shift+clic: selecciona el rango entre el último clic y este (orden de página).
+    if (shift && lastSelectedRef.current != null) {
+      const ids = pageItems.map((p) => p.id)
+      const a = ids.indexOf(lastSelectedRef.current)
+      const b = ids.indexOf(id)
+      if (a !== -1 && b !== -1) {
+        const [from, to] = a < b ? [a, b] : [b, a]
+        setSelected((prev) => {
+          const next = new Set(prev)
+          for (let i = from; i <= to; i++) {
+            const pid = ids[i]
+            if (pid !== undefined) next.add(pid)
+          }
+          return next
+        })
+        return
+      }
+    }
+    lastSelectedRef.current = id
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -853,10 +910,10 @@ function AdminProductsContent() {
     }
   }
 
-  /** Elimina un producto (el servidor rechaza si tiene pedidos asociados). */
+  /** Elimina un producto (soft delete: va a la papelera, se puede restaurar). */
   async function deleteProduct(p: Product) {
     if (deletingId != null) return
-    if (!window.confirm(`¿Eliminar "${p.name}"? Esta acción no se puede deshacer.`)) return
+    if (!window.confirm(`¿Mover "${p.name}" a la papelera? Se despublica y puedes restaurarlo después.`)) return
     setDeletingId(p.id)
     setError(null)
     try {
@@ -867,10 +924,32 @@ function AdminProductsContent() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? "Error al eliminar el producto")
-      setToast(`Producto eliminado: ${p.name}`)
+      setToast(`${p.name} movido a la papelera`)
       setReloadKey((k) => k + 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al eliminar el producto")
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  /** Restaura un producto de la papelera (queda despublicado). */
+  async function restoreProduct(p: Product) {
+    if (deletingId != null) return
+    setDeletingId(p.id)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/products/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: p.id, restore: true }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al restaurar el producto")
+      setToast(`${p.name} restaurado (despublicado)`)
+      setReloadKey((k) => k + 1)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al restaurar el producto")
     } finally {
       setDeletingId(null)
     }
@@ -881,6 +960,31 @@ function AdminProductsContent() {
     { action: string; actor_email: string | null; created_at: string; detail: Record<string, unknown> }[]
   >([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  // Drawer de actividad reciente (audit log de products, todos los productos).
+  const [activityOpen, setActivityOpen] = useState(false)
+  const [activityEntries, setActivityEntries] = useState<
+    {
+      action: string
+      actor_email: string | null
+      created_at: string
+      detail: Record<string, unknown>
+      entity_id: string | null
+    }[]
+  >([])
+  const [activityLoading, setActivityLoading] = useState(false)
+
+  async function openActivity() {
+    setActivityOpen(true)
+    setActivityEntries([])
+    setActivityLoading(true)
+    try {
+      const res = await fetch("/api/admin/products/audit")
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) setActivityEntries(data.entries ?? [])
+    } finally {
+      setActivityLoading(false)
+    }
+  }
 
   async function openHistory(p: Product) {
     setHistoryFor(p)
@@ -895,12 +999,30 @@ function AdminProductsContent() {
     }
   }
 
-  /** Elimina la selección respetando la protección por pedidos (409). */
+  /** Copia la selección al portapapeles ("Nombre — $precio" por línea). */
+  async function copySelection() {
+    if (selected.size === 0) return
+    try {
+      const res = await fetch(`/api/admin/products/list?ids=${[...selected].join(",")}`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al leer la selección")
+      const lines = (data.rows ?? []).map(
+        (p: Product) => `${p.name} — $${Number(p.sale_price ?? p.price ?? 0).toFixed(2)}`
+      )
+      if (lines.length === 0) return
+      await navigator.clipboard.writeText(lines.join("\n"))
+      setToast(`${lines.length} producto${lines.length === 1 ? "" : "s"} copiado${lines.length === 1 ? "" : "s"}`)
+    } catch {
+      setError("No se pudo copiar al portapapeles")
+    }
+  }
+
+  /** Elimina la selección (soft delete: los productos van a la papelera). */
   async function bulkDelete() {
     if (selected.size === 0 || bulkSaving) return
     if (
       !window.confirm(
-        `¿Eliminar ${selected.size} producto${selected.size === 1 ? "" : "s"}? Los que tengan pedidos se omitirán. Esta acción no se puede deshacer.`
+        `¿Mover ${selected.size} producto${selected.size === 1 ? "" : "s"} a la papelera? Se despublican y puedes restaurarlos después.`
       )
     )
       return
@@ -909,7 +1031,6 @@ function AdminProductsContent() {
     try {
       const ids = [...selected]
       let deleted = 0
-      let skipped = 0
       let failed = 0
       for (const productId of ids) {
         const res = await fetch("/api/admin/products/delete", {
@@ -918,15 +1039,11 @@ function AdminProductsContent() {
           body: JSON.stringify({ productId }),
         })
         if (res.ok) deleted++
-        else if (res.status === 409) skipped++
         else failed++
       }
       setSelected(new Set())
       setReloadKey((k) => k + 1)
-      setToast(
-        `${deleted} eliminado${deleted === 1 ? "" : "s"}` +
-          (skipped > 0 ? ` · ${skipped} omitido${skipped === 1 ? "" : "s"} (tienen pedidos)` : "")
-      )
+      setToast(`${deleted} movido${deleted === 1 ? "" : "s"} a la papelera`)
       if (failed > 0) {
         setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron eliminar`)
       }
@@ -964,6 +1081,100 @@ function AdminProductsContent() {
       }
     } catch {
       setError("Error al duplicar en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  /** Aplica o quita ofertas (sale_price) en la selección. */
+  async function bulkSale() {
+    if (selected.size === 0 || bulkSaving) return
+    const pct = parseFloat(bulkSalePct)
+    if (bulkSaleMode === "apply" && (!Number.isFinite(pct) || pct <= 0 || pct >= 100)) {
+      setError("El descuento debe ser mayor que 0 y menor que 100")
+      return
+    }
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const ids = [...selected]
+      const listRes = await fetch(`/api/admin/products/list?ids=${ids.join(",")}`)
+      const listData = await listRes.json().catch(() => ({}))
+      if (!listRes.ok) throw new Error(listData.error ?? "Error al leer precios actuales")
+      const current = new Map<number, Product>(
+        (listData.rows ?? []).map((r: Product) => [r.id, r])
+      )
+      const factor = 1 - pct / 100
+      const newSalePrices = new Map<number, number | null>()
+      const results = await Promise.all(
+        ids.map(async (productId) => {
+          const p = current.get(productId)
+          if (!p) return false
+          const salePrice =
+            bulkSaleMode === "remove"
+              ? null
+              : p.price != null
+              ? Math.round(p.price * factor * 100) / 100
+              : undefined
+          if (salePrice === undefined) return false // sin precio base no aplica
+          newSalePrices.set(productId, salePrice)
+          const res = await fetch("/api/admin/products/update", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId, sale_price: salePrice }),
+          })
+          return res.ok
+        })
+      )
+      const succeededIds = ids.filter((_, i) => results[i])
+      setProducts((prev) =>
+        prev.map((p) => {
+          const sp = succeededIds.includes(p.id) ? newSalePrices.get(p.id) : undefined
+          return sp !== undefined ? { ...p, sale_price: sp } : p
+        })
+      )
+      const failed = results.filter((ok) => !ok).length
+      if (failed > 0) {
+        setError(
+          `${failed} producto${failed === 1 ? "" : "s"} omitido${failed === 1 ? "" : "s"} (sin precio base o error)`
+        )
+      }
+      if (succeededIds.length > 0) {
+        setToast(
+          bulkSaleMode === "apply"
+            ? `Oferta aplicada en ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`
+            : `Ofertas quitadas en ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`
+        )
+        setUndoAction({
+          message: `Ofertas actualizadas en ${succeededIds.length} producto${
+            succeededIds.length === 1 ? "" : "s"
+          }.`,
+          run: async () => {
+            await Promise.all(
+              succeededIds.map(async (productId) => {
+                const prev = current.get(productId)
+                if (!prev) return false
+                const res = await fetch("/api/admin/products/update", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ productId, sale_price: prev.sale_price }),
+                })
+                return res.ok
+              })
+            )
+            setProducts((prevList) =>
+              prevList.map((p) => {
+                const old = succeededIds.includes(p.id) ? current.get(p.id) : undefined
+                return old ? { ...p, sale_price: old.sale_price } : p
+              })
+            )
+          },
+        })
+      }
+      setBulkSaleOpen(false)
+      setSelected(new Set())
+    } catch {
+      setError("Error al actualizar ofertas en lote")
     } finally {
       setBulkSaving(false)
     }
@@ -1222,6 +1433,15 @@ function AdminProductsContent() {
             <MapPin className="w-4 h-4" />
             Matriz por ciudad
           </Link>
+          <button
+            type="button"
+            onClick={openActivity}
+            title="Últimas acciones sobre el catálogo"
+            className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-700"
+          >
+            <Activity className="w-4 h-4" />
+            Actividad
+          </button>
           {/* Fase 16 — importación masiva CSV */}
           <button
             type="button"
@@ -1253,14 +1473,36 @@ function AdminProductsContent() {
       </div>
 
       {error && (
-        <div className="mb-4 px-4 py-3 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200">
+        <div
+          role="alert"
+          className="mb-4 px-4 py-3 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200"
+        >
           {error}
+        </div>
+      )}
+
+      {/* Aviso de esquema degradado: migraciones 00096-00099 sin aplicar */}
+      {schemaDrift && (
+        <div
+          role="status"
+          className="mb-4 flex items-center gap-2 px-4 py-3 bg-amber-50 text-amber-800 text-sm rounded-xl border border-amber-200"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>
+            Faltan migraciones por aplicar en Supabase (00096–00099). El panel funciona en modo
+            limitado (sin papelera, publicación programada ni nota interna) hasta aplicarlas con{" "}
+            <code className="font-mono text-xs">npx supabase db push</code>.
+          </span>
         </div>
       )}
 
       {/* Toast de éxito (fijo, expira solo) */}
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 bg-green-600 text-white text-sm font-semibold rounded-xl shadow-lg">
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 bg-green-600 text-white text-sm font-semibold rounded-xl shadow-lg"
+        >
           <CheckCircle2 className="w-4 h-4" />
           {toast}
         </div>
@@ -1268,7 +1510,11 @@ function AdminProductsContent() {
 
       {/* Deshacer de la última acción en lote */}
       {undoAction && (
-        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-brand-50 text-brand-900 text-sm rounded-xl border border-brand-200">
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-4 flex items-center gap-3 px-4 py-3 bg-brand-50 text-brand-900 text-sm rounded-xl border border-brand-200"
+        >
           <span>{undoAction.message}</span>
           <button
             type="button"
@@ -1411,7 +1657,7 @@ function AdminProductsContent() {
       </div>
 
       {/* Salud del catálogo: problemas detectados; cada chip aplica su filtro */}
-      {counts.noImage + counts.noCities + counts.noPrice + counts.noCategory + counts.waMismatch > 0 && (
+      {counts.noImage + counts.noCities + counts.noPrice + counts.noCategory + counts.waMismatch + counts.dupNames > 0 && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <HeartPulse className="w-4 h-4 text-amber-600 shrink-0" />
@@ -1517,6 +1763,27 @@ function AdminProductsContent() {
             {counts.waMismatch}
           </span>
         </button>
+        <button
+          type="button"
+          onClick={() => updateFilters(() => setOnlyDupNames((v) => !v))}
+          aria-pressed={onlyDupNames}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            onlyDupNames
+              ? "bg-amber-600 text-white"
+              : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
+          }`}
+          title="Productos que comparten el mismo nombre"
+        >
+          <Copy className="w-3.5 h-3.5" />
+          Nombres duplicados
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              onlyDupNames ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+            }`}
+          >
+            {counts.dupNames}
+          </span>
+        </button>
           </div>
         </div>
       )}
@@ -1551,6 +1818,48 @@ function AdminProductsContent() {
             </span>
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => updateFilters(() => setOnlyOnSale((v) => !v))}
+          aria-pressed={onlyOnSale}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            onlyOnSale
+              ? "bg-green-600 text-white"
+              : "bg-white border border-green-200 text-green-700 hover:bg-green-50"
+          }`}
+          title="Productos con precio de oferta"
+        >
+          <Percent className="w-3.5 h-3.5" />
+          En oferta
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              onlyOnSale ? "bg-white/20 text-white" : "bg-green-50 text-green-600"
+            }`}
+          >
+            {counts.onSale}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => updateFilters(() => setOnlyTrash((v) => !v))}
+          aria-pressed={onlyTrash}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            onlyTrash
+              ? "bg-gray-700 text-white"
+              : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+          }`}
+          title="Productos eliminados (soft delete, restaurables)"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Papelera
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              onlyTrash ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+            }`}
+          >
+            {counts.trash}
+          </span>
+        </button>
         {/* Toggle tabla/grid */}
         <div className="ml-auto flex items-center gap-1 rounded-lg border border-gray-200 bg-white p-0.5">
           <button
@@ -1646,6 +1955,15 @@ function AdminProductsContent() {
               Precio %…
             </button>
             <button
+              onClick={() => setBulkSaleOpen(true)}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-50 text-pink-700 border border-pink-200 text-xs font-semibold hover:bg-pink-100 disabled:opacity-50"
+              title="Aplicar o quitar ofertas en la selección"
+            >
+              <Tag className="w-3.5 h-3.5" />
+              Oferta…
+            </button>
+            <button
               onClick={() => bulkSetWhatsApp(true)}
               disabled={bulkSaving}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
@@ -1662,6 +1980,15 @@ function AdminProductsContent() {
             >
               <EyeOff className="w-3.5 h-3.5" />
               WA no
+            </button>
+            <button
+              onClick={copySelection}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold hover:bg-indigo-100 disabled:opacity-50"
+              title="Copiar la selección como lista Nombre — $precio"
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              Copiar
             </button>
             <button
               onClick={bulkDuplicate}
@@ -1754,6 +2081,7 @@ function AdminProductsContent() {
                 const global = isGlobal(product.id)
                 const cityCount = citiesAvailableCount(product.id)
                 const edit = lastEdit[product.id]
+                const soldAmount = salesAmount[product.id] ?? 0
                 return (
                   <tr
                     key={product.id}
@@ -1765,7 +2093,7 @@ function AdminProductsContent() {
                       <input
                         type="checkbox"
                         checked={selected.has(product.id)}
-                        onChange={() => toggleSelect(product.id)}
+                        onChange={(e) => toggleSelect(product.id, (e.nativeEvent as MouseEvent).shiftKey ?? false)}
                         aria-label={`Seleccionar ${product.name}`}
                         className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                       />
@@ -1901,7 +2229,7 @@ function AdminProductsContent() {
                         disabled={saving.has(product.id)}
                         title="Clic para publicar/despublicar en tienda"
                         aria-label={`${product.is_visible ? "Despublicar" : "Publicar"} ${product.name}`}
-                        className="inline-flex items-center gap-2 disabled:opacity-50"
+                        className="inline-flex items-center gap-2 disabled:opacity-50 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                       >
                         <span
                           className={`relative w-9 h-5 rounded-full transition-colors ${
@@ -1996,6 +2324,11 @@ function AdminProductsContent() {
                       >
                         {sales[product.id] ?? 0}
                       </span>
+                      {soldAmount > 0 && (
+                        <p className="text-[10px] text-gray-400">
+                          ${soldAmount.toFixed(2)}
+                        </p>
+                      )}
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-1">
@@ -2042,20 +2375,37 @@ function AdminProductsContent() {
                             <ExternalLink className="w-4 h-4" />
                           </Link>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => deleteProduct(product)}
-                          disabled={deletingId === product.id}
-                          title={`Eliminar ${product.name}`}
-                          aria-label={`Eliminar ${product.name}`}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                        >
-                          {deletingId === product.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
+                        {onlyTrash ? (
+                          <button
+                            type="button"
+                            onClick={() => restoreProduct(product)}
+                            disabled={deletingId === product.id}
+                            title={`Restaurar ${product.name} (queda despublicado)`}
+                            aria-label={`Restaurar ${product.name}`}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
+                          >
+                            {deletingId === product.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="w-4 h-4" />
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => deleteProduct(product)}
+                            disabled={deletingId === product.id}
+                            title={`Eliminar ${product.name}`}
+                            aria-label={`Eliminar ${product.name}`}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                          >
+                            {deletingId === product.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -2090,7 +2440,7 @@ function AdminProductsContent() {
                   <input
                     type="checkbox"
                     checked={selected.has(product.id)}
-                    onChange={() => toggleSelect(product.id)}
+                    onChange={(e) => toggleSelect(product.id, (e.nativeEvent as MouseEvent).shiftKey ?? false)}
                     aria-label={`Seleccionar ${product.name}`}
                     className="absolute top-2 left-2 z-10 w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                   />
@@ -2199,20 +2549,37 @@ function AdminProductsContent() {
                             <ExternalLink className="w-4 h-4" />
                           </Link>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => deleteProduct(product)}
-                          disabled={deletingId === product.id}
-                          title={`Eliminar ${product.name}`}
-                          aria-label={`Eliminar ${product.name}`}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                        >
-                          {deletingId === product.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
+                        {onlyTrash ? (
+                          <button
+                            type="button"
+                            onClick={() => restoreProduct(product)}
+                            disabled={deletingId === product.id}
+                            title={`Restaurar ${product.name}`}
+                            aria-label={`Restaurar ${product.name}`}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
+                          >
+                            {deletingId === product.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="w-4 h-4" />
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => deleteProduct(product)}
+                            disabled={deletingId === product.id}
+                            title={`Eliminar ${product.name}`}
+                            aria-label={`Eliminar ${product.name}`}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                          >
+                            {deletingId === product.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2432,6 +2799,150 @@ function AdminProductsContent() {
           onClose={() => setImportOpen(false)}
           onImported={() => setReloadKey((k) => k + 1)}
         />
+      )}
+
+      {/* Modal: ofertas en lote (descuento % sobre precio base) */}
+      {bulkSaleOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !bulkSaving && setBulkSaleOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">Ofertas en lote</h2>
+              <button
+                onClick={() => setBulkSaleOpen(false)}
+                disabled={bulkSaving}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-xs text-gray-500">
+                Se aplicará a {selected.size} producto{selected.size === 1 ? "" : "s"} (los que
+                no tengan precio base se omiten).
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBulkSaleMode("apply")}
+                  aria-pressed={bulkSaleMode === "apply"}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    bulkSaleMode === "apply"
+                      ? "bg-pink-600 text-white"
+                      : "bg-pink-50 text-pink-700 border border-pink-200 hover:bg-pink-100"
+                  }`}
+                >
+                  Aplicar descuento
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkSaleMode("remove")}
+                  aria-pressed={bulkSaleMode === "remove"}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    bulkSaleMode === "remove"
+                      ? "bg-gray-700 text-white"
+                      : "bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100"
+                  }`}
+                >
+                  Quitar ofertas
+                </button>
+              </div>
+              {bulkSaleMode === "apply" && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="99"
+                    step="0.5"
+                    value={bulkSalePct}
+                    onChange={(e) => setBulkSalePct(e.target.value)}
+                    className="w-24 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500"
+                    aria-label="Porcentaje de descuento"
+                  />
+                  <span className="text-sm text-gray-500">% de descuento</span>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setBulkSaleOpen(false)}
+                disabled={bulkSaving}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={bulkSale}
+                disabled={bulkSaving}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50"
+              >
+                {bulkSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drawer: actividad reciente del catálogo */}
+      {activityOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={() => setActivityOpen(false)}>
+          <div
+            className="w-full max-w-sm h-full bg-white shadow-xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Actividad reciente</h2>
+                <p className="text-xs text-gray-500">Últimas 30 acciones sobre el catálogo</p>
+              </div>
+              <button
+                onClick={() => setActivityOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-3">
+              {activityLoading ? (
+                <div className="flex items-center justify-center py-8 text-gray-400">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Cargando…
+                </div>
+              ) : activityEntries.length === 0 ? (
+                <p className="py-8 text-center text-sm text-gray-400">Sin actividad registrada.</p>
+              ) : (
+                <ul className="divide-y divide-gray-50">
+                  {activityEntries.map((entry, i) => {
+                    const productName =
+                      (entry.detail?.name as string | undefined) ??
+                      products.find((p) => String(p.id) === entry.entity_id)?.name ??
+                      (entry.entity_id ? `#${entry.entity_id}` : "catálogo")
+                    return (
+                      <li key={i} className="py-2.5">
+                        <p className="text-sm font-medium text-gray-900">
+                          {AUDIT_ACTION_LABEL[entry.action as AuditAction] ?? entry.action}
+                          <span className="font-normal text-gray-500"> · {productName}</span>
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {timeAgo(entry.created_at)}
+                          {entry.actor_email ? ` · ${entry.actor_email}` : ""}
+                        </p>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal: historial de cambios del producto (audit log) */}

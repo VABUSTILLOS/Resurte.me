@@ -3,6 +3,7 @@ import {
   batchCatalogItems,
   buildCatalogBatchRequests,
   isRetryableMetaError,
+  parseMetaPriceToMajor,
   resolveCatalogId,
   retryDelayMs,
   type WhatsAppConfig,
@@ -163,5 +164,24 @@ describe("batchCatalogItems con reintentos", () => {
     const result = await batchCatalogItems(buildCatalogBatchRequests(many, "CREATE"), cfg)
     expect(fetchMock).toHaveBeenCalledTimes(3)
     expect(result.chunks).toBe(3)
+  })
+})
+
+describe("parseMetaPriceToMajor", () => {
+  it("convierte centavos (string entero) a unidades mayores", () => {
+    expect(parseMetaPriceToMajor("4990")).toBe(49.9)
+    expect(parseMetaPriceToMajor("100")).toBe(1)
+  })
+
+  it("acepta decimales tal cual", () => {
+    expect(parseMetaPriceToMajor("49.90")).toBe(49.9)
+    expect(parseMetaPriceToMajor(49.9)).toBe(49.9)
+  })
+
+  it("null/inválidos devuelven null", () => {
+    expect(parseMetaPriceToMajor(null)).toBeNull()
+    expect(parseMetaPriceToMajor("")).toBeNull()
+    expect(parseMetaPriceToMajor("abc")).toBeNull()
+    expect(parseMetaPriceToMajor(NaN)).toBeNull()
   })
 })

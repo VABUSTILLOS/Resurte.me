@@ -40,6 +40,12 @@
   `admin_note` (00098) es solo-admin — nunca exponerla en APIs públicas;
   la galería `products.images` es admin-only (la tienda no la renderiza):
   marcar ★ sincroniza `image_url`.
+- Productos ronda 4: eliminar es SOFT DELETE (`deleted_at`, 00099) — nunca
+  hard delete desde el panel; la papelera se filtra con `trash=1` y
+  restaurar deja el producto despublicado; todos los list/counts excluyen
+  `deleted_at` por defecto. La generación con IA (descripción/imagen) es
+  best-effort vía kie-ai: si KIE_AI_API_KEY falta, se muestra el error sin
+  romper el modal.
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
@@ -56,6 +62,14 @@
 - Credenciales por catálogo (WC8): el token se cifra con `encryptToken`
   (AES-GCM) y nunca sale del servidor; vacío = fallback a la WABA de
   plataforma.
+- Explorador Meta (WD1-WD4): la lectura del catálogo vivo usa
+  `compareMetaVsStore` como fuente única de verdad para chips de estado;
+  corregir una fila = push individual (`pushWaProductToMeta`), nunca un
+  sync completo implícito.
+- Acciones directas sobre Meta (WE1-WE4): disponibilidad de un producto
+  que existe en tienda SIEMPRE actualiza `products.stock_status` primero
+  (DB fuente única) y luego empuja; productos "solo en Meta" se operan
+  directo en Meta. Eliminar de Meta nunca borra el producto de la tienda.
 
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de

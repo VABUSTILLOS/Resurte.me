@@ -10,7 +10,8 @@ import Image from "next/image"
 import {
   Search, RefreshCw, ArrowUp, ArrowDown, Plus, Send,
   Loader2, MapPin, Globe, History, ListChecks, AlertTriangle, X,
-  ChevronDown, ChevronRight, RotateCcw, GripVertical, Eye, KeyRound,
+  ChevronDown, ChevronRight, RotateCcw, GripVertical, Eye, KeyRound, Radar,
+  Pause, Play, Trash2,
 } from "lucide-react"
 import { getCategoryIcon } from "@/lib/utils"
 import {
@@ -36,6 +37,11 @@ import {
   getWaCatalogCredentials,
   updateWaCatalogCredentials,
   testWaCatalogConnection,
+  getWaMetaCatalog,
+  pushWaProductToMeta,
+  deleteWaMetaProduct,
+  setWaMetaProductAvailability,
+  fixAllWaCatalogIssues,
   type AdminWhatsappProduct,
   type AdminWhatsappCategory,
   type WaCatalogSummary,
@@ -43,6 +49,7 @@ import {
   type WaSyncRunSummary,
   type WaSyncItemDetail,
   type WaQueueItem,
+  type WaMetaCatalogRow,
 } from "@/app/admin/actions"
 
 // Antigüedad legible para la cola y el historial.
@@ -115,6 +122,19 @@ export default function AdminWhatsAppPage() {
   const [credsHasToken, setCredsHasToken] = useState(false)
   const [credsActive, setCredsActive] = useState(true)
   const [connTest, setConnTest] = useState<{ ok: boolean; text: string } | null>(null)
+
+  // WD4 — explorador del catálogo vivo de Meta.
+  const [showExplorer, setShowExplorer] = useState(false)
+  const [explorerRows, setExplorerRows] = useState<WaMetaCatalogRow[]>([])
+  const [explorerMetaTotal, setExplorerMetaTotal] = useState(0)
+  const [explorerLoading, setExplorerLoading] = useState(false)
+  const [explorerFilter, setExplorerFilter] = useState<"all" | WaMetaCatalogRow["status"]>("all")
+  const [fixingId, setFixingId] = useState<number | null>(null)
+
+  // WE4 — acciones directas sobre Meta desde el explorador.
+  const [armDeleteId, setArmDeleteId] = useState<string | null>(null)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [fixingAll, setFixingAll] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -428,6 +448,118 @@ export default function AdminWhatsAppPage() {
       )
     })
 
+  // WD4 — abrir/cargar el explorador del catálogo vivo de Meta.
+  const loadExplorer = useCallback(async () => {
+    if (!selectedCatalog) return
+    setExplorerLoading(true)
+    try {
+      const data = await getWaMetaCatalog(selectedCatalog.id)
+      setExplorerRows(data.rows)
+      setExplorerMetaTotal(data.metaTotal)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cargar el catálogo de Meta")
+    } finally {
+      setExplorerLoading(false)
+    }
+  }, [selectedCatalog])
+
+  const toggleExplorer = () => {
+    if (showExplorer) {
+      setShowExplorer(false)
+      return
+    }
+    setShowExplorer(true)
+    setExplorerFilter("all")
+    loadExplorer().catch(() => {})
+  }
+
+  const handleFixRow = (row: WaMetaCatalogRow) => {
+    const productId = Number(row.retailer_id)
+    if (!Number.isFinite(productId) || !selectedCatalog) return
+    setFixingId(productId)
+    run(
+      async () => {
+        const result = await pushWaProductToMeta(selectedCatalog.id, productId)
+        if (!result.ok) throw new Error(result.error ?? "No se pudo corregir")
+        await loadExplorer()
+      },
+      () => `"${row.name}" reenviado a Meta con los datos de la tienda.`
+    ).finally(() => setFixingId(null))
+  }
+
+  // WD4 — contadores resumen del explorador.
+  const explorerCounts = useMemo((): Record<WaMetaCatalogRow["status"], number> & { diffs: number } => {
+    const counts: Record<WaMetaCatalogRow["status"], number> = {
+      match: 0,
+      price_diff: 0,
+      sale_price_diff: 0,
+      image_missing_meta: 0,
+      only_meta: 0,
+      only_store: 0,
+    }
+    for (const row of explorerRows) counts[row.status] += 1
+    const diffs = counts.price_diff + counts.sale_price_diff + counts.image_missing_meta
+    return { ...counts, diffs }
+  }, [explorerRows])
+
+  const filteredExplorerRows = useMemo(
+    () => (explorerFilter === "all" ? explorerRows : explorerRows.filter((r) => r.status === explorerFilter)),
+    [explorerRows, explorerFilter]
+  )
+
+  // WE4 — salud del catálogo (misma fórmula que computeCatalogHealth).
+  const healthScore = useMemo(() => {
+    const total = explorerRows.length
+    if (total === 0) return 100
+    return Math.round((explorerCounts.match / total) * 100)
+  }, [explorerRows, explorerCounts])
+
+  // WE4 — acciones directas sobre Meta.
+  const handleToggleAvailability = (row: WaMetaCatalogRow) => {
+    if (!selectedCatalog) return
+    const inStock = row.metaAvailability !== "in stock"
+    setTogglingId(row.retailer_id)
+    run(
+      async () => {
+        const result = await setWaMetaProductAvailability(selectedCatalog.id, row.retailer_id, inStock)
+        if (!result.ok) throw new Error(result.error ?? "No se pudo cambiar la disponibilidad")
+        await loadExplorer()
+      },
+      () => `"${row.name}" ${inStock ? "activado" : "pausado"} en Meta.`
+    ).finally(() => setTogglingId(null))
+  }
+
+  const handleDeleteMeta = (row: WaMetaCatalogRow) => {
+    if (!selectedCatalog) return
+    if (armDeleteId !== row.retailer_id) {
+      setArmDeleteId(row.retailer_id)
+      return
+    }
+    setArmDeleteId(null)
+    run(
+      async () => {
+        const result = await deleteWaMetaProduct(selectedCatalog.id, row.retailer_id)
+        if (!result.ok) throw new Error(result.error ?? "No se pudo eliminar")
+        await loadExplorer()
+      },
+      () => `"${row.name}" eliminado del catálogo de Meta.`
+    )
+  }
+
+  const handleFixAll = () => {
+    if (!selectedCatalog) return
+    setFixingAll(true)
+    run(
+      async () => {
+        const result = await fixAllWaCatalogIssues(selectedCatalog.id)
+        if (result.error) throw new Error(result.error)
+        await loadExplorer()
+        return result
+      },
+      (r) => `Corrección masiva: ${r.fixed} productos actualizados en Meta${r.skipped ? ` (${r.skipped} omitidos)` : ""}.`
+    ).finally(() => setFixingAll(false))
+  }
+
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault()
     run(
@@ -472,6 +604,14 @@ export default function AdminWhatsAppPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
+            onClick={toggleExplorer}
+            disabled={!selectedCatalog}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E8E9EB] text-[var(--text-secondary)] font-semibold rounded-full hover:bg-[#F7F5F0] transition-colors text-sm disabled:opacity-60"
+          >
+            <Radar className="w-4 h-4" />
+            Explorador Meta
+          </button>
+          <button
             onClick={openCreds}
             disabled={!selectedCatalog}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E8E9EB] text-[var(--text-secondary)] font-semibold rounded-full hover:bg-[#F7F5F0] transition-colors text-sm disabled:opacity-60"
@@ -513,6 +653,190 @@ export default function AdminWhatsAppPage() {
       )}
       {error && (
         <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+      )}
+
+      {/* Panel: explorador del catálogo vivo de Meta (WD4) */}
+      {showExplorer && selectedCatalog && (
+        <div className="mb-6 bg-white rounded-2xl border border-[#E8E9EB] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h2 className="font-bold text-[#242529] flex items-center gap-2">
+              <Radar className="w-4 h-4 text-[#0E7A0E]" />
+              Catálogo vivo en Meta — {selectedCatalog.name}
+            </h2>
+            <button
+              onClick={() => loadExplorer()}
+              disabled={explorerLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0E7A0E] hover:bg-[#F2FBF5] rounded-full disabled:opacity-60"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${explorerLoading ? "animate-spin" : ""}`} />
+              Actualizar
+            </button>
+          </div>
+
+          {/* Contadores resumen */}
+          <p className="text-xs text-[var(--text-secondary)] mb-3">
+            {explorerMetaTotal} productos en Meta · {explorerCounts.match} sincronizados ·{" "}
+            <span className={explorerCounts.diffs > 0 ? "text-amber-600 font-semibold" : ""}>
+              {explorerCounts.diffs} con diferencias
+            </span>
+            {explorerCounts.only_meta > 0 && ` · ${explorerCounts.only_meta} solo en Meta`}
+            {explorerCounts.only_store > 0 && ` · ${explorerCounts.only_store} solo en tienda`}
+          </p>
+
+          {/* Barra de salud + corrección masiva (WE4) */}
+          {explorerRows.length > 0 && (
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex-1 h-2 rounded-full bg-[#F0F1F2] overflow-hidden" role="img" aria-label={`Salud del catálogo: ${healthScore}%`}>
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    healthScore >= 90 ? "bg-emerald-500" : healthScore >= 70 ? "bg-amber-400" : "bg-red-500"
+                  }`}
+                  style={{ width: `${healthScore}%` }}
+                />
+              </div>
+              <span className="text-xs font-bold text-[#242529] w-10 text-right">{healthScore}%</span>
+              {explorerCounts.diffs + explorerCounts.only_store > 0 && (
+                <button
+                  onClick={handleFixAll}
+                  disabled={busy || fixingAll}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0E7A0E] text-white text-xs font-bold hover:bg-[#0D720D] disabled:opacity-50"
+                >
+                  {fixingAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                  Corregir {explorerCounts.diffs + explorerCounts.only_store} problema(s)
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Filtros por estado */}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {(
+              [
+                ["all", "Todos"],
+                ["match", "Sincronizados"],
+                ["price_diff", "Precio difiere"],
+                ["sale_price_diff", "Oferta difiere"],
+                ["image_missing_meta", "Sin imagen en Meta"],
+                ["only_meta", "Solo en Meta"],
+                ["only_store", "Solo en tienda"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => setExplorerFilter(value)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  explorerFilter === value
+                    ? "bg-[#0E7A0E] text-white"
+                    : "bg-[#F5F3F0] text-[var(--text-secondary)] hover:bg-[#EDEAE4]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {explorerLoading && explorerRows.length === 0 ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-5 h-5 animate-spin text-[#0E7A0E]" />
+            </div>
+          ) : filteredExplorerRows.length === 0 ? (
+            <p className="text-sm text-[#B0B3B8] py-6 text-center">
+              {explorerRows.length === 0 ? "El catálogo de Meta está vacío." : "Sin productos con este estado."}
+            </p>
+          ) : (
+            <ul className="space-y-1.5 max-h-[50vh] overflow-y-auto">
+              {filteredExplorerRows.map((row) => {
+                const productId = Number(row.retailer_id)
+                const fixable = row.status === "price_diff" || row.status === "sale_price_diff" || row.status === "image_missing_meta" || row.status === "only_store"
+                return (
+                  <li key={row.retailer_id} className="flex items-center gap-3 rounded-xl border border-[#F0F1F2] px-3 py-2">
+                    {row.imageUrl ? (
+                      <Image src={row.imageUrl} alt={row.name} width={36} height={36} className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg bg-[#F5F3F0] shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#242529] truncate">{row.name}</p>
+                      <p className="text-xs text-[var(--text-secondary)]">
+                        {row.metaPrice != null && `Meta: $${row.metaPrice.toFixed(2)}`}
+                        {row.metaPrice != null && row.storePrice != null && " · "}
+                        {row.storePrice != null && `Tienda: $${row.storePrice.toFixed(2)}`}
+                        {row.metaReviewStatus && row.metaReviewStatus !== "approved" && (
+                          <span className="ml-2 text-amber-600">revisión: {row.metaReviewStatus}</span>
+                        )}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        row.status === "match"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : row.status === "only_meta"
+                            ? "bg-sky-50 text-sky-700"
+                            : row.status === "only_store"
+                              ? "bg-gray-100 text-gray-600"
+                              : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {row.status === "match" && "✓ sync"}
+                      {row.status === "price_diff" && "precio difiere"}
+                      {row.status === "sale_price_diff" && "oferta difiere"}
+                      {row.status === "image_missing_meta" && "sin imagen"}
+                      {row.status === "only_meta" && "solo Meta"}
+                      {row.status === "only_store" && "solo tienda"}
+                    </span>
+                    {fixable && (
+                      <button
+                        onClick={() => handleFixRow(row)}
+                        disabled={busy || fixingId === productId}
+                        className="shrink-0 p-1.5 text-[#0E7A0E] hover:bg-[#E7F8EE] rounded-lg disabled:opacity-40"
+                        aria-label={`Corregir ${row.name} en Meta`}
+                        title="Corregir en Meta"
+                      >
+                        {fixingId === productId ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                    {row.status !== "only_store" && (
+                      <>
+                        <button
+                          onClick={() => handleToggleAvailability(row)}
+                          disabled={busy || togglingId === row.retailer_id}
+                          className="shrink-0 p-1.5 text-[#B0B3B8] hover:text-[#0E7A0E] hover:bg-[#E7F8EE] rounded-lg disabled:opacity-40"
+                          aria-label={`${row.metaAvailability === "in stock" ? "Pausar" : "Activar"} ${row.name} en Meta`}
+                          title={row.metaAvailability === "in stock" ? "Pausar en Meta" : "Activar en Meta"}
+                        >
+                          {togglingId === row.retailer_id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : row.metaAvailability === "in stock" ? (
+                            <Pause className="w-4 h-4" />
+                          ) : (
+                            <Play className="w-4 h-4" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMeta(row)}
+                          disabled={busy}
+                          className={`shrink-0 px-1.5 py-1 rounded-lg text-[10px] font-bold disabled:opacity-40 ${
+                            armDeleteId === row.retailer_id
+                              ? "bg-red-600 text-white"
+                              : "text-[#B0B3B8] hover:text-red-600 hover:bg-red-50"
+                          }`}
+                          aria-label={`Eliminar ${row.name} de Meta`}
+                          title={armDeleteId === row.retailer_id ? "Confirmar eliminación" : "Eliminar de Meta"}
+                        >
+                          {armDeleteId === row.retailer_id ? "¿Eliminar?" : <Trash2 className="w-4 h-4" />}
+                        </button>
+                      </>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
       )}
 
       {/* Panel de credenciales del catálogo (WC8/WC9) */}
