@@ -29,8 +29,8 @@ describe("checkout-config", () => {
     expect(MAX_BUMPS_POOL).toBeGreaterThan(MAX_BUMPS)
   })
 
-  it("la cantidad mínima de un artículo es 1 (el checkout nunca vacía el pedido)", () => {
-    expect(MIN_ITEM_QUANTITY).toBe(1)
+  it("la cantidad mínima de un artículo es 0 (el checkout deja vaciar una línea)", () => {
+    expect(MIN_ITEM_QUANTITY).toBe(0)
   })
 
   describe("countBumpUnits", () => {

@@ -16,12 +16,13 @@ interface ReviewStepProps {
   deliveryFee: number
   total: number
   /** Order bumps ya seleccionados (mecánica ThriveCart). Se listan como
-   *  artículos del pedido con cantidad editable — el "−" se deshabilita en 1.
+   *  artículos del pedido con cantidad editable — el "−" baja hasta 0 y en 0
+   *  pide confirmación para quitar el artículo.
    *  Retrocompatible: si no se pasan, el paso renderiza igual que antes. */
   bumpItems?: { ruleId: number; product_id: number; name: string; quantity: number; unitPrice: number }[]
-  /** Cambia la cantidad de un artículo del catálogo (mínimo 1). */
+  /** Cambia la cantidad de un artículo del catálogo (0 = línea vacía; negativo = confirmar eliminación). */
   onUpdateItemQuantity: (productId: number, quantity: number) => void
-  /** Cambia la cantidad de un artículo especial (mínimo 1). */
+  /** Cambia la cantidad de un artículo especial (misma regla que arriba). */
   onUpdateBumpQuantity: (ruleId: number, quantity: number) => void
   onEditAddress: () => void
   onEditSchedule: () => void
@@ -105,8 +106,8 @@ export function ReviewStep({
         </p>
       </div>
 
-      {/* Items summary — cantidades editables con +/− (mínimo 1: el botón "−"
-          se deshabilita en 1, nunca se quita un artículo desde el checkout). */}
+      {/* Items summary — cantidades editables con +/−: bajan hasta 0 y en 0 el
+          "−" pide confirmar la eliminación del artículo. */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">
           Productos ({itemCount})
@@ -119,7 +120,13 @@ export function ReviewStep({
                   {item.quantity}× {item.name}
                 </span>
                 <span className="font-medium text-gray-900 shrink-0">
-                  ${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}
+                  {item.quantity === 0 ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 border border-red-300 text-red-600 text-[10px] font-bold uppercase tracking-wide">
+                      En 0
+                    </span>
+                  ) : (
+                    `$${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}`
+                  )}
                 </span>
               </div>
               <div className="mt-2">
@@ -127,6 +134,7 @@ export function ReviewStep({
                   quantity={item.quantity}
                   label={item.name}
                   onChange={(q) => onUpdateItemQuantity(item.product_id, q)}
+                  onRequestRemove={() => onUpdateItemQuantity(item.product_id, -1)}
                 />
               </div>
             </li>
@@ -143,7 +151,13 @@ export function ReviewStep({
                   </span>
                 </span>
                 <span className="font-medium text-gray-900 shrink-0">
-                  ${(bump.unitPrice * bump.quantity).toFixed(2)}
+                  {bump.quantity === 0 ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-50 border border-red-300 text-red-600 text-[10px] font-bold uppercase tracking-wide">
+                      En 0
+                    </span>
+                  ) : (
+                    `$${(bump.unitPrice * bump.quantity).toFixed(2)}`
+                  )}
                 </span>
               </div>
               <div className="mt-2">
@@ -151,6 +165,7 @@ export function ReviewStep({
                   quantity={bump.quantity}
                   label={bump.name}
                   onChange={(q) => onUpdateBumpQuantity(bump.ruleId, q)}
+                  onRequestRemove={() => onUpdateBumpQuantity(bump.ruleId, -1)}
                 />
               </div>
             </li>
@@ -181,6 +196,15 @@ export function ReviewStep({
         </div>
       </div>
 
+      {/* Con todo el pedido en 0 no hay nada que pagar: se bloquea el avance
+          (mismo criterio que el "Continuar al envío" del CheckoutDrawer). */}
+      {itemCount === 0 && (
+        <p className="mb-3 text-sm text-gray-500">
+          Tu pedido está en 0 artículos. Sube la cantidad de un artículo o
+          confirma su eliminación para continuar.
+        </p>
+      )}
+
       <div className="flex gap-3">
         <button
           onClick={onBack}
@@ -191,7 +215,8 @@ export function ReviewStep({
         </button>
         <button
           onClick={onContinue}
-          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 transition-colors"
+          disabled={itemCount === 0}
+          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 text-white font-bold rounded-xl hover:bg-brand-700 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-200"
         >
           Continuar al pago
           <ArrowRight className="w-4 h-4" />

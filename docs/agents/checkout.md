@@ -14,15 +14,29 @@
   **unidades**, no líneas: se calcula con `countBumpUnits(selectedBumps)` para
   que un bump con cantidad 3 cuente como 3 artículos.
 - **Bumps encadenados**: el checkout pide el pool completo (`MAX_BUMPS_POOL`) y
-  `BumpCards` con `revealNext` muestra una ventana de `MAX_BUMPS` que se
-  desplaza al elegir: el bump entra al pedido y aparece el siguiente. El pool se
-  agota y ahí se detiene. Las superficies de carrito (`cart-drawer`, `/cart`,
-  `/{ciudad}/carrito`) siguen sin `revealNext` y conservan su copy de "Hasta 3".
-- **Cantidades editables (mínimo 1)**: `OrderItemsList` (checkout) y
+  `BumpCards` con `revealNext` muestra siempre un máximo de `MAX_BUMPS` tarjetas.
+  Al elegir una oferta su tarjeta **desaparece** (ya vive como línea del pedido)
+  y el hueco lo ocupa la siguiente oferta del pool; al agotarse el pool la lista
+  se encoge y, sin ofertas pendientes, `BumpCards` renderiza `null`. Por eso en
+  el checkout un bump no se deselecciona desde las tarjetas: se ajusta o se
+  reduce su cantidad en `OrderItemsList`. Las superficies de carrito
+  (`cart-drawer`, `/cart`, `/{ciudad}/carrito`) siguen sin `revealNext`: ahí las
+  tarjetas se marcan/desmarcan y conservan su copy de "Hasta 3".
+- **Cantidades editables (piso 0 + confirmación)**: `OrderItemsList` (checkout) y
   `QuantityStepper` (exportado para `ReviewStep`) son la única UI de +/− del
-  pedido. El "−" se deshabilita en `MIN_ITEM_QUANTITY`: el checkout nunca deja
-  el pedido en 0 artículos, para quitar un producto se vuelve al carrito
-  (donde `UPDATE_QUANTITY` sí elimina en ≤0).
+  pedido. `MIN_ITEM_QUANTITY` es 0: el "−" baja hasta 0 y ya en 0 pide
+  confirmación (`RemoveLineDialog`) para quitar el artículo del pedido — el
+  checkout nunca borra nada sin un "sí" explícito. Una línea en 0 **sale del
+  carrito** (una sola fuente de totales, `POST /api/orders` rechaza cantidad 0)
+  pero sigue visible en el pedido con la etiqueta "En 0" hasta que el usuario
+  confirme quitarla o la suba otra vez. Ese estado lo gobierna `useOrderLines`
+  (`src/components/checkout/use-order-lines.ts`), compartido por `CheckoutDrawer`
+  y el checkout full-page; la regla pura vive en `src/lib/order-lines.ts`
+  (`resolveQuantityChange`) y tiene pruebas en `order-lines.test.ts`. Por eso el
+  checkout full-page **no** se vacía con el carrito en 0: su guard usa
+  `items.length` (líneas visibles), no `itemCount`. El payload de
+  `use-checkout-order` omite las líneas con `quantity === 0` (catalog y bumps):
+  un bump en 0 sigue en `selectedBumps` y enviarlo 400-earía el pedido.
 - **Cifras comerciales**: el umbral de envío gratis vive en `commercial-facts.ts`
   (`FREE_SHIPPING_MXN`) y la tarifa en `checkout-config.ts` (`DELIVERY_FEE_FLAT`).
   Ninguna superficie publica la cifra a mano: la prosa interpola la constante y

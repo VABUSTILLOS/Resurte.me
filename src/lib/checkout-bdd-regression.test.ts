@@ -4,7 +4,9 @@ import {
   freeShippingProgress,
   FREE_SHIPPING_THRESHOLD,
   MAX_BUMPS as CONFIG_MAX_BUMPS,
+  MIN_ITEM_QUANTITY,
 } from "./checkout-config"
+import { resolveQuantityChange } from "./order-lines"
 import {
   evaluateTriggerTypes,
   resolveBumpPricing,
@@ -200,5 +202,34 @@ describe("BDD — cross-sell por colección/receta", () => {
     expect(matched).toContain("perishables")
     expect(matched).toContain("recipe_collection")
     expect(matched).toHaveLength(2)
+  })
+})
+
+// -----------------------------------------------------------
+// BDD: "Un artículo en 0 se elimina solo con confirmación" / "El segundo "−" en
+// una línea en 0 pide confirmar la eliminación"
+// -----------------------------------------------------------
+describe("BDD — cantidades con piso 0 y confirmación de eliminación", () => {
+  it("en el carrito, 1 → 0 vacía la línea; volver a bajar (sentinel −1) pide confirmar", () => {
+    expect(resolveQuantityChange(true, 0)).toEqual({ type: "empty" })
+    expect(resolveQuantityChange(false, -1)).toEqual({ type: "confirm-remove" })
+  })
+
+  it("una línea ya fuera del carrito en 0 no se elimina sola: exige confirmación", () => {
+    expect(resolveQuantityChange(false, 0)).toEqual({ type: "confirm-remove" })
+  })
+
+  it("subir desde 0 restaura la línea en el carrito con la cantidad pedida", () => {
+    expect(resolveQuantityChange(false, 1)).toEqual({ type: "restore", quantity: 1 })
+    expect(resolveQuantityChange(false, 3)).toEqual({ type: "restore", quantity: 3 })
+  })
+
+  it("con la línea en el carrito, cualquier cantidad > 0 es un set directo", () => {
+    expect(resolveQuantityChange(true, 1)).toEqual({ type: "set", quantity: 1 })
+    expect(resolveQuantityChange(true, 5)).toEqual({ type: "set", quantity: 5 })
+  })
+
+  it("MIN_ITEM_QUANTITY es 0: el piso del checkout ya no bloquea el \"−\"", () => {
+    expect(MIN_ITEM_QUANTITY).toBe(0)
   })
 })

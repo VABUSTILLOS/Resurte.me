@@ -258,7 +258,7 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await expect(page.getByText("+$31.50", { exact: true })).toBeVisible()
   })
 
-  test("checkout: el bump entra al pedido, encadena el siguiente y las cantidades son editables", async ({
+  test("checkout: el bump entra al pedido, su tarjeta desaparece y las cantidades son editables", async ({
     page,
   }) => {
     // Pool de 5 ofertas para poder observar la ventana deslizante: solo se
@@ -306,10 +306,11 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
 
     const drawer = page.getByLabel("Checkout", { exact: true })
     const aguacateLabel = "Aguacate Hass (caja 10 kg)"
-    // Las tarjetas de bump son los únicos botones con aria-pressed del drawer:
-    // así el locator no choca con los steppers ("Aumentar cantidad de …").
+    // Las tarjetas de bump viven en el grupo "Artículos especiales": así el
+    // locator no choca con los steppers ("Aumentar cantidad de …").
+    const bumpGroup = drawer.getByRole("group", { name: "Artículos especiales" })
     const bumpCard = (name: string) =>
-      drawer.locator("button[aria-pressed]").filter({ hasText: name })
+      bumpGroup.locator("button").filter({ hasText: name })
     const visibleText = (text: string) => drawer.getByText(text, { exact: true }).filter({ visible: true })
 
     // Ventana inicial: 3 ofertas visibles, el resto del pool oculto.
@@ -317,27 +318,32 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await expect(bumpCard("Tortillas")).toBeVisible()
     await expect(bumpCard("Salsa")).toHaveCount(0)
     await expect(bumpCard("Queso")).toHaveCount(0)
+    await expect(bumpGroup.locator("button")).toHaveCount(3)
+    await expect(
+      bumpGroup.getByText("Elige una oferta: entra a tu pedido y aparece la siguiente.")
+    ).toBeVisible()
 
-    // Cantidad mínima: con 1 unidad el "−" está deshabilitado (no se puede
-    // dejar el pedido sin artículos desde el checkout).
+    // Piso 0: con 1 unidad el "−" está operativo (el checkout ya no bloquea la
+    // bajada a 0; eliminar exige un segundo "−" y confirmación, ver el test
+    // "el '−' baja hasta 0 y el segundo '−' pide confirmar la eliminación").
     await expect(
       drawer.getByRole("button", { name: `Reducir cantidad de ${aguacateLabel}` })
-    ).toBeDisabled()
+    ).toBeEnabled()
 
     // "+" sube la cantidad del artículo del catálogo y recalcula su línea.
     await drawer.getByRole("button", { name: `Aumentar cantidad de ${aguacateLabel}` }).click()
     await expect(drawer.getByText(`2× ${aguacateLabel}`)).toBeVisible()
     await expect(visibleText("$1700.00").first()).toBeVisible() // línea + total
     await expect(drawer.getByText("Tu pedido (2)")).toBeVisible()
-    // Ya con 2 unidades el "−" vuelve a estar operativo.
+    // Con 2 unidades el "−" sigue operativo.
     await expect(
       drawer.getByRole("button", { name: `Reducir cantidad de ${aguacateLabel}` })
     ).toBeEnabled()
 
-    // Elegir un bump lo agrega como línea editable del pedido…
-    const guacamoleCard = bumpCard("Guacamole preparado")
-    await guacamoleCard.click()
-    await expect(guacamoleCard).toHaveAttribute("aria-pressed", "true")
+    // Elegir un bump: la tarjeta DESAPARECE (ya vive como línea del pedido) y su
+    // hueco lo ocupa la siguiente oferta del pool. Nunca hay más de 3 tarjetas.
+    await bumpCard("Guacamole preparado").click()
+    await expect(bumpCard("Guacamole preparado")).toHaveCount(0)
     await expect(drawer.getByText("1× Guacamole preparado")).toBeVisible()
     await expect(drawer.getByText("Tu pedido (3)")).toBeVisible()
     await expect(visibleText("$31.50").first()).toBeVisible() // línea del bump
@@ -345,9 +351,10 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     // …y el total del pedido incluye el bump ($1700 + $31.50).
     await expect(visibleText("$1731.50").first()).toBeVisible()
 
-    // …y revela la siguiente oferta del pool (ventana deslizante).
+    // …y revela la siguiente oferta del pool sin pasar de 3 tarjetas.
     await expect(bumpCard("Salsa")).toBeVisible()
     await expect(bumpCard("Queso")).toHaveCount(0)
+    await expect(bumpGroup.locator("button")).toHaveCount(3)
 
     // La cantidad del bump también es editable con "+".
     await drawer.getByRole("button", { name: "Aumentar cantidad de Guacamole preparado" }).click()
@@ -356,18 +363,140 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await expect(visibleText("$63.00").first()).toBeVisible()
     await expect(visibleText("+$63.00").first()).toBeVisible()
 
-    // El encadenamiento continúa: el segundo bump entra al pedido y libera un
-    // hueco en la ventana, revelando la quinta oferta.
+    // El encadenamiento continúa: el segundo bump desaparece y entra el quinto.
     await bumpCard("Sazonador").click()
+    await expect(bumpCard("Sazonador")).toHaveCount(0)
     await expect(drawer.getByText("1× Sazonador")).toBeVisible()
     await expect(bumpCard("Queso")).toBeVisible()
+    await expect(bumpGroup.locator("button")).toHaveCount(3)
 
-    // Re-tap sobre una tarjeta seleccionada: el bump sale del pedido pero la
-    // tarjeta sigue visible y marcable (no se pierde la oferta).
-    await guacamoleCard.click()
-    await expect(guacamoleCard).toHaveAttribute("aria-pressed", "false")
-    await expect(drawer.getByText("2× Guacamole preparado")).toHaveCount(0)
-    await expect(visibleText("+$31.50")).toHaveCount(0)
-    await expect(drawer.getByText("1× Sazonador")).toBeVisible()
+    // Al agotarse el pool la ventana se encoge (2, luego 1) y, cuando ya no
+    // queda ninguna oferta por mostrar, la sección desaparece del todo.
+    await bumpCard("Tortillas").click()
+    await expect(bumpCard("Tortillas")).toHaveCount(0)
+    await expect(bumpGroup.locator("button")).toHaveCount(2)
+    await bumpCard("Salsa").click()
+    await expect(bumpGroup.locator("button")).toHaveCount(1)
+    await bumpCard("Queso").click()
+    await expect(bumpGroup).toHaveCount(0)
+
+    // Los 5 bumps quedaron como líneas del pedido: 2 aguacate + 6 unidades de
+    // bump = 8 artículos, y $1700 + $145 de especiales = $1845.
+    await expect(drawer.getByText("Tu pedido (8)")).toBeVisible()
+    await expect(visibleText("+$145.00").first()).toBeVisible()
+    await expect(visibleText("$1845.00").first()).toBeVisible()
+  })
+
+  test("checkout: el '−' baja hasta 0 y el segundo '−' pide confirmar la eliminación", async ({
+    page,
+  }) => {
+    seedCart(page, [aguacate])
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
+    await openCheckoutDrawer(page)
+
+    const drawer = page.getByLabel("Checkout", { exact: true })
+    const label = "Aguacate Hass (caja 10 kg)"
+    const zeroLine = drawer.getByText(`0× ${label}`, { exact: true })
+    const reduceBtn = drawer.getByRole("button", { name: `Reducir cantidad de ${label}` })
+    const removeBtn = drawer.getByRole("button", { name: `Eliminar ${label} del pedido` })
+    // El diálogo de confirmación comparte el rol con el drawer: se acota por
+    // su nombre accesible ("¿Eliminar del pedido?").
+    const dialog = page.getByRole("dialog", { name: "¿Eliminar del pedido?" })
+
+    // 1 → 0: la línea SIGUE en el pedido, marcada "En 0" y sin cobrar.
+    await reduceBtn.click()
+    await expect(zeroLine).toBeVisible()
+    await expect(drawer.getByText("En 0", { exact: true }).first()).toBeVisible()
+    await expect(drawer.getByText("Tu pedido (0)")).toBeVisible()
+    await expect(drawer.getByText("$0.00").first()).toBeVisible()
+    // Con el pedido en 0 no se avanza al envío.
+    await expect(drawer.getByRole("button", { name: "Continuar al envío" })).toBeDisabled()
+
+    // El "−" en 0 ya no reduce: pide confirmar la eliminación.
+    await expect(removeBtn).toBeEnabled()
+    await removeBtn.click()
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByText(label, { exact: true })).toBeVisible()
+
+    // Cancelar: la línea se queda en 0 y no se elimina nada.
+    await dialog.getByRole("button", { name: "Cancelar" }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(zeroLine).toBeVisible()
+
+    // Volver a subir desde 0 restaura la línea en el carrito (y su precio).
+    await drawer.getByRole("button", { name: `Aumentar cantidad de ${label}` }).click()
+    await expect(drawer.getByText(`1× ${label}`, { exact: true })).toBeVisible()
+    await expect(drawer.getByText("En 0", { exact: true })).toHaveCount(0)
+    await expect(drawer.getByText("Tu pedido (1)")).toBeVisible()
+
+    // Confirmar: la línea sale del pedido.
+    await reduceBtn.click()
+    await expect(zeroLine).toBeVisible()
+    await removeBtn.click()
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole("button", { name: "Eliminar" }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(zeroLine).toHaveCount(0)
+    await expect(drawer.getByText("Tu pedido (0)")).toBeVisible()
+  })
+
+  test("checkout: un artículo especial en 0 se elimina solo con confirmación", async ({ page }) => {
+    // Un solo bump en el pool: al quitarse vuelve a ofrecerse.
+    const guacamole = {
+      ruleId: 6201,
+      trigger_type: "perishables",
+      title: "Guacamole preparado",
+      description: "El complemento perfecto para tu taquería",
+      discount_pct: 0.1,
+      product: {
+        id: 9201,
+        name: "Guacamole preparado",
+        slug: "guacamole",
+        description: "",
+        image_url: "",
+        price: 35,
+        sale_price: null,
+        stock_status: "in_stock",
+        category_id: 1,
+      },
+      price: 31.5,
+      original_price: 35,
+    }
+    await page.route("**/api/cart/bumps", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ bumps: [guacamole] }),
+      })
+    )
+
+    seedCart(page, [aguacate])
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
+    await openCheckoutDrawer(page)
+
+    const drawer = page.getByLabel("Checkout", { exact: true })
+    const bumpGroup = drawer.getByRole("group", { name: "Artículos especiales" })
+    const bumpCard = bumpGroup.locator("button").filter({ hasText: "Guacamole preparado" })
+    const dialog = page.getByRole("dialog", { name: "¿Eliminar del pedido?" })
+
+    // Agrega el bump: la tarjeta desaparece y entra como línea del pedido.
+    await bumpCard.click()
+    await expect(bumpCard).toHaveCount(0)
+    await expect(drawer.getByText("1× Guacamole preparado")).toBeVisible()
+
+    // 1 → 0: el bump se queda en el pedido (los bumps no viven en el carrito).
+    await drawer.getByRole("button", { name: "Reducir cantidad de Guacamole preparado" }).click()
+    await expect(drawer.getByText("0× Guacamole preparado")).toBeVisible()
+    await expect(drawer.getByText("En 0", { exact: true }).first()).toBeVisible()
+    await expect(drawer.getByText("Tu pedido (1)")).toBeVisible() // solo el aguacate
+    await expect(bumpCard).toHaveCount(0) // sigue seleccionado, no se re-ofrece
+
+    // Segundo "−": confirma la eliminación y el bump vuelve a la ventana de ofertas.
+    await drawer.getByRole("button", { name: "Eliminar Guacamole preparado del pedido" }).click()
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole("button", { name: "Eliminar" }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(drawer.getByText("0× Guacamole preparado")).toHaveCount(0)
+    await expect(bumpCard).toBeVisible()
   })
 })

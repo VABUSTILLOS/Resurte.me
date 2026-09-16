@@ -3,28 +3,32 @@
 import Image from "next/image"
 import { Minus, Plus, ShoppingBag } from "lucide-react"
 import type { CartItem } from "@/types"
-import { MIN_ITEM_QUANTITY } from "@/lib/checkout-config"
 import type { SelectedBump } from "@/components/checkout/BumpCards"
 
 interface OrderItemsListProps {
-  /** Artículos del catálogo en el carrito. */
+  /** Líneas visibles del pedido (incluye las que están en 0). */
   items: CartItem[]
   /** Order bumps ya agregados al pedido. */
   bumps: SelectedBump[]
-  /** Cambia la cantidad de un artículo del catálogo. */
+  /**
+   * Cambia la cantidad de un artículo del catálogo. Un valor negativo (el "−"
+   * sobre una línea en 0) pide confirmación para eliminarla en lugar de
+   * escribir la cantidad: ver `resolveQuantityChange` en `@/lib/order-lines`.
+   */
   onUpdateItemQuantity: (productId: number, quantity: number) => void
-  /** Cambia la cantidad de un artículo especial (por ruleId del bump). */
+  /** Cambia la cantidad de un artículo especial (misma regla que arriba). */
   onUpdateBumpQuantity: (ruleId: number, quantity: number) => void
   /** Resumen final de confirmación: misma lista, sin steppers. */
   readOnly?: boolean
 }
 
 /**
- * Stepper de cantidad +/− con mínimo MIN_ITEM_QUANTITY.
+ * Stepper de cantidad +/− (0 incluido).
  *
  * Reutiliza el patrón visual del carrito (`cart-drawer.tsx`) para que editar
- * cantidades se sienta igual en todo el flujo. El botón "−" se deshabilita en
- * el mínimo: el checkout nunca deja el pedido en 0 artículos.
+ * cantidades se sienta igual en todo el flujo. El "−" baja hasta 0 y, ya en 0,
+ * pide confirmación para quitar el artículo: el checkout nunca elimina nada sin
+ * un "sí" explícito del usuario.
  *
  * Exportado porque `ReviewStep` (checkout full-page) usa su propio lenguaje
  * visual de tarjeta y solo necesita el control, no la lista completa.
@@ -33,19 +37,22 @@ export function QuantityStepper({
   quantity,
   label,
   onChange,
+  onRequestRemove,
 }: {
   quantity: number
   label: string
   onChange: (quantity: number) => void
+  /** Si se pasa, el "−" en 0 no se deshabilita: pide confirmar la eliminación. */
+  onRequestRemove?: () => void
 }) {
-  const atMin = quantity <= MIN_ITEM_QUANTITY
+  const atZero = quantity <= 0
   return (
     <div className="flex items-center gap-0.5 border border-[#E8E9EB] rounded-[10px]">
       <button
         type="button"
-        onClick={() => onChange(quantity - 1)}
-        disabled={atMin}
-        aria-label={`Reducir cantidad de ${label}`}
+        onClick={() => (atZero ? onRequestRemove?.() : onChange(quantity - 1))}
+        disabled={atZero && !onRequestRemove}
+        aria-label={atZero ? `Eliminar ${label} del pedido` : `Reducir cantidad de ${label}`}
         className="p-2.5 sm:p-1.5 rounded-md hover:bg-[#F7F5F0] transition-colors touch-target disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
       >
         <Minus className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[var(--text-secondary)]" />
@@ -96,7 +103,7 @@ function Thumb({ src, alt, isBump }: { src?: string; alt: string; isBump?: boole
 
 /**
  * Lista de artículos del pedido (catálogo + order bumps) con cantidades
- * editables con +/− (mínimo MIN_ITEM_QUANTITY).
+ * editables con +/− (bajan hasta 0; en 0 el "−" pide confirmar la eliminación).
  *
  * Fuente única del render de "Tu pedido" en el checkout: la usan el
  * CheckoutDrawer y el checkout full-page para que ambos permitan editar
@@ -128,11 +135,18 @@ export function OrderItemsList({
                     quantity={item.quantity}
                     label={item.name}
                     onChange={(q) => onUpdateItemQuantity(item.product_id, q)}
+                    onRequestRemove={() => onUpdateItemQuantity(item.product_id, -1)}
                   />
                 )}
-                <span className="text-sm font-semibold text-[#242529]">
-                  ${(unitPrice * item.quantity).toFixed(2)}
-                </span>
+                {item.quantity === 0 ? (
+                  <span className="shrink-0 text-[10px] font-bold text-[#DC2626] bg-[#FEF2F2] border border-[#FCA5A5] rounded-full px-2 py-0.5 uppercase tracking-wide">
+                    En 0
+                  </span>
+                ) : (
+                  <span className="text-sm font-semibold text-[#242529]">
+                    ${(unitPrice * item.quantity).toFixed(2)}
+                  </span>
+                )}
               </div>
             </div>
           </li>
@@ -163,11 +177,18 @@ export function OrderItemsList({
                     quantity={bump.quantity}
                     label={name}
                     onChange={(q) => onUpdateBumpQuantity(bump.ruleId, q)}
+                    onRequestRemove={() => onUpdateBumpQuantity(bump.ruleId, -1)}
                   />
                 )}
-                <span className="text-sm font-semibold text-[#B87A3A]">
-                  ${(bump.unitPrice * bump.quantity).toFixed(2)}
-                </span>
+                {bump.quantity === 0 ? (
+                  <span className="shrink-0 text-[10px] font-bold text-[#DC2626] bg-[#FEF2F2] border border-[#FCA5A5] rounded-full px-2 py-0.5 uppercase tracking-wide">
+                    En 0
+                  </span>
+                ) : (
+                  <span className="text-sm font-semibold text-[#B87A3A]">
+                    ${(bump.unitPrice * bump.quantity).toFixed(2)}
+                  </span>
+                )}
               </div>
             </div>
           </li>

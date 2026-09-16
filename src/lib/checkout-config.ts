@@ -47,11 +47,12 @@ export const MAX_BUMPS_POOL = 12
 /**
  * Cantidad mínima de un artículo en el checkout.
  *
- * Con 1 el botón "−" queda deshabilitado: para quitar un producto del pedido
- * el usuario vuelve al carrito (evita borrados accidentales en el paso de
- * pago). Es la única fuente del mínimo para los steppers del checkout.
+ * Con 0 el "−" nunca se bloquea: baja la cantidad hasta 0 (la línea queda
+ * vacía y aporta $0 al total) y, ya en 0, un segundo "−" pide confirmación para
+ * quitar el artículo del pedido. Es la única fuente del mínimo para los
+ * steppers y para el clamp de cantidades de bumps del checkout.
  */
-export const MIN_ITEM_QUANTITY = 1
+export const MIN_ITEM_QUANTITY = 0
 
 /**
  * Cuenta las UNIDADES de una lista de order bumps, no las líneas.

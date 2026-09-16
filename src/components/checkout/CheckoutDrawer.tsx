@@ -27,6 +27,8 @@ import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
 import { BumpCards, type SelectedBump } from "@/components/checkout/BumpCards"
 import { OrderItemsList } from "@/components/checkout/OrderItemsList"
+import { RemoveLineDialog } from "@/components/checkout/RemoveLineDialog"
+import { useOrderLines } from "@/components/checkout/use-order-lines"
 import { SocialProofBadge } from "@/components/checkout/social-proof"
 import { readStoredBumps } from "@/hooks/use-selected-bumps"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
@@ -58,7 +60,7 @@ type DrawerStep = "review" | "address" | "schedule" | "bumps" | "payment"
  * siempre tiene la alternativa de pagar en la página completa.
  */
 export function CheckoutDrawer() {
-  const { cart, itemCount, subtotal, clearCart, coupon, updateQuantity } = useCart()
+  const { cart, itemCount, subtotal, clearCart, coupon } = useCart()
   const { city } = useCity()
   const router = useRouter()
 
@@ -103,8 +105,8 @@ export function CheckoutDrawer() {
   const { discountAmount, payableSubtotal, deliveryFee } = totals
   const total = totals.total
 
-  // Cantidades editables desde el paso de revisión (mínimo 1: el botón "−"
-  // se deshabilita en el mínimo, nunca se quita el artículo desde el checkout).
+  // Cantidades editables desde el paso de revisión: el "−" baja hasta 0 y, ya
+  // en 0, pide confirmar la eliminación del artículo (useOrderLines).
   const updateBumpQuantity = useCallback((ruleId: number, quantity: number) => {
     setSelectedBumps((prev) =>
       prev.map((b) =>
@@ -112,6 +114,15 @@ export function CheckoutDrawer() {
       )
     )
   }, [])
+
+  const orderLines = useOrderLines({
+    bumps: selectedBumps,
+    onSetBumpQuantity: updateBumpQuantity,
+    onRemoveBump: useCallback(
+      (ruleId: number) => setSelectedBumps((prev) => prev.filter((b) => b.ruleId !== ruleId)),
+      []
+    ),
+  })
 
   // add_payment_info (GA4/Meta): se dispara al entrar al paso de pago del
   // drawer. Solo una vez por visita (ref) para no duplicar el evento si el
@@ -249,7 +260,12 @@ export function CheckoutDrawer() {
     return () => window.removeEventListener(CHECKOUT_DRAWER_EVENT, handler)
   }, [setStep, setCheckoutError, setShowStripeForm, setStripeClientSecret, setSelectedBumps, setSaveAsDefault])
 
-  useEscapeKey(useCallback(() => setIsOpen(false), []), isOpen)
+  // Escape cierra el drawer, salvo que la confirmación de eliminación esté
+  // abierta: ahí el primer Escape cancela el diálogo, no el checkout.
+  useEscapeKey(
+    useCallback(() => setIsOpen(false), []),
+    isOpen && !orderLines.pendingRemoval
+  )
 
   if (!isOpen || !city) return null
 
@@ -332,10 +348,10 @@ export function CheckoutDrawer() {
                   Tu pedido ({itemCount + bumpUnits})
                 </p>
                 <OrderItemsList
-                  items={cart.items}
+                  items={orderLines.items}
                   bumps={selectedBumps}
-                  onUpdateItemQuantity={updateQuantity}
-                  onUpdateBumpQuantity={updateBumpQuantity}
+                  onUpdateItemQuantity={orderLines.updateItemQuantity}
+                  onUpdateBumpQuantity={orderLines.updateBumpQuantity}
                 />
               </div>
 
@@ -504,10 +520,10 @@ export function CheckoutDrawer() {
                   Tu pedido ({itemCount + bumpUnits})
                 </p>
                 <OrderItemsList
-                  items={cart.items}
+                  items={orderLines.items}
                   bumps={selectedBumps}
-                  onUpdateItemQuantity={updateQuantity}
-                  onUpdateBumpQuantity={updateBumpQuantity}
+                  onUpdateItemQuantity={orderLines.updateItemQuantity}
+                  onUpdateBumpQuantity={orderLines.updateBumpQuantity}
                   readOnly
                 />
               </div>
@@ -706,6 +722,14 @@ export function CheckoutDrawer() {
           )}
         </div>
       </div>
+
+      {/* Confirmación de eliminación (z-[90]: por encima del panel del drawer) */}
+      <RemoveLineDialog
+        open={orderLines.pendingRemoval !== null}
+        itemName={orderLines.pendingRemoval?.name ?? ""}
+        onCancel={orderLines.cancelRemoval}
+        onConfirm={orderLines.confirmRemoval}
+      />
     </>
   )
 }

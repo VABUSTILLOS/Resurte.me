@@ -91,4 +91,40 @@ test.describe("checkout público", { tag: "@ci" }, () => {
     await expect(page.getByRole("heading", { name: /Carrito vacío/i })).toBeVisible()
     await expect(page.getByRole("link", { name: /Ver productos/i })).toBeVisible()
   })
+
+  test("una línea en 0 no vacía el checkout y el segundo '−' pide confirmar", async ({ page }) => {
+    seedCart(page)
+    const response = await page.goto("/chihuahua/checkout", { waitUntil: "domcontentloaded" })
+    expect(response?.status()).toBe(200)
+
+    // Address → Schedule
+    await page.getByPlaceholder("Av. Insurgentes Sur").fill("Av. Juárez")
+    await page.getByPlaceholder("1234", { exact: true }).fill("123")
+    await page.getByPlaceholder("Roma Norte").fill("Centro")
+    await page.getByPlaceholder("06700").fill("31000")
+    await page.getByPlaceholder("55 1234 5678").fill("6141234567")
+    await page.getByRole("button", { name: "Continuar", exact: true }).click()
+    await page.getByRole("button", { name: "Continuar", exact: true }).click()
+
+    const label = "Aguacate Hass (caja 10 kg)"
+    const zeroLine = page.getByText(`0× ${label}`, { exact: true })
+    const dialog = page.getByRole("dialog", { name: "¿Eliminar del pedido?" })
+    await expect(page.getByRole("heading", { name: /Revisa tu pedido/i })).toBeVisible()
+
+    // 1 → 0: la línea sigue en el pedido y la página NO cae al estado vacío.
+    await page.getByRole("button", { name: `Reducir cantidad de ${label}` }).click()
+    await expect(zeroLine).toBeVisible()
+    await expect(page.getByRole("heading", { name: /Carrito vacío/i })).toHaveCount(0)
+    await expect(page.getByText("En 0", { exact: true }).first()).toBeVisible()
+    await expect(page.getByRole("button", { name: "Continuar al pago", exact: true })).toBeDisabled()
+
+    // El "−" en 0 pide confirmación explícita antes de eliminar.
+    await page.getByRole("button", { name: `Eliminar ${label} del pedido` }).click()
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole("button", { name: "Eliminar" }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(zeroLine).toHaveCount(0)
+    // Confirmada la única línea, el pedido queda vacío y sí aparece el estado vacío.
+    await expect(page.getByRole("heading", { name: /Carrito vacío/i })).toBeVisible()
+  })
 })

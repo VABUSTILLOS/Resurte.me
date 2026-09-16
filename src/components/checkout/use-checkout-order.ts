@@ -357,19 +357,25 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
             // servidor la persiste en orders.utm_* para medir conversión.
             utm: getStoredUtm() ?? undefined,
             items: [
-              ...cartItems.map((item) => ({
-                product_id: item.product_id,
-                quantity: item.quantity,
-                unit_price: item.sale_price ?? item.price,
-                name: item.name,
-              })),
-              ...selectedBumps.map((b) => ({
-                product_id: b.productId,
-                quantity: b.quantity,
-                unit_price: b.unitPrice,
-                name: b.name ?? `Artículo especial #${b.productId}`,
-                item_type: "bump" as const,
-              })),
+              // Las líneas en 0 (vaciadas con "−" en el checkout) no viajan:
+              // POST /api/orders exige quantity > 0 y las ignoraría igual.
+              ...cartItems
+                .filter((item) => item.quantity > 0)
+                .map((item) => ({
+                  product_id: item.product_id,
+                  quantity: item.quantity,
+                  unit_price: item.sale_price ?? item.price,
+                  name: item.name,
+                })),
+              ...selectedBumps
+                .filter((b) => b.quantity > 0)
+                .map((b) => ({
+                  product_id: b.productId,
+                  quantity: b.quantity,
+                  unit_price: b.unitPrice,
+                  name: b.name ?? `Artículo especial #${b.productId}`,
+                  item_type: "bump" as const,
+                })),
             ],
           }),
         })

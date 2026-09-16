@@ -28,6 +28,8 @@ import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { ReviewStep } from "@/components/checkout/ReviewStep"
 import { PaymentStep } from "@/components/checkout/PaymentStep"
 import { BumpCards } from "@/components/checkout/BumpCards"
+import { RemoveLineDialog } from "@/components/checkout/RemoveLineDialog"
+import { useOrderLines } from "@/components/checkout/use-order-lines"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { calcCheckoutTotals, DELIVERY_FEE_FLAT, MAX_BUMPS_POOL, MIN_ITEM_QUANTITY, countBumpUnits } from "@/lib/checkout-config"
 import {
@@ -40,7 +42,7 @@ import {
 // ============================================================
 
 export default function CheckoutPage() {
-  const { cart, itemCount, subtotal, clearCart, coupon, isLoaded, updateQuantity } = useCart()
+  const { cart, itemCount, subtotal, clearCart, coupon, isLoaded } = useCart()
   const { city } = useCity()
   const router = useRouter()
 
@@ -104,9 +106,8 @@ export default function CheckoutPage() {
   const { effectiveSubtotal, discountAmount, allItemsCount, deliveryFee } = totals
   const total = totals.total
 
-  // Cantidades editables desde el paso de revisión. Mínimo 1 (MIN_ITEM_QUANTITY):
-  // el botón "−" se deshabilita en el mínimo, el checkout nunca deja el pedido
-  // en 0 artículos.
+  // Cantidades editables desde el paso de revisión: el "−" baja hasta 0 y, ya
+  // en 0, pide confirmar la eliminación del artículo (useOrderLines).
   const updateBumpQuantity = useCallback(
     (ruleId: number, quantity: number) => {
       setSelectedBumps(
@@ -117,6 +118,15 @@ export default function CheckoutPage() {
     },
     [selectedBumps, setSelectedBumps]
   )
+
+  const orderLines = useOrderLines({
+    bumps: selectedBumps,
+    onSetBumpQuantity: updateBumpQuantity,
+    onRemoveBump: useCallback(
+      (ruleId: number) => setSelectedBumps(selectedBumps.filter((b) => b.ruleId !== ruleId)),
+      [selectedBumps, setSelectedBumps]
+    ),
+  })
 
   // Persist the order summary so the confirmation page can fire a complete
   // `purchase` event after the cart is cleared.
@@ -264,8 +274,9 @@ export default function CheckoutPage() {
     )
   }
 
-  // Si no hay items
-  if (itemCount === 0) {
+  // Si no hay items. Un pedido con líneas en 0 sigue mostrándose: el usuario
+  // necesita volver a verlas para confirmar su eliminación con otro "−".
+  if (itemCount === 0 && orderLines.items.length === 0) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
         <ShoppingBag className="w-16 h-16 text-gray-200 mx-auto mb-4" />
@@ -419,7 +430,7 @@ export default function CheckoutPage() {
             address={address}
             schedule={schedule}
             city={city}
-            cartItems={cart.items}
+            cartItems={orderLines.items}
             itemCount={allItemsCount}
             subtotal={effectiveSubtotal}
             discount={discountAmount}
@@ -432,8 +443,8 @@ export default function CheckoutPage() {
               quantity: b.quantity,
               unitPrice: b.unitPrice,
             }))}
-            onUpdateItemQuantity={updateQuantity}
-            onUpdateBumpQuantity={updateBumpQuantity}
+            onUpdateItemQuantity={orderLines.updateItemQuantity}
+            onUpdateBumpQuantity={orderLines.updateBumpQuantity}
             onEditAddress={() => setStep("address")}
             onEditSchedule={() => setStep("schedule")}
             onBack={() => setStep("schedule")}
@@ -481,6 +492,14 @@ export default function CheckoutPage() {
           onStripeBack={handleStripeBack}
         />
       )}
+
+      {/* Confirmación de eliminación de una línea en 0 */}
+      <RemoveLineDialog
+        open={orderLines.pendingRemoval !== null}
+        itemName={orderLines.pendingRemoval?.name ?? ""}
+        onCancel={orderLines.cancelRemoval}
+        onConfirm={orderLines.confirmRemoval}
+      />
     </div>
   )
 }
