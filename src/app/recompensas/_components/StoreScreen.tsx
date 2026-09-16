@@ -8,6 +8,7 @@ import { useLoyaltyTier } from "./LoyaltyTierCard";
 import { useEscapeKey } from "@/hooks/use-escape-key";
 import { SERVICES } from "./services-data";
 import { formatNumber } from "@/lib/money";
+import { countAffordable, findNearestReachable, serviceAffordability } from "@/lib/store-affordability";
 
 export { SERVICES };
 
@@ -81,6 +82,9 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator, balance = 0 }: 
   const monthsToUnlockOf = (cost: number) =>
     monthlyCashback > 0 ? Math.ceil(cost / monthlyCashback) : 1;
 
+  const affordableCount = countAffordable(services, balance);
+  const nearest = findNearestReachable(services, balance);
+
   return (
     <div className="px-4 pt-4 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
       {/* Header */}
@@ -96,6 +100,45 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator, balance = 0 }: 
         <p className="text-[#5c6069] text-[13px] mt-0.5">
           Convierte tus recompensas en clientes nuevos. Tus recompensas ya son tuyas.
         </p>
+
+        {/* Estado del saldo frente al catálogo */}
+        <div
+          role="status"
+          className={`mt-3 rounded-xl border px-3 py-2.5 ${
+            affordableCount > 0
+              ? "border-brand-200 bg-brand-50"
+              : "border-amber-200 bg-amber-50"
+          }`}
+        >
+          {affordableCount > 0 ? (
+            <p className="text-[12px] font-medium text-brand-500">
+              Con tus ${formatNumber(balance)} créditos puedes canjear {affordableCount}{" "}
+              {affordableCount === 1 ? "servicio" : "servicios"} hoy.
+              {nearest ? (
+                <>
+                  {" "}
+                  El siguiente, <span className="font-bold">{nearest.name}</span>, está a $
+                  {formatNumber(nearest.missing)}.
+                </>
+              ) : (
+                " Tienes todo el catálogo a tu alcance."
+              )}
+            </p>
+          ) : (
+            <p className="text-[12px] font-medium text-amber-700">
+              Tu saldo es de ${formatNumber(balance)} créditos.
+              {nearest ? (
+                <>
+                  {" "}
+                  Lo más cerca que estás es <span className="font-bold">{nearest.name}</span>
+                  : te faltan ${formatNumber(nearest.missing)} ({nearest.percent}% del costo).
+                </>
+              ) : (
+                " Explora el catálogo para elegir tu próximo objetivo."
+              )}
+            </p>
+          )}
+        </div>
       </motion.div>
 
       {/* Category filter chips */}
@@ -155,6 +198,7 @@ export function StoreScreen({ onServiceSelect, onOpenCalculator, balance = 0 }: 
                   monthsToUnlock={monthsToUnlock}
                   tier={tier}
                   balance={balance}
+                  isNearest={nearest?.id === service.id}
                   onSelect={() => setDetailService(service)}
                   onRedeem={() => onServiceSelect(service)}
                   onCalculator={() => onOpenCalculator(service)}
@@ -204,6 +248,7 @@ function ServiceCard({
   monthsToUnlock,
   tier,
   balance,
+  isNearest = false,
   onSelect,
   onRedeem,
   onCalculator,
@@ -213,11 +258,12 @@ function ServiceCard({
   monthsToUnlock: number;
   tier: { label: string; bg: string; text: string; border: string };
   balance: number;
+  isNearest?: boolean;
   onSelect: () => void;
   onRedeem: () => void;
   onCalculator: () => void;
 }) {
-  const remaining = service.cost - balance;
+  const { missing: remaining, percent } = serviceAffordability(service.cost, balance);
   // Simulated social proof counters
   const socialProofCounts: Record<string, string> = {
     "google-maps": "247 restaurantes",
@@ -261,7 +307,7 @@ function ServiceCard({
       </div>
 
       {/* Unlocked badge */}
-      {isUnlocked && (
+      {isUnlocked ? (
         <motion.div
           initial={{ scale: 0, rotate: -10 }}
           animate={{ scale: 1, rotate: 0 }}
@@ -272,6 +318,14 @@ function ServiceCard({
             <CheckCircle className="h-3 w-3" /> Disponible
           </span>
         </motion.div>
+      ) : (
+        isNearest && (
+          <div className="absolute top-3 right-3 z-10">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 text-[10px] font-bold">
+              Más cerca
+            </span>
+          </div>
+        )
       )}
 
       <div className="p-3 pt-8">
@@ -304,6 +358,28 @@ function ServiceCard({
             {socialProofCounts[service.id] || "0 restaurantes"} ya lo canjearon
           </span>
         </div>
+
+        {/* Avance hacia el canje */}
+        {!isUnlocked && (
+          <div className="mt-2.5">
+            <div
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
+              aria-label={`Avance hacia ${service.name}: ${percent}%`}
+              className="h-1.5 w-full overflow-hidden rounded-full bg-cream-200"
+            >
+              <div
+                className="h-full rounded-full bg-brand-500 transition-[width] duration-500"
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+            <p className="text-[#6e737b] text-[10px] mt-1 tabular-nums">
+              {percent}% del costo
+            </p>
+          </div>
+        )}
 
         {/* Cost + CTA */}
         <div className="mt-2.5 flex items-center justify-between">
@@ -363,7 +439,7 @@ function ServiceDetailSheet({
   onRedeem: () => void;
 }) {
   const isUnlocked = balance >= service.cost;
-  const remaining = service.cost - balance;
+  const { missing: remaining, percent } = serviceAffordability(service.cost, balance);
   const monthsToUnlock =
     monthlyCashback > 0 ? Math.ceil(service.cost / monthlyCashback) : 1;
   const tier = tierConfig[service.tier];
@@ -443,31 +519,54 @@ function ServiceDetailSheet({
         )}
 
         {/* Bottom CTA */}
-        <div className="mt-5 flex items-center justify-between border-t border-cream-300 pt-4">
-          <div>
-            <p className="text-[#6e737b] text-xs">Costo en recompensas</p>
-            <p className="text-brand-500 font-bold text-xl tabular-nums">
-              ${formatNumber(service.cost)}
-            </p>
-          </div>
-          {isUnlocked ? (
-            <button
-              onClick={onRedeem}
-              className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-bold text-white 
-                shadow-sm hover:bg-brand-600 active:scale-95 transition-all"
-            >
-              Canjear ahora
-            </button>
-          ) : (
-            <div className="text-right">
-              <p className="text-amber-700 text-xs font-medium">
-                Te faltan ${formatNumber(remaining)}
-              </p>
-              <p className="text-[#6e737b] text-xs mt-0.5">
-                ~{monthsToUnlock} {monthsToUnlock === 1 ? "mes" : "meses"} con tu consumo actual
-              </p>
+        <div className="mt-5 border-t border-cream-300 pt-4">
+          {!isUnlocked && (
+            <div className="mb-3">
+              <div
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={percent}
+                aria-label={`Avance hacia ${service.name}: ${percent}%`}
+                className="h-2 w-full overflow-hidden rounded-full bg-cream-200"
+              >
+                <div
+                  className="h-full rounded-full bg-brand-500 transition-[width] duration-500"
+                  style={{ width: `${percent}%` }}
+                />
+              </div>
+              <div className="mt-1.5 flex items-center justify-between text-[10px] text-[#6e737b] tabular-nums">
+                <span>${formatNumber(balance)} de ${formatNumber(service.cost)}</span>
+                <span>{percent}%</span>
+              </div>
             </div>
           )}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[#6e737b] text-xs">Costo en recompensas</p>
+              <p className="text-brand-500 font-bold text-xl tabular-nums">
+                ${formatNumber(service.cost)}
+              </p>
+            </div>
+            {isUnlocked ? (
+              <button
+                onClick={onRedeem}
+                className="rounded-xl bg-brand-500 px-6 py-3 text-sm font-bold text-white 
+                  shadow-sm hover:bg-brand-600 active:scale-95 transition-all"
+              >
+                Canjear ahora
+              </button>
+            ) : (
+              <div className="text-right">
+                <p className="text-amber-700 text-xs font-medium">
+                  Te faltan ${formatNumber(remaining)}
+                </p>
+                <p className="text-[#6e737b] text-xs mt-0.5">
+                  ~{monthsToUnlock} {monthsToUnlock === 1 ? "mes" : "meses"} con tu consumo actual
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
     </>

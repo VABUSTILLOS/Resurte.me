@@ -183,12 +183,13 @@ export default function CashbackPage() {
     handleTabChange("wallet");
   }, [handleTabChange]);
 
-  const handleCheckoutComplete = useCallback((newBalance?: number) => {
+  const handleCheckoutComplete = useCallback((newBalance?: number, destination?: "wallet" | "store") => {
     setShowCheckout(false);
     if (typeof newBalance === "number") setBalance(newBalance);
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 4000);
-  }, []);
+    if (destination) handleTabChange(destination);
+  }, [handleTabChange]);
 
   const handleOnboardingComplete = useCallback(() => {
     setShowOnboarding(false);

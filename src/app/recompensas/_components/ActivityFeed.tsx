@@ -4,9 +4,22 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle, Clock, TrendingUp, Download, Loader2 } from "lucide-react";
 import type { ActivityItem } from "./types";
+import type { WalletHistoryFilter } from "@/types";
 import { getWalletHistory } from "@/lib/wallet-actions";
 import { formatNumber } from "@/lib/money";
 import { toCsv, downloadCsv } from "@/lib/csv";
+
+const FILTERS: { id: WalletHistoryFilter; label: string }[] = [
+  { id: "all", label: "Todos" },
+  { id: "earned", label: "Cashback" },
+  { id: "redeemed", label: "Canjes" },
+];
+
+const FILTER_FILE_SUFFIX: Record<WalletHistoryFilter, string> = {
+  all: "",
+  earned: "-cashback",
+  redeemed: "-canjes",
+};
 
 // Mapea los movimientos reales del monedero a items de actividad.
 // amount > 0 = cashback (invoice), amount < 0 = canje de servicio (redemption).
@@ -31,17 +44,22 @@ function toActivityItem(tx: {
 
 export function ActivityFeed() {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [filter, setFilter] = useState<WalletHistoryFilter>("all");
+  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     async function fetchActivity() {
+      setLoading(true);
       try {
-        const { transactions } = await getWalletHistory(0, 5);
+        const { transactions } = await getWalletHistory(0, 5, filter);
         if (!cancelled) setActivities(transactions.map(toActivityItem));
       } catch {
-        setActivities([]);
+        if (!cancelled) setActivities([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
 
@@ -50,17 +68,17 @@ export function ActivityFeed() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [filter]);
 
-  // Exporta el historial COMPLETO del monedero (paginado) a CSV, no solo los
-  // 5 movimientos visibles. Tope de 50 páginas × 100 como salvaguarda.
+  // Exporta el historial COMPLETO del monedero (paginado) a CSV, respetando el
+  // filtro activo. Tope de 50 páginas × 100 como salvaguarda.
   async function exportHistory() {
     if (exporting) return;
     setExporting(true);
     try {
       const all: { amount: number; concept: string; created_at: string }[] = [];
       for (let page = 0; page < 50; page++) {
-        const { transactions, hasMore } = await getWalletHistory(page, 100);
+        const { transactions, hasMore } = await getWalletHistory(page, 100, filter);
         all.push(...transactions);
         if (!hasMore) break;
       }
@@ -74,7 +92,7 @@ export function ActivityFeed() {
         ])
       );
       const stamp = new Date().toISOString().slice(0, 10);
-      downloadCsv(`mis-creditos-${stamp}.csv`, csv);
+      downloadCsv(`mis-creditos${FILTER_FILE_SUFFIX[filter]}-${stamp}.csv`, csv);
     } catch {
       // Error de red/sesión: no interrumpir la vista por la exportación
     } finally {
@@ -82,18 +100,12 @@ export function ActivityFeed() {
     }
   }
 
-  if (activities.length === 0) {
-    return (
-      <div className="mx-4 mt-4 md:mx-0">
-        <h2 className="text-warm-700 text-[15px] font-bold mb-2">Actividad Reciente</h2>
-        <div className="rounded-xl bg-white border border-cream-300 shadow-sm p-4">
-          <p className="text-[#6e737b] text-xs">
-            Aún no tienes movimientos. Tus cashbacks y canjes aparecerán aquí.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const emptyCopy =
+    filter === "earned"
+      ? "Aún no tienes cashbacks. Tus compras pagadas aparecerán aquí."
+      : filter === "redeemed"
+        ? "Aún no has canjeado créditos. Tus canjes aparecerán aquí."
+        : "Aún no tienes movimientos. Tus cashbacks y canjes aparecerán aquí.";
 
   return (
     <div className="mx-4 mt-4 md:mx-0">
@@ -102,7 +114,7 @@ export function ActivityFeed() {
         <button
           type="button"
           onClick={exportHistory}
-          disabled={exporting}
+          disabled={exporting || loading}
           className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-warm-700 bg-white border border-cream-300 shadow-sm hover:bg-cream-50 transition-colors disabled:opacity-50"
         >
           {exporting ? (
@@ -114,8 +126,39 @@ export function ActivityFeed() {
         </button>
       </div>
 
-      <div className="space-y-2">
-        {activities.map((activity, i) => (
+      <div className="flex gap-1.5 mb-2" role="group" aria-label="Filtrar movimientos">
+        {FILTERS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            aria-pressed={filter === option.id}
+            onClick={() => setFilter(option.id)}
+            className={`min-h-11 rounded-full px-3 text-[11px] font-medium transition-colors ${
+              filter === option.id
+                ? "bg-brand-500 text-white"
+                : "bg-white text-warm-700 border border-cream-300 hover:bg-cream-50"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div
+          role="status"
+          aria-busy="true"
+          className="rounded-xl bg-white border border-cream-300 shadow-sm p-4"
+        >
+          <p className="text-[#6e737b] text-xs">Cargando movimientos…</p>
+        </div>
+      ) : activities.length === 0 ? (
+        <div className="rounded-xl bg-white border border-cream-300 shadow-sm p-4">
+          <p className="text-[#6e737b] text-xs">{emptyCopy}</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {activities.map((activity, i) => (
           <motion.div
             key={activity.id}
             initial={{ opacity: 0, x: -15 }}
@@ -162,8 +205,9 @@ export function ActivityFeed() {
               </span>
             )}
           </motion.div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import type { Notification, Tier } from "./types";
 import { TIER_ORDER, TIER_CONFIGS, TIER_REQUIREMENTS } from "./types";
 import { QUALIFYING_WEEK_MIN } from "@/lib/utils";
 import { formatNumber } from "@/lib/money";
+import type { WeekProgress } from "@/lib/wallet-progress";
 
 /** Movimiento del monedero (forma de `wallet_transactions`). */
 export interface WalletMovement {
@@ -15,6 +16,8 @@ export interface DeriveNotificationsInput {
   movements: WalletMovement[];
   tier: Tier;
   weekCount: number;
+  /** Progreso de la semana en curso (opcional: activa los avisos semanales). */
+  weekProgress?: WeekProgress | null;
   now?: Date;
 }
 
@@ -44,6 +47,7 @@ export function deriveNotifications({
   movements,
   tier,
   weekCount,
+  weekProgress = null,
   now = new Date(),
 }: DeriveNotificationsInput): Notification[] {
   const derived: Notification[] = [];
@@ -89,7 +93,50 @@ export function deriveNotifications({
     }
   }
 
-  // 4. Movimientos recientes del monedero (más recientes primero).
+  // 4. Avisos de la semana ISO en curso. Los IDs incluyen la semana, así que
+  // el estado "leído" se reinicia solo cada lunes, sin backend nuevo.
+  if (weekProgress) {
+    const key = weekProgress.weekKey;
+    if (weekProgress.qualifies) {
+      derived.push({
+        id: `semana-calificada-${key}`,
+        type: "milestone",
+        title: "Semana calificada ✅",
+        body: `Sumaste $${formatNumber(Math.round(weekProgress.weekSpend))} esta semana: tus Créditos ya se abonan al ${weekProgress.tierPct}%.`,
+        timestamp: "Esta semana",
+        read: false,
+        actionLabel: "Ver mi monedero",
+      });
+    } else if (weekProgress.weekSpend <= 0 && weekProgress.daysLeft <= 3) {
+      derived.push({
+        id: `semana-sin-compras-${key}`,
+        type: "milestone",
+        title:
+          weekProgress.daysLeft <= 0
+            ? "Último día para calificar la semana"
+            : "Aún no compras esta semana",
+        body: `Te faltan $${formatNumber(weekProgress.remainingToQualify)} para calificarla y asegurar tus Créditos.`,
+        timestamp: "Esta semana",
+        read: false,
+        actionLabel: "Ver catálogo",
+      });
+    } else if (weekProgress.remainingToQualify > 0 && weekProgress.daysLeft <= 2) {
+      derived.push({
+        id: `cierre-semana-${key}`,
+        type: "milestone",
+        title: `Te faltan $${formatNumber(Math.round(weekProgress.remainingToQualify))} para cerrar la semana`,
+        body:
+          weekProgress.daysLeft <= 0
+            ? "Hoy es el último día de la semana: completa el mínimo y califica."
+            : `Quedan ${weekProgress.daysLeft} día${weekProgress.daysLeft === 1 ? "" : "s"} para llegar a $${formatNumber(weekProgress.qualifyingMin)}.`,
+        timestamp: "Esta semana",
+        read: false,
+        actionLabel: "Completar pedido",
+      });
+    }
+  }
+
+  // 5. Movimientos recientes del monedero (más recientes primero).
   const sorted = [...movements].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );

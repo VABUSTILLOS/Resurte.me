@@ -355,3 +355,6 @@ export interface WalletHistoryPage {
   pageSize: number
   hasMore: boolean
 }
+
+/** Filtro del historial del monedero: todo, solo abonos o solo canjes. */
+export type WalletHistoryFilter = "all" | "earned" | "redeemed"

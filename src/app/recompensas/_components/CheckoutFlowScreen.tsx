@@ -9,8 +9,14 @@ import { formatNumber } from "@/lib/money";
 interface CheckoutFlowScreenProps {
   service: ServiceItem;
   onBack: () => void;
-  onComplete: (newBalance?: number) => void;
+  onComplete: (newBalance?: number, destination?: "wallet" | "store") => void;
   balance?: number;
+}
+
+interface RedemptionResult {
+  folio: number | null;
+  newBalance?: number;
+  alreadyRedeemed: boolean;
 }
 
 export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }: CheckoutFlowScreenProps) {
@@ -18,6 +24,7 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
   const [restaurantName, setRestaurantName] = useState("");
   const [redeemError, setRedeemError] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
+  const [result, setResult] = useState<RedemptionResult | null>(null);
   const totalSteps = 3;
 
   const remainingAfter = balance - service.cost;
@@ -70,13 +77,20 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
       }
 
       setStep(3);
-      setTimeout(() => {
-        onComplete(data.newBalance);
-      }, 2500);    } catch {
+      setResult({
+        folio: typeof data.redemption?.id === "number" ? data.redemption.id : null,
+        newBalance: typeof data.newBalance === "number" ? data.newBalance : undefined,
+        alreadyRedeemed: data.already_redeemed === true,
+      });
+    } catch {
       setRedeemError("Error de conexión. Intenta de nuevo.");
       setIsRedeeming(false);
     }
   };
+
+  // El saldo se propaga al cerrar el flujo; así la vista de créditos y la
+  // tienda muestran el saldo real sin recargar la página.
+  const finish = (destination: "wallet" | "store") => onComplete(result?.newBalance, destination);
 
   return (
     <div className="flex flex-col min-h-screen bg-transparent">
@@ -152,6 +166,9 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
             <Step3Confirmation
               key="s3"
               service={service}
+              result={result}
+              onGoWallet={() => finish("wallet")}
+              onGoStore={() => finish("store")}
             />
           )}
         </AnimatePresence>
@@ -347,7 +364,17 @@ function Step2Context({
   );
 }
 
-function Step3Confirmation({ service }: { service: ServiceItem }) {
+function Step3Confirmation({
+  service,
+  result,
+  onGoWallet,
+  onGoStore,
+}: {
+  service: ServiceItem;
+  result: RedemptionResult | null;
+  onGoWallet: () => void;
+  onGoStore: () => void;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
@@ -371,6 +398,8 @@ function Step3Confirmation({ service }: { service: ServiceItem }) {
       </motion.div>
 
       <motion.h2
+        role="status"
+        aria-live="polite"
         className="text-warm-700 text-2xl font-black"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -388,9 +417,57 @@ function Step3Confirmation({ service }: { service: ServiceItem }) {
         Tu <strong className="text-warm-700">{service.name}</strong> está en marcha. Te avisaremos en cada paso del proceso.
       </motion.p>
 
+      {result?.alreadyRedeemed && (
+        <motion.p
+          className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.55 }}
+        >
+          Ya habías solicitado este servicio hace unos minutos. No se te cobró dos veces.
+        </motion.p>
+      )}
+
+      {/* Comprobante del canje */}
+      <motion.dl
+        className="mt-6 w-full rounded-2xl bg-white border border-cream-300 shadow-sm p-5 text-left"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.55 }}
+      >
+        <p className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-3">
+          Comprobante del canje
+        </p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-[#5c6069] text-sm">Folio</dt>
+            <dd className="text-warm-700 text-sm font-bold tabular-nums">
+              {result?.folio != null ? `#${result.folio}` : "En proceso"}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-[#5c6069] text-sm">Créditos canjeados</dt>
+            <dd className="text-red-600 text-sm font-bold tabular-nums">
+              −${formatNumber(service.cost)}
+            </dd>
+          </div>
+          {result?.newBalance != null && (
+            <div className="flex items-center justify-between gap-3">
+              <dt className="text-[#5c6069] text-sm">Saldo restante</dt>
+              <dd className="text-brand-500 text-sm font-bold tabular-nums">
+                ${formatNumber(result.newBalance)}
+              </dd>
+            </div>
+          )}
+        </div>
+        <p className="text-[#6e737b] text-[10px] mt-3">
+          Lo encontrarás en tu historial de créditos con la fecha exacta del movimiento.
+        </p>
+      </motion.dl>
+
       {/* Timeline preview */}
       <motion.div
-        className="mt-8 w-full rounded-2xl bg-white border border-cream-300 shadow-sm p-5 text-left"
+        className="mt-3 w-full rounded-2xl bg-white border border-cream-300 shadow-sm p-5 text-left"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
@@ -418,6 +495,29 @@ function Step3Confirmation({ service }: { service: ServiceItem }) {
             </div>
           ))}
         </div>
+      </motion.div>
+
+      {/* CTAs explícitos: sin redirección automática sorpresiva */}
+      <motion.div
+        className="mt-5 w-full space-y-2"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.75 }}
+      >
+        <button
+          type="button"
+          onClick={onGoWallet}
+          className="w-full rounded-2xl bg-brand-500 py-4 text-base font-bold text-white shadow-lg transition-all active:scale-[0.98] hover:bg-brand-600 touch-target"
+        >
+          Ver mis créditos
+        </button>
+        <button
+          type="button"
+          onClick={onGoStore}
+          className="w-full rounded-2xl bg-white border border-cream-300 py-3.5 text-sm font-bold text-warm-700 shadow-sm transition-all active:scale-[0.98] hover:bg-cream-50 touch-target"
+        >
+          Volver a la tienda
+        </button>
       </motion.div>
     </motion.div>
   );

@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   getWalletBalance,
   getWalletHistory,
+  getWalletSummary,
   getTotalRewards,
 } from "@/lib/wallet-actions";
 import { localMonthYear } from "@/lib/utils";
@@ -27,6 +28,7 @@ import { formatNumber } from "@/lib/money";
 import type { Tier } from "./types";
 import type { ServiceItem } from "./types";
 import type { WalletTransaction } from "@/types";
+import type { WalletSummary } from "@/lib/wallet-summary";
 
 interface DashboardScreenProps {
   onOpenCalculator: (service?: ServiceItem) => void;
@@ -257,6 +259,7 @@ function WalletView() {
 
   const [balance, setBalance] = useState(0)
   const [transactions, setTransactions] = useState<WalletTransaction[]>([])
+  const [summary, setSummary] = useState<WalletSummary | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -267,8 +270,14 @@ function WalletView() {
         if (cancelled) return
         if (wallet) {
           setBalance(Number(wallet.balance_credits))
-          const { transactions } = await getWalletHistory(0, 8)
-          if (!cancelled) setTransactions(transactions)
+          const [{ transactions }, walletSummary] = await Promise.all([
+            getWalletHistory(0, 8),
+            getWalletSummary(),
+          ])
+          if (!cancelled) {
+            setTransactions(transactions)
+            setSummary(walletSummary)
+          }
         }
       } catch {
         // Keep defaults
@@ -326,6 +335,29 @@ function WalletView() {
             </p>
           </div>
         </div>
+
+        {summary && (
+          <div className="mt-3 rounded-xl bg-cream-50 border border-cream-300 p-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[#5c6069] text-[10px] uppercase tracking-wider">Total ganado</p>
+                <p className="text-brand-500 text-base font-bold tabular-nums mt-0.5">
+                  +${formatNumber(summary.earned)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[#5c6069] text-[10px] uppercase tracking-wider">Total canjeado</p>
+                <p className="text-red-600 text-base font-bold tabular-nums mt-0.5">
+                  −${formatNumber(summary.redeemed)}
+                </p>
+              </div>
+            </div>
+            <p className="text-[#6e737b] text-[10px] mt-2.5">
+              Ganado − canjeado = tu saldo disponible. Cada movimiento queda registrado en
+              tu historial.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Recent Transactions */}

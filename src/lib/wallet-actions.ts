@@ -5,12 +5,15 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { getActivePersonalCoupon } from "@/lib/repurchase-coupon"
 import { computeRunningOutProducts } from "@/lib/reorder-heuristics"
 import { isoWeek, QUALIFYING_WEEK_MIN } from "@/lib/utils"
+import { computeWeekProgress, type WeekProgress } from "@/lib/wallet-progress"
+import { summarizeWallet, type WalletSummary } from "@/lib/wallet-summary"
 import type {
   OrderWithCashback,
   OrderItem,
   Wallet,
   WalletTransaction,
   WalletHistoryPage,
+  WalletHistoryFilter,
   RepurchaseCouponInfo,
 } from "@/types"
 
@@ -158,10 +161,13 @@ export async function getWalletBalance(): Promise<Wallet | null> {
 /**
  * Obtiene el historial de transacciones del monedero del usuario autenticado.
  * Paginado, orden descendente por fecha.
+ *
+ * @param filter "all" (default) | "earned" (solo abonos) | "redeemed" (solo canjes)
  */
 export async function getWalletHistory(
   page: number = 0,
-  pageSize: number = 20
+  pageSize: number = 20,
+  filter: WalletHistoryFilter = "all"
 ): Promise<WalletHistoryPage> {
   const supabase = await createClient()
 
@@ -184,10 +190,15 @@ export async function getWalletHistory(
   const from = page * pageSize
   const to = from + pageSize - 1
 
-  const { data, count } = await supabase
+  let query = supabase
     .from("wallet_transactions")
     .select("*", { count: "exact" })
     .eq("wallet_id", wallet.id)
+
+  if (filter === "earned") query = query.gt("amount", 0)
+  else if (filter === "redeemed") query = query.lt("amount", 0)
+
+  const { data, count } = await query
     .order("created_at", { ascending: false })
     .range(from, to)
 
@@ -198,6 +209,38 @@ export async function getWalletHistory(
     pageSize,
     hasMore: from + ((data as WalletTransaction[])?.length ?? 0) < (count ?? 0),
   }
+}
+
+// ============================================================
+// RESUMEN DEL MONEDERO (TRANSPARENCIA)
+// ============================================================
+
+/**
+ * Resumen del monedero: saldo, total acumulado, total canjeado y neto.
+ * Alimenta las tarjetas de transparencia del monedero.
+ */
+export async function getWalletSummary(): Promise<WalletSummary | null> {
+  const supabase = await createClient()
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return null
+
+  const { data: wallet } = await supabase
+    .from("wallets")
+    .select("id, balance_credits")
+    .eq("user_id", user.id)
+    .single()
+
+  if (!wallet) return summarizeWallet([])
+
+  const { data: movements } = await supabase
+    .from("wallet_transactions")
+    .select("amount, created_at")
+    .eq("wallet_id", wallet.id)
+
+  return summarizeWallet(movements ?? [], {
+    balance: Number(wallet.balance_credits ?? 0),
+  })
 }
 
 // ============================================================
@@ -323,6 +366,35 @@ export async function getMonthlyCashbackProgress(): Promise<{
     monthlySpend: orders.reduce((sum, o) => sum + Number(o.total ?? 0), 0),
     walletBalance: Number(wallet?.balance_credits ?? 0),
   }
+}
+
+/**
+ * Progreso de la semana en curso: gasto pagado acumulado, cuánto falta para
+ * calificar la semana ($2,500) y cuántos días quedan. Alimenta el bloque
+ * "Esta semana" del dashboard de recompensas.
+ *
+ * Trae 45 días de órdenes pagadas para cubrir la semana ISO en curso aunque
+ * haya empezado en el mes anterior; el filtro por mes lo hace el cálculo puro.
+ */
+export async function getWeekProgress(): Promise<WeekProgress | null> {
+  const supabase = await createClient()
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return null
+
+  const since = new Date(Date.now() - 45 * 86400000).toISOString()
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("created_at, total")
+    .eq("user_id", user.id)
+    .eq("payment_status", "paid")
+    .neq("status", "cancelled")
+    .gte("created_at", since)
+
+  if (error) return null
+
+  return computeWeekProgress(data ?? [])
 }
 
 // ============================================================
