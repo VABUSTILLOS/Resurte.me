@@ -72,6 +72,19 @@
   deriva (cantidad vs umbral, en create/update/modal/panel); un estado
   manual solo sobrevive con la cantidad vacía. `restock.ts` calcula la
   cantidad sugerida (cobertura de 30 días) — el panel solo la muestra.
+- Productos ronda 7 — degradación en ESCRITURA: `create`/`update` también
+  degradan si falta una columna de la ronda. Ojo: una columna ausente da DOS
+  errores distintos y `isMissingColumnError` (`sale-window.ts`) cubre ambos —
+  lecturas `42703` ("column ... does not exist", lo detecta Postgres) y
+  escrituras `PGRST204` ("Could not find the '...' column ... in the schema
+  cache", lo detecta PostgREST antes de Postgres y NO trae "does not exist").
+  Sin el `PGRST204` un `INSERT`/`PATCH` fallaba con 500 aunque la lectura
+  degradara. `create` reintenta el insert sin el umbral; `update` relee la
+  fila actual sin el umbral (el diff de la bitácora lo omite) y reintenta el
+  PATCH sin él. El modal envía SIEMPRE el umbral (y `related_product_ids`,
+  `sku`, `barcode`, `sale_*`, `tags`), así que la degradación es
+  responsabilidad del servidor: no se puede inferir "campo ausente" desde el
+  payload.
 - Productos ronda 7 — imágenes: la detección de rotas es un HEAD con
   fallback a GET `Range: bytes=0-0` (403/405/501 ⇒ reintento), timeout 8 s y
   concurrencia 6; nunca bloquea el listado. `image_url` acepta `null` para
@@ -83,8 +96,9 @@
 - Productos ronda 7 — historial: el PATCH guarda `detail.before/after` con
   solo los campos de `AUDIT_FIELDS`; `audit-diff.ts` es la fuente única de
   las etiquetas y del formateo (los registros viejos traen `updates` plano y
-  caen al fallback). `related_product_ids` y `cost` aún no están en
-  `AUDIT_FIELDS`, así que sus cambios no generan diff.
+  caen al fallback). `related_product_ids` aún no está en `AUDIT_FIELDS`, así
+  que sus cambios no generan diff (`cost` sí está, y `low_stock_threshold`
+  se omite del diff mientras 00108 falte).
 - Productos ronda 7 — IA: `bulk-seo` SOLO devuelve propuestas (nunca
   escribe); la escritura pasa por el PATCH normal tras la vista previa
   editable. El prompt SEO vive duplicado en `seo-batch.ts` y en

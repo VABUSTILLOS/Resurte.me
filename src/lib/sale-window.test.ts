@@ -6,6 +6,7 @@ import {
   resolveEffectivePrice,
   withResolvedSale,
   normalizeSale,
+  isMissingColumnError,
 } from "./sale-window"
 
 const NOW = new Date("2026-03-10T12:00:00.000Z")
@@ -108,5 +109,35 @@ describe("withResolvedSale / normalizeSale", () => {
   it("isSaleActive es coherente con saleState", () => {
     expect(isSaleActive({ sale_price: 5 }, NOW)).toBe(true)
     expect(isSaleActive({ sale_price: null }, NOW)).toBe(false)
+  })
+})
+
+describe("isMissingColumnError", () => {
+  it("detecta la columna ausente en lecturas (Postgres 42703)", () => {
+    expect(
+      isMissingColumnError({
+        code: "42703",
+        message: 'column products.low_stock_threshold does not exist',
+      })
+    ).toBe(true)
+  })
+
+  it("detecta la columna ausente en escrituras (PostgREST PGRST204)", () => {
+    // PostgREST valida el payload de INSERT/UPDATE antes de Postgres, así que
+    // el error NO trae "does not exist": sin el código explícito, create y
+    // update devolvían 500 mientras las lecturas degradaban.
+    const writeError = {
+      code: "PGRST204",
+      message: "Could not find the 'low_stock_threshold' column of 'products' in the schema cache",
+    }
+    expect(writeError.message.includes("does not exist")).toBe(false)
+    expect(isMissingColumnError(writeError)).toBe(true)
+  })
+
+  it("no confunde otros errores", () => {
+    expect(isMissingColumnError({ code: "42501", message: "row-level security" })).toBe(false)
+    expect(isMissingColumnError({ code: "23505", message: "duplicate key value" })).toBe(false)
+    expect(isMissingColumnError(null)).toBe(false)
+    expect(isMissingColumnError(undefined)).toBe(false)
   })
 })

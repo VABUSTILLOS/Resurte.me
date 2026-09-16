@@ -6,6 +6,7 @@ import { logAdminAction } from "@/lib/audit-log"
 import { slugify } from "@/lib/foodos"
 import { validateSku, validateBarcode } from "@/lib/sku"
 import { deriveStockStatus, isStockStatus } from "@/lib/stock"
+import { isMissingColumnError } from "@/lib/sale-window"
 import { NextResponse } from "next/server"
 
 /** Productos relacionados: ids enteros, sin duplicados, sin el propio. */
@@ -187,41 +188,57 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data, error } = await supabase
-      .from("products")
-      .insert({
-        name,
-        slug,
-        description: typeof body.description === "string" ? body.description : null,
-        unit: typeof body.unit === "string" && body.unit.trim() ? body.unit.trim() : null,
-        brand: typeof body.brand === "string" ? body.brand : null,
-        category_id: categoryId,
-        price,
-        sale_price: salePrice,
-        sku: sku.value,
-        barcode: barcode.value,
-        tags,
-        sale_starts_at: schedule.sale_starts_at,
-        sale_ends_at: schedule.sale_ends_at,
-        low_stock_threshold: lowStockThreshold,
-        related_product_ids: relatedIds,
-        stock_status: derivedStock,
-        stock_quantity: stockQuantity,
-        cost,
-        is_visible: body.is_visible === true,
-        show_in_whatsapp: body.show_in_whatsapp === true,
-        publish_at: schedule.publish_at,
-        unpublish_at: schedule.unpublish_at,
-        admin_note: typeof body.admin_note === "string" ? body.admin_note : null,
-        seo_title: typeof body.seo_title === "string" ? body.seo_title : null,
-        seo_description: typeof body.seo_description === "string" ? body.seo_description : null,
-        image_url: imageUrl,
-        images,
-      })
-      .select(
-        "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,sku,barcode,tags,sale_starts_at,sale_ends_at,low_stock_threshold,related_product_ids,created_at"
-      )
-      .single()
+    const payload = {
+      name,
+      slug,
+      description: typeof body.description === "string" ? body.description : null,
+      unit: typeof body.unit === "string" && body.unit.trim() ? body.unit.trim() : null,
+      brand: typeof body.brand === "string" ? body.brand : null,
+      category_id: categoryId,
+      price,
+      sale_price: salePrice,
+      sku: sku.value,
+      barcode: barcode.value,
+      tags,
+      sale_starts_at: schedule.sale_starts_at,
+      sale_ends_at: schedule.sale_ends_at,
+      low_stock_threshold: lowStockThreshold,
+      related_product_ids: relatedIds,
+      stock_status: derivedStock,
+      stock_quantity: stockQuantity,
+      cost,
+      is_visible: body.is_visible === true,
+      show_in_whatsapp: body.show_in_whatsapp === true,
+      publish_at: schedule.publish_at,
+      unpublish_at: schedule.unpublish_at,
+      admin_note: typeof body.admin_note === "string" ? body.admin_note : null,
+      seo_title: typeof body.seo_title === "string" ? body.seo_title : null,
+      seo_description: typeof body.seo_description === "string" ? body.seo_description : null,
+      image_url: imageUrl,
+      images,
+    }
+
+    const SELECT_COLS =
+      "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,sku,barcode,tags,sale_starts_at,sale_ends_at,low_stock_threshold,related_product_ids,created_at"
+    const SELECT_COLS_BASE =
+      "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,sku,barcode,tags,sale_starts_at,sale_ends_at,related_product_ids,created_at"
+
+    let inserted = await supabase.from("products").insert(payload).select(SELECT_COLS).single()
+
+    if (inserted.error && isMissingColumnError(inserted.error)) {
+      // Migración 00108 pendiente: el umbral por producto aún no existe y
+      // PostgREST rechaza el INSERT completo. Se reintenta sin la columna
+      // (mismo patrón que list/payments/order-bumps); `stock_status` ya viene
+      // derivado contra el umbral efectivo, así que la tienda no cambia.
+      const { low_stock_threshold: _omit, ...base } = payload
+      inserted = (await supabase
+        .from("products")
+        .insert(base)
+        .select(SELECT_COLS_BASE)
+        .single()) as unknown as typeof inserted
+    }
+
+    const { data, error } = inserted
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

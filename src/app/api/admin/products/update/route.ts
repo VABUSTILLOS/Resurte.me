@@ -5,6 +5,7 @@ import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
 import { validateSku, validateBarcode } from "@/lib/sku"
 import { deriveStockStatus, isStockStatus } from "@/lib/stock"
+import { isMissingColumnError } from "@/lib/sale-window"
 import { NextResponse } from "next/server"
 
 /** Campos que se guardan en la bitácora para el diff antes/después. */
@@ -266,12 +267,26 @@ export async function PATCH(request: Request) {
 
     // Fila actual: hace falta para derivar el stock con el umbral vigente y
     // para registrar el diff antes/después en la bitácora (Fase 15).
-    const { data: currentRaw } = await supabase
+    const AUDIT_COLS = [...AUDIT_FIELDS, "deleted_at"]
+    let thresholdReadable = true
+    let currentRes = await supabase
       .from("products")
-      .select([...AUDIT_FIELDS, "deleted_at"].join(", "))
+      .select(AUDIT_COLS.join(", "))
       .eq("id", productId)
       .maybeSingle()
-    const current = currentRaw as Record<string, unknown> | null
+    if (currentRes.error && isMissingColumnError(currentRes.error)) {
+      // Migración 00108 pendiente: se relee sin el umbral para no perder el
+      // diff antes/después de la bitácora (el umbral queda fuera del diff,
+      // porque leerlo como `null` inventaría un cambio inexistente).
+      thresholdReadable = false
+      const base = AUDIT_COLS.filter((c) => c !== "low_stock_threshold")
+      currentRes = (await supabase
+        .from("products")
+        .select(base.join(", "))
+        .eq("id", productId)
+        .maybeSingle()) as unknown as typeof currentRes
+    }
+    const current = currentRes.data as Record<string, unknown> | null
 
     // Unicidad de SKU: el índice parcial solo cubre productos no borrados.
     if (typeof updates.sku === "string") {
@@ -360,10 +375,15 @@ export async function PATCH(request: Request) {
       )
     }
 
-    const { error } = await supabase
-      .from("products")
-      .update(updates)
-      .eq("id", productId)
+    let { error } = await supabase.from("products").update(updates).eq("id", productId)
+
+    if (error && isMissingColumnError(error) && "low_stock_threshold" in updates) {
+      // Migración 00108 pendiente: PostgREST rechaza el PATCH entero por una
+      // sola columna inexistente. Se reintenta sin el umbral para que el
+      // resto de la edición sí se guarde (mismo patrón que las lecturas).
+      const { low_stock_threshold: _omit, ...rest } = updates
+      ;({ error } = await supabase.from("products").update(rest).eq("id", productId))
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
@@ -378,6 +398,7 @@ export async function PATCH(request: Request) {
     const after: Record<string, unknown> = {}
     for (const field of AUDIT_FIELDS) {
       if (!(field in updates)) continue
+      if (field === "low_stock_threshold" && !thresholdReadable) continue
       const prev = (current as Record<string, unknown> | null)?.[field] ?? null
       const next = (updates as Record<string, unknown>)[field] ?? null
       if (JSON.stringify(prev) !== JSON.stringify(next)) {

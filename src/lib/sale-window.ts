@@ -7,7 +7,13 @@
  */
 
 /**
- * Postgres 42703 / PostgREST: la columna no existe (migración pendiente).
+ * Columna inexistente por migración pendiente. Dos formas distintas:
+ * - `42703` / "does not exist": lo devuelve Postgres al hacer SELECT de la
+ *   columna, que es el caso de las lecturas.
+ * - `PGRST204` / "Could not find the ... column ... in the schema cache": lo
+ *   devuelve PostgREST al validar el payload de un INSERT/UPDATE, ANTES de
+ *   llegar a Postgres. Sin este caso las escrituras devuelven 500 mientras
+ *   las lecturas degradan.
  * Las columnas de la ventana son `sale_starts_at` y `sale_ends_at` (00107):
  * los selects explícitos deben incluirlas junto a `sale_price` y reintentar
  * sin ellas si esta función devuelve true.
@@ -16,6 +22,7 @@ export function isMissingColumnError(err: unknown): boolean {
   const e = err as { code?: string; message?: string } | null
   return (
     e?.code === "42703" ||
+    e?.code === "PGRST204" ||
     (typeof e?.message === "string" && e.message.includes("does not exist"))
   )
 }
