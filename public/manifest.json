@@ -48,8 +48,24 @@
       "description": "Herramientas de gestión para tu negocio",
       "url": "/panel",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Compartir lista",
+      "short_name": "Compartir",
+      "description": "Convertir una lista de WhatsApp en un pedido",
+      "url": "/compartir",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ],
+  "share_target": {
+    "action": "/compartir",
+    "method": "GET",
+    "params": {
+      "title": "titulo",
+      "text": "texto",
+      "url": "url"
+    }
+  },
   "categories": ["food", "business", "shopping"],
   "lang": "es-MX",
   "dir": "ltr"

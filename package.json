@@ -260,6 +260,12 @@
       "src/lib/ingredient-affinity.ts": [
         "exports",
         "types"
+      ],
+      "src/lib/order-bulk.ts": [
+        "exports"
+      ],
+      "src/lib/share-list.ts": [
+        "exports"
       ]
     }
   }

@@ -34,7 +34,7 @@
 | W5 | standalone + safe areas (auditado) | ✅ |
 | W6 | OfflineBanner como puente offline | ✅ |
 | W7 | **Banner de instalación A2HS**: `beforeinstallprompt` en Android + instrucciones en iOS; tras 25 s, dismiss persistente, sin colisiones | ✅ |
-| W8 | Share target para recibir listas de insumos | 🔜 |
+| W8 | **Share target para recibir listas de insumos**: `manifest.json` declara `share_target` con `method: "GET"` hacia `/compartir` (parámetros `titulo`/`texto`/`url`) y un cuarto shortcut "Compartir lista". `/compartir` es una página **estática** (`robots: noindex`) que resuelve cada renglón contra el catálogo de la ciudad en el cliente, en tandas de 5 (`searchProducts`), y muestra "Encontrados" con checkbox + stepper de cantidad y "Sin coincidencia" con deep link al buscador (`/{ciudad}/buscar?q=`). Nada entra al carrito sin confirmar: un solo `addOrderItems` + un toast + `AnalyticsEvents.addToCart` por ítem. El parseo (cantidad, unidad, viñetas, URLs, tope de 20 renglones) vive en `src/lib/share-list.ts` (27 tests) y el UI nunca guarda `resolving` en estado (se deriva del texto, para respetar `react-hooks/set-state-in-effect`). Sin service worker nuevo: al ser GET no hace falta handler de `fetch` | ✅ |
 | W9 | Push notifications de estado de pedido | 🔜 |
 | W10 | Background sync del carrito | 🔜 |
 
@@ -163,7 +163,7 @@
 | A37 | Productos ronda 7: SEO con IA en lote (`seo-batch.ts` + `bulk-seo`, solo propuestas con vista previa editable) y reporte de ventas ampliado con margen, costo faltante y clasificación ABC (`sales-report.ts`, CSV + `format=json` con resumen del rango) | ✅ |
 | A38 | Productos en móvil: contenedor `max-w-7xl`, barra de acciones con CTA primario + menú "Más", bloques de diagnóstico plegables (`MobileCollapsible`), vista grid por defecto en móvil y tabla en escritorio (`admin-products-view.ts`, derivada con `useMediaQuery`), columnas secundarias ocultas bajo `md` | ✅ |
 | A12 | Asignación de repartidor desde el dashboard | 🔜 |
-| A14 | Pedidos: filtros guardados y acciones masivas de estado | 🔜 |
+| A14 | Pedidos: filtros guardados ✅ (`admin_saved_filters`) **y acciones masivas de estado** ✅: checkbox por renglón + "seleccionar todos los visibles" (indeterminado), barra de acciones con cambio de estado, confirmación de pago y asignación de repartidor, y exportación CSV de la selección. Las reglas puras viven en `src/lib/order-bulk.ts` (28 tests): los pedidos en estado terminal (`delivered`/`cancelled`) se omiten de las acciones de estado pero siguen seleccionables a mano para correcciones puntuales, y la partición devuelve `{eligible, skipped}` por acción. La barra hace fan-out **secuencial** al `PATCH /api/orders/[id]/status` existente (no hay endpoint batch) para no duplicar ni perder efectos por pedido — cupones, `payment_status: "failed"` al cancelar, workflows de WhatsApp, cashback y auditoría. La cancelación masiva es la única acción destructiva: pide `window.confirm` | ✅ |
 | A15 | Dashboard: alertas accionables con deep-link al recurso | 🔜 |
 
 ## 9. Blog
@@ -210,6 +210,12 @@ Smoke móvil (375px) — flujo de compra completo:
 9. Artículo del blog con 3+ H2: el índice abre, resalta la sección visible y
    los anclajes llevan al encabezado correcto. Automatizado: `npx playwright
    test e2e/smoke.spec.ts --grep "índice del artículo"`.
+10. Compartir una lista desde WhatsApp eligiendo Resurte.me: `/compartir`
+   precarga el texto, muestra el resumen "N productos · M piezas" y separa
+   "Encontrados" de "Sin coincidencia". Los renglones sin coincidencia
+   enlazan a `/{ciudad}/buscar?q=<sustantivo>` (sin cantidad ni unidad) y el
+   CTA queda deshabilitado mientras no haya nada incluido.
+   Automatizado: `npx playwright test e2e/compartir.spec.ts --grep "share target"`.
 
 Smoke escritorio (1280px):
 1. Header → "Categorías" abre el mega-menú con conteo por categoría; Escape
@@ -217,6 +223,12 @@ Smoke escritorio (1280px):
    Automatizado: `npx playwright test e2e/keyboard.spec.ts --project=chromium
    --grep "mega-menú"`.
 2. `/api/categories` responde 200 sin sesión (página prerenderizada).
+3. `/admin/pedidos` con sesión admin: marcar el checkbox del encabezado deja
+   la columna en estado indeterminado cuando la selección es parcial, la barra
+   masiva muestra el conteo de elegibles/omitidos por acción, cancelar en lote
+   pide confirmación, y "Exportar selección" descarga solo las filas marcadas.
+   Automatizado (guards sin sesión): `npx playwright test
+   e2e/compartir.spec.ts --grep "acciones masivas"`.
 
 ## Agentes de mantenimiento por dominio
 

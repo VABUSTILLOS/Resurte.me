@@ -5,7 +5,9 @@
 - `src/app/layout.tsx` (shell raíz)
 - `src/components/layout/**` (header, footer, BackToTop, OfflineBanner)
 - `src/components/toast.tsx`, `src/lib/haptics.ts`
-- `src/components/pwa/**` (InstallPrompt, RegisterSW) y `public/sw.js`
+- `src/components/pwa/**` (InstallPrompt, RegisterSW), `public/sw.js` y
+  `public/manifest.json` (identidad de la app, shortcuts y share target)
+- `src/app/compartir/**` y `src/components/share/**` (destino del share target)
 
 ## Invariantes
 - `--floating-bottom-offset` es la fuente única del rail inferior; sus cambios de
@@ -22,8 +24,26 @@
   `CACHE_VERSION`. `RegisterSW` solo registra en producción.
 - `InstallPrompt` respeta dismiss persistente (`resurte-install-dismissed`) y no
   se muestra en standalone ni en iOS web app.
+- **Share target**: el `share_target` del manifest usa `method: "GET"` hacia
+  `/compartir`, así que **no** se agrega un handler de `fetch` al service worker
+  (si algún día pasa a POST, hay que añadirlo y subir `CACHE_VERSION`). Los
+  nombres de `params` (`titulo`/`texto`/`url`) son el contrato con el sistema
+  operativo: cambiarlos rompe el share sheet instalado.
+- `/compartir` es **estática** y no lee `cookies()`/`headers()`: la ciudad se
+  resuelve en el cliente con `useCity()` y `useSearchParams()` vive dentro de un
+  `<Suspense>`. Es `robots: noindex` (contenido efímero por usuario).
+- El UI de `/compartir` **no guarda `resolving` en estado**: se deriva del texto
+  pendiente, porque `react-hooks/set-state-in-effect` es error con
+  `--max-warnings 0`. Mantener ese patrón al editarlo.
+- Nada se agrega al carrito sin confirmación explícita del usuario: un solo
+  `addOrderItems`, un toast y un `AnalyticsEvents.addToCart` por ítem.
 
 ## Verificación
 Recorrido a 320px/375px/768px: header, drawer de carrito, WhatsApp FAB, cookie
 banner, BackToTop, InstallPrompt, BottomTabBar de recompensas y PanelQuickNav sin
 solapes. Modo offline: el catálogo visitado abre desde el SW.
+
+Share target: `npx playwright test e2e/compartir.spec.ts --grep "share target"`
+(ambos proyectos: `chromium` y `mobile-chromium`). Cubre estado vacío, precarga
+desde `?texto=`/`?titulo=`, resumen de la lista, deep links de "sin coincidencia"
+y que el manifest siga declarando el `share_target` GET.

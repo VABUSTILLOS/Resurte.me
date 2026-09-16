@@ -160,6 +160,31 @@
   debajo (`hidden md:table-cell`, pares `th`/`td`). Todo control móvil nuevo
   lleva `touch-target` (44px).
 
+- Pedidos (`/admin/pedidos`) — acciones masivas: la selección vive en un
+  `ReadonlySet<number>` y se **poda con `pruneSelection` dentro de un
+  `useMemo`** (devuelve la MISMA referencia cuando no hay nada que podar, para
+  no re-renderizar en bucle); nunca se poda con un efecto
+  (`react-hooks/set-state-in-effect` es error). El checkbox del encabezado es
+  indeterminado cuando la selección es parcial y solo abarca los pedidos
+  **visibles** (la tabla pagina). Las reglas de elegibilidad son puras y viven
+  en `src/lib/order-bulk.ts` — no duplicarlas en el componente:
+  `canChangeStatusTo` excluye los estados terminales (`delivered`/`cancelled`),
+  pero un pedido terminal **sí** se puede marcar a mano para corregirlo, así
+  que la partición (`partitionForStatus`/`ForPayment`/`ForDriver`) devuelve
+  `{eligible, skipped}` y la barra anuncia ambos conteos.
+- Pedidos — el fan-out es **secuencial** contra `PATCH /api/orders/[id]/status`
+  (no hay endpoint batch, a propósito): así se conservan los efectos por
+  pedido (decremento de cupón, `payment_status: "failed"` al cancelar un
+  pedido pendiente, workflows de WhatsApp, abono de cashback, auditoría) sin
+  duplicarlos ni perderlos. No paralelizar: dispararía workflows simultáneos
+  y golpearía Supabase. Agregar una acción masiva = agregar su predicado y su
+  partición en `order-bulk.ts` + una función `bulk*` que reusa el `patchOrder`
+  existente.
+- Pedidos — `exportCsv(subset, suffix)` acepta un subconjunto: la barra exporta
+  solo la selección (`pedidos-seleccion-YYYY-MM-DD.csv`) con las mismas
+  columnas que el export completo. La cancelación masiva es la única acción
+  destructiva y siempre pide `window.confirm` (`bulkCancelConfirmMessage`).
+
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de
 visibilidad de un producto y confirmación de que el caché de catálogo se invalida.
@@ -174,3 +199,10 @@ Móvil de `/admin/productos`: a 375×812 y 320×568 el primer producto queda por
 encima del pliegue, sin scroll horizontal, con la búsqueda visible y "Nuevo
 producto" + "Más" alcanzables (44px); a 768/1440 se conserva la tabla con todas
 sus columnas y las 7 acciones en la barra.
+
+Acciones masivas de pedidos (requiere sesión admin + datos): en `/admin/pedidos`
+marcar un subconjunto y comprobar que el checkbox del encabezado queda
+indeterminado; que el cambio de estado omite los pedidos terminales (la barra
+lo dice); que cancelar en lote pide confirmación; y que "Exportar selección"
+descarga solo las filas marcadas. Los guards sin sesión están automatizados:
+`npx playwright test e2e/compartir.spec.ts --grep "acciones masivas"`.

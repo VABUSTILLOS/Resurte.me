@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   getAdminOrders,
   type AdminOrder,
@@ -26,6 +26,23 @@ import {
   SAVED_FILTERS_STORAGE_KEY,
   type SavedOrderFilter,
 } from "@/lib/order-filters"
+import {
+  BULK_STATUS_TARGETS,
+  areAllSelected,
+  bulkCancelConfirmMessage,
+  bulkOutcomeMessage,
+  bulkOutcomeTone,
+  isPartiallySelected,
+  partitionForDriver,
+  partitionForPayment,
+  partitionForStatus,
+  pruneSelection,
+  selectAll,
+  summarizeBulkResult,
+  toggleSelection,
+  type BulkResult,
+  type Selection,
+} from "@/lib/order-bulk"
 
 function formatAdminAddress(a: NonNullable<AdminOrder["address"]>): string {
   const parts = [
@@ -84,6 +101,12 @@ function AdminOrdersContent() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [drivers, setDrivers] = useState<{ id: number; name: string; is_active: boolean }[]>([])
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null)
+  // Fase 14 — selección múltiple para acciones masivas
+  const [selected, setSelected] = useState<Selection>(() => new Set<number>())
+  const [bulkTarget, setBulkTarget] = useState("")
+  const [bulkDriverId, setBulkDriverId] = useState("")
+  const [bulkRunning, setBulkRunning] = useState(false)
+  const selectAllRef = useRef<HTMLInputElement>(null)
 
   useEscapeKey(useCallback(() => setSelectedOrder(null), []), !!selectedOrder)
 
@@ -230,10 +253,11 @@ function AdminOrdersContent() {
 
   // Exporta a CSV los pedidos cargados (respetando el filtro/búsqueda SQL ya
   // aplicados). Para el historial completo hay que pulsar "Cargar anteriores".
-  function exportCsv() {
+  function exportCsv(subset: AdminOrder[] = filtered, suffix = "") {
+    if (subset.length === 0) return
     const csv = toCsv(
       ["Pedido", "Cliente", "Dirección", "Subtotal", "Envío", "Descuento", "Cupón", "Total", "Método de pago", "Estado de pago", "Estado", "Origen", "Repartidor", "Fecha"],
-      filtered.map((o) => [
+      subset.map((o) => [
         o.id,
         o.customer_name ?? `Usuario #${o.user_id.slice(0, 8)}`,
         o.address ? formatAdminAddress(o.address) : "",
@@ -251,8 +275,8 @@ function AdminOrdersContent() {
       ])
     )
     const stamp = new Date().toISOString().slice(0, 10)
-    downloadCsv(`pedidos-${stamp}.csv`, csv)
-    toast(`${filtered.length} pedido${filtered.length !== 1 ? "s" : ""} exportados a CSV`, "success")
+    downloadCsv(`pedidos-${suffix ? `${suffix}-` : ""}${stamp}.csv`, csv)
+    toast(`${subset.length} pedido${subset.length !== 1 ? "s" : ""} exportados a CSV`, "success")
   }
 
   // El filtrado por estatus, fechas y la búsqueda ya se aplicaron en SQL.
@@ -339,6 +363,92 @@ function AdminOrdersContent() {
     }
   }
 
+  // Fase 14 — acciones masivas.
+  //
+  // La selección se poda contra lo visible en cada render en vez de guardarse
+  // ya podada: `pruneSelection` devuelve la MISMA referencia cuando no hay
+  // nada que quitar, así que la memo no se invalida sola y no hace falta
+  // sincronizar estado dentro de un efecto.
+  const visibleIds = useMemo(() => filtered.map((o) => o.id), [filtered])
+  const selection = useMemo(() => pruneSelection(selected, visibleIds), [selected, visibleIds])
+  const selectedIds = useMemo(() => [...selection], [selection])
+  const selectedCount = selectedIds.length
+  const allSelected = areAllSelected(visibleIds, selection)
+  const partiallySelected = isPartiallySelected(visibleIds, selection)
+
+  // El checkbox "todos" es de tres estados; `indeterminate` solo existe como
+  // propiedad del DOM, no como atributo JSX.
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = partiallySelected
+  }, [partiallySelected])
+
+  function toggleOne(id: number) {
+    setSelected((prev) => toggleSelection(prev, id))
+  }
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set<number>() : selectAll(visibleIds))
+  }
+
+  async function patchOrder(id: number, body: Record<string, unknown>): Promise<BulkResult> {
+    try {
+      const res = await fetch(`/api/orders/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) return { id, ok: true }
+      const data = (await res.json().catch(() => null)) as { error?: string } | null
+      return { id, ok: false, error: data?.error }
+    } catch {
+      return { id, ok: false, error: "Error de conexión" }
+    }
+  }
+
+  /**
+   * Fan-out secuencial al PATCH que ya existe por pedido.
+   *
+   * A propósito NO hay endpoint batch: cada pedido arrastra efectos propios
+   * (reversión del cupón, cashback a la wallet, workflows de WhatsApp, audit
+   * log) que un batch tendría que duplicar y podría perder. Secuencial y no
+   * en paralelo para no saturar Supabase ni disparar los workflows a la vez.
+   */
+  async function runBulk(eligible: number[], skipped: number, bodyFor: () => Record<string, unknown>) {
+    setBulkRunning(true)
+    try {
+      const results: BulkResult[] = []
+      for (const id of eligible) results.push(await patchOrder(id, bodyFor()))
+      const outcome = summarizeBulkResult(results, skipped)
+      toast(bulkOutcomeMessage(outcome), bulkOutcomeTone(outcome))
+      setSelected(new Set<number>())
+      if (outcome.ok > 0) refresh()
+    } finally {
+      setBulkRunning(false)
+    }
+  }
+
+  function bulkChangeStatus() {
+    if (!bulkTarget) return
+    const { eligible, skipped } = partitionForStatus(filtered, selection, bulkTarget)
+    // La cancelación masiva revierte cupones y marca pagos pendientes como
+    // fallidos: es la única acción destructiva, así que se confirma aparte.
+    if (bulkTarget === "cancelled" && eligible.length > 0) {
+      if (!window.confirm(bulkCancelConfirmMessage(eligible.length))) return
+    }
+    void runBulk(eligible, skipped.length, () => ({ status: bulkTarget }))
+  }
+
+  function bulkConfirmPayment() {
+    const { eligible, skipped } = partitionForPayment(filtered, selection)
+    void runBulk(eligible, skipped.length, () => ({ payment_status: "paid" }))
+  }
+
+  function bulkAssignDriver() {
+    if (!bulkDriverId) return
+    const { eligible, skipped } = partitionForDriver(filtered, selection)
+    void runBulk(eligible, skipped.length, () => ({ driver_id: Number(bulkDriverId) }))
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
@@ -377,7 +487,7 @@ function AdminOrdersContent() {
           {/* Fase 4 — exporta los pedidos actualmente filtrados */}
           <button
             type="button"
-            onClick={exportCsv}
+            onClick={() => exportCsv()}
             disabled={filtered.length === 0}
             title="Descargar los pedidos filtrados en CSV (Excel)"
             className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -488,12 +598,117 @@ function AdminOrdersContent() {
         </div>
       </div>
 
+      {/* Fase 14 — barra de acciones masivas (aparece al seleccionar filas) */}
+      {selectedCount > 0 && (
+        <div
+          role="region"
+          aria-label="Acciones masivas"
+          className="flex flex-wrap items-center gap-2 mb-4 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5"
+        >
+          <span className="text-xs font-semibold text-brand-700 mr-1">
+            {selectedCount} seleccionado{selectedCount !== 1 ? "s" : ""}
+          </span>
+
+          <select
+            value={bulkTarget}
+            onChange={(e) => setBulkTarget(e.target.value)}
+            disabled={bulkRunning}
+            aria-label="Estado destino para los pedidos seleccionados"
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 disabled:opacity-50"
+          >
+            <option value="">Cambiar estado a…</option>
+            {BULK_STATUS_TARGETS.map((value) => (
+              <option key={value} value={value}>
+                {STATUS_LABEL[value] ?? value}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={bulkChangeStatus}
+            disabled={!bulkTarget || bulkRunning}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Aplicar
+          </button>
+
+          <button
+            type="button"
+            onClick={bulkConfirmPayment}
+            disabled={bulkRunning}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50 transition-colors"
+          >
+            Confirmar pago
+          </button>
+
+          <select
+            value={bulkDriverId}
+            onChange={(e) => setBulkDriverId(e.target.value)}
+            disabled={bulkRunning}
+            aria-label="Repartidor para los pedidos seleccionados"
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 disabled:opacity-50"
+          >
+            <option value="">Asignar repartidor…</option>
+            {drivers.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={bulkAssignDriver}
+            disabled={!bulkDriverId || bulkRunning}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Bike className="w-3.5 h-3.5" />
+            Asignar
+          </button>
+
+          <button
+            type="button"
+            onClick={() => exportCsv(filtered.filter((o) => selection.has(o.id)), "seleccion")}
+            disabled={bulkRunning}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Exportar selección
+          </button>
+
+          {bulkRunning && (
+            <span role="status" className="text-xs text-brand-700">
+              Aplicando…
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setSelected(new Set<number>())}
+            disabled={bulkRunning}
+            className="ml-auto inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+            Limpiar
+          </button>
+        </div>
+      )}
+
       {/* Orders table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
+                <th className="px-3 py-3 w-10">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    aria-label="Seleccionar todos los pedidos visibles"
+                    className="w-4 h-4 align-middle accent-brand-600 cursor-pointer"
+                  />
+                </th>
                 <th className="px-5 py-3">Pedido</th>
                 <th className="px-5 py-3">Cliente</th>
                 <th className="px-5 py-3">Dirección</th>
@@ -508,6 +723,15 @@ function AdminOrdersContent() {
             <tbody className="divide-y divide-gray-100">
               {filtered.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selection.has(order.id)}
+                      onChange={() => toggleOne(order.id)}
+                      aria-label={`Seleccionar pedido #${order.id}`}
+                      className="w-4 h-4 align-middle accent-brand-600 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-5 py-3 font-mono text-xs font-semibold text-gray-500">#{order.id}</td>
                   <td className="px-5 py-3 text-xs text-gray-500">
                     {order.customer_name || `Usuario #${order.user_id.slice(0, 8)}`}
@@ -597,7 +821,7 @@ function AdminOrdersContent() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={10} className="px-5 py-12 text-center text-gray-400 text-sm">
                     No hay pedidos que coincidan con el filtro.
                   </td>
                 </tr>
