@@ -11,7 +11,8 @@ Característica: Checkout drawer con order bumps y upsells 1-click
 
   Antecedentes:
     Dado que la tienda opera con envío gratis desde $500 MXN
-    Y un máximo de 3 order bumps simultáneos
+    Y una ventana de 3 order bumps simultáneos en las superficies de carrito
+    Y un pool de hasta 12 ofertas disponibles para el checkout encadenado
 
   # -----------------------------------------------------------
   # Retrocompatibilidad estricta (regla 1)
@@ -93,6 +94,41 @@ Característica: Checkout drawer con order bumps y upsells 1-click
     Cuando se consulta POST /api/cart/bumps
     Entonces se devuelven hasta 3 bumps simultáneos
     Y cada bump corresponde a un producto distinto
+
+  # -----------------------------------------------------------
+  # Encadenado de bumps + cantidades editables (checkout)
+  # -----------------------------------------------------------
+
+  Escenario: Un bump elegido entra al pedido y aparece el siguiente
+    Dado un checkout con el pool de bumps solicitado (limit 12)
+    Cuando el usuario agrega un order bump
+    Entonces ese bump aparece como artículo del pedido con cantidad 1
+    Y se revela la siguiente oferta del pool
+    Y el ciclo se repite mientras queden ofertas disponibles
+
+  Escenario: El pool agotado deja de ofrecer bumps
+    Dado que el usuario ya agregó todos los bumps disponibles
+    Cuando se revisa la lista de ofertas
+    Entonces no se revela ninguna oferta nueva
+    Y el pedido conserva todos los bumps ya agregados
+
+  Escenario: Quitar un bump seleccionado lo devuelve a la lista
+    Dado un bump ya agregado al pedido
+    Cuando el usuario toca de nuevo su tarjeta (sigue visible en la ventana)
+    Entonces el bump sale del pedido
+    Y su tarjeta vuelve a mostrarse como disponible
+
+  Escenario: Cantidades editables con + y − en el checkout
+    Dado un pedido con artículos del catálogo y bumps
+    Cuando el usuario toca "+" en un artículo
+    Entonces la cantidad sube 1 y el total se recalcula con la fuente única
+    Y al tocar "−" la cantidad baja 1
+
+  Escenario: La cantidad mínima de un artículo es 1
+    Dado un artículo del pedido con cantidad 1
+    Cuando el usuario intenta reducir su cantidad
+    Entonces el botón "−" está deshabilitado
+    Y el artículo sigue en el pedido (nunca se vacía desde el checkout)
 
   Escenario: Fallback dinámico para colección sin regla admin
     Dado un carrito con una colección detectada sin regla en bump_rules

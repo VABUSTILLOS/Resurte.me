@@ -9,7 +9,7 @@ import Link from "next/link"
 import { useState, useEffect } from "react"
 import { CouponInput } from "@/components/cart/coupon-input"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
-import { calcCheckoutTotals, FREE_SHIPPING_THRESHOLD, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
+import { calcCheckoutTotals, FREE_SHIPPING_THRESHOLD, DELIVERY_FEE_FLAT, countBumpUnits } from "@/lib/checkout-config"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 
@@ -29,7 +29,7 @@ export default function CartPage() {
     bumpsSubtotal,
     coupon,
     itemCount,
-    selectedBumps.length,
+    countBumpUnits(selectedBumps),
     DELIVERY_FEE_FLAT
   )
   const deliveryFee = totals.deliveryFee

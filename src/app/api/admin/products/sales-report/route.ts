@@ -1,14 +1,36 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { isMissingColumnError } from "@/lib/sale-window"
+import {
+  buildSalesRows,
+  salesReportCsv,
+  salesReportInsights,
+  type SalesInput,
+} from "@/lib/sales-report"
 import { NextResponse, type NextRequest } from "next/server"
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const MAX_ROWS = 10_000
 
+interface OrderItemRow {
+  product_id: number
+  quantity: number
+  unit_price: number
+}
+
+interface ProductRow {
+  id: number
+  name: string
+  cost?: number | null
+}
+
 /**
- * GET /api/admin/products/sales-report?from=YYYY-MM-DD&to=YYYY-MM-DD
- * Reporte de ventas por producto en CSV (pedidos no cancelados del rango,
- * fechas inclusivas). Columnas: producto, unidades, monto.
+ * GET /api/admin/products/sales-report?from=YYYY-MM-DD&to=YYYY-MM-DD[&format=json]
+ *
+ * Reporte de ventas por producto (pedidos no cancelados del rango, fechas
+ * inclusivas). Por defecto responde un CSV con unidades, monto, costo, margen
+ * ($ y %), clase ABC y participación. Con `format=json` devuelve las mismas
+ * filas más la tarjeta de insights que muestra el panel.
  */
 export async function GET(request: NextRequest) {
   const { response: adminDenied } = await requireAdmin()
@@ -42,11 +64,7 @@ export async function GET(request: NextRequest) {
     const units = new Map<number, number>()
     const amounts = new Map<number, number>()
     for (const order of orders ?? []) {
-      const items = (order.order_items ?? []) as {
-        product_id: number
-        quantity: number
-        unit_price: number
-      }[]
+      const items = (order.order_items ?? []) as OrderItemRow[]
       for (const item of items) {
         units.set(item.product_id, (units.get(item.product_id) ?? 0) + item.quantity)
         amounts.set(
@@ -57,25 +75,38 @@ export async function GET(request: NextRequest) {
     }
 
     const ids = [...units.keys()]
-    const { data: products } = ids.length
-      ? await supabase.from("products").select("id,name").in("id", ids)
-      : { data: [] as { id: number; name: string }[] }
-    const nameOf = new Map((products ?? []).map((p) => [p.id, p.name as string]))
+    // El costo es la base del margen; si la columna aún no existe en este
+    // entorno el reporte sigue funcionando y solo omite el margen.
+    let products: ProductRow[] | null = null
+    if (ids.length) {
+      const withCost = await supabase.from("products").select("id,name,cost").in("id", ids)
+      if (withCost.error && isMissingColumnError(withCost.error)) {
+        const withoutCost = await supabase.from("products").select("id,name").in("id", ids)
+        products = (withoutCost.data ?? []) as ProductRow[]
+      } else {
+        products = (withCost.data ?? []) as ProductRow[]
+      }
+    }
 
-    const esc = (v: string) => (/[",;\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
-    const lines = [...units.entries()]
-      .sort((a, b) => (amounts.get(b[0]) ?? 0) - (amounts.get(a[0]) ?? 0))
-      .map((row) => {
-        const [productId, qty] = row as [number, number]
-        return [
-          esc(nameOf.get(productId) ?? `#${productId}`),
-          String(qty),
-          (amounts.get(productId) ?? 0).toFixed(2),
-        ].join(",")
-      })
-    const csv = "﻿" + ["producto,unidades,monto", ...lines].join("\n")
+    const byId = new Map((products ?? []).map((p) => [p.id, p]))
+    const items: SalesInput[] = ids.map((productId) => {
+      const cost = byId.get(productId)?.cost
+      return {
+        productId,
+        name: byId.get(productId)?.name ?? `#${productId}`,
+        units: units.get(productId) ?? 0,
+        revenue: amounts.get(productId) ?? 0,
+        unitCost: typeof cost === "number" && Number.isFinite(cost) ? cost : null,
+      }
+    })
 
-    return new NextResponse(csv, {
+    const rows = buildSalesRows(items)
+
+    if (sp.get("format") === "json") {
+      return NextResponse.json({ from, to, rows, insights: salesReportInsights(rows) })
+    }
+
+    return new NextResponse(salesReportCsv(rows), {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="ventas-${from}_a_${to}.csv"`,

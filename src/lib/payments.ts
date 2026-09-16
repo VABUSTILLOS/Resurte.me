@@ -8,6 +8,7 @@ import {
   type PaymentNextAction,
 } from "@/lib/payment-next-action"
 import { logger } from "@/lib/logger"
+import { isMissingColumnError, resolveEffectivePrice } from "@/lib/sale-window"
 import {
   buildDestinationChargeParams,
   getRestaurantConnectStatus,
@@ -223,11 +224,22 @@ export async function processUpsellForOrder(
   }
 
   // Producto + descuento del upsell (derivados del server, nunca del cliente).
-  const { data: product, error: productError } = await supabase
+  const UPSELL_PRODUCT_COLS =
+    "id, name, price, sale_price, stock_status, sale_starts_at, sale_ends_at"
+  let { data: product, error: productError } = await supabase
     .from("products")
-    .select("id, name, price, sale_price, stock_status")
+    .select(UPSELL_PRODUCT_COLS)
     .eq("id", params.productId)
     .maybeSingle()
+
+  if (productError && isMissingColumnError(productError)) {
+    // Migración 00107 pendiente: sin ventana de oferta, la oferta siempre aplica.
+    ;({ data: product, error: productError } = await supabase
+      .from("products")
+      .select("id, name, price, sale_price, stock_status")
+      .eq("id", params.productId)
+      .maybeSingle())
+  }
 
   if (productError || !product) {
     throw new PaymentIntentError("Producto de upsell no encontrado", 404)
@@ -246,7 +258,7 @@ export async function processUpsellForOrder(
     .limit(1)
     .maybeSingle()
 
-  const effectivePrice = product.sale_price ?? product.price
+  const effectivePrice = resolveEffectivePrice(product) ?? product.price
   const unitPrice = applyDiscount(effectivePrice, Number(bumpRule?.discount_pct) || 0)
   const amount = round2(unitPrice * qty)
   if (amount <= 0) {

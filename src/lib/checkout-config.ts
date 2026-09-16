@@ -31,6 +31,41 @@ export const DELIVERY_FEE_FLAT = envNumber("NEXT_PUBLIC_DELIVERY_FEE_FLAT", 125)
 export const MAX_BUMPS = 3
 
 /**
+ * Tamaño máximo del pool de ofertas de order bumps que el checkout puede
+ * solicitar a la API.
+ *
+ * Las superficies de carrito siguen pidiendo solo `MAX_BUMPS`, pero el
+ * checkout pide el pool completo para poder encadenar ofertas: al elegir un
+ * bump aparece el siguiente de la lista mientras queden ofertas disponibles.
+ *
+ * El pool real lo determina `bump_rules` (una regla por trigger de categoría
+ * + una por colección de receta), así que 12 es un tope de seguridad que en
+ * la práctica no se alcanza.
+ */
+export const MAX_BUMPS_POOL = 12
+
+/**
+ * Cantidad mínima de un artículo en el checkout.
+ *
+ * Con 1 el botón "−" queda deshabilitado: para quitar un producto del pedido
+ * el usuario vuelve al carrito (evita borrados accidentales en el paso de
+ * pago). Es la única fuente del mínimo para los steppers del checkout.
+ */
+export const MIN_ITEM_QUANTITY = 1
+
+/**
+ * Cuenta las UNIDADES de una lista de order bumps, no las líneas.
+ *
+ * Un bump con cantidad 3 son 3 artículos: es lo que se pasa como `bumpCount` a
+ * `calcCheckoutTotals` para que el conteo de artículos del pedido y el umbral
+ * de envío gratis cuadren con lo que realmente se cobra. Acepta cualquier
+ * `{ quantity }` para no depender del tipo del componente de bumps.
+ */
+export function countBumpUnits(bumps: readonly { quantity: number }[]): number {
+  return bumps.reduce((sum, b) => sum + b.quantity, 0)
+}
+
+/**
  * Calcula el envío válido para un pedido con `itemCount` artículos.
  *
  * - Sin artículos → 0.

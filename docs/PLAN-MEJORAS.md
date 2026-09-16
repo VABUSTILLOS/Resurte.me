@@ -149,6 +149,11 @@
 | A30 | Productos ronda 6: precios por tienda (`product_stores`, modal con overrides + GET/PUT), unidad en export/copiar/CSV, badge ✨ Nuevo (<7 días) | ✅ |
 | A31 | Productos ronda 6: imagen por URL, duplicar eligiendo categoría, pausa temporal (⏸ republica en N días vía publish_at), oferta por margen objetivo en lote | ✅ |
 | A32 | SEO con IA (kie-ai), imágenes IA en lote (tandas de 10), dictado por voz (Web Speech API es-MX), QR descargable por producto (`qrcode` client-side) | ✅ |
+| A33 | Productos ronda 7: SKU y código de barras (`sku`/`barcode` 00106, índice único parcial sobre `sku`, búsqueda por SKU/código en `search_product_ids_fuzzy` 00110 y fallback `.or(sku.ilike,barcode.ilike)`), etiquetas editables (`tags` JSONB con chips + bulk agregar/quitar), filtro por defecto `low_stock_threshold` | ✅ |
+| A34 | Productos ronda 7: ventana de oferta programada (`sale_starts_at`/`sale_ends_at` 00107, `sale-window.ts` como fuente única, `withResolvedSale` en tienda/pagos/bumps/upsells, `get_products_by_collection` 00111 devuelve la ventana) y productos relacionados (`related_product_ids` 00109, selector en el modal, `buildRelatedProducts` en la ficha de producto) | ✅ |
+| A35 | Productos ronda 7: umbral de stock por producto (`low_stock_threshold` 00108 con backfill de `stock_status`), reposición sugerida con cantidad (`restock.ts`), importación CSV con match por SKU, modos de actualización y dry-run enriquecido | ✅ |
+| A36 | Productos ronda 7: detección de imágenes rotas en lote (`product-images.ts` + `check-images`, reemplazar/quitar URL), retención y purga de papelera (`trash.ts`, 30 días, `purge-trash` en cron diario y botón "Vaciar papelera") y diff antes/después en el historial (`audit-diff.ts`, sparkline de precios) | ✅ |
+| A37 | Productos ronda 7: SEO con IA en lote (`seo-batch.ts` + `bulk-seo`, solo propuestas con vista previa editable) y reporte de ventas ampliado con margen, costo faltante y clasificación ABC (`sales-report.ts`, CSV + `format=json` con resumen del rango) | ✅ |
 | A12 | Asignación de repartidor desde el dashboard | 🔜 |
 | A14 | Pedidos: filtros guardados y acciones masivas de estado | 🔜 |
 | A15 | Dashboard: alertas accionables con deep-link al recurso | 🔜 |

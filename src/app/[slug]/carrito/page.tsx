@@ -18,7 +18,7 @@ import Link from "next/link"
 import { CouponInput } from "@/components/cart/coupon-input"
 import { ShoppingLists } from "@/components/cart/shopping-lists"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
-import { calcCheckoutTotals, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT, countBumpUnits } from "@/lib/checkout-config"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 
@@ -33,13 +33,13 @@ export default function CartPage() {
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
   // Totales unificados (misma fórmula que el checkout y el servidor): el
   // descuento de cupón aplica sobre subtotal + bumps y el envío es gratis desde
-  // el umbral contando bumps.
+  // el umbral contando las unidades de bumps.
   const totals = calcCheckoutTotals(
     subtotal,
     bumpsSubtotal,
     coupon,
     itemCount,
-    selectedBumps.length,
+    countBumpUnits(selectedBumps),
     DELIVERY_FEE_FLAT
   )
   const { deliveryFee } = totals

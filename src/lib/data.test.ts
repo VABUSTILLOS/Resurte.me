@@ -15,7 +15,7 @@ vi.mock("@/lib/supabase/public", () => ({
   createPublicClient: vi.fn(() => fakeSupabase),
 }))
 
-import { getProductsByCollection } from "@/lib/data"
+import { getProducts, getProductsByCollection } from "@/lib/data"
 
 const PRODUCTS = [
   {
@@ -165,5 +165,89 @@ describe("getProductsByCollection fallback en memoria", () => {
 
     const result = await getProductsByCollection("no-existe")
     expect(result).toEqual([])
+  })
+})
+
+describe("ventana de oferta (00107) en las consultas de catálogo", () => {
+  beforeEach(() => {
+    rpcMock.mockReset()
+    fromMock.mockReset()
+  })
+
+  const past = new Date(Date.now() - 86_400_000).toISOString()
+  const future = new Date(Date.now() + 86_400_000).toISOString()
+
+  const conOferta = (over: Partial<Product>): Product =>
+    ({ ...PRODUCTS[0], sale_price: 15, ...over }) as Product
+
+  it("getProducts anula sale_price cuando la oferta venció", async () => {
+    fromMock.mockImplementation(() => ({
+      select: () => ({
+        eq: () => ({
+          order: () => ({
+            order: () =>
+              Promise.resolve({
+                data: [conOferta({ sale_ends_at: past, sale_starts_at: null })],
+                error: null,
+              }),
+          }),
+        }),
+        order: () => ({
+          order: () =>
+            Promise.resolve({
+              data: [conOferta({ sale_ends_at: past, sale_starts_at: null })],
+              error: null,
+            }),
+        }),
+      }),
+    }))
+
+    const [product] = await getProducts()
+    expect(product!.sale_price).toBeNull()
+    expect(product!.price).toBe(25)
+  })
+
+  it("getProducts conserva sale_price cuando la oferta está vigente", async () => {
+    fromMock.mockImplementation(() => ({
+      select: () => ({
+        eq: () => ({
+          order: () => ({
+            order: () =>
+              Promise.resolve({
+                data: [conOferta({ sale_starts_at: past, sale_ends_at: future })],
+                error: null,
+              }),
+          }),
+        }),
+        order: () => ({
+          order: () =>
+            Promise.resolve({
+              data: [conOferta({ sale_starts_at: past, sale_ends_at: future })],
+              error: null,
+            }),
+        }),
+      }),
+    }))
+
+    const [product] = await getProducts()
+    expect(product!.sale_price).toBe(15)
+  })
+
+  it("getProductsByCollection (RPC) respeta la ventana", async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        conOferta({ id: 10, slug: "vencida", sale_ends_at: past }),
+        conOferta({ id: 11, slug: "vigente", sale_starts_at: past, sale_ends_at: future }),
+        conOferta({ id: 12, slug: "programada", sale_starts_at: future }),
+      ],
+      error: null,
+    })
+
+    const result = await getProductsByCollection("carne-asada")
+    expect(result.map((p) => [p.slug, p.sale_price])).toEqual([
+      ["vencida", null],
+      ["vigente", 15],
+      ["programada", null],
+    ])
   })
 })

@@ -14,8 +14,11 @@ interface Suggestion {
   productId: number
   name: string
   stockStatus: string
+  stockQuantity: number | null
+  lowStockThreshold: number | null
   units30d: number
   priority: number
+  suggestedQuantity: number
   reason: string
 }
 
@@ -73,7 +76,20 @@ export function RestockPanel({ onRestocked }: { onRestocked: (productId: number)
   async function restock(s: Suggestion) {
     setWorkingId(s.productId)
     try {
-      await adjustProductStock(s.productId, "in_stock", "Reabasto desde sugerencias")
+      // Reponer la cantidad sugerida deja el stock por encima del umbral y
+      // el estado se deriva de la existencia (00108).
+      const quantity =
+        s.suggestedQuantity > 0
+          ? (s.stockQuantity ?? 0) + s.suggestedQuantity
+          : undefined
+      await adjustProductStock(
+        s.productId,
+        "in_stock",
+        quantity !== undefined
+          ? `Reabasto desde sugerencias (+${s.suggestedQuantity})`
+          : "Reabasto desde sugerencias",
+        quantity
+      )
       setSuggestions((prev) => prev.filter((x) => x.productId !== s.productId))
       onRestocked(s.productId)
       if (showHistory) await loadHistory()
@@ -123,16 +139,25 @@ export function RestockPanel({ onRestocked }: { onRestocked: (productId: number)
       ) : (
         <ul className="mt-3 divide-y divide-amber-100">
           {suggestions.map((s) => (
-            <li key={s.productId} className="flex items-center gap-3 py-2 text-sm">
+            <li key={s.productId} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
               <span className="font-medium text-gray-900">{s.name}</span>
               <span className="text-xs text-amber-800/80">{s.reason}</span>
+              {s.stockQuantity !== null && (
+                <span className="text-[11px] text-amber-900/60">
+                  {s.stockQuantity} en existencia · umbral {s.lowStockThreshold ?? 5}
+                </span>
+              )}
               <button
                 type="button"
                 disabled={workingId === s.productId}
                 onClick={() => void restock(s)}
                 className="ml-auto rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50 transition-colors"
               >
-                {workingId === s.productId ? "..." : "Reabastecer"}
+                {workingId === s.productId
+                  ? "..."
+                  : s.suggestedQuantity > 0
+                    ? `Reponer ${s.suggestedQuantity}`
+                    : "Reabastecer"}
               </button>
             </li>
           ))}

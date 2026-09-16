@@ -4,16 +4,25 @@
  */
 
 import { slugify } from "./foodos"
+import { validateSku, validateBarcode } from "./sku"
+import { deriveStockStatus, DEFAULT_LOW_STOCK_THRESHOLD } from "./stock"
 
 const PRODUCT_IMPORT_HEADER = [
   "nombre",
   "slug",
+  "sku",
+  "barcode",
   "precio",
   "precio_oferta",
+  "oferta_desde",
+  "oferta_hasta",
   "marca",
   "categoria",
+  "etiquetas",
   "unidad",
   "stock",
+  "cantidad",
+  "umbral_stock",
   "visible",
   "imagen",
 ] as const
@@ -23,10 +32,19 @@ export interface ProductImportRow {
   slug: string
   price: number
   sale_price: number | null
+  sale_starts_at: string | null
+  sale_ends_at: string | null
   brand: string | null
   category_slug: string | null
   unit: string | null
   stock_status: "in_stock" | "low_stock" | "out_of_stock"
+  stock_quantity: number | null
+  low_stock_threshold: number | null
+  sku: string | null
+  barcode: string | null
+  tags: string[]
+  /** La columna `etiquetas` viene en el CSV (reemplazo total, incluso a []). */
+  tags_provided: boolean
   is_visible: boolean
   image_url: string | null
 }
@@ -47,12 +65,19 @@ export function generateProductImportTemplate(): string {
   const example = [
     "Agua mineral 600ml",
     "agua-mineral-600ml",
+    "AGUA-600",
+    "7501234567890",
     "18.50",
-    "",
+    "15.00",
+    "2026-03-01T00:00:00.000Z",
+    "2026-03-31T23:59:59.000Z",
     "Topo Chico",
     "bebidas",
+    "arranque|refrescos",
     "pieza",
     "in_stock",
+    "24",
+    "6",
     "si",
     "",
   ].join(";")
@@ -89,6 +114,31 @@ function splitCsvLine(line: string, sep: string): string[] {
 }
 
 const VALID_STOCK = new Set(["in_stock", "low_stock", "out_of_stock"])
+
+/**
+ * Acepta ISO completo o fecha suelta (YYYY-MM-DD). La fecha suelta se ancla a
+ * la zona del negocio (America/Mexico_City, UTC-6 sin horario de verano):
+ * inicio de día para la apertura y fin de día para el cierre de la oferta.
+ */
+export function parseImportDate(raw: string, edge: "start" | "end"): string | null {
+  if (!raw) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return edge === "start" ? `${raw}T00:00:00-06:00` : `${raw}T23:59:59-06:00`
+  }
+  const d = new Date(raw)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+/** Etiquetas separadas por "|" (minúsculas, sin duplicados). */
+export function parseImportTags(raw: string): string[] {
+  if (!raw) return []
+  const seen = new Set<string>()
+  for (const part of raw.split("|")) {
+    const clean = part.trim().toLowerCase()
+    if (clean) seen.add(clean)
+  }
+  return [...seen]
+}
 
 /**
  * Parsea y valida el CSV pegado/subido. Acepta separador ; o , (detectado
@@ -140,9 +190,94 @@ export function parseProductImportCsv(text: string): ProductImportResult {
       continue
     }
 
-    const stockRaw = get("stock") || "in_stock"
-    if (!VALID_STOCK.has(stockRaw)) {
-      errors.push({ line: lineNo, message: `stock inválido: "${stockRaw}" (in_stock | low_stock | out_of_stock)` })
+    const stockRaw = get("stock")
+    const qtyRaw = get("cantidad")
+    const thresholdRaw = get("umbral_stock")
+
+    let lowStockThreshold: number | null = null
+    if (thresholdRaw) {
+      const threshold = Number(thresholdRaw)
+      if (!Number.isInteger(threshold) || threshold < 0) {
+        errors.push({ line: lineNo, message: `umbral_stock inválido: "${thresholdRaw}"` })
+        continue
+      }
+      lowStockThreshold = threshold
+    }
+
+    let stockQuantity: number | null = null
+    if (qtyRaw) {
+      const qty = Number(qtyRaw)
+      if (!Number.isInteger(qty) || qty < 0) {
+        errors.push({ line: lineNo, message: `cantidad inválida: "${qtyRaw}"` })
+        continue
+      }
+      stockQuantity = qty
+    }
+
+    // La columna `stock` manda si viene; si no, se deriva de la cantidad con el
+    // umbral de la fila (o el umbral por defecto).
+    let stockStatus: ProductImportRow["stock_status"]
+    if (stockRaw) {
+      if (!VALID_STOCK.has(stockRaw)) {
+        errors.push({ line: lineNo, message: `stock inválido: "${stockRaw}" (in_stock | low_stock | out_of_stock)` })
+        continue
+      }
+      stockStatus = stockRaw as ProductImportRow["stock_status"]
+    } else if (stockQuantity !== null) {
+      stockStatus = deriveStockStatus(
+        stockQuantity,
+        lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD
+      )
+    } else {
+      stockStatus = "in_stock"
+    }
+
+    const skuRaw = get("sku")
+    let sku: string | null = null
+    if (skuRaw) {
+      const check = validateSku(skuRaw)
+      if (!check.ok) {
+        errors.push({ line: lineNo, message: check.error })
+        continue
+      }
+      sku = check.value
+    }
+
+    const barcodeRaw = get("barcode")
+    let barcode: string | null = null
+    if (barcodeRaw) {
+      const check = validateBarcode(barcodeRaw)
+      if (!check.ok) {
+        errors.push({ line: lineNo, message: check.error })
+        continue
+      }
+      barcode = check.value
+    }
+
+    const tags = parseImportTags(get("etiquetas"))
+    if (tags.length > 20) {
+      errors.push({ line: lineNo, message: "etiquetas: máximo 20 por producto" })
+      continue
+    }
+    if (tags.some((t) => t.length > 40)) {
+      errors.push({ line: lineNo, message: "etiquetas: máximo 40 caracteres cada una" })
+      continue
+    }
+
+    const startsRaw = get("oferta_desde")
+    const endsRaw = get("oferta_hasta")
+    const saleStartsAt = parseImportDate(startsRaw, "start")
+    const saleEndsAt = parseImportDate(endsRaw, "end")
+    if (startsRaw && !saleStartsAt) {
+      errors.push({ line: lineNo, message: `oferta_desde inválida: "${startsRaw}"` })
+      continue
+    }
+    if (endsRaw && !saleEndsAt) {
+      errors.push({ line: lineNo, message: `oferta_hasta inválida: "${endsRaw}"` })
+      continue
+    }
+    if (saleStartsAt && saleEndsAt && new Date(saleStartsAt) > new Date(saleEndsAt)) {
+      errors.push({ line: lineNo, message: "oferta_desde es posterior a oferta_hasta" })
       continue
     }
 
@@ -170,10 +305,18 @@ export function parseProductImportCsv(text: string): ProductImportResult {
       slug,
       price,
       sale_price: salePrice,
+      sale_starts_at: saleStartsAt,
+      sale_ends_at: saleEndsAt,
       brand: get("marca") || null,
       category_slug: get("categoria") || null,
       unit: get("unidad") || null,
-      stock_status: stockRaw as ProductImportRow["stock_status"],
+      stock_status: stockStatus,
+      stock_quantity: stockQuantity,
+      low_stock_threshold: lowStockThreshold,
+      sku,
+      barcode,
+      tags,
+      tags_provided: col("etiquetas") !== -1,
       is_visible: isVisible,
       image_url: imageRaw || null,
     })

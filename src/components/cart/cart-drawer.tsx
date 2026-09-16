@@ -22,7 +22,7 @@ import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
-import { calcCheckoutTotals, DELIVERY_FEE_FLAT, freeShippingProgress } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT, freeShippingProgress, countBumpUnits } from "@/lib/checkout-config"
 
 // Global event bus to control drawer from header
 export const CART_DRAWER_EVENT = "resurte:toggle-cart-drawer"
@@ -72,7 +72,7 @@ export function CartDrawer() {
     bumpsSubtotal,
     coupon,
     itemCount,
-    selectedBumps.length,
+    countBumpUnits(selectedBumps),
     DELIVERY_FEE_FLAT
   )
   const { deliveryFee, payableSubtotal } = totals
@@ -464,7 +464,7 @@ export function MobileCartBar() {
     bumpsSubtotal,
     coupon,
     itemCount,
-    selectedBumps.length,
+    countBumpUnits(selectedBumps),
     DELIVERY_FEE_FLAT
   )
   const barTotal = totals.total

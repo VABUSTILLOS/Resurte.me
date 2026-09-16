@@ -4,7 +4,36 @@ import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
 import { slugify } from "@/lib/foodos"
+import { validateSku, validateBarcode } from "@/lib/sku"
+import { deriveStockStatus, isStockStatus } from "@/lib/stock"
 import { NextResponse } from "next/server"
+
+/** Productos relacionados: ids enteros, sin duplicados, sin el propio. */
+function normalizeRelatedIds(raw: unknown, selfId?: number): number[] | null {
+  if (raw === null || raw === undefined) return []
+  if (!Array.isArray(raw)) return null
+  const ids: number[] = []
+  for (const v of raw) {
+    if (typeof v !== "number" || !Number.isInteger(v)) return null
+    if (v !== selfId && !ids.includes(v)) ids.push(v)
+  }
+  return ids.slice(0, 12)
+}
+
+/** Etiquetas normalizadas (minúsculas, sin duplicados, máximo 20). */
+function normalizeTags(raw: unknown): string[] | null {
+  if (raw === null || raw === undefined) return []
+  if (!Array.isArray(raw)) return null
+  const seen = new Set<string>()
+  for (const t of raw) {
+    if (typeof t !== "string") return null
+    const clean = t.trim().toLowerCase()
+    if (!clean) continue
+    if (clean.length > 40) return null
+    seen.add(clean)
+  }
+  return seen.size > 20 ? null : [...seen]
+}
 
 /** Genera un slug único agregando sufijos -2, -3… si ya existe. */
 async function uniqueSlug(
@@ -48,9 +77,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Precio de oferta inválido" }, { status: 400 })
     }
 
-    const stockStatus = ["in_stock", "low_stock", "out_of_stock"].includes(body.stock_status)
-      ? body.stock_status
-      : "in_stock"
+    const sku = validateSku(body.sku)
+    if (!sku.ok) return NextResponse.json({ error: sku.error }, { status: 400 })
+    const barcode = validateBarcode(body.barcode)
+    if (!barcode.ok) return NextResponse.json({ error: barcode.error }, { status: 400 })
+    const tags = normalizeTags(body.tags)
+    if (tags === null) {
+      return NextResponse.json(
+        { error: "tags debe ser un arreglo de hasta 20 etiquetas de texto" },
+        { status: 400 }
+      )
+    }
+    const relatedIds = normalizeRelatedIds(body.related_product_ids)
+    if (relatedIds === null) {
+      return NextResponse.json(
+        { error: "related_product_ids debe ser un arreglo de ids enteros" },
+        { status: 400 }
+      )
+    }
+    const lowStockThreshold =
+      typeof body.low_stock_threshold === "number" &&
+      Number.isInteger(body.low_stock_threshold) &&
+      body.low_stock_threshold >= 0
+        ? body.low_stock_threshold
+        : null
+
+    const stockStatus = isStockStatus(body.stock_status) ? body.stock_status : "in_stock"
     const categoryId =
       typeof body.category_id === "number" && Number.isInteger(body.category_id)
         ? body.category_id
@@ -65,22 +117,30 @@ export async function POST(request: Request) {
     const derivedStock =
       stockQuantity === null
         ? stockStatus
-        : stockQuantity === 0
-        ? "out_of_stock"
-        : stockQuantity <= 5
-        ? "low_stock"
-        : "in_stock"
+        : deriveStockStatus(stockQuantity, lowStockThreshold)
     const cost =
       typeof body.cost === "number" && Number.isFinite(body.cost) && body.cost >= 0
         ? body.cost
         : null
 
-    // Programación opcional: fechas ISO válidas o null.
-    const schedule: { publish_at: string | null; unpublish_at: string | null } = {
+    // Programación y ventana de oferta: fechas ISO válidas o null.
+    const schedule: {
+      publish_at: string | null
+      unpublish_at: string | null
+      sale_starts_at: string | null
+      sale_ends_at: string | null
+    } = {
       publish_at: null,
       unpublish_at: null,
+      sale_starts_at: null,
+      sale_ends_at: null,
     }
-    for (const field of ["publish_at", "unpublish_at"] as const) {
+    for (const field of [
+      "publish_at",
+      "unpublish_at",
+      "sale_starts_at",
+      "sale_ends_at",
+    ] as const) {
       const v = body[field]
       if (v !== null && v !== undefined) {
         if (typeof v !== "string" || Number.isNaN(new Date(v).getTime())) {
@@ -110,6 +170,23 @@ export async function POST(request: Request) {
     const supabase = await createServiceClient()
     const slug = await uniqueSlug(supabase, name)
 
+    // SKU único entre productos vivos (índice parcial idx_products_sku_unique).
+    if (sku.value) {
+      const { data: clash } = await supabase
+        .from("products")
+        .select("id")
+        .eq("sku", sku.value)
+        .is("deleted_at", null)
+        .limit(1)
+        .maybeSingle()
+      if (clash) {
+        return NextResponse.json(
+          { error: `El SKU ${sku.value} ya está en uso por otro producto` },
+          { status: 409 }
+        )
+      }
+    }
+
     const { data, error } = await supabase
       .from("products")
       .insert({
@@ -121,6 +198,13 @@ export async function POST(request: Request) {
         category_id: categoryId,
         price,
         sale_price: salePrice,
+        sku: sku.value,
+        barcode: barcode.value,
+        tags,
+        sale_starts_at: schedule.sale_starts_at,
+        sale_ends_at: schedule.sale_ends_at,
+        low_stock_threshold: lowStockThreshold,
+        related_product_ids: relatedIds,
         stock_status: derivedStock,
         stock_quantity: stockQuantity,
         cost,
@@ -135,7 +219,7 @@ export async function POST(request: Request) {
         images,
       })
       .select(
-        "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,created_at"
+        "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,sku,barcode,tags,sale_starts_at,sale_ends_at,low_stock_threshold,related_product_ids,created_at"
       )
       .single()
 

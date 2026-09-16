@@ -45,11 +45,21 @@ import {
   ChevronDown,
   Minus,
   Bookmark,
+  Clock,
   QrCode,
   Sparkles,
   Store,
+  ImageOff,
+  Link2,
+  ScanSearch,
 } from "lucide-react"
 import { AUDIT_ACTION_LABEL, type AuditAction } from "@/lib/audit-log"
+import { auditDiffRows, auditExtraFields, priceSeries } from "@/lib/audit-diff"
+import { resolveSalePrice, saleState } from "@/lib/sale-window"
+import { TRASH_RETENTION_DAYS, purgeLabel } from "@/lib/trash"
+import { SEO_DESCRIPTION_MAX, SEO_TITLE_MAX, chunkIds, seoBatchSummary } from "@/lib/seo-batch"
+import { type SalesReportInsights } from "@/lib/sales-report"
+import { deriveStockStatus } from "@/lib/stock"
 import { createClient } from "@/lib/supabase/client"
 import { cropImageToSquare } from "@/lib/crop-image"
 
@@ -63,8 +73,15 @@ interface Product {
   unit: string | null
   price: number | null
   sale_price: number | null
+  sale_starts_at: string | null
+  sale_ends_at: string | null
   cost: number | null
   stock_quantity: number | null
+  low_stock_threshold: number | null
+  sku: string | null
+  barcode: string | null
+  tags: string[] | null
+  related_product_ids: number[] | null
   sort_order: number | null
   stock_status: "in_stock" | "low_stock" | "out_of_stock"
   is_visible: boolean
@@ -77,12 +94,30 @@ interface Product {
   seo_title: string | null
   seo_description: string | null
   created_at: string | null
+  /** Solo presente en la papelera (00099). Opcional para no romper la
+   *  asignabilidad con `ProductFormProduct` del modal. */
+  deleted_at?: string | null
 }
 
 interface Category {
   id: number
   name: string
   slug: string
+}
+
+/** R7-10 — propuesta de SEO editable en el preview del lote. */
+interface SeoDraft {
+  id: number
+  name: string
+  seo_title: string
+  seo_description: string
+}
+
+/** R7-10 — producto omitido o sin respuesta de la IA. */
+interface SeoNote {
+  id: number
+  name: string
+  reason: string
 }
 
 interface City {
@@ -266,6 +301,7 @@ function AdminProductsContent() {
   const [productForm, setProductForm] = useState<"new" | Product | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [purging, setPurging] = useState(false)
   const [reorderingId, setReorderingId] = useState<number | null>(null)
   // Historial de cambios (audit log) del producto.
   const [historyFor, setHistoryFor] = useState<Product | null>(null)
@@ -279,12 +315,25 @@ function AdminProductsContent() {
   const [bulkSaleOpen, setBulkSaleOpen] = useState(false)
   const [bulkSalePct, setBulkSalePct] = useState<string>("10")
   const [bulkSaleMode, setBulkSaleMode] = useState<"apply" | "remove">("apply")
+  const [bulkSaleStart, setBulkSaleStart] = useState("")
+  const [bulkSaleEnd, setBulkSaleEnd] = useState("")
+  const [bulkTagOpen, setBulkTagOpen] = useState(false)
+  const [bulkTagValue, setBulkTagValue] = useState("")
+  const [bulkTagMode, setBulkTagMode] = useState<"add" | "remove">("add")
   // Unidad en lote.
   const [bulkUnitOpen, setBulkUnitOpen] = useState(false)
   const [bulkUnitValue, setBulkUnitValue] = useState("kg")
   // Oferta por margen objetivo (requiere cost).
   const [bulkMarginOpen, setBulkMarginOpen] = useState(false)
   const [bulkMarginPct, setBulkMarginPct] = useState("25")
+  // SEO con IA en lote (R7-10): propuestas editables antes de aplicar.
+  const [seoOpen, setSeoOpen] = useState(false)
+  const [seoGenerating, setSeoGenerating] = useState(false)
+  const [seoApplying, setSeoApplying] = useState(false)
+  const [seoOverwrite, setSeoOverwrite] = useState(false)
+  const [seoProposals, setSeoProposals] = useState<SeoDraft[]>([])
+  const [seoSkipped, setSeoSkipped] = useState<SeoNote[]>([])
+  const [seoFailed, setSeoFailed] = useState<SeoNote[]>([])
 
   // Atajos de teclado: "/" enfoca búsqueda, "n" nuevo producto, Esc cierra
   // el modal más superficial abierto.
@@ -299,6 +348,7 @@ function AdminProductsContent() {
       if (e.key === "Escape") {
         if (lightbox) setLightbox(null)
         else if (historyFor) setHistoryFor(null)
+        else if (seoOpen && !seoApplying) setSeoOpen(false)
         else if (productForm !== null) setProductForm(null)
         else if (bulkCategoryOpen) setBulkCategoryOpen(false)
         else if (bulkPriceOpen) setBulkPriceOpen(false)
@@ -315,7 +365,17 @@ function AdminProductsContent() {
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [lightbox, historyFor, productForm, bulkCategoryOpen, bulkPriceOpen, cityModalOpen, bulkSaving])
+  }, [
+    lightbox,
+    historyFor,
+    productForm,
+    bulkCategoryOpen,
+    bulkPriceOpen,
+    cityModalOpen,
+    bulkSaving,
+    seoOpen,
+    seoApplying,
+  ])
 
   // Fase 5 — filtros de categoría/stock (con deep-link ?stock= desde las
   // alertas del dashboard) y paginación.
@@ -343,6 +403,21 @@ function AdminProductsContent() {
   const [onlyDupNames, setOnlyDupNames] = useState(searchParams.get("dupNames") === "1")
   // Papelera (soft delete, 00099).
   const [onlyTrash, setOnlyTrash] = useState(searchParams.get("trash") === "1")
+  // Ronda 7 — ofertas vencidas y etiqueta (colecciones de la tienda).
+  const [onlyStaleSale, setOnlyStaleSale] = useState(searchParams.get("staleSale") === "1")
+  const [onlyUnderThreshold, setOnlyUnderThreshold] = useState(
+    searchParams.get("underThreshold") === "1"
+  )
+  const [tagFilter, setTagFilter] = useState(searchParams.get("tag") ?? "all")
+  const [tagList, setTagList] = useState<{ tag: string; count: number }[]>([])
+  // Ronda 7 — imágenes rotas detectadas por el sondeo del servidor. El filtro
+  // es local a la página cargada (el sondeo trabaja sobre filas concretas).
+  const [imageIssues, setImageIssues] = useState<
+    Record<number, { url: string | null; status: number | null; reason: string }>
+  >({})
+  const [checkingImages, setCheckingImages] = useState(false)
+  const [onlyBrokenImage, setOnlyBrokenImage] = useState(false)
+  const [imagesModalOpen, setImagesModalOpen] = useState(false)
   // Filtros por ciudad y marca (server-side).
   const [cityFilter, setCityFilter] = useState(searchParams.get("city") ?? "all")
   const [brandFilter, setBrandFilter] = useState(searchParams.get("brand") ?? "all")
@@ -382,6 +457,9 @@ function AdminProductsContent() {
     if (onlyOnSale) sp.set("onSale", "1")
     if (onlyDupNames) sp.set("dupNames", "1")
     if (onlyTrash) sp.set("trash", "1")
+    if (onlyStaleSale) sp.set("staleSale", "1")
+    if (onlyUnderThreshold) sp.set("underThreshold", "1")
+    if (tagFilter !== "all") sp.set("tag", tagFilter)
     if (cityFilter !== "all") sp.set("city", cityFilter)
     if (brandFilter !== "all") sp.set("brand", brandFilter)
     if (view === "grid") sp.set("view", "grid")
@@ -404,6 +482,9 @@ function AdminProductsContent() {
     onlyOnSale,
     onlyDupNames,
     onlyTrash,
+    onlyStaleSale,
+    onlyUnderThreshold,
+    tagFilter,
     cityFilter,
     brandFilter,
     view,
@@ -429,6 +510,8 @@ function AdminProductsContent() {
     onSale: 0,
     dupNames: 0,
     trash: 0,
+    staleSale: 0,
+    underThreshold: 0,
   })
   const [refreshing, setRefreshing] = useState(false)
   // true cuando la BD aún no tiene las migraciones 00096-00099: el panel
@@ -456,6 +539,9 @@ function AdminProductsContent() {
       onSale: onlyOnSale ? "1" : "0",
       dupNames: onlyDupNames ? "1" : "0",
       trash: onlyTrash ? "1" : "0",
+      staleSale: onlyStaleSale ? "1" : "0",
+      underThreshold: onlyUnderThreshold ? "1" : "0",
+      tag: tagFilter,
       city: cityFilter,
       brand: brandFilter,
       sort: sort.key,
@@ -506,6 +592,7 @@ function AdminProductsContent() {
         setTotal(data.total ?? 0)
         if (data.counts) setCounts(data.counts)
         if (data.brands) setBrands(data.brands)
+        if (data.tags) setTagList(data.tags)
         setSchemaDrift(data.schemaDrift === true)
         // Metadatos por fila (sync WA + última edición), best-effort.
         const ids = (data.rows ?? []).map((r: Product) => r.id)
@@ -561,6 +648,9 @@ function AdminProductsContent() {
     onlyOnSale,
     onlyDupNames,
     onlyTrash,
+    onlyStaleSale,
+    onlyUnderThreshold,
+    tagFilter,
     cityFilter,
     brandFilter,
     sort,
@@ -589,6 +679,9 @@ function AdminProductsContent() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pageItems = products
+  // Incidencias de imagen de la página cargada (el sondeo es bajo demanda).
+  const brokenItems = pageItems.filter((p) => imageIssues[p.id])
+  const filterBroken = onlyBrokenImage && brokenItems.length > 0
 
   function updateFilters(next: () => void) {
     next()
@@ -887,18 +980,28 @@ function AdminProductsContent() {
     if (rows.length === 0) return
     const esc = (v: string) => (/[",;\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
     const catSlug = (id: number | null) => categories.find((c) => c.id === id)?.slug ?? ""
-    const header = "nombre,slug,marca,categoria,precio,precio_oferta,unidad,stock,visible"
+    // Mismas columnas que parseProductImportCsv (paridad export/import).
+    const header =
+      "nombre,slug,sku,barcode,precio,precio_oferta,oferta_desde,oferta_hasta,marca,categoria,etiquetas,unidad,stock,cantidad,umbral_stock,visible,imagen"
     const lines = rows.map((p) =>
       [
         esc(p.name),
         p.slug,
-        esc(p.brand ?? ""),
-        catSlug(p.category_id),
+        esc(p.sku ?? ""),
+        esc(p.barcode ?? ""),
         p.price ?? "",
         p.sale_price ?? "",
+        p.sale_starts_at ?? "",
+        p.sale_ends_at ?? "",
+        esc(p.brand ?? ""),
+        catSlug(p.category_id),
+        esc((p.tags ?? []).join("|")),
         p.unit ?? "",
         p.stock_status,
+        p.stock_quantity ?? "",
+        p.low_stock_threshold ?? "",
         p.is_visible ? "si" : "no",
+        esc(p.image_url ?? ""),
       ].join(",")
     )
     // BOM para que Excel respete los acentos.
@@ -993,8 +1096,8 @@ function AdminProductsContent() {
   /** Ajusta el stock numérico; el servidor deriva stock_status. */
   function adjustQuantity(p: Product, delta: number) {
     const next = Math.max(0, (p.stock_quantity ?? 0) + delta)
-    const derived =
-      next === 0 ? "out_of_stock" : next <= 5 ? "low_stock" : "in_stock"
+    // El umbral es por producto (Ronda 7); sin umbral se usa el default.
+    const derived = deriveStockStatus(next, p.low_stock_threshold)
     patchProduct(p.id, { stock_quantity: next, stock_status: derived })
   }
 
@@ -1100,6 +1203,127 @@ function AdminProductsContent() {
       }
     }
     return null
+  }
+
+  /** Revisa con el servidor si las imágenes responden (ronda 7). */
+  async function checkImages() {
+    if (checkingImages) return
+    // Con selección se revisa la selección (puede estar en otras páginas);
+    // sin selección, las filas visibles.
+    const targets = selected.size > 0 ? [...selected] : pageItems.map((p) => p.id)
+    if (targets.length === 0) {
+      setToast("No hay productos que revisar")
+      return
+    }
+    setCheckingImages(true)
+    setError(null)
+    try {
+      const found: typeof imageIssues = {}
+      let checked = 0
+      let ok = 0
+      let skipped = 0
+      const CHUNK = 60
+      for (let i = 0; i < targets.length; i += CHUNK) {
+        const res = await fetch("/api/admin/products/check-images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: targets.slice(i, i + CHUNK) }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error ?? "Error al revisar las imágenes")
+        checked += Number(data.checked ?? 0)
+        ok += Number(data.ok ?? 0)
+        skipped += Number(data.skipped ?? 0)
+        const broken = (data.broken ?? []) as {
+          id: number
+          image_url: string | null
+          status: number | null
+          reason: string
+        }[]
+        for (const b of broken) {
+          found[b.id] = { url: b.image_url, status: b.status, reason: b.reason }
+        }
+      }
+      setImageIssues(found)
+      const brokenCount = Object.keys(found).length
+      if (brokenCount > 0) setImagesModalOpen(true)
+      setToast(
+        brokenCount === 0
+          ? `Imágenes revisadas: ${ok} correcta${ok === 1 ? "" : "s"}${
+              skipped > 0 ? `, ${skipped} sin URL externa` : ""
+            }`
+          : `${brokenCount} imagen${brokenCount === 1 ? "" : "es"} rota${
+              brokenCount === 1 ? "" : "s"
+            } de ${checked} revisada${checked === 1 ? "" : "s"}`
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al revisar las imágenes")
+    } finally {
+      setCheckingImages(false)
+    }
+  }
+
+  /** Guarda (o quita con null) la imagen principal del producto. */
+  async function saveProductImage(p: Product, url: string | null) {
+    setSaving((prev) => new Set(prev).add(p.id))
+    setError(null)
+    try {
+      const gallery = (p.images ?? []).filter((u) => u !== p.image_url)
+      const res = await fetch("/api/admin/products/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: p.id,
+          image_url: url,
+          images: url ? [...gallery, url] : gallery,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al guardar la imagen")
+      // La incidencia ya no aplica: el sondeo vuelve a decidir en la próxima revisión.
+      setImageIssues((prev) => {
+        const next = { ...prev }
+        delete next[p.id]
+        return next
+      })
+      setProducts((prev) =>
+        prev.map((row) =>
+          row.id === p.id
+            ? { ...row, image_url: url, images: url ? [...gallery, url] : gallery }
+            : row
+        )
+      )
+      setToast(url ? `${p.name}: imagen actualizada` : `${p.name}: imagen eliminada`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al guardar la imagen")
+    } finally {
+      setSaving((prev) => {
+        const next = new Set(prev)
+        next.delete(p.id)
+        return next
+      })
+    }
+  }
+
+  /** Reemplaza la imagen rota pegando una URL nueva. */
+  async function replaceBrokenImage(p: Product) {
+    const raw = window.prompt(
+      `Nueva URL de imagen para "${p.name}" (debe empezar por https://)`,
+      p.image_url ?? ""
+    )
+    if (raw == null) return
+    const url = raw.trim()
+    if (!url.startsWith("https://") && !url.startsWith("/")) {
+      setError("La URL debe empezar por https:// o ser una ruta local (/)")
+      return
+    }
+    await saveProductImage(p, url)
+  }
+
+  /** Quita la imagen rota: el producto queda sin foto en la tienda. */
+  async function removeBrokenImage(p: Product) {
+    if (!window.confirm(`¿Quitar la imagen de "${p.name}"? El producto queda sin foto en la tienda.`)) return
+    await saveProductImage(p, null)
   }
 
   /** Genera con IA la imagen de los productos SIN imagen de la selección
@@ -1215,7 +1439,7 @@ function AdminProductsContent() {
     }
   }
 
-  /** Restaura un producto de la papelera (queda despublicado). */
+    /** Restaura un producto de la papelera (queda despublicado). */
   async function restoreProduct(p: Product) {
     if (deletingId != null) return
     setDeletingId(p.id)
@@ -1234,6 +1458,61 @@ function AdminProductsContent() {
       setError(err instanceof Error ? err.message : "Error al restaurar el producto")
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  /**
+   * Purga definitiva de la papelera (ronda 7). Con `productIds` vacía solo esos
+   * productos; sin argumentos vacía toda la papelera vencida. `ignoreRetention`
+   * salta los 30 días de retención (requiere doble confirmación).
+   */
+  async function purgeTrash(opts: { productIds?: number[]; ignoreRetention?: boolean } = {}) {
+    if (purging) return
+    const scope = opts.productIds ? `${opts.productIds.length} producto(s)` : "la papelera"
+    const extra = opts.ignoreRetention ? " (sin esperar la retención de 30 días)" : ""
+    if (!window.confirm(`¿Borrar definitivamente ${scope}${extra}? Esta acción no se puede deshacer.`))
+      return
+    setPurging(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/products/purge-trash", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(opts.productIds ? { productIds: opts.productIds } : { all: true }),
+          ...(opts.ignoreRetention ? { ignoreRetention: true } : {}),
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string
+        purged?: number
+        keptWithOrders?: number[]
+        keptNotDue?: number[]
+      }
+      if (!res.ok) throw new Error(data.error ?? "Error al vaciar la papelera")
+      const purged = data.purged ?? 0
+      const withOrders = data.keptWithOrders?.length ?? 0
+      const notDue = data.keptNotDue?.length ?? 0
+      if (purged === 0 && (withOrders > 0 || notDue > 0)) {
+        setToast(
+          `Nada que borrar: ${withOrders} con pedidos y ${notDue} dentro de la retención de ${TRASH_RETENTION_DAYS} días`
+        )
+      } else {
+        setToast(
+          [
+            `${purged} producto(s) borrado(s) definitivamente`,
+            withOrders > 0 ? `${withOrders} conservado(s) por pedidos` : null,
+            notDue > 0 ? `${notDue} aún en retención` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        )
+      }
+      setReloadKey((k) => k + 1)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al vaciar la papelera")
+    } finally {
+      setPurging(false)
     }
   }
 
@@ -1310,6 +1589,32 @@ function AdminProductsContent() {
   })
   const [reportTo, setReportTo] = useState(() => new Date().toISOString().slice(0, 10))
   const [reportLoading, setReportLoading] = useState(false)
+  const [reportInsights, setReportInsights] = useState<SalesReportInsights | null>(null)
+  const [insightsLoading, setInsightsLoading] = useState(false)
+
+  // Los insights se recalculan al abrir el modal y cuando cambia el rango.
+  useEffect(() => {
+    if (!reportOpen) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        setInsightsLoading(true)
+        const res = await fetch(
+          `/api/admin/products/sales-report?from=${reportFrom}&to=${reportTo}&format=json`
+        )
+        const data = await res.json().catch(() => ({}))
+        if (cancelled) return
+        setReportInsights(res.ok ? (data.insights ?? null) : null)
+      } catch {
+        if (!cancelled) setReportInsights(null)
+      } finally {
+        if (!cancelled) setInsightsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [reportOpen, reportFrom, reportTo])
 
   async function downloadSalesReport() {
     if (reportLoading) return
@@ -1377,6 +1682,9 @@ function AdminProductsContent() {
     if (onlyOnSale) params.onSale = "1"
     if (onlyDupNames) params.dupNames = "1"
     if (onlyTrash) params.trash = "1"
+    if (onlyStaleSale) params.staleSale = "1"
+    if (onlyUnderThreshold) params.underThreshold = "1"
+    if (tagFilter !== "all") params.tag = tagFilter
     if (cityFilter !== "all") params.city = cityFilter
     if (brandFilter !== "all") params.brand = brandFilter
     if (view === "grid") params.view = "grid"
@@ -1412,6 +1720,9 @@ function AdminProductsContent() {
       setOnlyOnSale(v.params.onSale === "1")
       setOnlyDupNames(v.params.dupNames === "1")
       setOnlyTrash(v.params.trash === "1")
+      setOnlyStaleSale(v.params.staleSale === "1")
+      setOnlyUnderThreshold(v.params.underThreshold === "1")
+      setTagFilter(v.params.tag ?? "all")
       setCityFilter(v.params.city ?? "all")
       setBrandFilter(v.params.brand ?? "all")
       setView(v.params.view === "grid" ? "grid" : "table")
@@ -1523,6 +1834,110 @@ function AdminProductsContent() {
     }
   }
 
+  /**
+   * R7-10 — propone `seo_title`/`seo_description` con IA para la selección.
+   * Corre en tandas (`SEO_BATCH_SIZE`) para acotar cada respuesta, y solo
+   * genera propuestas: el admin las revisa/edita antes de aplicar.
+   */
+  async function generateSeoBatch() {
+    if (selected.size === 0 || seoGenerating) return
+    setSeoGenerating(true)
+    setError(null)
+    setSeoProposals([])
+    setSeoSkipped([])
+    setSeoFailed([])
+    try {
+      const proposals: SeoDraft[] = []
+      const skipped: SeoNote[] = []
+      const failed: SeoNote[] = []
+      for (const batch of chunkIds([...selected])) {
+        const res = await fetch("/api/admin/products/bulk-seo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: batch, overwrite: seoOverwrite }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.error ?? "Error al generar SEO")
+        proposals.push(...((data.proposals ?? []) as SeoDraft[]))
+        skipped.push(...((data.skipped ?? []) as SeoNote[]))
+        failed.push(...((data.failed ?? []) as SeoNote[]))
+      }
+      setSeoProposals(proposals)
+      setSeoSkipped(skipped)
+      setSeoFailed(failed)
+      if (proposals.length === 0) {
+        setError("La IA no devolvió propuestas para la selección")
+        return
+      }
+      setSeoOpen(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al generar SEO")
+    } finally {
+      setSeoGenerating(false)
+    }
+  }
+
+  /** R7-10 — aplica las propuestas (ya editadas) vía el PATCH de producto. */
+  async function applySeoBatch() {
+    if (seoApplying) return
+    const drafts = seoProposals.filter(
+      (p) => p.seo_title.trim().length > 0 || p.seo_description.trim().length > 0
+    )
+    if (drafts.length === 0) {
+      setError("No hay propuestas que aplicar")
+      return
+    }
+    setSeoApplying(true)
+    setError(null)
+    try {
+      const results = await Promise.all(
+        drafts.map(async (draft) => {
+          const res = await fetch("/api/admin/products/update", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              productId: draft.id,
+              seo_title: draft.seo_title.trim() || null,
+              seo_description: draft.seo_description.trim() || null,
+            }),
+          })
+          return res.ok ? draft : null
+        })
+      )
+      const applied = results.filter((r): r is SeoDraft => r !== null)
+      const appliedById = new Map(applied.map((d) => [d.id, d]))
+      setProducts((prev) =>
+        prev.map((p) => {
+          const draft = appliedById.get(p.id)
+          return draft
+            ? {
+                ...p,
+                seo_title: draft.seo_title.trim() || null,
+                seo_description: draft.seo_description.trim() || null,
+              }
+            : p
+        })
+      )
+      setToast(
+        seoBatchSummary({
+          applied: applied.length,
+          skipped: seoSkipped.length,
+          failed: seoFailed.length + (drafts.length - applied.length),
+        })
+      )
+      setSeoOpen(false)
+      setSeoProposals([])
+      setSeoSkipped([])
+      setSeoFailed([])
+      setSelected(new Set())
+      setReloadKey((k) => k + 1)
+    } catch {
+      setError("Error al aplicar el SEO en lote")
+    } finally {
+      setSeoApplying(false)
+    }
+  }
+
   /** Aplica o quita ofertas (sale_price) en la selección. */
   async function bulkSale() {
     if (selected.size === 0 || bulkSaving) return
@@ -1558,16 +1973,37 @@ function AdminProductsContent() {
           const res = await fetch("/api/admin/products/update", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, sale_price: salePrice }),
+            body: JSON.stringify({
+              productId,
+              sale_price: salePrice,
+              // Quitar la oferta también borra su ventana; al aplicarla se
+              // reemplaza por la capturada (vacío = sin límite).
+              sale_starts_at:
+                bulkSaleMode === "remove" || !bulkSaleStart
+                  ? null
+                  : new Date(bulkSaleStart).toISOString(),
+              sale_ends_at:
+                bulkSaleMode === "remove" || !bulkSaleEnd
+                  ? null
+                  : new Date(bulkSaleEnd).toISOString(),
+            }),
           })
           return res.ok
         })
       )
       const succeededIds = ids.filter((_, i) => results[i])
+      const nextStart =
+        bulkSaleMode === "remove" || !bulkSaleStart
+          ? null
+          : new Date(bulkSaleStart).toISOString()
+      const nextEnd =
+        bulkSaleMode === "remove" || !bulkSaleEnd ? null : new Date(bulkSaleEnd).toISOString()
       setProducts((prev) =>
         prev.map((p) => {
           const sp = succeededIds.includes(p.id) ? newSalePrices.get(p.id) : undefined
-          return sp !== undefined ? { ...p, sale_price: sp } : p
+          return sp !== undefined
+            ? { ...p, sale_price: sp, sale_starts_at: nextStart, sale_ends_at: nextEnd }
+            : p
         })
       )
       const failed = results.filter((ok) => !ok).length
@@ -1594,7 +2030,12 @@ function AdminProductsContent() {
                 const res = await fetch("/api/admin/products/update", {
                   method: "PATCH",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ productId, sale_price: prev.sale_price }),
+                  body: JSON.stringify({
+                    productId,
+                    sale_price: prev.sale_price,
+                    sale_starts_at: prev.sale_starts_at,
+                    sale_ends_at: prev.sale_ends_at,
+                  }),
                 })
                 return res.ok
               })
@@ -1602,7 +2043,14 @@ function AdminProductsContent() {
             setProducts((prevList) =>
               prevList.map((p) => {
                 const old = succeededIds.includes(p.id) ? current.get(p.id) : undefined
-                return old ? { ...p, sale_price: old.sale_price } : p
+                return old
+                  ? {
+                      ...p,
+                      sale_price: old.sale_price,
+                      sale_starts_at: old.sale_starts_at,
+                      sale_ends_at: old.sale_ends_at,
+                    }
+                  : p
               })
             )
           },
@@ -1612,6 +2060,186 @@ function AdminProductsContent() {
       setSelected(new Set())
     } catch {
       setError("Error al actualizar ofertas en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  /** Suma o quita una etiqueta en toda la selección. */
+  async function bulkTag() {
+    if (selected.size === 0 || bulkSaving) return
+    const value = bulkTagValue.trim().toLowerCase()
+    if (!value) {
+      setError("Escribe la etiqueta")
+      return
+    }
+    if (value.length > 40) {
+      setError("La etiqueta debe tener máximo 40 caracteres")
+      return
+    }
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const ids = [...selected]
+      const listRes = await fetch(`/api/admin/products/list?ids=${ids.join(",")}`)
+      const listData = await listRes.json().catch(() => ({}))
+      if (!listRes.ok) throw new Error(listData.error ?? "Error al leer etiquetas actuales")
+      const current = new Map<number, Product>(
+        (listData.rows ?? []).map((r: Product) => [r.id, r])
+      )
+      const nextTags = new Map<number, string[]>()
+      const results = await Promise.all(
+        ids.map(async (productId) => {
+          const p = current.get(productId)
+          if (!p) return false
+          const prev = p.tags ?? []
+          const tags =
+            bulkTagMode === "add"
+              ? prev.includes(value)
+                ? prev
+                : [...prev, value].slice(0, 20)
+              : prev.filter((t) => t !== value)
+          nextTags.set(productId, tags)
+          const res = await fetch("/api/admin/products/update", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId, tags }),
+          })
+          return res.ok
+        })
+      )
+      const succeededIds = ids.filter((_, i) => results[i])
+      setProducts((prev) =>
+        prev.map((p) => {
+          const tags = succeededIds.includes(p.id) ? nextTags.get(p.id) : undefined
+          return tags ? { ...p, tags } : p
+        })
+      )
+      if (succeededIds.length > 0) {
+        setToast(
+          bulkTagMode === "add"
+            ? `Etiqueta "${value}" agregada a ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`
+            : `Etiqueta "${value}" quitada de ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`
+        )
+        setUndoAction({
+          message: `Etiquetas actualizadas en ${succeededIds.length} producto${
+            succeededIds.length === 1 ? "" : "s"
+          }.`,
+          run: async () => {
+            await Promise.all(
+              succeededIds.map(async (productId) => {
+                const prev = current.get(productId)
+                if (!prev) return false
+                const res = await fetch("/api/admin/products/update", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ productId, tags: prev.tags ?? [] }),
+                })
+                return res.ok
+              })
+            )
+            setProducts((prevList) =>
+              prevList.map((p) => {
+                const old = succeededIds.includes(p.id) ? current.get(p.id) : undefined
+                return old ? { ...p, tags: old.tags ?? [] } : p
+              })
+            )
+          },
+        })
+        // La lista de etiquetas del filtro puede haber ganado una nueva.
+        setReloadKey((k) => k + 1)
+      }
+      setBulkTagOpen(false)
+      setBulkTagValue("")
+    } catch {
+      setError("Error al actualizar etiquetas en lote")
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  /** Borra precio de oferta y ventana de los productos con oferta ya vencida. */
+  async function clearExpiredSales() {
+    if (bulkSaving) return
+    const stale = products.filter((p) => saleState(p) === "expired")
+    if (stale.length === 0) {
+      setToast("No hay ofertas vencidas en esta página")
+      return
+    }
+    if (
+      !window.confirm(
+        `Se borrará el precio de oferta y su ventana en ${stale.length} producto${
+          stale.length === 1 ? "" : "s"
+        }. La tienda ya cobra el precio normal. ¿Continuar?`
+      )
+    ) {
+      return
+    }
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const results = await Promise.all(
+        stale.map(async (p) => {
+          const res = await fetch("/api/admin/products/update", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              productId: p.id,
+              sale_price: null,
+              sale_starts_at: null,
+              sale_ends_at: null,
+            }),
+          })
+          return res.ok
+        })
+      )
+      const ids = stale.filter((_, i) => results[i]).map((p) => p.id)
+      setProducts((prev) =>
+        prev.map((p) =>
+          ids.includes(p.id)
+            ? { ...p, sale_price: null, sale_starts_at: null, sale_ends_at: null }
+            : p
+        )
+      )
+      setToast(`Ofertas vencidas limpiadas en ${ids.length} producto${ids.length === 1 ? "" : "s"}`)
+      setUndoAction({
+        message: `Ofertas vencidas limpiadas en ${ids.length} producto${ids.length === 1 ? "" : "s"}.`,
+        run: async () => {
+          await Promise.all(
+            stale
+              .filter((p) => ids.includes(p.id))
+              .map(async (p) => {
+                const res = await fetch("/api/admin/products/update", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    productId: p.id,
+                    sale_price: p.sale_price,
+                    sale_starts_at: p.sale_starts_at,
+                    sale_ends_at: p.sale_ends_at,
+                  }),
+                })
+                return res.ok
+              })
+          )
+          setProducts((prev) =>
+            prev.map((p) => {
+              const old = ids.includes(p.id) ? stale.find((s) => s.id === p.id) : undefined
+              return old
+                ? {
+                    ...p,
+                    sale_price: old.sale_price,
+                    sale_starts_at: old.sale_starts_at,
+                    sale_ends_at: old.sale_ends_at,
+                  }
+                : p
+            })
+          )
+        },
+      })
+      setReloadKey((k) => k + 1)
+    } catch {
+      setError("Error al limpiar ofertas vencidas")
     } finally {
       setBulkSaving(false)
     }
@@ -2013,6 +2641,24 @@ function AdminProductsContent() {
           </button>
           <button
             type="button"
+            onClick={checkImages}
+            disabled={checkingImages || (selected.size === 0 && pageItems.length === 0)}
+            title={
+              selected.size > 0
+                ? `Revisar si responden las imágenes de ${selected.size} producto(s) seleccionado(s)`
+                : "Revisar si responden las imágenes de los productos de esta página"
+            }
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm disabled:opacity-50"
+          >
+            {checkingImages ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <ScanSearch className="w-4 h-4" />
+            )}
+            {checkingImages ? "Revisando…" : "Revisar imágenes"}
+          </button>
+          <button
+            type="button"
             onClick={() => setProductForm("new")}
             className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 transition-colors text-sm"
           >
@@ -2207,7 +2853,7 @@ function AdminProductsContent() {
       </div>
 
       {/* Salud del catálogo: problemas detectados; cada chip aplica su filtro */}
-      {counts.noImage + counts.noCities + counts.noPrice + counts.noCategory + counts.waMismatch + counts.dupNames > 0 && (
+      {counts.noImage + counts.noCities + counts.noPrice + counts.noCategory + counts.waMismatch + counts.dupNames + counts.underThreshold + brokenItems.length > 0 && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <HeartPulse className="w-4 h-4 text-amber-600 shrink-0" />
@@ -2232,6 +2878,29 @@ function AdminProductsContent() {
             {counts.noImage}
           </span>
         </button>
+        {brokenItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setOnlyBrokenImage((v) => !v)}
+            aria-pressed={onlyBrokenImage}
+            title="Imágenes de esta página que no responden (revisadas con «Revisar imágenes»)"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              onlyBrokenImage
+                ? "bg-red-600 text-white"
+                : "bg-white border border-red-200 text-red-700 hover:bg-red-50"
+            }`}
+          >
+            <ImageOff className="w-3.5 h-3.5" />
+            Imagen rota
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                onlyBrokenImage ? "bg-white/20 text-white" : "bg-red-50 text-red-600"
+              }`}
+            >
+              {brokenItems.length}
+            </span>
+          </button>
+        )}
         <button
           type="button"
           onClick={() => updateFilters(() => setOnlyNoCities((v) => !v))}
@@ -2391,6 +3060,79 @@ function AdminProductsContent() {
         </button>
         <button
           type="button"
+          onClick={() => updateFilters(() => setOnlyStaleSale((v) => !v))}
+          aria-pressed={onlyStaleSale}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            onlyStaleSale
+              ? "bg-amber-600 text-white"
+              : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
+          }`}
+          title="Ofertas con fecha de fin ya vencida (el precio de oferta sigue guardado)"
+        >
+          <Clock className="w-3.5 h-3.5" />
+          Ofertas vencidas
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              onlyStaleSale ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+            }`}
+          >
+            {counts.staleSale}
+          </span>
+        </button>
+        {onlyStaleSale && counts.staleSale > 0 && (
+          <button
+            type="button"
+            onClick={clearExpiredSales}
+            disabled={bulkSaving}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 disabled:opacity-50"
+            title="Borra precio de oferta y ventana en los productos con oferta vencida de esta página"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Limpiar ofertas vencidas
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => updateFilters(() => setOnlyUnderThreshold((v) => !v))}
+          aria-pressed={onlyUnderThreshold}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            onlyUnderThreshold
+              ? "bg-red-600 text-white"
+              : "bg-white border border-red-200 text-red-700 hover:bg-red-50"
+          }`}
+          title="Productos con existencia en o por debajo de su umbral de stock bajo"
+        >
+          <AlertTriangle className="w-3.5 h-3.5" />
+          Bajo umbral
+          <span
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              onlyUnderThreshold ? "bg-white/20 text-white" : "bg-red-50 text-red-600"
+            }`}
+          >
+            {counts.underThreshold}
+          </span>
+        </button>
+        {tagList.length > 0 && (
+          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-gray-200 text-gray-600">
+            <Tag className="w-3.5 h-3.5 text-gray-400" />
+            <span className="sr-only">Filtrar por etiqueta</span>
+            <select
+              value={tagFilter}
+              onChange={(e) => updateFilters(() => setTagFilter(e.target.value))}
+              className="bg-transparent text-xs font-semibold text-gray-700 focus:outline-none"
+              title="Etiquetas usadas por las colecciones de la tienda"
+            >
+              <option value="all">Todas las etiquetas</option>
+              {tagList.map((t) => (
+                <option key={t.tag} value={t.tag}>
+                  {t.tag} ({t.count})
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <button
+          type="button"
           onClick={() => updateFilters(() => setOnlyTrash((v) => !v))}
           aria-pressed={onlyTrash}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
@@ -2410,6 +3152,18 @@ function AdminProductsContent() {
             {counts.trash}
           </span>
         </button>
+        {onlyTrash && (
+          <button
+            type="button"
+            onClick={() => purgeTrash()}
+            disabled={purging || counts.trash === 0}
+            title={`Borrar definitivamente los productos con más de ${TRASH_RETENTION_DAYS} días en la papelera`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {purging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            Vaciar papelera
+          </button>
+        )}
         {/* Vistas guardadas de filtros */}
         <div className="relative">
           <button
@@ -2576,6 +3330,15 @@ function AdminProductsContent() {
               Oferta…
             </button>
             <button
+              onClick={() => setBulkTagOpen(true)}
+              disabled={bulkSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold hover:bg-indigo-100 disabled:opacity-50"
+              title="Agregar o quitar una etiqueta en la selección"
+            >
+              <Tag className="w-3.5 h-3.5" />
+              Etiqueta…
+            </button>
+            <button
               onClick={() => setBulkMarginOpen(true)}
               disabled={bulkSaving}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-lime-50 text-lime-700 border border-lime-200 text-xs font-semibold hover:bg-lime-100 disabled:opacity-50"
@@ -2583,6 +3346,19 @@ function AdminProductsContent() {
             >
               <Percent className="w-3.5 h-3.5" />
               Margen…
+            </button>
+            <button
+              onClick={generateSeoBatch}
+              disabled={bulkSaving || seoGenerating}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-xs font-semibold hover:bg-violet-100 disabled:opacity-50"
+              title="Generar título y descripción SEO con IA (solo productos sin SEO)"
+            >
+              {seoGenerating ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              {seoGenerating ? "Generando SEO…" : "SEO con IA…"}
             </button>
             <button
               onClick={() => bulkSetWhatsApp(true)}
@@ -2725,11 +3501,12 @@ function AdminProductsContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {pageItems.map((product) => {
+              {(filterBroken ? brokenItems : pageItems).map((product) => {
                 const global = isGlobal(product.id)
                 const cityCount = citiesAvailableCount(product.id)
                 const edit = lastEdit[product.id]
                 const soldAmount = salesAmount[product.id] ?? 0
+                const imageIssue = imageIssues[product.id]
                 return (
                   <tr
                     key={product.id}
@@ -2795,7 +3572,84 @@ function AdminProductsContent() {
                               </span>
                             )}
                           </p>
-                          <p className="text-xs text-gray-400">{product.brand ?? "—"}</p>
+                          <p className="text-xs text-gray-400">
+                            {product.brand ?? "—"}
+                            {product.sku && (
+                              <span className="ml-1.5 font-mono text-[10px] text-gray-400">
+                                · {product.sku}
+                              </span>
+                            )}
+                          </p>
+                          {(product.tags?.length ||
+                            saleState(product) === "expired" ||
+                            product.barcode ||
+                            imageIssue ||
+                            (product.related_product_ids?.length ?? 0) > 0 ||
+                            (onlyTrash && purgeLabel(product.deleted_at))) && (
+                            <div className="flex flex-wrap items-center gap-1 mt-1">
+                              {onlyTrash && purgeLabel(product.deleted_at) && (
+                                <span
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200 text-[10px] font-bold"
+                                  title={`Eliminado el ${new Date(product.deleted_at ?? "").toLocaleString("es-CO")}`}
+                                >
+                                  <Clock className="w-3 h-3" />
+                                  {purgeLabel(product.deleted_at)}
+                                </span>
+                              )}
+                              {(product.related_product_ids?.length ?? 0) > 0 && (
+                                <span
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 text-[10px] font-bold"
+                                  title="Tiene productos relacionados elegidos a mano"
+                                >
+                                  <Link2 className="w-3 h-3" />
+                                  {product.related_product_ids?.length}
+                                </span>
+                              )}
+                              {imageIssue && (
+                                <span
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-[10px] font-bold"
+                                  title={`La imagen no responde: ${imageIssue.reason}${
+                                    imageIssue.url ? ` (${imageIssue.url})` : ""
+                                  }`}
+                                >
+                                  <ImageOff className="w-3 h-3" />
+                                  Imagen rota
+                                </span>
+                              )}
+                              {(product.tags ?? []).slice(0, 4).map((t) => (
+                                <span
+                                  key={t}
+                                  className="px-1.5 py-0.5 rounded-full bg-brand-50 text-brand-700 text-[10px] font-semibold"
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                              {(product.tags?.length ?? 0) > 4 && (
+                                <span className="text-[10px] text-gray-400">
+                                  +{(product.tags?.length ?? 0) - 4}
+                                </span>
+                              )}
+                              {product.barcode && (
+                                <span
+                                  className="px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-mono"
+                                  title="Código de barras"
+                                >
+                                  {product.barcode}
+                                </span>
+                              )}
+                              {saleState(product) === "expired" && (
+                                <span
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold"
+                                  title={`La oferta terminó el ${new Date(
+                                    product.sale_ends_at as string
+                                  ).toLocaleDateString("es-MX")}; la tienda ya cobra el precio normal`}
+                                >
+                                  <Clock className="w-3 h-3" />
+                                  Oferta vencida
+                                </span>
+                              )}
+                            </div>
+                          )}
                           {edit && (
                             <p className="text-[10px] text-gray-400">
                               Editado {timeAgo(edit.at)}
@@ -2842,13 +3696,27 @@ function AdminProductsContent() {
                           className="group flex items-center gap-1.5"
                           title="Editar precio"
                         >
-                          {product.sale_price ? (
+                          {resolveSalePrice(product) != null ? (
                             <div className="flex items-center">
                               <span className="font-semibold text-brand-600">
-                                ${Number(product.sale_price).toFixed(2)}
+                                ${Number(resolveSalePrice(product)).toFixed(2)}
                               </span>
                               <span className="ml-1.5 text-xs text-gray-400 line-through">
                                 ${Number(product.price ?? 0).toFixed(2)}
+                              </span>
+                            </div>
+                          ) : product.sale_price != null ? (
+                            // Oferta guardada pero fuera de vigencia: se muestra
+                            // tachada para que el admin vea que ya no aplica.
+                            <div className="flex items-center">
+                              <span className="font-semibold text-gray-900">
+                                ${Number(product.price ?? 0).toFixed(2)}
+                              </span>
+                              <span
+                                className="ml-1.5 text-xs text-gray-400 line-through"
+                                title="Precio de oferta guardado, fuera de la ventana de vigencia"
+                              >
+                                ${Number(product.sale_price).toFixed(2)}
                               </span>
                             </div>
                           ) : (
@@ -2862,7 +3730,7 @@ function AdminProductsContent() {
                     </td>
                     <td className="px-5 py-3">
                       {(() => {
-                        const selling = product.sale_price ?? product.price
+                        const selling = resolveSalePrice(product) ?? product.price
                         if (selling == null || selling <= 0 || product.cost == null) {
                           return <span className="text-xs text-gray-300">—</span>
                         }
@@ -3103,20 +3971,32 @@ function AdminProductsContent() {
                           </Link>
                         )}
                         {onlyTrash ? (
-                          <button
-                            type="button"
-                            onClick={() => restoreProduct(product)}
-                            disabled={deletingId === product.id}
-                            title={`Restaurar ${product.name} (queda despublicado)`}
-                            aria-label={`Restaurar ${product.name}`}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
-                          >
-                            {deletingId === product.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <RotateCcw className="w-4 h-4" />
-                            )}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => restoreProduct(product)}
+                              disabled={deletingId === product.id}
+                              title={`Restaurar ${product.name} (queda despublicado)`}
+                              aria-label={`Restaurar ${product.name}`}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
+                            >
+                              {deletingId === product.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RotateCcw className="w-4 h-4" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => purgeTrash({ productIds: [product.id], ignoreRetention: true })}
+                              disabled={purging}
+                              title={`Borrar ${product.name} definitivamente`}
+                              aria-label={`Borrar ${product.name} definitivamente`}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
                         ) : (
                           <>
                             <button
@@ -3185,7 +4065,7 @@ function AdminProductsContent() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {pageItems.map((product) => (
+              {(filterBroken ? brokenItems : pageItems).map((product) => (
                 <div
                   key={product.id}
                   className={`relative rounded-xl border transition-colors overflow-hidden ${
@@ -3218,6 +4098,35 @@ function AdminProductsContent() {
                       <ImagePlus className="w-6 h-6 text-gray-300" />
                     )}
                   </button>
+                  {(product.related_product_ids?.length ?? 0) > 0 && (
+                    <span
+                      className="absolute top-2 right-2 z-10 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-600 text-white text-[10px] font-bold shadow"
+                      title="Tiene productos relacionados elegidos a mano"
+                    >
+                      <Link2 className="w-3 h-3" />
+                      {product.related_product_ids?.length}
+                    </span>
+                  )}
+                  {imageIssues[product.id] && (
+                    <span
+                      className={`absolute right-2 z-10 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold shadow ${
+                        (product.related_product_ids?.length ?? 0) > 0 ? "top-9" : "top-2"
+                      }`}
+                      title={`La imagen no responde: ${imageIssues[product.id]?.reason}`}
+                    >
+                      <ImageOff className="w-3 h-3" />
+                      Rota
+                    </span>
+                  )}
+                  {onlyTrash && purgeLabel(product.deleted_at) && (
+                    <span
+                      className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-gray-900/80 text-white text-[10px] font-bold shadow"
+                      title={`Eliminado el ${new Date(product.deleted_at ?? "").toLocaleString("es-CO")}`}
+                    >
+                      <Clock className="w-3 h-3" />
+                      {purgeLabel(product.deleted_at)}
+                    </span>
+                  )}
                   <div className="p-3">
                     <p className="text-sm font-medium text-gray-900 truncate" title={product.name}>
                       {product.name}
@@ -3307,20 +4216,32 @@ function AdminProductsContent() {
                           </Link>
                         )}
                         {onlyTrash ? (
-                          <button
-                            type="button"
-                            onClick={() => restoreProduct(product)}
-                            disabled={deletingId === product.id}
-                            title={`Restaurar ${product.name}`}
-                            aria-label={`Restaurar ${product.name}`}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
-                          >
-                            {deletingId === product.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <RotateCcw className="w-4 h-4" />
-                            )}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => restoreProduct(product)}
+                              disabled={deletingId === product.id}
+                              title={`Restaurar ${product.name}`}
+                              aria-label={`Restaurar ${product.name}`}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
+                            >
+                              {deletingId === product.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RotateCcw className="w-4 h-4" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => purgeTrash({ productIds: [product.id], ignoreRetention: true })}
+                              disabled={purging}
+                              title={`Borrar ${product.name} definitivamente`}
+                              aria-label={`Borrar ${product.name} definitivamente`}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
                         ) : (
                           <button
                             type="button"
@@ -3611,19 +4532,44 @@ function AdminProductsContent() {
                 </button>
               </div>
               {bulkSaleMode === "apply" && (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max="99"
-                    step="0.5"
-                    value={bulkSalePct}
-                    onChange={(e) => setBulkSalePct(e.target.value)}
-                    className="w-24 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500"
-                    aria-label="Porcentaje de descuento"
-                  />
-                  <span className="text-sm text-gray-500">% de descuento</span>
-                </div>
+                <>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="99"
+                      step="0.5"
+                      value={bulkSalePct}
+                      onChange={(e) => setBulkSalePct(e.target.value)}
+                      className="w-24 px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500"
+                      aria-label="Porcentaje de descuento"
+                    />
+                    <span className="text-sm text-gray-500">% de descuento</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-[11px] font-semibold text-gray-600">
+                      Desde
+                      <input
+                        type="datetime-local"
+                        value={bulkSaleStart}
+                        onChange={(e) => setBulkSaleStart(e.target.value)}
+                        className="mt-1 w-full px-2.5 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-brand-500"
+                      />
+                    </label>
+                    <label className="text-[11px] font-semibold text-gray-600">
+                      Hasta
+                      <input
+                        type="datetime-local"
+                        value={bulkSaleEnd}
+                        onChange={(e) => setBulkSaleEnd(e.target.value)}
+                        className="mt-1 w-full px-2.5 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-brand-500"
+                      />
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-gray-400">
+                    Ventana opcional de la oferta; vacía = sin límite de vigencia.
+                  </p>
+                </>
               )}
             </div>
             <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
@@ -3642,6 +4588,283 @@ function AdminProductsContent() {
                 {bulkSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                 Aplicar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: etiquetas en lote */}
+      {bulkTagOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !bulkSaving && setBulkTagOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">Etiquetas en lote</h2>
+              <button
+                onClick={() => setBulkTagOpen(false)}
+                disabled={bulkSaving}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-xs text-gray-500">
+                Se aplicará a {selected.size} producto{selected.size === 1 ? "" : "s"}. Las
+                etiquetas alimentan las colecciones de la tienda.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBulkTagMode("add")}
+                  aria-pressed={bulkTagMode === "add"}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    bulkTagMode === "add"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100"
+                  }`}
+                >
+                  Agregar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkTagMode("remove")}
+                  aria-pressed={bulkTagMode === "remove"}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    bulkTagMode === "remove"
+                      ? "bg-gray-700 text-white"
+                      : "bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100"
+                  }`}
+                >
+                  Quitar
+                </button>
+              </div>
+              <input
+                value={bulkTagValue}
+                onChange={(e) => setBulkTagValue(e.target.value)}
+                placeholder="arranque, limpieza…"
+                maxLength={40}
+                list="bulk-tag-suggestions"
+                aria-label="Etiqueta"
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500"
+              />
+              <datalist id="bulk-tag-suggestions">
+                {tagList.map((t) => (
+                  <option key={t.tag} value={t.tag} />
+                ))}
+              </datalist>
+              {bulkTagMode === "add" && tagList.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {tagList.slice(0, 10).map((t) => (
+                    <button
+                      key={t.tag}
+                      type="button"
+                      onClick={() => setBulkTagValue(t.tag)}
+                      className="px-2 py-0.5 rounded-full border border-gray-200 text-[11px] text-gray-500 hover:bg-gray-50"
+                    >
+                      {t.tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setBulkTagOpen(false)}
+                disabled={bulkSaving}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={bulkTag}
+                disabled={bulkSaving || !bulkTagValue.trim()}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50"
+              >
+                {bulkSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal R7-10: SEO con IA — preview editable antes de aplicar */}
+      {seoOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !seoApplying && setSeoOpen(false)}
+        >
+          <div
+            className="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-violet-600" />
+                  SEO con IA
+                </h2>
+                <p className="text-xs text-gray-500">
+                  {seoProposals.length} propuesta{seoProposals.length === 1 ? "" : "s"} · revisa y
+                  edita antes de aplicar
+                </p>
+              </div>
+              <button
+                onClick={() => setSeoOpen(false)}
+                disabled={seoApplying}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 disabled:opacity-50"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              {seoProposals.map((draft) => {
+                const titleLen = draft.seo_title.length
+                const descLen = draft.seo_description.length
+                return (
+                  <div
+                    key={draft.id}
+                    className="rounded-xl border border-gray-200 px-3 py-3 space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-gray-900">{draft.name}</p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSeoProposals((prev) => prev.filter((p) => p.id !== draft.id))
+                        }
+                        className="p-1 rounded-lg text-gray-400 hover:bg-gray-100"
+                        aria-label={`Quitar propuesta de ${draft.name}`}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-500 mb-1">
+                        Título SEO
+                      </label>
+                      <input
+                        value={draft.seo_title}
+                        maxLength={SEO_TITLE_MAX}
+                        onChange={(e) =>
+                          setSeoProposals((prev) =>
+                            prev.map((p) =>
+                              p.id === draft.id ? { ...p, seo_title: e.target.value } : p
+                            )
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-500"
+                      />
+                      <p
+                        className={`mt-1 text-[11px] ${
+                          titleLen > SEO_TITLE_MAX ? "text-amber-600" : "text-gray-400"
+                        }`}
+                      >
+                        {titleLen}/{SEO_TITLE_MAX} caracteres
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-500 mb-1">
+                        Descripción SEO
+                      </label>
+                      <textarea
+                        value={draft.seo_description}
+                        maxLength={SEO_DESCRIPTION_MAX}
+                        rows={2}
+                        onChange={(e) =>
+                          setSeoProposals((prev) =>
+                            prev.map((p) =>
+                              p.id === draft.id ? { ...p, seo_description: e.target.value } : p
+                            )
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:border-brand-500"
+                      />
+                      <p
+                        className={`mt-1 text-[11px] ${
+                          descLen > SEO_DESCRIPTION_MAX ? "text-amber-600" : "text-gray-400"
+                        }`}
+                      >
+                        {descLen}/{SEO_DESCRIPTION_MAX} caracteres
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {seoProposals.length === 0 && (
+                <p className="py-6 text-center text-sm text-gray-400">
+                  No quedan propuestas por aplicar.
+                </p>
+              )}
+
+              {(seoSkipped.length > 0 || seoFailed.length > 0) && (
+                <div className="rounded-xl bg-gray-50 border border-gray-200 px-3 py-3">
+                  <p className="text-xs font-semibold text-gray-600 mb-1.5">
+                    Omitidos ({seoSkipped.length}) y sin respuesta ({seoFailed.length})
+                  </p>
+                  <ul className="space-y-1">
+                    {[...seoSkipped, ...seoFailed].slice(0, 12).map((note) => (
+                      <li key={`${note.id}-${note.reason}`} className="text-[11px] text-gray-500">
+                        {note.name} · {note.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-gray-100">
+              <label className="flex items-center gap-2 text-xs text-gray-500">
+                <input
+                  type="checkbox"
+                  checked={seoOverwrite}
+                  onChange={(e) => setSeoOverwrite(e.target.checked)}
+                  disabled={seoGenerating || seoApplying}
+                  className="rounded border-gray-300"
+                />
+                Sobrescribir SEO existente
+              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={generateSeoBatch}
+                  disabled={seoGenerating || seoApplying}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {seoGenerating ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                  Regenerar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSeoOpen(false)}
+                  disabled={seoApplying}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={applySeoBatch}
+                  disabled={seoApplying || seoProposals.length === 0}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {seoApplying && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Aplicar {seoProposals.length}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -3678,8 +4901,12 @@ function AdminProductsContent() {
               ) : (
                 <ul className="divide-y divide-gray-50">
                   {activityEntries.map((entry, i) => {
+                    const diff = (entry.detail?.after ?? {}) as Record<string, unknown>
+                    const prev = (entry.detail?.before ?? {}) as Record<string, unknown>
                     const productName =
                       (entry.detail?.name as string | undefined) ??
+                      (diff.name as string | undefined) ??
+                      (prev.name as string | undefined) ??
                       products.find((p) => String(p.id) === entry.entity_id)?.name ??
                       (entry.entity_id ? `#${entry.entity_id}` : "catálogo")
                     return (
@@ -3703,13 +4930,106 @@ function AdminProductsContent() {
       )}
 
       {/* Modal: reporte de ventas por rango de fechas */}
+      {/* Ronda 7 — imágenes que no responden, con acciones por fila */}
+      {imagesModalOpen && brokenItems.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setImagesModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <ImageOff className="w-4 h-4 text-red-600" />
+                Imágenes rotas ({brokenItems.length})
+              </h2>
+              <button
+                onClick={() => setImagesModalOpen(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+                aria-label="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 overflow-y-auto space-y-2">
+              <p className="text-xs text-gray-500">
+                Estas URLs no respondieron al sondeo. Quita la imagen o pega una nueva: la tienda
+                dejará de mostrar el hueco.
+              </p>
+              {brokenItems.map((product) => {
+                const issue = imageIssues[product.id]
+                if (!issue) return null
+                return (
+                  <div
+                    key={product.id}
+                    className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 p-3"
+                  >
+                    <div className="w-12 h-12 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+                      {product.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- thumb admin, URL dinámica
+                        <img src={product.image_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <ImagePlus className="w-5 h-5 text-gray-300" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {product.name}
+                      </p>
+                      <p className="text-[11px] text-red-600 font-medium">{issue.reason}</p>
+                      {issue.url && (
+                        <p className="text-[10px] text-gray-400 font-mono truncate" title={issue.url}>
+                          {issue.url}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => void replaceBrokenImage(product)}
+                        disabled={saving.has(product.id)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <Link2 className="w-3.5 h-3.5" />
+                        Reemplazar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => startImageUpload(product.id)}
+                        disabled={saving.has(product.id)}
+                        title="Subir un archivo desde tu equipo"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <ImagePlus className="w-3.5 h-3.5" />
+                        Subir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void removeBrokenImage(product)}
+                        disabled={saving.has(product.id)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-semibold hover:bg-red-100 disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Quitar
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {reportOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={() => !reportLoading && setReportOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-white shadow-xl"
+            className="w-full max-w-md rounded-2xl bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -3725,7 +5045,7 @@ function AdminProductsContent() {
             </div>
             <div className="px-5 py-4 space-y-3">
               <p className="text-xs text-gray-500">
-                Unidades y monto por producto (pedidos no cancelados del rango).
+                Unidades, monto y margen por producto (pedidos no cancelados del rango).
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -3752,6 +5072,116 @@ function AdminProductsContent() {
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500"
                   />
                 </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-gray-700">Resumen del rango</span>
+                  {insightsLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />}
+                </div>
+                {insightsLoading && !reportInsights ? (
+                  <p className="text-xs text-gray-400">Calculando…</p>
+                ) : !reportInsights || reportInsights.products === 0 ? (
+                  <p className="text-xs text-gray-400">Sin ventas en el rango.</p>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-500">Productos</span>
+                        <span className="font-semibold text-gray-800">{reportInsights.products}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-500">Unidades</span>
+                        <span className="font-semibold text-gray-800">{reportInsights.units}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-500">Ingreso</span>
+                        <span className="font-semibold text-gray-800">
+                          ${reportInsights.revenue.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-500">Margen</span>
+                        <span className="font-semibold text-gray-800">
+                          {reportInsights.margin === null
+                            ? "—"
+                            : `$${reportInsights.margin.toFixed(2)}${
+                                reportInsights.marginPct === null
+                                  ? ""
+                                  : ` (${reportInsights.marginPct.toFixed(1)}%)`
+                              }`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs text-gray-500">ABC:</span>
+                      {(
+                        [
+                          ["A", reportInsights.abc.A, "bg-emerald-50 text-emerald-700"],
+                          ["B", reportInsights.abc.B, "bg-amber-50 text-amber-700"],
+                          ["C", reportInsights.abc.C, "bg-gray-100 text-gray-600"],
+                        ] as const
+                      ).map(([label, count, cls]) => (
+                        <span
+                          key={label}
+                          className={`px-1.5 py-0.5 rounded-md text-[11px] font-bold ${cls}`}
+                        >
+                          {label}: {count}
+                        </span>
+                      ))}
+                      <span className="text-[11px] text-gray-400">
+                        {Math.round(reportInsights.aShare * 100)}% del ingreso en A
+                      </span>
+                    </div>
+
+                    <ul className="text-xs text-gray-600 space-y-1">
+                      {reportInsights.topRevenue && (
+                        <li className="flex justify-between gap-2">
+                          <span className="text-gray-500">Más vendido</span>
+                          <span className="font-semibold text-gray-800 truncate text-right">
+                            {reportInsights.topRevenue.name}
+                          </span>
+                        </li>
+                      )}
+                      {reportInsights.topUnits && (
+                        <li className="flex justify-between gap-2">
+                          <span className="text-gray-500">Más unidades</span>
+                          <span className="font-semibold text-gray-800 truncate text-right">
+                            {reportInsights.topUnits.name} ({reportInsights.topUnits.units})
+                          </span>
+                        </li>
+                      )}
+                      {reportInsights.bestMargin && (
+                        <li className="flex justify-between gap-2">
+                          <span className="text-gray-500">Mejor margen</span>
+                          <span className="font-semibold text-emerald-700 truncate text-right">
+                            {reportInsights.bestMargin.name} (
+                            {reportInsights.bestMargin.marginPct.toFixed(1)}%)
+                          </span>
+                        </li>
+                      )}
+                      {reportInsights.worstMargin &&
+                        reportInsights.bestMargin?.name !== reportInsights.worstMargin.name && (
+                          <li className="flex justify-between gap-2">
+                            <span className="text-gray-500">Margen más bajo</span>
+                            <span className="font-semibold text-amber-700 truncate text-right">
+                              {reportInsights.worstMargin.name} (
+                              {reportInsights.worstMargin.marginPct.toFixed(1)}%)
+                            </span>
+                          </li>
+                        )}
+                    </ul>
+
+                    {reportInsights.missingCost > 0 && (
+                      <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">
+                        {reportInsights.missingCost} producto
+                        {reportInsights.missingCost === 1 ? "" : "s"} sin costo capturado: su margen
+                        no se calcula.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
@@ -4019,10 +5449,7 @@ function AdminProductsContent() {
             </div>
             {/* Sparkline de precio: puntos de los cambios registrados en la bitácora */}
             {(() => {
-              const pts = historyEntries
-                .filter((e) => typeof e.detail?.price === "number")
-                .map((e) => ({ at: e.created_at, price: Number(e.detail.price) }))
-                .reverse()
+              const pts = priceSeries(historyEntries).reverse()
               if (pts.length < 2) return null
               const min = Math.min(...pts.map((p) => p.price))
               const max = Math.max(...pts.map((p) => p.price))
@@ -4063,22 +5490,46 @@ function AdminProductsContent() {
                 </p>
               ) : (
                 <ul className="divide-y divide-gray-50">
-                  {historyEntries.map((entry, i) => (
-                    <li key={i} className="py-2.5">
-                      <p className="text-sm font-medium text-gray-900">
-                        {AUDIT_ACTION_LABEL[entry.action as AuditAction] ?? entry.action}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        {timeAgo(entry.created_at)}
-                        {entry.actor_email ? ` · ${entry.actor_email}` : ""}
-                      </p>
-                      {Object.keys(entry.detail ?? {}).length > 0 && (
-                        <p className="mt-0.5 text-[10px] font-mono text-gray-400 break-all">
-                          {JSON.stringify(entry.detail)}
+                  {historyEntries.map((entry, i) => {
+                    const rows = auditDiffRows(entry.detail)
+                    const extras = auditExtraFields(entry.detail)
+                    return (
+                      <li key={i} className="py-2.5">
+                        <p className="text-sm font-medium text-gray-900">
+                          {AUDIT_ACTION_LABEL[entry.action as AuditAction] ?? entry.action}
                         </p>
-                      )}
-                    </li>
-                  ))}
+                        <p className="text-xs text-gray-400">
+                          {timeAgo(entry.created_at)}
+                          {entry.actor_email ? ` · ${entry.actor_email}` : ""}
+                        </p>
+                        {rows.length > 0 && (
+                          <ul className="mt-1.5 space-y-1">
+                            {rows.map((row) => (
+                              <li
+                                key={row.field}
+                                className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[11px]"
+                              >
+                                <span className="font-semibold text-gray-500">{row.label}:</span>
+                                <span className="text-gray-400 line-through">{row.before}</span>
+                                <span className="text-gray-300">→</span>
+                                <span className="font-semibold text-gray-800">{row.after}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {extras.length > 0 && (
+                          <p className="mt-1 text-[11px] text-gray-500">
+                            {extras.map((e) => `${e.label}: ${e.value}`).join(" · ")}
+                          </p>
+                        )}
+                        {rows.length === 0 && extras.length === 0 && (
+                          <p className="mt-0.5 text-[10px] font-mono text-gray-400 break-all">
+                            {JSON.stringify(entry.detail ?? {})}
+                          </p>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </div>
@@ -4096,6 +5547,7 @@ function AdminProductsContent() {
           onCategoryCreated={(cat) =>
             setCategories((prev) => [...prev, cat].sort((a, b) => a.name.localeCompare(b.name, "es")))
           }
+          tagSuggestions={tagList.map((t) => t.tag)}
         />
       )}
 

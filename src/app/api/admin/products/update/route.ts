@@ -3,14 +3,40 @@ import { requireAdmin } from "@/lib/admin-auth"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
+import { validateSku, validateBarcode } from "@/lib/sku"
+import { deriveStockStatus, isStockStatus } from "@/lib/stock"
 import { NextResponse } from "next/server"
+
+/** Campos que se guardan en la bitácora para el diff antes/después. */
+const AUDIT_FIELDS = [
+  "price",
+  "sale_price",
+  "sale_starts_at",
+  "sale_ends_at",
+  "stock_status",
+  "stock_quantity",
+  "low_stock_threshold",
+  "is_visible",
+  "show_in_whatsapp",
+  "name",
+  "brand",
+  "category_id",
+  "sku",
+  "barcode",
+  "tags",
+  "cost",
+  "image_url",
+  "seo_title",
+  "seo_description",
+] as const
 
 /**
  * PATCH /api/admin/products/update
  * Actualiza campos de un producto (superadmin).
- * Acepta un subconjunto de campos: price, sale_price, stock_status,
+ * Acepta un subconjunto de campos: price, sale_price, sale_starts_at,
+ * sale_ends_at, stock_status, stock_quantity, low_stock_threshold,
  * is_visible, show_in_whatsapp, image_url, name, brand, category_id,
- * description.
+ * description, sku, barcode, tags.
  */
 export async function PATCH(request: Request) {
   try {
@@ -52,6 +78,13 @@ export async function PATCH(request: Request) {
       "cost",
       "seo_title",
       "seo_description",
+      "sku",
+      "barcode",
+      "tags",
+      "sale_starts_at",
+      "sale_ends_at",
+      "low_stock_threshold",
+      "related_product_ids",
     ] as const
     type AllowedField = (typeof allowed)[number]
     const updates: Partial<Record<AllowedField, unknown>> = {}
@@ -78,8 +111,13 @@ export async function PATCH(request: Request) {
     if ("unit" in updates && updates.unit !== null && typeof updates.unit !== "string") {
       return NextResponse.json({ error: "unit debe ser texto o null" }, { status: 400 })
     }
-    // publish_at / unpublish_at: ISO 8601 válido o null (limpiar programación).
-    for (const field of ["publish_at", "unpublish_at"] as const) {
+    // publish_at / unpublish_at / ventana de oferta: ISO 8601 válido o null.
+    for (const field of [
+      "publish_at",
+      "unpublish_at",
+      "sale_starts_at",
+      "sale_ends_at",
+    ] as const) {
       if (field in updates) {
         const v = updates[field]
         if (v !== null && (typeof v !== "string" || Number.isNaN(new Date(v).getTime()))) {
@@ -119,6 +157,144 @@ export async function PATCH(request: Request) {
         )
       }
     }
+    // Precios: número finito ≥ 0 o null (la oferta vencida no se borra: se
+    // filtra al leer con resolveSalePrice, así el admin ve lo que programó).
+    for (const field of ["price", "sale_price"] as const) {
+      if (field in updates) {
+        const v = updates[field]
+        if (v !== null && (typeof v !== "number" || !Number.isFinite(v) || v < 0)) {
+          return NextResponse.json(
+            { error: `${field} debe ser un número ≥ 0 o null` },
+            { status: 400 }
+          )
+        }
+      }
+    }
+    // SKU / código de barras (migración 00106).
+    if ("sku" in updates) {
+      const res = validateSku(updates.sku)
+      if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 })
+      updates.sku = res.value
+    }
+    if ("barcode" in updates) {
+      const res = validateBarcode(updates.barcode)
+      if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 })
+      updates.barcode = res.value
+    }
+    // tags: arreglo de etiquetas normalizadas (colecciones de la tienda).
+    if ("tags" in updates) {
+      const raw = updates.tags
+      if (raw !== null && !Array.isArray(raw)) {
+        return NextResponse.json(
+          { error: "tags debe ser un arreglo de etiquetas o null" },
+          { status: 400 }
+        )
+      }
+      if (raw === null) {
+        updates.tags = []
+      } else {
+        const seen = new Set<string>()
+        for (const t of raw as unknown[]) {
+          if (typeof t !== "string") {
+            return NextResponse.json(
+              { error: "cada etiqueta debe ser texto" },
+              { status: 400 }
+            )
+          }
+          const clean = t.trim().toLowerCase()
+          if (!clean) continue
+          if (clean.length > 40) {
+            return NextResponse.json(
+              { error: "cada etiqueta admite hasta 40 caracteres" },
+              { status: 400 }
+            )
+          }
+          seen.add(clean)
+        }
+        if (seen.size > 20) {
+          return NextResponse.json(
+            { error: "máximo 20 etiquetas por producto" },
+            { status: 400 }
+          )
+        }
+        updates.tags = [...seen]
+      }
+    }
+    // Umbral de stock bajo (migración 00108).
+    if ("low_stock_threshold" in updates) {
+      const v = updates.low_stock_threshold
+      if (v !== null && (typeof v !== "number" || !Number.isInteger(v) || v < 0)) {
+        return NextResponse.json(
+          { error: "low_stock_threshold debe ser un entero ≥ 0 o null" },
+          { status: 400 }
+        )
+      }
+    }
+    // Productos relacionados (migración 00109): ids enteros, sin el propio.
+    if ("related_product_ids" in updates) {
+      const raw = updates.related_product_ids
+      if (raw !== null && !Array.isArray(raw)) {
+        return NextResponse.json(
+          { error: "related_product_ids debe ser un arreglo de ids o null" },
+          { status: 400 }
+        )
+      }
+      if (raw === null) {
+        updates.related_product_ids = []
+      } else {
+        const ids: number[] = []
+        for (const v of raw as unknown[]) {
+          if (typeof v !== "number" || !Number.isInteger(v)) {
+            return NextResponse.json(
+              { error: "cada producto relacionado debe ser un id entero" },
+              { status: 400 }
+            )
+          }
+          if (v !== productId && !ids.includes(v)) ids.push(v)
+        }
+        if (ids.length > 12) {
+          return NextResponse.json(
+            { error: "máximo 12 productos relacionados" },
+            { status: 400 }
+          )
+        }
+        updates.related_product_ids = ids
+      }
+    }
+
+    const supabase = await createServiceClient()
+
+    // Fila actual: hace falta para derivar el stock con el umbral vigente y
+    // para registrar el diff antes/después en la bitácora (Fase 15).
+    const { data: currentRaw } = await supabase
+      .from("products")
+      .select([...AUDIT_FIELDS, "deleted_at"].join(", "))
+      .eq("id", productId)
+      .maybeSingle()
+    const current = currentRaw as Record<string, unknown> | null
+
+    // Unicidad de SKU: el índice parcial solo cubre productos no borrados.
+    if (typeof updates.sku === "string") {
+      const { data: clash } = await supabase
+        .from("products")
+        .select("id")
+        .eq("sku", updates.sku)
+        .is("deleted_at", null)
+        .neq("id", productId)
+        .limit(1)
+        .maybeSingle()
+      if (clash) {
+        return NextResponse.json(
+          { error: `El SKU ${updates.sku} ya está en uso por otro producto` },
+          { status: 409 }
+        )
+      }
+    }
+
+    if ("stock_status" in updates && !isStockStatus(updates.stock_status)) {
+      return NextResponse.json({ error: "stock_status inválido" }, { status: 400 })
+    }
+
     if ("stock_quantity" in updates) {
       const q = updates.stock_quantity
       if (q !== null && (typeof q !== "number" || !Number.isInteger(q) || q < 0)) {
@@ -127,11 +303,21 @@ export async function PATCH(request: Request) {
           { status: 400 }
         )
       }
-      // La tienda lee stock_status: se deriva de la cantidad salvo que la
-      // misma petición fije un status explícito.
-      if (!("stock_status" in updates)) {
-        updates.stock_status =
-          q === null ? "in_stock" : q === 0 ? "out_of_stock" : q <= 5 ? "low_stock" : "in_stock"
+      // La tienda lee stock_status: con cantidad conocida siempre se deriva
+      // contra el umbral del producto (misma regla que create); el status
+      // manual solo aplica cuando la cantidad se deja vacía.
+      if (q !== null) {
+        const threshold =
+          "low_stock_threshold" in updates
+            ? (updates.low_stock_threshold as number | null)
+            : (current?.low_stock_threshold as number | null | undefined)
+        updates.stock_status = deriveStockStatus(q as number, threshold)
+      } else if (!("stock_status" in updates)) {
+        const threshold =
+          "low_stock_threshold" in updates
+            ? (updates.low_stock_threshold as number | null)
+            : (current?.low_stock_threshold as number | null | undefined)
+        updates.stock_status = deriveStockStatus(null, threshold)
       }
     }
     if ("cost" in updates) {
@@ -154,11 +340,17 @@ export async function PATCH(request: Request) {
         )
       }
     }
-    // image_url: solo URLs https públicas (o rutas locales del sitio).
+    // image_url: URL https pública, ruta local del sitio, o null para quitarla.
     if ("image_url" in updates) {
       const url = updates.image_url
-      if (typeof url !== "string" || (!url.startsWith("https://") && !url.startsWith("/"))) {
-        return NextResponse.json({ error: "image_url debe ser una URL https o ruta local" }, { status: 400 })
+      if (
+        url !== null &&
+        (typeof url !== "string" || (!url.startsWith("https://") && !url.startsWith("/")))
+      ) {
+        return NextResponse.json(
+          { error: "image_url debe ser una URL https, una ruta local o null" },
+          { status: 400 }
+        )
       }
     }
     if (Object.keys(updates).length === 0) {
@@ -168,7 +360,6 @@ export async function PATCH(request: Request) {
       )
     }
 
-    const supabase = await createServiceClient()
     const { error } = await supabase
       .from("products")
       .update(updates)
@@ -182,14 +373,25 @@ export async function PATCH(request: Request) {
     revalidateCatalogCache()
     resetCatalogCache()
 
-    // Fase 15 — bitácora de auditoría (best-effort)
+    // Fase 15 — bitácora de auditoría con diff antes/después (best-effort).
+    const before: Record<string, unknown> = {}
+    const after: Record<string, unknown> = {}
+    for (const field of AUDIT_FIELDS) {
+      if (!(field in updates)) continue
+      const prev = (current as Record<string, unknown> | null)?.[field] ?? null
+      const next = (updates as Record<string, unknown>)[field] ?? null
+      if (JSON.stringify(prev) !== JSON.stringify(next)) {
+        before[field] = prev
+        after[field] = next
+      }
+    }
     await logAdminAction(supabase, {
       actorId: adminUser?.id ?? null,
       actorEmail: adminUser?.email ?? null,
       action: "product_update",
       entity: "products",
       entityId: productId,
-      detail: updates as Record<string, unknown>,
+      detail: Object.keys(after).length > 0 ? { before, after } : (updates as Record<string, unknown>),
     })
 
     // WA5 — encolar sync incremental del catálogo WhatsApp (best-effort).

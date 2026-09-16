@@ -12,6 +12,7 @@ import {
 import { ProductDetailClient } from "./product-detail-client"
 import { RecentlyViewed } from "@/components/product/recently-viewed"
 import { getBreadcrumbSchema, getProductSchema } from "@/lib/structured-data"
+import { buildRelatedProducts } from "@/lib/related-products"
 
 // ISR: se revalida cada 5 min (alineado con catalog-cache). La primera
 // visita a cada producto renderiza y cachea; el resto sale del CDN.
@@ -93,8 +94,9 @@ export default async function ProductPage({ params }: Props) {
   // Fetch category info (cached)
   const category = await getCachedCategoryById(product.category_id)
 
-  // Fetch related products (same category, excluding current),
-  // filtrados por disponibilidad de la ciudad.
+  // Fetch related products: primero los relacionados explícitos del admin
+  // (00109), en su orden; después la misma categoría y el resto del catálogo.
+  // Todo filtrado por disponibilidad de la ciudad.
   const relatedSameCategory = filterByCityAvailability(
     await getCachedProductsByCategory(product.category_id),
     availableIds
@@ -102,20 +104,20 @@ export default async function ProductPage({ params }: Props) {
     (p) => p.id !== product.id
   )
 
-  const related = relatedSameCategory.slice(0, 4)
+  const availableProducts = filterByCityAvailability(
+    await getCachedVisibleProducts(),
+    availableIds
+  )
 
-  // If fewer than 4 from same category, fill with products from other categories
-  if (related.length < 4) {
-    const existingIds = new Set([product.id, ...related.map((p) => p.id)])
-    const otherProducts = filterByCityAvailability(
-      await getCachedVisibleProducts(),
-      availableIds
-    ).filter(
-      (p) => p.id !== product.id && !existingIds.has(p.id)
-    )
-
-    if (otherProducts.length) related.push(...otherProducts.slice(0, 4 - related.length))
-  }
+  const related = buildRelatedProducts({
+    productId: product.id,
+    explicitIds: product.related_product_ids,
+    availableById: new Map(availableProducts.map((p) => [p.id, p])),
+    sameCategory: relatedSameCategory,
+    others: availableProducts.filter(
+      (p) => p.id !== product.id && p.category_id !== product.category_id
+    ),
+  })
 
   const url = `https://resurte.me/${slug}/producto/${productSlug}`
   const jsonLd = [

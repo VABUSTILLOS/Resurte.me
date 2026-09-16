@@ -101,6 +101,11 @@ export interface Product {
   category_id: number
   price: number
   sale_price: number | null
+  /** Ventana de vigencia de `sale_price` (migración 00107). Ausente = sin límite. */
+  sale_starts_at?: string | null
+  sale_ends_at?: string | null
+  /** Relacionados explícitos elegidos en el panel (migración 00109). */
+  related_product_ids?: number[] | null
   stock_status: 'in_stock' | 'low_stock' | 'out_of_stock'
   show_in_whatsapp: boolean
   whatsapp_product_id: string | null

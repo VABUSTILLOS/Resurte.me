@@ -1,14 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
-import { resolveBumps, type BumpDiagnostics } from "@/lib/order-bumps"
+import { resolveBumps, sanitizeBumpLimit, type BumpDiagnostics } from "@/lib/order-bumps"
 import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 
 /**
  * POST /api/cart/bumps
  *
- * Devuelve hasta 3 order bumps condicionales para el carrito actual.
- * Body: { city_id?: number, items: [{ product_id, quantity }] }
+ * Devuelve order bumps condicionales para el carrito actual.
+ * Body: { city_id?: number, items: [{ product_id, quantity }], limit?: number }
+ *
+ * `limit` (opcional) acota cuántas ofertas se devuelven, saneado a
+ * [1, MAX_BUMPS_POOL] con default MAX_BUMPS. El checkout pide el pool completo
+ * para encadenar ofertas; las superficies de carrito no lo envían.
  *
  * El cliente solo envía IDs/cantidades; el servidor deriva reglas, precios y
  * stock de la BD (nunca acepta precios del cliente). Fail-open: si la BD
@@ -31,9 +35,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { items } = body as {
+    const { items, limit } = body as {
       city_id?: number
       items?: { product_id: number; quantity: number }[]
+      limit?: number
     }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -73,12 +78,14 @@ export async function POST(request: NextRequest) {
     }
 
     const bumpsDiagnostics: BumpDiagnostics = {}
-    const bumps = await resolveBumps({ items: validItems }, bumpsDiagnostics)
+    const bumpLimit = sanitizeBumpLimit(limit)
+    const bumps = await resolveBumps({ items: validItems }, bumpsDiagnostics, bumpLimit)
     // Log del resultado para poder correlacionar en Vercel si el navegador del
     // usuario recibe bumps (clave del diagnóstico "no veo bumps logueado").
     logger.info("[BUMPS] served", {
       items: validItems.map((i) => i.product_id),
       bumpCount: bumps.length,
+      limit: bumpLimit,
       rules: bumps.map((b) => `${b.ruleId}:${b.trigger_type}`),
       ua: request.headers.get("user-agent") ?? "n/a",
       state: bumpsDiagnostics.state ?? null,

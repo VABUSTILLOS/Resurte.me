@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useCart } from "@/contexts/cart-context"
-import { calcCheckoutTotals } from "@/lib/checkout-config"
+import { calcCheckoutTotals, countBumpUnits } from "@/lib/checkout-config"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import type { AppliedCoupon } from "@/types"
 import { Tag, X, Loader2, Check } from "lucide-react"
@@ -26,8 +26,8 @@ export function CouponInput() {
     [selectedBumps]
   )
   const totals = useMemo(
-    () => calcCheckoutTotals(subtotal, bumpsSubtotal, coupon, itemCount, selectedBumps.length),
-    [subtotal, bumpsSubtotal, coupon, itemCount, selectedBumps.length]
+    () => calcCheckoutTotals(subtotal, bumpsSubtotal, coupon, itemCount, countBumpUnits(selectedBumps)),
+    [subtotal, bumpsSubtotal, coupon, itemCount, selectedBumps]
   )
 
   // Revalida el cupón persistido (localStorage) al montar o si cambia el

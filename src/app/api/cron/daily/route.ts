@@ -116,6 +116,18 @@ export async function GET(req: NextRequest) {
         return runWhatsAppAutomations()
       },
     ],
+    // Ronda 7 — purga de la papelera de productos: borra definitivamente los
+    // que llevan más de 30 días con deleted_at (nunca los que tienen pedidos,
+    // porque order_items.product_id es ON DELETE CASCADE).
+    [
+      "purge-trash",
+      async () => {
+        const { purgeTrashProducts } = await import("@/lib/trash")
+        const { createServiceClient } = await import("@/lib/supabase/service")
+        const supabase = await createServiceClient()
+        return purgeTrashProducts(supabase)
+      },
+    ],
   ]
 
   // Secuencial e independiente: un job que falla no detiene a los demás.

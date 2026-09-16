@@ -9,18 +9,36 @@ import {
 } from "@/lib/product-import"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 
+type ImportMode = "upsert" | "create_only" | "update_only"
+
 interface ImportResponse {
   created?: number
   updated?: number
+  skipped?: number
   errors?: { slug: string; message: string }[]
   error?: string
+}
+
+interface PlanEntry {
+  line: number
+  slug: string
+  name: string
+  sku: string | null
+  matchedBy: "sku" | "slug" | null
 }
 
 interface DryRunPlan {
   created: number
   updated: number
-  toCreate: { slug: string; name: string }[]
-  toUpdate: { slug: string; name: string }[]
+  skipped: number
+  toCreate: PlanEntry[]
+  toUpdate: PlanEntry[]
+}
+
+const MODE_LABEL: Record<ImportMode, string> = {
+  upsert: "Crear y actualizar",
+  create_only: "Solo crear nuevos",
+  update_only: "Solo actualizar existentes",
 }
 
 /**
@@ -41,6 +59,7 @@ export function ImportProductsModal({
   // Dry-run: clasificación servidor (crear/actualizar) antes de aplicar.
   const [plan, setPlan] = useState<DryRunPlan | null>(null)
   const [planning, setPlanning] = useState(false)
+  const [mode, setMode] = useState<ImportMode>("upsert")
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEscapeKey(onClose, true)
@@ -76,13 +95,14 @@ export function ImportProductsModal({
       const res = await fetch("/api/admin/products/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: parsed.rows, dryRun: true }),
+        body: JSON.stringify({ rows: parsed.rows, dryRun: true, mode }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Error al previsualizar")
       setPlan({
         created: data.created ?? 0,
         updated: data.updated ?? 0,
+        skipped: data.skipped ?? 0,
         toCreate: data.toCreate ?? [],
         toUpdate: data.toUpdate ?? [],
       })
@@ -100,7 +120,7 @@ export function ImportProductsModal({
       const res = await fetch("/api/admin/products/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: parsed.rows }),
+        body: JSON.stringify({ rows: parsed.rows, mode }),
       })
       const data = (await res.json()) as ImportResponse
       setResult(data)
@@ -177,6 +197,35 @@ export function ImportProductsModal({
           className="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-xs focus:outline-none focus:border-brand-500"
         />
 
+        <fieldset className="mt-3">
+          <legend className="text-xs font-semibold text-gray-700 mb-1.5">
+            Qué hacer con las filas
+          </legend>
+          <div className="flex flex-wrap gap-1.5">
+            {(Object.keys(MODE_LABEL) as ImportMode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => {
+                  setMode(m)
+                  setPlan(null)
+                }}
+                aria-pressed={mode === m}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  mode === m
+                    ? "bg-brand-600 text-white"
+                    : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {MODE_LABEL[m]}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px] text-gray-500">
+            La coincidencia es primero por SKU y luego por slug.
+          </p>
+        </fieldset>
+
         {parsed && (
           <div className="mt-3" aria-live="polite">
             <p className="text-xs font-medium text-gray-700">
@@ -216,31 +265,36 @@ export function ImportProductsModal({
           <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
             <p className="font-semibold">
               Vista previa: {plan.created} nuevos · {plan.updated} se actualizarán
+              {plan.skipped > 0 && ` · ${plan.skipped} se omitirán por el modo elegido`}
             </p>
-            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
               {plan.toCreate.length > 0 && (
                 <ul className="rounded-lg bg-white/70 border border-blue-100 p-2 space-y-0.5">
                   <li className="text-[10px] font-bold text-green-700 uppercase">Nuevos</li>
-                  {plan.toCreate.slice(0, 10).map((r) => (
-                    <li key={r.slug} className="text-[11px] text-gray-700">
+                  {plan.toCreate.slice(0, 20).map((r) => (
+                    <li key={`c-${r.line}`} className="text-[11px] text-gray-700">
                       {r.name}
+                      {r.sku && <span className="text-gray-400"> · {r.sku}</span>}
                     </li>
                   ))}
-                  {plan.toCreate.length > 10 && (
-                    <li className="text-[11px] text-gray-400">…y {plan.toCreate.length - 10} más</li>
+                  {plan.toCreate.length > 20 && (
+                    <li className="text-[11px] text-gray-400">…y {plan.toCreate.length - 20} más</li>
                   )}
                 </ul>
               )}
               {plan.toUpdate.length > 0 && (
                 <ul className="rounded-lg bg-white/70 border border-blue-100 p-2 space-y-0.5">
                   <li className="text-[10px] font-bold text-amber-700 uppercase">Se actualizan</li>
-                  {plan.toUpdate.slice(0, 10).map((r) => (
-                    <li key={r.slug} className="text-[11px] text-gray-700">
+                  {plan.toUpdate.slice(0, 20).map((r) => (
+                    <li key={`u-${r.line}`} className="text-[11px] text-gray-700">
                       {r.name}
+                      <span className="ml-1 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-bold text-amber-700 uppercase">
+                        {r.matchedBy === "sku" ? "SKU" : "slug"}
+                      </span>
                     </li>
                   ))}
-                  {plan.toUpdate.length > 10 && (
-                    <li className="text-[11px] text-gray-400">…y {plan.toUpdate.length - 10} más</li>
+                  {plan.toUpdate.length > 20 && (
+                    <li className="text-[11px] text-gray-400">…y {plan.toUpdate.length - 20} más</li>
                   )}
                 </ul>
               )}
@@ -262,6 +316,7 @@ export function ImportProductsModal({
             ) : (
               <>
                 {result.created ?? 0} creados · {result.updated ?? 0} actualizados
+                {(result.skipped ?? 0) > 0 && ` · ${result.skipped} omitidos`}
                 {(result.errors?.length ?? 0) > 0 && ` · ${result.errors?.length ?? 0} fallidos`}
                 {(result.errors ?? []).slice(0, 5).map((e) => (
                   <p key={e.slug} className="mt-1 text-red-700">

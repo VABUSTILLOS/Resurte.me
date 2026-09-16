@@ -2,6 +2,7 @@ import { createPublicClient } from "@/lib/supabase/public"
 import type { City, Category, Product, RestaurantCollection } from "@/types"
 import { logger } from "@/lib/logger"
 import { expandSearchTerms, escapeIlike } from "@/lib/search-terms"
+import { normalizeSale, withResolvedSale } from "@/lib/sale-window"
 
 type SupabasePublicClient = NonNullable<ReturnType<typeof createPublicClient>>
 
@@ -119,7 +120,9 @@ export async function getProducts(
     }
     ;({ data: rows } = await fallback)
   }
-  return (rows as Product[]) ?? []
+  // Oferta fuera de su ventana (00107): se anula sale_price para que tarjetas,
+  // detalle y JSON-LD sigan usando sale_price ?? price sin cambios.
+  return normalizeSale(rows as Product[])
 }
 
 const PAGE_SIZE = 24
@@ -172,7 +175,7 @@ export async function getProductsPaginated(
     ;({ data, count } = await fallback)
   }
 
-  const products = (data as Product[]) ?? []
+  const products = normalizeSale(data as Product[])
   const total = count ?? products.length
   const hasMore = from + products.length < total
 
@@ -195,7 +198,8 @@ export async function getProductBySlug(
   }
 
   const { data } = await query.single()
-  return (data as Product) ?? null
+  const product = (data as Product) ?? null
+  return product ? withResolvedSale(product) : null
 }
 
 // ============================================================
@@ -233,7 +237,7 @@ export async function searchAll(
     .limit(20)
 
   return {
-    products: (products as Product[]) ?? [],
+    products: normalizeSale(products as Product[]),
   }
 }
 
@@ -331,7 +335,7 @@ export async function getProductsByCollection(
   })
 
   if (!error) {
-    return (data ?? []) as Product[]
+    return normalizeSale(data as Product[])
   }
 
   logger.warn(

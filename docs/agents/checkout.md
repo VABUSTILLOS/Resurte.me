@@ -10,7 +10,19 @@
 ## Invariantes
 - **Fuente única de totales**: `calcCheckoutTotals` (cliente) y su espejo en
   `POST /api/orders` (servidor). Cualquier cambio de regla (envío gratis, cupón
-  sobre bumps) se hace en ambos lados el mismo día.
+  sobre bumps) se hace en ambos lados el mismo día. El `bumpCount` que recibe es
+  **unidades**, no líneas: se calcula con `countBumpUnits(selectedBumps)` para
+  que un bump con cantidad 3 cuente como 3 artículos.
+- **Bumps encadenados**: el checkout pide el pool completo (`MAX_BUMPS_POOL`) y
+  `BumpCards` con `revealNext` muestra una ventana de `MAX_BUMPS` que se
+  desplaza al elegir: el bump entra al pedido y aparece el siguiente. El pool se
+  agota y ahí se detiene. Las superficies de carrito (`cart-drawer`, `/cart`,
+  `/{ciudad}/carrito`) siguen sin `revealNext` y conservan su copy de "Hasta 3".
+- **Cantidades editables (mínimo 1)**: `OrderItemsList` (checkout) y
+  `QuantityStepper` (exportado para `ReviewStep`) son la única UI de +/− del
+  pedido. El "−" se deshabilita en `MIN_ITEM_QUANTITY`: el checkout nunca deja
+  el pedido en 0 artículos, para quitar un producto se vuelve al carrito
+  (donde `UPDATE_QUANTITY` sí elimina en ≤0).
 - **Cifras comerciales**: el umbral de envío gratis vive en `commercial-facts.ts`
   (`FREE_SHIPPING_MXN`) y la tarifa en `checkout-config.ts` (`DELIVERY_FEE_FLAT`).
   Ninguna superficie publica la cifra a mano: la prosa interpola la constante y

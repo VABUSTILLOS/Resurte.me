@@ -1,8 +1,14 @@
 "use client"
 
-import { useRef, useState } from "react"
-import { ImagePlus, Loader2, Sparkles, Star, X } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { ImagePlus, Loader2, Plus, Search, Sparkles, Star, X } from "lucide-react"
 import { cropImageToSquare } from "@/lib/crop-image"
+import { validateBarcode, validateSku } from "@/lib/sku"
+import {
+  DEFAULT_LOW_STOCK_THRESHOLD,
+  deriveStockStatus,
+  resolveLowStockThreshold,
+} from "@/lib/stock"
 
 interface Category {
   id: number
@@ -20,8 +26,15 @@ export interface ProductFormProduct {
   unit: string | null
   price: number | null
   sale_price: number | null
+  sale_starts_at: string | null
+  sale_ends_at: string | null
   cost: number | null
   stock_quantity: number | null
+  low_stock_threshold: number | null
+  sku: string | null
+  barcode: string | null
+  tags: string[] | null
+  related_product_ids: number[] | null
   sort_order: number | null
   stock_status: "in_stock" | "low_stock" | "out_of_stock"
   is_visible: boolean
@@ -44,6 +57,8 @@ interface ProductFormModalProps {
   onSaved: (product: ProductFormProduct, created: boolean) => void
   /** Alta inline de categoría: el padre la agrega a su lista. */
   onCategoryCreated?: (category: Category) => void
+  /** Etiquetas ya usadas en el catálogo, para autocompletar. */
+  tagSuggestions?: string[]
 }
 
 interface SpeechRecognitionLike {
@@ -65,6 +80,15 @@ const STOCK_OPTIONS = [
   { value: "out_of_stock", label: "Agotado" },
 ] as const
 
+interface RelatedOption {
+  id: number
+  name: string
+  brand: string | null
+}
+
+/** Tope de relacionados que acepta el servidor (update/route.ts). */
+const RELATED_MAX = 12
+
 /** Modal de alta/edición completa de producto (nombre, marca, categoría,
  *  descripción, precios, stock y flags de publicación). */
 export function ProductFormModal({
@@ -73,6 +97,7 @@ export function ProductFormModal({
   onClose,
   onSaved,
   onCategoryCreated,
+  tagSuggestions = [],
 }: ProductFormModalProps) {
   const isEdit = product !== null
   const [name, setName] = useState(product?.name ?? "")
@@ -90,9 +115,80 @@ export function ProductFormModal({
   const [stockQuantity, setStockQuantity] = useState(
     product?.stock_quantity != null ? String(product.stock_quantity) : ""
   )
+  const [sku, setSku] = useState(product?.sku ?? "")
+  const [barcode, setBarcode] = useState(product?.barcode ?? "")
+  const [tags, setTags] = useState<string[]>(product?.tags ?? [])
+  const [tagDraft, setTagDraft] = useState("")
+  const [lowStockThreshold, setLowStockThreshold] = useState(
+    product?.low_stock_threshold != null ? String(product.low_stock_threshold) : ""
+  )
   const [seoTitle, setSeoTitle] = useState(product?.seo_title ?? "")
   const [seoDescription, setSeoDescription] = useState(product?.seo_description ?? "")
   const [generatingSeo, setGeneratingSeo] = useState(false)
+
+  // Relacionados explícitos (00109): ids elegidos + metadatos para los chips.
+  const [relatedIds, setRelatedIds] = useState<number[]>(product?.related_product_ids ?? [])
+  const [relatedInfo, setRelatedInfo] = useState<Record<number, RelatedOption>>({})
+  const [relatedQuery, setRelatedQuery] = useState("")
+  const [relatedResults, setRelatedResults] = useState<RelatedOption[]>([])
+  const [relatedSearching, setRelatedSearching] = useState(false)
+
+  // Nombres de los ya elegidos que no vinieron en la carga inicial.
+  useEffect(() => {
+    const missing = relatedIds.filter((id) => !relatedInfo[id])
+    if (missing.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      const res = await fetch(`/api/admin/products/list?ids=${missing.join(",")}`)
+      const data = await res.json().catch(() => ({}))
+      if (cancelled || !Array.isArray(data.rows)) return
+      setRelatedInfo((prev) => {
+        const next = { ...prev }
+        for (const r of data.rows as RelatedOption[]) next[r.id] = r
+        return next
+      })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [relatedIds, relatedInfo])
+
+  // Buscador del catálogo (nombre, marca, SKU, código de barras).
+  const relatedActive = relatedQuery.trim().length >= 2
+  useEffect(() => {
+    const q = relatedQuery.trim()
+    if (q.length < 2) return
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      setRelatedSearching(true)
+      try {
+        const res = await fetch(
+          `/api/admin/products/list?q=${encodeURIComponent(q)}&page=1&pageSize=12&sort=name&dir=asc`
+        )
+        const data = await res.json().catch(() => ({}))
+        if (cancelled) return
+        setRelatedResults(Array.isArray(data.rows) ? (data.rows as RelatedOption[]) : [])
+      } finally {
+        if (!cancelled) setRelatedSearching(false)
+      }
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [relatedQuery])
+
+  function toggleRelated(option: RelatedOption) {
+    if (product && option.id === product.id) return
+    setRelatedIds((prev) =>
+      prev.includes(option.id)
+        ? prev.filter((id) => id !== option.id)
+        : prev.length >= RELATED_MAX
+          ? prev
+          : [...prev, option.id]
+    )
+    setRelatedInfo((prev) => ({ ...prev, [option.id]: option }))
+  }
 
   async function generateSeo() {
     if (!name.trim()) {
@@ -144,6 +240,9 @@ export function ProductFormModal({
   const toLocalInput = (iso: string | null | undefined) => (iso ? iso.slice(0, 16) : "")
   const [publishAt, setPublishAt] = useState(toLocalInput(product?.publish_at))
   const [unpublishAt, setUnpublishAt] = useState(toLocalInput(product?.unpublish_at))
+  // Ventana de vigencia de la oferta (00107).
+  const [saleStartsAt, setSaleStartsAt] = useState(toLocalInput(product?.sale_starts_at))
+  const [saleEndsAt, setSaleEndsAt] = useState(toLocalInput(product?.sale_ends_at))
   const [adminNote, setAdminNote] = useState(product?.admin_note ?? "")
   // Galería de imágenes (products.images jsonb) + principal (image_url).
   const [gallery, setGallery] = useState<string[]>(product?.images ?? [])
@@ -388,6 +487,33 @@ export function ProductFormModal({
     }
   }
 
+  /** Etiquetas normalizadas (minúsculas, sin duplicados, máx 20). */
+  function addTag(raw: string) {
+    const value = raw.trim().toLowerCase()
+    if (!value) return
+    if (value.length > 40) {
+      setError("Cada etiqueta debe tener máximo 40 caracteres")
+      return
+    }
+    setTags((prev) => {
+      if (prev.includes(value)) return prev
+      if (prev.length >= 20) {
+        setError("Máximo 20 etiquetas por producto")
+        return prev
+      }
+      return [...prev, value]
+    })
+    setTagDraft("")
+  }
+
+  function removeTag(tag: string) {
+    setTags((prev) => prev.filter((t) => t !== tag))
+  }
+
+  const tagSuggestionsAvailable = tagSuggestions
+    .filter((t) => !tags.includes(t))
+    .slice(0, 8)
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (saving) return
@@ -416,6 +542,34 @@ export function ProductFormModal({
       setError("Cantidad de stock inválida")
       return
     }
+    const parsedThreshold =
+      lowStockThreshold.trim() === "" ? null : parseInt(lowStockThreshold, 10)
+    if (
+      parsedThreshold !== null &&
+      (!Number.isInteger(parsedThreshold) || parsedThreshold < 0)
+    ) {
+      setError("Umbral de stock bajo inválido")
+      return
+    }
+    const skuCheck = validateSku(sku)
+    if (!skuCheck.ok) {
+      setError(skuCheck.error)
+      return
+    }
+    const barcodeCheck = validateBarcode(barcode)
+    if (!barcodeCheck.ok) {
+      setError(barcodeCheck.error)
+      return
+    }
+    if (saleStartsAt && saleEndsAt && new Date(saleStartsAt) > new Date(saleEndsAt)) {
+      setError("La oferta no puede empezar después de terminar")
+      return
+    }
+
+    // Espeja la regla del servidor: con unidades capturadas el estado se
+    // deriva del umbral; sin unidades manda la selección manual.
+    const derivedStockStatus =
+      parsedQty === null ? stockStatus : deriveStockStatus(parsedQty, parsedThreshold)
 
     setSaving(true)
     setError(null)
@@ -428,9 +582,16 @@ export function ProductFormModal({
         unit: unit.trim() || null,
         price: parsedPrice,
         sale_price: parsedSale,
+        sale_starts_at: saleStartsAt ? new Date(saleStartsAt).toISOString() : null,
+        sale_ends_at: saleEndsAt ? new Date(saleEndsAt).toISOString() : null,
         cost: parsedCost,
         stock_quantity: parsedQty,
-        stock_status: stockStatus,
+        low_stock_threshold: parsedThreshold,
+        stock_status: derivedStockStatus,
+        sku: sku.trim() || null,
+        barcode: barcode.trim() || null,
+        tags,
+        related_product_ids: relatedIds,
         seo_title: seoTitle.trim() || null,
         seo_description: seoDescription.trim() || null,
         is_visible: isVisible,
@@ -542,6 +703,196 @@ export function ProductFormModal({
                 className={inputCls}
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-sku">
+                SKU
+              </label>
+              <input
+                id="pf-sku"
+                value={sku}
+                onChange={(e) => setSku(e.target.value)}
+                placeholder="AB-0001"
+                maxLength={40}
+                className={`${inputCls} font-mono`}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-xs font-semibold text-gray-600 mb-1"
+                htmlFor="pf-barcode"
+              >
+                Código de barras
+              </label>
+              <input
+                id="pf-barcode"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                inputMode="numeric"
+                placeholder="7501234567890"
+                className={`${inputCls} font-mono`}
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-400 -mt-2">
+            El SKU debe ser único en el catálogo; el código de barras acepta 8, 12, 13 o 14
+            dígitos.
+          </p>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-tag">
+              Etiquetas
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+              {tags.length === 0 && (
+                <span className="text-[11px] text-gray-400">Sin etiquetas</span>
+              )}
+              {tags.map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-[11px] font-semibold"
+                >
+                  {t}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(t)}
+                    className="text-brand-500 hover:text-brand-800"
+                    aria-label={`Quitar etiqueta ${t}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="pf-tag"
+                value={tagDraft}
+                onChange={(e) => setTagDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault()
+                    addTag(tagDraft)
+                  }
+                }}
+                placeholder="arranque, limpieza…"
+                maxLength={40}
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={() => addTag(tagDraft)}
+                disabled={!tagDraft.trim()}
+                className="shrink-0 flex items-center gap-1 px-3 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Agregar
+              </button>
+            </div>
+            {tagSuggestionsAvailable.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {tagSuggestionsAvailable.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => addTag(t)}
+                    className="px-2 py-0.5 rounded-full border border-gray-200 text-[11px] text-gray-500 hover:bg-gray-50"
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="mt-1 text-[10px] text-gray-400">
+              Las etiquetas alimentan las colecciones de la tienda (p. ej. arranque, limpieza).
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-related">
+              Productos relacionados
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+              {relatedIds.length === 0 && (
+                <span className="text-[11px] text-gray-400">
+                  Sin relacionados: la tienda sugiere por categoría
+                </span>
+              )}
+              {relatedIds.map((id) => (
+                <span
+                  key={id}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 text-[11px] font-semibold"
+                >
+                  {relatedInfo[id]?.name ?? `#${id}`}
+                  <button
+                    type="button"
+                    onClick={() => setRelatedIds((prev) => prev.filter((x) => x !== id))}
+                    className="text-violet-500 hover:text-violet-800"
+                    aria-label={`Quitar relacionado ${relatedInfo[id]?.name ?? id}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                id="pf-related"
+                value={relatedQuery}
+                onChange={(e) => setRelatedQuery(e.target.value)}
+                placeholder="Buscar por nombre, marca o SKU…"
+                className={`${inputCls} pl-9`}
+                autoComplete="off"
+              />
+              {relatedActive && relatedSearching && (
+                <Loader2 className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 animate-spin" />
+              )}
+            </div>
+            {relatedActive && relatedResults.length > 0 && (
+              <ul className="mt-1.5 max-h-40 overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-100">
+                {relatedResults.map((r) => {
+                  const selected = relatedIds.includes(r.id)
+                  const isSelf = product?.id === r.id
+                  const full = !selected && relatedIds.length >= RELATED_MAX
+                  return (
+                    <li key={r.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleRelated(r)}
+                        disabled={isSelf || full}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-gray-50 disabled:opacity-40"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium text-gray-800">
+                            {r.name}
+                          </span>
+                          {r.brand && (
+                            <span className="block truncate text-[10px] text-gray-400">
+                              {r.brand}
+                            </span>
+                          )}
+                        </span>
+                        <span className="shrink-0 text-[10px] font-semibold text-violet-600">
+                          {isSelf ? "Es este" : selected ? "Quitar" : full ? "Tope" : "Agregar"}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            {relatedActive &&
+              !relatedSearching &&
+              relatedResults.length === 0 && (
+                <p className="mt-1 text-[10px] text-gray-400">Sin resultados.</p>
+              )}
+            <p className="mt-1 text-[10px] text-gray-400">
+              Se muestran primero en la ficha del producto; máximo {RELATED_MAX}. Si no hay
+              ninguno, la tienda sugiere por categoría.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -834,6 +1185,44 @@ export function ProductFormModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
+              <label
+                className="block text-xs font-semibold text-gray-600 mb-1"
+                htmlFor="pf-sale-start"
+              >
+                Oferta desde
+              </label>
+              <input
+                id="pf-sale-start"
+                type="datetime-local"
+                value={saleStartsAt}
+                onChange={(e) => setSaleStartsAt(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-xs font-semibold text-gray-600 mb-1"
+                htmlFor="pf-sale-end"
+              >
+                Oferta hasta
+              </label>
+              <input
+                id="pf-sale-end"
+                type="datetime-local"
+                value={saleEndsAt}
+                onChange={(e) => setSaleEndsAt(e.target.value)}
+                className={inputCls}
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400 -mt-2">
+            {salePrice.trim() === ""
+              ? "Sin precio de oferta no hay ventana que aplicar."
+              : "Fuera de esta ventana la tienda cobra el precio normal; déjala vacía para que la oferta no expire."}
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-qty">
                 Unidades disponibles
               </label>
@@ -867,7 +1256,30 @@ export function ProductFormModal({
                 ))}
               </select>
               <p className="mt-1 text-[10px] text-gray-400">
-                Si capturas unidades, el estado se deriva (0 → agotado, ≤5 → bajo).
+                {`Si capturas unidades, el estado se deriva (0 → agotado, ≤${resolveLowStockThreshold(
+                  lowStockThreshold.trim() === "" ? null : Number(lowStockThreshold)
+                )} → bajo).`}
+              </p>
+            </div>
+            <div>
+              <label
+                className="block text-xs font-semibold text-gray-600 mb-1"
+                htmlFor="pf-threshold"
+              >
+                Umbral stock bajo
+              </label>
+              <input
+                id="pf-threshold"
+                type="number"
+                min="0"
+                step="1"
+                value={lowStockThreshold}
+                onChange={(e) => setLowStockThreshold(e.target.value)}
+                placeholder={String(DEFAULT_LOW_STOCK_THRESHOLD)}
+                className={inputCls}
+              />
+              <p className="mt-1 text-[10px] text-gray-400">
+                Vacío = predeterminado ({DEFAULT_LOW_STOCK_THRESHOLD}).
               </p>
             </div>
           </div>

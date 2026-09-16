@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { useCart } from "@/contexts/cart-context"
 import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
 import { AnalyticsEvents } from "@/lib/analytics"
@@ -14,7 +13,7 @@ import {
   CheckCircle2,
   Zap,
 } from "lucide-react"
-import { calcCheckoutTotals, DELIVERY_FEE_FLAT, FREE_SHIPPING_THRESHOLD } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT, FREE_SHIPPING_THRESHOLD, MAX_BUMPS_POOL, MIN_ITEM_QUANTITY, countBumpUnits } from "@/lib/checkout-config"
 import { formatMxn } from "@/lib/commercial-facts"
 import {
   DEFAULT_ADDRESS_FORM,
@@ -27,6 +26,7 @@ import { AddressStep } from "@/components/checkout/AddressStep"
 import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
 import { BumpCards, type SelectedBump } from "@/components/checkout/BumpCards"
+import { OrderItemsList } from "@/components/checkout/OrderItemsList"
 import { SocialProofBadge } from "@/components/checkout/social-proof"
 import { readStoredBumps } from "@/hooks/use-selected-bumps"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
@@ -58,7 +58,7 @@ type DrawerStep = "review" | "address" | "schedule" | "bumps" | "payment"
  * siempre tiene la alternativa de pagar en la página completa.
  */
 export function CheckoutDrawer() {
-  const { cart, itemCount, subtotal, clearCart, coupon } = useCart()
+  const { cart, itemCount, subtotal, clearCart, coupon, updateQuantity } = useCart()
   const { city } = useCity()
   const router = useRouter()
 
@@ -88,16 +88,30 @@ export function CheckoutDrawer() {
   // El descuento de cupón se calcula sobre el subtotal CON bumps incluidos,
   // igual que el servidor en POST /api/orders — así el total coincide a 0.01.
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
+  // Cuenta de artículos: unidades, no líneas (un bump con cantidad 3 son 3
+  // artículos) para que el envío gratis y el conteo del resumen cuadren con
+  // el pedido real.
+  const bumpUnits = countBumpUnits(selectedBumps)
   const totals = calcCheckoutTotals(
     subtotal,
     bumpsSubtotal,
     coupon,
     itemCount,
-    selectedBumps.length,
+    bumpUnits,
     DELIVERY_FEE_FLAT
   )
   const { discountAmount, payableSubtotal, deliveryFee } = totals
   const total = totals.total
+
+  // Cantidades editables desde el paso de revisión (mínimo 1: el botón "−"
+  // se deshabilita en el mínimo, nunca se quita el artículo desde el checkout).
+  const updateBumpQuantity = useCallback((ruleId: number, quantity: number) => {
+    setSelectedBumps((prev) =>
+      prev.map((b) =>
+        b.ruleId === ruleId ? { ...b, quantity: Math.max(MIN_ITEM_QUANTITY, quantity) } : b
+      )
+    )
+  }, [])
 
   // add_payment_info (GA4/Meta): se dispara al entrar al paso de pago del
   // drawer. Solo una vez por visita (ref) para no duplicar el evento si el
@@ -106,9 +120,9 @@ export function CheckoutDrawer() {
   useEffect(() => {
     if (step === "payment" && !addPaymentInfoRef.current) {
       addPaymentInfoRef.current = true
-      AnalyticsEvents.addPaymentInfo(total, itemCount + selectedBumps.length)
+      AnalyticsEvents.addPaymentInfo(total, itemCount + bumpUnits)
     }
-  }, [step, total, itemCount, selectedBumps.length])
+  }, [step, total, itemCount, bumpUnits])
 
   const isAddressValid = Boolean(
     address.street.trim() &&
@@ -311,46 +325,24 @@ export function CheckoutDrawer() {
             <div className="space-y-5">
               <FreeShippingProgress payableSubtotal={payableSubtotal} />
 
-              {/* Items del carrito — primero el usuario revisa sus productos */}
+              {/* Items del carrito — primero el usuario revisa sus productos.
+                  Cantidades editables con +/− (mínimo 1). */}
               <div>
                 <p className="text-xs font-semibold text-[#B87A3A] uppercase tracking-wide mb-2">
-                  Tu pedido ({itemCount})
+                  Tu pedido ({itemCount + bumpUnits})
                 </p>
-                <ul className="divide-y divide-[#E8E9EB]">
-                  {cart.items.map((item) => (
-                    <li key={item.product_id} className="py-3 flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-[10px] bg-[#F7F5F0] flex items-center justify-center shrink-0 overflow-hidden">
-                        {item.image_url ? (
-                          <Image
-                            src={item.image_url}
-                            alt={item.name}
-                            width={48}
-                            height={48}
-                            className="w-full h-full object-contain p-1"
-                            />
-                        ) : (
-                          <ShoppingBag className="w-5 h-5 text-[#C7C8CD]" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-[#242529] truncate">
-                          {item.quantity}× {item.name}
-                        </p>
-                        <p className="text-xs text-[var(--text-secondary)]">
-                          {item.brand}
-                        </p>
-                      </div>
-                      <span className="text-sm font-semibold text-[#242529]">
-                        ${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <OrderItemsList
+                  items={cart.items}
+                  bumps={selectedBumps}
+                  onUpdateItemQuantity={updateQuantity}
+                  onUpdateBumpQuantity={updateBumpQuantity}
+                />
               </div>
 
               {/* Teaser de order bumps (mecánica ThriveCart): visibles después
                   de la lista de items del primer paso. El usuario puede
-                  agregar/quitarlos aquí o volver. */}
+                  agregar/quitarlos aquí o volver. En modo encadenado cada bump
+                  elegido entra al pedido de arriba y aparece el siguiente. */}
               <BumpCards
                 cartItems={cart.items.map((i) => ({
                   product_id: i.product_id,
@@ -358,6 +350,8 @@ export function CheckoutDrawer() {
                 }))}
                 selected={selectedBumps}
                 onChange={setSelectedBumps}
+                revealNext
+                limit={MAX_BUMPS_POOL}
               />
 
               {/* Resumen */}
@@ -507,71 +501,15 @@ export function CheckoutDrawer() {
                   pagar. Los bumps se eligen en el paso anterior (review). */}
               <div>
                 <p className="text-xs font-semibold text-[#B87A3A] uppercase tracking-wide mb-2">
-                  Tu pedido ({itemCount + selectedBumps.reduce((n, b) => n + b.quantity, 0)})
+                  Tu pedido ({itemCount + bumpUnits})
                 </p>
-                <ul className="divide-y divide-[#E8E9EB]">
-                  {cart.items.map((item) => (
-                    <li key={item.product_id} className="py-3 flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-[10px] bg-[#F7F5F0] flex items-center justify-center shrink-0 overflow-hidden">
-                        {item.image_url ? (
-                          <Image
-                            src={item.image_url}
-                            alt={item.name}
-                            width={48}
-                            height={48}
-                            className="w-full h-full object-contain p-1"
-                            />
-                        ) : (
-                          <ShoppingBag className="w-5 h-5 text-[#C7C8CD]" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-[#242529] truncate">
-                          {item.quantity}× {item.name}
-                        </p>
-                        <p className="text-xs text-[var(--text-secondary)]">
-                          {item.brand}
-                        </p>
-                      </div>
-                      <span className="text-sm font-semibold text-[#242529]">
-                        ${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}
-                      </span>
-                    </li>
-                  ))}
-                  {selectedBumps.map((b) => (
-                    <li key={`bump-${b.productId}`} className="py-3 flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-[10px] bg-[#FDF3E3] flex items-center justify-center shrink-0 overflow-hidden">
-                        {b.imageUrl ? (
-                          <Image
-                            src={b.imageUrl}
-                            alt={b.name ?? `Artículo especial #${b.productId}`}
-                            width={48}
-                            height={48}
-                            className="w-full h-full object-contain p-1"
-                          />
-                        ) : (
-                          <ShoppingBag className="w-5 h-5 text-[#B87A3A]" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-[#242529] truncate">
-                            {b.quantity}× {b.name ?? `Artículo especial #${b.productId}`}
-                          </p>
-                          <span className="shrink-0 text-[10px] font-bold text-[#B87A3A] bg-[#FDF3E3] border border-[#EEDCC4] rounded-full px-2 py-0.5 uppercase tracking-wide">
-                            Especial
-                          </span>
-                        </div>
-                        <p className="text-xs text-[var(--text-secondary)]">
-                          Agregado a tu pedido
-                        </p>
-                      </div>
-                      <span className="text-sm font-semibold text-[#B87A3A]">
-                        ${(b.unitPrice * b.quantity).toFixed(2)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <OrderItemsList
+                  items={cart.items}
+                  bumps={selectedBumps}
+                  onUpdateItemQuantity={updateQuantity}
+                  onUpdateBumpQuantity={updateBumpQuantity}
+                  readOnly
+                />
               </div>
 
               {/* Resumen con bumps en tiempo real */}

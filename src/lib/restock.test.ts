@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildRestockSuggestions } from "./restock"
+import { buildRestockSuggestions, suggestRestockQuantity } from "./restock"
 
 // Espejo de la función interna (no exportada): peso por estado + piezas vendidas.
 // Si la implementación cambia, este test debe actualizarse.
@@ -47,5 +47,66 @@ describe("buildRestockSuggestions", () => {
     const [top] = buildRestockSuggestions(candidates)
     expect(top!.reason).toContain("Agotado")
     expect(top!.reason).toContain("50 vendidas en 30 d")
+  })
+})
+
+describe("umbral por producto (00108)", () => {
+  it("usa el umbral del producto, no el 5 fijo", () => {
+    // 8 piezas es stock bajo si el umbral es 10, aunque el defecto sea 5.
+    const [s] = buildRestockSuggestions([
+      { productId: 1, name: "Café", stockStatus: "in_stock", units30d: 40, stockQuantity: 8, lowStockThreshold: 10 },
+    ])
+    expect(s!.effectiveStatus).toBe("low_stock")
+    expect(s!.threshold).toBe(10)
+  })
+
+  it("reclasifica como in_stock y descarta si la existencia supera el umbral", () => {
+    expect(
+      buildRestockSuggestions([
+        { productId: 1, name: "Café", stockStatus: "low_stock", units30d: 40, stockQuantity: 30, lowStockThreshold: 10 },
+      ])
+    ).toHaveLength(0)
+  })
+
+  it("cae al umbral por defecto si el producto no lo define", () => {
+    const [s] = buildRestockSuggestions([
+      { productId: 1, name: "Café", stockStatus: "low_stock", units30d: 40, stockQuantity: 4 },
+    ])
+    expect(s!.threshold).toBe(5)
+  })
+
+  it("respeta el estado guardado cuando no hay control de inventario", () => {
+    const [s] = buildRestockSuggestions([
+      { productId: 1, name: "Café", stockStatus: "out_of_stock", units30d: 12, stockQuantity: null },
+    ])
+    expect(s!.effectiveStatus).toBe("out_of_stock")
+  })
+})
+
+describe("suggestRestockQuantity", () => {
+  it("cubre 14 días de demanda al ritmo de 30 días, descontando existencia", () => {
+    // 60/mes = 2/día → 28 en 14 días; con 10 en existencia, pedir 18.
+    expect(suggestRestockQuantity(60, 10)).toBe(18)
+  })
+
+  it("no sugiere cantidades negativas", () => {
+    expect(suggestRestockQuantity(10, 500)).toBe(0)
+    expect(suggestRestockQuantity(0, 0)).toBe(0)
+  })
+
+  it("trata la existencia nula como 0", () => {
+    expect(suggestRestockQuantity(30, null)).toBe(14)
+  })
+
+  it("acepta un horizonte de cobertura distinto", () => {
+    expect(suggestRestockQuantity(60, 0, 30)).toBe(60)
+  })
+
+  it("aparece en la razón y en la sugerencia", () => {
+    const [s] = buildRestockSuggestions([
+      { productId: 1, name: "Agua", stockStatus: "out_of_stock", units30d: 60, stockQuantity: 0 },
+    ])
+    expect(s!.suggestedQuantity).toBe(28)
+    expect(s!.reason).toContain("pedir 28")
   })
 })

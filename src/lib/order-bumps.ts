@@ -27,15 +27,23 @@
  * deriva server-side de `bump_rules` y `products` (precios reales), igual
  * que la filosofía de `createPaymentIntentForOrder`.
  *
- * Máximo MAX_BUMPS (3) bumps simultáneos. Ranking de relevancia: recetas y
- * colecciones primero, luego categorías/umbral por display_order. Fail-open:
- * cualquier error de BD devuelve [] para no bloquear el checkout.
+ * Por defecto devuelve MAX_BUMPS (3) bumps. El llamador puede pedir un pool
+ * mayor (`limit`) para encadenar ofertas en el checkout: al elegir un bump el
+ * cliente ya tiene la siguiente oferta sin volver a consultar la API. El tope
+ * duro es MAX_BUMPS_POOL. Ranking de relevancia: recetas y colecciones
+ * primero, luego categorías/umbral por display_order. Fail-open: cualquier
+ * error de BD devuelve [] para no bloquear el checkout.
  */
 
 import { createServiceClient } from "@/lib/supabase/service"
 import { applyDiscount } from "@/lib/money"
-import { MAX_BUMPS } from "@/lib/checkout-config"
+import { MAX_BUMPS, MAX_BUMPS_POOL } from "@/lib/checkout-config"
 import { logger } from "@/lib/logger"
+import {
+  isMissingColumnError,
+  resolveEffectivePrice,
+  resolveSalePrice,
+} from "@/lib/sale-window"
 
 export type BumpTriggerType =
   | "perishables"
@@ -70,6 +78,9 @@ export interface BumpProduct {
   sale_price: number | null
   stock_status: "in_stock" | "low_stock" | "out_of_stock"
   category_id: number
+  /** Ventana de la oferta (00107); ausente si la migración no está aplicada. */
+  sale_starts_at?: string | null
+  sale_ends_at?: string | null
   /** Tags de recetas/colecciones (product.tags ∩ collection.tags). */
   tags?: string[]
   /** Visibilidad en catálogo público. */
@@ -151,7 +162,8 @@ const DRINKS_SLUGS = ["bebidas"]
 const DYNAMIC_RECIPE_DISCOUNT = 0.1
 
 function effectivePrice(product: BumpProduct): number {
-  return product.sale_price ?? product.price
+  // Oferta vencida/programada (00107) no aplica: mismo precio que la tienda.
+  return resolveEffectivePrice(product) ?? product.price
 }
 
 function discountPrice(product: BumpProduct, discountPct: number): number {
@@ -204,7 +216,8 @@ export function evaluateTriggerTypes(
   categorySlugsInCart: Set<string>,
   subtotal: number,
   rules: BumpRuleRow[],
-  collectionSlugsInCart: Set<string> = new Set()
+  collectionSlugsInCart: Set<string> = new Set(),
+  limit: number = MAX_BUMPS
 ): BumpTriggerType[] {
   const has = (slugs: string[]) => slugs.some((s) => categorySlugsInCart.has(s))
   const matched: BumpTriggerType[] = []
@@ -236,9 +249,9 @@ export function evaluateTriggerTypes(
     if (applies) matched.push(rule.trigger_type)
   }
 
-  // Máximo MAX_BUMPS en display_order (el ranking final por relevancia ocurre
+  // Máximo `limit` en display_order (el ranking final por relevancia ocurre
   // en resolveBumps, donde las colecciones/recetas tienen prioridad).
-  return matched.slice(0, MAX_BUMPS)
+  return matched.slice(0, limit)
 }
 
 /**
@@ -323,6 +336,10 @@ function buildBump(rule: BumpRuleRow, product: BumpProduct): OrderBump {
 
 /** Columnas de producto necesarias para construir bumps (sin tags). */
 const BUMP_PRODUCT_COLUMNS =
+  "id, name, slug, description, image_url, price, sale_price, stock_status, category_id, is_visible, sale_starts_at, sale_ends_at"
+
+/** Set previo a la migración 00107 (ventana de oferta). */
+const BUMP_PRODUCT_COLUMNS_BASE =
   "id, name, slug, description, image_url, price, sale_price, stock_status, category_id, is_visible"
 
 /**
@@ -339,8 +356,25 @@ async function loadBumpProducts(
     .from("products")
     .select(BUMP_PRODUCT_COLUMNS)
     .in("id", productIds)
-  if (error) return new Map()
-  return new Map((data ?? []).map((product) => [product.id, product as BumpProduct]))
+  if (!error) {
+    return new Map((data ?? []).map((product) => [product.id, product as BumpProduct]))
+  }
+  if (isMissingColumnError(error)) {
+    // Migración 00107 pendiente: sin ventana, la oferta siempre aplica.
+    const fallback = await supabase
+      .from("products")
+      .select(BUMP_PRODUCT_COLUMNS_BASE)
+      .in("id", productIds)
+    if (!fallback.error) {
+      return new Map(
+        (fallback.data ?? []).map((product) => [
+          product.id,
+          product as unknown as BumpProduct,
+        ])
+      )
+    }
+  }
+  return new Map()
 }
 
 /**
@@ -372,6 +406,33 @@ async function queryWithRetry<T>(
   return []
 }
 
+/** Productos del carrito con tags (para detectar colecciones de receta). */
+async function loadCartProducts(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  productIds: number[]
+): Promise<{
+  data: BumpProduct[] | null
+  error: { message: string; code?: string } | null
+}> {
+  const cols = `${BUMP_PRODUCT_COLUMNS}, tags`
+  const { data, error } = await supabase.from("products").select(cols).in("id", productIds)
+  if (!error) {
+    return { data: (data as BumpProduct[] | null) ?? null, error: null }
+  }
+  if (isMissingColumnError(error)) {
+    // Migración 00107 pendiente: sin ventana, la oferta siempre aplica.
+    const fallback = await supabase
+      .from("products")
+      .select(`${BUMP_PRODUCT_COLUMNS_BASE}, tags`)
+      .in("id", productIds)
+    return {
+      data: (fallback.data as unknown as BumpProduct[] | null) ?? null,
+      error: fallback.error,
+    }
+  }
+  return { data: null, error }
+}
+
 /**
  * Resuelve los bumps condicionales para un carrito.
  * La entrada es una lista de { product_id, quantity } (sin precios del
@@ -382,24 +443,25 @@ async function queryWithRetry<T>(
  *
  * `diagnostics` (opcional) se rellena cuando un resultado vacío proviene de
  * un error de BD real (con retry) para distinguirlo de "no hay match".
+ *
+ * `limit` (opcional, default MAX_BUMPS) acota cuántas ofertas se devuelven.
+ * Se sanea a [1, MAX_BUMPS_POOL] para que un cliente no pueda ampliarlo
+ * indefinidamente.
  */
 export async function resolveBumps(
   input: BumpCartInput,
-  diagnostics?: BumpDiagnostics
+  diagnostics?: BumpDiagnostics,
+  limit: number = MAX_BUMPS
 ): Promise<OrderBump[]> {
   if (input.items.length === 0) return []
+  const maxBumps = sanitizeBumpLimit(limit)
 
   const supabase = await createServiceClient()
   const cartProductIds = new Set(input.items.map((i) => i.product_id))
 
   const [rules, productRows, collections] = await Promise.all([
     loadActiveRules(supabase, diagnostics),
-    supabase
-      .from("products")
-      .select(
-        "id, name, slug, description, image_url, price, sale_price, stock_status, category_id, tags, is_visible"
-      )
-      .in("id", Array.from(cartProductIds)),
+    loadCartProducts(supabase, Array.from(cartProductIds)),
     // NOTA: esta query no debe silenciarse. Con solo reglas recipe_collection
     // activas, un fallo aquí dejaba collectionSlugsInCart vacío y resolveBumps
     // devolvía [] (el "resolveBumps_vacio" del reporte). Retry + log.
@@ -455,7 +517,7 @@ export async function resolveBumps(
 
   const subtotal = cartProducts.reduce((sum, p) => {
     const item = input.items.find((i) => i.product_id === p.id)
-    return sum + (p.sale_price ?? p.price) * (item?.quantity ?? 0)
+    return sum + (resolveEffectivePrice(p) ?? p.price) * (item?.quantity ?? 0)
   }, 0)
 
   const collectionSlugsInCart = detectCollectionsInCart(cartProducts, collections)
@@ -464,7 +526,8 @@ export async function resolveBumps(
     cartCategorySlugs,
     subtotal,
     rules,
-    collectionSlugsInCart
+    collectionSlugsInCart,
+    maxBumps
   )
   // Estado interno del motor: captura SIEMPRE (no solo al fallar) para que el
   // log "[BUMPS] served" y el _debug (?debug=1 en /api/cart/bumps) revelen
@@ -514,7 +577,7 @@ export async function resolveBumps(
   const recipeCandidates: OrderBump[] = []
   for (const rule of recipeRules) {
     if (cartProductIds.has(rule.product_id)) continue
-    if (recipeCandidates.length >= MAX_BUMPS) break
+    if (recipeCandidates.length >= maxBumps) break
     const product = recipeProductMap.get(rule.product_id)
     if (!isUsableBumpProduct(product)) continue
     recipeCandidates.push(buildBump(rule, product))
@@ -528,7 +591,7 @@ export async function resolveBumps(
   )
   for (const slug of collectionSlugsInCart) {
     if (collectionsWithAdminRule.has(slug)) continue
-    if (recipeCandidates.length >= MAX_BUMPS) break
+    if (recipeCandidates.length >= maxBumps) break
     const bump = await buildDynamicRecipeBump(supabase, slug, cartProductIds, collections)
     if (bump) recipeCandidates.push(bump)
   }
@@ -562,16 +625,27 @@ export async function resolveBumps(
     categoryCandidates.push(buildBump(rule, product))
   }
 
-  // ── Ranking final: recetas/colecciones primero, top MAX_BUMPS, sin dupes ──
+  // ── Ranking final: recetas/colecciones primero, top maxBumps, sin dupes ──
   const seen = new Set<number>()
   const bumps: OrderBump[] = []
   for (const bump of [...recipeCandidates, ...categoryCandidates]) {
     if (seen.has(bump.product.id)) continue
     seen.add(bump.product.id)
     bumps.push(bump)
-    if (bumps.length >= MAX_BUMPS) break
+    if (bumps.length >= maxBumps) break
   }
   return bumps
+}
+
+/**
+ * Sanea el `limit` de ofertas de bumps: entero en [1, MAX_BUMPS_POOL].
+ * Valores inválidos (NaN, 0, negativos, no numéricos) caen al default.
+ */
+export function sanitizeBumpLimit(limit: number | undefined | null): number {
+  if (typeof limit !== "number" || !Number.isFinite(limit)) return MAX_BUMPS
+  const floored = Math.floor(limit)
+  if (floored < 1) return MAX_BUMPS
+  return Math.min(floored, MAX_BUMPS_POOL)
 }
 
 /**
@@ -609,6 +683,13 @@ async function buildDynamicRecipeBump(
   const title =
     typeof candidate.name === "string" ? candidate.name : "Complemento para tu pedido"
 
+  const saleWindow = {
+    sale_price: typeof candidate.sale_price === "number" ? candidate.sale_price : null,
+    sale_starts_at:
+      typeof candidate.sale_starts_at === "string" ? candidate.sale_starts_at : null,
+    sale_ends_at: typeof candidate.sale_ends_at === "string" ? candidate.sale_ends_at : null,
+  }
+
   const product: BumpProduct = {
     id: candidate.id as number,
     name: typeof candidate.name === "string" ? candidate.name : "",
@@ -616,9 +697,11 @@ async function buildDynamicRecipeBump(
     description: typeof candidate.description === "string" ? candidate.description : "",
     image_url: typeof candidate.image_url === "string" ? candidate.image_url : "",
     price: typeof candidate.price === "number" ? candidate.price : 0,
-    sale_price: typeof candidate.sale_price === "number" ? candidate.sale_price : null,
+    sale_price: resolveSalePrice(saleWindow),
     stock_status: (candidate.stock_status as BumpProduct["stock_status"]) ?? "in_stock",
     category_id: typeof candidate.category_id === "number" ? candidate.category_id : 0,
+    sale_starts_at: saleWindow.sale_starts_at,
+    sale_ends_at: saleWindow.sale_ends_at,
   }
 
   const insertPayload = {
@@ -653,9 +736,7 @@ async function buildDynamicRecipeBump(
     if (cartProductIds.has(rule.product_id)) return null
     const { data: existingProduct, error: pErr } = await supabase
       .from("products")
-      .select(
-        "id, name, slug, description, image_url, price, sale_price, stock_status, category_id, is_visible"
-      )
+      .select(BUMP_PRODUCT_COLUMNS)
       .eq("id", rule.product_id)
       .maybeSingle()
     if (pErr || !isUsableBumpProduct(existingProduct as BumpProduct | null)) return null

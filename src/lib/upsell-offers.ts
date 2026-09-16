@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { round2 } from "@/lib/money"
 import { bumpUnitPrice, type BumpRuleRow, type BumpProduct } from "@/lib/order-bumps"
+import { resolveEffectivePrice } from "@/lib/sale-window"
 
 /**
  * Ofertas 1-click post-compra (mecánica SamCart).
@@ -53,7 +54,9 @@ export interface ResolveUpsellOffersParams {
 }
 
 function toOffer(rule: BumpRuleRow, product: BumpProduct): UpsellOffer {
-  const base = product.sale_price ?? product.price
+  // Oferta vigente (00107) o precio de lista: nunca el precio de una oferta
+  // vencida, para que el upsell cobre lo mismo que muestra la tienda.
+  const base = resolveEffectivePrice(product) ?? product.price
   return {
     ruleId: rule.id,
     productId: product.id,

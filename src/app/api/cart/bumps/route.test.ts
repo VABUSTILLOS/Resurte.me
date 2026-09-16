@@ -1,8 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
+import { MAX_BUMPS } from "@/lib/checkout-config"
 
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }))
-vi.mock("@/lib/order-bumps", () => ({ resolveBumps: vi.fn().mockResolvedValue([]) }))
+vi.mock("@/lib/order-bumps", () => ({
+  resolveBumps: vi.fn().mockResolvedValue([]),
+  sanitizeBumpLimit: vi.fn((limit: number | undefined | null) =>
+    typeof limit === "number" && Number.isFinite(limit) && Math.floor(limit) >= 1
+      ? Math.floor(limit)
+      : MAX_BUMPS
+  ),
+}))
 vi.mock("@/lib/rate-limit", async () => {
   const { NextResponse } = await import("next/server")
   return {
@@ -68,7 +76,8 @@ describe("POST /api/cart/bumps", () => {
     // resolveBumps recibe solo IDs/cantidades (nunca precios del cliente)
     expect(resolveBumps).toHaveBeenCalledWith(
       { items: [{ product_id: 7, quantity: 2 }] },
-      expect.anything()
+      expect.anything(),
+      MAX_BUMPS
     )
     expect(logger.info).toHaveBeenCalledWith(
       "[BUMPS] served",

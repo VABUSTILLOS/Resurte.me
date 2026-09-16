@@ -58,6 +58,44 @@
   cancelar programación respeta fechas explícitas); la generación IA en
   lote va en tandas de 10 secuenciales y el QR se genera client-side
   (nunca en servidor).
+- Productos ronda 7 — identidad: `sku` (00106) es único entre productos no
+  borrados (índice parcial; un SKU duplicado responde 409) y `barcode` es
+  solo índice. La búsqueda del panel pasa por `search_product_ids_fuzzy`
+  (00110) que puntúa SKU (exacto > prefijo > substring) y código de barras
+  por encima de la similitud de nombre; si la migración falta, el fallback
+  `.or(name.ilike, sku.ilike, barcode.ilike)` degrada sin romper.
+  `products.tags` es JSONB (`?|` en la RPC de colecciones) y es la fuente
+  única de las colecciones de la tienda: agregar/quitar en lote siempre
+  reescribe el array completo.
+- Productos ronda 7 — umbral de stock: `low_stock_threshold` (00108) manda
+  sobre el 5 hardcodeado. Con cantidad numérica, `stock_status` SIEMPRE se
+  deriva (cantidad vs umbral, en create/update/modal/panel); un estado
+  manual solo sobrevive con la cantidad vacía. `restock.ts` calcula la
+  cantidad sugerida (cobertura de 30 días) — el panel solo la muestra.
+- Productos ronda 7 — imágenes: la detección de rotas es un HEAD con
+  fallback a GET `Range: bytes=0-0` (403/405/501 ⇒ reintento), timeout 8 s y
+  concurrencia 6; nunca bloquea el listado. `image_url` acepta `null` para
+  poder quitar una imagen rota (la tienda cae al placeholder).
+- Productos ronda 7 — papelera: la retención es de 30 días (`trash.ts`) y la
+  purga (`purge-trash`, cron diario + botón) es el ÚNICO hard delete
+  permitido; el DELETE CASCADE de `order_items` es la razón por la que
+  eliminar desde el panel sigue siendo soft delete.
+- Productos ronda 7 — historial: el PATCH guarda `detail.before/after` con
+  solo los campos de `AUDIT_FIELDS`; `audit-diff.ts` es la fuente única de
+  las etiquetas y del formateo (los registros viejos traen `updates` plano y
+  caen al fallback). `related_product_ids` y `cost` aún no están en
+  `AUDIT_FIELDS`, así que sus cambios no generan diff.
+- Productos ronda 7 — IA: `bulk-seo` SOLO devuelve propuestas (nunca
+  escribe); la escritura pasa por el PATCH normal tras la vista previa
+  editable. El prompt SEO vive duplicado en `seo-batch.ts` y en
+  `ProductFormModal` (máx 60/160 vs 70/170) — al cambiar uno, cambiar el otro.
+- Productos ronda 7 — reporte de ventas: el CSV conserva columnas previas y
+  solo agrega (paridad con la importación); el margen se calcula con
+  `products.cost` y queda VACÍO (no 0) cuando falta el costo — `missingCost`
+  lo reporta aparte y el `marginPct` agregado se calcula solo sobre el
+  subconjunto con costo. La clase ABC usa el punto medio de la banda
+  acumulada de ingreso (A < 80 %, B < 95 %, resto C). `format=json` es
+  aditivo y alimenta el resumen del rango.
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
@@ -90,3 +128,9 @@
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de
 visibilidad de un producto y confirmación de que el caché de catálogo se invalida.
+
+Ronda 7 (requiere 00106-00111 aplicadas): en `/admin/productos` buscar por SKU,
+editar etiquetas, programar una oferta y ver que la ficha de tienda solo la
+muestra dentro de la ventana, elegir relacionados, correr "Revisar imágenes",
+"SEO con IA…" (debe abrir la vista previa, no escribir) y descargar el reporte
+de ventas del rango (margen vacío donde falte `cost`).

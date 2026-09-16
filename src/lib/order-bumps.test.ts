@@ -10,11 +10,13 @@ import {
   evaluateTriggerTypes,
   resolveBumps,
   resolveBumpPricing,
+  sanitizeBumpLimit,
   detectCollectionsInCart,
   type BumpProduct,
   type BumpRuleRow,
   type BumpTriggerType,
 } from "@/lib/order-bumps"
+import { MAX_BUMPS, MAX_BUMPS_POOL } from "@/lib/checkout-config"
 import { createServiceClient } from "@/lib/supabase/service"
 
 function rule(
@@ -102,6 +104,16 @@ describe("evaluateTriggerTypes", () => {
     expect(matched).toHaveLength(3)
     expect(new Set(matched).size).toBe(3)
     expect(matched[0]).toBe("perishables")
+  })
+
+  it("un límite mayor permite encadenar más bumps (pool del checkout)", () => {
+    const dup = rule("perishables", { id: 99, display_order: 4 })
+    const slugs = new Set(["frutas-verduras", "bebidas"])
+    const rules = [perishableRule, snacksRule, thresholdRule, dup]
+    // Con el default de 3 el cuarto trigger queda fuera…
+    expect(evaluateTriggerTypes(slugs, 600, rules)).toHaveLength(MAX_BUMPS)
+    // …y con el pool completo entra, que es lo que habilita el encadenado.
+    expect(evaluateTriggerTypes(slugs, 600, rules, undefined, MAX_BUMPS_POOL)).toHaveLength(4)
   })
 
   it("nuevos triggers meat_bbq y drinks_sides disparan por categoría", () => {
@@ -378,6 +390,38 @@ describe("resolveBumps", () => {
     expect(bumps[0]?.price).toBeCloseTo(18, 2) // 20 * 0.9
   })
 
+  it("ignora sale_price si la oferta ya venció (00107)", async () => {
+    const supabase = makeSupabase({
+      bumpProducts: {
+        100: product({
+          id: 100,
+          sale_price: 20,
+          sale_ends_at: new Date(Date.now() - 3_600_000).toISOString(),
+        }),
+      },
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+    expect(bumps[0]?.original_price).toBe(25)
+    expect(bumps[0]?.price).toBeCloseTo(22.5, 2) // 25 * 0.9
+  })
+
+  it("usa sale_price si la ventana de la oferta está vigente (00107)", async () => {
+    const supabase = makeSupabase({
+      bumpProducts: {
+        100: product({
+          id: 100,
+          sale_price: 20,
+          sale_starts_at: new Date(Date.now() - 3_600_000).toISOString(),
+          sale_ends_at: new Date(Date.now() + 3_600_000).toISOString(),
+        }),
+      },
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+    expect(bumps[0]?.original_price).toBe(20)
+  })
+
   it("omite bumps cuyo producto está agotado", async () => {
     const supabase = makeSupabase({
       bumpProducts: { 100: product({ id: 100, stock_status: "out_of_stock" }) },
@@ -521,6 +565,39 @@ describe("resolveBumps", () => {
     expect(new Set(bumps.map((b) => b.product.id)).size).toBe(3)
   })
 
+  it("acepta un límite mayor y devuelve hasta el pool solicitado", async () => {
+    const meatRule = rule("meat_bbq", { id: 4, product_id: 400, display_order: 4 })
+    const drinksRule = rule("drinks_sides", { id: 5, product_id: 500, display_order: 5 })
+    const recipeRule = rule("recipe_collection", {
+      id: 6,
+      product_id: 600,
+      collection_slug: "taquerias-antojitos",
+      display_order: 6,
+    })
+    const supabase = makeSupabase({
+      rules: [meatRule, drinksRule, recipeRule],
+      cartProducts: [
+        product({ id: 1, name: "Arrachera", category_id: 4, tags: ["taqueria"] }),
+        product({ id: 2, name: "Cerveza", category_id: 6, tags: ["bar"] }),
+      ],
+      categories: [
+        { id: 4, slug: "carnes-aves-pescados" },
+        { id: 6, slug: "bebidas" },
+      ],
+      bumpProducts: {
+        400: product({ id: 400, name: "Sazonador", price: 15 }),
+        500: product({ id: 500, name: "Botana", price: 20 }),
+        600: product({ id: 600, name: "Guacamole", price: 35 }),
+      },
+      collections: [collection()],
+    })
+    vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] }, undefined, MAX_BUMPS_POOL)
+    expect(bumps).toHaveLength(3)
+    // El ranking sigue priorizando recetas aunque el límite sea amplio.
+    expect(bumps[0]?.trigger_type).toBe("recipe_collection")
+  })
+
   it("fail-open: error en rpc de colección no rompe el flujo", async () => {
     const recipeRule = rule("recipe_collection", {
       id: 6,
@@ -540,5 +617,30 @@ describe("resolveBumps", () => {
     const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
     expect(Array.isArray(bumps)).toBe(true)
     expect(bumps.some((b) => b.product.id === 600)).toBe(true)
+  })
+})
+
+describe("sanitizeBumpLimit", () => {
+  it("sin límite usa el default de la ventana visible", () => {
+    expect(sanitizeBumpLimit(undefined)).toBe(MAX_BUMPS)
+  })
+
+  it("acepta un límite mayor para el pool encadenado del checkout", () => {
+    expect(sanitizeBumpLimit(MAX_BUMPS_POOL)).toBe(MAX_BUMPS_POOL)
+  })
+
+  it("acota al tamaño máximo del pool (un cliente no puede pedir todo)", () => {
+    expect(sanitizeBumpLimit(1000)).toBe(MAX_BUMPS_POOL)
+  })
+
+  it("cae al default con valores inválidos", () => {
+    expect(sanitizeBumpLimit(0)).toBe(MAX_BUMPS)
+    expect(sanitizeBumpLimit(-5)).toBe(MAX_BUMPS)
+    expect(sanitizeBumpLimit(Number.NaN)).toBe(MAX_BUMPS)
+    expect(sanitizeBumpLimit(Number.POSITIVE_INFINITY)).toBe(MAX_BUMPS)
+  })
+
+  it("trunca decimales a entero", () => {
+    expect(sanitizeBumpLimit(5.9)).toBe(5)
   })
 })

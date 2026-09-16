@@ -5,6 +5,8 @@ import { createServiceClient } from "@/lib/supabase/service"
 import type * as WaCatalogs from "@/lib/whatsapp-catalogs"
 import { logger } from "@/lib/logger"
 import { requireAdmin } from "@/lib/admin-auth"
+import { isMissingColumnError } from "@/lib/sale-window"
+import { deriveStockStatus } from "@/lib/stock"
 import { format } from "date-fns"
 
 interface AdminOrderItem {
@@ -917,7 +919,8 @@ export interface StockAdjustmentEntry {
 export async function adjustProductStock(
   productId: number,
   newStatus: "in_stock" | "low_stock" | "out_of_stock",
-  note?: string
+  note?: string,
+  newQuantity?: number | null
 ): Promise<void> {
   const { response: adminDenied, user } = await requireAdmin()
   if (adminDenied) {
@@ -925,6 +928,13 @@ export async function adjustProductStock(
   }
   if (!["in_stock", "low_stock", "out_of_stock"].includes(newStatus)) {
     throw new Error("Estado de stock inválido")
+  }
+  if (
+    newQuantity !== undefined &&
+    newQuantity !== null &&
+    (!Number.isInteger(newQuantity) || newQuantity < 0)
+  ) {
+    throw new Error("La existencia debe ser un entero mayor o igual a 0")
   }
 
   const supabase = await createServiceClient()
@@ -936,11 +946,28 @@ export async function adjustProductStock(
   if (readError || !product) {
     throw new Error("Producto no encontrado")
   }
-  if (product.stock_status === newStatus) return
+
+  // Con existencia nueva el estado se deriva de ella (00108); sin cantidad
+  // se respeta el estado pedido explícitamente.
+  let finalStatus = newStatus
+  if (newQuantity !== undefined && newQuantity !== null) {
+    const { data: thresholdRow } = await supabase
+      .from("products")
+      .select("low_stock_threshold")
+      .eq("id", productId)
+      .single()
+    const threshold = (thresholdRow as { low_stock_threshold?: number | null } | null)
+      ?.low_stock_threshold
+    finalStatus = deriveStockStatus(newQuantity, threshold)
+  }
+  if (product.stock_status === finalStatus && newQuantity === undefined) return
+
+  const patch: { stock_status: string; stock_quantity?: number } = { stock_status: finalStatus }
+  if (newQuantity !== undefined && newQuantity !== null) patch.stock_quantity = newQuantity
 
   const { error: updateError } = await supabase
     .from("products")
-    .update({ stock_status: newStatus })
+    .update(patch)
     .eq("id", productId)
   if (updateError) {
     logger.error("[ADMIN-STOCK] Error updating stock:", updateError)
@@ -950,7 +977,7 @@ export async function adjustProductStock(
   const { error: logError } = await supabase.from("stock_adjustments").insert({
     product_id: productId,
     previous_status: product.stock_status,
-    new_status: newStatus,
+    new_status: finalStatus,
     note: note?.trim() || null,
     adjusted_by: user?.id ?? null,
   })
@@ -994,7 +1021,17 @@ export async function getStockAdjustments(limit = 20): Promise<StockAdjustmentEn
  * cobradas en los últimos 30 días, ordenados por prioridad.
  */
 export async function getRestockSuggestions(limit = 10): Promise<
-  { productId: number; name: string; stockStatus: string; units30d: number; priority: number; reason: string }[]
+  {
+    productId: number
+    name: string
+    stockStatus: string
+    stockQuantity: number | null
+    lowStockThreshold: number | null
+    units30d: number
+    priority: number
+    suggestedQuantity: number
+    reason: string
+  }[]
 > {
   const { response: adminDenied } = await requireAdmin()
   if (adminDenied) {
@@ -1021,21 +1058,49 @@ export async function getRestockSuggestions(limit = 10): Promise<
 
   const productIds = Array.from(unitsByProduct.keys())
   if (productIds.length === 0) return []
-  const { data: products } = await supabase
+  const { data: products, error: productsError } = await supabase
     .from("products")
-    .select("id, name, stock_status")
+    .select("id, name, stock_status, stock_quantity, low_stock_threshold")
     .in("id", productIds)
+
+  // Migración 00108 pendiente: reintenta sin el umbral por producto.
+  let rows = (products ?? []) as {
+    id: number
+    name: string
+    stock_status: string
+    stock_quantity: number | null
+    low_stock_threshold?: number | null
+  }[]
+  if (productsError && isMissingColumnError(productsError)) {
+    const fallback = await supabase
+      .from("products")
+      .select("id, name, stock_status, stock_quantity")
+      .in("id", productIds)
+    rows = (fallback.data ?? []) as typeof rows
+  }
 
   const { buildRestockSuggestions } = await import("@/lib/restock")
   return buildRestockSuggestions(
-    (products ?? []).map((p) => ({
+    rows.map((p) => ({
       productId: p.id,
       name: p.name,
       stockStatus: p.stock_status as "in_stock" | "low_stock" | "out_of_stock",
       units30d: unitsByProduct.get(p.id) ?? 0,
+      stockQuantity: p.stock_quantity ?? null,
+      lowStockThreshold: p.low_stock_threshold ?? null,
     })),
     limit
-  )
+  ).map((s) => ({
+    productId: s.productId,
+    name: s.name,
+    stockStatus: s.stockStatus,
+    stockQuantity: s.stockQuantity ?? null,
+    lowStockThreshold: s.lowStockThreshold ?? null,
+    units30d: s.units30d,
+    priority: s.priority,
+    suggestedQuantity: s.suggestedQuantity,
+    reason: s.reason,
+  }))
 }
 
 // ============================================================

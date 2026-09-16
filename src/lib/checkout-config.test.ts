@@ -4,6 +4,9 @@ import {
   FREE_SHIPPING_THRESHOLD,
   DELIVERY_FEE_FLAT,
   MAX_BUMPS,
+  MAX_BUMPS_POOL,
+  MIN_ITEM_QUANTITY,
+  countBumpUnits,
   validDeliveryFee,
   calcCouponDiscount,
   freeShippingProgress,
@@ -18,6 +21,26 @@ describe("checkout-config", () => {
     expect(FREE_SHIPPING_THRESHOLD).toBe(override ? Number(override) : FREE_SHIPPING_MXN)
     expect(DELIVERY_FEE_FLAT).toBe(125)
     expect(MAX_BUMPS).toBe(3)
+  })
+
+  it("el pool de bumps es mayor que la ventana visible (permite encadenar)", () => {
+    // El checkout pide el pool completo y muestra una ventana de MAX_BUMPS:
+    // si el pool no fuera mayor, elegir un bump nunca revelaría el siguiente.
+    expect(MAX_BUMPS_POOL).toBeGreaterThan(MAX_BUMPS)
+  })
+
+  it("la cantidad mínima de un artículo es 1 (el checkout nunca vacía el pedido)", () => {
+    expect(MIN_ITEM_QUANTITY).toBe(1)
+  })
+
+  describe("countBumpUnits", () => {
+    it("suma unidades, no líneas", () => {
+      expect(countBumpUnits([{ quantity: 1 }, { quantity: 3 }])).toBe(4)
+    })
+
+    it("sin bumps devuelve 0", () => {
+      expect(countBumpUnits([])).toBe(0)
+    })
   })
 
   describe("validDeliveryFee", () => {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useCart } from "@/contexts/cart-context"
 import { useCity, DEFAULT_CITY_SLUG } from "@/contexts/city-context"
@@ -29,7 +29,7 @@ import { ReviewStep } from "@/components/checkout/ReviewStep"
 import { PaymentStep } from "@/components/checkout/PaymentStep"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
-import { calcCheckoutTotals, DELIVERY_FEE_FLAT } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT, MAX_BUMPS_POOL, MIN_ITEM_QUANTITY, countBumpUnits } from "@/lib/checkout-config"
 import {
   useCheckoutOrder,
   type CheckoutPaidInfo,
@@ -40,7 +40,7 @@ import {
 // ============================================================
 
 export default function CheckoutPage() {
-  const { cart, itemCount, subtotal, clearCart, coupon, isLoaded } = useCart()
+  const { cart, itemCount, subtotal, clearCart, coupon, isLoaded, updateQuantity } = useCart()
   const { city } = useCity()
   const router = useRouter()
 
@@ -90,16 +90,33 @@ export default function CheckoutPage() {
   // El descuento de cupón se calcula sobre el subtotal CON bumps incluidos,
   // igual que el servidor en POST /api/orders — así el total coincide a 0.01.
   const bumpsSubtotal = selectedBumps.reduce((sum, b) => sum + b.unitPrice * b.quantity, 0)
+  // Unidades de bumps (no líneas): un bump con cantidad 3 son 3 artículos, así
+  // el envío gratis y el conteo cuadran con el pedido real.
+  const bumpUnits = countBumpUnits(selectedBumps)
   const totals = calcCheckoutTotals(
     subtotal,
     bumpsSubtotal,
     coupon,
     itemCount,
-    selectedBumps.length,
+    bumpUnits,
     DELIVERY_FEE_FLAT
   )
   const { effectiveSubtotal, discountAmount, allItemsCount, deliveryFee } = totals
   const total = totals.total
+
+  // Cantidades editables desde el paso de revisión. Mínimo 1 (MIN_ITEM_QUANTITY):
+  // el botón "−" se deshabilita en el mínimo, el checkout nunca deja el pedido
+  // en 0 artículos.
+  const updateBumpQuantity = useCallback(
+    (ruleId: number, quantity: number) => {
+      setSelectedBumps(
+        selectedBumps.map((b) =>
+          b.ruleId === ruleId ? { ...b, quantity: Math.max(MIN_ITEM_QUANTITY, quantity) } : b
+        )
+      )
+    },
+    [selectedBumps, setSelectedBumps]
+  )
 
   // Persist the order summary so the confirmation page can fire a complete
   // `purchase` event after the cart is cleared.
@@ -409,11 +426,14 @@ export default function CheckoutPage() {
             deliveryFee={deliveryFee}
             total={total}
             bumpItems={selectedBumps.map((b) => ({
+              ruleId: b.ruleId,
               product_id: b.productId,
               name: b.name ?? `Artículo especial #${b.productId}`,
               quantity: b.quantity,
               unitPrice: b.unitPrice,
             }))}
+            onUpdateItemQuantity={updateQuantity}
+            onUpdateBumpQuantity={updateBumpQuantity}
             onEditAddress={() => setStep("address")}
             onEditSchedule={() => setStep("schedule")}
             onBack={() => setStep("schedule")}
@@ -421,6 +441,8 @@ export default function CheckoutPage() {
           />
           {/* Order bumps (mecánica ThriveCart): visibles justo antes de pagar,
               después del resumen de productos, igual que en el CheckoutDrawer.
+              Modo encadenado: al elegir un bump entra al pedido (con cantidad
+              editable en el resumen) y aparece el siguiente.
               Si el carrito no dispara reglas, BumpCards renderiza null y no
               cambia nada (retrocompatible). */}
           <div className="mt-4">
@@ -431,6 +453,8 @@ export default function CheckoutPage() {
               }))}
               selected={selectedBumps}
               onChange={setSelectedBumps}
+              revealNext
+              limit={MAX_BUMPS_POOL}
             />
           </div>
         </>

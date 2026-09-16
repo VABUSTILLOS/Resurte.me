@@ -68,19 +68,37 @@ interface BumpCardsProps {
   /** Bumps seleccionados (controlado desde el drawer). */
   selected: SelectedBump[]
   onChange: (selected: SelectedBump[]) => void
+  /**
+   * Modo encadenado del checkout: la lista visible es
+   * seleccionados + los siguientes MAX_BUMPS no seleccionados, de modo que al
+   * elegir una oferta aparece la siguiente sin volver a consultar la API. Sin
+   * este flag el comportamiento es el de siempre (hasta MAX_BUMPS tarjetas).
+   */
+  revealNext?: boolean
+  /** Cuántas ofertas pedir a la API (default MAX_BUMPS). */
+  limit?: number
+  /** Tope de bumps seleccionables (default: el pool disponible). */
+  maxSelected?: number
 }
 
 /**
  * Tarjetas de order bumps condicionales (mecánica ThriveCart).
  *
- * Consulta POST /api/cart/bumps con los items del carrito y renderiza hasta
- * MAX_BUMPS tarjetas con checkbox. El estado de selección es local (prop
- * controlada); NO toca CartProvider ni los componentes base del carrito.
+ * Consulta POST /api/cart/bumps con los items del carrito y renderiza las
+ * ofertas con checkbox. El estado de selección es local (prop controlada);
+ * NO toca CartProvider ni los componentes base del carrito.
  *
  * Fallback seguro: si la API falla o no hay bumps, renderiza null — el
  * checkout nunca se bloquea por esto.
  */
-export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
+export function BumpCards({
+  cartItems,
+  selected,
+  onChange,
+  revealNext = false,
+  limit = MAX_BUMPS,
+  maxSelected,
+}: BumpCardsProps) {
   const [bumps, setBumps] = useState<OrderBump[]>([])
   // Marca la clave del carrito ya cargada para derivar "loading" sin llamar
   // setState sincrónicamente dentro del efecto (regla react-hooks).
@@ -171,7 +189,7 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
       fetch("/api/cart/bumps", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cartItems }),
+        body: JSON.stringify({ items: cartItems, limit }),
       })
         .then((res) => {
           if (!res.ok) throw new Error(`bumps http ${res.status}`)
@@ -209,7 +227,7 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
       if (retryTimer) clearTimeout(retryTimer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartKey])
+  }, [cartKey, limit])
 
   if (loading && bumps.length === 0) {
     return (
@@ -222,12 +240,33 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
 
   if (bumps.length === 0) return null
 
+  // Tope de bumps seleccionables: en el checkout (revealNext) es el tamaño del
+  // pool disponible; en las superficies de carrito se mantiene MAX_BUMPS.
+  const selectionCap = maxSelected ?? (revealNext ? bumps.length : MAX_BUMPS)
+
+  // Lista visible. En modo encadenado los ya seleccionados siguen marcados al
+  // frente (en orden de elección) y siempre se muestran los siguientes
+  // MAX_BUMPS candidatos: al elegir una oferta aparece la siguiente. Al
+  // desmarcarla se libera el hueco y vuelve a la ventana.
+  const visible = (() => {
+    if (!revealNext) return bumps.slice(0, MAX_BUMPS)
+    const byRule = new Map(bumps.map((b) => [b.ruleId, b]))
+    const chosen = selected
+      .map((s) => byRule.get(s.ruleId))
+      .filter((b): b is OrderBump => b !== undefined)
+    const chosenRules = new Set(chosen.map((b) => b.ruleId))
+    return [
+      ...chosen,
+      ...bumps.filter((b) => !chosenRules.has(b.ruleId)).slice(0, MAX_BUMPS),
+    ]
+  })()
+
   const toggle = (bump: OrderBump) => {
     const isSelected = selected.some((s) => s.ruleId === bump.ruleId)
     let next: SelectedBump[]
     if (isSelected) {
       next = selected.filter((s) => s.ruleId !== bump.ruleId)
-    } else if (selected.length < MAX_BUMPS) {
+    } else if (selected.length < selectionCap) {
       next = [
         ...selected,
         {
@@ -240,7 +279,7 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
         },
       ]
     } else {
-      return // ya hay MAX_BUMPS seleccionados
+      return // ya no quedan ofertas por agregar
     }
     onChange(next)
     // Evento de selección de bump: mide el AOV incremental de esta mecánica.
@@ -266,7 +305,7 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
             : "Agrega a tu pedido"}
         </p>
       </div>
-      {bumps.map((bump) => {
+      {visible.map((bump) => {
         const isSelected = selected.some((s) => s.ruleId === bump.ruleId)
         return (
           <motion.div
@@ -349,7 +388,9 @@ export function BumpCards({ cartItems, selected, onChange }: BumpCardsProps) {
         )
       })}
       <p className="text-[11px] text-gray-400">
-        Hasta {MAX_BUMPS} artículos especiales por pedido.
+        {revealNext
+          ? "Elige los que quieras: al agregar uno aparece la siguiente oferta."
+          : `Hasta ${MAX_BUMPS} artículos especiales por pedido.`}
       </p>
     </div>
   )

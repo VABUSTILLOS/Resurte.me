@@ -257,4 +257,117 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await expect(page.getByText("Artículos especiales", { exact: true })).toBeVisible()
     await expect(page.getByText("+$31.50", { exact: true })).toBeVisible()
   })
+
+  test("checkout: el bump entra al pedido, encadena el siguiente y las cantidades son editables", async ({
+    page,
+  }) => {
+    // Pool de 5 ofertas para poder observar la ventana deslizante: solo se
+    // muestran MAX_BUMPS candidatos a la vez (3), nunca el pool completo.
+    const bump = (ruleId: number, name: string, price: number, categoryId: number) => ({
+      ruleId,
+      trigger_type: "perishables",
+      title: name,
+      description: `Complemento ${name} para tu pedido`,
+      discount_pct: 0.1,
+      product: {
+        id: 900 + ruleId,
+        name,
+        slug: name.toLowerCase().replace(/\s+/g, "-"),
+        description: "",
+        image_url: "",
+        price: price + 5,
+        sale_price: null,
+        stock_status: "in_stock",
+        category_id: categoryId,
+      },
+      price,
+      original_price: price + 5,
+    })
+    const stubBumps = {
+      bumps: [
+        bump(6101, "Guacamole preparado", 31.5, 1),
+        bump(6102, "Sazonador", 17, 4),
+        bump(6103, "Tortillas", 22, 5),
+        bump(6104, "Salsa", 18, 6),
+        bump(6105, "Queso", 25, 7),
+      ],
+    }
+    await page.route("**/api/cart/bumps", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(stubBumps),
+      })
+    )
+
+    seedCart(page, [aguacate])
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
+    await openCheckoutDrawer(page)
+
+    const drawer = page.getByLabel("Checkout", { exact: true })
+    const aguacateLabel = "Aguacate Hass (caja 10 kg)"
+    // Las tarjetas de bump son los únicos botones con aria-pressed del drawer:
+    // así el locator no choca con los steppers ("Aumentar cantidad de …").
+    const bumpCard = (name: string) =>
+      drawer.locator("button[aria-pressed]").filter({ hasText: name })
+    const visibleText = (text: string) => drawer.getByText(text, { exact: true }).filter({ visible: true })
+
+    // Ventana inicial: 3 ofertas visibles, el resto del pool oculto.
+    await expect(bumpCard("Guacamole preparado")).toBeVisible()
+    await expect(bumpCard("Tortillas")).toBeVisible()
+    await expect(bumpCard("Salsa")).toHaveCount(0)
+    await expect(bumpCard("Queso")).toHaveCount(0)
+
+    // Cantidad mínima: con 1 unidad el "−" está deshabilitado (no se puede
+    // dejar el pedido sin artículos desde el checkout).
+    await expect(
+      drawer.getByRole("button", { name: `Reducir cantidad de ${aguacateLabel}` })
+    ).toBeDisabled()
+
+    // "+" sube la cantidad del artículo del catálogo y recalcula su línea.
+    await drawer.getByRole("button", { name: `Aumentar cantidad de ${aguacateLabel}` }).click()
+    await expect(drawer.getByText(`2× ${aguacateLabel}`)).toBeVisible()
+    await expect(visibleText("$1700.00").first()).toBeVisible() // línea + total
+    await expect(drawer.getByText("Tu pedido (2)")).toBeVisible()
+    // Ya con 2 unidades el "−" vuelve a estar operativo.
+    await expect(
+      drawer.getByRole("button", { name: `Reducir cantidad de ${aguacateLabel}` })
+    ).toBeEnabled()
+
+    // Elegir un bump lo agrega como línea editable del pedido…
+    const guacamoleCard = bumpCard("Guacamole preparado")
+    await guacamoleCard.click()
+    await expect(guacamoleCard).toHaveAttribute("aria-pressed", "true")
+    await expect(drawer.getByText("1× Guacamole preparado")).toBeVisible()
+    await expect(drawer.getByText("Tu pedido (3)")).toBeVisible()
+    await expect(visibleText("$31.50").first()).toBeVisible() // línea del bump
+    await expect(visibleText("+$31.50").first()).toBeVisible() // subtotal especiales
+    // …y el total del pedido incluye el bump ($1700 + $31.50).
+    await expect(visibleText("$1731.50").first()).toBeVisible()
+
+    // …y revela la siguiente oferta del pool (ventana deslizante).
+    await expect(bumpCard("Salsa")).toBeVisible()
+    await expect(bumpCard("Queso")).toHaveCount(0)
+
+    // La cantidad del bump también es editable con "+".
+    await drawer.getByRole("button", { name: "Aumentar cantidad de Guacamole preparado" }).click()
+    await expect(drawer.getByText("2× Guacamole preparado")).toBeVisible()
+    await expect(drawer.getByText("Tu pedido (4)")).toBeVisible()
+    await expect(visibleText("$63.00").first()).toBeVisible()
+    await expect(visibleText("+$63.00").first()).toBeVisible()
+
+    // El encadenamiento continúa: el segundo bump entra al pedido y libera un
+    // hueco en la ventana, revelando la quinta oferta.
+    await bumpCard("Sazonador").click()
+    await expect(drawer.getByText("1× Sazonador")).toBeVisible()
+    await expect(bumpCard("Queso")).toBeVisible()
+
+    // Re-tap sobre una tarjeta seleccionada: el bump sale del pedido pero la
+    // tarjeta sigue visible y marcable (no se pierde la oferta).
+    await guacamoleCard.click()
+    await expect(guacamoleCard).toHaveAttribute("aria-pressed", "false")
+    await expect(drawer.getByText("2× Guacamole preparado")).toHaveCount(0)
+    await expect(visibleText("+$31.50")).toHaveCount(0)
+    await expect(drawer.getByText("1× Sazonador")).toBeVisible()
+  })
 })

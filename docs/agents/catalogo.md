@@ -21,6 +21,17 @@
   del admin) con fallback a solo `name` si la columna no existe; la metadata
   de la página de producto prefiere `seo_title`/`seo_description` (00104)
   con fallback al título/descripción derivados.
+- Ventana de oferta (00107): `sale-window.ts` es la fuente única. La tienda
+  (ficha, listados, pagos, bumps y upsells) consume `withResolvedSale` /
+  `resolveSalePrice` / `resolveEffectivePrice`, NUNCA `sale_price` a pelo:
+  fuera de la ventana el precio de oferta se resuelve a `null` para que el
+  patrón legado `sale_price ?? price` siga siendo correcto. `get_products_by_collection`
+  (00111) devuelve `sale_starts_at`/`sale_ends_at` para que las colecciones
+  también respeten la ventana.
+- Productos relacionados (00109): `buildRelatedProducts` (tope 4) es la
+  fuente única de la sección "También te puede interesar"; descarta el propio
+  producto, los no visibles y los agotados, y cae a la misma categoría cuando
+  el admin no eligió relacionados. El array lo escribe solo el admin.
 - La búsqueda de ciudades es insensible a acentos (`fold()` con NFD).
 - `RecentlyViewed` persiste en localStorage (`resurte-recently-viewed`, tope 12) y
   se monta desde la página de producto (server) recibiendo el producto por props —

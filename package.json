@@ -220,6 +220,35 @@
       ],
       "src/lib/search-terms.ts": [
         "exports"
+      ],
+      "src/lib/product-import.ts": [
+        "exports"
+      ],
+      "src/lib/restock.ts": [
+        "exports"
+      ],
+      "src/lib/sale-window.ts": [
+        "exports",
+        "types"
+      ],
+      "src/lib/sku.ts": [
+        "exports"
+      ],
+      "src/lib/trash.ts": [
+        "exports"
+      ],
+      "src/lib/audit-diff.ts": [
+        "exports"
+      ],
+      "src/lib/seo-batch.ts": [
+        "exports"
+      ],
+      "src/lib/related-products.ts": [
+        "exports"
+      ],
+      "src/lib/sales-report.ts": [
+        "exports",
+        "types"
       ]
     }
   }

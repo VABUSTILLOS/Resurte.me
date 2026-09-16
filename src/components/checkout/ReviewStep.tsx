@@ -2,6 +2,7 @@
 
 import { MapPin, Clock, ArrowLeft, ArrowRight } from "lucide-react"
 import type { City, CartItem } from "@/types"
+import { QuantityStepper } from "@/components/checkout/OrderItemsList"
 import { getNextDays, type AddressForm, type ScheduleForm } from "./checkout-shared"
 
 interface ReviewStepProps {
@@ -14,11 +15,14 @@ interface ReviewStepProps {
   discount: number
   deliveryFee: number
   total: number
-  /** Order bumps ya seleccionados (mecánica ThriveCart). Se muestran como
-   *  línea de resumen de solo lectura — la selección ocurrió antes del review
-   *  (carrito o drawer); aquí solo se confirman. Retrocompatible: si no se
-   *  pasan, el paso renderiza igual que antes. */
-  bumpItems?: { product_id: number; name: string; quantity: number; unitPrice: number }[]
+  /** Order bumps ya seleccionados (mecánica ThriveCart). Se listan como
+   *  artículos del pedido con cantidad editable — el "−" se deshabilita en 1.
+   *  Retrocompatible: si no se pasan, el paso renderiza igual que antes. */
+  bumpItems?: { ruleId: number; product_id: number; name: string; quantity: number; unitPrice: number }[]
+  /** Cambia la cantidad de un artículo del catálogo (mínimo 1). */
+  onUpdateItemQuantity: (productId: number, quantity: number) => void
+  /** Cambia la cantidad de un artículo especial (mínimo 1). */
+  onUpdateBumpQuantity: (ruleId: number, quantity: number) => void
   onEditAddress: () => void
   onEditSchedule: () => void
   onBack: () => void
@@ -36,6 +40,8 @@ export function ReviewStep({
   deliveryFee,
   total,
   bumpItems,
+  onUpdateItemQuantity,
+  onUpdateBumpQuantity,
   onEditAddress,
   onEditSchedule,
   onBack,
@@ -99,38 +105,54 @@ export function ReviewStep({
         </p>
       </div>
 
-      {/* Items summary */}
+      {/* Items summary — cantidades editables con +/− (mínimo 1: el botón "−"
+          se deshabilita en 1, nunca se quita un artículo desde el checkout). */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">
           Productos ({itemCount})
         </h3>
         <ul className="space-y-2">
           {cartItems.map((item) => (
-            <li key={item.product_id} className="flex justify-between text-sm">
-              <span className="text-gray-600 truncate mr-4">
-                {item.quantity}× {item.name}
-              </span>
-              <span className="font-medium text-gray-900 shrink-0">
-                ${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}
-              </span>
+            <li key={item.product_id} className="text-sm">
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-gray-600 truncate mr-4">
+                  {item.quantity}× {item.name}
+                </span>
+                <span className="font-medium text-gray-900 shrink-0">
+                  ${((item.sale_price ?? item.price) * item.quantity).toFixed(2)}
+                </span>
+              </div>
+              <div className="mt-2">
+                <QuantityStepper
+                  quantity={item.quantity}
+                  label={item.name}
+                  onChange={(q) => onUpdateItemQuantity(item.product_id, q)}
+                />
+              </div>
             </li>
           ))}
-          {/* Order bumps seleccionados (mecánica ThriveCart): solo lectura, ya
-              se eligieron en el carrito o drawer — aquí solo se confirman. */}
+          {/* Order bumps seleccionados (mecánica ThriveCart): se eligen antes
+              (carrito o BumpCards de este paso) y aquí se ajustan cantidades. */}
           {bumpItems?.map((bump) => (
-            <li
-              key={`bump-${bump.product_id}`}
-              className="flex justify-between text-sm"
-            >
-              <span className="text-gray-600 truncate mr-4 flex items-center gap-2">
-                {bump.quantity}× {bump.name}
-                <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">
-                  Especial
+            <li key={`bump-${bump.ruleId}`} className="text-sm">
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-gray-600 truncate mr-4 flex items-center gap-2">
+                  {bump.quantity}× {bump.name}
+                  <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold uppercase tracking-wide">
+                    Especial
+                  </span>
                 </span>
-              </span>
-              <span className="font-medium text-gray-900 shrink-0">
-                ${(bump.unitPrice * bump.quantity).toFixed(2)}
-              </span>
+                <span className="font-medium text-gray-900 shrink-0">
+                  ${(bump.unitPrice * bump.quantity).toFixed(2)}
+                </span>
+              </div>
+              <div className="mt-2">
+                <QuantityStepper
+                  quantity={bump.quantity}
+                  label={bump.name}
+                  onChange={(q) => onUpdateBumpQuantity(bump.ruleId, q)}
+                />
+              </div>
             </li>
           ))}
         </ul>
