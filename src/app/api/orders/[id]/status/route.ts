@@ -21,7 +21,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { logAdminAction as logAdminAudit } from "@/lib/audit"
 import { onOrderStatusChange } from "@/lib/workflows"
-import { notifyUser } from "@/lib/notifications"
+import { notifyCashbackCredited } from "@/lib/notifications"
 import { logAdminAction } from "@/lib/audit-log"
 import type { OrderStatus, PaymentStatus } from "@/types"
 
@@ -205,21 +205,10 @@ export async function PATCH(
     }
 
     // Cashback abonado (trigger trg_credit_cashback_on_payment): notificar
-    // al usuario en su campana persistente.
-    if (
-      payment_status === "paid" &&
-      oldPaymentStatus !== "paid" &&
-      updatedOrder.user_id &&
-      Number(updatedOrder.cashback_credits ?? 0) > 0
-    ) {
-      void notifyUser({
-        userId: updatedOrder.user_id,
-        type: "cashback_credited",
-        title: `Cashback abonado: +$${Number(updatedOrder.cashback_credits).toFixed(2)}`,
-        body: `Pedido #${orderId}${updatedOrder.cashback_tier ? ` · Nivel ${updatedOrder.cashback_tier}` : ""} — ya está en tu monedero`,
-        actionUrl: "/recompensas",
-        orderId,
-      })
+    // al usuario en su campana persistente. El monto y el dedupe los resuelve
+    // notifyCashbackCredited leyendo el monedero real, igual que la vía Stripe.
+    if (payment_status === "paid" && oldPaymentStatus !== "paid") {
+      void notifyCashbackCredited(orderId)
     }
 
     // Revertir la reserva del cupón si la orden se cancela.

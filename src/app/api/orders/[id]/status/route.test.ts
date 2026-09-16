@@ -10,7 +10,10 @@ vi.mock("@/lib/admin-auth", () => ({
 }))
 vi.mock("@/lib/audit", () => ({ logAdminAction: vi.fn().mockResolvedValue(undefined) }))
 vi.mock("@/lib/workflows", () => ({ onOrderStatusChange: vi.fn().mockResolvedValue([]) }))
-vi.mock("@/lib/notifications", () => ({ notifyUser: vi.fn().mockResolvedValue(undefined) }))
+vi.mock("@/lib/notifications", () => ({
+  notifyUser: vi.fn().mockResolvedValue(undefined),
+  notifyCashbackCredited: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
 
 import { PATCH } from "./route"
@@ -18,7 +21,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { logAdminAction } from "@/lib/audit"
 import { onOrderStatusChange } from "@/lib/workflows"
-import { notifyUser } from "@/lib/notifications"
+import { notifyCashbackCredited } from "@/lib/notifications"
 
 interface TableResult {
   data?: unknown
@@ -271,13 +274,8 @@ describe("PATCH /api/orders/[id]/status", () => {
     expect(res.status).toBe(200)
     // Solo cambió el pago: no hay workflow de estado
     expect(onOrderStatusChange).not.toHaveBeenCalled()
-    expect(notifyUser).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: "u-1",
-        type: "cashback_credited",
-        orderId: 7,
-      })
-    )
+    // El aviso lo emite el helper compartido (lee el monto real del monedero)
+    expect(notifyCashbackCredited).toHaveBeenCalledWith(7)
     expect(logAdminAction).toHaveBeenCalledWith(
       expect.objectContaining({ action: "order_payment_confirmed", orderId: 7 })
     )

@@ -4,9 +4,10 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, TrendingUp, Star, Megaphone, Gift, Sparkles, BellOff } from "lucide-react";
 import type { Notification, Tier } from "./types";
-import { getWalletHistory, getMonthlyCashbackProgress } from "@/lib/wallet-actions";
+import { getWalletHistory, getMonthlyCashbackProgress, getWeekProgress } from "@/lib/wallet-actions";
 import { useEscapeKey } from "@/hooks/use-escape-key";
 import { deriveNotifications, formatRelativeTime, type WalletMovement } from "./notifications-data";
+import type { WeekProgress } from "@/lib/wallet-progress";
 
 const READ_IDS_KEY = "rewards-notifications-read";
 
@@ -71,6 +72,7 @@ export function NotificationBell() {
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   // Notificaciones persistentes del servidor (null = no cargadas / invitado).
   const [serverNotifs, setServerNotifs] = useState<ServerNotification[] | null>(null);
+  const [weekProgress, setWeekProgress] = useState<WeekProgress | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const bellRef = useRef<HTMLButtonElement>(null);
 
@@ -91,20 +93,36 @@ export function NotificationBell() {
 
   useEscapeKey(() => setIsOpen(false), isOpen);
 
+  // Al abrir, mueve el foco al panel; al cerrar, lo regresa a la campana.
+  useEffect(() => {
+    if (!isOpen) return;
+    const panel = panelRef.current;
+    const bell = bellRef.current;
+    panel?.focus();
+    return () => {
+      const active = document.activeElement;
+      if (!active || active === document.body || panel?.contains(active)) {
+        bell?.focus();
+      }
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     let cancelled = false;
 
     async function fetchNotifications() {
       try {
-        const [history, monthly] = await Promise.all([
+        const [history, monthly, weekly] = await Promise.all([
           getWalletHistory(0, 5),
           getMonthlyCashbackProgress(),
+          getWeekProgress(),
         ]);
         if (cancelled) return;
         // Estado "leído" persistido (se lee aquí, de forma asíncrona, para no
         // bloquear el primer render ni desincronizar la hidratación).
         setReadIds(loadReadIds());
         setMovements(history.transactions);
+        setWeekProgress(weekly);
         setProgress(
           monthly
             ? {
@@ -149,6 +167,7 @@ export function NotificationBell() {
       movements,
       tier: progress.tier,
       weekCount: progress.weekCount,
+      weekProgress,
     });
 
     // Hitos derivados (metas/nivel) siempre se calculan en cliente.
@@ -173,7 +192,7 @@ export function NotificationBell() {
     }
 
     return derived.map((n) => ({ ...n, read: readIds.has(n.id) }));
-  }, [loading, progress, movements, readIds, serverNotifs]);
+  }, [loading, progress, movements, readIds, serverNotifs, weekProgress]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -223,15 +242,23 @@ export function NotificationBell() {
       <button
         ref={bellRef}
         onClick={() => setIsOpen(!isOpen)}
-        aria-label="Notificaciones"
+        aria-label={
+          unreadCount > 0
+            ? `Notificaciones, ${unreadCount} sin leer`
+            : "Notificaciones"
+        }
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        aria-controls="notifications-panel"
         className="relative rounded-xl bg-white border border-cream-300 shadow-sm p-2.5 text-[#5c6069] 
           hover:text-warm-700 transition-colors touch-target"
       >
-        <Bell className="h-5 w-5" />
+        <Bell className="h-5 w-5" aria-hidden="true" />
         {unreadCount > 0 && (
           <motion.span
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
+            aria-hidden="true"
             className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center 
               rounded-full bg-brand-500 text-[10px] font-bold text-white shadow-lg shadow-brand-500/30"
           >
@@ -255,6 +282,10 @@ export function NotificationBell() {
 
             <motion.div
               ref={panelRef}
+              id="notifications-panel"
+              role="dialog"
+              aria-labelledby="notifications-heading"
+              tabIndex={-1}
               initial={{ opacity: 0, y: -10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -265,7 +296,7 @@ export function NotificationBell() {
             >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-cream-300">
-                <h3 className="text-warm-700 text-sm font-bold">
+                <h3 id="notifications-heading" className="text-warm-700 text-sm font-bold">
                   Notificaciones
                   {unreadCount > 0 && (
                     <span className="ml-2 text-brand-500 text-xs font-medium">
@@ -284,10 +315,13 @@ export function NotificationBell() {
               </div>
 
               {/* List */}
-              <div className="max-h-[60vh] overflow-y-auto divide-y divide-cream-300">
+              <div
+                className="max-h-[60vh] overflow-y-auto overscroll-contain divide-y divide-cream-300"
+                aria-busy={loading}
+              >
                 {loading ? (
                   // Skeleton de carga (mismo patrón visual que LoyaltyTierCard).
-                  <div className="p-4 space-y-3 animate-pulse" aria-label="Cargando notificaciones">
+                  <div className="p-4 space-y-3 animate-pulse" role="status" aria-label="Cargando notificaciones">
                     {[0, 1, 2].map((i) => (
                       <div key={i} className="flex items-start gap-3">
                         <div className="h-9 w-9 rounded-xl bg-cream-100 flex-shrink-0" />
@@ -300,8 +334,8 @@ export function NotificationBell() {
                     ))}
                   </div>
                 ) : notifications.length === 0 ? (
-                  <div className="py-12 text-center">
-                    <BellOff className="h-10 w-10 text-cream-300 mx-auto mb-3" />
+                  <div className="py-12 text-center" role="status">
+                    <BellOff className="h-10 w-10 text-cream-300 mx-auto mb-3" aria-hidden="true" />
                     <p className="text-warm-700 text-sm font-semibold">Estás al día</p>
                     <p className="text-[#6e737b] text-xs mt-1">
                       No tienes notificaciones nuevas.
@@ -339,7 +373,10 @@ export function NotificationBell() {
                               {notif.title}
                             </p>
                             {!notif.read && (
-                              <span className="h-2 w-2 rounded-full bg-brand-500 flex-shrink-0" />
+                              <span
+                                className="h-2 w-2 rounded-full bg-brand-500 flex-shrink-0"
+                                aria-hidden="true"
+                              />
                             )}
                           </div>
                           <p className="text-[#5c6069] text-xs mt-0.5 line-clamp-2">

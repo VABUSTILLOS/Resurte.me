@@ -1,6 +1,7 @@
 import { after } from "next/server"
 import { confirmPaymentToCustomer, notifyCustomerStatusUpdate } from "@/lib/workflows"
 import { sendOrderStatusEmail } from "@/lib/order-emails"
+import { notifyCashbackCredited } from "@/lib/notifications"
 import { isAmountSufficient, toCents } from "@/lib/payment-validation"
 import { logger } from "@/lib/logger"
 import type { createServiceClient } from "@/lib/supabase/service"
@@ -120,6 +121,13 @@ export async function handlePaymentIntentSucceeded(
         // admin también dispara el cambio de estado.
         sendOrderStatusEmail(lookupOrder.id, "confirmed").catch((e) =>
           logger.error("Email: order_status_confirmed failed:", e)
+        )
+        // Cashback abonado por el trigger trg_credit_cashback_on_payment:
+        // esta vía (tarjeta) no pasa por el panel, así que sin este aviso el
+        // saldo subía sin explicación en la campana. El monto lo lee el helper
+        // del monedero real y el índice único (order_id, type) dedupe.
+        notifyCashbackCredited(lookupOrder.id).catch((e) =>
+          logger.error("Notify: cashback_credited failed:", e)
         )
       })
     } else {
