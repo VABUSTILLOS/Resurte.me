@@ -154,6 +154,7 @@
 | A35 | Productos ronda 7: umbral de stock por producto (`low_stock_threshold` 00108 con backfill de `stock_status`), reposición sugerida con cantidad (`restock.ts`), importación CSV con match por SKU, modos de actualización y dry-run enriquecido | ✅ |
 | A36 | Productos ronda 7: detección de imágenes rotas en lote (`product-images.ts` + `check-images`, reemplazar/quitar URL), retención y purga de papelera (`trash.ts`, 30 días, `purge-trash` en cron diario y botón "Vaciar papelera") y diff antes/después en el historial (`audit-diff.ts`, sparkline de precios) | ✅ |
 | A37 | Productos ronda 7: SEO con IA en lote (`seo-batch.ts` + `bulk-seo`, solo propuestas con vista previa editable) y reporte de ventas ampliado con margen, costo faltante y clasificación ABC (`sales-report.ts`, CSV + `format=json` con resumen del rango) | ✅ |
+| A38 | Productos en móvil: contenedor `max-w-7xl`, barra de acciones con CTA primario + menú "Más", bloques de diagnóstico plegables (`MobileCollapsible`), vista grid por defecto en móvil y tabla en escritorio (`admin-products-view.ts`, derivada con `useMediaQuery`), columnas secundarias ocultas bajo `md` | ✅ |
 | A12 | Asignación de repartidor desde el dashboard | 🔜 |
 | A14 | Pedidos: filtros guardados y acciones masivas de estado | 🔜 |
 | A15 | Dashboard: alertas accionables con deep-link al recurso | 🔜 |

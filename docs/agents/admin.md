@@ -139,6 +139,19 @@
   `marketing_consent`, tope de 200 y dedupe por día en
   `whatsapp_automation_sends`.
 
+- Productos — móvil: la página vive en el contenedor `max-w-7xl mx-auto px-4
+  sm:px-6` (como el resto del área); la barra de 7 acciones se parte en CTA
+  primario + menú "Más" (`role="menu"`) por debajo de `sm`; los bloques de
+  diagnóstico (alertas de inventario, salud del catálogo, filtros secundarios)
+  se pliegan con `MobileCollapsible` (un solo árbol de render ⇒ sin mismatch de
+  hidratación); la vista por defecto es **grid en móvil** y **tabla en
+  escritorio** (`resolveProductsView` en `src/lib/admin-products-view.ts`,
+  derivada con `useMediaQuery` — nunca con un efecto, `set-state-in-effect`),
+  y un `?view=` explícito o una elección del usuario manda sobre el default.
+  La tabla conserva todas sus columnas en `md+` y oculta las secundarias por
+  debajo (`hidden md:table-cell`, pares `th`/`td`). Todo control móvil nuevo
+  lleva `touch-target` (44px).
+
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de
 visibilidad de un producto y confirmación de que el caché de catálogo se invalida.
@@ -148,3 +161,8 @@ editar etiquetas, programar una oferta y ver que la ficha de tienda solo la
 muestra dentro de la ventana, elegir relacionados, correr "Revisar imágenes",
 "SEO con IA…" (debe abrir la vista previa, no escribir) y descargar el reporte
 de ventas del rango (margen vacío donde falte `cost`).
+
+Móvil de `/admin/productos`: a 375×812 y 320×568 el primer producto queda por
+encima del pliegue, sin scroll horizontal, con la búsqueda visible y "Nuevo
+producto" + "Más" alcanzables (44px); a 768/1440 se conserva la tabla con todas
+sus columnas y las 7 acciones en la barra.

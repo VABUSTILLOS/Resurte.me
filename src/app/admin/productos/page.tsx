@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useState, useEffect, useRef } from "react"
+import { Suspense, useState, useEffect, useRef, type ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
@@ -52,6 +52,8 @@ import {
   ImageOff,
   Link2,
   ScanSearch,
+  MoreHorizontal,
+  SlidersHorizontal,
 } from "lucide-react"
 import { AUDIT_ACTION_LABEL, type AuditAction } from "@/lib/audit-log"
 import { auditDiffRows, auditExtraFields, priceSeries } from "@/lib/audit-diff"
@@ -62,6 +64,12 @@ import { type SalesReportInsights } from "@/lib/sales-report"
 import { deriveStockStatus } from "@/lib/stock"
 import { createClient } from "@/lib/supabase/client"
 import { cropImageToSquare } from "@/lib/crop-image"
+import { useMediaQuery } from "@/hooks/use-media-query"
+import {
+  MOBILE_VIEW_MEDIA_QUERY,
+  resolveProductsView,
+  type ProductsView,
+} from "@/lib/admin-products-view"
 
 interface Product {
   id: number
@@ -179,6 +187,55 @@ function buildMap(rows: AvailabilityRow[]): AvailabilityMap {  const map: Availa
     map.set(row.product_id, inner)
   }
   return map
+}
+
+/**
+ * Envuelve un bloque para que en móvil se pueda plegar y en escritorio se
+ * muestre siempre. Un solo árbol de render (el mismo nodo se oculta con
+ * `hidden`), así que no hay desajuste de hidratación.
+ */
+function MobileCollapsible({
+  id,
+  label,
+  badge,
+  icon,
+  open,
+  onToggle,
+  children,
+}: {
+  id: string
+  label: string
+  badge?: number
+  icon?: ReactNode
+  open: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="mb-3 sm:mb-4">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={id}
+        className="touch-target mb-1.5 flex w-full items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 sm:hidden"
+      >
+        {icon ?? <SlidersHorizontal className="w-4 h-4 text-gray-400" />}
+        <span className="flex-1 text-left">
+          {label}
+          {badge !== undefined && badge > 0 && (
+            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
+              {badge}
+            </span>
+          )}
+        </span>
+        {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+      </button>
+      <div id={id} className={open ? "block" : "hidden sm:block"}>
+        {children}
+      </div>
+    </div>
+  )
 }
 
 export default function AdminProductsPage() {
@@ -418,14 +475,25 @@ function AdminProductsContent() {
   const [checkingImages, setCheckingImages] = useState(false)
   const [onlyBrokenImage, setOnlyBrokenImage] = useState(false)
   const [imagesModalOpen, setImagesModalOpen] = useState(false)
+  // Estado de los desplegables de móvil: el encabezado no cabe a 375px, así que
+  // las acciones secundarias van a un menú "Más" y los bloques de filtros y
+  // diagnóstico se colapsan para que el listado quede dentro del primer pantallazo.
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [healthOpen, setHealthOpen] = useState(false)
+  const [alertsOpen, setAlertsOpen] = useState(false)
   // Filtros por ciudad y marca (server-side).
   const [cityFilter, setCityFilter] = useState(searchParams.get("city") ?? "all")
   const [brandFilter, setBrandFilter] = useState(searchParams.get("brand") ?? "all")
   const [brands, setBrands] = useState<string[]>([])
   // Vista tabla/grid (también viaja en la URL).
-  const [view, setView] = useState<"table" | "grid">(
-    searchParams.get("view") === "grid" ? "grid" : "table"
-  )
+  // La vista efectiva se deriva en render: `useMediaQuery` devuelve `false` en
+  // SSR y en el primer render del cliente, así que el HTML prerenderizado
+  // (tabla) coincide con la hidratación y luego se ajusta a tarjetas en móvil.
+  const viewParam = searchParams.get("view")
+  const isMobileViewport = useMediaQuery(MOBILE_VIEW_MEDIA_QUERY)
+  const [viewOverride, setView] = useState<ProductsView | null>(null)
+  const view = resolveProductsView(viewParam, isMobileViewport, viewOverride)
   // Orden de la tabla (por defecto nombre asc, como la consulta inicial).
   const [sort, setSort] = useState<{ key: "name" | "price" | "stock"; dir: "asc" | "desc" }>({
     key: initialSort === "price" || initialSort === "stock" ? initialSort : "name",
@@ -462,7 +530,9 @@ function AdminProductsContent() {
     if (tagFilter !== "all") sp.set("tag", tagFilter)
     if (cityFilter !== "all") sp.set("city", cityFilter)
     if (brandFilter !== "all") sp.set("brand", brandFilter)
-    if (view === "grid") sp.set("view", "grid")
+    // Solo se persiste una vista elegida (o un `?view=` ya presente): el
+    // default de móvil (tarjetas) no contamina la URL.
+    if ((viewOverride ?? viewParam) === "grid") sp.set("view", "grid")
     if (sort.key !== "name") sp.set("sort", sort.key)
     if (sort.dir !== "asc") sp.set("dir", sort.dir)
     if (page > 1) sp.set("page", String(page))
@@ -488,6 +558,8 @@ function AdminProductsContent() {
     cityFilter,
     brandFilter,
     view,
+    viewOverride,
+    viewParam,
     sort,
     page,
     pageSize,
@@ -2582,9 +2654,174 @@ function AdminProductsContent() {
     )
   }
 
+  // Acciones del encabezado. En escritorio se muestran todas; en móvil solo la
+  // primaria y el resto detrás de "Más": la barra completa mide ~720px y el
+  // `overflow-x: clip` global dejaría los botones recortados e inalcanzables.
+  const headerActions: {
+    key: string
+    label: string
+    title?: string
+    icon: ReactNode
+    variant: "link" | "button" | "primary"
+    tone?: "brand" | "gray"
+    href?: string
+    onClick?: () => void
+    disabled?: boolean
+  }[] = [
+    {
+      key: "cities",
+      label: "Matriz por ciudad",
+      icon: <MapPin className="w-4 h-4" />,
+      variant: "link",
+      tone: "brand",
+      href: "/admin/disponibilidad",
+    },
+    {
+      key: "activity",
+      label: "Actividad",
+      title: "Últimas acciones sobre el catálogo",
+      icon: <Activity className="w-4 h-4" />,
+      variant: "link",
+      tone: "gray",
+      onClick: openActivity,
+    },
+    {
+      key: "import",
+      label: "Importar CSV",
+      icon: <Package className="w-4 h-4" />,
+      variant: "button",
+      onClick: () => setImportOpen(true),
+    },
+    {
+      key: "export",
+      label: "Exportar CSV",
+      title: "Descarga los productos filtrados en CSV (re-importable)",
+      icon: <Download className="w-4 h-4" />,
+      variant: "button",
+      onClick: exportCsv,
+      disabled: total === 0,
+    },
+    {
+      key: "report",
+      label: "Reporte ventas",
+      title: "Ventas por producto en un rango de fechas (CSV)",
+      icon: <Activity className="w-4 h-4" />,
+      variant: "button",
+      onClick: () => setReportOpen(true),
+    },
+    {
+      key: "images",
+      label: checkingImages ? "Revisando…" : "Revisar imágenes",
+      title:
+        selected.size > 0
+          ? `Revisar si responden las imágenes de ${selected.size} producto(s) seleccionado(s)`
+          : "Revisar si responden las imágenes de los productos de esta página",
+      icon: checkingImages ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : (
+        <ScanSearch className="w-4 h-4" />
+      ),
+      variant: "button",
+      onClick: checkImages,
+      disabled: checkingImages || (selected.size === 0 && pageItems.length === 0),
+    },
+    {
+      key: "new",
+      label: "Nuevo producto",
+      icon: <Plus className="w-4 h-4" />,
+      variant: "primary",
+      onClick: () => setProductForm("new"),
+    },
+  ]
+
+  const renderHeaderAction = (
+    action: (typeof headerActions)[number],
+    mode: "desktop" | "mobilePrimary" | "mobileMenu",
+  ) => {
+    const className =
+      mode === "desktop"
+        ? action.variant === "primary"
+          ? "flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 transition-colors text-sm"
+          : action.variant === "link"
+            ? `flex items-center gap-1.5 text-sm font-semibold ${
+                action.tone === "brand"
+                  ? "text-brand-600 hover:text-brand-700"
+                  : "text-gray-500 hover:text-gray-700"
+              }`
+            : "flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm disabled:opacity-50"
+        : mode === "mobilePrimary"
+          ? "touch-target flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white font-semibold rounded-xl text-sm"
+          : "flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+
+    const content = (
+      <>
+        {action.icon}
+        {action.label}
+      </>
+    )
+
+    if (action.href) {
+      return (
+        <Link
+          key={action.key}
+          href={action.href}
+          title={action.title}
+          className={className}
+          onClick={mode === "mobileMenu" ? () => setMoreOpen(false) : undefined}
+        >
+          {content}
+        </Link>
+      )
+    }
+
+    return (
+      <button
+        key={action.key}
+        type="button"
+        title={action.title}
+        onClick={() => {
+          if (mode === "mobileMenu") setMoreOpen(false)
+          action.onClick?.()
+        }}
+        disabled={action.disabled}
+        className={className}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  // Filtros secundarios plegados en móvil: se revelan con el mismo botón
+  // "Filtros" que los selects. En escritorio (sm+) quedan siempre visibles.
+  const secondaryFilterClass = filtersOpen ? "inline-flex" : "hidden sm:inline-flex"
+  const activeFilterCount = [
+    categoryFilter !== "all",
+    stockFilter !== "all",
+    cityFilter !== "all",
+    brandFilter !== "all",
+    tagFilter !== "all",
+    onlyOnSale,
+    onlyStaleSale,
+    onlyUnderThreshold,
+    onlyTrash,
+  ].filter(Boolean).length
+  const healthIssues =
+    counts.noImage +
+    counts.noCities +
+    counts.noPrice +
+    counts.noCategory +
+    counts.waMismatch +
+    counts.dupNames +
+    counts.underThreshold +
+    brokenItems.length
+  const stockAlertCount = (counts.lowStock ?? 0) + (counts.outStock ?? 0)
+
+  const primaryAction = headerActions.find((a) => a.variant === "primary")
+  const secondaryActions = headerActions.filter((a) => a.variant !== "primary")
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 pb-6 sm:py-6">
+      <div className="mb-4 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Productos</h1>
           <p className="text-sm text-gray-500">
@@ -2594,77 +2831,33 @@ function AdminProductsContent() {
             {refreshing && <Loader2 className="inline w-3.5 h-3.5 ml-2 animate-spin text-brand-500" />}
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          <Link
-            href="/admin/disponibilidad"
-            className="flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:text-brand-700"
-          >
-            <MapPin className="w-4 h-4" />
-            Matriz por ciudad
-          </Link>
+
+        {/* Escritorio: barra completa de acciones */}
+        <div className="hidden items-center gap-4 sm:flex">
+          {headerActions.map((action) => renderHeaderAction(action, "desktop"))}
+        </div>
+
+        {/* Móvil: acción primaria siempre visible + menú con el resto */}
+        <div className="relative flex items-center gap-2 sm:hidden">
+          {primaryAction && renderHeaderAction(primaryAction, "mobilePrimary")}
           <button
             type="button"
-            onClick={openActivity}
-            title="Últimas acciones sobre el catálogo"
-            className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-700"
+            onClick={() => setMoreOpen((v) => !v)}
+            aria-expanded={moreOpen}
+            aria-haspopup="menu"
+            className="touch-target flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl text-sm"
           >
-            <Activity className="w-4 h-4" />
-            Actividad
+            <MoreHorizontal className="w-4 h-4" />
+            Más
           </button>
-          {/* Fase 16 — importación masiva CSV */}
-          <button
-            type="button"
-            onClick={() => setImportOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm"
-          >
-            <Package className="w-4 h-4" />
-            Importar CSV
-          </button>
-          <button
-            type="button"
-            onClick={exportCsv}
-            disabled={total === 0}
-            title="Descarga los productos filtrados en CSV (re-importable)"
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" />
-            Exportar CSV
-          </button>
-          <button
-            type="button"
-            onClick={() => setReportOpen(true)}
-            title="Ventas por producto en un rango de fechas (CSV)"
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm"
-          >
-            <Activity className="w-4 h-4" />
-            Reporte ventas
-          </button>
-          <button
-            type="button"
-            onClick={checkImages}
-            disabled={checkingImages || (selected.size === 0 && pageItems.length === 0)}
-            title={
-              selected.size > 0
-                ? `Revisar si responden las imágenes de ${selected.size} producto(s) seleccionado(s)`
-                : "Revisar si responden las imágenes de los productos de esta página"
-            }
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm disabled:opacity-50"
-          >
-            {checkingImages ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <ScanSearch className="w-4 h-4" />
-            )}
-            {checkingImages ? "Revisando…" : "Revisar imágenes"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setProductForm("new")}
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white font-semibold rounded-xl hover:bg-brand-700 transition-colors text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Nuevo producto
-          </button>
+          {moreOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-30 mt-2 flex w-56 flex-col gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg"
+            >
+              {secondaryActions.map((action) => renderHeaderAction(action, "mobileMenu"))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -2732,283 +2925,327 @@ function AdminProductsContent() {
         </div>
       )}
 
-      {/* Fase 12 — sugerencias de reabasto + historial de ajustes */}
-      <RestockPanel
-        onRestocked={(productId) =>
-          setProducts((prev) =>
-            prev.map((p) => (p.id === productId ? { ...p, stock_status: "in_stock" } : p))
-          )
-        }
-      />
-      {/* Alertas de stock: conteo de productos con stock bajo o agotado;
-          cada chip filtra la tabla. */}
-      {(counts.lowStock > 0 || counts.outStock > 0) && (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-          <span className="text-sm font-semibold text-amber-800">Alertas de inventario:</span>
-          <button
-            type="button"
-            onClick={() => updateFilters(() => setStockFilter((f) => (f === "low_stock" ? "all" : "low_stock")))}
-            aria-pressed={stockFilter === "low_stock"}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              stockFilter === "low_stock"
-                ? "bg-amber-600 text-white"
-                : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-100"
-            }`}
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            {counts.lowStock} con stock bajo
-          </button>
-          <button
-            type="button"
-            onClick={() => updateFilters(() => setStockFilter((f) => (f === "out_of_stock" ? "all" : "out_of_stock")))}
-            aria-pressed={stockFilter === "out_of_stock"}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              stockFilter === "out_of_stock"
-                ? "bg-red-600 text-white"
-                : "bg-white border border-red-200 text-red-700 hover:bg-red-100"
-            }`}
-          >
-            <PackageX className="w-3.5 h-3.5" />
-            {counts.outStock} agotado{counts.outStock === 1 ? "" : "s"}
-          </button>
-          {stockFilter !== "all" && (
+      {/* Fase 12 — sugerencias de reabasto + historial de ajustes.
+          En móvil van plegados: son diagnóstico, no el contenido principal. */}
+      <MobileCollapsible
+        id="alertas-inventario"
+        label="Alertas de inventario"
+        badge={stockAlertCount}
+        icon={<AlertTriangle className="w-4 h-4 text-amber-600" />}
+        open={alertsOpen}
+        onToggle={() => setAlertsOpen((v) => !v)}
+      >
+        <RestockPanel
+          onRestocked={(productId) =>
+            setProducts((prev) =>
+              prev.map((p) => (p.id === productId ? { ...p, stock_status: "in_stock" } : p))
+            )
+          }
+        />
+        {/* Alertas de stock: conteo de productos con stock bajo o agotado;
+            cada chip filtra la tabla. */}
+        {stockAlertCount > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="text-sm font-semibold text-amber-800">Alertas de inventario:</span>
             <button
               type="button"
-              onClick={() => updateFilters(() => setStockFilter("all"))}
-              className="text-xs font-semibold text-amber-700 hover:underline"
+              onClick={() => updateFilters(() => setStockFilter((f) => (f === "low_stock" ? "all" : "low_stock")))}
+              aria-pressed={stockFilter === "low_stock"}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                stockFilter === "low_stock"
+                  ? "bg-amber-600 text-white"
+                  : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-100"
+              }`}
             >
-              Ver todos
+              <AlertTriangle className="w-3.5 h-3.5" />
+              {counts.lowStock} con stock bajo
             </button>
-          )}
-        </div>
-      )}
+            <button
+              type="button"
+              onClick={() => updateFilters(() => setStockFilter((f) => (f === "out_of_stock" ? "all" : "out_of_stock")))}
+              aria-pressed={stockFilter === "out_of_stock"}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                stockFilter === "out_of_stock"
+                  ? "bg-red-600 text-white"
+                  : "bg-white border border-red-200 text-red-700 hover:bg-red-100"
+              }`}
+            >
+              <PackageX className="w-3.5 h-3.5" />
+              {counts.outStock} agotado{counts.outStock === 1 ? "" : "s"}
+            </button>
+            {stockFilter !== "all" && (
+              <button
+                type="button"
+                onClick={() => updateFilters(() => setStockFilter("all"))}
+                className="text-xs font-semibold text-amber-700 hover:underline"
+              >
+                Ver todos
+              </button>
+            )}
+          </div>
+        )}
+      </MobileCollapsible>
 
-      {/* Fase 5 — búsqueda + filtros de categoría y stock */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            ref={searchRef}
-            type="text"
-            placeholder="Buscar producto o categoría... ( / )"
-            value={search}
-            onChange={(e) => updateFilters(() => setSearch(e.target.value))}
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-          />
-        </div>
-        <select
-          value={categoryFilter}
-          onChange={(e) => updateFilters(() => setCategoryFilter(e.target.value))}
-          className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
-          aria-label="Filtrar por categoría"
-        >
-          <option value="all">Todas las categorías</option>
-          {categories.map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={stockFilter}
-          onChange={(e) => updateFilters(() => setStockFilter(e.target.value as StockStatus | "all"))}
-          className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
-          aria-label="Filtrar por stock"
-        >
-          {STOCK_FILTERS.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={cityFilter}
-          onChange={(e) => updateFilters(() => setCityFilter(e.target.value))}
-          className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
-          aria-label="Filtrar por ciudad disponible"
-        >
-          <option value="all">Todas las ciudades</option>
-          {cities.map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        {brands.length > 0 && (
-          <select
-            value={brandFilter}
-            onChange={(e) => updateFilters(() => setBrandFilter(e.target.value))}
-            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
-            aria-label="Filtrar por marca"
+      {/* Fase 5 — búsqueda + filtros de categoría y stock.
+          La búsqueda queda siempre visible; los selects se pliegan en móvil. */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-2 sm:flex-1">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              ref={searchRef}
+              type="text"
+              placeholder="Buscar producto o categoría... ( / )"
+              value={search}
+              onChange={(e) => updateFilters(() => setSearch(e.target.value))}
+              className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            aria-controls="filtros-catalogo"
+            className="touch-target flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 sm:hidden"
           >
-            <option value="all">Todas las marcas</option>
-            {brands.map((b) => (
-              <option key={b} value={b}>
-                {b}
+            <SlidersHorizontal className="w-4 h-4 text-gray-400" />
+            Filtros
+            {activeFilterCount > 0 && (
+              <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-bold text-brand-700">
+                {activeFilterCount}
+              </span>
+            )}
+            {filtersOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </div>
+        <div
+          id="filtros-catalogo"
+          className={`${filtersOpen ? "flex" : "hidden sm:flex"} flex-col gap-3 sm:flex-row`}
+        >
+          <select
+            value={categoryFilter}
+            onChange={(e) => updateFilters(() => setCategoryFilter(e.target.value))}
+            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+            aria-label="Filtrar por categoría"
+          >
+            <option value="all">Todas las categorías</option>
+            {categories.map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {c.name}
               </option>
             ))}
           </select>
-        )}
+          <select
+            value={stockFilter}
+            onChange={(e) => updateFilters(() => setStockFilter(e.target.value as StockStatus | "all"))}
+            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+            aria-label="Filtrar por stock"
+          >
+            {STOCK_FILTERS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={cityFilter}
+            onChange={(e) => updateFilters(() => setCityFilter(e.target.value))}
+            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+            aria-label="Filtrar por ciudad disponible"
+          >
+            <option value="all">Todas las ciudades</option>
+            {cities.map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          {brands.length > 0 && (
+            <select
+              value={brandFilter}
+              onChange={(e) => updateFilters(() => setBrandFilter(e.target.value))}
+              className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+              aria-label="Filtrar por marca"
+            >
+              <option value="all">Todas las marcas</option>
+              {brands.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
 
-      {/* Salud del catálogo: problemas detectados; cada chip aplica su filtro */}
-      {counts.noImage + counts.noCities + counts.noPrice + counts.noCategory + counts.waMismatch + counts.dupNames + counts.underThreshold + brokenItems.length > 0 && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <HeartPulse className="w-4 h-4 text-amber-600 shrink-0" />
-            <span className="text-sm font-semibold text-amber-800">Salud del catálogo:</span>
-        <button
-          type="button"
-          onClick={() => updateFilters(() => setOnlyNoImage((v) => !v))}
-          aria-pressed={onlyNoImage}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-            onlyNoImage
-              ? "bg-amber-600 text-white"
-              : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
-          }`}
+      {/* Salud del catálogo: problemas detectados; cada chip aplica su filtro.
+          En móvil va plegado tras el botón "Salud del catálogo". */}
+      {healthIssues > 0 && (
+        <MobileCollapsible
+          id="salud-catalogo"
+          label="Salud del catálogo"
+          badge={healthIssues}
+          icon={<HeartPulse className="w-4 h-4 text-amber-600" />}
+          open={healthOpen}
+          onToggle={() => setHealthOpen((v) => !v)}
         >
-          <ImagePlus className="w-3.5 h-3.5" />
-          Sin imagen
-          <span
-            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              onlyNoImage ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
-            }`}
-          >
-            {counts.noImage}
-          </span>
-        </button>
-        {brokenItems.length > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <HeartPulse className="w-4 h-4 text-amber-600 shrink-0" />
+              <span className="text-sm font-semibold text-amber-800">Salud del catálogo:</span>
           <button
             type="button"
-            onClick={() => setOnlyBrokenImage((v) => !v)}
-            aria-pressed={onlyBrokenImage}
-            title="Imágenes de esta página que no responden (revisadas con «Revisar imágenes»)"
+            onClick={() => updateFilters(() => setOnlyNoImage((v) => !v))}
+            aria-pressed={onlyNoImage}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              onlyBrokenImage
+              onlyNoImage
+                ? "bg-amber-600 text-white"
+                : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
+            }`}
+          >
+            <ImagePlus className="w-3.5 h-3.5" />
+            Sin imagen
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                onlyNoImage ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+              }`}
+            >
+              {counts.noImage}
+            </span>
+          </button>
+          {brokenItems.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setOnlyBrokenImage((v) => !v)}
+              aria-pressed={onlyBrokenImage}
+              title="Imágenes de esta página que no responden (revisadas con «Revisar imágenes»)"
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                onlyBrokenImage
+                  ? "bg-red-600 text-white"
+                  : "bg-white border border-red-200 text-red-700 hover:bg-red-50"
+              }`}
+            >
+              <ImageOff className="w-3.5 h-3.5" />
+              Imagen rota
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  onlyBrokenImage ? "bg-white/20 text-white" : "bg-red-50 text-red-600"
+                }`}
+              >
+                {brokenItems.length}
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => updateFilters(() => setOnlyNoCities((v) => !v))}
+            aria-pressed={onlyNoCities}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              onlyNoCities
+                ? "bg-amber-600 text-white"
+                : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
+            }`}
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            Sin ciudades
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                onlyNoCities ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+              }`}
+            >
+              {counts.noCities}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => updateFilters(() => setOnlyNoPrice((v) => !v))}
+            aria-pressed={onlyNoPrice}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              onlyNoPrice
+                ? "bg-amber-600 text-white"
+                : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
+            }`}
+          >
+            <Tag className="w-3.5 h-3.5" />
+            Sin precio
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                onlyNoPrice ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+              }`}
+            >
+              {counts.noPrice}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => updateFilters(() => setOnlyNoCategory((v) => !v))}
+            aria-pressed={onlyNoCategory}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              onlyNoCategory
+                ? "bg-amber-600 text-white"
+                : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
+            }`}
+          >
+            <Package className="w-3.5 h-3.5" />
+            Sin categoría
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                onlyNoCategory ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+              }`}
+            >
+              {counts.noCategory}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => updateFilters(() => setOnlyWaMismatch((v) => !v))}
+            aria-pressed={onlyWaMismatch}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              onlyWaMismatch
                 ? "bg-red-600 text-white"
                 : "bg-white border border-red-200 text-red-700 hover:bg-red-50"
             }`}
+            title="Activos en el catálogo de WhatsApp pero despublicados en tienda"
           >
-            <ImageOff className="w-3.5 h-3.5" />
-            Imagen rota
+            <AlertTriangle className="w-3.5 h-3.5" />
+            WA sin publicar
             <span
               className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                onlyBrokenImage ? "bg-white/20 text-white" : "bg-red-50 text-red-600"
+                onlyWaMismatch ? "bg-white/20 text-white" : "bg-red-50 text-red-600"
               }`}
             >
-              {brokenItems.length}
+              {counts.waMismatch}
             </span>
           </button>
-        )}
-        <button
-          type="button"
-          onClick={() => updateFilters(() => setOnlyNoCities((v) => !v))}
-          aria-pressed={onlyNoCities}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-            onlyNoCities
-              ? "bg-amber-600 text-white"
-              : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
-          }`}
-        >
-          <MapPin className="w-3.5 h-3.5" />
-          Sin ciudades
-          <span
-            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              onlyNoCities ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+          <button
+            type="button"
+            onClick={() => updateFilters(() => setOnlyDupNames((v) => !v))}
+            aria-pressed={onlyDupNames}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              onlyDupNames
+                ? "bg-amber-600 text-white"
+                : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
             }`}
+            title="Productos que comparten el mismo nombre"
           >
-            {counts.noCities}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => updateFilters(() => setOnlyNoPrice((v) => !v))}
-          aria-pressed={onlyNoPrice}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-            onlyNoPrice
-              ? "bg-amber-600 text-white"
-              : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
-          }`}
-        >
-          <Tag className="w-3.5 h-3.5" />
-          Sin precio
-          <span
-            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              onlyNoPrice ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
-            }`}
-          >
-            {counts.noPrice}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => updateFilters(() => setOnlyNoCategory((v) => !v))}
-          aria-pressed={onlyNoCategory}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-            onlyNoCategory
-              ? "bg-amber-600 text-white"
-              : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
-          }`}
-        >
-          <Package className="w-3.5 h-3.5" />
-          Sin categoría
-          <span
-            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              onlyNoCategory ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
-            }`}
-          >
-            {counts.noCategory}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => updateFilters(() => setOnlyWaMismatch((v) => !v))}
-          aria-pressed={onlyWaMismatch}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-            onlyWaMismatch
-              ? "bg-red-600 text-white"
-              : "bg-white border border-red-200 text-red-700 hover:bg-red-50"
-          }`}
-          title="Activos en el catálogo de WhatsApp pero despublicados en tienda"
-        >
-          <AlertTriangle className="w-3.5 h-3.5" />
-          WA sin publicar
-          <span
-            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              onlyWaMismatch ? "bg-white/20 text-white" : "bg-red-50 text-red-600"
-            }`}
-          >
-            {counts.waMismatch}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => updateFilters(() => setOnlyDupNames((v) => !v))}
-          aria-pressed={onlyDupNames}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-            onlyDupNames
-              ? "bg-amber-600 text-white"
-              : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
-          }`}
-          title="Productos que comparten el mismo nombre"
-        >
-          <Copy className="w-3.5 h-3.5" />
-          Nombres duplicados
-          <span
-            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              onlyDupNames ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
-            }`}
-          >
-            {counts.dupNames}
-          </span>
-        </button>
+            <Copy className="w-3.5 h-3.5" />
+            Nombres duplicados
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                onlyDupNames ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+              }`}
+            >
+              {counts.dupNames}
+            </span>
+          </button>
+            </div>
           </div>
-        </div>
+        </MobileCollapsible>
       )}
 
       {/* Chips de estado de publicación y catálogo incompleto (con conteos) */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-1.5 mb-3 sm:gap-2 sm:mb-4">
         {(
           [
             { label: "Todos", value: "all" as const, count: counts.catalogTotal },
@@ -3041,7 +3278,7 @@ function AdminProductsContent() {
           type="button"
           onClick={() => updateFilters(() => setOnlyOnSale((v) => !v))}
           aria-pressed={onlyOnSale}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+          className={`${secondaryFilterClass} items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
             onlyOnSale
               ? "bg-green-600 text-white"
               : "bg-white border border-green-200 text-green-700 hover:bg-green-50"
@@ -3062,7 +3299,7 @@ function AdminProductsContent() {
           type="button"
           onClick={() => updateFilters(() => setOnlyStaleSale((v) => !v))}
           aria-pressed={onlyStaleSale}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+          className={`${secondaryFilterClass} items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
             onlyStaleSale
               ? "bg-amber-600 text-white"
               : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
@@ -3095,7 +3332,7 @@ function AdminProductsContent() {
           type="button"
           onClick={() => updateFilters(() => setOnlyUnderThreshold((v) => !v))}
           aria-pressed={onlyUnderThreshold}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+          className={`${secondaryFilterClass} items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
             onlyUnderThreshold
               ? "bg-red-600 text-white"
               : "bg-white border border-red-200 text-red-700 hover:bg-red-50"
@@ -3113,7 +3350,7 @@ function AdminProductsContent() {
           </span>
         </button>
         {tagList.length > 0 && (
-          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-gray-200 text-gray-600">
+          <label className={`${secondaryFilterClass} items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-gray-200 text-gray-600`}>
             <Tag className="w-3.5 h-3.5 text-gray-400" />
             <span className="sr-only">Filtrar por etiqueta</span>
             <select
@@ -3135,7 +3372,7 @@ function AdminProductsContent() {
           type="button"
           onClick={() => updateFilters(() => setOnlyTrash((v) => !v))}
           aria-pressed={onlyTrash}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+          className={`${secondaryFilterClass} items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
             onlyTrash
               ? "bg-gray-700 text-white"
               : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -3165,7 +3402,7 @@ function AdminProductsContent() {
           </button>
         )}
         {/* Vistas guardadas de filtros */}
-        <div className="relative">
+        <div className={filtersOpen ? "relative" : "hidden sm:block relative"}>
           <button
             type="button"
             onClick={() => setViewsOpen((v) => !v)}
@@ -3467,7 +3704,7 @@ function AdminProductsContent() {
                     Producto {sortIcon("name")}
                   </button>
                 </th>
-                <th className="px-5 py-3">Categoría</th>
+                <th className="px-5 py-3 hidden md:table-cell">Categoría</th>
                 <th className="px-5 py-3">
                   <button
                     type="button"
@@ -3478,7 +3715,7 @@ function AdminProductsContent() {
                     Precio {sortIcon("price")}
                   </button>
                 </th>
-                <th className="px-5 py-3" title="(precio de venta − costo) / precio de venta">
+                <th className="px-5 py-3 hidden md:table-cell" title="(precio de venta − costo) / precio de venta">
                   Margen
                 </th>
                 <th className="px-5 py-3">
@@ -3491,10 +3728,10 @@ function AdminProductsContent() {
                     Stock {sortIcon("stock")}
                   </button>
                 </th>
-                <th className="px-5 py-3">Estado</th>
-                <th className="px-5 py-3">WhatsApp</th>
-                <th className="px-5 py-3">Ciudades</th>
-                <th className="px-5 py-3" title="Unidades vendidas (histórico)">
+                <th className="px-5 py-3 hidden md:table-cell">Estado</th>
+                <th className="px-5 py-3 hidden md:table-cell">WhatsApp</th>
+                <th className="px-5 py-3 hidden md:table-cell">Ciudades</th>
+                <th className="px-5 py-3 hidden md:table-cell" title="Unidades vendidas (histórico)">
                   Ventas
                 </th>
                 <th className="px-5 py-3">Acciones</th>
@@ -3659,7 +3896,7 @@ function AdminProductsContent() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3">
+                    <td className="px-5 py-3 hidden md:table-cell">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
                         <Tag className="w-3 h-3" />
                         {categoryName(product.category_id)}
@@ -3728,7 +3965,7 @@ function AdminProductsContent() {
                         </button>
                       )}
                     </td>
-                    <td className="px-5 py-3">
+                    <td className="px-5 py-3 hidden md:table-cell">
                       {(() => {
                         const selling = resolveSalePrice(product) ?? product.price
                         if (selling == null || selling <= 0 || product.cost == null) {
@@ -3794,7 +4031,7 @@ function AdminProductsContent() {
                         </button>
                       </div>
                     </td>
-                    <td className="px-5 py-3">
+                    <td className="px-5 py-3 hidden md:table-cell">
                       <button
                         onClick={() => toggleVisibility(product)}
                         disabled={saving.has(product.id)}
@@ -3840,7 +4077,7 @@ function AdminProductsContent() {
                         </p>
                       )}
                     </td>
-                    <td className="px-5 py-3">
+                    <td className="px-5 py-3 hidden md:table-cell">
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => toggleWhatsApp(product)}
@@ -3863,7 +4100,7 @@ function AdminProductsContent() {
                         )}
                       </div>
                     </td>
-                    <td className="px-5 py-3">
+                    <td className="px-5 py-3 hidden md:table-cell">
                       <button
                         onClick={() => openCityModal(product.id)}
                         disabled={cities.length === 0}
@@ -3887,7 +4124,7 @@ function AdminProductsContent() {
                         )}
                       </button>
                     </td>
-                    <td className="px-5 py-3">
+                    <td className="px-5 py-3 hidden md:table-cell">
                       <span
                         className={`text-xs font-semibold ${
                           (sales[product.id] ?? 0) > 0 ? "text-gray-900" : "text-gray-300"
