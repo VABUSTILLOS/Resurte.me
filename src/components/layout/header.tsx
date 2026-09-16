@@ -5,6 +5,7 @@ import { ShoppingCart, User, MapPin, ChevronDown, Coins, LogOut, Package, Search
 import { useCity } from "@/contexts/city-context"
 import { useCart } from "@/contexts/cart-context"
 import { CitySelector } from "@/components/city/city-selector"
+import { CategoryMegaMenu } from "@/components/layout/category-mega-menu"
 import { SearchBar } from "@/components/search/search-bar"
 import { CART_DRAWER_EVENT } from "@/components/cart/cart-drawer"
 import { MobileSearchOverlay, MOBILE_SEARCH_EVENT } from "@/components/search/mobile-search-overlay"
@@ -26,6 +27,7 @@ export function Header() {
   const [showCitySelector, setShowCitySelector] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showMobileSearch, setShowMobileSearch] = useState(false)
+  const [showCategories, setShowCategories] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [cashbackBalance, setCashbackBalance] = useState<number | null>(null)
   const [role, setRole] = useState<"admin" | "vendedor" | "cliente" | null>(null)
@@ -33,7 +35,7 @@ export function Header() {
 
   // Auto-hide: el header se desliza fuera al bajar y reaparece al subir.
   // Con cualquier overlay/menú abierto se fuerza visible.
-  const overlayOpen = showCitySelector || showUserMenu || showMobileSearch
+  const overlayOpen = showCitySelector || showUserMenu || showMobileSearch || showCategories
   const scrollDirection = useScrollDirection({ forceVisible: overlayOpen })
   const headerHidden = scrollDirection === "down" && !overlayOpen
 
@@ -48,6 +50,10 @@ export function Header() {
   // usuario) — patrón ARIA disclosure; antes solo se cerraban con clic fuera.
   useEscapeKey(useCallback(() => setShowUserMenu(false), []), showUserMenu)
   useEscapeKey(useCallback(() => setShowCitySelector(false), []), showCitySelector)
+
+  // El mega-menú de categorías gestiona su propio estado; el header solo
+  // necesita saber si está abierto para mantener la barra visible.
+  const handleCategoriesOpenChange = useCallback((open: boolean) => setShowCategories(open), [])
 
   // Resolver el rol del usuario (server action) para navegación por sección
   useEffect(() => {
@@ -135,7 +141,7 @@ export function Header() {
       }}
     >
       <div className="max-w-7xl mx-auto px-3 sm:px-6">
-        <div className="flex items-center justify-between h-16 gap-2 sm:gap-3">
+        <div className="relative flex items-center justify-between h-16 gap-2 sm:gap-3">
           {/* Logo — Erewhon-style with refined type */}
           <Link
             href="/"
@@ -187,6 +193,14 @@ export function Header() {
 
           {/* Right actions */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Desktop: acceso directo al catálogo por categoría (N11) */}
+            {city && (
+              <CategoryMegaMenu
+                citySlug={city.slug}
+                onOpenChange={handleCategoriesOpenChange}
+              />
+            )}
+
             {/* Mobile: acceso persistente a "todos los productos" de la tienda */}
             {city && (
               <Link

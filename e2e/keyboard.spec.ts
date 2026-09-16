@@ -132,4 +132,42 @@ test.describe("accesibilidad navegación por teclado", () => {
     })
     expect(hasVisibleOutline, "el elemento enfocado debe mostrar outline visible").toBe(true)
   })
+
+  // N11: el mega-menú de categorías se ancla a la derecha del disparador. A
+  // 640px (el viewport más angosto donde existe) no debe salirse de la ventana.
+  test("el mega-menú de categorías cabe en la ventana y cierra con Escape", async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
+
+    const trigger = page.locator('button[aria-controls="category-mega-menu"]:visible').first()
+    test.skip((await trigger.count()) === 0, "el mega-menú solo existe en desktop")
+
+    const panel = page.locator("#category-mega-menu")
+
+    async function openMenu() {
+      await expect(async () => {
+        if (!(await panel.isVisible())) await trigger.click({ timeout: 2_000 })
+        await expect(panel).toBeVisible({ timeout: 2_000 })
+      }).toPass({ timeout: 30_000 })
+    }
+
+    for (const width of [1280, 640]) {
+      await page.setViewportSize({ width, height: 800 })
+      await openMenu()
+      await expect(trigger).toHaveAttribute("aria-expanded", "true")
+
+      const box = await panel.boundingBox()
+      expect(box, `el panel debe tener caja a ${width}px`).not.toBeNull()
+      expect(box!.x, `el panel no debe salirse por la izquierda a ${width}px`).toBeGreaterThanOrEqual(0)
+      expect(
+        box!.x + box!.width,
+        `el panel no debe salirse por la derecha a ${width}px`,
+      ).toBeLessThanOrEqual(width + 1)
+
+      await page.keyboard.press("Escape")
+      await expect(panel).toBeHidden()
+      await expect(trigger).toHaveAttribute("aria-expanded", "false")
+      await expect(trigger).toBeFocused()
+    }
+  })
 })
