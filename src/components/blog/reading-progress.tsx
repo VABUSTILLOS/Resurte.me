@@ -50,7 +50,7 @@ export function ReadingProgress() {
     >
       <div
         aria-hidden="true"
-        className="h-full w-full origin-left rounded-r-full bg-gradient-to-r from-brand-500 to-brand-600 shadow-[0_1px_4px_rgba(16,137,16,0.35)] will-change-transform transition-transform duration-150 ease-out"
+        className="reading-progress-fill h-full w-full origin-left rounded-r-full bg-gradient-to-r from-brand-500 to-brand-600 shadow-[0_1px_4px_rgba(16,137,16,0.35)] will-change-transform transition-transform duration-150 ease-out"
         style={{ transform: `scaleX(${progress})` }}
       />
     </div>

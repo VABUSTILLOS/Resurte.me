@@ -516,7 +516,8 @@ input.marquee-input:placeholder-shown:not(:focus) + .marquee-placeholder {
   .quick-add-btn,
   .product-card-img-swap .product-card-img-primary,
   .product-card-img-swap .product-card-img-secondary,
-  .marquee-placeholder {
+  .marquee-placeholder,
+  .reading-progress-fill {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

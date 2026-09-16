@@ -6,6 +6,7 @@ import type { Metadata } from "next"
 import { compileMDX } from "next-mdx-remote/rsc"
 import remarkGfm from "remark-gfm"
 import { rehypeHeadingAnchors } from "@/lib/rehype-heading-anchors"
+import { extractHeadings } from "@/lib/heading-slug"
 import { getPostBySlug, getPostSlugs, getPostUrl, getPostCta } from "@/lib/blog"
 import {
   getBlogPostingSchema,
@@ -21,6 +22,7 @@ import { BlogFAQ } from "@/components/blog/blog-faq"
 import { PostCTA } from "@/components/blog/post-cta"
 import { RelatedPosts } from "@/components/blog/related-posts"
 import { ReadingProgress } from "@/components/blog/reading-progress"
+import { ArticleToc, type TocHeading } from "@/components/blog/article-toc"
 import { BlogShare } from "@/components/blog/blog-share"
 import { BlogShareRail } from "@/components/blog/blog-share-rail"
 import { BlogNewsletter } from "@/components/blog/blog-newsletter"
@@ -106,6 +108,24 @@ export default async function BlogPostPage({
       ? getHowToSchema(post.data, post.content)
       : null
   const esPiezaConCifras = PRICE_INDEX_CATEGORIES.has(post.data.category)
+
+  // Índice del artículo: solo H2/H3 (el H4 ensucia más de lo que ayuda) y
+  // solo si hay secciones suficientes para que valga la pena.
+  const headings = extractHeadings(post.content)
+  const h2Count = headings.filter((heading) => heading.level === 2).length
+  const tocHeadings: TocHeading[] =
+    h2Count >= 3
+      ? headings
+          .filter(
+            (heading): heading is TocHeading =>
+              heading.level === 2 || heading.level === 3
+          )
+          .map((heading) => ({
+            text: heading.text,
+            id: heading.id,
+            level: heading.level,
+          }))
+      : []
   const jsonLd = [
     // `speakable` va dentro del BlogPosting: es donde el vocabulario lo
     // define, y apunta a fragmentos que existen en el HTML de esta página.
@@ -216,6 +236,9 @@ export default async function BlogPostPage({
           />
         </div>
       )}
+
+      {/* Índice del artículo (scroll-spy) */}
+      {tocHeadings.length > 0 && <ArticleToc headings={tocHeadings} />}
 
       {/* Contenido MDX */}
       <div id="contenido-articulo" className="mx-auto max-w-3xl px-4 pb-4 sm:px-6">
