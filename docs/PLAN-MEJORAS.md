@@ -51,7 +51,7 @@
 | C9-C10 | aria-labels; overscroll en listas | ✅ |
 | C11 | **Stepper − N + en la card cuando el producto ya está en el carrito** | ✅ |
 | C12 | **Rail "Vistos recientemente"** en la página de producto | ✅ |
-| C13 | Comparador de precios por kilo/pieza entre presentaciones | 🔜 |
+| C13 | **Comparador de precios por unidad**: `unit-price.ts` normaliza la presentación (`por kilo`, `500 g`, `1 l`, `por pieza`…) a un precio por kg/l/pieza; la ficha de producto muestra el `$/kg` real y una sección "Comparar presentaciones" con la más barata y el sobreprecio (`+N%`) de las demás, y las cards y la búsqueda global muestran el `$/kg` como insignia | ✅ |
 
 ## 4. Carrito y checkout
 
@@ -62,6 +62,8 @@
 | K11 | **Autoguardado de la última dirección + "Usar mi última dirección"** | ✅ |
 | K12 | **Swipe-down para cerrar el drawer** con handle visual y haptic | ✅ |
 | K13 | Reanudar el paso exacto del checkout tras interrupción | 🔜 |
+| K14 | **Bump sells encadenados sin tope**: el checkout omite `limit` y el motor devuelve **todas** las reglas activas que apliquen al carrito (el pool lo determina `bump_rules`; `MAX_BUMPS` = 3 es solo la ventana visible y `MAX_BUMPS_REQUEST_LIMIT` = 100 el tope anti-abuso del endpoint público); al elegir una oferta su tarjeta desaparece, se agrega como línea del pedido y el hueco lo ocupa la siguiente, de forma indefinida. **La selección sobrevive salir del checkout**: localStorage (`resurte_bumps`) + `user_carts.bumps` (migración `00113`) con endpoints dedicados (`PUT /api/cart/bumps/selection`, `POST /api/cart/bumps/hydrate`) y `bumps_updated_at` propio, con merge last-write-wins compartido (`bumps-sync.ts`). **Cantidades editables** en la lista del pedido con +/− y piso 0: una línea en 0 sigue visible con la insignia "En 0" y un segundo "−" abre el prompt `RemoveLineDialog` para quitarla (`order-lines.ts` como regla pura, `useOrderLines` compartido por drawer y checkout full-page) | ✅ |
+| K15 | **Bumps = productos reales del catálogo**: las tarjetas encabezan con `bump.product.name` (el `bump_rules.title` pasa a ser subtítulo adorno, p. ej. "Limón" en vez de "Limones para tus tacos"). **Afinidad por ingrediente** (`ingredient-affinity.ts` + tabla `bump_affinity` 00112 + recetario): el primer tier del ranking sugiere los ingredientes que combinan con lo que ya está en el checkout (carne → especias/salsa; cebolla → chiles y tomate; receta → sus otros ingredientes), con descuento de 10 % al registrarse la regla y `display_order = 100`. Panel de admin en `/admin/marketing` → "Afinidad entre productos" (CRUD + búsqueda de producto); el tier es aditivo y tolerante a fallos si la migración no está aplicada | ✅ |
 
 ## 5. Recompensas
 
@@ -71,7 +73,12 @@
 | R5-R8 | Título por sección, overscroll, error boundary, OG | ✅ |
 | R9-R10 | Haptic y scroll-to-top al cambiar de sección | ✅ |
 | R11 | **Pull-to-refresh del saldo** con indicador animado | ✅ |
-| R12 | Notificaciones de cashback ganado tras cada pedido | 🔜 |
+| R12 | Notificaciones de cashback ganado tras cada pedido (helper único `notifyCashbackCredited` invocado desde el webhook de Stripe, la conciliación y el cambio de estado en admin) | ✅ |
+| R13 | **Progreso semanal de calificación**: bloque "Esta semana" en la meta mensual y avisos deterministas (semana calificada, sin compras, cierre próximo) con IDs por semana ISO | ✅ |
+| R14 | **Transparencia del monedero**: `getWalletSummary()` y tarjetas de total ganado/canjeado en la vista de créditos; filtros Todos/Cashback/Canjes en la actividad, con exportación CSV que respeta el filtro | ✅ |
+| R15 | **Canje más claro**: avance por servicio y "Más cerca" en la tienda; comprobante con folio, saldo restante y CTAs explícitos tras canjear (sin redirección automática) | ✅ |
+| R16 | **Accesibilidad de la campana**: `aria-expanded`/`aria-controls`, panel `role="dialog"` con foco gestionado, anuncios de estado y objetivos táctiles de 44 px | ✅ |
+| R17 | Créditos por expirar (requiere migración: fecha de caducidad por movimiento) | 🔜 |
 
 ## 6. Cuenta y autenticación
 
@@ -164,14 +171,15 @@
 | # | Fase | Estado |
 |---|---|---|
 | BL1-BL10 | Escape, scroll al paginar, aria-live, `<time>`, RSS, limpiar filtros | ✅ |
-| BL11 | Barra de progreso de lectura en artículos | 🔜 |
+| BL11 | **Barra de progreso de lectura** en artículos (`reading-progress.tsx`, `role="progressbar"` con `aria-valuenow` actualizado por rAF) | ✅ |
+| BL12 | **Índice del artículo con scroll-spy**: `article-toc.tsx` reutiliza `extractHeadings` (los ids ya coinciden con los anclajes de `rehypeHeadingAnchors`), se muestra a partir de 3 H2 y marca la sección activa con `aria-current="location"`; la barra de progreso respeta `prefers-reduced-motion`. Automatizado en `e2e/smoke.spec.ts` (verifica que cada enlace apunte a un encabezado real y que el activo siga al scroll) | ✅ |
 
 ## 10. Navegación global
 
 | # | Fase | Estado |
 |---|---|---|
 | N1-N10 | Escape, role=menu, aria-expanded, footer directo, 404 con salidas | ✅ |
-| N11 | Mega-menú de categorías en desktop | 🔜 |
+| N11 | **Mega-menú de categorías en desktop**: `/api/categories` sirve las categorías con el conteo de productos visibles (cacheado 1 h / CDN 1 día, sin `cookies()` para no romper el prerender); `category-mega-menu.tsx` carga el catálogo solo al abrir por primera vez, cierra con Escape (devolviendo el foco al disparador), con clic fuera y al cambiar de ruta, y el header se mantiene visible mientras está abierto. El panel se ancla a la fila del header (no al disparador) para no desbordar la ventana a 640px, verificado por e2e | ✅ |
 
 ---
 
@@ -189,6 +197,26 @@ Smoke móvil (375px) — flujo de compra completo:
 3. Checkout: rellenar con "Usar mi última dirección" (2ª compra).
 4. Modo offline → navegar al catálogo cacheado (SW) y ver el banner offline.
 5. /recompensas: pull-to-refresh del saldo y cambio de tabs.
+6. Checkout con un producto de la receta: el primer bump es un ingrediente
+   afín con nombre real del catálogo ("Limón"), y al agregarlo desaparece y
+   lo reemplaza otro.
+7. Recompensas: la meta muestra el avance "Esta semana"; la campana anuncia el
+   cashback de un pago con tarjeta; en Actividad los filtros Cashback/Canjes
+   cambian la lista y el CSV exportado; en la Tienda el servicio más cercano
+   lleva la insignia "Más cerca" y su barra de avance; al canjear aparece el
+   comprobante con folio y los CTAs "Ver mis créditos" / "Volver a la tienda".
+8. Ficha de un producto vendido "por kilo" con hermanos de 500 g / 1 kg: la
+   insignia `$/kg` y la sección "Comparar presentaciones" marcan la más barata.
+9. Artículo del blog con 3+ H2: el índice abre, resalta la sección visible y
+   los anclajes llevan al encabezado correcto. Automatizado: `npx playwright
+   test e2e/smoke.spec.ts --grep "índice del artículo"`.
+
+Smoke escritorio (1280px):
+1. Header → "Categorías" abre el mega-menú con conteo por categoría; Escape
+   cierra y devuelve el foco; el panel no se sale de la ventana a 640px.
+   Automatizado: `npx playwright test e2e/keyboard.spec.ts --project=chromium
+   --grep "mega-menú"`.
+2. `/api/categories` responde 200 sin sesión (página prerenderizada).
 
 ## Agentes de mantenimiento por dominio
 

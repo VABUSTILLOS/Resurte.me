@@ -33,11 +33,37 @@
   producto, los no visibles y los agotados, y cae a la misma categoría cuando
   el admin no eligió relacionados. El array lo escribe solo el admin.
 - La búsqueda de ciudades es insensible a acentos (`fold()` con NFD).
+- Precio por unidad (C13): `unit-price.ts` es la fuente única. `parsePresentation`
+  normaliza el texto libre de `products.unit` (`por kilo`, `500 g`, `1 l`,
+  `por pieza`, `por manojo`…) a una base física; `comparePresentations` solo
+  empareja presentaciones del **mismo** producto base (nombre normalizado) y la
+  misma base física, y decide "Más barato" **incluyendo al producto actual en el
+  concurso** — nunca comparar kg contra piezas ni `500 g` contra `1 kg` a ojo.
+  Las cards y la búsqueda global muestran `$/kg` como insignia y conservan el
+  heurístico de mayoreo solo cuando el precio por unidad no es calculable.
+- Mega-menú de categorías (N11): `category-mega-menu.tsx` carga `/api/categories`
+  **solo al abrir por primera vez**, cierra con Escape (devolviendo el foco al
+  disparador), con clic fuera y al cambiar de ruta, y avisa al header vía
+  `onOpenChange` para que la barra no se oculte mientras está abierto. El
+  endpoint no lee `cookies()`/`headers()` — mantenerlo así o se rompe el
+  prerender estático.
+- Anclaje del mega-menú (N11): el panel es `absolute right-0` y se ancla al
+  ancestro posicionado más cercano, que es la **fila del header**
+  (`relative` en `header.tsx`), no el disparador. El disparador queda a ~150px
+  del borde derecho (carrito + cuenta van después), así que anclarlo a él
+  desborda la ventana a 640px. Si se mueve el componente a otra superficie,
+  hay que darle un ancestro posicionado que llegue al borde del contenedor.
+  Cubierto por el e2e `keyboard.spec.ts` → "el mega-menú de categorías cabe en
+  la ventana y cierra con Escape" (1280px y 640px).
 - `RecentlyViewed` persiste en localStorage (`resurte-recently-viewed`, tope 12) y
   se monta desde la página de producto (server) recibiendo el producto por props —
   no leer localStorage en render inicial.
 
 ## Verificación
-`npm run build` (prerender de 20 ciudades) + smoke de `/chihuahua`,
-`/chihuahua/buscar?q=aguacate`, `/catalogo/chihuahua` y la página de un producto
-(verificar stepper tras agregar y el rail de recientes) a 375px.
+`npx vitest run src/lib/unit-price.test.ts` + `npm run build` (prerender de 20
+ciudades) + smoke de `/chihuahua`, `/chihuahua/buscar?q=aguacate`,
+`/catalogo/chihuahua` y la página de un producto (verificar stepper tras agregar,
+el rail de recientes, la insignia `$/kg` y "Comparar presentaciones") a 375px;
+a 1280px verificar que el mega-menú de categorías abre, cierra con Escape y no
+se sale de la ventana al reducir a 640px (`E2E_PORT=3111 npx playwright test
+e2e/keyboard.spec.ts --project=chromium --grep "mega-menú"`).
