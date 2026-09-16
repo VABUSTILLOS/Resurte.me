@@ -18,11 +18,11 @@ interface Submission {
 }
 
 /**
- * /admin/facturas — cola de revisión de facturas subidas desde
- * /recompensas. Aprobar abona créditos reales (grant_wallet_credit) y
- * notifica al usuario; rechazar también notifica.
+ * Cola de revisión de facturas subidas desde /recompensas. Aprobar abona
+ * créditos reales (grant_wallet_credit) y notifica al usuario; rechazar también
+ * notifica.
  */
-export default function AdminFacturasPage() {
+export function FacturasTab() {
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -107,15 +107,12 @@ export default function AdminFacturasPage() {
   const reviewed = submissions.filter((s) => s.status !== "pending")
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Facturas de clientes</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Revisa los tickets/facturas subidos desde Recompensas. Aprobar abona
-            créditos (5% del total por defecto).
-          </p>
-        </div>
+    <div>
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
+        <p className="text-sm text-gray-500">
+          Revisa los tickets/facturas subidos desde Recompensas. Aprobar abona
+          créditos (5% del total por defecto).
+        </p>
         <div className="flex items-center gap-2">
           <button
             type="button"

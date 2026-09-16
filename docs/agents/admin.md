@@ -1,8 +1,8 @@
 # Agente: Administración
 
 ## Posee
-- `src/app/admin/**` (dashboard, pedidos, productos, visibilidad, disponibilidad,
-  proveedores, conversión, marketing, whatsapp, workflows)
+- `src/app/admin/**` (dashboard, pedidos, productos, proveedores, conversión,
+  marketing, whatsapp + automations, recompensas, bitácoras, clientes, sistema)
 - `src/app/api/admin/**`
 - `src/lib/admin-auth.ts`, `src/lib/admin-marketing-validation.ts`
 
@@ -13,7 +13,15 @@
   export CSV, badge de pendientes, skeleton de carga.
 - Las gráficas (recharts) llevan `role="img"` + resumen textual de la serie
   (`describeSeries`) — el SVG solo no es accesible.
-- La subnav es scroll horizontal en móvil.
+- La subnav es scroll horizontal en móvil y está agrupada por dominio
+  (`ADMIN_NAV_GROUPS` en `sub-nav.tsx`: Operación, Catálogo, Crecimiento,
+  Clientes, Sistema). No agregar píldoras sueltas fuera de un grupo.
+- Superficies consolidadas: visibilidad y disponibilidad por ciudad viven solo
+  en `/admin/productos`; auditoría/errores/emails en `/admin/bitacoras?tab=…`;
+  facturas en `/admin/recompensas?tab=facturas`; el disparo manual de workflows
+  en `/admin/whatsapp/automations`. Las rutas viejas se mantienen como
+  `redirects()` permanentes (308) en `next.config.ts`; al mover una superficie,
+  agrega el redirect correspondiente en vez de dejar un 404.
 - Errores con reintento (`error.tsx` del área + botón Reintentar en página).
 - Productos (`/admin/productos`): la tabla es server-side
   (`GET /api/admin/products/list` con búsqueda/filtros/orden/paginación y

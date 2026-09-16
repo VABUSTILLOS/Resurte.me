@@ -21,16 +21,8 @@ import {
   notifyFulfillmentUpdate,
   type WorkflowType,
 } from "@/lib/workflows"
+import { VALID_WORKFLOWS } from "@/lib/workflow-types"
 import { createServiceClient } from "@/lib/supabase/service"
-
-const VALID_WORKFLOWS: WorkflowType[] = [
-  "new_order_staff",
-  "new_order_customer",
-  "status_update",
-  "payment_reminder",
-  "payment_confirmed",
-  "fulfillment_update",
-]
 
 export async function GET(req: NextRequest) {
   try {

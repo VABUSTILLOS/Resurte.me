@@ -15,6 +15,7 @@ import {
   Save,
 } from "lucide-react"
 import type { AutomationType } from "@/types"
+import { ManualTriggerPanel } from "./manual-trigger-panel"
 
 // ============================================================
 // Mock automations with UI config
@@ -218,6 +219,34 @@ export default function AdminAutomationsPage() {
           <p className="text-xs text-amber-600">
             Cada automatización usa una plantilla de WhatsApp que debe estar <strong>aprobada por Meta</strong> antes de poder enviarse. Las plantillas se configuran en el WhatsApp Business Manager. Una vez aprobadas, asigna el nombre de la plantilla en cada automatización.
           </p>
+        </div>
+      </div>
+
+      <ManualTriggerPanel />
+
+      {/* Cómo funciona el motor */}
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-5 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
+            <MessageCircle className="w-5 h-5 text-green-600" aria-hidden="true" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-green-900 mb-1">Así funciona el motor de workflows</h2>
+            <div className="text-sm text-green-700 space-y-1">
+              <p>
+                <strong>1. Evento</strong> — Un pedido se crea, se paga o cambia de estado.
+              </p>
+              <p>
+                <strong>2. Workflow</strong> — El motor detecta el evento y selecciona el mensaje correcto.
+              </p>
+              <p>
+                <strong>3. WhatsApp</strong> — Se envía el mensaje automáticamente al staff o al cliente.
+              </p>
+              <p>
+                <strong>4. Log</strong> — Cada envío se registra para auditoría y diagnóstico.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 

@@ -20,8 +20,8 @@ function detailSummary(detail: Record<string, unknown>): string {
   return parts.join(" · ") || "—"
 }
 
-/** Fase 15 — /admin/auditoria: bitácora de acciones administrativas. */
-export default function AdminAuditPage() {
+/** Bitácora de acciones administrativas (quién, cuándo, qué cambió). */
+export function AuditoriaTab() {
   const [entries, setEntries] = useState<AuditLogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -48,16 +48,6 @@ export default function AdminAuditPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <ScrollText className="w-6 h-6 text-brand-600" aria-hidden="true" />
-          Auditoría
-        </h1>
-        <p className="text-sm text-gray-500">
-          Bitácora de acciones administrativas (quién, cuándo, qué cambió)
-        </p>
-      </div>
-
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <select
           value={action}
@@ -107,47 +97,50 @@ export default function AdminAuditPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
-                <th className="px-5 py-3">Fecha</th>
-                <th className="px-5 py-3">Actor</th>
-                <th className="px-5 py-3">Acción</th>
-                <th className="px-5 py-3">Entidad</th>
-                <th className="px-5 py-3">Detalle</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {entries.map((e) => (
-                <tr key={e.id} className="hover:bg-gray-50">
-                  <td
-                    className="px-5 py-3 text-xs text-gray-400 whitespace-nowrap"
-                    title={new Date(e.created_at).toLocaleString("es-MX")}
-                  >
-                    {formatRelativeTime(e.created_at)}
-                  </td>
-                  <td className="px-5 py-3 text-xs text-gray-600">{e.actor_email ?? "—"}</td>
-                  <td className="px-5 py-3 text-xs font-medium text-gray-800">
-                    {AUDIT_ACTION_LABEL[e.action as keyof typeof AUDIT_ACTION_LABEL] ?? e.action}
-                  </td>
-                  <td className="px-5 py-3 text-xs text-gray-500">
-                    {e.entity}
-                    {e.entity_id ? ` #${e.entity_id}` : ""}
-                  </td>
-                  <td className="px-5 py-3 text-xs text-gray-500 max-w-[280px] truncate" title={detailSummary(e.detail)}>
-                    {detailSummary(e.detail)}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
+                  <th className="px-5 py-3">Fecha</th>
+                  <th className="px-5 py-3">Actor</th>
+                  <th className="px-5 py-3">Acción</th>
+                  <th className="px-5 py-3">Entidad</th>
+                  <th className="px-5 py-3">Detalle</th>
                 </tr>
-              ))}
-              {entries.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-400">
-                    Sin eventos registrados con estos filtros
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {entries.map((e) => (
+                  <tr key={e.id} className="hover:bg-gray-50">
+                    <td
+                      className="px-5 py-3 text-xs text-gray-400 whitespace-nowrap"
+                      title={new Date(e.created_at).toLocaleString("es-MX")}
+                    >
+                      {formatRelativeTime(e.created_at)}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-gray-600">{e.actor_email ?? "—"}</td>
+                    <td className="px-5 py-3 text-xs font-medium text-gray-800">
+                      {AUDIT_ACTION_LABEL[e.action as keyof typeof AUDIT_ACTION_LABEL] ?? e.action}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-gray-500">
+                      {e.entity}
+                      {e.entity_id ? ` #${e.entity_id}` : ""}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-gray-500 max-w-[280px] truncate" title={detailSummary(e.detail)}>
+                      {detailSummary(e.detail)}
+                    </td>
+                  </tr>
+                ))}
+                {entries.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-400">
+                      <ScrollText className="w-8 h-8 text-gray-200 mx-auto mb-2" aria-hidden="true" />
+                      Sin eventos registrados con estos filtros
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

@@ -26,10 +26,10 @@ const TYPE_LABEL: Record<string, string> = {
 }
 
 /**
- * /admin/emails — bitácora de correos enviados (transaccionales y
- * campañas), con filtro por tipo y estado.
+ * Bitácora de correos enviados (transaccionales y campañas), con filtro por
+ * tipo y estado.
  */
-export default function AdminEmailsPage() {
+export function EmailsTab() {
   const [logs, setLogs] = useState<EmailLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -71,17 +71,14 @@ export default function AdminEmailsPage() {
   const failedCount = logs.filter((l) => l.status !== "sent").length
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Correos enviados</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Bitácora de emails transaccionales y campañas (email_logs).
-            {failedCount > 0 && (
-              <span className="text-red-600 font-medium"> {failedCount} fallidos.</span>
-            )}
-          </p>
-        </div>
+    <div>
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
+        <p className="text-sm text-gray-500">
+          Bitácora de emails transaccionales y campañas (email_logs).
+          {failedCount > 0 && (
+            <span className="text-red-600 font-medium"> {failedCount} fallidos.</span>
+          )}
+        </p>
         <button
           onClick={reload}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg"
@@ -127,54 +124,56 @@ export default function AdminEmailsPage() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/50 text-left text-gray-400">
-                <th className="px-4 py-3 font-medium">Destinatario</th>
-                <th className="px-4 py-3 font-medium">Tipo</th>
-                <th className="px-4 py-3 font-medium">Pedido</th>
-                <th className="px-4 py-3 font-medium">Fecha</th>
-                <th className="px-4 py-3 font-medium text-center">Estado</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filtered.map((log) => (
-                <tr key={log.id}>
-                  <td className="px-4 py-2.5 font-medium text-gray-700">{log.email_to}</td>
-                  <td className="px-4 py-2.5 text-gray-500">
-                    {TYPE_LABEL[log.email_type] ?? log.email_type}
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-400">
-                    {log.order_id ? `#${log.order_id}` : "—"}
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap">
-                    {new Date(log.sent_at).toLocaleString("es-MX", {
-                      day: "numeric",
-                      month: "short",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </td>
-                  <td className="px-4 py-2.5 text-center">
-                    {log.status === "sent" ? (
-                      <span className="inline-flex items-center gap-1 text-brand-700">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Enviado
-                      </span>
-                    ) : (
-                      <span
-                        className="inline-flex items-center gap-1 text-red-600"
-                        title={log.error ?? undefined}
-                      >
-                        <XCircle className="w-3.5 h-3.5" />
-                        Falló
-                      </span>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/50 text-left text-gray-400">
+                  <th className="px-4 py-3 font-medium">Destinatario</th>
+                  <th className="px-4 py-3 font-medium">Tipo</th>
+                  <th className="px-4 py-3 font-medium">Pedido</th>
+                  <th className="px-4 py-3 font-medium">Fecha</th>
+                  <th className="px-4 py-3 font-medium text-center">Estado</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((log) => (
+                  <tr key={log.id}>
+                    <td className="px-4 py-2.5 font-medium text-gray-700">{log.email_to}</td>
+                    <td className="px-4 py-2.5 text-gray-500">
+                      {TYPE_LABEL[log.email_type] ?? log.email_type}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-400">
+                      {log.order_id ? `#${log.order_id}` : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-400 whitespace-nowrap">
+                      {new Date(log.sent_at).toLocaleString("es-MX", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      {log.status === "sent" ? (
+                        <span className="inline-flex items-center gap-1 text-brand-700">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Enviado
+                        </span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1 text-red-600"
+                          title={log.error ?? undefined}
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          Falló
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

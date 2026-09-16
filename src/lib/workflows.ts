@@ -23,18 +23,14 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/order-emails"
 import type { OrderStatus, PaymentStatus } from "@/types"
 import { logger } from "@/lib/logger"
+import type { WorkflowType } from "@/lib/workflow-types"
 
 // ============================================================
 // Types
 // ============================================================
 
-export type WorkflowType =
-  | "new_order_staff"
-  | "new_order_customer"
-  | "status_update"
-  | "payment_reminder"
-  | "payment_confirmed"
-  | "fulfillment_update"
+// La definición canónica vive en `@/lib/workflow-types` (client-safe).
+export type { WorkflowType }
 
 export interface WorkflowLog {
   id?: number

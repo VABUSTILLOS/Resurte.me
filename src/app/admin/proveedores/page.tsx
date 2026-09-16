@@ -378,8 +378,8 @@ export default function ProveedoresPage() {
 
       <p className="mt-6 text-xs text-gray-400 leading-relaxed">
         Los productos vinculados entran ocultos y con precio de venta $0.00: el costo de
-        lista es la referencia para definir margen. Actívalos desde /admin/disponibilidad
-        o /admin/visibilidad solo después de capturar el precio de venta.
+        lista es la referencia para definir margen. Actívalos desde /admin/productos
+        solo después de capturar el precio de venta.
       </p>
     </div>
   )

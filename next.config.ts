@@ -42,6 +42,17 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
+  // Rutas del panel de admin consolidadas: se mantienen como redirects
+  // permanentes para no romper enlaces guardados ni marcadores.
+  redirects: async () => [
+    { source: "/admin/visibilidad", destination: "/admin/productos", permanent: true },
+    { source: "/admin/disponibilidad", destination: "/admin/productos", permanent: true },
+    { source: "/admin/workflows", destination: "/admin/whatsapp/automations", permanent: true },
+    { source: "/admin/auditoria", destination: "/admin/bitacoras?tab=auditoria", permanent: true },
+    { source: "/admin/errores", destination: "/admin/bitacoras?tab=errores", permanent: true },
+    { source: "/admin/emails", destination: "/admin/bitacoras?tab=emails", permanent: true },
+    { source: "/admin/facturas", destination: "/admin/recompensas?tab=facturas", permanent: true },
+  ],
   headers: async () => {
     if (process.env.NODE_ENV !== "production") return []
     return [

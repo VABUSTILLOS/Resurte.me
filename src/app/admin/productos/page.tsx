@@ -2669,14 +2669,6 @@ function AdminProductsContent() {
     disabled?: boolean
   }[] = [
     {
-      key: "cities",
-      label: "Matriz por ciudad",
-      icon: <MapPin className="w-4 h-4" />,
-      variant: "link",
-      tone: "brand",
-      href: "/admin/disponibilidad",
-    },
-    {
       key: "activity",
       label: "Actividad",
       title: "Últimas acciones sobre el catálogo",

@@ -24,9 +24,9 @@ Marketplace mayorista B2B de insumos para restaurantes (México) + suite SaaS de
 - Auth: login, registro, reset de password, callback OAuth.
 
 ### Recompensas (`/recompensas`)
-- Wallet de cashback: saldo, historial, progreso mensual (semana calificante ≥ $2,500 MXN).
-- Tienda de servicios canjeables (`/api/redeem` + RPC `redeem_service`), tiers de lealtad.
-- Calculadora ROI, escáner de facturas, onboarding y feed de actividad (UI con framer-motion).
+- Wallet de cashback: saldo, historial filtrable (todo / ganado / canjeado) y exportable, progreso semanal y mensual (semana calificante ≥ $2,500 MXN).
+- Tienda de servicios canjeables (`/api/redeem` + RPC `redeem_service`) con barra de avance por servicio y "Más cerca", tiers de lealtad, comprobante de canje con folio.
+- Campana de notificaciones proactivas (cashback acreditado, semana en riesgo, cierre de semana), calculadora ROI, escáner de facturas, onboarding y feed de actividad (UI con framer-motion).
 
 ### Canal de restaurantes (FoodOS público)
 - `/comer`: directorio de restaurantes para pedir directo sin comisiones.
@@ -129,7 +129,8 @@ Marketplace mayorista B2B de insumos para restaurantes (México) + suite SaaS de
 - ✅ **A4**: "Mi canasta" — listas de compra recurrentes en localStorage (`shopping-lists.ts`), guardar carrito como lista, Mis listas con reordenar/renombrar/borrar en `/carrito` (commit `081e186`, 6 tests).
 - ✅ **B3**: alertas de reorden específicas — `getClientsToReorder` con productos del último pedido + días sin pedir, badge de inactividad >14d, mensaje WhatsApp con el detalle (commit `081e186`, 2 tests).
 - ✅ **A1 (parcial)**: instrucciones de pago SPEI/OXXO en `pedido-confirmado` (CLABE/referencia por env `NEXT_PUBLIC_SPEI_CLABE`/`_BENEFICIARIO`/`_OXXO_REFERENCIA`); el admin confirma el cobro manualmente (commit `081e186`).
-- ✅ **E2**: `/admin/errores` — salud de la app leyendo `error_logs` (conteos por severidad, filtro por fuente client/server/edge, export CSV), sin Sentry. Link en sub-nav (commit `9d679cb`).
-- ✅ **C6**: export CSV de la cola de facturas en `/admin/facturas` (commit `9d679cb`).
+- ✅ **E2**: `/admin/bitacoras?tab=errores` (antes `/admin/errores`) — salud de la app leyendo `error_logs` (conteos por severidad, filtro por fuente client/server/edge, export CSV), sin Sentry. Link en sub-nav (commit `9d679cb`).
+- ✅ **C6**: export CSV de la cola de facturas en `/admin/recompensas?tab=facturas` (antes `/admin/facturas`) (commit `9d679cb`).
 - ⏸️ **C2 prueba de entrega**: pospuesta (requiere migración `orders.delivery_proof_url`; el usuario decidió no tocar la BD por ahora).
+- ✅ **A3**: ronda de recompensas sin migración — (1) **fix**: el cashback de pagos con tarjeta ya no se acredita en silencio (`notifyCashbackCredited` lee el crédito real de `wallet_transactions` y es el productor único, usado por el webhook de Stripe, el reconciliador y el cambio de estado admin); (2) **proactividad semanal**: bloque "Esta semana" en la meta + avisos deterministas por semana ISO (`wallet-progress.ts`); (3) **transparencia**: filtros y CSV filtrado en Actividad, "Total ganado / Total canjeado" en el monedero (`wallet-summary.ts`); (4) **canje claro**: barra de avance y "Más cerca" en la tienda (`store-affordability.ts`), comprobante con folio y CTAs explícitos en el checkout (sin redirección automática); (5) **accesibilidad** de la campana (roles, foco, `aria-*`).
 - Pendientes con credenciales externas: C1 (PAC para timbrado CFDI), A1 completo (confirmación Stripe OXXO/SPEI en la cuenta).
