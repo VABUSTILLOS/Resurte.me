@@ -253,6 +253,13 @@
       "src/lib/unit-price.ts": [
         "exports",
         "types"
+      ],
+      "src/hooks/use-selected-bumps.ts": [
+        "exports"
+      ],
+      "src/lib/ingredient-affinity.ts": [
+        "exports",
+        "types"
       ]
     }
   }

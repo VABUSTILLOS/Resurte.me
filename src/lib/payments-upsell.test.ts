@@ -109,14 +109,18 @@ function makeSupabase(opts: {
         }
       }
       if (table === "bump_rules") {
+        // La cadena real es .eq().eq().neq().limit().maybeSingle(); el neq
+        // excluye las reglas de afinidad, que no aplican a upsells 1-click.
+        const terminal = {
+          limit: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: bumpRule, error: null }),
+          }),
+        }
+        const afterEq = { ...terminal, neq: vi.fn().mockReturnValue(terminal) }
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                limit: vi.fn().mockReturnValue({
-                  maybeSingle: vi.fn().mockResolvedValue({ data: bumpRule, error: null }),
-                }),
-              }),
+              eq: vi.fn().mockReturnValue(afterEq),
             }),
           }),
         }

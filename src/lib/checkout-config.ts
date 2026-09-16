@@ -31,18 +31,27 @@ export const DELIVERY_FEE_FLAT = envNumber("NEXT_PUBLIC_DELIVERY_FEE_FLAT", 125)
 export const MAX_BUMPS = 3
 
 /**
- * Tamaño máximo del pool de ofertas de order bumps que el checkout puede
- * solicitar a la API.
+ * Tope de seguridad del `limit` que un cliente puede pedir a la API pública
+ * de bumps (`POST /api/cart/bumps`).
  *
- * Las superficies de carrito siguen pidiendo solo `MAX_BUMPS`, pero el
- * checkout pide el pool completo para poder encadenar ofertas: al elegir un
- * bump aparece el siguiente de la lista mientras queden ofertas disponibles.
- *
- * El pool real lo determina `bump_rules` (una regla por trigger de categoría
- * + una por colección de receta), así que 12 es un tope de seguridad que en
- * la práctica no se alcanza.
+ * NO es una regla de producto: el pool real lo determina `bump_rules` (todas
+ * las reglas activas que apliquen al carrito + los candidatos de afinidad por
+ * ingrediente). El checkout no envía `limit`, así que recibe **todas** las
+ * ofertas aplicables y puede encadenarlas sin tope artificial. Este número
+ * solo acota lo que un cliente anónimo puede solicitar de golpe.
  */
-export const MAX_BUMPS_POOL = 12
+export const MAX_BUMPS_REQUEST_LIMIT = 100
+
+/**
+ * Máximo de order bumps seleccionados que se persisten en el carrito
+ * (`user_carts.bumps`).
+ *
+ * No es un límite de producto: es el mismo orden de magnitud que el cap de
+ * `items` (200) del carrito, para que una selección no pueda crecer sin
+ * control. El motor de bumps nunca devuelve más de
+ * `MAX_BUMPS_REQUEST_LIMIT` ofertas, así que en la práctica nunca se alcanza.
+ */
+export const MAX_STORED_BUMPS = 200
 
 /**
  * Cantidad mínima de un artículo en el checkout.

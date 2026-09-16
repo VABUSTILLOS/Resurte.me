@@ -73,6 +73,91 @@ export function validateBumpRuleInput(
   }
 }
 
+/**
+ * Kind de un par de afinidad entre productos:
+ * - `curated`: par escrito a mano por el admin (gana sobre el recetario).
+ * - `recipe`: par derivado del recetario al sembrar la tabla.
+ */
+export const AFFINITY_KINDS = ["curated", "recipe"] as const
+
+export interface AffinityPairInput {
+  source_product_id: number
+  target_product_id: number
+  kind: (typeof AFFINITY_KINDS)[number]
+  weight: number
+  is_active: boolean
+}
+
+/**
+ * Valida un par de afinidad ("si el carrito trae A, sugiere B").
+ * Rechaza el auto-par: un producto no puede sugerirse a sí mismo.
+ */
+export function validateAffinityPairInput(
+  body: Record<string, unknown>,
+): { ok: true; value: AffinityPairInput } | { ok: false; error: string } {
+  const sourceId = Number(body.source_product_id)
+  if (!Number.isInteger(sourceId) || sourceId <= 0) {
+    return { ok: false, error: "source_product_id debe ser un entero positivo" }
+  }
+  const targetId = Number(body.target_product_id)
+  if (!Number.isInteger(targetId) || targetId <= 0) {
+    return { ok: false, error: "target_product_id debe ser un entero positivo" }
+  }
+  if (sourceId === targetId) {
+    return { ok: false, error: "Un producto no puede ser afín consigo mismo" }
+  }
+  const kind = body.kind === undefined ? "curated" : body.kind
+  if (typeof kind !== "string" || !AFFINITY_KINDS.includes(kind as never)) {
+    return { ok: false, error: `kind inválido (${AFFINITY_KINDS.join(", ")})` }
+  }
+  const weight = body.weight === undefined ? 1 : Number(body.weight)
+  if (!Number.isInteger(weight) || weight < 0) {
+    return { ok: false, error: "weight debe ser un entero >= 0" }
+  }
+  return {
+    ok: true,
+    value: {
+      source_product_id: sourceId,
+      target_product_id: targetId,
+      kind: kind as AffinityPairInput["kind"],
+      weight,
+      is_active: body.is_active === undefined ? true : Boolean(body.is_active),
+    },
+  }
+}
+
+export interface AffinityPairPatch {
+  kind?: AffinityPairInput["kind"]
+  weight?: number
+  is_active?: boolean
+}
+
+/** Actualización parcial de un par de afinidad (peso, kind, on/off). */
+export function validateAffinityPairPatch(
+  body: Record<string, unknown>,
+): { ok: true; value: AffinityPairPatch } | { ok: false; error: string } {
+  const patch: AffinityPairPatch = {}
+  if ("kind" in body) {
+    const kind = body.kind
+    if (typeof kind !== "string" || !AFFINITY_KINDS.includes(kind as never)) {
+      return { ok: false, error: `kind inválido (${AFFINITY_KINDS.join(", ")})` }
+    }
+    patch.kind = kind as AffinityPairInput["kind"]
+  }
+  if ("weight" in body) {
+    const weight = Number(body.weight)
+    if (!Number.isInteger(weight) || weight < 0) {
+      return { ok: false, error: "weight debe ser un entero >= 0" }
+    }
+    patch.weight = weight
+  }
+  if ("is_active" in body) patch.is_active = Boolean(body.is_active)
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: "Sin campos para actualizar" }
+  }
+  return { ok: true, value: patch }
+}
+
 export interface CouponInput {
   code: string
   discount_type: "percentage" | "fixed_amount"

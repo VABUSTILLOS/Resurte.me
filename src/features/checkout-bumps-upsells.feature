@@ -12,7 +12,7 @@ Característica: Checkout drawer con order bumps y upsells 1-click
   Antecedentes:
     Dado que la tienda opera con envío gratis desde $500 MXN
     Y una ventana de 3 order bumps simultáneos como máximo
-    Y un pool de hasta 12 ofertas disponibles para el checkout encadenado
+    Y todas las ofertas que apliquen al carrito disponibles para el checkout encadenado
 
   # -----------------------------------------------------------
   # Retrocompatibilidad estricta (regla 1)
@@ -61,11 +61,11 @@ Característica: Checkout drawer con order bumps y upsells 1-click
     Cuando se consulta POST /api/cart/bumps
     Entonces se ofrece la bolsa reutilizable de alta resistencia
 
-  Escenario: Máximo 3 bumps simultáneos
+  Escenario: Todas las reglas disparadas aportan su bump, sin tope artificial
     Dado un carrito que dispara las tres reglas a la vez
     Cuando se consulta POST /api/cart/bumps
     Entonces se devuelven exactamente 3 bumps
-    Y cada bump corresponde a un trigger_type distinto
+    Y cada bump corresponde a un producto distinto
 
   Escenario: Bump no duplica producto ya en carrito
     Dado que el producto del bump ya está en el carrito
@@ -89,11 +89,53 @@ Característica: Checkout drawer con order bumps y upsells 1-click
     Entonces ese bump NO se ofrece
     Y los bumps devueltos están en stock, visibles y fuera del carrito
 
-  Escenario: Máximo 3 bumps con prioridad de recetas
+  Escenario: Prioridad de recetas con todas las reglas aplicables
     Dado un carrito que dispara varias reglas de categoría y de colección a la vez
     Cuando se consulta POST /api/cart/bumps
-    Entonces se devuelven hasta 3 bumps simultáneos
+    Entonces se devuelven todas las reglas que apliquen al carrito
     Y cada bump corresponde a un producto distinto
+
+  # -----------------------------------------------------------
+  # Afinidad por ingrediente + nombres reales del catálogo
+  # -----------------------------------------------------------
+
+  Escenario: La tarjeta muestra el nombre real del producto, no un título adorno
+    Dado un bump cuya bump_rule tiene el título "Limón para tus mariscos"
+    Y el producto del catálogo se llama "Limón"
+    Cuando se consulta POST /api/cart/bumps
+    Entonces el encabezado de la tarjeta es "Limón"
+    Y el título de la regla solo se usa como subtítulo explicativo
+
+  Escenario: Afinidad automática desde el recetario
+    Dado un carrito con "Cebolla Blanca"
+    Y el recetario incluye una receta que usa cebolla y jitomate
+    Cuando se consulta POST /api/cart/bumps
+    Entonces se ofrece "Jitomate Bola" con el motivo "Para tu receta de {receta}"
+    Y ese bump aparece antes que los de categoría
+
+  Escenario: Afinidad curada por el admin tiene prioridad sobre la de receta
+    Dado un par curado "Cebolla Blanca" -> "Chile Serrano" en bump_affinity
+    Cuando se consulta POST /api/cart/bumps
+    Entonces el motivo del bump es "Ideal con Cebolla Blanca"
+    Y su badge es "Ideal con tu pedido"
+
+  Escenario: La afinidad nunca duplica ni sugiere lo que ya está en el carrito
+    Dado un candidato afín que ya está en el carrito
+    Y un producto alcanzado a la vez por el recetario y por un par curado
+    Cuando se consulta POST /api/cart/bumps
+    Entonces el producto del carrito NO se ofrece
+    Y el producto alcanzado por ambas vías se ofrece una sola vez
+
+  Escenario: El tier de afinidad es tolerante a fallos
+    Dado que la tabla bump_affinity todavía no existe (migración 00112 sin aplicar)
+    Cuando se consulta POST /api/cart/bumps
+    Entonces la respuesta no falla
+    Y se siguen ofreciendo los bumps de receta y de categoría
+
+  Escenario: Las reglas de afinidad no se filtran a upsells ni a descuentos 1-click
+    Dado una bump_rule con trigger_type "ingredient_affinity"
+    Cuando se consultan las ofertas de upsell o se cotiza un upsell 1-click
+    Entonces esa regla se excluye de ambos resultados
 
   # -----------------------------------------------------------
   # Encadenado de bumps + cantidades editables (checkout)

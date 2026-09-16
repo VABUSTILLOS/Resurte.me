@@ -73,15 +73,30 @@ describe("POST /api/cart/bumps", () => {
     // Rate limit por IP antes de resolver reglas
     expect(clientIp).toHaveBeenCalled()
     expect(rateLimited).toHaveBeenCalledWith(expect.anything(), "bumps:127.0.0.1", 120, 60)
-    // resolveBumps recibe solo IDs/cantidades (nunca precios del cliente)
+    // resolveBumps recibe solo IDs/cantidades (nunca precios del cliente).
+    // Sin `limit` en el body → `undefined` = todas las ofertas aplicables.
     expect(resolveBumps).toHaveBeenCalledWith(
       { items: [{ product_id: 7, quantity: 2 }] },
       expect.anything(),
-      MAX_BUMPS
+      undefined
     )
     expect(logger.info).toHaveBeenCalledWith(
       "[BUMPS] served",
       expect.objectContaining({ bumpCount: 1, items: [7] })
+    )
+  })
+
+  it("un `limit` explícito se sanea y llega a resolveBumps (ventana de carrito)", async () => {
+    await POST(req({ ...validBody, limit: 3 }))
+
+    expect(resolveBumps).toHaveBeenCalledWith(
+      { items: [{ product_id: 7, quantity: 2 }] },
+      expect.anything(),
+      3
+    )
+    expect(logger.info).toHaveBeenCalledWith(
+      "[BUMPS] served",
+      expect.objectContaining({ limit: 3 })
     )
   })
 

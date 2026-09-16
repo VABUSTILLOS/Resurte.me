@@ -13,7 +13,7 @@ import {
   CheckCircle2,
   Zap,
 } from "lucide-react"
-import { calcCheckoutTotals, DELIVERY_FEE_FLAT, FREE_SHIPPING_THRESHOLD, MAX_BUMPS_POOL, MIN_ITEM_QUANTITY, countBumpUnits } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT, FREE_SHIPPING_THRESHOLD, MIN_ITEM_QUANTITY, countBumpUnits } from "@/lib/checkout-config"
 import { formatMxn } from "@/lib/commercial-facts"
 import {
   DEFAULT_ADDRESS_FORM,
@@ -25,12 +25,12 @@ import {
 import { AddressStep } from "@/components/checkout/AddressStep"
 import { ScheduleStep } from "@/components/checkout/ScheduleStep"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
-import { BumpCards, type SelectedBump } from "@/components/checkout/BumpCards"
+import { BumpCards } from "@/components/checkout/BumpCards"
 import { OrderItemsList } from "@/components/checkout/OrderItemsList"
 import { RemoveLineDialog } from "@/components/checkout/RemoveLineDialog"
 import { useOrderLines } from "@/components/checkout/use-order-lines"
 import { SocialProofBadge } from "@/components/checkout/social-proof"
-import { readStoredBumps } from "@/hooks/use-selected-bumps"
+import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { StripeProvider } from "@/components/stripe/stripe-provider"
 import { StripePaymentForm } from "@/components/stripe/stripe-payment-form"
 import { useCheckoutOrder, type CheckoutPaidInfo } from "@/components/checkout/use-checkout-order"
@@ -73,7 +73,10 @@ export function CheckoutDrawer() {
     date: getNextDays()[0]?.value ?? "",
     time: DELIVERY_TIMES[2] ?? "12:00 PM — 2:00 PM",
   })
-  const [selectedBumps, setSelectedBumps] = useState<SelectedBump[]>([])
+  // Bumps seleccionados: store compartido con el carrito y el checkout (ver
+  // useSelectedBumps). Ya no es estado local del drawer, así que la selección
+  // sobrevive a cerrar el drawer, salir del checkout y recargar la página.
+  const { selectedBumps, setSelectedBumps } = useSelectedBumps()
   // Consentimiento de guardado de tarjeta (Stripe setup_future_usage → upsells)
   const [saveCardConsent, setSaveCardConsent] = useState(false)
   // Guardar la dirección como predeterminada (checkbox en AddressStep, logged-in)
@@ -113,14 +116,14 @@ export function CheckoutDrawer() {
         b.ruleId === ruleId ? { ...b, quantity: Math.max(MIN_ITEM_QUANTITY, quantity) } : b
       )
     )
-  }, [])
+  }, [setSelectedBumps])
 
   const orderLines = useOrderLines({
     bumps: selectedBumps,
     onSetBumpQuantity: updateBumpQuantity,
     onRemoveBump: useCallback(
       (ruleId: number) => setSelectedBumps((prev) => prev.filter((b) => b.ruleId !== ruleId)),
-      []
+      [setSelectedBumps]
     ),
   })
 
@@ -224,25 +227,12 @@ export function CheckoutDrawer() {
 
   // ── Apertura / cierre del drawer ──
   useEffect(() => {
-    const handler = (event: Event) => {
-      // Los bumps seleccionados en el cross-sell del CartDrawer viajan en
-      // detail.bumps; sin detail se conserva el comportamiento retrocompatible
-      // (se inician vacíos). Se valida la forma para no aceptar basura.
-      const detail = (event as CustomEvent<{ bumps?: unknown }>).detail
-      // Si vienen en detail (drawer móvil / MobileCartBar) se validan y usan;
-      // si no, se leen de sessionStorage (fallback: navegación directa a
-      // /checkout tras seleccionar bumps en /carrito).
-      const incomingBumps = Array.isArray(detail?.bumps)
-        ? (detail.bumps as SelectedBump[]).filter(
-            (b) =>
-              b &&
-              typeof b.ruleId === "number" &&
-              typeof b.productId === "number" &&
-              typeof b.quantity === "number" &&
-              b.quantity > 0 &&
-              typeof b.unitPrice === "number"
-          )
-        : readStoredBumps()
+    const handler = () => {
+      // Los bumps ya NO se transfieren por el evento: viven en el store
+      // compartido (`useSelectedBumps`), así que el drawer abre con la misma
+      // selección que se ve en el cross-sell del carrito, /cart y
+      // /{ciudad}/carrito. Antes viajaban en detail.bumps y se perdían al
+      // salir del checkout; ahora sobreviven a la navegación y a la recarga.
       setIsOpen((prev) => {
         const next = !prev
         if (next) {
@@ -250,7 +240,6 @@ export function CheckoutDrawer() {
           setCheckoutError(null)
           setShowStripeForm(false)
           setStripeClientSecret(null)
-          setSelectedBumps(incomingBumps)
           setSaveAsDefault(false)
         }
         return next
@@ -258,7 +247,7 @@ export function CheckoutDrawer() {
     }
     window.addEventListener(CHECKOUT_DRAWER_EVENT, handler)
     return () => window.removeEventListener(CHECKOUT_DRAWER_EVENT, handler)
-  }, [setStep, setCheckoutError, setShowStripeForm, setStripeClientSecret, setSelectedBumps, setSaveAsDefault])
+  }, [setStep, setCheckoutError, setShowStripeForm, setStripeClientSecret, setSaveAsDefault])
 
   // Escape cierra el drawer, salvo que la confirmación de eliminación esté
   // abierta: ahí el primer Escape cancela el diálogo, no el checkout.
@@ -367,7 +356,6 @@ export function CheckoutDrawer() {
                 selected={selectedBumps}
                 onChange={setSelectedBumps}
                 revealNext
-                limit={MAX_BUMPS_POOL}
               />
 
               {/* Resumen */}

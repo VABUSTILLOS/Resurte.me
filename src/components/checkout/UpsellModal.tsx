@@ -457,7 +457,7 @@ export function UpsellModal() {
       currency: "MXN",
       value: offer.price,
       item_id: String(offer.productId),
-      item_name: offer.title,
+      item_name: offer.product.name,
       quantity: offer.quantity,
       discount_pct: offer.discount_pct,
     })
@@ -473,7 +473,7 @@ export function UpsellModal() {
         currency: "MXN",
         value: offer.price,
         item_id: String(offer.productId),
-        item_name: offer.title,
+        item_name: offer.product.name,
       })
     }
     if (!showDownsell && downsell) {

@@ -38,7 +38,7 @@ export function OfferStage({ offer, isDownsell, error, onAccept, onDecline }: Of
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-gray-900 leading-tight">
-            {offer.title}
+            {offer.product.name}
           </p>
           <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
             {offer.description}

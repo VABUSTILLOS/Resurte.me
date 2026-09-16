@@ -24,13 +24,6 @@ export interface SelectedBump {
 }
 
 /**
- * Clave de sessionStorage que transporta los bumps seleccionados entre la
- * página /cart (desktop) y /checkout. El drawer móvil usa el CustomEvent
- * CHECKOUT_DRAWER_EVENT en su lugar; aquí no aplica.
- */
-export const BUMPS_STORAGE_KEY = "resurte:selected-bumps"
-
-/**
  * Estado de diagnóstico expuesto en `window.__resurteBumpsDebug` para
  * depurar en producción por qué un usuario no ve los order bumps.
  * Es aditivo y no altera el render ni el flujo del checkout.
@@ -76,7 +69,11 @@ interface BumpCardsProps {
    * desmarcables).
    */
   revealNext?: boolean
-  /** Cuántas ofertas pedir a la API (default MAX_BUMPS). */
+  /**
+   * Cuántas ofertas pedir a la API. Si se omite junto con `revealNext`, se
+   * piden TODAS las que apliquen al carrito (sin tope); las superficies de
+   * carrito pasan MAX_BUMPS explícito.
+   */
   limit?: number
   /** Tope de bumps seleccionables (default: el pool disponible). */
   maxSelected?: number
@@ -97,7 +94,7 @@ export function BumpCards({
   selected,
   onChange,
   revealNext = false,
-  limit = MAX_BUMPS,
+  limit,
   maxSelected,
 }: BumpCardsProps) {
   const [bumps, setBumps] = useState<OrderBump[]>([])
@@ -144,53 +141,92 @@ export function BumpCards({
     }
   }, [cartKey, loading, bumps, lastError, loadedAt, retries])
 
-  // Re-enriquece los bumps seleccionados con el nombre e imagen reales del
-  // producto cuando la data de reglas está disponible. Los bumps persistidos
-  // en sessionStorage antes de añadir los campos `name`/`imageUrl` (o con datos
-  // desactualizados) llegarían al resumen del review como "Artículo especial
-  // #X" o con ícono genérico; aquí se resuelven por ruleId para que SIEMPRE
-  // se muestre el producto real.
+  // Reconcilia la selección con la data de reglas disponible:
+  //  1. Poda (los bumps ya no viven solo en la sesión, así que hay que
+  //     descartar las selecciones que dejaron de ser válidas):
+  //     a. el producto del bump ya está en el carrito → se cobraría dos veces;
+  //     b. solo en modo encadenado sin `limit` (el pool pedido son TODAS las
+  //        ofertas aplicables, o sea es completo): la regla ya no aplica. En
+  //        las superficies de carrito el pool es solo la ventana visible, así
+  //        que podar por `ruleId` borraría bumps válidos fuera de la ventana.
+  //     Los bumps con `quantity: 0` se conservan: el "−" del checkout deja
+  //     líneas en 0 a propósito (MIN_ITEM_QUANTITY) y `POST /api/orders` las
+  //     filtra al crear el pedido.
+  //  2. Re-enriquece con el nombre e imagen reales del producto. Los bumps
+  //     persistidos sin esos campos (o con datos desactualizados) llegarían al
+  //     resumen del review como "Artículo especial #X" o con ícono genérico;
+  //     aquí se resuelven por ruleId para que SIEMPRE se vea el producto real.
+  // `onChange` persiste y sincroniza, así que solo se llama si algo cambió.
   useEffect(() => {
     if (bumps.length === 0 || selected.length === 0) return
     const productByRule = new Map(bumps.map((b) => [b.ruleId, b.product]))
+    const cartProductIds = new Set(cartItems.map((i) => i.product_id))
+    const poolIsComplete = revealNext && limit === undefined
     let changed = false
-    const next = selected.map((s) => {
-      const product = productByRule.get(s.ruleId)
-      if (!product) return s
-      const patch: Partial<SelectedBump> = {}
-      if (product.name && product.name !== s.name) patch.name = product.name
-      if (product.image_url && product.image_url !== s.imageUrl)
-        patch.imageUrl = product.image_url
-      if (Object.keys(patch).length === 0) return s
-      changed = true
-      return { ...s, ...patch }
-    })
+    const next = selected
+      .filter((s) => {
+        if (cartProductIds.has(s.productId)) {
+          changed = true
+          return false
+        }
+        if (poolIsComplete && !productByRule.has(s.ruleId)) {
+          changed = true
+          return false
+        }
+        return true
+      })
+      .map((s) => {
+        const product = productByRule.get(s.ruleId)
+        if (!product) return s
+        const patch: Partial<SelectedBump> = {}
+        if (product.name && product.name !== s.name) patch.name = product.name
+        if (product.image_url && product.image_url !== s.imageUrl)
+          patch.imageUrl = product.image_url
+        if (Object.keys(patch).length === 0) return s
+        changed = true
+        return { ...s, ...patch }
+      })
     if (changed) onChange(next)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bumps])
+  }, [bumps, selected, cartItems, revealNext, limit])
 
   useEffect(() => {
     if (!cartItems || cartItems.length === 0) return
     let cancelled = false
     let retryTimer: ReturnType<typeof setTimeout> | null = null
 
+    // NO llamar a `onChange` desde aquí. Este efecto depende de `[cartKey,
+    // limit, revealNext]`, así que `selected` quedaría capturado en un closure
+    // obsoleto: en el primer mount vale `[]` (la hidratación del store es
+    // diferida), y una poda sobre ese `[]` pisaría la selección persistida con
+    // un vacío. Es un riesgo latente (verificado en producción: no llega a
+    // manifestarse en el flujo natural porque el efecto vuelve a correr cuando
+    // `cartKey` pasa de vacío a la clave real del carrito, ya con `selected`
+    // hidratado), pero el shape es frágil y depende de ese re-render. La poda
+    // vive en el efecto de arriba, que sí depende de `selected` y sale temprano
+    // si está vacío.
     const apply = (data: OrderBump[]) => {
       if (cancelled) return
       setBumps(data)
       setLastGood({ key: cartKey, bumps: data })
       setLastError(undefined)
       setLoadedAt(new Date().toISOString())
-      // Descarta selecciones previas de bumps que ya no aplican.
-      const valid = new Set(data.map((b) => b.ruleId))
-      onChange(selected.filter((s) => valid.has(s.ruleId)))
       setLoadedFor(cartKey)
     }
+
+    // En modo encadenado sin `limit` explícito se piden TODAS las ofertas
+    // aplicables (el pool lo define `bump_rules`, no una constante) para que
+    // elegir una oferta siempre reponga la siguiente. Las superficies de
+    // carrito piden solo la ventana visible.
+    const requestLimit = limit ?? (revealNext ? undefined : MAX_BUMPS)
 
     const attempt = (isRetry: boolean) => {
       fetch("/api/cart/bumps", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cartItems, limit }),
+        body: JSON.stringify(
+          requestLimit === undefined ? { items: cartItems } : { items: cartItems, limit: requestLimit }
+        ),
       })
         .then((res) => {
           if (!res.ok) throw new Error(`bumps http ${res.status}`)
@@ -228,7 +264,7 @@ export function BumpCards({
       if (retryTimer) clearTimeout(retryTimer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartKey, limit])
+  }, [cartKey, limit, revealNext])
 
   if (loading && bumps.length === 0) {
     return (
@@ -355,7 +391,7 @@ export function BumpCards({
                     ) : null}
                   </div>
                   <p className="text-sm font-semibold text-gray-900 leading-tight mt-1">
-                    {bump.title}
+                    {bump.product.name}
                   </p>
                   <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">
                     {bump.description}

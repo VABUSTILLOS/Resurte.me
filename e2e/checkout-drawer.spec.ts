@@ -9,7 +9,8 @@ import { test, expect, type Page } from "@playwright/test"
  *
  * Se recorre el flujo de pasos (review → address → schedule → bumps → payment)
  * sin completar el pago (no hay credenciales de Stripe en CI) y se verifican
- * las mecánicas de conversión: barra de envío gratis, límite de 3 bumps y
+ * las mecánicas de conversión: barra de envío gratis, bumps encadenados sin
+ * tope artificial (con su persistencia al salir del checkout) y
  * retrocompatibilidad con el carrito vacío.
  */
 
@@ -240,7 +241,10 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     const guacamoleCard = page.getByRole("button", { name: /Guacamole preparado/ })
     await expect(guacamoleCard).toBeVisible()
     await expect(page.getByText("Sugerido para tu receta / pedido")).toBeVisible()
-    await expect(page.getByText("Sazonador para carne asada")).toBeVisible()
+    // El encabezado es el nombre real del producto; el título adorno de la
+    // bump_rule ya no se pinta en la tarjeta.
+    await expect(page.getByText("Sazonador", { exact: true })).toBeVisible()
+    await expect(page.getByText("Sazonador para carne asada")).toHaveCount(0)
     await expect(page.getByText(/Hasta 3 artículos especiales por pedido/)).toBeVisible()
 
     // Selecciona un bump → el subtotal del bump se marca en el drawer.
@@ -387,6 +391,83 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await expect(visibleText("$1845.00").first()).toBeVisible()
   })
 
+  test("checkout: la tarjeta muestra el nombre real del producto y el motivo como subtítulo", async ({
+    page,
+  }) => {
+    // El título de la bump_rule es una frase adorno; el nombre real vive en el
+    // producto. La tarjeta debe encabezar con el nombre, no con la frase.
+    const bump = (
+      ruleId: number,
+      productName: string,
+      title: string,
+      description: string,
+      triggerType: string,
+      badgeLabel?: string
+    ) => ({
+      ruleId,
+      trigger_type: triggerType,
+      title,
+      description,
+      discount_pct: 0.1,
+      badgeLabel,
+      product: {
+        id: 900 + ruleId,
+        name: productName,
+        slug: productName.toLowerCase().replace(/\s+/g, "-"),
+        description: "",
+        image_url: "",
+        price: 30,
+        sale_price: null,
+        stock_status: "in_stock",
+        category_id: 1,
+      },
+      price: 27,
+      original_price: 30,
+    })
+
+    await page.route("**/api/cart/bumps", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          bumps: [
+            bump(
+              6201,
+              "Limón",
+              "Limón para tus mariscos",
+              "Ideal con Camarón",
+              "ingredient_affinity",
+              "Ideal con tu pedido"
+            ),
+            bump(6202, "Chile Serrano", "Chiles secos para tu salsa", "Ideal con Cebolla Blanca", "ingredient_affinity", "Ideal con tu pedido"),
+          ],
+        }),
+      })
+    )
+
+    seedCart(page, [aguacate])
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
+    await openCheckoutDrawer(page)
+
+    const drawer = page.getByLabel("Checkout", { exact: true })
+    const bumpGroup = drawer.getByRole("group", { name: "Artículos especiales" })
+
+    // Encabezado = nombre real del catálogo.
+    await expect(bumpGroup.getByText("Limón", { exact: true })).toBeVisible()
+    await expect(bumpGroup.getByText("Chile Serrano", { exact: true })).toBeVisible()
+    // El título adorno NO se usa como encabezado.
+    await expect(drawer.getByText("Limón para tus mariscos", { exact: true })).toHaveCount(0)
+    await expect(drawer.getByText("Chiles secos para tu salsa", { exact: true })).toHaveCount(0)
+    // El motivo y el badge del tier de afinidad sí se muestran.
+    await expect(bumpGroup.getByText("Ideal con Cebolla Blanca", { exact: true })).toBeVisible()
+    await expect(bumpGroup.getByText("Ideal con tu pedido").first()).toBeVisible()
+
+    // Al elegirlo entra al pedido con el nombre real, no con la frase.
+    await bumpGroup.locator("button").filter({ hasText: "Limón" }).first().click()
+    await expect(bumpGroup.getByText("Limón", { exact: true })).toHaveCount(0)
+    await expect(drawer.getByText("1× Limón", { exact: true })).toBeVisible()
+  })
+
   test("checkout: el '−' baja hasta 0 y el segundo '−' pide confirmar la eliminación", async ({
     page,
   }) => {
@@ -498,5 +579,158 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     await expect(dialog).toHaveCount(0)
     await expect(drawer.getByText("0× Guacamole preparado")).toHaveCount(0)
     await expect(bumpCard).toBeVisible()
+  })
+
+  test("checkout: pide todas las ofertas (sin 'limit') y encadena más allá de la ventana de 3", async ({
+    page,
+  }) => {
+    // Regresión del tope artificial: el checkout pedía `limit=12` y, agotado el
+    // pool, no había forma de agregar más ofertas. Ahora omite `limit` por
+    // completo para que el servidor devuelva TODAS las reglas que apliquen.
+    const requestBodies: { method: string; body: Record<string, unknown> | null }[] = []
+    const bump = (ruleId: number, name: string, price: number) => ({
+      ruleId,
+      trigger_type: "perishables",
+      title: name,
+      description: `Complemento ${name} para tu pedido`,
+      discount_pct: 0.1,
+      product: {
+        id: 900 + ruleId,
+        name,
+        slug: name.toLowerCase().replace(/\s+/g, "-"),
+        description: "",
+        image_url: "",
+        price: price + 5,
+        sale_price: null,
+        stock_status: "in_stock",
+        category_id: 1,
+      },
+      price,
+      original_price: price + 5,
+    })
+    // Pool de 14 ofertas: más que el tope anterior (12), para que el encadenado
+    // no pueda agotarse dentro del test.
+    const names = Array.from({ length: 14 }, (_, i) => `Oferta ${i + 1}`)
+    await page.route("**/api/cart/bumps", (route) => {
+      const raw = route.request().postData()
+      let parsed: Record<string, unknown> | null = null
+      if (raw) {
+        try {
+          parsed = JSON.parse(raw) as Record<string, unknown>
+        } catch {
+          parsed = null
+        }
+      }
+      requestBodies.push({ method: route.request().method(), body: parsed })
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          bumps: names.map((name, i) => bump(6201 + i, name, 10 + i)),
+        }),
+      })
+    })
+
+    seedCart(page, [aguacate])
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
+    await openCheckoutDrawer(page)
+
+    const drawer = page.getByLabel("Checkout", { exact: true })
+    const bumpGroup = drawer.getByRole("group", { name: "Artículos especiales" })
+    const bumpCard = (name: string) => bumpGroup.locator("button").filter({ hasText: name })
+
+    // La petición NO lleva `limit`: el cliente pide el pool completo.
+    // El fetch sale de un efecto posterior al render, así que se espera.
+    await expect.poll(() => requestBodies.length).toBeGreaterThan(0)
+    for (const { method, body } of requestBodies) {
+      expect(method).toBe("POST")
+      expect(body).not.toBeNull()
+      expect(body).not.toHaveProperty("limit")
+    }
+
+    // Ventana de 3 tarjetas: el resto del pool queda oculto hasta elegir.
+    await expect(bumpGroup.locator("button")).toHaveCount(3)
+    await expect(bumpCard("Oferta 4")).toHaveCount(0)
+
+    // El encadenado no se agota: cada elección repone la ventana a 3 y sigue
+    // revelando ofertas nuevas más allá de las 3 visibles.
+    await bumpCard("Oferta 1").click()
+    await expect(bumpCard("Oferta 1")).toHaveCount(0)
+    await expect(drawer.getByText("1× Oferta 1")).toBeVisible()
+    await expect(bumpCard("Oferta 4")).toBeVisible()
+    await expect(bumpGroup.locator("button")).toHaveCount(3)
+
+    await bumpCard("Oferta 2").click()
+    await bumpCard("Oferta 3").click()
+    await bumpCard("Oferta 4").click()
+    await expect(drawer.getByText("1× Oferta 4")).toBeVisible()
+    // Sigue habiendo 3 tarjetas en la ventana y una oferta que antes no se veía.
+    await expect(bumpGroup.locator("button")).toHaveCount(3)
+    await expect(bumpCard("Oferta 7")).toBeVisible()
+
+    // Las 4 ofertas elegidas viven como líneas del pedido.
+    await expect(drawer.getByText("Tu pedido (5)")).toBeVisible() // 1 aguacate + 4 bumps
+  })
+
+  test("checkout: los bumps agregados sobreviven salir del checkout (recarga)", async ({ page }) => {
+    // Petición del usuario: al salir del checkout las ofertas agregadas se
+    // perdían. Ahora la selección persiste en el dispositivo (localStorage
+    // `resurte_bumps`) y, con sesión, también en `user_carts.bumps`.
+    const guacamole = {
+      ruleId: 6301,
+      trigger_type: "perishables",
+      title: "Guacamole preparado",
+      description: "Complemento para tu pedido",
+      discount_pct: 0.1,
+      product: {
+        id: 9301,
+        name: "Guacamole preparado",
+        slug: "guacamole-preparado",
+        description: "",
+        image_url: "",
+        price: 35,
+        sale_price: null,
+        stock_status: "in_stock",
+        category_id: 1,
+      },
+      price: 31.5,
+      original_price: 35,
+    }
+    await page.route("**/api/cart/bumps", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ bumps: [guacamole] }),
+      })
+    )
+
+    seedCart(page, [aguacate])
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
+    await openCheckoutDrawer(page)
+
+    const drawer = page.getByLabel("Checkout", { exact: true })
+    const bumpGroup = drawer.getByRole("group", { name: "Artículos especiales" })
+    const bumpCard = bumpGroup.locator("button").filter({ hasText: "Guacamole preparado" })
+
+    // Agrega el bump: entra al pedido y su tarjeta desaparece.
+    await bumpCard.click()
+    await expect(drawer.getByText("1× Guacamole preparado")).toBeVisible()
+    await expect(bumpCard).toHaveCount(0)
+
+    // Sale del checkout recargando la página (equivale a volver más tarde).
+    await page.reload({ waitUntil: "domcontentloaded" })
+    await openCheckoutDrawer(page)
+
+    const drawerAfter = page.getByLabel("Checkout", { exact: true })
+    const bumpGroupAfter = drawerAfter.getByRole("group", { name: "Artículos especiales" })
+
+    // El bump sigue en el pedido: no se perdió al salir del checkout.
+    await expect(drawerAfter.getByText("1× Guacamole preparado")).toBeVisible()
+    await expect(drawerAfter.getByText("Tu pedido (2)")).toBeVisible() // aguacate + bump
+    await expect(drawerAfter.getByText("+$31.50").filter({ visible: true }).first()).toBeVisible()
+    // …y no se vuelve a ofrecer como tarjeta (ya está en el pedido).
+    await expect(
+      bumpGroupAfter.locator("button").filter({ hasText: "Guacamole preparado" })
+    ).toHaveCount(0)
   })
 })

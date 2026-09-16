@@ -8,10 +8,17 @@ import {
 } from "./checkout-config"
 import { resolveQuantityChange } from "./order-lines"
 import {
+  bumpUnitPrice,
   evaluateTriggerTypes,
   resolveBumpPricing,
   type BumpRuleRow,
 } from "./order-bumps"
+import {
+  computeAffinity,
+  normalizeIngredient,
+  type AffinityProduct,
+  type AffinityRecipe,
+} from "./ingredient-affinity"
 
 /**
  * Suite de regresión BDD — mapea los escenarios de
@@ -94,7 +101,7 @@ describe("BDD — retrocompatibilidad de la orden estándar", () => {
 })
 
 // -----------------------------------------------------------
-// BDD: "Máximo 3 bumps simultáneos"
+// BDD: "Todas las reglas disparadas aportan su bump, sin tope artificial"
 // -----------------------------------------------------------
 describe("BDD — límite de bumps", () => {
   it("MAX_BUMPS es exactamente 3 (límite acordado de bumps simultáneos)", () => {
@@ -231,5 +238,87 @@ describe("BDD — cantidades con piso 0 y confirmación de eliminación", () => 
 
   it("MIN_ITEM_QUANTITY es 0: el piso del checkout ya no bloquea el \"−\"", () => {
     expect(MIN_ITEM_QUANTITY).toBe(0)
+  })
+})
+// -----------------------------------------------------------
+// BDD: "Afinidad por ingrediente + nombres reales del catálogo"
+// -----------------------------------------------------------
+describe("BDD — afinidad por ingrediente", () => {
+  const catalogo: AffinityProduct[] = [
+    { id: 1, name: "Cebolla Blanca", slug: "cebolla-blanca" },
+    { id: 2, name: "Jitomate Bola", slug: "jitomate-bola" },
+    { id: 3, name: "Chile Serrano", slug: "chile-serrano" },
+    { id: 4, name: "Limón", slug: "limon" },
+  ]
+
+  // El recetario llega indexado por colección, igual que `RECIPES`.
+  const recetas: Record<string, AffinityRecipe[]> = {
+    "taquerias-antojitos": [
+      { name: "Salsa roja", ingredients: ["1 kg Cebolla Blanca", "500 g Jitomate Bola"] },
+    ],
+  }
+
+  const afinidad = (input: {
+    cart: AffinityProduct[]
+    pairs?: { source_product_id: number; target_product_id: number; kind: "curated" | "recipe"; weight: number }[]
+    recipes?: Record<string, AffinityRecipe[]>
+  }) =>
+    computeAffinity({
+      cartProducts: input.cart,
+      allProducts: catalogo,
+      recipes: input.recipes ?? {},
+      curatedPairs: input.pairs ?? [],
+      limit: 3,
+    })
+
+  it("la afinidad no es un trigger evaluable: no dispara por sí sola", () => {
+    const matched = evaluateTriggerTypes(
+      new Set(["taquerias-antojitos"]),
+      1000,
+      [rule({ trigger_type: "ingredient_affinity" })],
+      new Set(["taquerias-antojitos"])
+    )
+    expect(matched).toHaveLength(0)
+  })
+
+  it("normaliza unidades y calificativos al comparar ingredientes", () => {
+    expect(normalizeIngredient("1 kg Cebolla Blanca")).toBe("cebolla blanca")
+    expect(normalizeIngredient("Cebolla morada fresca")).toBe("cebolla morada")
+    expect(afinidad({ cart: [catalogo[0]!], recipes: recetas }).map((c) => c.productId)).toEqual([2])
+  })
+
+  it("el par curado gana el motivo sobre el de receta, sin duplicar el producto", () => {
+    const candidates = afinidad({
+      cart: [catalogo[0]!],
+      recipes: recetas,
+      pairs: [{ source_product_id: 1, target_product_id: 2, kind: "curated", weight: 5 }],
+    })
+    const matches = candidates.filter((c) => c.productId === 2)
+    expect(matches).toHaveLength(1)
+    expect(matches[0]?.kind).toBe("curated")
+    expect(matches[0]?.reason).toBe("Ideal con Cebolla Blanca")
+  })
+
+  it("nunca sugiere un producto que ya está en el carrito", () => {
+    const candidates = afinidad({
+      cart: catalogo,
+      recipes: recetas,
+      pairs: [{ source_product_id: 1, target_product_id: 2, kind: "curated", weight: 5 }],
+    })
+    expect(candidates).toHaveLength(0)
+  })
+
+  it("sin recetario y sin pares curados no hay candidatos: el tier es puramente aditivo", () => {
+    expect(afinidad({ cart: [catalogo[0]!] })).toHaveLength(0)
+  })
+
+  it("el descuento de afinidad es el mismo 10% que el de receta", () => {
+    const pricing = resolveBumpPricing({
+      bumpItems: [{ product_id: 100, quantity: 1 }],
+      basePriceByProduct: new Map([[100, 100]]),
+      discountPctByProduct: new Map([[100, 0.1]]),
+    })
+    expect(pricing).toEqual({ ok: true, pricesByProduct: new Map([[100, 90]]) })
+    expect(bumpUnitPrice(100, 0.1)).toBe(90)
   })
 })

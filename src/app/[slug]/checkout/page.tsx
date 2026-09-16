@@ -31,7 +31,7 @@ import { BumpCards } from "@/components/checkout/BumpCards"
 import { RemoveLineDialog } from "@/components/checkout/RemoveLineDialog"
 import { useOrderLines } from "@/components/checkout/use-order-lines"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
-import { calcCheckoutTotals, DELIVERY_FEE_FLAT, MAX_BUMPS_POOL, MIN_ITEM_QUANTITY, countBumpUnits } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT, MIN_ITEM_QUANTITY, countBumpUnits } from "@/lib/checkout-config"
 import {
   useCheckoutOrder,
   type CheckoutPaidInfo,
@@ -465,7 +465,6 @@ export default function CheckoutPage() {
               selected={selectedBumps}
               onChange={setSelectedBumps}
               revealNext
-              limit={MAX_BUMPS_POOL}
             />
           </div>
         </>

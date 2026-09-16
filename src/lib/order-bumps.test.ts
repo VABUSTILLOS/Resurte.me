@@ -16,8 +16,9 @@ import {
   type BumpRuleRow,
   type BumpTriggerType,
 } from "@/lib/order-bumps"
-import { MAX_BUMPS, MAX_BUMPS_POOL } from "@/lib/checkout-config"
+import { MAX_BUMPS, MAX_BUMPS_REQUEST_LIMIT } from "@/lib/checkout-config"
 import { createServiceClient } from "@/lib/supabase/service"
+import type { AffinityPairRow, AffinityProduct } from "@/lib/ingredient-affinity"
 
 function rule(
   trigger: BumpTriggerType,
@@ -112,8 +113,8 @@ describe("evaluateTriggerTypes", () => {
     const rules = [perishableRule, snacksRule, thresholdRule, dup]
     // Con el default de 3 el cuarto trigger queda fuera…
     expect(evaluateTriggerTypes(slugs, 600, rules)).toHaveLength(MAX_BUMPS)
-    // …y con el pool completo entra, que es lo que habilita el encadenado.
-    expect(evaluateTriggerTypes(slugs, 600, rules, undefined, MAX_BUMPS_POOL)).toHaveLength(4)
+    // …y con el tope de petición entra, que es lo que habilita el encadenado.
+    expect(evaluateTriggerTypes(slugs, 600, rules, undefined, MAX_BUMPS_REQUEST_LIMIT)).toHaveLength(4)
   })
 
   it("nuevos triggers meat_bbq y drinks_sides disparan por categoría", () => {
@@ -211,9 +212,14 @@ describe("resolveBumps", () => {
    * Construye el mock de Supabase con respuestas por tabla/query.
    * - bump_rules: select("*") → reglas; insert → regla insertada (fallback dinámico)
    * - products: in() → productos del carrito; eq(id) → bumpProduct por producto
+   * - products select("id, name, slug") → catálogo para el índice de afinidad
+   * - bump_affinity: eq(is_active) + in(source) → pares curados
    * - categories: in() → categorías
    * - restaurant_collections: eq(is_active) → colecciones
    * - rpc get_products_by_collection: productos de la colección (fallback dinámico)
+   *
+   * `catalog` y `affinityPairs` vacíos (default) apagan el tier de afinidad,
+   * así que las pruebas existentes siguen midiendo el ranking previo.
    */
   function makeSupabase(opts: {
     rules?: BumpRuleRow[]
@@ -223,6 +229,8 @@ describe("resolveBumps", () => {
     collections?: { id: number; slug: string; name: string; tags: string[]; is_active: boolean }[]
     rpcProducts?: Record<string, Record<string, unknown>[]>
     insertedRule?: BumpRuleRow | null
+    catalog?: AffinityProduct[]
+    affinityPairs?: AffinityPairRow[]
   }) {
     const {
       rules = [perishableRule],
@@ -232,6 +240,8 @@ describe("resolveBumps", () => {
       collections = [],
       rpcProducts = {},
       insertedRule = null,
+      catalog = [],
+      affinityPairs = [],
     } = opts
 
     // Espía accesible para verificar que el fallback dinámico registró la regla.
@@ -275,6 +285,10 @@ describe("resolveBumps", () => {
                   }),
                 }
               }
+              // Catálogo mínimo para el índice de afinidad por ingrediente.
+              if (cols === "id, name, slug") {
+                return Promise.resolve({ data: catalog, error: null })
+              }
               const eq = vi.fn().mockImplementation((_col: string, value?: number) => ({
                 maybeSingle: vi.fn().mockResolvedValue({
                   data:
@@ -299,6 +313,15 @@ describe("resolveBumps", () => {
                 })),
                 eq,
               }
+            }),
+          }
+        }
+        if (table === "bump_affinity") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                in: vi.fn().mockResolvedValue({ data: affinityPairs, error: null }),
+              }),
             }),
           }
         }
@@ -592,7 +615,7 @@ describe("resolveBumps", () => {
       collections: [collection()],
     })
     vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
-    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] }, undefined, MAX_BUMPS_POOL)
+    const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] }, undefined, MAX_BUMPS_REQUEST_LIMIT)
     expect(bumps).toHaveLength(3)
     // El ranking sigue priorizando recetas aunque el límite sea amplio.
     expect(bumps[0]?.trigger_type).toBe("recipe_collection")
@@ -618,6 +641,135 @@ describe("resolveBumps", () => {
     expect(Array.isArray(bumps)).toBe(true)
     expect(bumps.some((b) => b.product.id === 600)).toBe(true)
   })
+
+  describe("tier de afinidad por ingrediente (00112)", () => {
+    const cebolla: AffinityProduct = { id: 1, name: "Cebolla Blanca", slug: "cebolla-blanca" }
+    const chile: AffinityProduct = { id: 300, name: "Chile Serrano", slug: "chile-serrano" }
+    const affinityRule = rule("ingredient_affinity", {
+      id: 900,
+      product_id: 300,
+      title: "Chile Serrano",
+      description: "Ideal con Cebolla Blanca",
+      discount_pct: 0.1,
+      display_order: 100,
+    })
+
+    it("sugiere un producto afín y usa el nombre real del catálogo como título", async () => {
+      const supabase = makeSupabase({
+        rules: [],
+        cartProducts: [product({ id: 1, name: "Cebolla Blanca" })],
+        categories: [],
+        catalog: [cebolla, chile],
+        affinityPairs: [
+          { source_product_id: 1, target_product_id: 300, kind: "curated", weight: 5 },
+        ],
+        bumpProducts: { 300: product({ id: 300, name: "Chile Serrano" }) },
+        insertedRule: affinityRule,
+      })
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+
+      const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+
+      expect(bumps).toHaveLength(1)
+      expect(bumps[0]?.trigger_type).toBe("ingredient_affinity")
+      expect(bumps[0]?.product.name).toBe("Chile Serrano")
+      // El encabezado de la tarjeta sale del producto, no del título de la regla.
+      expect(bumps[0]?.title).toBe("Chile Serrano")
+      expect(bumps[0]?.badgeLabel).toBe("Ideal con tu pedido")
+    })
+
+    it("coloca la afinidad por encima del tier de categoría", async () => {
+      const supabase = makeSupabase({
+        cartProducts: [product({ id: 1, name: "Cebolla Blanca", category_id: 20 })],
+        catalog: [cebolla, chile],
+        affinityPairs: [
+          { source_product_id: 1, target_product_id: 300, kind: "curated", weight: 5 },
+        ],
+        bumpProducts: { 100: product(), 300: product({ id: 300, name: "Chile Serrano" }) },
+        insertedRule: affinityRule,
+      })
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+
+      const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+
+      expect(bumps[0]?.trigger_type).toBe("ingredient_affinity")
+      expect(bumps.map((b) => b.product.id)).toContain(100)
+    })
+
+    it("omite el candidato afín agotado y conserva el resto del pool", async () => {
+      const supabase = makeSupabase({
+        rules: [],
+        cartProducts: [product({ id: 1, name: "Cebolla Blanca" })],
+        categories: [],
+        catalog: [cebolla, chile, { id: 301, name: "Jitomate Bola", slug: "jitomate-bola" }],
+        affinityPairs: [
+          { source_product_id: 1, target_product_id: 300, kind: "curated", weight: 9 },
+          { source_product_id: 1, target_product_id: 301, kind: "curated", weight: 8 },
+        ],
+        bumpProducts: {
+          300: product({ id: 300, name: "Chile Serrano", stock_status: "out_of_stock" }),
+          301: product({ id: 301, name: "Jitomate Bola" }),
+        },
+        insertedRule: affinityRule,
+      })
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+
+      const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+
+      expect(bumps.map((b) => b.product.id)).toEqual([301])
+    })
+
+    it("no duplica el producto afín si además lo cubre el tier de receta", async () => {
+      const recipeRule = rule("recipe_collection", {
+        id: 6,
+        product_id: 300,
+        collection_slug: "taquerias-antojitos",
+        display_order: 6,
+      })
+      const supabase = makeSupabase({
+        rules: [recipeRule],
+        cartProducts: [product({ id: 1, name: "Cebolla Blanca", tags: ["taqueria"] })],
+        collections: [collection()],
+        catalog: [cebolla, chile],
+        affinityPairs: [
+          { source_product_id: 1, target_product_id: 300, kind: "curated", weight: 5 },
+        ],
+        bumpProducts: { 300: product({ id: 300, name: "Chile Serrano" }) },
+        insertedRule: affinityRule,
+      })
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+
+      const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+
+      expect(bumps.map((b) => b.product.id)).toEqual([300])
+      expect(bumps[0]?.trigger_type).toBe("ingredient_affinity")
+    })
+
+    it("fail-open: si bump_affinity no está disponible no rompe el checkout", async () => {
+      const supabase = makeSupabase({})
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+      supabase.from = vi.fn().mockImplementation((table: string) => {
+        if (table === "bump_affinity") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                in: vi.fn().mockResolvedValue({
+                  data: null,
+                  error: { code: "42P01", message: "relation does not exist" },
+                }),
+              }),
+            }),
+          }
+        }
+        return makeSupabase({}).from(table)
+      })
+
+      const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 2 }] })
+
+      expect(bumps).toHaveLength(1)
+      expect(bumps[0]?.trigger_type).toBe("perishables")
+    })
+  })
 })
 
 describe("sanitizeBumpLimit", () => {
@@ -626,11 +778,10 @@ describe("sanitizeBumpLimit", () => {
   })
 
   it("acepta un límite mayor para el pool encadenado del checkout", () => {
-    expect(sanitizeBumpLimit(MAX_BUMPS_POOL)).toBe(MAX_BUMPS_POOL)
+    expect(sanitizeBumpLimit(MAX_BUMPS_REQUEST_LIMIT)).toBe(MAX_BUMPS_REQUEST_LIMIT)
   })
-
-  it("acota al tamaño máximo del pool (un cliente no puede pedir todo)", () => {
-    expect(sanitizeBumpLimit(1000)).toBe(MAX_BUMPS_POOL)
+  it("acota al tope de petición (un cliente no puede pedir un pool desmedido)", () => {
+    expect(sanitizeBumpLimit(1000)).toBe(MAX_BUMPS_REQUEST_LIMIT)
   })
 
   it("cae al default con valores inválidos", () => {

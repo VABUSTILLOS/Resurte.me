@@ -250,11 +250,15 @@ export async function processUpsellForOrder(
 
   // Si el producto tiene una bump_rule activa, se reutiliza su descuento
   // (el admin define el descuento del upsell ahí); si no, precio completo.
+  // Se excluyen las reglas de afinidad por ingrediente: las registra el motor
+  // en checkout con un descuento por defecto y no son una decisión del admin
+  // sobre el precio del upsell.
   const { data: bumpRule } = await supabase
     .from("bump_rules")
     .select("discount_pct")
     .eq("product_id", product.id)
     .eq("is_active", true)
+    .neq("trigger_type", "ingredient_affinity")
     .limit(1)
     .maybeSingle()
 

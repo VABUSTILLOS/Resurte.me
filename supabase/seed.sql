@@ -749,5 +749,14 @@ WHERE slug IN ('pepperoni', 'mozzarella', 'harina-de-trigo', 'pure-de-tomate');
 -- ============================================================
 SELECT public.seed_bump_rules();
 
+-- ============================================================
+-- ORDER BUMPS POR AFINIDAD: sembrar pares producto→producto (idempotente).
+-- Mismo motivo que arriba: en el reset local los productos se insertan
+-- después de las migraciones, así que la función de 00112 se re-invoca aquí
+-- para resolver los slugs contra el catálogo ya poblado. En producción es un
+-- no-op (ON CONFLICT DO UPDATE sin cambios).
+-- ============================================================
+SELECT public.seed_bump_affinity();
+
 -- FIN COLECCIONES
 -- ============================================================

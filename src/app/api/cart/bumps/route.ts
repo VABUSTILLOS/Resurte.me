@@ -11,8 +11,10 @@ import { logger } from "@/lib/logger"
  * Body: { city_id?: number, items: [{ product_id, quantity }], limit?: number }
  *
  * `limit` (opcional) acota cuántas ofertas se devuelven, saneado a
- * [1, MAX_BUMPS_POOL] con default MAX_BUMPS. El checkout pide el pool completo
- * para encadenar ofertas; las superficies de carrito no lo envían.
+ * [1, MAX_BUMPS_REQUEST_LIMIT]. Si se omite, devuelve TODAS las ofertas que
+ * apliquen al carrito (el checkout no lo envía: quiere el pool completo para
+ * encadenar ofertas sin tope); las superficies de carrito sí lo envían para
+ * pedir solo la ventana visible.
  *
  * El cliente solo envía IDs/cantidades; el servidor deriva reglas, precios y
  * stock de la BD (nunca acepta precios del cliente). Fail-open: si la BD
@@ -78,14 +80,16 @@ export async function POST(request: NextRequest) {
     }
 
     const bumpsDiagnostics: BumpDiagnostics = {}
-    const bumpLimit = sanitizeBumpLimit(limit)
+    // Sin `limit` explícito no se sanea a MAX_BUMPS: `resolveBumps` entiende
+    // `undefined` como "todas las reglas aplicables".
+    const bumpLimit = limit === undefined ? undefined : sanitizeBumpLimit(limit)
     const bumps = await resolveBumps({ items: validItems }, bumpsDiagnostics, bumpLimit)
     // Log del resultado para poder correlacionar en Vercel si el navegador del
     // usuario recibe bumps (clave del diagnóstico "no veo bumps logueado").
     logger.info("[BUMPS] served", {
       items: validItems.map((i) => i.product_id),
       bumpCount: bumps.length,
-      limit: bumpLimit,
+      limit: bumpLimit ?? "all",
       rules: bumps.map((b) => `${b.ruleId}:${b.trigger_type}`),
       ua: request.headers.get("user-agent") ?? "n/a",
       state: bumpsDiagnostics.state ?? null,

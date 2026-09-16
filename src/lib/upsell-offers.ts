@@ -139,10 +139,13 @@ export async function resolveUpsellOffers(
   const existingIds = new Set((existingItems ?? []).map((i) => i.product_id))
 
   // Reglas de bump activas + su producto del catálogo.
+  // Se excluyen las de afinidad por ingrediente: son contextuales al carrito
+  // (las registra el motor en checkout) y no ofertas genéricas post-compra.
   const { data: rules, error: rulesError } = await supabase
     .from("bump_rules")
     .select("*, product:products(*)")
     .eq("is_active", true)
+    .neq("trigger_type", "ingredient_affinity")
     .order("display_order", { ascending: true })
 
   if (rulesError) return base(true, orderTotal)

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Copy, Megaphone, Pencil, Percent, Plus, Power, TicketPercent, Trash2 } from "lucide-react"
 import { suggestDuplicateCode } from "@/lib/admin-marketing-validation"
+import BumpAffinitySection, { type AffinityPair } from "@/components/admin/bump-affinity-section"
 
 interface BumpRule {
   id: number
@@ -33,6 +34,10 @@ const TRIGGER_LABEL: Record<string, string> = {
   perishables: "Perecederos",
   snacks_drinks: "Snacks/bebidas",
   subtotal_threshold: "Umbral de subtotal",
+  meat_bbq: "Carne/asador",
+  drinks_sides: "Bebidas/guarniciones",
+  recipe_collection: "Receta",
+  ingredient_affinity: "Afinidad (automática)",
 }
 
 /**
@@ -42,6 +47,7 @@ const TRIGGER_LABEL: Record<string, string> = {
  */
 export default function MarketingAdminPage() {
   const [rules, setRules] = useState<BumpRule[]>([])
+  const [pairs, setPairs] = useState<AffinityPair[]>([])
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -56,12 +62,17 @@ export default function MarketingAdminPage() {
 
   const load = useCallback(async () => {
     try {
-      const [r, c] = await Promise.all([
+      const [r, a, c] = await Promise.all([
         fetch("/api/admin/bump-rules"),
+        fetch("/api/admin/bump-affinity"),
         fetch("/api/admin/coupons"),
       ])
       if (!r.ok || !c.ok) throw new Error("Error al cargar datos")
       setRules(((await r.json()) as { rules: BumpRule[] }).rules)
+      // La afinidad falla en silencio: si la migración 00112 no está aplicada
+      // el resto del panel debe seguir funcionando.
+      if (a.ok) setPairs(((await a.json()) as { pairs: AffinityPair[] }).pairs)
+      else setPairs([])
       setCoupons(((await c.json()) as { coupons: Coupon[] }).coupons)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar datos")
@@ -300,6 +311,8 @@ export default function MarketingAdminPage() {
           )}
         </ul>
       </section>
+
+      <BumpAffinitySection pairs={pairs} onChanged={reload} />
 
       {/* ── Cupones ─────────────────────────────────────────── */}
       <section className="bg-white rounded-xl border border-gray-200 p-4">

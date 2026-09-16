@@ -4,7 +4,7 @@ import {
   FREE_SHIPPING_THRESHOLD,
   DELIVERY_FEE_FLAT,
   MAX_BUMPS,
-  MAX_BUMPS_POOL,
+  MAX_BUMPS_REQUEST_LIMIT,
   MIN_ITEM_QUANTITY,
   countBumpUnits,
   validDeliveryFee,
@@ -23,10 +23,12 @@ describe("checkout-config", () => {
     expect(MAX_BUMPS).toBe(3)
   })
 
-  it("el pool de bumps es mayor que la ventana visible (permite encadenar)", () => {
-    // El checkout pide el pool completo y muestra una ventana de MAX_BUMPS:
-    // si el pool no fuera mayor, elegir un bump nunca revelaría el siguiente.
-    expect(MAX_BUMPS_POOL).toBeGreaterThan(MAX_BUMPS)
+  it("el tope de petición de bumps es de seguridad, no una regla de producto", () => {
+    // El checkout NO envía `limit`: recibe todas las ofertas aplicables al
+    // carrito (el pool lo define `bump_rules`). Esta constante solo acota lo
+    // que un cliente anónimo puede pedir de golpe en la API pública.
+    expect(MAX_BUMPS_REQUEST_LIMIT).toBeGreaterThan(MAX_BUMPS)
+    expect(MAX_BUMPS_REQUEST_LIMIT).toBe(100)
   })
 
   it("la cantidad mínima de un artículo es 0 (el checkout deja vaciar una línea)", () => {

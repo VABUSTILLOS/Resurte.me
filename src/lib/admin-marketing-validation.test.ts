@@ -3,6 +3,8 @@ import {
   validateBumpRuleInput,
   validateCouponInput,
   validateCouponPatch,
+  validateAffinityPairInput,
+  validateAffinityPairPatch,
   suggestDuplicateCode,
 } from "./admin-marketing-validation"
 
@@ -157,5 +159,62 @@ describe("suggestDuplicateCode", () => {
   it("recorta códigos largos al máximo de 32", () => {
     const long = "X".repeat(32)
     expect(suggestDuplicateCode(long, [])).toHaveLength(32)
+  })
+})
+
+describe("validateAffinityPairInput", () => {
+  const validBase = { source_product_id: 1, target_product_id: 2 }
+
+  it("acepta un par válido con defaults", () => {
+    const r = validateAffinityPairInput(validBase)
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.value).toEqual({
+        source_product_id: 1,
+        target_product_id: 2,
+        kind: "curated",
+        weight: 1,
+        is_active: true,
+      })
+    }
+  })
+
+  it("rechaza el auto-par", () => {
+    const r = validateAffinityPairInput({ source_product_id: 7, target_product_id: 7 })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toMatch(/consigo mismo/)
+  })
+
+  it("rechaza ids no enteros o no positivos", () => {
+    expect(validateAffinityPairInput({ source_product_id: 0, target_product_id: 2 }).ok).toBe(false)
+    expect(validateAffinityPairInput({ source_product_id: 1, target_product_id: -2 }).ok).toBe(false)
+    expect(validateAffinityPairInput({ source_product_id: 1.5, target_product_id: 2 }).ok).toBe(false)
+    expect(validateAffinityPairInput({ target_product_id: 2 }).ok).toBe(false)
+  })
+
+  it("valida kind y weight", () => {
+    expect(validateAffinityPairInput({ ...validBase, kind: "recipe" }).ok).toBe(true)
+    expect(validateAffinityPairInput({ ...validBase, kind: "inventado" }).ok).toBe(false)
+    expect(validateAffinityPairInput({ ...validBase, weight: 0 }).ok).toBe(true)
+    expect(validateAffinityPairInput({ ...validBase, weight: -1 }).ok).toBe(false)
+    expect(validateAffinityPairInput({ ...validBase, weight: 1.5 }).ok).toBe(false)
+  })
+})
+
+describe("validateAffinityPairPatch", () => {
+  it("acepta campos parciales válidos", () => {
+    const r = validateAffinityPairPatch({ weight: 5, is_active: false })
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.value.weight).toBe(5)
+      expect(r.value.is_active).toBe(false)
+      expect(r.value.kind).toBeUndefined()
+    }
+  })
+
+  it("rechaza un patch vacío o inválido", () => {
+    expect(validateAffinityPairPatch({}).ok).toBe(false)
+    expect(validateAffinityPairPatch({ kind: "nope" }).ok).toBe(false)
+    expect(validateAffinityPairPatch({ weight: -3 }).ok).toBe(false)
   })
 })

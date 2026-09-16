@@ -34,9 +34,9 @@ export function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false)
   const { cart, itemCount, subtotal, coupon, removeItem, updateQuantity, clearCart } = useCart()
   const { city } = useCity()
-  // Order bumps seleccionados en el cross-sell del carrito; se transfieren al
-  // CheckoutDrawer vía detail.bumps al presionar "Ir a Checkout". Compartidos
-  // con /cart y /{ciudad}/carrito vía sessionStorage + evento global.
+  // Order bumps seleccionados en el cross-sell del carrito; el CheckoutDrawer
+  // los lee del mismo store compartido (useSelectedBumps), así que la selección
+  // ya no se transfiere por el evento y sobrevive a la navegación.
   const { selectedBumps, setSelectedBumps } = useSelectedBumps()
   const closeBtnRef = useRef<HTMLButtonElement>(null)
 
@@ -114,11 +114,9 @@ export function CartDrawer() {
     setIsOpen(false)
     // Abrir el checkout completo dentro del drawer (mecánica SamCart) en vez
     // de navegar a /{city}/checkout. La ruta sigue funcionando como fallback.
-    // Los bumps seleccionados en el cross-sell viajan en detail.bumps para que
-    // CheckoutDrawer los inicialice (retrocompatible: si no llegan, se vacían).
-    window.dispatchEvent(
-      new CustomEvent(CHECKOUT_DRAWER_EVENT, { detail: { bumps: selectedBumps } })
-    )
+    // Los bumps no viajan en el evento: el CheckoutDrawer los lee del store
+    // compartido, así que ya están seleccionados al abrir.
+    window.dispatchEvent(new CustomEvent(CHECKOUT_DRAWER_EVENT))
   }
 
   if (!isOpen) return null
@@ -487,9 +485,7 @@ export function MobileCartBar() {
         quantity: i.quantity,
       }))
     )
-    window.dispatchEvent(
-      new CustomEvent(CHECKOUT_DRAWER_EVENT, { detail: { bumps: selectedBumps } })
-    )
+    window.dispatchEvent(new CustomEvent(CHECKOUT_DRAWER_EVENT))
   }
 
   const barClass = "bg-white border-t border-[#E8E9EB] shadow-[0_-4px_24px_rgba(0,0,0,0.1)]"

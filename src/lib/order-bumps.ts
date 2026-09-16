@@ -13,6 +13,14 @@
  *   6. recipe_collection   → tags del carrito ∩ tags de una colección de
  *                            recetas (restaurant_collections) → ingrediente
  *                            clave faltante de esa receta.
+ *   7. ingredient_affinity → afinidad por INGREDIENTE, no por tag: se resuelve
+ *                            el nombre de cada ingrediente del recetario
+ *                            contra el catálogo y, si el carrito ya lleva
+ *                            alguno, los demás ingredientes de esa receta se
+ *                            ofrecen primero (carne → especias/salsa, cebolla
+ *                            → chile + jitomate para una salsa). Los pares
+ *                            curados por el admin en `bump_affinity` refuerzan
+ *                            o corrigen lo que el recetario no cubre.
  *
  * Estrategia híbrida:
  *   - Las reglas administradas en `bump_rules` son la fuente de verdad.
@@ -22,6 +30,11 @@
  *     con stock y visible, y lo registra como regla `recipe_collection`
  *     (idempotente, 1 por colección) para que POST /api/orders pueda
  *     validarlo igual que cualquier otro bump.
+ *   - La afinidad por ingrediente (`bump_affinity` + recetario) es el tier de
+ *     MAYOR prioridad y tampoco requiere reglas preexistentes: se registra una
+ *     regla `ingredient_affinity` por producto servido (idempotente gracias al
+ *     índice único parcial de la migración 00112), de modo que POST /api/orders
+ *     la valide sin cambios en esa ruta.
  *
  * El cliente NUNCA envía precios ni reglas: solo items del carrito. Todo se
  * deriva server-side de `bump_rules` y `products` (precios reales), igual
@@ -29,16 +42,24 @@
  *
  * Por defecto devuelve MAX_BUMPS (3) bumps. El llamador puede pedir un pool
  * mayor (`limit`) para encadenar ofertas en el checkout: al elegir un bump el
- * cliente ya tiene la siguiente oferta sin volver a consultar la API. El tope
- * duro es MAX_BUMPS_POOL. Ranking de relevancia: recetas y colecciones
- * primero, luego categorías/umbral por display_order. Fail-open: cualquier
- * error de BD devuelve [] para no bloquear el checkout.
+ * cliente ya tiene la siguiente oferta sin volver a consultar la API. Sin
+ * `limit` devuelve TODAS las reglas activas que apliquen al carrito (el pool
+ * real lo determina `bump_rules`, no una constante); un `limit` explícito se
+ * acota a [1, MAX_BUMPS_REQUEST_LIMIT]. Ranking de relevancia: recetas y
+ * colecciones primero, luego categorías/umbral por display_order. Fail-open:
+ * cualquier error de BD devuelve [] para no bloquear el checkout.
  */
 
 import { createServiceClient } from "@/lib/supabase/service"
 import { applyDiscount } from "@/lib/money"
-import { MAX_BUMPS, MAX_BUMPS_POOL } from "@/lib/checkout-config"
+import { MAX_BUMPS, MAX_BUMPS_REQUEST_LIMIT } from "@/lib/checkout-config"
 import { logger } from "@/lib/logger"
+import { getAllRecipes } from "@/lib/recipes"
+import {
+  computeAffinity,
+  type AffinityPairRow,
+  type AffinityProduct,
+} from "@/lib/ingredient-affinity"
 import {
   isMissingColumnError,
   resolveEffectivePrice,
@@ -52,6 +73,7 @@ export type BumpTriggerType =
   | "meat_bbq"
   | "drinks_sides"
   | "recipe_collection"
+  | "ingredient_affinity"
 
 export interface BumpRuleRow {
   id: number
@@ -133,6 +155,10 @@ export interface BumpDiagnostics {
     cartCategorySlugs: string[]
     subtotal: number
     matchedTriggers: string[]
+    /** Pares de afinidad leídos de `bump_affinity` para este carrito. */
+    affinityPairs: number
+    /** Candidatos de afinidad antes de filtrar por stock/visibilidad. */
+    affinityCandidates: number
   }
 }
 
@@ -160,6 +186,15 @@ const DRINKS_SLUGS = ["bebidas"]
 
 /** Descuento por defecto para bumps dinámicos de colección (10%). */
 const DYNAMIC_RECIPE_DISCOUNT = 0.1
+
+/**
+ * Descuento por defecto de un bump de afinidad recién registrado. Una vez
+ * creada la regla, el admin puede editarla en el panel y ese valor manda.
+ */
+const AFFINITY_DISCOUNT = 0.1
+
+/** display_order de las reglas registradas por el motor (por debajo de las del admin). */
+const ENGINE_RULE_DISPLAY_ORDER = 100
 
 function effectivePrice(product: BumpProduct): number {
   // Oferta vencida/programada (00107) no aplica: mismo precio que la tienda.
@@ -245,6 +280,14 @@ export function evaluateTriggerTypes(
         applies =
           rule.collection_slug !== null && collectionSlugsInCart.has(rule.collection_slug)
         break
+      // La afinidad por ingrediente NO se resuelve aquí: no depende de
+      // categorías, subtotal ni tags, sino del cruce ingrediente→producto que
+      // hace computeAffinity(). Se mantiene en `false` para que estas reglas
+      // (registradas por el motor, no por el admin) nunca entren al tier de
+      // categorías y dupliquen una oferta ya servida por afinidad.
+      case "ingredient_affinity":
+        applies = false
+        break
     }
     if (applies) matched.push(rule.trigger_type)
   }
@@ -307,6 +350,98 @@ export function detectCollectionsInCart(
   return detected
 }
 
+/**
+ * Lee los pares de afinidad de `bump_affinity` que apuntan desde el carrito.
+ * Se filtra por `source_product_id` en el carrito para traer solo las filas
+ * relevantes (el catálogo completo de pares es pequeño, pero la query acotada
+ * evita depender del tamaño). Fail-open: si la migración 00112 no está
+ * aplicada, la tabla no existe y devuelve [] (la afinidad curada se omite y
+ * queda solo la del recetario).
+ */
+async function loadAffinityPairs(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  cartProductIds: number[],
+  diagnostics?: BumpDiagnostics
+): Promise<AffinityPairRow[]> {
+  if (cartProductIds.length === 0) return []
+  const { data, error } = await supabase
+    .from("bump_affinity")
+    .select("source_product_id, target_product_id, kind, weight")
+    .eq("is_active", true)
+    .in("source_product_id", cartProductIds)
+
+  if (error) {
+    // 42P01 = tabla inexistente (00112 pendiente): no es un fallo de negocio.
+    logger.warn("[BUMPS] bump_affinity fetch error, afinidad curada omitida", {
+      error: error.message,
+    })
+    if (diagnostics) diagnostics.reason = "bump_affinity_fetch_error"
+    return []
+  }
+  return (data ?? []) as AffinityPairRow[]
+}
+
+/**
+ * Carga el catálogo mínimo (id, name, slug) para resolver los ingredientes del
+ * recetario contra productos reales. Es la única query "ancha" del motor; se
+ * pide una sola vez y solo con las columnas que necesita el índice de nombres.
+ */
+async function loadCatalogIndex(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  diagnostics?: BumpDiagnostics
+): Promise<AffinityProduct[]> {
+  const { data, error } = await supabase.from("products").select("id, name, slug")
+  if (error) {
+    logger.warn("[BUMPS] catalog fetch error, afinidad por receta omitida", {
+      error: error.message,
+    })
+    if (diagnostics) diagnostics.reason = "catalog_fetch_error"
+    return []
+  }
+  return (data ?? []) as AffinityProduct[]
+}
+
+/**
+ * Registra (idempotente) la regla `bump_rules` de un bump de afinidad para que
+ * POST /api/orders lo valide igual que cualquier otro bump. El índice único
+ * parcial `idx_bump_rules_ingredient_affinity` (product_id) de la migración
+ * 00112 garantiza una sola regla por producto incluso con requests
+ * concurrentes. Fail-open: devuelve null si no se puede registrar.
+ */
+async function registerAffinityRule(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  product: BumpProduct,
+  reason: string
+): Promise<BumpRuleRow | null> {
+  const { data: inserted, error } = await supabase
+    .from("bump_rules")
+    .insert({
+      trigger_type: "ingredient_affinity",
+      category_slugs: [] as string[],
+      product_id: product.id,
+      title: product.name,
+      description: reason,
+      discount_pct: AFFINITY_DISCOUNT,
+      is_active: true,
+      display_order: ENGINE_RULE_DISPLAY_ORDER,
+      collection_slug: null,
+    })
+    .select("*")
+    .maybeSingle()
+
+  if (!error && inserted) return inserted as BumpRuleRow
+
+  // Carrera con otro request (o 00112 pendiente): reutiliza la regla existente.
+  const { data: existing, error: selError } = await supabase
+    .from("bump_rules")
+    .select("*")
+    .eq("trigger_type", "ingredient_affinity")
+    .eq("product_id", product.id)
+    .maybeSingle()
+  if (selError || !existing) return null
+  return existing as BumpRuleRow
+}
+
 /** Producto usable: existe, visible y con stock (no out_of_stock). */
 function isUsableBumpProduct(product: BumpProduct | null | undefined): product is BumpProduct {
   return (
@@ -319,6 +454,7 @@ function isUsableBumpProduct(product: BumpProduct | null | undefined): product i
 
 function buildBump(rule: BumpRuleRow, product: BumpProduct): OrderBump {
   const isRecipe = rule.trigger_type === "recipe_collection"
+  const isAffinity = rule.trigger_type === "ingredient_affinity"
   return {
     ruleId: rule.id,
     trigger_type: rule.trigger_type,
@@ -328,8 +464,12 @@ function buildBump(rule: BumpRuleRow, product: BumpProduct): OrderBump {
     product,
     price: discountPrice(product, rule.discount_pct),
     original_price: effectivePrice(product),
-    isRecipeMatch: isRecipe,
-    badgeLabel: isRecipe ? "Sugerido para tu receta / pedido" : undefined,
+    isRecipeMatch: isRecipe || isAffinity,
+    badgeLabel: isAffinity
+      ? "Ideal con tu pedido"
+      : isRecipe
+        ? "Sugerido para tu receta / pedido"
+        : undefined,
     collection_slug: rule.collection_slug ?? undefined,
   }
 }
@@ -434,6 +574,72 @@ async function loadCartProducts(
 }
 
 /**
+ * Tier 0: bumps por AFINIDAD DE INGREDIENTE.
+ *
+ * Cruza los ingredientes del recetario y los pares curados (`bump_affinity`)
+ * contra el catálogo real para resolver qué producto del carrito "pide" qué
+ * otro producto (carne → especias/salsa, cebolla → chile + jitomate). El
+ * cálculo es puro (`computeAffinity`); aquí solo se resuelven los productos,
+ * se descartan los no usables y se registra la regla para que POST /api/orders
+ * valide el bump.
+ *
+ * El `limit` del cálculo es `maxBumps` (no un tope fijo) a propósito: da
+ * margen para descartar candidatos agotados o invisibles sin quedarse corto.
+ * Los IDs que van a la query de productos sí se acotan a
+ * MAX_BUMPS_REQUEST_LIMIT: la afinidad es un ranking de relevancia y más allá
+ * de eso solo serían ruido (además de un `.in()` desmedido).
+ */
+async function resolveAffinityBumps(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  cartProducts: BumpProduct[],
+  cartProductIds: Set<number>,
+  maxBumps: number,
+  diagnostics?: BumpDiagnostics
+): Promise<{ pairsLoaded: number; candidateCount: number; bumps: OrderBump[] }> {
+  if (cartProducts.length === 0) {
+    return { pairsLoaded: 0, candidateCount: 0, bumps: [] }
+  }
+
+  const [catalog, pairs] = await Promise.all([
+    loadCatalogIndex(supabase, diagnostics),
+    loadAffinityPairs(supabase, Array.from(cartProductIds), diagnostics),
+  ])
+  if (catalog.length === 0) {
+    return { pairsLoaded: pairs.length, candidateCount: 0, bumps: [] }
+  }
+
+  const candidates = computeAffinity({
+    cartProducts,
+    allProducts: catalog,
+    recipes: getAllRecipes(),
+    curatedPairs: pairs,
+    limit: maxBumps,
+  })
+  if (candidates.length === 0) {
+    return { pairsLoaded: pairs.length, candidateCount: 0, bumps: [] }
+  }
+
+  // Una sola query para los productos candidatos; el orden de afinidad ya
+  // viene resuelto en `candidates`, así que se recorre en ese orden.
+  const productMap = await loadBumpProducts(
+    supabase,
+    candidates.slice(0, MAX_BUMPS_REQUEST_LIMIT).map((c) => c.productId)
+  )
+
+  const bumps: OrderBump[] = []
+  for (const candidate of candidates) {
+    if (bumps.length >= maxBumps) break
+    const product = productMap.get(candidate.productId)
+    // Agotado, invisible o inexistente: se descarta el candidato, no el tier.
+    if (!isUsableBumpProduct(product)) continue
+    const rule = await registerAffinityRule(supabase, product, candidate.reason)
+    if (!rule) continue
+    bumps.push(buildBump(rule, product))
+  }
+  return { pairsLoaded: pairs.length, candidateCount: candidates.length, bumps }
+}
+
+/**
  * Resuelve los bumps condicionales para un carrito.
  * La entrada es una lista de { product_id, quantity } (sin precios del
  * cliente). Los precios se derivan de `products`.
@@ -444,17 +650,18 @@ async function loadCartProducts(
  * `diagnostics` (opcional) se rellena cuando un resultado vacío proviene de
  * un error de BD real (con retry) para distinguirlo de "no hay match".
  *
- * `limit` (opcional, default MAX_BUMPS) acota cuántas ofertas se devuelven.
- * Se sanea a [1, MAX_BUMPS_POOL] para que un cliente no pueda ampliarlo
- * indefinidamente.
+ * `limit` (opcional) acota cuántas ofertas se devuelven. `undefined` = todas
+ * las reglas activas que apliquen al carrito (el checkout no envía `limit`);
+ * un valor explícito se sanea a [1, MAX_BUMPS_REQUEST_LIMIT] para que un
+ * cliente no pueda ampliarlo indefinidamente.
  */
 export async function resolveBumps(
   input: BumpCartInput,
   diagnostics?: BumpDiagnostics,
-  limit: number = MAX_BUMPS
+  limit?: number
 ): Promise<OrderBump[]> {
   if (input.items.length === 0) return []
-  const maxBumps = sanitizeBumpLimit(limit)
+  const maxBumps = limit === undefined ? MAX_BUMPS_REQUEST_LIMIT : sanitizeBumpLimit(limit)
 
   const supabase = await createServiceClient()
   const cartProductIds = new Set(input.items.map((i) => i.product_id))
@@ -522,6 +729,18 @@ export async function resolveBumps(
 
   const collectionSlugsInCart = detectCollectionsInCart(cartProducts, collections)
 
+  // ── 0) Afinidad por ingrediente (mayor prioridad) ──
+  // Se calcula ANTES del guard de salida temprana porque, a diferencia de los
+  // otros tiers, no depende de categorías, subtotal, tags ni colecciones: un
+  // carrito con carne y sin ninguna colección detectada igual merece especias.
+  const affinity = await resolveAffinityBumps(
+    supabase,
+    cartProducts,
+    cartProductIds,
+    maxBumps,
+    diagnostics
+  )
+
   const matchedTriggers = evaluateTriggerTypes(
     cartCategorySlugs,
     subtotal,
@@ -548,13 +767,16 @@ export async function resolveBumps(
       cartCategorySlugs: Array.from(cartCategorySlugs),
       subtotal,
       matchedTriggers: Array.from(matchedTriggers),
+      affinityPairs: affinity.pairsLoaded,
+      affinityCandidates: affinity.candidateCount,
     }
   }
-  if (matchedTriggers.length === 0 && collectionSlugsInCart.size === 0) return []
-
-  const ruleByTrigger = new Map<BumpTriggerType, BumpRuleRow>()
-  for (const rule of rules) {
-    if (!ruleByTrigger.has(rule.trigger_type)) ruleByTrigger.set(rule.trigger_type, rule)
+  if (
+    matchedTriggers.length === 0 &&
+    collectionSlugsInCart.size === 0 &&
+    affinity.bumps.length === 0
+  ) {
+    return []
   }
 
   // ── 1) Candidatos de receta/colección (mayor relevancia) ──
@@ -597,17 +819,19 @@ export async function resolveBumps(
   }
 
   // ── 3) Candidatos por categoría / umbral ──
+  // Todas las reglas cuyo trigger aplica al carrito, no solo la primera de
+  // cada tipo: quedarse con una por trigger_type agotaba el pool sin motivo
+  // cuando el admin configura varias reglas de categoría/umbral.
   const categoryCandidates: OrderBump[] = []
   const usedProductIds = new Set(recipeCandidates.map((b) => b.product.id))
-  const categoryTriggerRules = matchedTriggers
-    .filter((trigger) => trigger !== "recipe_collection")
-    .map((trigger) => ruleByTrigger.get(trigger))
-    .filter(
-      (rule): rule is BumpRuleRow =>
-        rule !== undefined &&
-        !cartProductIds.has(rule.product_id) &&
-        !usedProductIds.has(rule.product_id)
-    )
+  const matchedTriggerSet = new Set(matchedTriggers)
+  const categoryTriggerRules = rules.filter(
+    (rule) =>
+      rule.trigger_type !== "recipe_collection" &&
+      matchedTriggerSet.has(rule.trigger_type) &&
+      !cartProductIds.has(rule.product_id) &&
+      !usedProductIds.has(rule.product_id)
+  )
 
   // Igual que arriba: una sola query para los productos de todas las reglas.
   const categoryProductMap = await loadBumpProducts(
@@ -615,20 +839,20 @@ export async function resolveBumps(
     categoryTriggerRules.map((rule) => rule.product_id)
   )
 
-  for (const trigger of matchedTriggers) {
-    if (trigger === "recipe_collection") continue
-    const rule = ruleByTrigger.get(trigger)
-    if (!rule) continue
-    if (cartProductIds.has(rule.product_id) || usedProductIds.has(rule.product_id)) continue
+  for (const rule of categoryTriggerRules) {
+    if (categoryCandidates.length >= maxBumps) break
+    if (usedProductIds.has(rule.product_id)) continue
     const product = categoryProductMap.get(rule.product_id)
     if (!isUsableBumpProduct(product)) continue
+    usedProductIds.add(rule.product_id)
     categoryCandidates.push(buildBump(rule, product))
   }
 
-  // ── Ranking final: recetas/colecciones primero, top maxBumps, sin dupes ──
+  // ── Ranking final: afinidad por ingrediente → recetas/colecciones →
+  //    categoría/umbral. Top maxBumps, sin duplicados ──
   const seen = new Set<number>()
   const bumps: OrderBump[] = []
-  for (const bump of [...recipeCandidates, ...categoryCandidates]) {
+  for (const bump of [...affinity.bumps, ...recipeCandidates, ...categoryCandidates]) {
     if (seen.has(bump.product.id)) continue
     seen.add(bump.product.id)
     bumps.push(bump)
@@ -638,14 +862,18 @@ export async function resolveBumps(
 }
 
 /**
- * Sanea el `limit` de ofertas de bumps: entero en [1, MAX_BUMPS_POOL].
+ * Sanea el `limit` de ofertas de bumps: entero en [1, MAX_BUMPS_REQUEST_LIMIT].
  * Valores inválidos (NaN, 0, negativos, no numéricos) caen al default.
+ *
+ * `undefined`/inválido → MAX_BUMPS (contrato de las superficies de carrito,
+ * que piden la ventana visible). Para "todas las ofertas aplicables" el
+ * llamador debe omitir el `limit` en `resolveBumps`, no pasar este valor.
  */
 export function sanitizeBumpLimit(limit: number | undefined | null): number {
   if (typeof limit !== "number" || !Number.isFinite(limit)) return MAX_BUMPS
   const floored = Math.floor(limit)
   if (floored < 1) return MAX_BUMPS
-  return Math.min(floored, MAX_BUMPS_POOL)
+  return Math.min(floored, MAX_BUMPS_REQUEST_LIMIT)
 }
 
 /**
