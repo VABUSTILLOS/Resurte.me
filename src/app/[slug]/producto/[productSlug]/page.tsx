@@ -13,6 +13,7 @@ import { ProductDetailClient } from "./product-detail-client"
 import { RecentlyViewed } from "@/components/product/recently-viewed"
 import { getBreadcrumbSchema, getProductSchema } from "@/lib/structured-data"
 import { buildRelatedProducts } from "@/lib/related-products"
+import { comparePresentations } from "@/lib/unit-price"
 
 // ISR: se revalida cada 5 min (alineado con catalog-cache). La primera
 // visita a cada producto renderiza y cachea; el resto sale del CDN.
@@ -119,6 +120,17 @@ export default async function ProductPage({ params }: Props) {
     ),
   })
 
+  // Presentaciones comparables (C13): el pool es el catálogo visible ya
+  // filtrado por ciudad, que la página ya tiene en memoria. `comparePresentations`
+  // descarta todo lo que no comparta nombre base y unidad física, así que el
+  // resultado solo contiene la misma mercancía en otro tamaño.
+  const presentations = comparePresentations(
+    { ...product, price: product.sale_price ?? product.price },
+    availableProducts
+      .filter((p) => p.id !== product.id)
+      .map((p) => ({ ...p, price: p.sale_price ?? p.price }))
+  )
+
   const url = `https://resurte.me/${slug}/producto/${productSlug}`
   const jsonLd = [
     getProductSchema(
@@ -146,6 +158,7 @@ export default async function ProductPage({ params }: Props) {
         product={product}
         category={category ?? undefined}
         relatedProducts={related}
+        presentations={presentations}
         citySlug={slug}
         cityName={city.name}
       />

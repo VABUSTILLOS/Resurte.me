@@ -13,6 +13,8 @@ import { useMediaQuery } from "@/hooks/use-media-query"
 import { StoreBreadcrumb } from "@/components/ui/store-breadcrumb"
 import Link from "next/link"
 import type { Category, Product } from "@/types"
+import type { PresentationCandidate } from "@/lib/unit-price"
+import { formatUnitPrice, unitPrice } from "@/lib/unit-price"
 import { getCategoryIcon } from "@/lib/utils"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
@@ -21,11 +23,13 @@ interface ProductDetailClientProps {
   product: Product
   category?: Category
   relatedProducts: Product[]
+  /** Otras presentaciones de la misma mercancía, ya ordenadas por $/unidad. */
+  presentations?: PresentationCandidate<Product>[]
   citySlug: string
   cityName: string
 }
 
-export function ProductDetailClient({ product, category, relatedProducts, citySlug, cityName }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, category, relatedProducts, presentations = [], citySlug, cityName }: ProductDetailClientProps) {
   const { addItem } = useCart()
   const { toast } = useToast()
   const [added, setAdded] = useState(false)
@@ -35,6 +39,7 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
   const allImages = product.images?.length ? product.images : [product.image_url]
 
   const displayPrice = product.sale_price ?? product.price ?? 0
+  const perUnit = unitPrice(displayPrice, product.unit)
   const originalPrice = product.price ?? 0
   const hasDiscount = !!product.sale_price && product.sale_price < (product.price ?? 0)
   const discountPercent = product.sale_price != null && hasDiscount
@@ -232,12 +237,66 @@ export function ProductDetailClient({ product, category, relatedProducts, citySl
                   Ahorras ${(originalPrice - displayPrice).toFixed(2)}
                 </p>
               )}
-              {product.unit && (
+              {perUnit ? (
+                <p className="text-[13px] text-[#6b6b6b] mt-1">
+                  {formatUnitPrice(perUnit)} · {product.unit}
+                </p>
+              ) : product.unit ? (
                 <p className="text-[13px] text-[#6b6b6b] mt-1">
                   Precio por {product.unit.toLowerCase()}
                 </p>
-              )}
+              ) : null}
             </div>
+
+            {/* Comparador de presentaciones (C13): solo aparece cuando el
+                catálogo tiene la misma mercancía en otro tamaño comparable. */}
+            {perUnit && presentations.length > 0 && (
+              <section
+                aria-labelledby="comparar-presentaciones"
+                className="mt-4 rounded-xl border border-[#ede8df] bg-[#faf8f4] p-3"
+              >
+                <h2 id="comparar-presentaciones" className="text-[13px] font-semibold text-[#1a1a1a]">
+                  Comparar presentaciones
+                </h2>
+                <p className="text-[12px] text-[#6b6b6b] mt-0.5">
+                  Mismo producto en otro tamaño, ordenado por precio por unidad.
+                </p>
+                <ul className="mt-1.5 divide-y divide-[#ede8df]">
+                  {presentations.map((candidate) => (
+                    <li key={candidate.product.id}>
+                      <Link
+                        href={`/${citySlug}/producto/${candidate.product.slug}`}
+                        aria-label={`${candidate.product.name} — ${formatUnitPrice(candidate.unitPrice)}, ${candidate.best ? "más barato por unidad" : `+${Math.round(candidate.deltaPct)}% por unidad`}`}
+                        className="flex items-center gap-3 py-2 min-h-[44px] group"
+                      >
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-medium text-[#1a1a1a] truncate group-hover:text-[#0E7A0E] transition-colors">
+                            {candidate.product.unit || candidate.product.name}
+                          </span>
+                          <span className="block text-[12px] text-[#6b6b6b]">
+                            {formatUnitPrice(candidate.unitPrice)}
+                          </span>
+                        </span>
+                        <span className="text-right shrink-0">
+                          <span className="block text-sm font-semibold text-[#1a1a1a]">
+                            ${candidate.product.price.toFixed(2)}
+                          </span>
+                          {candidate.best ? (
+                            <span className="inline-block text-[11px] font-semibold text-[#0E7A0E] bg-[#e8f5e9] px-1.5 py-0.5 rounded-full">
+                              Más barato
+                            </span>
+                          ) : (
+                            <span className="inline-block text-[11px] font-semibold text-[#DE3534] bg-[#fdf2f2] px-1.5 py-0.5 rounded-full">
+                              +{Math.round(candidate.deltaPct)}%
+                            </span>
+                          )}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             {/* Quality guarantee badge — prominent trust signal */}
             <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-[#e8f5e9] rounded-xl border border-[#c8e6c8]">

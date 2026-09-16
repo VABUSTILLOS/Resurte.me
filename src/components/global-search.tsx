@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Search, X, ArrowRight } from "lucide-react"
 import { readStored } from "@/lib/storage"
 import { searchProducts } from "@/app/[slug]/buscar/actions"
+import { formatUnitPrice, unitPrice } from "@/lib/unit-price"
 import type { Product } from "@/types"
 
 interface InventarioItem {
@@ -129,10 +130,12 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
     // Productos de la tienda primero (catálogo completo vía server search).
     const citySlug = slug ?? "cdmx"
     for (const p of productHits) {
+      const price = p.sale_price ?? p.price
+      const perUnit = unitPrice(price, p.unit)
       items.push({
         id: `product-${p.id}`,
         label: p.name,
-        subtitle: `$${(p.sale_price ?? p.price).toFixed(2)}${p.unit ? ` · ${p.unit}` : ""}${p.brand ? ` · ${p.brand}` : ""}`,
+        subtitle: `$${price.toFixed(2)}${perUnit ? ` · ${formatUnitPrice(perUnit)}` : p.unit ? ` · ${p.unit}` : ""}${p.brand ? ` · ${p.brand}` : ""}`,
         tool: "tienda",
         toolLabel: "Tienda",
         url: `/${citySlug}/producto/${p.slug}`,

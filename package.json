@@ -249,6 +249,10 @@
       "src/lib/sales-report.ts": [
         "exports",
         "types"
+      ],
+      "src/lib/unit-price.ts": [
+        "exports",
+        "types"
       ]
     }
   }

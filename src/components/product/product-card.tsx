@@ -7,6 +7,7 @@ import { useCart } from "@/contexts/cart-context"
 import { useFavorites } from "@/contexts/favorites-context"
 import { useToast } from "@/components/toast"
 import { cn, getProductTagline } from "@/lib/utils"
+import { formatUnitPrice, unitPrice } from "@/lib/unit-price"
 import { haptic } from "@/lib/haptics"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { useState, memo } from "react"
@@ -49,6 +50,7 @@ export const ProductCard = memo(function ProductCard({
 
   const price = product.sale_price ?? product.price
   const hasDiscount = product.sale_price && product.sale_price < product.price
+  const perUnit = unitPrice(price, product.unit)
   const discountPercent = product.sale_price && product.sale_price < product.price
     ? Math.round((1 - product.sale_price / product.price) * 100)
     : 0
@@ -226,12 +228,17 @@ export const ProductCard = memo(function ProductCard({
             </p>
           )}
 
-          {/* Volume pricing hint — shown for bulk-friendly products */}
-          {product.unit && (["por kilo", "por pieza", "charola"].some(u => product.unit?.includes(u))) && (
+          {/* Precio por unidad real cuando la presentación es comparable;
+              si no, se mantiene la pista genérica de mayoreo. */}
+          {perUnit ? (
+            <p className="text-[10px] sm:text-[11px] text-[#0E7A0E]/70 font-medium mt-0.5">
+              {formatUnitPrice(perUnit)}
+            </p>
+          ) : product.unit && (["por kilo", "por pieza", "charola"].some(u => product.unit?.includes(u))) ? (
             <p className="text-[10px] text-[#0E7A0E]/70 font-medium mt-0.5">
               💰 Precio de mayoreo — compra más y ahorra
             </p>
-          )}
+          ) : null}
         </div>
       </Link>
 
