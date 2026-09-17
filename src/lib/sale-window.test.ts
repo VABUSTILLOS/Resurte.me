@@ -7,6 +7,7 @@ import {
   withResolvedSale,
   normalizeSale,
   isMissingColumnError,
+  isMissingRelationError,
 } from "./sale-window"
 
 const NOW = new Date("2026-03-10T12:00:00.000Z")
@@ -139,5 +140,40 @@ describe("isMissingColumnError", () => {
     expect(isMissingColumnError({ code: "23505", message: "duplicate key value" })).toBe(false)
     expect(isMissingColumnError(null)).toBe(false)
     expect(isMissingColumnError(undefined)).toBe(false)
+  })
+})
+
+describe("isMissingRelationError", () => {
+  it("detecta una vista pendiente de aplicar (Postgres 42P01)", () => {
+    expect(
+      isMissingRelationError({
+        code: "42P01",
+        message: 'relation "public.products_with_sales" does not exist',
+      })
+    ).toBe(true)
+  })
+
+  it("detecta la relación ausente en la caché de PostgREST", () => {
+    expect(
+      isMissingRelationError({
+        code: "PGRST205",
+        message: "Could not find the table 'public.products_with_sales' in the schema cache",
+      })
+    ).toBe(true)
+  })
+
+  it("no se confunde con una columna ausente ni con otros errores", () => {
+    // `isMissingColumnError` acepta cualquier mensaje con "does not exist",
+    // pero una columna no es una relación: ahí la vista existe y el problema
+    // es otro, así que el listado no debe degradar por esta rama.
+    expect(
+      isMissingRelationError({
+        code: "42703",
+        message: "column products.low_stock_threshold does not exist",
+      })
+    ).toBe(false)
+    expect(isMissingRelationError({ code: "42501", message: "row-level security" })).toBe(false)
+    expect(isMissingRelationError(null)).toBe(false)
+    expect(isMissingRelationError(undefined)).toBe(false)
   })
 })

@@ -9,6 +9,8 @@ const MAX_IDS = 200
  * Metadatos por fila para el panel de productos:
  * - waPending: ids con cambios pendientes en whatsapp_sync_queue.
  * - lastEdit: última edición registrada en admin_audit_log por producto.
+ * - sales/salesAmount: unidades y monto vendidos (pedidos no cancelados),
+ *   que alimentan la columna "Ventas" del listado.
  */
 export async function GET(request: NextRequest) {
   const { response: adminDenied } = await requireAdmin()
@@ -40,10 +42,16 @@ export async function GET(request: NextRequest) {
         .in("entity_id", ids.map(String))
         .order("created_at", { ascending: false })
         .limit(500),
+      // Unidades y monto por producto con la MISMA semántica que el reporte de
+      // ventas (y que el orden "más vendidos"): se descartan los pedidos
+      // cancelados. Contarlos hacía que la columna Ventas no cuadrara con el
+      // orden por ventas (un pedido cancelado grande colocaba al producto más
+      // arriba de lo que mostraba su propia cifra).
       supabase
         .from("order_items")
-        .select("product_id,quantity,unit_price")
-        .in("product_id", ids),
+        .select("product_id,quantity,unit_price,orders!inner(status)")
+        .in("product_id", ids)
+        .neq("orders.status", "cancelled"),
     ])
 
     const waPending = [...new Set((queueRes.data ?? []).map((r) => r.product_id as number))]

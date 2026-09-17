@@ -71,17 +71,16 @@ function fakeBuilder() {
   const spies = {} as ChainSpies
   for (const name of [...CHAIN_METHODS, "select"] as const) spies[name] = vi.fn()
 
-  function makeChain(rows: unknown[]): Record<string, unknown> {
+  function makeChain(rows: unknown[], error: unknown = null): Record<string, unknown> {
     const chain: Record<string, unknown> = {
       select: (cols: string) => {
         spies.select(cols)
-        return makeChain(rowsFor(cols))
+        return makeChain(rowsFor(cols), error)
       },
       then: (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
-        Promise.resolve({ data: rows, error: null, count: rows.length }).then(
-          onFulfilled,
-          onRejected
-        ),
+        Promise.resolve(
+          error ? { data: null, error, count: null } : { data: rows, error: null, count: rows.length }
+        ).then(onFulfilled, onRejected),
     }
     for (const name of CHAIN_METHODS) {
       chain[name] = (...args: unknown[]) => {
@@ -93,13 +92,32 @@ function fakeBuilder() {
   }
 
   const entry = makeChain(ROWS)
-  return { entry, spies }
+  return { entry, spies, makeChain }
 }
 
 function mockClient() {
   const { entry, spies } = fakeBuilder()
-  vi.mocked(createServiceClient).mockResolvedValue({ from: vi.fn(() => entry) } as never)
-  return { spies, order: spies.order, range: spies.range }
+  const from = vi.fn(() => entry)
+  vi.mocked(createServiceClient).mockResolvedValue({ from } as never)
+  return { spies, order: spies.order, range: spies.range, from }
+}
+
+/**
+ * Cliente falso en el que la vista `products_with_sales` (00116) todavía no
+ * existe: PostgREST responde `42P01` al consultarla y el listado debe
+ * reintentar sin el orden por ventas en vez de devolver 500.
+ */
+function mockClientWithoutSalesView() {
+  const { spies, makeChain } = fakeBuilder()
+  const missingView = {
+    code: "42P01",
+    message: 'relation "public.products_with_sales" does not exist',
+  }
+  const from = vi.fn((table: string) =>
+    table === "products_with_sales" ? makeChain(ROWS, missingView) : makeChain(ROWS)
+  )
+  vi.mocked(createServiceClient).mockResolvedValue({ from } as never)
+  return { spies, order: spies.order, range: spies.range, from }
 }
 
 /**
@@ -283,5 +301,61 @@ describe("GET /api/admin/products/list", () => {
     expect(rpc).toHaveBeenCalledWith("admin_product_filter_counts", { p_include_deleted: false })
     // Fallback: el tally sale de las filas paginadas del catálogo.
     expect(body.categoryCounts).toEqual({ "1": 2, "3": 1 })
+  })
+})
+
+describe("GET /api/admin/products/list?sort=sales", () => {
+  it("ordena por ventas contra la vista y desempata por nombre", async () => {
+    const { from, order } = mockClient()
+
+    // Sin `dir`: "más vendidos" arranca en descendente.
+    const res = await GET(listRequest("sort=sales&page=1&pageSize=2"))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.schemaDrift).toBe(false)
+    // El agregado de `order_items` solo existe en la vista (00116).
+    expect(from).toHaveBeenCalledWith("products_with_sales")
+    expect(order).toHaveBeenNthCalledWith(1, "sales_units", {
+      ascending: false,
+      nullsFirst: false,
+    })
+    expect(order).toHaveBeenNthCalledWith(2, "name", { ascending: true })
+  })
+
+  it("invierte a menos vendidos con ?dir=asc", async () => {
+    const { order } = mockClient()
+
+    const res = await GET(listRequest("sort=sales&dir=asc&page=1&pageSize=2"))
+
+    expect(res.status).toBe(200)
+    expect(order).toHaveBeenNthCalledWith(1, "sales_units", {
+      ascending: true,
+      nullsFirst: true,
+    })
+  })
+
+  it("degrada al orden por nombre si la vista aún no está aplicada", async () => {
+    const { from, order } = mockClientWithoutSalesView()
+
+    const res = await GET(listRequest("sort=sales&page=1&pageSize=2"))
+    const body = await res.json()
+
+    // Ni 500 ni lista vacía: se reintenta sin el orden por ventas.
+    expect(res.status).toBe(200)
+    expect(body.error).toBeUndefined()
+    expect(body.rows).toHaveLength(2)
+    expect(body.schemaDrift).toBe(true)
+    expect(from).toHaveBeenCalledWith("products_with_sales")
+    expect(from).toHaveBeenCalledWith("products")
+    expect(order).toHaveBeenLastCalledWith("name", { ascending: true, nullsFirst: false })
+  })
+
+  it("no consulta la vista si el orden es otro", async () => {
+    const { from } = mockClient()
+
+    await GET(listRequest("sort=price&dir=desc&page=1&pageSize=2"))
+
+    expect(from).not.toHaveBeenCalledWith("products_with_sales")
   })
 })
