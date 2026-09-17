@@ -32,11 +32,11 @@ export const FOOTER_LINKS = {
 export function Footer() {
   return (
     <footer className="bg-[#242529] text-[#C7C8CD] mt-auto site-footer">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-[calc(2.25rem+env(safe-area-inset-bottom))]">
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-5 sm:gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-12 pb-[calc(2.25rem+env(safe-area-inset-bottom))]">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-4 sm:gap-x-6 sm:gap-y-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <Link href="/" className="inline-block mb-2 sm:mb-4" aria-label="Resurte.me — Ir al inicio">
+            <Link href="/" className="inline-block mb-1 sm:mb-4" aria-label="Resurte.me — Ir al inicio">
               <span className="text-xl font-bold text-[#3CC73C]">Resurte</span>
               <span className="text-xl font-bold text-[#E8E9EB]">.me</span>
             </Link>
@@ -44,7 +44,7 @@ export function Footer() {
               Central de Abastos Digital. Tu aliado en proveeduría para negocio.
             </p>
             {/* Contacto directo: los dos canales que más usa un restaurantero */}
-            <div className="mt-3 flex flex-col gap-2">
+            <div className="mt-2 sm:mt-3 flex flex-col gap-2">
               <a
                 href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("¡Hola! Necesito ayuda con Resurte.me")}`}
                 target="_blank"
@@ -67,7 +67,7 @@ export function Footer() {
           {/* Link sections */}
           {Object.entries(FOOTER_LINKS).map(([title, links]) => (
             <nav key={title} aria-label={title}>
-              <h2 className="font-semibold text-[#E8E9EB] mb-1.5 sm:mb-3 text-[13px] sm:text-sm uppercase tracking-wider">
+              <h2 className="font-semibold text-[#E8E9EB] mb-1 sm:mb-3 text-[13px] sm:text-sm uppercase tracking-wider">
                 {title}
               </h2>
               <ul className="space-y-1 sm:space-y-2">
@@ -86,10 +86,10 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-5 sm:mt-10 pt-4 sm:pt-6 border-t border-[#343538] text-center text-sm text-[#A0A4AD]">
+        <div className="mt-4 sm:mt-10 pt-3 sm:pt-6 border-t border-[#343538] text-center text-sm text-[#A0A4AD]">
           <p className="flex items-center justify-center gap-1">
             Hecho con <Heart className="w-3 h-3 text-red-500 fill-red-500" aria-hidden="true" /> en
-            México — Resurte.me — Central de Abastos Digital © {new Date().getFullYear()}
+            México — Resurte.me © {new Date().getFullYear()}
           </p>
         </div>
       </div>

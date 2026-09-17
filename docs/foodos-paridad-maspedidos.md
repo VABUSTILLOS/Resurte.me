@@ -218,4 +218,20 @@ validación de líneas: agregar un canal nuevo fue agregar un valor a
 | `00137_foodos_mesas_cuenta.sql` | `foodos_table_tickets.billing_requested_at` |
 | `00138_panel_members_cajero.sql` | Rol `cajero` en `panel_members_role_valid` |
 
-Las tres son **idempotentes y aditivas**.
+Las tres son **idempotentes y aditivas**, están aplicadas en producción y están
+registradas en `supabase_migrations.schema_migrations`, que debe ser
+`00001`…`00138` (138 filas) y coincidir **exactamente** con los prefijos de
+`supabase/migrations/`.
+
+**Trampa del MCP.** `supabase-apply_migration` registra la migración con una
+**versión timestamp generada** (`YYYYMMDDHHMMSS`, p. ej. `20260917143810`), no
+con el prefijo del archivo. El CLI v2 exige que el historial remoto sea un
+**prefijo de la lista local**, así que una fila timestamp suelta rompe
+`npx supabase db push` con *"The remote database's migration history is not in
+sync with the local migrations directory"*. Para migraciones futuras: aplicarla
+con `supabase-execute_sql` (que **no** registra nada) y añadir la fila del
+historial a mano, o corregir la `version` después. `db push` sólo compara
+`version`; `name`, `statements` y `created_by` son informativos.
+
+`db push` además exige sesión: `npx supabase login` (o `SUPABASE_ACCESS_TOKEN`)
+y, sin enlace previo, la contraseña de la base.
