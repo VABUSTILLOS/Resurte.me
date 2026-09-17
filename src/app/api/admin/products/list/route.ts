@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
-import { isMissingColumnError } from "@/lib/sale-window"
+import { isMissingColumnError, isMissingRelationError } from "@/lib/sale-window"
 import { resolveLowStockThreshold } from "@/lib/stock"
 import {
   clampProductSortToColumns,
@@ -488,7 +488,9 @@ export async function GET(request: NextRequest) {
     // Carga principal con degradación: si alguna columna de las migraciones
     // 00096-00099 aún no existe en la BD, reintenta sin ellas (panel usable
     // con funciones limitadas en vez de error 500).
-    async function loadData(withDeletedAt: boolean, cols: string) {
+    // `hasSales` indica que la vista `products_with_sales` (00116) está
+    // disponible; si no, "más vendidos" no se puede calcular en Postgres.
+    async function loadData(withDeletedAt: boolean, cols: string, hasSales: boolean) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const alive = (q: any) => (withDeletedAt ? q.is("deleted_at", null) : q)
 
@@ -496,9 +498,16 @@ export async function GET(request: NextRequest) {
       // (00115). Se calcula antes del listado para reutilizarla en ambos.
       const derived = await filterCounts(supabase, withDeletedAt)
 
+      // Ordenar por ventas exige el agregado de `order_items`, que solo existe
+      // en la vista; el resto de claves ordenan la tabla `products`. La vista
+      // expone las mismas columnas (`p.*`), así que el resto de la consulta
+      // (filtros, conteo, paginación) no cambia.
+      const useSalesView = hasSales && p.sort === "sales"
       let { query } = await applyFilters(
         supabase,
-        supabase.from("products").select(p.idsOnly ? "id" : cols, { count: "exact" }),
+        supabase
+          .from(useSalesView ? "products_with_sales" : "products")
+          .select(p.idsOnly ? "id" : cols, { count: "exact" }),
         p,
         withDeletedAt,
         derived
@@ -508,7 +517,9 @@ export async function GET(request: NextRequest) {
       // con desempate por nombre. `clampProductSortToColumns` evita que una
       // clave no soportada por el set de columnas degradado (migraciones sin
       // aplicar) haga fallar la consulta con `42703`.
-      const effectiveSort = clampProductSortToColumns({ key: p.sort, dir: p.dir }, cols)
+      const effectiveSort = clampProductSortToColumns({ key: p.sort, dir: p.dir }, cols, {
+        hasSales: useSalesView,
+      })
       for (const clause of productSortOrderClauses(effectiveSort)) {
         query = query.order(clause.column, {
           ascending: clause.ascending,

@@ -27,6 +27,27 @@ export function isMissingColumnError(err: unknown): boolean {
   )
 }
 
+/**
+ * Objeto (tabla o vista) inexistente por migración pendiente. Dos formas:
+ * - `42P01` / "relation ... does not exist": lo devuelve Postgres.
+ * - `PGRST205` / "Could not find the table ... in the schema cache": lo
+ *   devuelve PostgREST cuando el objeto no está en su caché de esquema, que
+ *   es el caso normal al consultar una vista antes de aplicarla.
+ *
+ * Se comprueba ANTES que `isMissingColumnError`: aquella acepta cualquier
+ * mensaje con "does not exist", así que también daría por buena una relación
+ * ausente y el llamador degradaría por la rama equivocada.
+ */
+export function isMissingRelationError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | null
+  if (!e) return false
+  if (e.code === "42P01" || e.code === "PGRST205") return true
+  return (
+    typeof e.message === "string" &&
+    /relation .* does not exist|could not find the (table|relation)/i.test(e.message)
+  )
+}
+
 export interface SaleWindow {
   sale_price?: number | null
   sale_starts_at?: string | null

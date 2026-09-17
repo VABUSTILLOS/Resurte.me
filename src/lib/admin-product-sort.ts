@@ -5,15 +5,17 @@
  * (`?sort=`/`?dir=`), el estado de React, el `aria-sort` de la cabecera y el
  * `ORDER BY` de PostgREST nunca se desincronicen.
  *
- * Alcance deliberado: solo columnas reales de `products`. Ordenar por ventas o
- * margen exigiría un agregado server-side que hoy no existe (los importes viven
- * en `row-meta`), así que esas columnas siguen siendo informativas.
+ * `sales` es la excepción: no es una columna de `products` sino el agregado de
+ * `order_items` que expone la vista `products_with_sales` (00116). La API solo
+ * consulta esa vista cuando la clave está activa y, si la migración aún no
+ * está aplicada, degrada al orden por defecto en vez de fallar.
  */
 
 export const PRODUCT_SORT_KEYS = [
   "name",
   "price",
   "stock",
+  "sales",
   "quantity",
   "cost",
   "created_at",
@@ -34,16 +36,34 @@ export const PRODUCT_SORT_LABEL: Record<ProductSortKey, string> = {
   name: "Nombre",
   price: "Precio",
   stock: "Stock (estado)",
+  sales: "Más vendidos",
   quantity: "Unidades",
   cost: "Costo",
   created_at: "Fecha de alta",
 }
 
 /** Claves que tienen botón en la cabecera de la tabla (`aria-sort`). */
-export const PRODUCT_TABLE_SORT_KEYS: readonly ProductSortKey[] = ["name", "price", "stock"]
+export const PRODUCT_TABLE_SORT_KEYS: readonly ProductSortKey[] = [
+  "name",
+  "price",
+  "stock",
+  "sales",
+]
 
 export function isProductSortKey(value: string | null | undefined): value is ProductSortKey {
   return typeof value === "string" && (PRODUCT_SORT_KEYS as readonly string[]).includes(value)
+}
+
+/**
+ * Dirección con la que ARRANCA cada clave al seleccionarla. Por defecto
+ * ascendente; "más vendidos" se mira de mayor a menor, así que empezar en
+ * `asc` mostraría justo lo contrario de lo que pide el nombre.
+ */
+const SORT_DEFAULT_DIR: Partial<Record<ProductSortKey, ProductSortDir>> = { sales: "desc" }
+
+/** Dirección por defecto de una clave (la que se usa al estrenarla). */
+export function defaultProductSortDir(key: ProductSortKey): ProductSortDir {
+  return SORT_DEFAULT_DIR[key] ?? "asc"
 }
 
 /**
@@ -54,15 +74,21 @@ export function parseProductSort(
   rawKey: string | null | undefined,
   rawDir: string | null | undefined
 ): ProductSort {
-  return {
-    key: isProductSortKey(rawKey) ? rawKey : DEFAULT_PRODUCT_SORT.key,
-    dir: rawDir === "desc" ? "desc" : "asc",
-  }
+  const key = isProductSortKey(rawKey) ? rawKey : DEFAULT_PRODUCT_SORT.key
+  // Sin `dir` explícito manda la dirección propia de la clave, para que un
+  // deep-link `?sort=sales` (que omite el default) siga mostrando los más
+  // vendidos primero.
+  const dir: ProductSortDir =
+    rawDir === "desc" || rawDir === "asc" ? rawDir : defaultProductSortDir(key)
+  return { key, dir }
 }
 
-/** Clic en una cabecera: misma columna alterna dirección, otra empieza en asc. */
+/**
+ * Clic en una cabecera: misma columna alterna dirección, otra empieza en la
+ * dirección propia de esa columna (ascendente salvo "más vendidos").
+ */
 export function nextProductSort(current: ProductSort, key: ProductSortKey): ProductSort {
-  if (current.key !== key) return { key, dir: "asc" }
+  if (current.key !== key) return { key, dir: defaultProductSortDir(key) }
   return { key, dir: current.dir === "asc" ? "desc" : "asc" }
 }
 
@@ -92,6 +118,16 @@ export interface ProductSortOrderClause {
  */
 export function productSortOrderClauses(sort: ProductSort): ProductSortOrderClause[] {
   const ascending = sort.dir === "asc"
+  if (sort.key === "sales") {
+    // `sales_units` vive en la vista `products_with_sales` y es NULL (no 0)
+    // cuando el producto no vendió: `nullsFirst: !ascending` lo trata como 0,
+    // así que "más vendidos" (desc) deja los no vendidos al final. `name`
+    // desempata de forma estable entre productos con las mismas ventas.
+    return [
+      { column: "sales_units", ascending, nullsFirst: !ascending },
+      { column: "name", ascending: true },
+    ]
+  }
   if (sort.key === "stock") {
     return [
       { column: "stock_status", ascending },
@@ -127,6 +163,10 @@ const SORT_REQUIRED_COLUMNS: Record<ProductSortKey, string[]> = {
   name: ["name"],
   price: ["price"],
   stock: ["stock_status", "name"],
+  // `sales` no se valida aquí: `sales_units` no es columna de `products` sino
+  // de la vista `products_with_sales`, así que su disponibilidad la decide el
+  // llamador con `hasSales` (ver `clampProductSortToColumns`).
+  sales: ["sales_units"],
   quantity: ["stock_quantity"],
   cost: ["cost"],
   created_at: ["created_at"],
@@ -136,8 +176,16 @@ const SORT_REQUIRED_COLUMNS: Record<ProductSortKey, string[]> = {
  * Degradación de columnas: si el set de columnas disponible (las migraciones
  * pueden faltar) no soporta la clave pedida, se vuelve al orden por defecto en
  * vez de dejar que PostgREST falle con `42703`.
+ *
+ * `hasSales` indica si la vista `products_with_sales` está disponible: sin ella
+ * "más vendidos" no se puede calcular en Postgres y también degrada.
  */
-export function clampProductSortToColumns(sort: ProductSort, columns: string): ProductSort {
+export function clampProductSortToColumns(
+  sort: ProductSort,
+  columns: string,
+  options: { hasSales?: boolean } = {}
+): ProductSort {
+  if (sort.key === "sales") return options.hasSales ? sort : DEFAULT_PRODUCT_SORT
   const available = new Set(
     columns
       .split(",")

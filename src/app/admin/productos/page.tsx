@@ -2700,10 +2700,13 @@ function AdminProductsContent() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-gray-400">
-        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-        Cargando productos...
-      </div>
+      <>
+        <div className="flex items-center justify-center py-20 text-gray-400">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+          Cargando productos...
+        </div>
+        {confirmDialog}
+      </>
     )
   }
 
