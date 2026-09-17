@@ -254,7 +254,7 @@ export async function getAdminOrders(
         payment_status: o.payment_status,
         source: o.source,
         created_at: o.created_at,
-        driver_id: (o as { driver_id?: number | null }).driver_id ?? null,
+        driver_id: o.driver_id ?? null,
         address: addr
           ? {
               street: addr.street,

@@ -13,6 +13,15 @@ const ROWS = [
   { id: 2, name: "Arroz", brand: null, tags: null },
 ]
 
+/** Filas que devuelve la consulta de conteo por categoría (select solo
+ *  `category_id`): una sin categoría no debe aparecer en el tally. */
+const CATEGORY_ROWS = [
+  { category_id: 1 },
+  { category_id: 1 },
+  { category_id: 3 },
+  { category_id: null },
+]
+
 /**
  * Builder falso que imita al de PostgREST: encadena devolviendo el mismo
  * objeto y, como es "thenable", al `await`-lo resuelve al resultado ya
@@ -21,8 +30,12 @@ const ROWS = [
 function fakeBuilder() {
   const order = vi.fn(() => builder)
   const range = vi.fn(() => builder)
+  let currentRows: unknown[] = ROWS
   const builder: Record<string, unknown> = {
-    select: vi.fn(() => builder),
+    select: vi.fn((cols: string) => {
+      currentRows = cols === "category_id" ? CATEGORY_ROWS : ROWS
+      return builder
+    }),
     is: vi.fn(() => builder),
     not: vi.fn(() => builder),
     eq: vi.fn(() => builder),
@@ -35,7 +48,10 @@ function fakeBuilder() {
     order,
     range,
     then: (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
-      Promise.resolve({ data: ROWS, error: null, count: ROWS.length }).then(onFulfilled, onRejected),
+      Promise.resolve({ data: currentRows, error: null, count: currentRows.length }).then(
+        onFulfilled,
+        onRejected
+      ),
   }
   return { builder, order, range }
 }
@@ -115,5 +131,17 @@ describe("GET /api/admin/products/list", () => {
     expect(res.status).toBe(200)
     expect(builder.eq).toHaveBeenCalledWith("brand", "Marca")
     expect(builder.contains).toHaveBeenCalledWith("tags", JSON.stringify(["oferta"]))
+  })
+
+  it("devuelve el conteo de productos por categoría para los chips", async () => {
+    mockClient()
+
+    const res = await GET(listRequest())
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    // Los productos sin categoría no entran en el tally (los cubre el chip
+    // "Sin categoría" con `counts.noCategory`).
+    expect(body.categoryCounts).toEqual({ "1": 2, "3": 1 })
   })
 })

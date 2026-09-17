@@ -163,6 +163,21 @@
   debajo (`hidden md:table-cell`, pares `th`/`td`). Todo control móvil nuevo
   lleva `touch-target` (44px).
 
+- Productos — filtro por categoría: es una fila de **chips con el conteo de
+  productos de cada categoría** (`role="group"` + `aria-label="Filtrar por
+  categoría"`, `aria-pressed`, scroll horizontal en móvil y wrap en `sm+`);
+  el `<select>` "Todas las categorías" ya no existe — no reintroducirlo. El
+  conteo lo sirve `categoryCounts` del listado (`categoryTally` en
+  `route.ts`), que **pagina** hasta `CATEGORY_TALLY_PAGES` (10 × 1000) porque
+  PostgREST corta en 1000 filas y una sola página subcontaría los chips;
+  cuenta el catálogo acotado (respeta la papelera) y devuelve `{}` si la
+  consulta falla (chips en 0, sin romper el panel). "Sin categoría" vive en
+  los chips de estado (no duplicarlo en la fila de categorías) y usa
+  `counts.noCategory`; activarlo limpia el chip de categoría y elegir una
+  categoría limpia "Sin categoría", porque un producto sin categoría nunca
+  cae en una categoría concreta y la combinación dejaría el listado vacío.
+  El chip "Todas" usa `counts.catalogTotal`.
+
 - Pedidos (`/admin/pedidos`) — acciones masivas: la selección vive en un
   `ReadonlySet<number>` y se **poda con `pruneSelection` dentro de un
   `useMemo`** (devuelve la MISMA referencia cuando no hay nada que podar, para

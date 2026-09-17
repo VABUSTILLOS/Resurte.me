@@ -588,6 +588,8 @@ function AdminProductsContent() {
     underThreshold: 0,
   })
   const [refreshing, setRefreshing] = useState(false)
+  // Conteo de productos por categoría (chips de categoría del listado).
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({})
   // true cuando la BD aún no tiene las migraciones 00096-00099: el panel
   // degrada (sin papelera, programación ni nota interna) en vez de fallar.
   const [schemaDrift, setSchemaDrift] = useState(false)
@@ -666,6 +668,7 @@ function AdminProductsContent() {
         setTotal(data.total ?? 0)
         if (data.counts) setCounts(data.counts)
         if (data.brands) setBrands(data.brands)
+        setCategoryCounts(data.categoryCounts ?? {})
         if (data.tags) setTagList(data.tags)
         setSchemaDrift(data.schemaDrift === true)
         // Metadatos por fila (sync WA + última edición), best-effort.
@@ -2867,6 +2870,19 @@ function AdminProductsContent() {
     brokenItems.length
   const stockAlertCount = (counts.lowStock ?? 0) + (counts.outStock ?? 0)
 
+  // Estilos compartidos de los chips de categoría (activo/inactivo) y de su
+  // contador, para no repetir el mismo ternario en cada chip de la fila.
+  const categoryChipClass = (active: boolean) =>
+    `inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+      active
+        ? "bg-brand-600 text-white"
+        : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+    }`
+  const chipCountClass = (active: boolean) =>
+    `text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+      active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+    }`
+
   const primaryAction = headerActions.find((a) => a.variant === "primary")
   const secondaryActions = headerActions.filter((a) => a.variant !== "primary")
 
@@ -3075,19 +3091,6 @@ function AdminProductsContent() {
           className={`${filtersOpen ? "flex" : "hidden sm:flex"} flex-col gap-3 sm:flex-row`}
         >
           <select
-            value={categoryFilter}
-            onChange={(e) => updateFilters(() => setCategoryFilter(e.target.value))}
-            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
-            aria-label="Filtrar por categoría"
-          >
-            <option value="all">Todas las categorías</option>
-            {categories.map((c) => (
-              <option key={c.id} value={String(c.id)}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <select
             value={stockFilter}
             onChange={(e) => updateFilters(() => setStockFilter(e.target.value as StockStatus | "all"))}
             className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
@@ -3230,7 +3233,16 @@ function AdminProductsContent() {
           </button>
           <button
             type="button"
-            onClick={() => updateFilters(() => setOnlyNoCategory((v) => !v))}
+            onClick={() =>
+              updateFilters(() => {
+                const next = !onlyNoCategory
+                setOnlyNoCategory(next)
+                // Un producto sin categoría nunca cae en una categoría
+                // concreta: activar este chip limpia el chip de categoría
+                // para que la combinación no deje el listado vacío.
+                if (next) setCategoryFilter("all")
+              })
+            }
             aria-pressed={onlyNoCategory}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               onlyNoCategory
@@ -3293,6 +3305,58 @@ function AdminProductsContent() {
             </div>
           </div>
         </MobileCollapsible>
+      )}
+
+      {/* Chips de categoría con el conteo de productos: escoger categoría sin
+          abrir los selects (y en móvil, donde los filtros van plegados). La
+          fila hace scroll horizontal en móvil y envuelve en escritorio. */}
+      {categories.length > 0 && (
+        <div
+          role="group"
+          aria-label="Filtrar por categoría"
+          className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1 sm:mb-4 sm:flex-wrap sm:pb-0"
+        >
+          <button
+            type="button"
+            onClick={() =>
+              updateFilters(() => {
+                setCategoryFilter("all")
+                setOnlyNoCategory(false)
+              })
+            }
+            aria-pressed={categoryFilter === "all" && !onlyNoCategory}
+            className={categoryChipClass(categoryFilter === "all" && !onlyNoCategory)}
+          >
+            Todas
+            <span className={chipCountClass(categoryFilter === "all" && !onlyNoCategory)}>
+              {counts.catalogTotal}
+            </span>
+          </button>
+          {categories.map((c) => {
+            const active = categoryFilter === String(c.id)
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() =>
+                  updateFilters(() => {
+                    setCategoryFilter(String(c.id))
+                    // Un producto sin categoría nunca cae en una categoría
+                    // concreta: elegir una limpia ese filtro para que la
+                    // combinación no deje el listado vacío.
+                    setOnlyNoCategory(false)
+                  })
+                }
+                aria-pressed={active}
+                title={`Ver solo los productos de ${c.name}`}
+                className={categoryChipClass(active)}
+              >
+                {c.name}
+                <span className={chipCountClass(active)}>{categoryCounts[String(c.id)] ?? 0}</span>
+              </button>
+            )
+          })}
+        </div>
       )}
 
       {/* Chips de estado de publicación y catálogo incompleto (con conteos) */}

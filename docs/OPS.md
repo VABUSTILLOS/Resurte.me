@@ -368,6 +368,54 @@ dashboard. Eso fue la causa del drift histórico (ver `supabase/ESQUEMA.md`).
    la tabla legado `product_stores` ya no se escribe ni se lee (la ruta admin
    `seed-products` aún hace upsert histórico — pendiente de limpieza).
 
+### ⚠️ Migración `00114` pendiente de aplicar (`orders.coupon_code`)
+
+`supabase/migrations/00114_orders_coupon_code.sql` está escrita, revisada y
+commiteada, pero **no aplicada** al proyecto vinculado (`isogthougrpctnfzcdes`).
+Es la única pieza que falta del arreglo del panel de pedidos.
+
+Qué pasó: la columna `orders.coupon_code` se escribía desde el checkout pero
+**nunca se versionó en una migración** (00049 la añadió a `leads` y 00080 a
+`foodos_restaurants`, pero no a `orders`). En el esquema desplegado la consulta
+del panel respondía `42703` y la UI mostraba *"Error al cargar los pedidos"*.
+El código de la app ya reintenta sin la columna, así que **hoy el panel carga**;
+lo que sigue roto hasta aplicar la migración es la persistencia del cupón:
+
+| Superficie | Sin `coupon_code` en el esquema |
+|---|---|
+| `POST /api/orders` (checkout con cupón) | El pedido se crea pero **sin** `coupon_code` y el descuento no queda auditado |
+| `PATCH /api/orders/[id]/status` | La liberación del cupón al cancelar se omite |
+| Webhook Stripe (`payment_failed` / `canceled`) | El cupón reservado **no se libera** ⇒ el cliente lo pierde (peor caso: cupones personales de recompra con `max_uses = 1`) |
+| Panel admin / ticket imprimible | La columna "Cupón" sale vacía |
+
+Consecuencia operativa: mientras no se aplique, un pago rechazado por el banco
+**consume** el cupón del cliente sin devolverlo. No hay pérdida de pedidos ni
+de dinero, pero sí de cupones.
+
+Aplicar (idempotente, aditiva, sin downtime ni backfill):
+
+```bash
+npx supabase login          # requiere token de cuenta con acceso al proyecto
+npx supabase db push        # aplica 00114
+```
+
+Verificar (REST, con la clave publicable):
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
+  "https://isogthougrpctnfzcdes.supabase.co/rest/v1/orders?select=id,coupon_code&limit=1"
+# 200 = la columna existe · 400 42703 = sigue sin aplicarse
+```
+
+**Por qué quedó pendiente:** el entorno donde se hizo el arreglo enmascara
+`POSTGRES_PASSWORD` y `POSTGRES_URL*` (se leen como la cadena literal
+`[SENSITIVE]`), y el token guardado en `~/.supabase/access-token` responde
+`401` en la Management API. El host directo
+(`db.<ref>.supabase.co:5432`) es solo IPv6 y no era alcanzable, y el pooler
+rechazaba la conexión por falta de contraseña. Es un bloqueo de credenciales,
+no de código: **aplicar la migración desde una máquina con `npx supabase login`
+válido es todo lo que falta.**
+
 ### Si el SQL Editor responde `Failed to fetch (api.supabase.com)`
 
 No es un error de SQL. El editor manda el script entero en **una sola petición
@@ -609,6 +657,9 @@ En el SQL Editor de Supabase, en este orden:
 2. `00083_foodos_order_notifications.sql` — sin ella los avisos se envían pero sin dedupe.
 3. `00084_foodos_orders_updated_at.sql` — sin ella nada se rompe, pero el timestamp queda congelado.
 4. `00085_stripe_connect.sql` — sin ella el panel de cobros falla al leer `stripe_*`.
+5. `00114_orders_coupon_code.sql` — sin ella el panel de pedidos carga (el código
+   reintenta sin la columna) pero **un pago rechazado consume el cupón del
+   cliente sin devolverlo**. Detalle en §9.
 
 ### Migraciones recientes ya aplicadas a producción
 

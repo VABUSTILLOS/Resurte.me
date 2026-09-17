@@ -279,6 +279,40 @@ async function applyFilters(
   return { query }
 }
 
+/** Tope de páginas del conteo por categoría (10 × 1000 filas): evita que un
+ *  catálogo anómalo convierta el listado en un bucle sin fin. */
+const CATEGORY_TALLY_PAGES = 10
+
+/**
+ * Conteo de productos por categoría para los chips del listado. PostgREST
+ * devuelve como máximo 1000 filas por consulta, así que se pagina hasta agotar
+ * el catálogo en vez de contar con una sola página (subcontaría los chips).
+ * Devuelve `{}` si la consulta falla: los chips quedan en 0 sin romper el panel.
+ */
+async function categoryTally(
+  supabase: ServiceClient,
+  withDeletedAt: boolean
+): Promise<Record<string, number>> {
+  const tally: Record<string, number> = {}
+  for (let page = 0; page < CATEGORY_TALLY_PAGES; page++) {
+    const from = page * MAX_PAGE_SIZE
+    const query = supabase
+      .from("products")
+      .select("category_id")
+      .range(from, from + MAX_PAGE_SIZE - 1)
+    const { data, error } = withDeletedAt ? await query.is("deleted_at", null) : await query
+    if (error) break
+    const rows = (data ?? []) as { category_id: number | null }[]
+    for (const row of rows) {
+      if (row.category_id == null) continue
+      const key = String(row.category_id)
+      tally[key] = (tally[key] ?? 0) + 1
+    }
+    if (rows.length < MAX_PAGE_SIZE) break
+  }
+  return tally
+}
+
 /**
  * GET /api/admin/products/list
  * Lista server-side del catálogo para el panel: búsqueda, filtros, orden y
@@ -468,11 +502,16 @@ export async function GET(request: NextRequest) {
         .slice(0, 50)
         .map(([tag]) => tag)
 
+      // Conteo por categoría para los chips de categoría (mismo catálogo
+      // acotado que marcas y etiquetas).
+      const categoryCounts = await categoryTally(supabase, withDeletedAt)
+
       return {
         rows: result.data ?? [],
         total: result.count ?? 0,
         brands,
         tags,
+        categoryCounts,
         counts: {
           catalogTotal: catalogTotal.count ?? 0,
           published: published.count ?? 0,
