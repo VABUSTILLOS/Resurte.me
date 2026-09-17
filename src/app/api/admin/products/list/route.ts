@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { isMissingColumnError, isMissingRelationError } from "@/lib/sale-window"
 import { resolveLowStockThreshold } from "@/lib/stock"
+import { parseProductCountsPayload, rankProductTags, sortProductBrands, type ProductChipCounts } from "@/lib/admin-product-counts"
 import {
   clampProductSortToColumns,
   parseProductSort,
@@ -153,9 +154,19 @@ function toCategoryCounts(value: unknown): Record<string, number> {
   return out
 }
 
+/** Resultado del RPC agregado `admin_product_filter_counts`.
+ *
+ *  `counts`, `brands` y `tags` llegan solo con la v2 (00118); con la v1 (00115)
+ *  quedan en `null` y el llamador resuelve esos tres por el camino JS. */
+interface RpcDerived {
+  filter: FilterCounts
+  counts: ProductChipCounts | null
+  brands: string[] | null
+  tags: string[] | null
+}
+
 /**
- * Conteos derivados vía `admin_product_filter_counts` (00115): una sola
- * consulta agregada, sin topes de paginación.
+ * Conteos derivados vía `admin_product_filter_counts` (00115/00118).
  *
  * Devuelve `null` si la migración aún no está aplicada (o el cliente no expone
  * `rpc`), y el llamador cae a los helpers en JS. Antes de 00115 estos conteos
@@ -165,7 +176,7 @@ function toCategoryCounts(value: unknown): Record<string, number> {
 async function filterCountsViaRpc(
   supabase: ServiceClient,
   withDeletedAt: boolean
-): Promise<FilterCounts | null> {
+): Promise<RpcDerived | null> {
   if (typeof supabase.rpc !== "function") return null
   try {
     // `withDeletedAt` significa "la BD tiene la columna": el panel cuenta
@@ -174,26 +185,44 @@ async function filterCountsViaRpc(
       p_include_deleted: !withDeletedAt,
     })
     if (error || !data || typeof data !== "object") return null
+    const v2 = parseProductCountsPayload(data)
+    if (v2) {
+      return {
+        filter: {
+          noCitiesIds: v2.noCitiesIds,
+          dupNameIds: v2.dupNameIds,
+          underThresholdIds: v2.underThresholdIds,
+          categoryCounts: v2.categoryCounts,
+        },
+        counts: v2.counts,
+        brands: v2.brands,
+        tags: v2.tags,
+      }
+    }
+    // v1 (00115) sin la v2 aplicada: solo los filtros derivados.
     const payload = data as Record<string, unknown>
     return {
-      noCitiesIds: toIdList(payload.noCitiesIds),
-      dupNameIds: toIdList(payload.dupNameIds),
-      underThresholdIds: toIdList(payload.underThresholdIds),
-      categoryCounts: toCategoryCounts(payload.categoryCounts),
+      filter: {
+        noCitiesIds: toIdList(payload.noCitiesIds),
+        dupNameIds: toIdList(payload.dupNameIds),
+        underThresholdIds: toIdList(payload.underThresholdIds),
+        categoryCounts: toCategoryCounts(payload.categoryCounts),
+      },
+      counts: null,
+      brands: null,
+      tags: null,
     }
   } catch {
     return null
   }
 }
 
-/** Conteos derivados con degradación: RPC si está disponible, si no los
- *  helpers en JS (mismo resultado, más lento y con tope de 1000 filas). */
-async function filterCounts(
+/** Conteos derivados en JS: último recurso cuando el RPC no está disponible
+ *  (mismo resultado, más lento y con tope de 1000 filas). */
+async function filterCountsInJs(
   supabase: ServiceClient,
   withDeletedAt: boolean
 ): Promise<FilterCounts> {
-  const viaRpc = await filterCountsViaRpc(supabase, withDeletedAt)
-  if (viaRpc) return viaRpc
   const [noCitiesIds, dupNameIds, underThresholdIds, categoryCounts] = await Promise.all([
     noCitiesProductIds(supabase, withDeletedAt),
     duplicateNameProductIds(supabase, withDeletedAt),
@@ -444,6 +473,107 @@ async function categoryTally(
 }
 
 /**
+ * Contadores de los chips en JS (11 consultas `count: "exact"`) más las marcas
+ * y las etiquetas del filtro.
+ *
+ * Solo se usa cuando el RPC agregado (00118) no está aplicado: con la migración
+ * disponible el listado resuelve todo en una sola consulta. Las marcas y las
+ * etiquetas se deduplican con las mismas funciones puras que el RPC, así que el
+ * resultado es idéntico salvo por el tope de 1000 filas de PostgREST.
+ */
+async function chipCountsInJs(
+  supabase: ServiceClient,
+  withDeletedAt: boolean,
+  derived: FilterCounts
+): Promise<ProductChipCounts> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- builder de PostgREST no exporta un tipo reusable
+  const alive = (q: any) => (withDeletedAt ? q.is("deleted_at", null) : q)
+  const head = () => supabase.from("products").select("id", { count: "exact", head: true })
+  const [
+    catalogTotal,
+    published,
+    noImage,
+    lowStock,
+    outStock,
+    noPrice,
+    noCategory,
+    waMismatch,
+    onSale,
+    staleSale,
+    trashCount,
+  ] = await Promise.all([
+    alive(head()),
+    alive(head().eq("is_visible", true)),
+    alive(head().is("image_url", null)),
+    alive(head().eq("stock_status", "low_stock")),
+    alive(head().eq("stock_status", "out_of_stock")),
+    alive(head().is("price", null)),
+    alive(head().is("category_id", null)),
+    alive(head().eq("show_in_whatsapp", true).eq("is_visible", false)),
+    alive(head().not("sale_price", "is", null)),
+    alive(
+      head()
+        .not("sale_price", "is", null)
+        .not("sale_ends_at", "is", null)
+        .lt("sale_ends_at", new Date().toISOString())
+    ),
+    withDeletedAt
+      ? supabase
+          .from("products")
+          .select("id", { count: "exact", head: true })
+          .not("deleted_at", "is", null)
+      : Promise.resolve({ count: 0 }),
+  ])
+  const total = catalogTotal.count ?? 0
+  const visible = published.count ?? 0
+  return {
+    catalogTotal: total,
+    published: visible,
+    unpublished: Math.max(0, total - visible),
+    noImage: noImage.count ?? 0,
+    lowStock: lowStock.count ?? 0,
+    outStock: outStock.count ?? 0,
+    noCities: derived.noCitiesIds.length,
+    noPrice: noPrice.count ?? 0,
+    noCategory: noCategory.count ?? 0,
+    waMismatch: waMismatch.count ?? 0,
+    onSale: onSale.count ?? 0,
+    staleSale: staleSale.count ?? 0,
+    dupNames: derived.dupNameIds.length,
+    underThreshold: derived.underThresholdIds.length,
+    trash: trashCount.count ?? 0,
+  }
+}
+
+/** Marcas distintas para el filtro (fallback sin RPC: tope de 1000 filas). */
+async function brandsInJs(supabase: ServiceClient, withDeletedAt: boolean): Promise<string[]> {
+  const query = supabase
+    .from("products")
+    .select("brand")
+    .not("brand", "is", null)
+    .limit(MAX_PAGE_SIZE)
+  const { data } = await (withDeletedAt ? query.is("deleted_at", null) : query)
+  return sortProductBrands(
+    ((data ?? []) as { brand: string | null }[]).map((row) => row.brand)
+  )
+}
+
+/** Etiquetas en uso ordenadas por frecuencia (fallback sin RPC). */
+async function tagsInJs(supabase: ServiceClient, withDeletedAt: boolean): Promise<string[]> {
+  const query = supabase.from("products").select("tags").limit(MAX_PAGE_SIZE)
+  const { data } = await (withDeletedAt ? query.is("deleted_at", null) : query)
+  const tally: Record<string, number> = {}
+  for (const row of (data ?? []) as { tags: string[] | null }[]) {
+    for (const tag of row.tags ?? []) {
+      if (typeof tag !== "string" || !tag.trim()) continue
+      const key = tag.trim().toLowerCase()
+      tally[key] = (tally[key] ?? 0) + 1
+    }
+  }
+  return rankProductTags(tally)
+}
+
+/**
  * GET /api/admin/products/list
  * Lista server-side del catálogo para el panel: búsqueda, filtros, orden y
  * paginación en Postgres, más conteos agregados para los chips.
@@ -491,12 +621,11 @@ export async function GET(request: NextRequest) {
     // `hasSales` indica que la vista `products_with_sales` (00116) está
     // disponible; si no, "más vendidos" no se puede calcular en Postgres.
     async function loadData(withDeletedAt: boolean, cols: string, hasSales: boolean) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const alive = (q: any) => (withDeletedAt ? q.is("deleted_at", null) : q)
-
-      // Una sola consulta agregada alimenta los filtros derivados y los chips
-      // (00115). Se calcula antes del listado para reutilizarla en ambos.
-      const derived = await filterCounts(supabase, withDeletedAt)
+      // Una sola consulta agregada alimenta los filtros derivados, los chips,
+      // las marcas y las etiquetas (00118). Antes eran 11 `count: "exact"` más
+      // dos descargas de 1000 filas en cada carga del panel.
+      const viaRpc = await filterCountsViaRpc(supabase, withDeletedAt)
+      const derived = viaRpc?.filter ?? (await filterCountsInJs(supabase, withDeletedAt))
 
       // Ordenar por ventas exige el agregado de `order_items`, que solo existe
       // en la vista; el resto de claves ordenan la tabla `products`. La vista
@@ -540,111 +669,15 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Conteos globales para los chips.
-      const [
-        catalogTotal,
-        published,
-        noImage,
-        lowStock,
-        outStock,
-        noPrice,
-        noCategory,
-        waMismatch,
-        onSale,
-        staleSale,
-        trashCount,
-      ] = await Promise.all([
-        alive(supabase.from("products").select("id", { count: "exact", head: true })),
-        alive(
-          supabase
-            .from("products")
-            .select("id", { count: "exact", head: true })
-            .eq("is_visible", true)
-        ),
-        alive(
-          supabase.from("products").select("id", { count: "exact", head: true }).is("image_url", null)
-        ),
-        alive(
-          supabase
-            .from("products")
-            .select("id", { count: "exact", head: true })
-            .eq("stock_status", "low_stock")
-        ),
-        alive(
-          supabase
-            .from("products")
-            .select("id", { count: "exact", head: true })
-            .eq("stock_status", "out_of_stock")
-        ),
-        alive(
-          supabase.from("products").select("id", { count: "exact", head: true }).is("price", null)
-        ),
-        alive(
-          supabase
-            .from("products")
-            .select("id", { count: "exact", head: true })
-            .is("category_id", null)
-        ),
-        alive(
-          supabase
-            .from("products")
-            .select("id", { count: "exact", head: true })
-            .eq("show_in_whatsapp", true)
-            .eq("is_visible", false)
-        ),
-        alive(
-          supabase
-            .from("products")
-            .select("id", { count: "exact", head: true })
-            .not("sale_price", "is", null)
-        ),
-        alive(
-          supabase
-            .from("products")
-            .select("id", { count: "exact", head: true })
-            .not("sale_price", "is", null)
-            .not("sale_ends_at", "is", null)
-            .lt("sale_ends_at", new Date().toISOString())
-        ),
-        withDeletedAt
-          ? supabase
-              .from("products")
-              .select("id", { count: "exact", head: true })
-              .not("deleted_at", "is", null)
-          : Promise.resolve({ count: 0 }),
+      // Conteos de chips, marcas y etiquetas: del RPC si está aplicado (00118),
+      // si no con el camino JS equivalente.
+      const [counts, brands, tags] = await Promise.all([
+        viaRpc?.counts ?? chipCountsInJs(supabase, withDeletedAt, derived),
+        viaRpc?.brands ?? brandsInJs(supabase, withDeletedAt),
+        viaRpc?.tags ?? tagsInJs(supabase, withDeletedAt),
       ])
 
-      // Marcas distintas para el filtro (dedup en JS; catálogo acotado).
-      const { data: brandRows } = await alive(
-        supabase.from("products").select("brand").not("brand", "is", null).limit(MAX_PAGE_SIZE)
-      )
-      const brands = [
-        ...new Set(
-          ((brandRows ?? []) as { brand: string | null }[])
-            .map((r: { brand: string | null }) => r.brand?.trim() ?? "")
-            .filter((b: string) => b.length > 0)
-        ),
-      ].sort((a: string, b: string) => a.localeCompare(b, "es"))
-
-      // Etiquetas en uso, ordenadas por frecuencia (filtro de colecciones).
-      const { data: tagRows } = await alive(
-        supabase.from("products").select("tags").limit(MAX_PAGE_SIZE)
-      )
-      const tagCount = new Map<string, number>()
-      for (const row of (tagRows ?? []) as { tags: string[] | null }[]) {
-        for (const t of row.tags ?? []) {
-          if (typeof t !== "string" || !t.trim()) continue
-          const key = t.trim().toLowerCase()
-          tagCount.set(key, (tagCount.get(key) ?? 0) + 1)
-        }
-      }
-      const tags = [...tagCount.entries()]
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"))
-        .slice(0, 50)
-        .map(([tag]) => tag)
-
-      // Conteo por categoría para los chips de categoría (mismo catálogo
-      // acotado que marcas y etiquetas).
+      // Conteo por categoría para los chips de categoría.
       const categoryCounts = derived.categoryCounts
 
       // Disponibilidad por ciudad de la página visible (reemplaza la descarga
@@ -659,23 +692,7 @@ export async function GET(request: NextRequest) {
         tags,
         categoryCounts,
         availability,
-        counts: {
-          catalogTotal: catalogTotal.count ?? 0,
-          published: published.count ?? 0,
-          unpublished: (catalogTotal.count ?? 0) - (published.count ?? 0),
-          noImage: noImage.count ?? 0,
-          lowStock: lowStock.count ?? 0,
-          outStock: outStock.count ?? 0,
-          noCities: derived.noCitiesIds.length,
-          noPrice: noPrice.count ?? 0,
-          noCategory: noCategory.count ?? 0,
-          waMismatch: waMismatch.count ?? 0,
-          onSale: onSale.count ?? 0,
-          staleSale: staleSale.count ?? 0,
-          dupNames: derived.dupNameIds.length,
-          underThreshold: derived.underThresholdIds.length,
-          trash: trashCount.count ?? 0,
-        },
+        counts,
       }
     }
 
