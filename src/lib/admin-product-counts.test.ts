@@ -106,6 +106,17 @@ describe("admin-product-counts", () => {
     expect(parsed.categoryCounts).toEqual({ "5": 2 })
   })
 
+  it("trata un array como 'no es un objeto plano' (B32)", () => {
+    // `typeof [] === "object"` y `![]` es false: sin el guard, un `tagCounts`
+    // array pasaría la validación de la v2 y el panel pintaría cero etiquetas
+    // en lugar de caer al camino antiguo.
+    expect(parseProductCountsPayload(payload({ tagCounts: ["promo"] }))).toBeNull()
+    expect(parseProductCountsPayload(payload({ brands: [] }))).not.toBeNull()
+    // `categoryCounts` no discrimina: se sanea a vacío.
+    expect(parseProductCountsPayload(payload({ categoryCounts: [] }))!.categoryCounts).toEqual({})
+    expect(rankProductTags([])).toEqual([])
+  })
+
   it("normaliza marcas y las ordena en español", () => {
     // Se recortan los espacios y se descartan las vacías; la deduplicación es
     // sensible a mayúsculas, igual que en la versión en JS que sustituye.

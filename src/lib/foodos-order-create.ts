@@ -15,6 +15,12 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { computeOrderTotals, validateCoupon } from "@/lib/foodos"
 import { ensureDeliveryForOrder, quoteDelivery } from "@/lib/flotilla/deliveries"
 import { isGeoPoint } from "@/lib/foodos-flotilla"
+import {
+  derivePaymentMethod,
+  derivePaymentStatus,
+  normalizePaymentBreakdown,
+  validatePaymentBreakdown,
+} from "@/lib/foodos-payments"
 import { dispatchOrderCreated } from "@/lib/foodos-webhooks"
 import { getOpenStatus } from "@/lib/foodos"
 import { logger } from "@/lib/logger"
@@ -24,6 +30,7 @@ import type {
   FoodosOrderChannel,
   FoodosOrderItem,
   FoodosOrderItemModifier,
+  FoodosPaymentBreakdown,
 } from "@/types/foodos"
 
 const MAX_LINES = 20
@@ -70,6 +77,42 @@ export interface FoodosOrderBody {
   use_credit?: boolean
 }
 
+/**
+ * Contexto del punto de venta nativo. **Nunca** viene del cuerpo HTTP: se pasa
+ * como tercer argumento desde las server actions del panel. Si estos campos
+ * viajaran en el `body`, cualquiera podría atribuir su pedido en línea a un
+ * turno de caja ajeno, o inventarse un folio.
+ *
+ * Un pedido con contexto de punto de venta tampoco se somete al horario
+ * publicado: el cajero está físicamente en el local y sabe si puede vender.
+ * Bloquear la caja porque la web dice "cerrado" sólo consigue que la venta se
+ * registre en otro lado.
+ */
+export interface FoodosPosContext {
+  /** Folio consecutivo ya reservado con `foodos_next_folio`. */
+  folio: string
+  cashierUserId: string
+  shiftId: string
+  tableTicketId?: string | null
+  /**
+   * Si el cobro ya se cerró con el cliente. Por omisión `true` en el mostrador
+   * (nadie cierra una venta sin cobrar); las cuentas de mesa abiertas pasan
+   * `false` y quedan pendientes hasta el cierre.
+   */
+  settled?: boolean
+}
+
+export interface FoodosOrderOptions {
+  pos?: FoodosPosContext
+  /**
+   * Cobro combinado. Sólo servidor, y sólo con el total ya recalculado: el
+   * desglose es la única entrada del arqueo que no se puede derivar de
+   * `payment_method`, así que si llegara del navegador se podría inflar el
+   * efectivo esperado y esconder un faltante.
+   */
+  paymentBreakdown?: FoodosPaymentBreakdown
+}
+
 export type CreateFoodosOrderResult =
   | { ok: true; orderId: string; total: number; slug: string | null }
   | { ok: false; status: number; error: string; detail?: string; code?: string }
@@ -84,7 +127,8 @@ function fail(status: number, error: string): CreateFoodosOrderResult {
  */
 export async function createFoodosOrder(
   supabase: SupabaseClient,
-  body: FoodosOrderBody
+  body: FoodosOrderBody,
+  options: FoodosOrderOptions = {}
 ): Promise<CreateFoodosOrderResult> {
   const {
     restaurant_id,
@@ -157,15 +201,18 @@ export async function createFoodosOrder(
       }
     }
 
-    // Horario de operación: rechazar pedidos fuera de horario.
-    const { data: hours } = await supabase
-      .from("foodos_branch_hours")
-      .select("branch_id, day_of_week, open_time, close_time, is_closed")
-      .eq("branch_id", branch.id)
-    if (hours?.length) {
-      const status = getOpenStatus(hours as FoodosBranchHours[], restaurant.timezone)
-      if (!status.isOpen) {
-        return fail(400, status.nextOpenLabel ?? "La sucursal está cerrada por ahora")
+    // Horario de operación: rechazar pedidos fuera de horario. El punto de venta
+    // lo salta (ver `FoodosPosContext`).
+    if (!options.pos) {
+      const { data: hours } = await supabase
+        .from("foodos_branch_hours")
+        .select("branch_id, day_of_week, open_time, close_time, is_closed")
+        .eq("branch_id", branch.id)
+      if (hours?.length) {
+        const status = getOpenStatus(hours as FoodosBranchHours[], restaurant.timezone)
+        if (!status.isOpen) {
+          return fail(400, status.nextOpenLabel ?? "La sucursal está cerrada por ahora")
+        }
       }
     }
   }
@@ -385,6 +432,21 @@ export async function createFoodosOrder(
     serverTip
   )
 
+  // Cobro combinado: se valida contra el total recién recalculado y se
+  // normaliza aquí, para que el ticket y el arqueo lean el mismo objeto.
+  let paymentBreakdown: FoodosPaymentBreakdown | null = null
+  if (options.paymentBreakdown) {
+    const check = validatePaymentBreakdown(options.paymentBreakdown, total)
+    if (!check.ok) return fail(400, check.error)
+    paymentBreakdown = normalizePaymentBreakdown(options.paymentBreakdown)
+  }
+
+  const serverPaymentMethod = derivePaymentMethod(
+    options.paymentBreakdown,
+    payment_method ?? null
+  )
+  const settled = options.pos ? options.pos.settled !== false : undefined
+
   const payload = {
     restaurant_id,
     branch_id: branch_id ?? null,
@@ -399,9 +461,15 @@ export async function createFoodosOrder(
     channel,
     fulfillment,
     status: "pending",
-    payment_method: payment_method || null,
-    // tarjeta y transferencia quedan pendientes hasta pagar/confirmar
-    payment_status: payment_method === "card" || payment_method === "transfer" ? "pending" : "paid",
+    payment_method: serverPaymentMethod,
+    payment_breakdown: paymentBreakdown,
+    payment_status: derivePaymentStatus(serverPaymentMethod, settled),
+    // Contexto del punto de venta nativo. Sólo llega por `options`, nunca por
+    // el cuerpo HTTP, así que un pedido en línea no puede atribuirse un turno.
+    folio: options.pos?.folio ?? null,
+    cashier_user_id: options.pos?.cashierUserId ?? null,
+    pos_shift_id: options.pos?.shiftId ?? null,
+    table_ticket_id: options.pos?.tableTicketId ?? null,
     customer_name: customer_name || null,
     customer_phone: customer_phone || null,
     note: note || null,

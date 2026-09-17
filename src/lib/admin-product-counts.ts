@@ -66,13 +66,23 @@ function toCount(value: unknown): number {
   return Math.trunc(value)
 }
 
+/**
+ * "Objeto plano" para el contrato del RPC. Un array cumple `typeof === "object"`
+ * y `!value`, así que sin este guard un `tagCounts: []` (o `categoryCounts: []`)
+ * pasaría la validación de la v2 y el panel pintaría cero etiquetas creyendo
+ * que el RPC funcionó, en vez de caer al camino antiguo.
+ */
+function isPlainObject(value: unknown): boolean {
+  return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
 function toIdList(value: unknown): number[] {
   if (!Array.isArray(value)) return []
   return value.filter((v): v is number => typeof v === "number" && Number.isInteger(v) && v > 0)
 }
 
 function toCategoryCounts(value: unknown): Record<string, number> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {}
+  if (!isPlainObject(value)) return {}
   const out: Record<string, number> = {}
   for (const [key, count] of Object.entries(value as Record<string, unknown>)) {
     if (typeof count === "number" && Number.isFinite(count)) out[key] = count
@@ -94,7 +104,7 @@ export function sortProductBrands(value: unknown): string[] {
 
 /** Etiquetas más usadas (por frecuencia y, a igualdad, alfabéticas en `es`). */
 export function rankProductTags(value: unknown, limit = PRODUCT_TAG_LIMIT): string[] {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return []
+  if (!isPlainObject(value)) return []
   const entries: [string, number][] = []
   for (const [rawTag, rawCount] of Object.entries(value as Record<string, unknown>)) {
     const tag = rawTag.trim().toLowerCase()
@@ -117,7 +127,7 @@ export function parseProductCountsPayload(payload: unknown): ProductCountsPayloa
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null
   const raw = payload as Record<string, unknown>
   // Marcadores de la v2: sin ellos el listado debe usar el camino antiguo.
-  if (!Array.isArray(raw.brands) || !raw.tagCounts || typeof raw.tagCounts !== "object") {
+  if (!Array.isArray(raw.brands) || !isPlainObject(raw.tagCounts)) {
     return null
   }
   const noCitiesIds = toIdList(raw.noCitiesIds)

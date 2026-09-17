@@ -638,6 +638,45 @@ const TOOL_GUIDES: Record<string, ToolGuideConfig> = {
     ],
   },
 
+  "/panel/foodos/caja": {
+    tool: "Corte de caja",
+    icon: "💵",
+    intro:
+      "Abre el turno con tu fondo, registra entradas y salidas de efectivo y ciérralo contando el cajón por denominación. El esperado y el faltante los calcula el servidor con las ventas y los movimientos guardados.",
+    steps: [
+      {
+        id: "abrir",
+        title: "Abre el turno antes de cobrar",
+        description:
+          "Captura el fondo con el que arranca el cajón. Sin turno abierto no hay a dónde imputar la venta, así que el mostrador no deja cobrar.",
+        example: [{ label: "Fondo inicial", value: "$500" }],
+      },
+      {
+        id: "movimientos",
+        title: "Registra lo que saca y entra al cajón",
+        description:
+          "Un retiro para pagar al proveedor o una entrada de cambio son movimientos del turno. Quedan con motivo, nombre y hora.",
+      },
+      {
+        id: "cierre",
+        title: "Cuenta el cajón y cierra",
+        description:
+          "Captura cuántas piezas hay de cada denominación. Verás el declarado, el esperado y la diferencia antes de firmar el corte.",
+        example: [
+          { label: "Esperado", value: "$4,380" },
+          { label: "Declarado", value: "$4,320" },
+          { label: "Diferencia", value: "−$60 · Faltante" },
+        ],
+      },
+      {
+        id: "historial",
+        title: "Revisa el historial y expórtalo",
+        description:
+          "Cada corte queda con quién lo abrió, quién lo cerró y su arqueo. Exporta a CSV cuando lo necesites para tu contabilidad.",
+      },
+    ],
+  },
+
   "/panel/foodos/pedidos": {
     tool: "Pedidos en vivo",
     icon: "🧋",

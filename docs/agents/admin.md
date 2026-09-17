@@ -440,6 +440,12 @@
   (`src/lib/api-body.ts`): un body ausente, vacío o malformado es **400**, no 500
   — `await request.json()` dentro del try hacía que un cliente con un body roto
   pareciera un fallo del servidor (y ensuciaba `error_logs`).
+  Los contadores de chips tienen **un solo contrato con la RPC** y está probado
+  contra el SQL: `src/lib/admin-product-counts.contract.test.ts` lee `00118`,
+  exige las 17 claves del `jsonb_build_object` y que el lector las mapee todas, y
+  fija la discriminación v1/v2 (`brands` array + `tagCounts` objeto **plano**;
+  un array cumple `typeof === "object"` y colaría como v2 válida, dejando el
+  panel con cero etiquetas y sin fallback).
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
@@ -878,12 +884,22 @@ Ronda 13 de `/admin/productos` (sin migraciones nuevas: se apoya en 00116 y 0011
   válido debe seguir funcionando igual que antes.
 - Bitácora degradada: sin `admin_audit_log` (o con la tabla vacía),
   `GET /api/admin/products/audit` y `?productId=391` responden **200** con
-  `{ entries: [], degraded: true }`; el modal de producto no debe mostrar un
-  error rojo por no poder cargar la bitácora. Con la tabla presente, el mismo
-  endpoint devuelve `degraded: false` y las entradas de siempre.
+  `{ entries: [], degraded: true }`, se registra
+  `logger.warn("products.audit.degraded")` con `scope: "activity"|"history"` y el
+  modal **no** muestra un error rojo. El panel distingue los dos casos: con
+  `degraded: true` el drawer y el historial dicen "Historial no disponible en
+  este momento." (ámbar), mientras que con la tabla presente y sin filas dicen
+  "Sin actividad registrada." / "Sin cambios registrados." — una lista vacía por
+  fallo no debe leerse como "no pasó nada". El 500 queda solo para fallos de
+  auth o de creación del cliente.
 - Conteos: `select jsonb_object_keys(admin_product_filter_counts(false));` debe
   listar las 17 claves de la v2 (con `brands` y `tagCounts`). El contrato está
-  fijado en `npx vitest run src/lib/admin-product-counts.test.ts` y en
-  `src/lib/admin-product-counts-contract.test.ts`: si alguien renombra una clave
-  en la RPC sin tocar el fallback (o al revés), el test falla en vez de que el
-  panel pierda un chip en silencio.
+  fijado en `npx vitest run src/lib/admin-product-counts.test.ts
+  src/lib/admin-product-counts.contract.test.ts`: la prueba lee el SQL de
+  `00118`, extrae las claves del `jsonb_build_object` final y exige que el lector
+  las consuma **todas**, así que renombrar una clave en la RPC sin tocar el
+  fallback (o al revés) falla aquí en vez de que el panel pierda un chip en
+  silencio. También blinda la discriminación v1/v2: `brands` debe ser array y
+  `tagCounts` un objeto **plano** — un `tagCounts: []` cumple `typeof ===
+  "object"`, así que sin el guard el panel pintaría cero etiquetas creyendo que
+  el RPC funcionó en lugar de caer al camino antiguo.

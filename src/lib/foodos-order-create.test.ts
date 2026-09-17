@@ -535,3 +535,164 @@ describe("persistencia", () => {
     })
   })
 })
+
+// El contexto de punto de venta es la única entrada de `createFoodosOrder` que
+// no viene del navegador. Estos tests fijan dos cosas: que se persista tal cual
+// y que un pedido en línea jamás pueda fabricarse uno.
+describe("contexto de punto de venta", () => {
+  const POS = {
+    folio: "260917-0001",
+    cashierUserId: "user-caja",
+    shiftId: "shift-1",
+  }
+
+  it("sella folio, cajero y turno en el pedido", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(client, body({ channel: "mostrador" }), { pos: POS })
+
+    expect(calls.inserts[0]?.payload).toMatchObject({
+      folio: "260917-0001",
+      cashier_user_id: "user-caja",
+      pos_shift_id: "shift-1",
+      table_ticket_id: null,
+    })
+  })
+
+  it("sin contexto de punto de venta no inventa folio ni turno", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(client, body())
+
+    expect(calls.inserts[0]?.payload).toMatchObject({
+      folio: null,
+      cashier_user_id: null,
+      pos_shift_id: null,
+      table_ticket_id: null,
+    })
+  })
+
+  it("el mostrador vende aunque el horario publicado esté cerrado", async () => {
+    const hours = [
+      {
+        branch_id: BRANCH_ID,
+        day_of_week: 0,
+        open_time: "00:00",
+        close_time: "00:01",
+        is_closed: true,
+      },
+    ]
+    const { client } = fakeClient(baseConfig({ foodos_branch_hours: hours }))
+
+    await expect(
+      createFoodosOrder(client, body({ channel: "mostrador" }), { pos: POS })
+    ).resolves.toMatchObject({ ok: true })
+
+    await expect(createFoodosOrder(client, body())).resolves.toMatchObject({ ok: false, status: 400 })
+  })
+
+  it("el cajero cierra la venta como pagada aunque sea con tarjeta", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(client, body({ payment_method: "card" }), { pos: POS })
+
+    expect(calls.inserts[0]?.payload).toMatchObject({
+      payment_method: "card",
+      payment_status: "paid",
+    })
+  })
+
+  it("una cuenta de mesa abierta queda pendiente", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(
+      client,
+      body({ payment_method: "cash" }),
+      { pos: { ...POS, tableTicketId: "ticket-1", settled: false } }
+    )
+
+    expect(calls.inserts[0]?.payload).toMatchObject({
+      payment_status: "pending",
+      table_ticket_id: "ticket-1",
+    })
+  })
+
+  it("en línea la tarjeta sigue pendiente de confirmar", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(client, body({ payment_method: "card" }))
+
+    expect(calls.inserts[0]?.payload).toMatchObject({ payment_status: "pending" })
+  })
+})
+
+describe("cobro combinado", () => {
+  const POS = {
+    folio: "260917-0001",
+    cashierUserId: "user-caja",
+    shiftId: "shift-1",
+  }
+  const parts = (pairs: [string, number][]) => ({
+    parts: pairs.map(([method, amount]) => ({ method, amount })),
+  })
+
+  it("persiste el desglose y resume el método como mixed", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(client, body(), {
+      pos: POS,
+      paymentBreakdown: parts([["cash", 120], ["card", 80]]),
+    })
+
+    expect(calls.inserts[0]?.payload).toMatchObject({
+      payment_method: "mixed",
+      payment_status: "paid",
+      payment_breakdown: { parts: [{ method: "cash", amount: 120 }, { method: "card", amount: 80 }] },
+    })
+  })
+
+  it("con una sola forma de pago no lo marca como combinado", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(client, body(), { pos: POS, paymentBreakdown: parts([["transfer", 200]]) })
+
+    expect(calls.inserts[0]?.payload).toMatchObject({
+      payment_method: "transfer",
+      payment_status: "paid",
+    })
+  })
+
+  it("rechaza un desglose que no cuadra con el total recalculado", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    const result = await createFoodosOrder(client, body(), {
+      pos: POS,
+      paymentBreakdown: parts([["cash", 150]]),
+    })
+
+    expect(result).toMatchObject({ ok: false, status: 400 })
+    expect(calls.inserts).toHaveLength(0)
+  })
+
+  it("rechaza un desglose con una forma de pago inventada", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    const result = await createFoodosOrder(client, body(), {
+      pos: POS,
+      paymentBreakdown: parts([["bitcoin", 200]]),
+    })
+
+    expect(result).toMatchObject({ ok: false, status: 400 })
+    expect(calls.inserts).toHaveLength(0)
+  })
+
+  it("recalcula el cambio en servidor: el navegador no lo fija", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(client, body(), {
+      pos: POS,
+      paymentBreakdown: { ...parts([["cash", 200]]), received: 500, change: 999 },
+    })
+
+    expect(calls.inserts[0]?.payload).toMatchObject({
+      payment_breakdown: { received: 500, change: 300 },
+    })
+  })
+
+  it("sin desglose no escribe la columna", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(client, body(), { pos: POS })
+
+    expect(calls.inserts[0]?.payload.payment_breakdown).toBeNull()
+  })
+})

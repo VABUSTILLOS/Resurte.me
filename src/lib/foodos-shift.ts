@@ -77,7 +77,7 @@ export async function requireOpenShift(
 }
 
 /** True si el error viene de `requireOpenShift`. */
-export function isNoOpenShiftError(error: unknown): boolean {
+export function isNoOpenShiftError(error: unknown): error is NoOpenShiftError {
   return error instanceof NoOpenShiftError
 }
 

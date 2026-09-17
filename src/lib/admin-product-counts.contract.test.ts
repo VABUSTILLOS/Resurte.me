@@ -36,7 +36,7 @@ function rpcKeys(): string[] {
   const start = sql.indexOf("SELECT jsonb_build_object(")
   expect(start).toBeGreaterThan(-1)
   const body = sql.slice(start, sql.indexOf("$$;", start))
-  return [...body.matchAll(/^\s*'([A-Za-z][A-Za-z0-9_]*)',\s*$/gm)].flatMap((m) =>
+  return [...body.matchAll(/^\s*'([A-Za-z][A-Za-z0-9_]*)',/gm)].flatMap((m) =>
     m[1] ? [m[1]] : []
   )
 }

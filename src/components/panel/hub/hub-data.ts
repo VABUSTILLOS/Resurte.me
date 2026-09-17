@@ -6,7 +6,7 @@ import {
   Calculator, ShoppingCart, Trash2, TrendingUp, Calendar, ClipboardCheck,
   Package, Receipt, Flame, QrCode, UtensilsCrossed, Gift, Megaphone,
   BarChart3, Compass, Users, Ticket, MessageCircle, Inbox, Bot, Truck,
-  Wallet, Globe, Server, CalendarHeart,
+  Wallet, Globe, Server, CalendarHeart, Banknote,
 } from "lucide-react"
 
 export type HubCollection = RestaurantCollection
@@ -433,6 +433,18 @@ export const TOOLS: Tool[] = [
     area: "sistema",
     short: "Cocina",
     standalone: true,
+  },
+  {
+    title: "Corte de caja y arqueo",
+    description: "Abre el turno con tu fondo, registra entradas y salidas de efectivo y ciérralo contando el cajón por denominación. El esperado y el faltante los calcula el servidor, no la pantalla.",
+    icon: Banknote,
+    href: "/panel/foodos/caja",
+    color: "text-emerald-700",
+    bgColor: "bg-emerald-50",
+    area: "sistema",
+    short: "Caja",
+    standalone: true,
+    feature: "pos_mostrador",
   },
   {
     title: "Tablero FoodTech",
