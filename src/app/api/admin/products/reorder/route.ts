@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin-auth"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
+import { readJsonBody } from "@/lib/api-body"
 import { NextResponse } from "next/server"
 
 /**
@@ -19,7 +20,10 @@ export async function POST(request: Request) {
       return adminDenied
     }
 
-    const { productId, direction } = await request.json()
+    const parsed = await readJsonBody<{ productId?: number; direction?: string }>(request)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+
+    const { productId, direction } = parsed.data
     if (!productId || (direction !== "up" && direction !== "down")) {
       return NextResponse.json(
         { error: "Se requiere productId y direction (up|down)" },

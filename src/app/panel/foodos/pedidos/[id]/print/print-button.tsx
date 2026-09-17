@@ -3,12 +3,16 @@
 import { useEffect } from "react"
 import { Printer } from "lucide-react"
 
-/** Botón de impresión: dispara window.print() (y auto-print al cargar). */
-export function PrintButton() {
+/**
+ * Botón de impresión. Dispara `window.print()` y, con `auto`, abre el diálogo
+ * solo al cargar la página (`?auto=1`).
+ */
+export function PrintButton({ auto = true }: { auto?: boolean }) {
   useEffect(() => {
+    if (!auto) return
     const timer = setTimeout(() => window.print(), 400)
     return () => clearTimeout(timer)
-  }, [])
+  }, [auto])
 
   return (
     <button

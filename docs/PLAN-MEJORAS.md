@@ -52,7 +52,7 @@
 | C11 | **Stepper − N + en la card cuando el producto ya está en el carrito** | ✅ |
 | C12 | **Rail "Vistos recientemente"** en la página de producto | ✅ |
 | C13 | **Comparador de precios por unidad**: `unit-price.ts` normaliza la presentación (`por kilo`, `500 g`, `1 l`, `por pieza`…) a un precio por kg/l/pieza; la ficha de producto muestra el `$/kg` real y una sección "Comparar presentaciones" con la más barata y el sobreprecio (`+N%`) de las demás, y las cards y la búsqueda global muestran el `$/kg` como insignia | ✅ |
-| C14 | **Contraste AA de la insignia `$/kg`** (deuda detectada al cerrar W9/U13, no es de esas rondas): el `<p>` de precio por unidad de la card usa `text-[#0E7A0E]/70` con `sm:text-[11px]` → **3.13:1** sobre blanco (`#56a256`), y el badge `.opacity-70` de la card → **3.52:1** (`#b7d7b7` sobre `#0e7a0e`). axe los marca como `color-contrast` serio, así que `npm run test:e2e` falla **de forma determinista** en `a11y.spec.ts:65 › busqueda` (ambos proyectos) y **de forma intermitente** en `home`/`ciudad`/storefront según qué productos renderice la rejilla. Regresión del commit `19cd8e0` (comparador por unidad), ajena a W9/U13. El único `<p>` nuevo es el de `perUnit` — se reconoce porque es el que lleva `sm:text-[11px]`, que la pista de mayoreo anterior no tenía. Arreglo: subir el color a `#0E7A0E` sin opacidad (o `#0B5F0B`) en `src/components/product/product-card.tsx` L234/L238 y en el badge de la card | 🔜 |
+| C14 | **Contraste AA de la insignia `$/kg`** (deuda detectada al cerrar W9/U13, no es de esas rondas): el `<p>` de precio por unidad de la card usaba `text-[#0E7A0E]/70` con `sm:text-[11px]` → **3.13:1** sobre blanco (`#56a256`), y el contador `.opacity-70` de los chips → **3.52:1** (`#b7d7b7` sobre `#0e7a0e`); axe los marca `color-contrast` serio, así que `npm run test:e2e` fallaba **de forma determinista** en `a11y.spec.ts › busqueda` (ambos proyectos) y **de forma intermitente** en `home`/`ciudad`/storefront según qué renderizara la rejilla. Regresión del commit `19cd8e0` (comparador por unidad), ajena a W9/U13. El `<p>` de `perUnit` se reconoce porque es el único que lleva `sm:text-[11px]`. Arreglo: quitar la opacidad en los 6 sitios con el mismo patrón — `product-card.tsx` (precio por unidad y pista de mayoreo), `header.tsx` (etiqueta *recompensas*), `recipe-slider.tsx` (*Recetario*), `collection-story-section.tsx` (*Nuestra Historia*) y los contadores de chip de `search-page-client.tsx` / `user-shop-view.tsx` (que también incumplían **en estado inactivo**: `#5C6068` al 70 % = 3.21:1). En el mismo barrido apareció `menu-view.tsx` L214 (`text-stone-500` sobre `bg-stone-100`, 10 px = **4.38:1**) bloqueando el storefront `/r/mr-fresh`: subido a `text-stone-600` (**≈7:1**). `e2e/a11y.spec.ts` queda **20/20 verde** en ambos proyectos | ✅ |
 
 ## 4. Carrito y checkout
 
@@ -224,6 +224,7 @@ con una regla nueva: **la caducidad de créditos es real**, no solo informativa.
 | # | Fase | Estado |
 |---|---|---|
 | M1 | **Nadie leía `foodos_ai_usage`**: la tabla acumulaba tokens desde `00121` y el tope diario (`AI_DAILY_TOKEN_CAP`) existía como freno, no como información. `src/lib/ai/usage.ts` (`summarizeAiUsage` puro + `loadAiUsage`, 14 pruebas) agrega el día en curso, los 7 previos y la media, y marca `nearCap` al 80 % (`NEAR_CAP_RATIO`); `loadAiUsage` lee la tabla **directamente** —RLS ya deja al dueño, y `foodos_ai_reserve`/`foodos_ai_settle` están revocadas para `authenticated`— y **degrada a `null`**: nunca lanza. La tarjeta `AiUsageCard` del tablero solo **avisa**, no corta: el corte lo sigue decidiendo `reserveAiBudget`. Cierra el pendiente de Observabilidad de PF6 | ✅ |
+| M2 | **El micrositio deja de responder 200 en un 404**: `/r/<slug-inexistente>` devolvía **200** con el cuerpo del not-found. Medición de control (guard apagado, env válida, caché limpia): slug inexistente y su `/carta` → **200**; con el guard → **404**, y `/r/mr-fresh` sigue **200** con su esqueleto (`aria-busy`, `role="status"`). Eran **dos** fronteras independientes: `src/app/r/[slug]/loading.tsx` —resuelta poniendo el guard en el `layout.tsx` del mismo segmento, porque `loading.js` se anida *dentro* de `layout.js`— y `src/app/loading.tsx` (raíz), que envolvía también al layout del segmento y por eso hubo que **borrarla** (restaurarla regresa 404→200). El 404 con identidad del micrositio se movió de `[slug]/not-found.tsx` —donde era **inerte**, porque un `not-found` se renderiza dentro del layout que lanza el `notFound()`— a `src/app/r/not-found.tsx`. `e2e/foodos.spec.ts` y `smoke.spec.ts` ahora afirman el **status** además del contenido, y el status es independiente de los datos, así que detecta la regresión incluso con la env de CI. Consecuencia aceptada: el sitio pierde el esqueleto **global** de carga (si vuelve, va por segmento o en un route group, nunca en la raíz) | ✅ |
 | M3 | **Los dos módulos puros que faltaban, con pruebas**: `src/lib/pos/reconcile.test.ts` (64) y `src/lib/messaging/send.test.ts` (41) — 105 pruebas sobre `planOrderReconcile`/`planMenuSync` y sobre la cadena de envío con adaptadores falsos. Los tests destaparon **5 hallazgos**; se corrigieron los dos que eran bugs reales: `attemptSms` no blindaba el envío con `try/catch` (un adaptador que lanza rompía el contrato "nunca lanza" y tumbaba `foodos-campaigns.ts`) y la degradación al WhatsApp global de la plataforma era **silenciosa** (`catch {}` sin log, así que los envíos salían del número equivocado sin dejar rastro) — ahora `logger.warn("messaging.wa-config", …)`. Quedan documentados tres hallazgos menores, hoy inocuos | ✅ |
 | M4 | **El arranque en frío deja de flaquear en e2e**: `e2e/global-setup.ts` (17 rutas, 3 reintentos, 60 s, `AbortController`) calienta las rutas antes de la suite y **nunca lanza** — un calentamiento fallido solo emite un `console.warn`. La compilación en frío era la causa #1 de flakes (medido: 212/1/21 → 213/0/21 al calentar a mano); ahora es automático y no depende de que alguien recuerde el `curl` | ✅ |
 
@@ -252,14 +253,14 @@ merge. Revisión estática completa del diff sin errores evidentes (los puntos
 de riesgo — imports, tipos estrictos, componentes nuevos — fueron verificados
 uno a uno).
 
-**Deuda conocida que no es del plan W9/U13:** `npm run test:e2e` reporta
-`e2e/a11y.spec.ts` en rojo por el contraste de la insignia `$/kg` de la card de
-producto — ver fila **C14** en § 3. Es una regresión del commit `19cd8e0`
-(comparador por unidad) y queda fuera del perímetro de W9/U13:
-`npx tsc --noEmit`, `npm test` y `npm run build` están en verde, y el test de
-axe de `/recompensas` (donde viven `PushOptInCard` y `PasskeyCard`) pasa.
-`e2e/compartir.spec.ts` y `e2e/mobile-chrome.spec.ts` también aparecen en rojo
-de forma intermitente bajo carga paralela (pasan aislados).
+**Estado de `test:e2e`:** `e2e/a11y.spec.ts` está **20/20 verde** en
+`chromium` y `mobile-chromium` — la deuda de contraste quedó cerrada (fila
+**C14** en § 3). Quedan dos rojos **intermitentes** que pasan aislados bajo
+carga paralela (`e2e/compartir.spec.ts`, `e2e/mobile-chrome.spec.ts`), y
+`e2e/mobile-chrome.spec.ts:28` es un fallo **real y preexistente** ajeno a este
+plan: el FAB de `src/components/panel/guide/guide-toggle-button.tsx` (commit
+`61decf1`, `fixed` + `z-[85]`) intercepta el tap del banner de cookies.
+`npx tsc --noEmit`, `npm test` y `npm run build` están en verde.
 
 > Nota: `playwright.config.ts` usa `E2E_PORT` (por defecto 3000) y
 > `next dev` toma un lock **por directorio**, así que si otro dev server del

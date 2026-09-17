@@ -27,6 +27,8 @@ export type FoodosFeature =
   | "marketing_ia"
   | "flotilla"
   | "mesero_ia"
+  | "pos_mostrador"
+  | "comandero"
   | "wallet_passes"
   | "app_marca"
   | "sitio_ia"
@@ -59,6 +61,10 @@ export const FEATURE_MIN_TIER: Record<FoodosFeature, CashbackTier> = {
   marketing_ia: "Plata",
   flotilla: "Oro",
   mesero_ia: "Diamante",
+  // POS nativo y comandero: el restaurantero cobra y opera el salón aquí mismo.
+  // Ojo: `pos_integraciones` es lo OPUESTO — conectar un punto de venta ajeno.
+  pos_mostrador: "Diamante",
+  comandero: "Diamante",
   wallet_passes: "Diamante",
   app_marca: "Diamante",
   sitio_ia: "Diamante",
@@ -93,6 +99,18 @@ export const FOODOS_FEATURES: Record<FoodosFeature, FoodosFeatureInfo> = {
     feature: "mesero_ia",
     labelKey: "foodos.entitlements.featureMeseroIa",
     descriptionKey: "foodos.entitlements.featureMeseroIaDesc",
+    minTier: "Diamante",
+  },
+  pos_mostrador: {
+    feature: "pos_mostrador",
+    labelKey: "foodos.entitlements.featurePosMostrador",
+    descriptionKey: "foodos.entitlements.featurePosMostradorDesc",
+    minTier: "Diamante",
+  },
+  comandero: {
+    feature: "comandero",
+    labelKey: "foodos.entitlements.featureComandero",
+    descriptionKey: "foodos.entitlements.featureComanderoDesc",
     minTier: "Diamante",
   },
   wallet_passes: {
@@ -138,6 +156,8 @@ const FEATURE_ORDER_BY_TIER: FoodosFeature[] = [
   "flotilla",
   // Diamante
   "mesero_ia",
+  "pos_mostrador",
+  "comandero",
   "wallet_passes",
   "app_marca",
   "sitio_ia",

@@ -21,6 +21,7 @@ import { logger } from "@/lib/logger"
 import type {
   FoodosBranchHours,
   FoodosCoupon,
+  FoodosOrderChannel,
   FoodosOrderItem,
   FoodosOrderItemModifier,
 } from "@/types/foodos"
@@ -51,7 +52,7 @@ export interface FoodosOrderBody {
   items: FoodosOrderItem[]
   delivery_fee?: number
   discount?: number
-  channel?: "web" | "qr" | "whatsapp"
+  channel?: FoodosOrderChannel
   fulfillment?: "delivery" | "pickup" | "dine_in"
   payment_method?: string | null
   customer_name?: string | null

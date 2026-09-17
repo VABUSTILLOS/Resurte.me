@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin-auth"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
+import { readJsonBody } from "@/lib/api-body"
 import { NextResponse } from "next/server"
 
 /**
@@ -21,7 +22,10 @@ export async function DELETE(request: Request) {
       return adminDenied
     }
 
-    const { productId } = await request.json()
+    const parsed = await readJsonBody<{ productId?: number }>(request)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+
+    const { productId } = parsed.data
     if (!productId || typeof productId !== "number") {
       return NextResponse.json({ error: "Se requiere productId" }, { status: 400 })
     }
@@ -78,7 +82,10 @@ export async function POST(request: Request) {
       return adminDenied
     }
 
-    const { productId, restore } = await request.json()
+    const parsed = await readJsonBody<{ productId?: number; restore?: boolean }>(request)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+
+    const { productId, restore } = parsed.data
     if (!productId || typeof productId !== "number" || restore !== true) {
       return NextResponse.json({ error: "Se requiere productId y restore: true" }, { status: 400 })
     }

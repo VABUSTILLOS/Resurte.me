@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { readJsonBody } from "@/lib/api-body"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
@@ -30,10 +31,13 @@ export async function PATCH(request: Request) {
       return adminDenied
     }
 
-    const body = await request.json()
+    const bodyResult = await readJsonBody<Record<string, unknown> & { productId?: number; expectedUpdatedAt?: string }>(request)
+    if (!bodyResult.ok)
+      return NextResponse.json({ error: bodyResult.error }, { status: bodyResult.status })
+
     // `expectedUpdatedAt` se extrae antes del spread para que no acabe en
     // `fields` (validateProductPatch solo conoce campos de producto).
-    const { productId, expectedUpdatedAt, ...fields } = body
+    const { productId, expectedUpdatedAt, ...fields } = bodyResult.data
 
     if (!productId) {
       return NextResponse.json(

@@ -312,7 +312,12 @@ export type FoodosOrderStatus =
   | "delivered"
   | "cancelled"
 
-export type FoodosOrderChannel = "web" | "qr" | "whatsapp"
+/**
+ * De dónde entró el pedido. `mostrador` es la venta en caja del POS nativo y
+ * `marketplace` el pedido que llega desde HoyQueComemos; en ambos el
+ * restaurante es quien cobra y entrega, no Resurte.me.
+ */
+export type FoodosOrderChannel = "web" | "qr" | "whatsapp" | "mostrador" | "marketplace"
 export type FoodosFulfillment = "delivery" | "pickup" | "dine_in"
 /**
  * `processing` = el cliente ya recibió las instrucciones de un método
@@ -344,6 +349,22 @@ export interface FoodosOrderItem {
   qty: number
   combo_id?: string | null
   modifiers?: FoodosOrderItemModifier[]
+}
+
+/** Una forma de pago dentro de un cobro combinado (POS de mostrador). */
+export interface FoodosPaymentBreakdownPart {
+  method: string
+  amount: number
+}
+
+/**
+ * Desglose del cobro cuando no fue una sola forma de pago.
+ * `received` y `change` sólo tienen sentido con efectivo de por medio.
+ */
+export interface FoodosPaymentBreakdown {
+  parts: FoodosPaymentBreakdownPart[]
+  received?: number | null
+  change?: number | null
 }
 
 export interface FoodosOrder {
@@ -378,6 +399,16 @@ export interface FoodosOrder {
   delivery_lng: number | null
   delivery_notes: string | null
   created_at: string
+  /** Folio consecutivo del día (`YYMMDD-0007`). Nulo en pedidos previos al POS. */
+  folio?: string | null
+  /** Quién cobró en caja. Nulo en pedidos que no pasaron por mostrador. */
+  cashier_user_id?: string | null
+  /** Turno de caja al que se cargó la venta. */
+  pos_shift_id?: string | null
+  /** Cuenta de mesa que originó el pedido (comandero). */
+  table_ticket_id?: string | null
+  /** Desglose del cobro cuando se pagó combinado. */
+  payment_breakdown?: FoodosPaymentBreakdown | null
 }
 
 /** Comprobante de pago manual (transferencia/OXXO/efectivo) subido por el comensal. */

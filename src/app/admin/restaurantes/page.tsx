@@ -35,10 +35,12 @@ const FEATURE_LABEL: Record<FoodosFeature, string> = {
   marketing_ia: "Marketing IA",
   flotilla: "Flotilla",
   mesero_ia: "Mesero IA",
+  pos_mostrador: "Mostrador",
+  comandero: "Comandero",
   wallet_passes: "Wallet",
   app_marca: "App de marca",
   sitio_ia: "Sitio y SEO",
-  pos_integraciones: "Punto de venta",
+  pos_integraciones: "Conectar POS",
   catering: "Catering",
 }
 

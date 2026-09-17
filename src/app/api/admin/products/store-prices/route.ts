@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { readJsonBody } from "@/lib/api-body"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
@@ -50,8 +51,10 @@ export async function PUT(request: Request) {
     const { response: adminDenied, user: adminUser } = await requireAdmin()
     if (adminDenied) return adminDenied
 
-    const body = await request.json()
-    const { productId, prices } = body
+    const parsed = await readJsonBody<{ productId?: number; prices?: unknown }>(request)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+
+    const { productId, prices } = parsed.data
     if (!productId || !Array.isArray(prices)) {
       return NextResponse.json(
         { error: "Se requieren productId y prices" },

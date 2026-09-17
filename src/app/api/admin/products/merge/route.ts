@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin-auth"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
+import { readJsonBody } from "@/lib/api-body"
 import { NextResponse } from "next/server"
 
 /**
@@ -21,7 +22,10 @@ export async function POST(request: Request) {
       return adminDenied
     }
 
-    const { sourceId, targetId } = await request.json()
+    const parsed = await readJsonBody<{ sourceId?: number; targetId?: number }>(request)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+
+    const { sourceId, targetId } = parsed.data
     if (
       typeof sourceId !== "number" ||
       typeof targetId !== "number" ||

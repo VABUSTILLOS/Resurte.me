@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { readJsonBody } from "@/lib/api-body"
 import { KieAiError, chatCompletion, isKieAiConfigured } from "@/lib/ai/kie-ai"
 import {
   SEO_MAX_IDS,
@@ -37,7 +38,10 @@ export async function POST(request: Request) {
       )
     }
 
-    const body = (await request.json().catch(() => ({}))) as { ids?: unknown; overwrite?: unknown }
+    const parsed = await readJsonBody<{ ids?: unknown; overwrite?: unknown }>(request)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+
+    const body = parsed.data
     const ids = Array.isArray(body.ids)
       ? [
           ...new Set(

@@ -417,6 +417,29 @@
     bueno: un **segundo** choque se compara contra lo que de verdad se guardó y
     no contra la fila original, que si no reportaría como choque lo que el propio
     admin acaba de escribir.
+- Productos ronda 13 — lecturas decorativas que degradan (B28-B32): la regla es
+  **una lectura decorativa nunca tumba la superficie; una escritura siempre falla
+  en voz alta**. `GET /api/admin/products/row-meta` pide tres fuentes que solo
+  alimentan columnas de adorno (cola de WhatsApp, última edición, ventas): cada
+  una degrada por su cuenta y el resultado declara las que fallaron en
+  `degraded: ("queue"|"audit"|"sales")[]` — la composición es pura y vive en
+  `src/lib/admin-product-row-meta.ts`, así que el contrato se prueba sin mocks.
+  El panel avisa en una franja ámbar (`metaDegraded`, `role="status"`) en vez de
+  mostrar columnas vacías sin explicación, y si la petición entera falla declara
+  las tres. Las ventas se leen de la **vista** `products_with_sales` (00116), no
+  agregando `order_items`: una fila por producto, sin recorte silencioso al
+  `max-rows` de PostgREST y con `idx_order_items_product` de apoyo; `sales_units`
+  y `sales_revenue` llegan como `numeric` (cadena en algunos caminos), así que se
+  normalizan con un `toNumber` tolerante a `null`. `MAX_META_IDS` (200) coincide
+  con el tamaño de página máximo del panel y al excederlo se emite
+  `logger.warn("products.row-meta.truncated")` en vez de recortar en silencio.
+  `GET /api/admin/products/audit` sigue la misma regla: si `admin_audit_log` no
+  existe devuelve `200 { entries: [], degraded: true }` (la bitácora es una
+  lectura, no un write path) y reserva el 500 para fallos de auth/admin.
+  El cuerpo JSON de las rutas de escritura se lee con `readJsonBody`
+  (`src/lib/api-body.ts`): un body ausente, vacío o malformado es **400**, no 500
+  — `await request.json()` dentro del try hacía que un cliente con un body roto
+  pareciera un fallo del servidor (y ensuciaba `error_logs`).
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
@@ -829,3 +852,38 @@ Sin credenciales los 6 casos de comportamiento se saltan solos; con ellas
 ejercen las invariantes (4) a (7) sin guardar nada (el formulario se deja
 inválido a propósito). Un SKU duplicado debe marcar `#pf-sku` en rojo con el
 mensaje del servidor y llevar el foco ahí, no dejar el aviso general solo.
+
+Ronda 13 de `/admin/productos` (sin migraciones nuevas: se apoya en 00116 y 00118):
+- Degradación por fuente de `row-meta`: con la sesión admin abierta, cortar una
+  sola fuente no debe vaciar el listado. La forma barata de probarlo es la vista
+  de ventas: `drop view products_with_sales;` en un entorno de prueba hace que
+  `GET /api/admin/products/row-meta?ids=391` responda **200** con
+  `degraded: ["sales"]`, `sales: {}` y `waPending`/`lastEdit` intactos, y que el
+  panel muestre la franja ámbar nombrando "las ventas" mientras las demás
+  columnas siguen pintadas. Volver a crear la vista y recargar: la franja
+  desaparece. Un fallo de la petición entera (por ejemplo, sesión sin rol admin
+  → 403) declara las tres fuentes y deja las columnas vacías, pero el listado
+  —que viene de `/list`— se sigue viendo.
+- Ventas contra la fuente de verdad: con `products_with_sales` presente, el
+  producto 391 debe mostrar 9 unidades y $612.00 en la columna "Ventas", la misma
+  cifra que devuelve el reporte de ventas y que usa el orden `sort=sales`
+  (comparar con `select id, sales_units, sales_revenue from products_with_sales
+  where sales_units is not null;`). Un pedido cancelado no debe sumar ni aquí ni
+  en el orden: el número de la fila tiene que cuadrar con la posición.
+- Body roto → 400: con la sesión admin abierta, `curl -X POST` a cualquier ruta
+  de escritura de `/api/admin/products/*` sin body (o con `-d '{'`) debe
+  responder **400** con un mensaje de petición inválida, **nunca 500**, y no debe
+  aparecer un registro nuevo en `/admin/bitacoras?tab=errores`. Repetir con body
+  `{}` (JSON válido pero sin los campos): ese sí es 400 de validación, y con body
+  válido debe seguir funcionando igual que antes.
+- Bitácora degradada: sin `admin_audit_log` (o con la tabla vacía),
+  `GET /api/admin/products/audit` y `?productId=391` responden **200** con
+  `{ entries: [], degraded: true }`; el modal de producto no debe mostrar un
+  error rojo por no poder cargar la bitácora. Con la tabla presente, el mismo
+  endpoint devuelve `degraded: false` y las entradas de siempre.
+- Conteos: `select jsonb_object_keys(admin_product_filter_counts(false));` debe
+  listar las 17 claves de la v2 (con `brands` y `tagCounts`). El contrato está
+  fijado en `npx vitest run src/lib/admin-product-counts.test.ts` y en
+  `src/lib/admin-product-counts-contract.test.ts`: si alguien renombra una clave
+  en la RPC sin tocar el fallback (o al revés), el test falla en vez de que el
+  panel pierda un chip en silencio.

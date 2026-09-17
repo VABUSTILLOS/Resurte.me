@@ -4,6 +4,7 @@ import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
 import { slugify } from "@/lib/foodos"
+import { readJsonBody } from "@/lib/api-body"
 import { NextResponse } from "next/server"
 
 /**
@@ -19,7 +20,10 @@ export async function POST(request: Request) {
       return adminDenied
     }
 
-    const body = await request.json()
+    const parsed = await readJsonBody<Record<string, unknown>>(request)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+
+    const body = parsed.data
     const { productId } = body
     if (!productId || typeof productId !== "number") {
       return NextResponse.json({ error: "Se requiere productId" }, { status: 400 })

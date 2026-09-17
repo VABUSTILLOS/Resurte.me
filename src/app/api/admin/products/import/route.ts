@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { requireAdmin } from "@/lib/admin-auth"
+import { readJsonBody } from "@/lib/api-body"
 import { createServiceClient } from "@/lib/supabase/service"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
@@ -40,13 +41,16 @@ export async function POST(request: NextRequest) {
   if (adminDenied) return adminDenied
 
   try {
-    const body = (await request.json()) as {
+    const parsed = await readJsonBody<{
       rows?: ProductImportRow[]
       dryRun?: boolean
       mode?: ImportMode
       /** Encabezado del CSV tal como lo leyó el cliente, para validarlo aquí. */
       columns?: string[]
-    }
+    }>(request)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+
+    const body = parsed.data
     const rows = Array.isArray(body.rows) ? body.rows : []
 
     // Guarda de entrada: un CSV con columnas desconocidas se importaría a medias

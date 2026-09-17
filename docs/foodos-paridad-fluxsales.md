@@ -660,10 +660,15 @@ tocó, y corre en los dos proyectos de Playwright (`chromium` y
 
 Dos hallazgos que cambiaron cómo están escritos los tests:
 
-- **`GET /r/<slug-inexistente>` responde 200**, no 404: Next sirve el armazón del
-  not-found en streaming y el segmento dinámico se renderiza bajo demanda. El
-  test verifica la **invariante** —el comensal no ve un restaurante— con
-  `heading "404"` visible y **cero** enlaces "Agregar", en vez del status.
+- **`GET /r/<slug-inexistente>` responde 404 real** (corregido en la ronda de
+  mejoras; antes devolvía **200** con el cuerpo del not-found). Next hacía flush
+  del shell en cuanto renderizaba el fallback de una frontera `loading.tsx`, y a
+  partir de ahí el status ya viajaba como 200 y no se podía corregir. La causa
+  eran **dos** fronteras —`src/app/loading.tsx` (raíz) y
+  `src/app/r/[slug]/loading.tsx`— por encima del `notFound()` que la página lanza
+  tras su `await`. El test ahora comprueba el **status** (`toBe(404)`) además del
+  contenido, porque el status es independiente de los datos y detecta la
+  regresión incluso con la env de CI.
 - **`innerText` en Playwright respeta `text-transform`.** Las etiquetas de la
   calculadora salen en mayúsculas por CSS, así que el assert compara contra
   `.toUpperCase()`.
@@ -807,6 +812,19 @@ marketplace**; no queda alcance pendiente del roadmap original.
   invoca la envuelve en su propio `try/catch`**: el contrato "nunca lanza" de un
   módulo no protege la promesa de quien lo llama.
 - Todo texto nuevo de panel pasa por `t()`.
+- **Ninguna frontera `loading.tsx` puede quedar por encima de un `notFound()`
+  posterior a un `await`**: el fallback hace flush del shell, el status queda
+  congelado en 200 y el enlace roto se indexa como página válida. La comprobación
+  de existencia vive en el `layout.tsx` **del mismo segmento** (`loading.js` se
+  anida *dentro* de `layout.js`, así que el layout queda fuera de su propia
+  frontera) o no hay frontera. Por eso `/r/[slug]/layout.tsx` hace el guard y
+  `src/app/loading.tsx` **no existe**. Un `not-found.tsx` del mismo segmento
+  **no** captura el `notFound()` de su propio layout —se renderiza *dentro* de
+  él—, así que el 404 con identidad del micrositio vive en
+  `src/app/r/not-found.tsx`. Excepción conocida:
+  `/panel/foodos/pedidos/[id]/print` (200 en vez de 404 bajo
+  `src/app/panel/loading.tsx`; página de impresión tras autenticación, sin valor
+  de indexación).
 
 ## Verificación por fase
 
@@ -824,9 +842,11 @@ y nunca lanza — un calentamiento fallido solo deja un `console.warn`. Medido:
 
 Dos notas para leer un fallo de e2e sin perder tiempo:
 
-- **El error boundary de Next responde `200`**, y `GET /r/<slug-inexistente>`
-  también devuelve `200` con el cuerpo del `not-found`. Por eso los guards
-  comprueban el **contenido** (que no aparezca "Algo salió mal") y no el status.
+- **El error boundary de Next responde `200`**, así que un `status < 500` por sí
+  solo no distingue una degradación correcta de un reventón: los guards
+  comprueban además el **contenido** (que no aparezca "Algo salió mal"). Desde la
+  ronda de mejoras `GET /r/<slug-inexistente>` **sí** devuelve 404 — ver el
+  invariante de fronteras de `loading.tsx`.
 - **En CI no hay `SUPABASE_SERVICE_ROLE_KEY`**: las rutas que abren el cliente de
   servicio responden `500` sin llegar a validar, así que los guards aceptan 500.
 

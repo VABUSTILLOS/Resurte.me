@@ -33,6 +33,7 @@ export default async function StorefrontLayout({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  // GUARD-OFF-PROBE
+  const data = await getPublicRestaurantBySlug(slug)
+  if (!data) notFound()
   return children
 }

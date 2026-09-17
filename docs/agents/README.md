@@ -30,6 +30,14 @@ requieren revisar todos los playbooks que dependen de esa superficie.
    `npm test` y `npm run build`.
 6. **Accesibilidad**: diálogos con foco inicial + Escape + `aria-modal`; cambios de
    estado anunciados con `aria-live`; iconos decorativos con `aria-hidden`.
+7. **Ninguna frontera `loading.tsx` por encima de un `notFound()` posterior a un
+   `await`**: el fallback hace flush del shell y el 404 queda congelado como 200
+   (soft-404 indexable). El guard va en el `layout.tsx` del mismo segmento —que
+   queda fuera de su propia frontera— o se elimina la frontera. Consecuencia
+   aceptada al corregir el micrositio: al borrar `src/app/loading.tsx` el sitio
+   perdió el esqueleto **global** de carga. Si se quiere de vuelta, va **por
+   segmento o dentro de un route group**, nunca en la raíz. Excepción conocida:
+   `/panel/foodos/pedidos/[id]/print` (bajo `src/app/panel/loading.tsx`).
 
 ## Sin agente asignado: cuenta y autenticación
 

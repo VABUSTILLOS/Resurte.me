@@ -30,7 +30,9 @@ const ROUTES = [
   "/admin",
   "/admin/restaurantes",
   "/admin/bitacoras",
-  // Micrositio de restaurante: el 404 y su carta
+  // Micrositio de restaurante: el 404 real y su carta. Estas rutas devuelven
+  // 404 a propósito (guard del layout); el calentamiento es de compilación, no
+  // de datos, así que el status es indiferente.
   "/r/no-existe",
   "/r/no-existe/carta",
   // 404 raíz

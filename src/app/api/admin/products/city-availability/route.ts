@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { readJsonBody } from "@/lib/api-body"
 import { logAdminAction } from "@/lib/audit-log"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
@@ -88,8 +89,10 @@ export async function PATCH(request: Request) {
       return adminDenied
     }
 
-    const body = await request.json()
-    const { productId, productIds, cityId, isAvailable, scope, changes, restore } = body ?? {}
+    const parsed = await readJsonBody<Record<string, unknown>>(request)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+
+    const { productId, productIds, cityId, isAvailable, scope, changes, restore } = parsed.data
 
     const ids: number[] = Array.isArray(productIds)
       ? productIds.filter((n): n is number => typeof n === "number" && Number.isInteger(n))

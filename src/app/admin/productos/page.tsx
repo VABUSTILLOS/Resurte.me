@@ -3,6 +3,7 @@
 import { Suspense, useMemo, useState, useEffect, useRef, type ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import type { RowMetaSource } from "@/lib/admin-product-row-meta"
 import {
   Search,
   Package,
@@ -216,6 +217,13 @@ const STOCK_LABELS: Record<StockStatus, string> = {
  *  mantiene el render fluido en móvil (el endpoint admite más, la UI no). */
 const DEFAULT_PAGE_SIZE = 50
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200]
+
+/** Columnas decorativas de `row-meta`, para nombrar lo que degradó. */
+const META_SOURCE_LABELS: Record<RowMetaSource, string> = {
+  queue: "los pendientes de WhatsApp",
+  audit: "la última edición",
+  sales: "las ventas",
+}
 
 const STOCK_FILTERS: { label: string; value: StockStatus | "all" }[] = [
   { label: "Todo el stock", value: "all" },
@@ -737,6 +745,9 @@ function AdminProductsContent() {
   // Unidades vendidas por producto (columna Ventas, display only).
   const [sales, setSales] = useState<Record<number, number>>({})
   const [salesAmount, setSalesAmount] = useState<Record<number, number>>({})
+  // Fuentes decorativas de row-meta que no llegaron: el listado se pinta igual,
+  // pero se avisa en vez de dejar columnas vacías sin explicación.
+  const [metaDegraded, setMetaDegraded] = useState<RowMetaSource[]>([])
 
   /** Query string compartida por la tabla, select-all y export. */
   const listParams = (extra: Record<string, string>) => {
@@ -797,6 +808,7 @@ function AdminProductsContent() {
           const metaRes = await fetch(`/api/admin/products/row-meta?ids=${ids.join(",")}`)
           const meta = await metaRes.json().catch(() => ({}))
           if (!cancelled && metaRes.ok) {
+            setMetaDegraded((meta.degraded ?? []) as RowMetaSource[])
             setWaPending(new Set(meta.waPending ?? []))
             const byId: Record<number, { at: string; email: string | null }> = {}
             for (const [id, v] of Object.entries(meta.lastEdit ?? {})) {
@@ -813,8 +825,18 @@ function AdminProductsContent() {
               amountsById[Number(id)] = v as number
             }
             setSalesAmount(amountsById)
+          } else if (!cancelled) {
+            // La lectura entera falló: ninguna de las tres columnas decorativas
+            // tiene datos, así que se declaran las tres en vez de mentir con
+            // ceros. Las filas del listado ya se pintaron.
+            setMetaDegraded(["queue", "audit", "sales"])
+            setWaPending(new Set())
+            setLastEdit({})
+            setSales({})
+            setSalesAmount({})
           }
         } else if (!cancelled) {
+          setMetaDegraded([])
           setWaPending(new Set())
           setLastEdit({})
           setSales({})
@@ -3371,6 +3393,24 @@ function AdminProductsContent() {
             limitado (sin papelera, publicación programada, nota interna ni orden por más vendidos)
             hasta aplicarlas con{" "}
             <code className="font-mono text-xs">npx supabase db push</code>.
+          </span>
+        </div>
+      )}
+
+      {/* Aviso de metadatos degradados: row-meta entrega lo que pudo y declara
+          qué fuente falló, para no mostrar columnas vacías sin explicación. */}
+      {metaDegraded.length > 0 && (
+        <div
+          role="status"
+          className="mb-4 flex items-center gap-2 px-4 py-3 bg-amber-50 text-amber-800 text-sm rounded-xl border border-amber-200"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>
+            No se pudieron cargar todos los metadatos del listado
+            {metaDegraded.length < 3
+              ? `: ${metaDegraded.map((s) => META_SOURCE_LABELS[s]).join(", ")} aparecen vacíos.`
+              : "."}{" "}
+            Los datos del producto (precio, stock, estado) no se ven afectados.
           </span>
         </div>
       )}

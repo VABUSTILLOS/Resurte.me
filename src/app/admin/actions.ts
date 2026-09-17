@@ -3362,11 +3362,29 @@ export async function setFoodosTierOverride(
  */
 const ADOPTION_SOURCES: Record<
   Exclude<FoodosFeature, "app_marca">,
-  { table: string; column: string; onlyOk?: boolean; notNull?: boolean }
+  {
+    table: string
+    column: string
+    onlyOk?: boolean
+    notNull?: boolean
+    /** Filtro extra para fuentes que comparten tabla con otros canales. */
+    eq?: { column: string; value: string }
+  }
 > = {
   marketing_ia: { table: "foodos_campaigns", column: "sent_at" },
   flotilla: { table: "foodos_deliveries", column: "created_at" },
   mesero_ia: { table: "foodos_ai_sessions", column: "created_at" },
+  // Venta en mostrador: un pedido con ese canal es la prueba de que la caja
+  // nativa se usa. `foodos_orders` es compartida con web/qr/whatsapp, así que
+  // sin el filtro de canal contaríamos como mostrador pedidos que no lo son.
+  pos_mostrador: {
+    table: "foodos_orders",
+    column: "created_at",
+    eq: { column: "channel", value: "mostrador" },
+  },
+  // Comandero: abrir una cuenta de mesa ya es adoptar el comandero, sin
+  // importar si la mesa terminó cerrada.
+  comandero: { table: "foodos_table_tickets", column: "created_at" },
   wallet_passes: { table: "foodos_wallet_passes", column: "created_at" },
   // Solo las aprobadas: un borrador que la IA generó y el dueño nunca revisó
   // no es adopción del sitio. El filtro de no-nulos no es cosmético: en un
@@ -3470,6 +3488,7 @@ export async function getAdminFoodosAdoption(): Promise<AdminFoodosAdoption> {
         .limit(ADOPTION_ACTIVITY_LIMIT)
       if (src.onlyOk) query = query.eq("status", "ok")
       if (src.notNull) query = query.not(src.column, "is", null)
+      if (src.eq) query = query.eq(src.eq.column, src.eq.value)
       return query
     }),
   ])

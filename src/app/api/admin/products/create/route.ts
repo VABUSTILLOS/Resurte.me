@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { readJsonBody } from "@/lib/api-body"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
@@ -62,7 +63,10 @@ export async function POST(request: Request) {
       return adminDenied
     }
 
-    const body = await request.json()
+    const parsed = await readJsonBody<Record<string, unknown>>(request)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+
+    const body = parsed.data
     const name = typeof body.name === "string" ? body.name.trim() : ""
     if (!name) {
       return NextResponse.json({ error: "El nombre es obligatorio", field: "name" }, { status: 400 })

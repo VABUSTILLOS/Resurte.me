@@ -27,6 +27,7 @@
 
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { readJsonBody } from "@/lib/api-body"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
@@ -126,13 +127,17 @@ export async function POST(request: Request) {
     const { response: adminDenied, user: adminUser } = await requireAdmin()
     if (adminDenied) return adminDenied
 
-    const body = (await request.json()) as {
+    const bodyResult = await readJsonBody<{
       ids?: unknown
       patch?: unknown
       patches?: unknown
       expected?: unknown
       force?: unknown
-    }
+    }>(request)
+    if (!bodyResult.ok)
+      return NextResponse.json({ error: bodyResult.error }, { status: bodyResult.status })
+
+    const body = bodyResult.data
 
     const idsResult = normalizeBulkIds(body.ids)
     if (!idsResult.ok) {

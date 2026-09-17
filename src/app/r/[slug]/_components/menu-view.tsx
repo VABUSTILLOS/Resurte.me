@@ -211,7 +211,7 @@ function ItemCard({ item, hasOptions, price, isFavorite, onToggleFavorite, onAdd
         {item.tags.length > 0 && (
           <div className="flex gap-1 mb-1">
             {item.tags.slice(0, 2).map((t) => (
-              <span key={t} className="text-[10px] bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full capitalize">
+              <span key={t} className="text-[10px] bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full capitalize">
                 {t}
               </span>
             ))}

@@ -10,9 +10,11 @@ import {
   Gift,
   Globe,
   Handshake,
+  LayoutGrid,
   MessageCircle,
   PiggyBank,
   Plug,
+  ShoppingCart,
   Smartphone,
   Sparkles,
   Store,
@@ -66,6 +68,18 @@ const FEATURE_COPY: Record<FoodosFeature, { label: string; description: string; 
       "Contesta el WhatsApp del restaurante, arma el pedido y lo deja listo para que tú solo lo confirmes.",
     icon: Bot,
   },
+  pos_mostrador: {
+    label: "Punto de venta en mostrador",
+    description:
+      "Cobra en el local sin depender de nadie: efectivo, tarjeta o transferencia, incluso combinados, con ticket y folio automáticos.",
+    icon: ShoppingCart,
+  },
+  comandero: {
+    label: "Comandero de mesas",
+    description:
+      "El mapa de tu salón con zonas y mesas como están acomodadas. Abre cuentas, manda a cocina y cobra al final.",
+    icon: LayoutGrid,
+  },
   wallet_passes: {
     label: "Tarjeta de lealtad en el celular",
     description:
@@ -85,7 +99,7 @@ const FEATURE_COPY: Record<FoodosFeature, { label: string; description: string; 
     icon: Globe,
   },
   pos_integraciones: {
-    label: "Punto de venta",
+    label: "Conectar tu punto de venta",
     description:
       "Conecta la caja que ya usas y mantén un solo menú y un solo inventario en los dos lados.",
     icon: Plug,

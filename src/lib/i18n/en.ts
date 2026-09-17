@@ -779,6 +779,12 @@ const en: Dictionary = {
       featureMeseroIa: "AI waiter",
       featureMeseroIaDesc:
         "An agent that takes full orders over WhatsApp 24/7, builds the cart with modifiers and hands the ticket to your kitchen with no intervention.",
+      featurePosMostrador: "Counter point of sale",
+      featurePosMostradorDesc:
+        "Sell at the counter without depending on anyone: take cash, card or transfer — even split payments — and the ticket prints itself, with a folio.",
+      featureComandero: "Table command system",
+      featureComanderoDesc:
+        "Your floor map with zones and tables laid out exactly as they are. Open checks, send to the kitchen, merge or move tables, and charge at the end.",
       featureWalletPasses: "Loyalty card in Wallet",
       featureWalletPassesDesc:
         "Your points program in Apple and Google Wallet, with automatic birthday and win-back messages.",

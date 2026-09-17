@@ -784,6 +784,12 @@ export const es = {
       featureMeseroIa: "Mesero IA",
       featureMeseroIaDesc:
         "Un agente que toma pedidos completos por WhatsApp 24/7, arma el carrito con modificadores y entrega la comanda a tu cocina sin intervención.",
+      featurePosMostrador: "Punto de venta en mostrador",
+      featurePosMostradorDesc:
+        "Vende en el local sin depender de nadie: cobra en efectivo, tarjeta o transferencia —incluso en pagos combinados— y el ticket sale solo, con folio.",
+      featureComandero: "Comandero de mesas",
+      featureComanderoDesc:
+        "El mapa de tu salón con zonas y mesas tal como están acomodadas. Abre cuentas, manda a cocina, une o cambia mesas de lugar y cobra al final.",
       featureWalletPasses: "Tarjeta de lealtad en Wallet",
       featureWalletPassesDesc:
         "Tu programa de puntos en Apple y Google Wallet, con cumpleaños y mensajes de reactivación automáticos.",
