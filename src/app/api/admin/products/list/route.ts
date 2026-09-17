@@ -481,14 +481,11 @@ export async function GET(request: NextRequest) {
         noImage,
         lowStock,
         outStock,
-        noCitiesIds,
         noPrice,
         noCategory,
         waMismatch,
         onSale,
         staleSale,
-        dupNameIds,
-        underThresholdIds,
         trashCount,
       ] = await Promise.all([
         alive(supabase.from("products").select("id", { count: "exact", head: true })),
@@ -513,6 +510,7 @@ export async function GET(request: NextRequest) {
             .select("id", { count: "exact", head: true })
             .eq("stock_status", "out_of_stock")
         ),
+        noCitiesProductIds(supabase, withDeletedAt),
         noCitiesProductIds(supabase, withDeletedAt),
         alive(
           supabase.from("products").select("id", { count: "exact", head: true }).is("price", null)
