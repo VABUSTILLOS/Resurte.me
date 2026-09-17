@@ -347,6 +347,53 @@ dashboard. Eso fue la causa del drift histórico (ver `supabase/ESQUEMA.md`).
    la tabla legado `product_stores` ya no se escribe ni se lee (la ruta admin
    `seed-products` aún hace upsert histórico — pendiente de limpieza).
 
+### Si el SQL Editor responde `Failed to fetch (api.supabase.com)`
+
+No es un error de SQL. El editor manda el script entero en **una sola petición
+HTTP**, y si el script abre una transacción explícita (`BEGIN; … COMMIT;`) todo
+corre en **una sola transacción de Postgres**: o se aplica todo, o no se aplica
+nada. Cuando el gateway corta la conexión antes de responder (timeout, o una
+espera de lock más larga que el límite del editor), el navegador no recibe
+respuesta y reporta `Failed to fetch`. El editor **no puede** decirte si
+commiteó, así que hay que averiguarlo por fuera.
+
+Antes de reintentar, comprobar si el DDL llegó a commitear (REST, con la clave
+publicable; ver el snippet de la sección anterior):
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
+  "https://<ref>.supabase.co/rest/v1/bump_affinity?select=id&limit=1"
+# 200 = la tabla existe, el DDL commiteó · 404 PGRST205 = rollback, no se aplicó nada
+```
+
+Ojo: `200` **no** prueba que las filas del sembrado estén. El rol anónimo
+responde `Content-Range: */0` en `bump_affinity` y `bump_rules`, así que el
+conteo real exige canal privilegiado (`npx supabase login` + Management API
+`POST /v1/projects/<ref>/database/query`, o `psql` con la contraseña de la BD).
+
+Todas las migraciones son idempotentes, así que reintentar es seguro. Para que
+el reintento no vuelva a caer en el mismo timeout, **trocear** el script: una
+petición por bloque, en este orden y sin envolverlo en `BEGIN;`/`COMMIT;` (el
+editor ya abre su propia transacción por petición).
+
+1. DDL: los `ALTER TABLE` / `CREATE TABLE` / `CREATE INDEX`.
+2. Funciones: los `CREATE OR REPLACE FUNCTION`.
+3. Datos: `SELECT public.seed_…();` y los bloques `DO $$ … $$` que reescriben
+   filas.
+
+Reglas obligatorias en migraciones que tocan tablas vivas (`bump_rules`,
+`products`, `orders`…):
+
+- `SET LOCAL lock_timeout = '5s';` al inicio de la transacción. Si otro proceso
+  tiene la tabla tomada, la migración falla en 5s con un error de lock legible
+  en vez de quedarse esperando hasta que el gateway corte la conexión.
+- Constraints en dos pasos: `ADD CONSTRAINT … NOT VALID;` y después
+  `ALTER TABLE … VALIDATE CONSTRAINT …;`. El `VALIDATE` corre con
+  `SHARE UPDATE EXCLUSIVE` (no bloquea lecturas ni escrituras), así que la
+  ventana de `ACCESS EXCLUSIVE` se reduce al `ALTER TABLE` inicial, que con
+  `NOT VALID` no escanea la tabla. El estado final es idéntico al de un
+  `ADD CONSTRAINT` validado.
+
 ---
 
 ## 9. Métodos de pago locales asíncronos (OXXO, SPEI, CoDi)
@@ -485,16 +532,28 @@ curl -s -H "Authorization: Bearer $TOK" \
 # {'blockedAt': 1789603990031, 'reason': 'FAIR_USE_LIMITS_EXCEEDED', 'blockedDueToOverageType': 'fluidCpuDuration'}
 ```
 
-`blockedAt` = **17-sep-2026 00:13 UTC** (16-sep 18:13 CDMX); el ciclo de
-facturación termina el **18-sep-2026 07:00 UTC** (17-sep 01:00 CDMX).
+Usar `vercel api`, no un `curl` directo: el token de
+`~/Library/Application Support/com.vercel.cli/auth.json` **no** autentica contra
+el REST de Vercel (cualquier endpoint responde `403 invalidToken`), pero el CLI
+sí lo usa para firmar la petición. `vercel usage` tampoco sirve en Hobby:
+responde `Costs not found (404)`.
+
+`blockedAt` = **17-sep-2026 00:13 UTC** (16-sep 18:13 CDMX). El fin de ciclo
+(**18-sep-2026 07:00 UTC**) es una **estimación, no un dato verificable**: la API
+devuelve `billing.period` = `null`, así que la fecha de reinicio no se puede
+confirmar por API.
+
+Un `402` lo sirve el **edge** antes de invocar la función (responde en ~0.35 s
+sin SSR), así que una sonda de estado suelta no consume Active CPU. Lo que sí
+consume es cualquier `page.goto` de Playwright contra un sitio **sano**.
 
 Remedios, en orden de rapidez:
 
 1. **Subir el equipo a Vercel Pro** — levanta el bloqueo de inmediato y da
    Active CPU por uso. Es además lo que exigen las Fair Use Guidelines: Hobby
    es solo para uso personal no comercial, y esta app cobra con Stripe.
-2. **Esperar el reinicio del ciclo** (18-sep 07:00 UTC) — el bloqueo se levanta
-   solo, pero son ~30 h de sitio caído.
+2. **Esperar el reinicio del ciclo** (18-sep 07:00 UTC, estimado) — el bloqueo
+   se levanta solo, pero son ~30 h de sitio caído.
 3. **Bajar el consumo de Active CPU** antes de que el ciclo vuelva a empezar:
    el costo lo dominan las regeneraciones ISR. Las páginas de catálogo
    (`/[slug]`, `/[slug]/categoria/[categorySlug]`,
@@ -510,6 +569,16 @@ Remedios, en orden de rapidez:
 
 No hay endpoint público para levantar el bloqueo: solo cambiar de plan o
 esperar. Vercel manda un correo al `vabustillos@gmail.com` con el detalle.
+
+**Resuelto el 16-sep-2026 18:47 CDMX (17-sep 00:47 UTC).** El equipo se pasó a
+**Pro**: `softBlock` quedó en `null` y el sitio volvió a servir de inmediato. Se
+redesplegó producción (`vercel redeploy`) y se confirmó con smoke: `/`,
+`/compartir`, `/recompensas`, `/blog`, `/checkout` y `/api/categories` en 200,
+14 categorías, precios por unidad renderizados y `POST /api/cart/bumps` devolviendo
+ofertas reales (por ejemplo `recipe_collection` con `discount_pct`). Lección
+operativa: con Hobby, 538 páginas ISR a `revalidate = 300` bastan para agotar
+las 4 h/mes de Active CPU; en Pro el recurso se cobra por uso, pero conviene
+subir el `revalidate` igual para no pagar regeneraciones que nadie mira.
 
 ### Migraciones pendientes de aplicar a mano
 
@@ -533,6 +602,9 @@ si faltan en un entorno nuevo:
   `SELECT public.seed_bump_affinity();`, que resuelve los pares canónicos
   contra el catálogo por slug (los slugs ausentes se omiten en silencio), así
   que en un entorno nuevo hay que ejecutar esa función después del catálogo.
+  Desde el incidente `Failed to fetch (api.supabase.com)` lleva el blindaje
+  anti-timeout descrito en §9: `SET LOCAL lock_timeout = '5s'` y el CHECK de
+  `trigger_type` en dos pasos (`NOT VALID` + `VALIDATE CONSTRAINT`).
 - `00113_user_carts_bumps.sql` — sin ella `PUT /api/cart/bumps/selection` y
   `POST /api/cart/bumps/hydrate` devuelven 500 y la selección de bumps solo
   sobrevive en `localStorage` (el cliente degrada en silencio, no rompe la
