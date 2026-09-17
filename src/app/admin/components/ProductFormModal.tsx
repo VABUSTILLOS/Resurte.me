@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react"
 import { ImagePlus, Loader2, Plus, Search, Sparkles, Star, X } from "lucide-react"
 import { cropImageToSquare } from "@/lib/crop-image"
-import { PRODUCT_FIELD_INPUT_IDS, validateProductForm } from "@/lib/product-form"
+import {
+  PRODUCT_FIELD_INPUT_IDS,
+  formKeyForServerField,
+  validateProductForm,
+} from "@/lib/product-form"
 import {
   DEFAULT_LOW_STOCK_THRESHOLD,
   deriveStockStatus,
@@ -765,10 +769,7 @@ export function ProductFormModal({
     if (check.firstInvalid) {
       setFieldErrors(check.errors)
       setError("Revisa los campos marcados en rojo")
-      const inputId = PRODUCT_FIELD_INPUT_IDS[check.firstInvalid]
-      const target = inputId ? document.getElementById(inputId) : null
-      target?.scrollIntoView({ block: "center" })
-      target?.focus()
+      focusField(check.firstInvalid)
       return
     }
     setFieldErrors({})
@@ -827,7 +828,13 @@ export function ProductFormModal({
             body: JSON.stringify(payload),
           })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error ?? "Error al guardar el producto")
+      if (!res.ok) {
+        const message = data.error ?? "Error al guardar el producto"
+        // Un 400/409 de campo (SKU duplicado, precio inválido…) marca su
+        // control; el aviso general se pinta igual como resumen.
+        markServerField(data.field, message)
+        throw new Error(message)
+      }
 
       if (isEdit) {
         onSaved({ ...product, ...payload, created_at: product.created_at ?? null }, false)
@@ -839,6 +846,23 @@ export function ProductFormModal({
     } finally {
       setSaving(false)
     }
+  }
+
+  /** Lleva el foco al control del campo, centrado, para que se vea el error. */
+  function focusField(key: string) {
+    const inputId = PRODUCT_FIELD_INPUT_IDS[key]
+    const target = inputId ? document.getElementById(inputId) : null
+    target?.scrollIntoView({ block: "center" })
+    target?.focus()
+  }
+
+  /** Marca el campo culpable de un error devuelto por el servidor. */
+  function markServerField(field: unknown, message: string): boolean {
+    const key = formKeyForServerField(field)
+    if (!key) return false
+    setFieldErrors({ [key]: message })
+    focusField(key)
+    return true
   }
 
   const inputCls =
@@ -1758,17 +1782,33 @@ export function ProductFormModal({
             <div className="flex gap-2">
               <button
                 type="button"
+                onClick={onClose}
+                disabled={saving}
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+              >
+                Descartar cambios
+              </button>
+              <button
+                type="button"
                 onClick={() => setConfirmingClose(false)}
-                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                disabled={saving}
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
               >
                 Seguir editando
               </button>
               <button
                 type="button"
-                onClick={onClose}
-                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+                onClick={() => {
+                  // Cerrar el aviso primero: si la validación falla, el usuario
+                  // ve los errores de campo en vez de la barra de descarte.
+                  setConfirmingClose(false)
+                  void submitForm()
+                }}
+                disabled={saving}
+                className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
               >
-                Descartar cambios
+                {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Guardar y cerrar
               </button>
             </div>
           </div>

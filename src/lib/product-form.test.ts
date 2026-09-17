@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { validateProductForm, PRODUCT_FIELD_INPUT_IDS } from "./product-form"
+import { validateProductForm, PRODUCT_FIELD_INPUT_IDS, formKeyForServerField } from "./product-form"
 import type { ProductFormInput } from "./product-form"
 
 const VALID: ProductFormInput = {
@@ -153,6 +153,50 @@ describe("validateProductForm", () => {
     })
     for (const key of Object.keys(result.errors)) {
       expect(PRODUCT_FIELD_INPUT_IDS[key]).toBeTruthy()
+    }
+  })
+})
+
+describe("formKeyForServerField", () => {
+  it("traduce las columnas del servidor a las claves del formulario", () => {
+    expect(formKeyForServerField("name")).toBe("name")
+    expect(formKeyForServerField("sale_price")).toBe("salePrice")
+    expect(formKeyForServerField("low_stock_threshold")).toBe("lowStockThreshold")
+    expect(formKeyForServerField("stock_quantity")).toBe("stockQuantity")
+    expect(formKeyForServerField("sku")).toBe("sku")
+    expect(formKeyForServerField("barcode")).toBe("barcode")
+  })
+
+  it("manda las dos fechas de la oferta al mismo campo", () => {
+    expect(formKeyForServerField("sale_starts_at")).toBe("saleWindow")
+    expect(formKeyForServerField("sale_ends_at")).toBe("saleWindow")
+  })
+
+  it("no marca nada cuando el servidor no dice el campo o no hay control", () => {
+    expect(formKeyForServerField(undefined)).toBeNull()
+    expect(formKeyForServerField(null)).toBeNull()
+    expect(formKeyForServerField(42)).toBeNull()
+    expect(formKeyForServerField("productId")).toBeNull()
+  })
+
+  it("toda clave traducida tiene un control al que llevar el foco", () => {
+    const serverFields = [
+      "name",
+      "category_id",
+      "price",
+      "sale_price",
+      "sale_starts_at",
+      "sale_ends_at",
+      "cost",
+      "stock_quantity",
+      "low_stock_threshold",
+      "sku",
+      "barcode",
+    ]
+    for (const field of serverFields) {
+      const key = formKeyForServerField(field)
+      expect(key).toBeTruthy()
+      expect(PRODUCT_FIELD_INPUT_IDS[key as string]).toBeTruthy()
     }
   })
 })

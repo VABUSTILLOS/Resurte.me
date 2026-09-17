@@ -40,7 +40,12 @@ export async function PATCH(request: Request) {
     // URLs ya indexadas/compartidas.
     const parsed = validateProductPatch(fields, { productId: Number(productId) })
     if (!parsed.ok) {
-      return NextResponse.json({ error: parsed.error }, { status: 400 })
+      // `field` deja que el modal marque el control culpable; el mensaje sigue
+      // sirviendo como aviso general.
+      return NextResponse.json(
+        { error: parsed.error, field: parsed.field ?? null },
+        { status: 400 }
+      )
     }
     const updates = parsed.updates
 
@@ -81,7 +86,7 @@ export async function PATCH(request: Request) {
         .maybeSingle()
       if (clash) {
         return NextResponse.json(
-          { error: `El SKU ${updates.sku} ya está en uso por otro producto` },
+          { error: `El SKU ${updates.sku} ya está en uso por otro producto`, field: "sku" },
           { status: 409 }
         )
       }

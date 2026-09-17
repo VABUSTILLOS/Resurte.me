@@ -65,23 +65,27 @@ export async function POST(request: Request) {
     const body = await request.json()
     const name = typeof body.name === "string" ? body.name.trim() : ""
     if (!name) {
-      return NextResponse.json({ error: "El nombre es obligatorio" }, { status: 400 })
+      return NextResponse.json({ error: "El nombre es obligatorio", field: "name" }, { status: 400 })
     }
 
     const price = body.price === null || body.price === undefined ? null : Number(body.price)
     if (price !== null && (!Number.isFinite(price) || price < 0)) {
-      return NextResponse.json({ error: "Precio inválido" }, { status: 400 })
+      return NextResponse.json({ error: "Precio inválido", field: "price" }, { status: 400 })
     }
     const salePrice =
       body.sale_price === null || body.sale_price === undefined ? null : Number(body.sale_price)
     if (salePrice !== null && (!Number.isFinite(salePrice) || salePrice < 0)) {
-      return NextResponse.json({ error: "Precio de oferta inválido" }, { status: 400 })
+      return NextResponse.json({ error: "Precio de oferta inválido", field: "sale_price" }, { status: 400 })
     }
 
     const sku = validateSku(body.sku)
-    if (!sku.ok) return NextResponse.json({ error: sku.error }, { status: 400 })
+    if (!sku.ok) {
+      return NextResponse.json({ error: sku.error, field: "sku" }, { status: 400 })
+    }
     const barcode = validateBarcode(body.barcode)
-    if (!barcode.ok) return NextResponse.json({ error: barcode.error }, { status: 400 })
+    if (!barcode.ok) {
+      return NextResponse.json({ error: barcode.error, field: "barcode" }, { status: 400 })
+    }
     const tags = normalizeTags(body.tags)
     if (tags === null) {
       return NextResponse.json(
@@ -146,7 +150,7 @@ export async function POST(request: Request) {
       if (v !== null && v !== undefined) {
         if (typeof v !== "string" || Number.isNaN(new Date(v).getTime())) {
           return NextResponse.json(
-            { error: `${field} debe ser una fecha ISO válida o null` },
+            { error: `${field} debe ser una fecha ISO válida o null`, field },
             { status: 400 }
           )
         }
@@ -182,7 +186,7 @@ export async function POST(request: Request) {
         .maybeSingle()
       if (clash) {
         return NextResponse.json(
-          { error: `El SKU ${sku.value} ya está en uso por otro producto` },
+          { error: `El SKU ${sku.value} ya está en uso por otro producto`, field: "sku" },
           { status: 409 }
         )
       }

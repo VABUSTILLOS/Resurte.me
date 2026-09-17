@@ -238,7 +238,21 @@
   `src/lib/product-form.test.ts`, no dentro del modal. Además deben espejar
   `create`/`update`: al cambiar una allí, cambiar la otra. El error de campo se
   pinta con `fieldCls`/`fieldA11y` y se retira con `clearFieldError` en el
-  `onChange` — un error que no se limpia al corregir el campo es un bug.
+  `onChange` — un error que no se limpia al corregir el campo es un bug. (5)
+  **Errores del servidor con campo**: `create`/`update` devuelven `field` cuando
+  rechazan (400 de `validateProductPatch`, 409 de SKU duplicado) y el modal lo
+  traduce con `formKeyForServerField` (`src/lib/product-form.ts`) para marcarlo
+  con `markServerField`; si se añade una regla de validación al servidor, esa
+  regla debe traer su `field` y su entrada en el mapa, o el error volverá a
+  caer solo en el aviso general. El contrato de esos `field` lo fija
+  `src/lib/product-patch.test.ts` (una prueba por rama). (6) **Un solo
+  `role="alert"`**: el resumen de validación. `FieldError` NO lleva `role` —con
+  9 campos mal serían 9 alertas encima del resumen—: los errores de campo se
+  anuncian al enfocar su control vía `aria-describedby`. (7) **"Guardar y
+  cerrar"**: cierra el aviso (`setConfirmingClose(false)`) **antes** de llamar a
+  `submitForm()` —invertir el orden deja la barra de descarte tapando los
+  errores de validación— y la acción primaria va al final de la barra. El modal
+  no se cierra solo al guardar: lo cierra el padre desde `onSaved`.
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
@@ -537,16 +551,32 @@ marcarse con `aria-current`; pulsar "Precios" debe llevar a esa sección respeta
 formulario vacío: deben salir **todos** los errores a la vez (no solo el primero),
 el resumen "Revisa los campos marcados en rojo" arriba y el foco en el campo
 nombre; corregir un campo debe quitar su error al escribir (y el resumen cuando
-no quede ninguno). Probar un precio `-1`, un costo `abc`, una cantidad `2.5` y una
+no quede ninguno). Probar un precio `-1`, un costo `-2`, una cantidad `2.5` y una
 oferta que empiece después de terminar: cada uno marca su campo, y en la ventana
 de oferta los dos `datetime-local` quedan en rojo con el mismo mensaje. Escribir
 algo y pulsar Escape (o el velo, o la X): debe aparecer la confirmación de
 descarte; `Escape` otra vez la cierra sin cerrar el modal, y con la pestaña sucia
-el navegador debe pedir confirmación al recargar. Con Tab desde el último control
+el navegador debe pedir confirmación al recargar. La barra de descarte ofrece las
+tres salidas (Descartar cambios / Seguir editando / Guardar y cerrar, la primaria
+al final): con el precio en `-1`, "Guardar y cerrar" debe dejar a la vista el
+error del precio y no la barra, y con datos válidos debe guardar y cerrar sin
+pasar por la barra. Con Tab desde el último control
 el foco debe volver al primero, y el listado de atrás no debe scrollear mientras
 el modal está abierto. Repetir en "Editar" sobre un producto con SKU: guardar sin
 tocar nada no debe marcar "Cambios sin guardar". Las reglas de validación se
 cubren además sin navegador: `npx vitest run src/lib/product-form.test.ts`
 (forma válida, formulario vacío, números negativos/`NaN`, cantidades no enteras,
 SKU/código de barras, ventana de oferta invertida y "todos los errores a la vez"
-con el orden de foco).
+con el orden de foco) y el mapeo de los `field` del servidor. Para los casos que
+solo se ven en pantalla está `e2e/admin-productos-modal.spec.ts` (`@ci`):
+
+```bash
+npm run test:e2e -- e2e/admin-productos-modal.spec.ts        # guardas (sin sesión)
+E2E_ADMIN_EMAIL=… E2E_ADMIN_PASSWORD=… npm run test:e2e -- \
+  e2e/admin-productos-modal.spec.ts                          # + comportamiento
+```
+
+Sin credenciales los 6 casos de comportamiento se saltan solos; con ellas
+ejercen las invariantes (4) a (7) sin guardar nada (el formulario se deja
+inválido a propósito). Un SKU duplicado debe marcar `#pf-sku` en rojo con el
+mensaje del servidor y llevar el foco ahí, no dejar el aviso general solo.

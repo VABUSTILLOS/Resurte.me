@@ -54,6 +54,35 @@ export const PRODUCT_FIELD_INPUT_IDS: Record<string, string> = {
   saleWindow: "pf-sale-start",
 }
 
+/**
+ * Columna del servidor → clave de error del formulario. El servidor habla en
+ * snake_case (`sale_price`) y el modal en camelCase (`salePrice`); este mapa es
+ * el único punto donde se traduce, para que un 400/409 de campo se pueda pintar
+ * sobre el control culpable en vez de solo en el aviso general.
+ */
+const SERVER_FIELD_TO_FORM_KEY: Record<string, string> = {
+  name: "name",
+  category_id: "category",
+  price: "price",
+  sale_price: "salePrice",
+  sale_starts_at: "saleWindow",
+  sale_ends_at: "saleWindow",
+  cost: "cost",
+  stock_quantity: "stockQuantity",
+  low_stock_threshold: "lowStockThreshold",
+  sku: "sku",
+  barcode: "barcode",
+}
+
+/**
+ * Traduce el `field` que devuelve la API a la clave de error del formulario.
+ * Devuelve null si la API no lo indica o si no hay control que marcar.
+ */
+export function formKeyForServerField(field: unknown): string | null {
+  if (typeof field !== "string") return null
+  return SERVER_FIELD_TO_FORM_KEY[field] ?? null
+}
+
 /** Cadena vacía (o solo espacios) → sin valor; si no, número finito o NaN. */
 function parseDecimal(raw: string): number | null {
   return raw.trim() === "" ? null : parseFloat(raw)
