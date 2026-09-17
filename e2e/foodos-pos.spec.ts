@@ -72,7 +72,8 @@ test.describe("marketplace HoyQueComemos", { tag: "@ci" }, () => {
     })
 
     expect(response?.status()).toBe(404)
-    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible()
+    // Mismo margen que en foodos.spec.ts: el boundary se hidrata, no viene en la cáscara.
+    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible({ timeout: 15000 })
     await expect(page.getByText("Página no encontrada")).toBeVisible()
   })
 

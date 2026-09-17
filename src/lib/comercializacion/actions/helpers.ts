@@ -60,7 +60,8 @@ export function validateProspectContact(input: {
 export function mapProspect(row: Record<string, unknown>): Prospect {
   return {
     id: Number(row.id),
-    seller_id: String(row.seller_id),
+    // Un prospecto sin vendedor llega como NULL; `String(null)` daría "null".
+    seller_id: row.seller_id != null ? String(row.seller_id) : null,
     name: String(row.name),
     restaurant_name: (row.restaurant_name as string | null) ?? null,
     phone: (row.phone as string | null) ?? null,

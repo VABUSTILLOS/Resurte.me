@@ -9,12 +9,15 @@
  * lugar de escribir hrefs a mano.
  */
 
+import { crmHref } from "@/lib/crm-filters"
+
 export type AdminAlertKind =
   | "stale_pending"
   | "out_of_stock"
   | "low_stock"
   | "coupon_expiring"
   | "new_leads"
+  | "follow_ups_due"
 
 export type AdminAlertSeverity = "critical" | "warning" | "info"
 
@@ -26,10 +29,12 @@ export interface AlertLinkSource {
 }
 
 /**
- * Los leads son el CRM de prospectos: no hay un filtro que aislar, la lista
- * completa es el destino.
+ * Los leads nuevos caen en la bandeja "pendientes" del CRM, que es justo lo que
+ * la alerta quiere que el admin atienda. El destino se arma con el mismo
+ * serializador que usa la página (`crmHref`), no a mano: si mañana cambian los
+ * valores por defecto del filtro, la alerta sigue aterrizando en el mismo sitio.
  */
-export const ADMIN_LEADS_HREF = "/admin/leads"
+export const ADMIN_LEADS_HREF = crmHref({ tab: "leads", box: "pendientes" })
 
 /**
  * Enlace al recurso concreto de cada alerta. Los parámetros coinciden con los
@@ -51,6 +56,11 @@ export function buildAlertHref(alert: AlertLinkSource): string {
     }
     case "new_leads":
       return ADMIN_LEADS_HREF
+    case "follow_ups_due":
+      // Los seguimientos vencidos viven en el tablero, no en la bandeja de
+      // leads: la alerta aterriza directamente en la tab `pipeline` con el
+      // filtro `due` ya aplicado.
+      return crmHref({ tab: "pipeline", due: true })
   }
 }
 

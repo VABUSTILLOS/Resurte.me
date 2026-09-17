@@ -62,8 +62,8 @@ import {
   Target,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
-import NivelGate from "@/components/panel/foodos/nivel-gate"
-import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
+import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
+import { useTierGuard } from "@/hooks/use-tier-guard"
 import { t } from "@/lib/i18n/es"
 
 const AUTOMATION_TYPES: { id: FoodosAutomationType; label: string; hint: string }[] = [
@@ -145,8 +145,7 @@ const SEGMENT_FILTERS: { id: FoodosCustomerSegment | "all"; label: string }[] = 
 export default function ClientesPage() {
   // El CRM es base; las automatizaciones y campañas son la capacidad premium
   // "marketing_ia" (Plata). El servidor las bloquea y aquí se explica por qué.
-  const { can } = useEntitlements()
-  const canMarketingIa = can("marketing_ia")
+  const { run, upsellDialog } = useTierGuard("marketing_ia")
 
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
   const [customers, setCustomers] = useState<FoodosCustomer[]>([])
@@ -252,12 +251,15 @@ export default function ClientesPage() {
     if (!restaurant) return
     setSaving(true)
     try {
-      await upsertLoyaltyProgram({
-        restaurant_id: restaurant.id,
-        points_per_100: Number(loyaltyForm.points_per_100) || 0,
-        point_value: Number(loyaltyForm.point_value) || 0,
-        is_active: loyaltyForm.is_active,
-      })
+      const attempt = await run(() =>
+        upsertLoyaltyProgram({
+          restaurant_id: restaurant.id,
+          points_per_100: Number(loyaltyForm.points_per_100) || 0,
+          point_value: Number(loyaltyForm.point_value) || 0,
+          is_active: loyaltyForm.is_active,
+        })
+      )
+      if (!attempt.ran) return
       setLoyalty(await getLoyaltyProgram(restaurant.id))
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al guardar lealtad")
@@ -269,14 +271,16 @@ export default function ClientesPage() {
   async function handleAdjustCredit(customerId: string) {
     const amount = Number(creditAmount)
     if (!amount) return
-    await adjustCustomerCredit(customerId, amount)
+    const attempt = await run(() => adjustCustomerCredit(customerId, amount))
+    if (!attempt.ran) return
     setCreditDraft(null)
     setCreditAmount("")
     await load()
   }
 
   async function handleToggleReview(id: string, isVisible: boolean) {
-    await setReviewVisibility(id, isVisible)
+    const attempt = await run(() => setReviewVisibility(id, isVisible))
+    if (!attempt.ran) return
     setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, is_visible: isVisible } : r)))
   }
 
@@ -291,20 +295,23 @@ export default function ClientesPage() {
           : autoForm.type === "season_promo"
             ? { season: autoForm.name, target_segment: "recurrente" as const }
             : { target_segment: "recurrente" as const }
-      await upsertAutomation({
-        id: autoForm.id,
-        restaurant_id: restaurant.id,
-        type: autoForm.type,
-        name: autoForm.name.trim(),
-        trigger_config: triggerConfig,
-        message: autoForm.message.trim() || null,
-        message_b: autoForm.message_b.trim() || null,
-        ab_test: autoForm.ab_test,
-        audience: autoForm.audience || null,
-        channel: autoForm.channel,
-        incentive_config: autoForm.discount_pct ? { discount_pct: Number(autoForm.discount_pct) } : {},
-        is_active: true,
-      })
+      const attempt = await run(() =>
+        upsertAutomation({
+          id: autoForm.id,
+          restaurant_id: restaurant.id,
+          type: autoForm.type,
+          name: autoForm.name.trim(),
+          trigger_config: triggerConfig,
+          message: autoForm.message.trim() || null,
+          message_b: autoForm.message_b.trim() || null,
+          ab_test: autoForm.ab_test,
+          audience: autoForm.audience || null,
+          channel: autoForm.channel,
+          incentive_config: autoForm.discount_pct ? { discount_pct: Number(autoForm.discount_pct) } : {},
+          is_active: true,
+        })
+      )
+      if (!attempt.ran) return
       setShowAutoForm(false)
       setAutoForm(EMPTY_AUTO)
       setAiBrief("")
@@ -323,13 +330,17 @@ export default function ClientesPage() {
     setSendingCampaign(auto.id)
     setError(null)
     try {
-      const { data: campaign } = await insertCampaign({
-        restaurant_id: restaurant.id,
-        automation_id: auto.id,
-        status: "scheduled",
-        // El canal por cliente lo resuelve el motor; aquí solo dejamos registrado el preferido.
-        channel: auto.channel === "sms" ? "sms" : "whatsapp",
-      })
+      const attempt = await run(() =>
+        insertCampaign({
+          restaurant_id: restaurant.id,
+          automation_id: auto.id,
+          status: "scheduled",
+          // El canal por cliente lo resuelve el motor; aquí solo dejamos registrado el preferido.
+          channel: auto.channel === "sms" ? "sms" : "whatsapp",
+        })
+      )
+      if (!attempt.ran) return
+      const { data: campaign } = attempt.value
       const result = await runCampaignNow(campaign.id)
       if (result.failed > 0) {
         setError(
@@ -348,7 +359,8 @@ export default function ClientesPage() {
   async function removeCampaign(id: string) {
     if (!confirm(t("foodos.clientes.deleteCampaignConfirm"))) return
     if (!restaurant) return
-    await deleteCampaign(id)
+    const attempt = await run(() => deleteCampaign(id))
+    if (!attempt.ran) return
     setCampaigns(await listCampaigns(restaurant.id))
   }
 
@@ -368,13 +380,17 @@ export default function ClientesPage() {
       const audience = isAudienceKey(autoForm.audience)
         ? t(AUDIENCE_PLAYBOOK[autoForm.audience].labelKey)
         : null
-      const result = await generateCampaignCopy({
-        restaurant_id: restaurant.id,
-        brief: aiBrief.trim(),
-        offer: autoForm.discount_pct ? `${autoForm.discount_pct}% de descuento` : null,
-        audienceLabel: audience,
-        tone: aiTone,
-      })
+      const attempt = await run(() =>
+        generateCampaignCopy({
+          restaurant_id: restaurant.id,
+          brief: aiBrief.trim(),
+          offer: autoForm.discount_pct ? `${autoForm.discount_pct}% de descuento` : null,
+          audienceLabel: audience,
+          tone: aiTone,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       setAutoForm((f) => ({ ...f, message: result.text }))
       setAiSource(result.source)
     } catch (e) {
@@ -389,11 +405,14 @@ export default function ClientesPage() {
     setSaving(true)
     setError(null)
     try {
-      await updateCustomerProfile({
-        id: profileDraft.id,
-        birthday: profileDraft.birthday || null,
-        sms_opt_in: profileDraft.sms_opt_in,
-      })
+      const attempt = await run(() =>
+        updateCustomerProfile({
+          id: profileDraft.id,
+          birthday: profileDraft.birthday || null,
+          sms_opt_in: profileDraft.sms_opt_in,
+        })
+      )
+      if (!attempt.ran) return
       setCustomers((prev) =>
         prev.map((c) =>
           c.id === profileDraft.id
@@ -413,7 +432,8 @@ export default function ClientesPage() {
     const next = !a.is_active
     setError(null)
     try {
-      await toggleAutomation(a.id, next)
+      const attempt = await run(() => toggleAutomation(a.id, next))
+      if (!attempt.ran) return
       setAutomations(
         automations.map((x) => (x.id === a.id ? { ...x, is_active: next } : x))
       )
@@ -447,7 +467,6 @@ export default function ClientesPage() {
         </div>
         <button
           onClick={() => openAutomationForm()}
-          disabled={!canMarketingIa}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-600"
         >
           <Plus className="w-4 h-4" /> {t("foodos.clientes.newAutomation")}
@@ -457,6 +476,8 @@ export default function ClientesPage() {
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>
       )}
+
+      <ToolPreviewNotice feature="marketing_ia" />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -545,7 +566,7 @@ export default function ClientesPage() {
                             Ajustar crédito
                           </button>
                         )}
-                        {canMarketingIa && profileDraft?.id !== c.id && (
+                        {profileDraft?.id !== c.id && (
                           <button
                             onClick={() =>
                               setProfileDraft({
@@ -641,7 +662,6 @@ export default function ClientesPage() {
                   <button
                     key={a.key}
                     type="button"
-                    disabled={!canMarketingIa}
                     onClick={() => openAutomationForm({ audience: a.key, type: "season_promo" })}
                     className="w-full text-left bg-stone-50 hover:bg-emerald-50 disabled:hover:bg-stone-50 rounded-xl p-3 transition-colors"
                   >
@@ -670,9 +690,7 @@ export default function ClientesPage() {
               <h2 className="font-bold text-stone-900">{t("foodos.clientes.automationsTitle")}</h2>
             </div>
 
-            {!canMarketingIa ? (
-              <NivelGate feature="marketing_ia" variant="inline" />
-            ) : automations.length === 0 ? (
+            {automations.length === 0 ? (
               <p className="text-sm text-stone-400 py-4">
                 {t("foodos.clientes.emptyAutomations")}
               </p>
@@ -729,9 +747,7 @@ export default function ClientesPage() {
               <CalendarClock className="w-5 h-5 text-stone-500" />
               <h2 className="font-bold text-stone-900">{t("foodos.clientes.campaignsTitle")}</h2>
             </div>
-            {!canMarketingIa ? (
-              <NivelGate feature="marketing_ia" variant="inline" />
-            ) : campaigns.length === 0 ? (
+            {campaigns.length === 0 ? (
               <p className="text-sm text-stone-400 py-4">{t("foodos.clientes.emptyCampaigns")}</p>
             ) : (
               <div className="space-y-2">
@@ -767,9 +783,7 @@ export default function ClientesPage() {
               <FlaskConical className="w-5 h-5 text-stone-500" />
               <h2 className="font-bold text-stone-900">{t("foodos.marketing.abResultsTitle")}</h2>
             </div>
-            {!canMarketingIa ? (
-              <NivelGate feature="marketing_ia" variant="inline" />
-            ) : abStats.every((v) => v.total === 0) ? (
+            {abStats.every((v) => v.total === 0) ? (
               <p className="text-sm text-stone-400 py-4">{t("foodos.marketing.abResultsEmpty")}</p>
             ) : (
               <div className="grid grid-cols-2 gap-3">
@@ -880,7 +894,7 @@ export default function ClientesPage() {
 
       {/* Modal nueva automatización */}
       <BottomSheet
-        open={showAutoForm && canMarketingIa}
+        open={showAutoForm}
         onClose={() => setShowAutoForm(false)}
         ariaLabelledby="auto-form-title"
         maxWidthClass="max-w-lg"
@@ -1109,6 +1123,8 @@ export default function ClientesPage() {
           </form>
       </BottomSheet>
       <ToolGuideHost toolKey="clientes" pathname="/panel/foodos/clientes" slug={null} icon="👥" title={t("foodos.clientes.guideTitle")} />
+
+      {upsellDialog}
     </div>
   )
 }

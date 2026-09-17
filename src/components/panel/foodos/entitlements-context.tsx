@@ -10,9 +10,9 @@
 
 import { createContext, useContext, useMemo } from "react"
 import {
+  canUseFeature,
   featuresForTier,
-  hasFeature,
-  minTierFor,
+  lockedTierFor,
   summarizeEntitlements,
   type FoodosEntitlementState,
   type FoodosFeature,
@@ -41,13 +41,6 @@ interface EntitlementsContextValue {
    * renderiza siempre y solo la acción final pide el nivel.
    */
   canUse: (feature: FoodosFeature) => boolean
-  /**
-   * Alias histórico de `canUse`.
-   *
-   * @deprecated Preferir `canUse` para escrituras y `isPreview` para
-   * presentación. Se conserva para no romper los llamadores existentes.
-   */
-  can: (feature: FoodosFeature) => boolean
   /** Nivel que falta para usar la capacidad, o `null` si ya se puede. */
   lockedTier: (feature: FoodosFeature) => CashbackTier | null
   /** ¿La capacidad se muestra en vista previa (solo lectura + demo)? */
@@ -71,12 +64,11 @@ export function FoodosEntitlementsProvider({
   children: React.ReactNode
 }) {
   const ctx = useMemo<EntitlementsContextValue>(() => {
-    const canUse = (feature: FoodosFeature) => isAdmin || hasFeature(value.tier, feature)
+    const canUse = (feature: FoodosFeature) => canUseFeature(value.tier, feature, { isAdmin })
     return {
       entitlements: value,
       canUse,
-      can: canUse,
-      lockedTier: (feature) => (canUse(feature) ? null : minTierFor(feature)),
+      lockedTier: (feature) => lockedTierFor(value.tier, feature, { isAdmin }),
       isPreview: (feature) => !canUse(feature),
       available: featuresForTier(value.tier),
       isAdmin,
@@ -96,8 +88,7 @@ export function useEntitlements(): EntitlementsContextValue {
   return {
     entitlements: EMPTY_ENTITLEMENTS,
     canUse: () => false,
-    can: () => false,
-    lockedTier: (feature) => minTierFor(feature),
+    lockedTier: (feature) => lockedTierFor(EMPTY_ENTITLEMENTS.tier, feature),
     isPreview: () => true,
     available: [],
     isAdmin: false,

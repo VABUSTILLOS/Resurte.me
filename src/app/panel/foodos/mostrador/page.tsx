@@ -34,7 +34,7 @@ import {
 import { getFoodosPanelData } from "../actions"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
-import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
+import { useTierGuard } from "@/hooks/use-tier-guard"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { ItemOptionsModal } from "@/app/r/[slug]/_components/item-options-modal"
 import { t } from "@/lib/i18n/es"
@@ -161,8 +161,7 @@ function parseAmount(raw: string): number {
 }
 
 export default function MostradorPage() {
-  const { can } = useEntitlements()
-  const canMostrador = can(FEATURE)
+  const { run, upsellDialog } = useTierGuard(FEATURE)
 
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
   const [branches, setBranches] = useState<MostradorBranch[]>([])
@@ -466,13 +465,17 @@ export default function MostradorPage() {
     setQuoting(true)
     setNotice(null)
     try {
-      const res = await quoteMostradorDelivery({
-        restaurant_id: restaurant.id,
-        branch_id: branchId || null,
-        subtotal: previewSubtotal,
-        delivery_lat: null,
-        delivery_lng: null,
-      })
+      const attempt = await run(() =>
+        quoteMostradorDelivery({
+          restaurant_id: restaurant.id,
+          branch_id: branchId || null,
+          subtotal: previewSubtotal,
+          delivery_lat: null,
+          delivery_lng: null,
+        })
+      )
+      if (!attempt.ran) return
+      const res = attempt.value
       if (!res.ok) {
         setDeliveryFee(null)
         setNotice({ ok: false, text: res.error ?? t("foodos.mostrador.chargeError") })
@@ -499,23 +502,27 @@ export default function MostradorPage() {
     setCharging(true)
     setNotice(null)
     try {
-      const res = await createMostradorSale({
-        restaurant_id: restaurant.id,
-        branch_id: branchId || null,
-        items: orderItems,
-        service,
-        // Exactamente uno de los dos: desglose o método único.
-        payment_method: breakdown ? null : paymentMethod,
-        payment_breakdown: breakdown,
-        customer_name: customerName.trim() || null,
-        customer_phone: customerPhone.trim() || null,
-        note: note.trim() || null,
-        table_number: service === "dine_in" ? tableNumber.trim() || null : null,
-        delivery_address: service === "delivery" ? address.trim() : null,
-        delivery_notes: service === "delivery" ? deliveryNotes.trim() || null : null,
-        tip,
-        coupon_code: coupon,
-      })
+      const attempt = await run(() =>
+        createMostradorSale({
+          restaurant_id: restaurant.id,
+          branch_id: branchId || null,
+          items: orderItems,
+          service,
+          // Exactamente uno de los dos: desglose o método único.
+          payment_method: breakdown ? null : paymentMethod,
+          payment_breakdown: breakdown,
+          customer_name: customerName.trim() || null,
+          customer_phone: customerPhone.trim() || null,
+          note: note.trim() || null,
+          table_number: service === "dine_in" ? tableNumber.trim() || null : null,
+          delivery_address: service === "delivery" ? address.trim() : null,
+          delivery_notes: service === "delivery" ? deliveryNotes.trim() || null : null,
+          tip,
+          coupon_code: coupon,
+        })
+      )
+      if (!attempt.ran) return
+      const res = attempt.value
 
       if (!res.ok || !res.orderId || !res.folio) {
         setNotice({ ok: false, text: res.error ?? t("foodos.mostrador.chargeError") })
@@ -972,6 +979,8 @@ export default function MostradorPage() {
         title={t("foodos.mostrador.title")}
         subtitle={t("foodos.mostrador.guideSubtitle")}
       />
+
+      {upsellDialog}
     </div>
   )
 }

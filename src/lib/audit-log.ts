@@ -20,6 +20,14 @@ export const AUDIT_ACTIONS = [
   "coupon_delete",
   "stock_adjust",
   "user_role",
+  "lead_convert",
+  "lead_discard",
+  "lead_restore",
+  "crm_prospect_status",
+  "crm_prospect_assign",
+  "crm_prospect_notes",
+  "crm_prospect_follow_up",
+  "crm_prospect_activity",
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -41,6 +49,14 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   coupon_delete: "Cupón eliminado",
   stock_adjust: "Ajuste de stock",
   user_role: "Cambio de rol",
+  lead_convert: "Lead convertido a prospecto",
+  lead_discard: "Lead descartado",
+  lead_restore: "Lead restaurado a la bandeja",
+  crm_prospect_status: "Estado de prospecto",
+  crm_prospect_assign: "Asignación de prospecto",
+  crm_prospect_notes: "Notas de prospecto",
+  crm_prospect_follow_up: "Seguimiento de prospecto",
+  crm_prospect_activity: "Actividad de prospecto",
 }
 
 function isAuditAction(value: string): value is AuditAction {

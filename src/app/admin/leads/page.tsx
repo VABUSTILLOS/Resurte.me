@@ -1,126 +1,459 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { Users, Mail, Phone, CalendarClock, ArrowRight } from "lucide-react"
 import {
-  getAdminLeads,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import {
+  ArrowRight,
+  CalendarClock,
+  Download,
+  Filter,
+  Loader2,
+  Mail,
+  MessageCircle,
+  RotateCcw,
+  Search,
+  Trash2,
+  UserRound,
+  UserRoundCheck,
+  Users,
+  X,
+} from "lucide-react"
+import {
+  assignCrmProspect,
+  convertLeadToProspect,
+  discardLead,
   getAdminCrmBoard,
+  getAdminLeadBoardCounts,
+  getAdminLeads,
+  getAdminSellers,
+  restoreLead,
   updateCrmProspectStatus,
-  updateCrmProspectNotes,
-  setCrmProspectFollowUp,
+  type AdminLeadBoardCounts,
   type AdminLeadRow,
 } from "../actions"
 import {
   CRM_BOARD_COLUMNS,
+  CRM_STATUSES,
   CRM_STATUS_LABEL,
+  LEAD_STATUS_LABEL,
+  compareByUrgency,
   groupIntoBoard,
-  nextCrmStatus,
-  isFollowUpDue,
   isCrmStatus,
+  isFollowUpDue,
+  nextCrmStatus,
   type CrmProspect,
-  type CrmStatus,
+  type LeadStatus,
 } from "@/lib/crm-pipeline"
+import {
+  buildFunnelBySegment,
+  buildFunnelBySource,
+  buildLeadFunnel,
+  buildPendingAging,
+  daysPending,
+  formatRate,
+  leadSources,
+  type FunnelLead,
+} from "@/lib/crm-funnel"
+import {
+  CRM_PAGE_SIZE,
+  LEAD_BOXES,
+  LEAD_BOX_LABEL,
+  buildCrmQuery,
+  hasActiveCrmFilters,
+  leadStatusForFilter,
+  parseCrmSearchParams,
+  prospectStatusForFilter,
+  type CrmTab,
+  type LeadBox,
+} from "@/lib/crm-filters"
+import { downloadCsv, toCsv } from "@/lib/csv"
 import { formatRelativeTime } from "@/lib/relative-time"
 import { ToastProvider, useToast } from "@/components/toast"
+import { LeadDetailDrawer } from "../components/LeadDetailDrawer"
 
 const SOURCE_LABEL: Record<string, string> = {
   checkout_drawer: "Checkout",
   exit_intent: "Exit intent",
   restaurantes_landing: "Landing /restaurantes",
+  manual: "Alta manual",
+  lead_web: "Lead web",
 }
+
+const TAB_LABEL: Record<CrmTab, string> = {
+  leads: "Bandeja de leads",
+  pipeline: "Pipeline CRM",
+  embudo: "Embudo",
+}
+
+const TAB_ORDER: CrmTab[] = ["leads", "pipeline", "embudo"]
+
+const SEGMENT_LABEL: Record<string, string> = {
+  A: "A · Alto",
+  B: "B · Medio",
+  C: "C · Bajo",
+  sin_diagnostico: "Sin diagnóstico",
+}
+
+const FILTER_FIELD =
+  "rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+const CARD = "rounded-xl border border-gray-200 bg-white p-4"
 
 export default function AdminLeadsPage() {
   return (
     <ToastProvider>
-      <AdminLeadsContent />
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center py-24 text-sm text-gray-400">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" />
+            Cargando leads y pipeline...
+          </div>
+        }
+      >
+        <AdminLeadsContent />
+      </Suspense>
     </ToastProvider>
   )
 }
 
 function AdminLeadsContent() {
   const { toast } = useToast()
-  const [tab, setTab] = useState<"pipeline" | "leads">("pipeline")
-  const [prospects, setProspects] = useState<CrmProspect[]>([])
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // Los filtros viven en la URL para que una alerta del dashboard pueda
+  // aterrizar en el subconjunto exacto (ver `buildAlertHref`).
+  const initial = useMemo(() => parseCrmSearchParams(searchParams), [searchParams])
+
+  const [tab, setTab] = useState<CrmTab>(initial.tab)
+  const [q, setQ] = useState(initial.q)
+  const [debouncedQ, setDebouncedQ] = useState(initial.q)
+  const [source, setSource] = useState(initial.source)
+  const [segment, setSegment] = useState(initial.segment)
+  const [status, setStatus] = useState(initial.status)
+  const [box, setBox] = useState<LeadBox>(initial.box)
+  const [due, setDue] = useState(initial.due)
+  const [unassigned, setUnassigned] = useState(initial.unassigned)
+  const [page, setPage] = useState(initial.page)
+
   const [leads, setLeads] = useState<AdminLeadRow[]>([])
+  const [leadTotal, setLeadTotal] = useState(0)
+  const [allLeads, setAllLeads] = useState<FunnelLead[]>([])
+  const [prospects, setProspects] = useState<CrmProspect[]>([])
+  const [counts, setCounts] = useState<AdminLeadBoardCounts | null>(null)
+  const [sellers, setSellers] = useState<{ id: string; name: string; email: string }[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [workingId, setWorkingId] = useState<number | null>(null)
+  const [drawerId, setDrawerId] = useState<number | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+
+  // Debounce: teclear no debe disparar una recarga por letra.
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQ(q.trim()), 300)
+    return () => clearTimeout(id)
+  }, [q])
+
+  useEffect(() => {
+    const qs = buildCrmQuery({
+      tab,
+      q: debouncedQ,
+      source,
+      segment,
+      status,
+      box,
+      due,
+      unassigned,
+      page,
+    })
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [tab, debouncedQ, source, segment, status, box, due, unassigned, page, router, pathname])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [board, leadRows] = await Promise.all([getAdminCrmBoard(), getAdminLeads(100)])
+      // El embudo necesita la bandeja completa sin filtros: mide el proceso, no
+      // el subconjunto que el admin esté mirando en ese momento.
+      const [board, leadPage, funnelPage, boardCounts] = await Promise.all([
+        getAdminCrmBoard({
+          q: debouncedQ || undefined,
+          status: prospectStatusForFilter(status),
+          due,
+          unassigned,
+          limit: 500,
+        }),
+        getAdminLeads({
+          q: debouncedQ,
+          source,
+          segment,
+          status: leadStatusForFilter(status) ?? undefined,
+          pendingOnly: box === "pendientes",
+          limit: CRM_PAGE_SIZE,
+          offset: 0,
+        }),
+        getAdminLeads({ limit: 2000 }),
+        getAdminLeadBoardCounts(),
+      ])
       setProspects(board)
-      setLeads(leadRows)
+      setLeads(leadPage.rows)
+      setLeadTotal(leadPage.total)
+      setAllLeads(funnelPage.rows)
+      setCounts(boardCounts)
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [debouncedQ, source, segment, status, box, due, unassigned])
 
   useEffect(() => {
     // Diferido a microtask: ningún setState corre síncrono en el efecto.
     void Promise.resolve().then(load)
-  }, [load])
+  }, [load, reloadKey])
 
-  async function advance(p: CrmProspect) {
-    const next = nextCrmStatus(p.status as CrmStatus)
+  useEffect(() => {
+    void getAdminSellers()
+      .then(setSellers)
+      .catch(() => setSellers([]))
+  }, [])
+
+  const refresh = useCallback(() => setReloadKey((k) => k + 1), [])
+
+  async function loadMore() {
+    setLoadingMore(true)
+    try {
+      const next = await getAdminLeads({
+        q: debouncedQ,
+        source,
+        segment,
+        status: leadStatusForFilter(status) ?? undefined,
+        pendingOnly: box === "pendientes",
+        limit: CRM_PAGE_SIZE,
+        offset: leads.length,
+      })
+      setLeads((prev) => [...prev, ...next.rows])
+      setLeadTotal(next.total)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error al cargar más", "error")
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  async function convert(lead: AdminLeadRow) {
+    setWorkingId(lead.id)
+    try {
+      const result = await convertLeadToProspect(lead.id)
+      if (result.alreadyConverted) {
+        toast("Ese lead ya estaba convertido", "warning")
+      } else if (result.duplicateOf) {
+        toast(
+          `Se vinculó al prospecto existente "${result.duplicateOf.name}" (#${result.duplicateOf.id})`,
+          "warning"
+        )
+      } else {
+        toast("Lead convertido: quedó sin asignar en el pipeline", "success")
+      }
+      refresh()
+      setDrawerId(result.prospectId)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo convertir el lead", "error")
+    } finally {
+      setWorkingId(null)
+    }
+  }
+
+  async function discard(lead: AdminLeadRow) {
+    setWorkingId(lead.id)
+    try {
+      await discardLead(lead.id)
+      toast("Lead descartado", "success")
+      refresh()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo descartar el lead", "error")
+    } finally {
+      setWorkingId(null)
+    }
+  }
+
+  async function restore(lead: AdminLeadRow) {
+    setWorkingId(lead.id)
+    try {
+      await restoreLead(lead.id)
+      toast("Lead devuelto a la bandeja", "success")
+      refresh()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo restaurar el lead", "error")
+    } finally {
+      setWorkingId(null)
+    }
+  }
+
+  async function changeStatus(p: CrmProspect, value: string) {
+    if (!isCrmStatus(value)) return
+    setWorkingId(p.id)
+    try {
+      await updateCrmProspectStatus(p.id, value)
+      toast(`${p.name} → ${CRM_STATUS_LABEL[value]}`, "success")
+      refresh()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error al actualizar", "error")
+    } finally {
+      setWorkingId(null)
+    }
+  }
+
+  async function assign(p: CrmProspect, sellerId: string) {
+    setWorkingId(p.id)
+    try {
+      await assignCrmProspect(p.id, sellerId || null)
+      toast(sellerId ? "Prospecto asignado" : "Prospecto devuelto a sin asignar", "success")
+      refresh()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo asignar", "error")
+    } finally {
+      setWorkingId(null)
+    }
+  }
+
+  function clearFilters() {
+    setQ("")
+    setDebouncedQ("")
+    setSource("")
+    setSegment("")
+    setStatus("")
+    setBox("pendientes")
+    setDue(false)
+    setUnassigned(false)
+    setPage(1)
+  }
+
+  function exportCsv() {
+    if (tab === "pipeline") {
+      const rows = prospects.map((p) => [
+        p.name,
+        p.restaurant_name,
+        p.phone,
+        p.whatsapp,
+        p.email,
+        isCrmStatus(p.status) ? CRM_STATUS_LABEL[p.status] : p.status,
+        p.seller_id === null
+          ? "Sin asignar"
+          : (sellers.find((s) => s.id === p.seller_id)?.name ?? ""),
+        p.next_follow_up_at,
+        p.notes,
+        p.created_at,
+      ])
+      downloadCsv(
+        `crm-pipeline-${todayKey()}.csv`,
+        toCsv(
+          [
+            "Nombre",
+            "Restaurante",
+            "Teléfono",
+            "WhatsApp",
+            "Correo",
+            "Estado",
+            "Vendedor",
+            "Próximo seguimiento",
+            "Notas",
+            "Alta",
+          ],
+          rows
+        )
+      )
+      return
+    }
+
+    const rows = leads.map((l) => [
+      l.id,
+      l.email,
+      l.phone,
+      SOURCE_LABEL[l.source] ?? l.source,
+      l.restaurant_name,
+      l.qualification ? `${l.qualification.segment} (${l.qualification.score}/100)` : "",
+      l.qualification?.recommended_tier ?? "",
+      l.coupon_code,
+      LEAD_STATUS_LABEL[l.status as LeadStatus] ?? l.status,
+      l.converted_at,
+      l.created_at,
+    ])
+    downloadCsv(
+      `crm-leads-${box}-${todayKey()}.csv`,
+      toCsv(
+        [
+          "ID",
+          "Correo",
+          "Teléfono",
+          "Fuente",
+          "Restaurante",
+          "Segmento",
+          "Nivel recomendado",
+          "Cupón",
+          "Estado",
+          "Convertido el",
+          "Alta",
+        ],
+        rows
+      )
+    )
+  }
+
+  const sources = useMemo(() => leadSources(allLeads), [allLeads])
+  const segments = useMemo(
+    () =>
+      [...new Set(allLeads.map((l) => l.qualification?.segment).filter(Boolean) as string[])].sort(),
+    [allLeads]
+  )
+  const board = useMemo(() => groupIntoBoard(prospects), [prospects])
+  const unassignedCount = useMemo(
+    () => prospects.filter((p) => p.seller_id === null).length,
+    [prospects]
+  )
+  const filtersActive = hasActiveCrmFilters({
+    tab,
+    q: debouncedQ,
+    source,
+    segment,
+    status,
+    box,
+    due,
+    unassigned,
+    page,
+  })
+
+  const tabRefs = useRef<Record<CrmTab, HTMLButtonElement | null>>({
+    leads: null,
+    pipeline: null,
+    embudo: null,
+  })
+
+  function onTabKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
+    const dir = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0
+    if (dir === 0) return
+    e.preventDefault()
+    const idx = TAB_ORDER.indexOf(tab)
+    const next = TAB_ORDER[(idx + dir + TAB_ORDER.length) % TAB_ORDER.length]
     if (!next) return
-    setWorkingId(p.id)
-    try {
-      await updateCrmProspectStatus(p.id, next)
-      toast(`${p.name} → ${CRM_STATUS_LABEL[next]}`, "success")
-      await load()
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Error al actualizar", "error")
-    } finally {
-      setWorkingId(null)
-    }
+    setTab(next)
+    setPage(1)
+    tabRefs.current[next]?.focus()
   }
 
-  async function changeStatus(p: CrmProspect, status: string) {
-    if (!isCrmStatus(status)) return
-    setWorkingId(p.id)
-    try {
-      await updateCrmProspectStatus(p.id, status)
-      await load()
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Error al actualizar", "error")
-    } finally {
-      setWorkingId(null)
-    }
-  }
-
-  async function editNotes(p: CrmProspect) {
-    const notes = window.prompt(`Notas para ${p.name}:`, p.notes ?? "")
-    if (notes === null) return
-    try {
-      await updateCrmProspectNotes(p.id, notes)
-      toast("Notas actualizadas", "success")
-      await load()
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Error al guardar notas", "error")
-    }
-  }
-
-  async function editFollowUp(p: CrmProspect) {
-    const current = p.next_follow_up_at?.slice(0, 10) ?? ""
-    const date = window.prompt("Próximo seguimiento (YYYY-MM-DD, vacío para quitar):", current)
-    if (date === null) return
-    try {
-      await setCrmProspectFollowUp(p.id, date.trim() ? `${date.trim()}T09:00:00` : null)
-      toast("Seguimiento actualizado", "success")
-      await load()
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Error al programar seguimiento", "error")
-    }
-  }
-
-  if (loading) {
+  if (loading && leads.length === 0 && prospects.length === 0 && !error) {
     return (
-      <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
+      <div className="flex items-center justify-center py-24 text-sm text-gray-400">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" />
         Cargando leads y pipeline...
       </div>
     )
@@ -129,11 +462,11 @@ function AdminLeadsContent() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <p className="text-red-600 text-sm font-medium">{error}</p>
+        <p className="text-sm font-medium text-red-600">{error}</p>
         <button
           type="button"
           onClick={() => void load()}
-          className="mt-4 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 transition-colors"
+          className="mt-4 min-h-[44px] rounded-lg bg-gray-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-gray-700"
         >
           Reintentar
         </button>
@@ -141,198 +474,743 @@ function AdminLeadsContent() {
     )
   }
 
-  const board = groupIntoBoard(prospects)
-
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="pb-4">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Leads / CRM</h1>
           <p className="text-sm text-gray-500">
-            {prospects.length} prospectos en pipeline · {leads.length} leads web recientes
+            {counts
+              ? `${counts.pending} sin atender · ${counts.converted} convertidos · ${counts.discarded} descartados`
+              : `${leads.length} leads web`}
+            {" · "}
+            {prospects.length} prospectos
+            {unassignedCount > 0 && ` · ${unassignedCount} sin asignar`}
           </p>
         </div>
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden" role="tablist">
-          <button
-            role="tab"
-            aria-selected={tab === "pipeline"}
-            onClick={() => setTab("pipeline")}
-            className={`px-3 py-1.5 text-xs font-semibold ${
-              tab === "pipeline" ? "bg-gray-900 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            Pipeline CRM
-          </button>
-          <button
-            role="tab"
-            aria-selected={tab === "leads"}
-            onClick={() => setTab("leads")}
-            className={`px-3 py-1.5 text-xs font-semibold ${
-              tab === "leads" ? "bg-gray-900 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            Leads web
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={exportCsv}
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Exportar CSV
+        </button>
       </div>
 
-      {tab === "pipeline" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {CRM_BOARD_COLUMNS.map((col) => (
-            <div key={col.key} className="bg-gray-50 rounded-xl border border-gray-200 p-3">
-              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
-                {col.label}
-                <span className="ml-1 text-gray-400">({(board[col.key] ?? []).length})</span>
-              </h2>
-              <ul className="space-y-2">
-                {(board[col.key] ?? []).map((p) => {
-                  const next = nextCrmStatus(p.status as CrmStatus)
-                  const due = isFollowUpDue(p.next_follow_up_at)
-                  return (
-                    <li key={p.id} className="bg-white rounded-lg border border-gray-200 p-2.5">
-                      <p className="text-sm font-semibold text-gray-900">{p.name}</p>
-                      {p.restaurant_name && (
-                        <p className="text-xs text-gray-500">{p.restaurant_name}</p>
-                      )}
-                      <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-gray-400">
-                        {p.whatsapp && (
-                          <span className="inline-flex items-center gap-0.5">
-                            <Phone className="w-3 h-3" /> {p.whatsapp}
-                          </span>
-                        )}
-                        {p.email && (
-                          <span className="inline-flex items-center gap-0.5">
-                            <Mail className="w-3 h-3" /> {p.email}
-                          </span>
-                        )}
-                      </div>
-                      {p.next_follow_up_at && (
-                        <button
-                          type="button"
-                          onClick={() => void editFollowUp(p)}
-                          className={`mt-1 inline-flex items-center gap-1 text-[11px] font-medium ${
-                            due ? "text-red-600" : "text-gray-400"
-                          }`}
-                          title={new Date(p.next_follow_up_at).toLocaleString("es-MX")}
-                        >
-                          <CalendarClock className="w-3 h-3" />
-                          {due ? "Seguimiento vencido" : "Seguimiento"} ·{" "}
-                          {formatRelativeTime(p.next_follow_up_at)}
-                        </button>
-                      )}
-                      {p.notes && (
-                        <p className="mt-1 text-[11px] text-gray-500 line-clamp-2" title={p.notes}>
-                          {p.notes}
-                        </p>
-                      )}
-                      <div className="mt-2 flex items-center gap-1.5">
-                        {next && (
-                          <button
-                            type="button"
-                            disabled={workingId === p.id}
-                            onClick={() => void advance(p)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-                          >
-                            {CRM_STATUS_LABEL[next]}
-                            <ArrowRight className="w-3 h-3" />
-                          </button>
-                        )}
-                        <select
-                          value={p.status}
-                          disabled={workingId === p.id}
-                          onChange={(e) => void changeStatus(p, e.target.value)}
-                          aria-label={`Estado de ${p.name}`}
-                          className="text-[11px] border border-gray-200 rounded-lg px-1.5 py-1 text-gray-600"
-                        >
-                          {Object.entries(CRM_STATUS_LABEL).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => void editNotes(p)}
-                          className="text-[11px] text-gray-500 hover:underline"
-                        >
-                          Notas
-                        </button>
-                        {!p.next_follow_up_at && (
-                          <button
-                            type="button"
-                            onClick={() => void editFollowUp(p)}
-                            className="text-[11px] text-gray-500 hover:underline"
-                          >
-                            + Seguimiento
-                          </button>
-                        )}
-                      </div>
-                    </li>
-                  )
-                })}
-                {(board[col.key] ?? []).length === 0 && (
-                  <li className="text-[11px] text-gray-400 text-center py-3">Vacío</li>
-                )}
-              </ul>
-            </div>
-          ))}
+      <div
+        role="tablist"
+        aria-label="Vistas del CRM de leads"
+        className="mb-4 flex overflow-hidden rounded-lg border border-gray-200"
+      >
+        {TAB_ORDER.map((key) => (
+          <button
+            key={key}
+            ref={(el) => {
+              tabRefs.current[key] = el
+            }}
+            role="tab"
+            id={`crm-tab-${key}`}
+            aria-selected={tab === key}
+            aria-controls={`crm-panel-${key}`}
+            tabIndex={tab === key ? 0 : -1}
+            onKeyDown={onTabKeyDown}
+            onClick={() => {
+              setTab(key)
+              setPage(1)
+            }}
+            className={`min-h-[44px] flex-1 px-3 text-xs font-semibold transition-colors sm:flex-none ${
+              tab === key ? "bg-gray-900 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            {TAB_LABEL[key]}
+          </button>
+        ))}
+      </div>
+
+      {tab !== "embudo" && (
+        <div className={`${CARD} mb-4`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="relative min-w-[200px] flex-1">
+              <span className="sr-only">Buscar</span>
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+              <input
+                type="search"
+                value={q}
+                onChange={(e) => {
+                  setQ(e.target.value)
+                  setPage(1)
+                }}
+                placeholder={
+                  tab === "leads"
+                    ? "Correo, restaurante o teléfono"
+                    : "Nombre, restaurante, correo o teléfono"
+                }
+                className={`${FILTER_FIELD} w-full pl-9`}
+              />
+            </label>
+
+            {tab === "leads" ? (
+              <>
+                <select
+                  value={source}
+                  onChange={(e) => {
+                    setSource(e.target.value)
+                    setPage(1)
+                  }}
+                  aria-label="Fuente del lead"
+                  className={FILTER_FIELD}
+                >
+                  <option value="">Todas las fuentes</option>
+                  {sources.map((s) => (
+                    <option key={s} value={s}>
+                      {SOURCE_LABEL[s] ?? s}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={segment}
+                  onChange={(e) => {
+                    setSegment(e.target.value)
+                    setPage(1)
+                  }}
+                  aria-label="Segmento del calificador"
+                  className={FILTER_FIELD}
+                >
+                  <option value="">Todos los segmentos</option>
+                  {segments.map((s) => (
+                    <option key={s} value={s}>
+                      {SEGMENT_LABEL[s] ?? s}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={status}
+                  onChange={(e) => {
+                    setStatus(e.target.value)
+                    setPage(1)
+                  }}
+                  aria-label="Estado del lead"
+                  className={FILTER_FIELD}
+                >
+                  <option value="">Cualquier estado</option>
+                  <option value="nuevo">Sin atender</option>
+                  <option value="convertido">Convertido</option>
+                  <option value="descartado">Descartado</option>
+                </select>
+              </>
+            ) : (
+              <>
+                <select
+                  value={status}
+                  onChange={(e) => {
+                    setStatus(e.target.value)
+                    setPage(1)
+                  }}
+                  aria-label="Estado del prospecto"
+                  className={FILTER_FIELD}
+                >
+                  <option value="">Cualquier estado</option>
+                  {CRM_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {CRM_STATUS_LABEL[s]}
+                    </option>
+                  ))}
+                </select>
+                <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border border-gray-200 px-3 text-xs font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={due}
+                    onChange={(e) => {
+                      setDue(e.target.checked)
+                      setPage(1)
+                    }}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  Seguimiento vencido
+                </label>
+                <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border border-gray-200 px-3 text-xs font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={unassigned}
+                    onChange={(e) => {
+                      setUnassigned(e.target.checked)
+                      setPage(1)
+                    }}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  Sin asignar
+                </label>
+              </>
+            )}
+
+            {filtersActive && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+              >
+                <X className="h-3.5 w-3.5" />
+                Limpiar
+              </button>
+            )}
+          </div>
         </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
+      )}
+
+      {tab === "leads" && (
+        <div role="tabpanel" id="crm-panel-leads" aria-labelledby="crm-tab-leads">
+          <LeadInbox
+            leads={leads}
+            total={leadTotal}
+            box={box}
+            counts={counts}
+            workingId={workingId}
+            loadingMore={loadingMore}
+            onBoxChange={(next) => {
+              setBox(next)
+              setPage(1)
+            }}
+            onConvert={(l) => void convert(l)}
+            onDiscard={(l) => void discard(l)}
+            onRestore={(l) => void restore(l)}
+            onOpenProspect={(id) => setDrawerId(id)}
+            onLoadMore={() => void loadMore()}
+          />
+        </div>
+      )}
+
+      {tab === "pipeline" && (
+        <div role="tabpanel" id="crm-panel-pipeline" aria-labelledby="crm-tab-pipeline">
+          <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-5">
+            {CRM_BOARD_COLUMNS.map((col) => {
+              const cards = [...(board[col.key] ?? [])].sort(compareByUrgency)
+              return (
+                <div
+                  key={col.key}
+                  className="w-[80vw] flex-none snap-start rounded-xl border border-gray-200 bg-gray-50 p-3 sm:w-auto"
+                >
+                  <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">
+                    {col.label}
+                    <span className="ml-1 text-gray-400">({cards.length})</span>
+                  </h2>
+                  <ul className="space-y-2">
+                    {cards.map((p) => {
+                      const next = isCrmStatus(p.status) ? nextCrmStatus(p.status) : null
+                      const overdue = isFollowUpDue(p.next_follow_up_at)
+                      return (
+                        <li key={p.id} className="rounded-lg border border-gray-200 bg-white p-2.5">
+                          <button
+                            type="button"
+                            onClick={() => setDrawerId(p.id)}
+                            className="block w-full text-left"
+                          >
+                            <span className="block text-sm font-semibold text-gray-900">
+                              {p.name}
+                            </span>
+                            {p.restaurant_name && (
+                              <span className="block text-xs text-gray-500">
+                                {p.restaurant_name}
+                              </span>
+                            )}
+                          </button>
+
+                          {p.seller_id === null && (
+                            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+                              <UserRound className="h-2.5 w-2.5" />
+                              Sin asignar
+                            </span>
+                          )}
+
+                          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-gray-400">
+                            {p.whatsapp && (
+                              <a
+                                href={`https://wa.me/${p.whatsapp.replace(/\D/g, "")}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-0.5 hover:text-brand-600"
+                              >
+                                <MessageCircle className="h-3 w-3" /> {p.whatsapp}
+                              </a>
+                            )}
+                            {p.email && (
+                              <a
+                                href={`mailto:${p.email}`}
+                                className="inline-flex items-center gap-0.5 hover:text-brand-600"
+                              >
+                                <Mail className="h-3 w-3" /> {p.email}
+                              </a>
+                            )}
+                          </div>
+
+                          {p.next_follow_up_at && (
+                            <p
+                              className={`mt-1 inline-flex items-center gap-1 text-[11px] font-medium ${
+                                overdue ? "text-red-600" : "text-gray-400"
+                              }`}
+                              title={new Date(p.next_follow_up_at).toLocaleString("es-MX")}
+                            >
+                              <CalendarClock className="h-3 w-3" />
+                              {overdue ? "Vencido" : "Seguimiento"} ·{" "}
+                              {formatRelativeTime(p.next_follow_up_at)}
+                            </p>
+                          )}
+
+                          {p.notes && (
+                            <p
+                              className="mt-1 line-clamp-2 text-[11px] text-gray-500"
+                              title={p.notes}
+                            >
+                              {p.notes}
+                            </p>
+                          )}
+
+                          <div className="mt-2 space-y-1.5">
+                            <select
+                              value={p.seller_id ?? ""}
+                              disabled={workingId === p.id}
+                              onChange={(e) => void assign(p, e.target.value)}
+                              aria-label={`Vendedor de ${p.name}`}
+                              className="min-h-[32px] w-full rounded-lg border border-gray-200 px-1.5 text-[11px] text-gray-600"
+                            >
+                              <option value="">Sin asignar</option>
+                              {sellers.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="flex items-center gap-1.5">
+                              {next && (
+                                <button
+                                  type="button"
+                                  disabled={workingId === p.id}
+                                  onClick={() => void changeStatus(p, next)}
+                                  className="inline-flex min-h-[32px] items-center gap-1 rounded-lg bg-brand-600 px-2 text-[11px] font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                                >
+                                  {CRM_STATUS_LABEL[next]}
+                                  <ArrowRight className="h-3 w-3" />
+                                </button>
+                              )}
+                              <select
+                                value={p.status}
+                                disabled={workingId === p.id}
+                                onChange={(e) => void changeStatus(p, e.target.value)}
+                                aria-label={`Estado de ${p.name}`}
+                                className="min-h-[32px] rounded-lg border border-gray-200 px-1.5 text-[11px] text-gray-600"
+                              >
+                                {CRM_STATUSES.map((s) => (
+                                  <option key={s} value={s}>
+                                    {CRM_STATUS_LABEL[s]}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => setDrawerId(p.id)}
+                                className="min-h-[32px] px-1 text-[11px] text-gray-500 hover:underline"
+                              >
+                                Ficha
+                              </button>
+                            </div>
+                          </div>
+                        </li>
+                      )
+                    })}
+                    {cards.length === 0 && (
+                      <li className="py-3 text-center text-[11px] text-gray-400">Vacío</li>
+                    )}
+                  </ul>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {tab === "embudo" && (
+        <div
+          role="tabpanel"
+          id="crm-panel-embudo"
+          aria-labelledby="crm-tab-embudo"
+          className="space-y-4"
+        >
+          <FunnelView leads={allLeads} />
+        </div>
+      )}
+
+      {drawerId !== null && (
+        <LeadDetailDrawer
+          prospectId={drawerId}
+          onClose={() => setDrawerId(null)}
+          onChanged={refresh}
+        />
+      )}
+    </div>
+  )
+}
+
+function todayKey(): string {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+}
+
+interface LeadInboxProps {
+  leads: AdminLeadRow[]
+  total: number
+  box: LeadBox
+  counts: AdminLeadBoardCounts | null
+  workingId: number | null
+  loadingMore: boolean
+  onBoxChange: (box: LeadBox) => void
+  onConvert: (lead: AdminLeadRow) => void
+  onDiscard: (lead: AdminLeadRow) => void
+  onRestore: (lead: AdminLeadRow) => void
+  onOpenProspect: (id: number) => void
+  onLoadMore: () => void
+}
+
+function LeadInbox({
+  leads,
+  total,
+  box,
+  counts,
+  workingId,
+  loadingMore,
+  onBoxChange,
+  onConvert,
+  onDiscard,
+  onRestore,
+  onOpenProspect,
+  onLoadMore,
+}: LeadInboxProps) {
+  const boxCount: Record<LeadBox, number> = {
+    pendientes: counts?.pending ?? 0,
+    convertidos: counts?.converted ?? 0,
+    descartados: counts?.discarded ?? 0,
+    todos: counts?.total ?? 0,
+  }
+  const hasMore = leads.length < total
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        {LEAD_BOXES.map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onBoxChange(key)}
+            aria-pressed={box === key}
+            className={`min-h-[36px] rounded-full border px-3 text-xs font-semibold transition-colors ${
+              box === key
+                ? "border-gray-900 bg-gray-900 text-white"
+                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            {LEAD_BOX_LABEL[key]}
+            {counts && <span className="ml-1 opacity-70">{boxCount[key]}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-sm">
             <thead>
-              <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
-                <th className="px-5 py-3">Email</th>
-                <th className="px-5 py-3">Teléfono</th>
-                <th className="px-5 py-3">Fuente</th>
-                <th className="px-5 py-3">Restaurante / diagnóstico</th>
-                <th className="px-5 py-3">Cupón</th>
-                <th className="px-5 py-3">Fecha</th>
+              <tr className="bg-gray-50 text-left text-xs font-medium text-gray-400">
+                <th className="px-4 py-3">Correo</th>
+                <th className="px-4 py-3">Teléfono</th>
+                <th className="px-4 py-3">Fuente</th>
+                <th className="px-4 py-3">Restaurante / diagnóstico</th>
+                <th className="px-4 py-3">Cupón</th>
+                <th className="px-4 py-3">Antigüedad</th>
+                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {leads.map((l) => (
-                <tr key={l.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-3 text-xs text-gray-800">{l.email}</td>
-                  <td className="px-5 py-3 text-xs text-gray-500">{l.phone ?? "—"}</td>
-                  <td className="px-5 py-3 text-xs text-gray-500">
-                    {SOURCE_LABEL[l.source] ?? l.source}
-                  </td>
-                  <td className="px-5 py-3 text-xs text-gray-600">
-                    {l.restaurant_name && (
-                      <span className="block font-medium text-gray-800">{l.restaurant_name}</span>
-                    )}
-                    {l.qualification ? (
+              {leads.map((l) => {
+                const days = daysPending(l)
+                const busy = workingId === l.id
+                const prospectId = l.converted_prospect_id
+                return (
+                  <tr key={l.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-xs text-gray-800">{l.email}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {l.phone ? (
+                        <a href={`tel:${l.phone.replace(/\s/g, "")}`} className="hover:underline">
+                          {l.phone}
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {SOURCE_LABEL[l.source] ?? l.source}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-600">
+                      {l.restaurant_name && (
+                        <span className="block font-medium text-gray-800">{l.restaurant_name}</span>
+                      )}
+                      {l.qualification ? (
+                        <span
+                          className="block text-gray-500"
+                          title={l.qualification.reasons.join(" ")}
+                        >
+                          Segmento {l.qualification.segment} ({l.qualification.score}/100) · nivel{" "}
+                          {l.qualification.recommended_tier}
+                        </span>
+                      ) : (
+                        !l.restaurant_name && <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                      {l.coupon_code ?? "—"}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-xs text-gray-400"
+                      title={new Date(l.created_at).toLocaleString("es-MX")}
+                    >
+                      {formatRelativeTime(l.created_at)}
+                      {days !== null && days > 0 && (
+                        <span className="block text-[10px] text-gray-300">
+                          {days} {days === 1 ? "día" : "días"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
                       <span
-                        className="block text-gray-500"
-                        title={l.qualification.reasons.join(" ")}
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          l.status === "convertido"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : l.status === "descartado"
+                              ? "bg-gray-100 text-gray-500"
+                              : "bg-amber-100 text-amber-800"
+                        }`}
                       >
-                        Segmento {l.qualification.segment} ({l.qualification.score}/100) · nivel{" "}
-                        {l.qualification.recommended_tier}
+                        {LEAD_STATUS_LABEL[l.status as LeadStatus] ?? l.status}
                       </span>
-                    ) : (
-                      !l.restaurant_name && <span className="text-gray-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-xs font-mono text-gray-500">{l.coupon_code ?? "—"}</td>
-                  <td
-                    className="px-5 py-3 text-xs text-gray-400"
-                    title={new Date(l.created_at).toLocaleString("es-MX")}
-                  >
-                    {formatRelativeTime(l.created_at)}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {prospectId !== null ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenProspect(prospectId)}
+                            className="inline-flex min-h-[36px] items-center gap-1 rounded-lg border border-gray-200 px-2.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-50"
+                          >
+                            <UserRoundCheck className="h-3.5 w-3.5" />
+                            Ver prospecto
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onConvert(l)}
+                            className="inline-flex min-h-[36px] items-center gap-1 rounded-lg bg-brand-600 px-2.5 text-[11px] font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                          >
+                            {busy ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
+                            ) : (
+                              <ArrowRight className="h-3.5 w-3.5" />
+                            )}
+                            Convertir
+                          </button>
+                        )}
+                        {l.status === "descartado" ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onRestore(l)}
+                            className="inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Restaurar
+                          </button>
+                        ) : (
+                          prospectId === null && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => onDiscard(l)}
+                              className="inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2.5 text-[11px] font-semibold text-gray-500 hover:bg-gray-50 hover:text-red-600 disabled:opacity-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Descartar
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
               {leads.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-400">
-                    <Users className="w-5 h-5 mx-auto mb-2 text-gray-300" />
-                    Sin leads capturados todavía
+                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-400">
+                    <Users className="mx-auto mb-2 h-5 w-5 text-gray-300" />
+                    Sin leads en esta bandeja
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-      )}
+        {hasMore && (
+          <div className="border-t border-gray-100 p-3 text-center">
+            <button
+              type="button"
+              disabled={loadingMore}
+              onClick={onLoadMore}
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-gray-200 px-4 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {loadingMore && (
+                <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
+              )}
+              Cargar más ({leads.length} de {total})
+            </button>
+          </div>
+        )}
+      </div>
     </div>
+  )
+}
+
+function FunnelView({ leads }: { leads: FunnelLead[] }) {
+  const steps = buildLeadFunnel(leads)
+  const bySource = buildFunnelBySource(leads)
+  const bySegment = buildFunnelBySegment(leads)
+  const aging = buildPendingAging(leads)
+  const maxStep = Math.max(1, ...steps.map((s) => s.count))
+  const agingMax = Math.max(1, ...aging.map((b) => b.count))
+
+  return (
+    <>
+      <div className={CARD}>
+        <h2 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-gray-900">
+          <Filter className="h-3.5 w-3.5 text-gray-400" />
+          Embudo de captación
+        </h2>
+        <ul className="space-y-3">
+          {steps.map((step) => (
+            <li key={step.key}>
+              <div className="mb-1 flex items-baseline justify-between text-xs">
+                <span className="font-semibold text-gray-700">{step.label}</span>
+                <span className="text-gray-500">
+                  {step.count}
+                  <span className="ml-2 text-gray-400">
+                    {step.rateFromPrevious === null
+                      ? "—"
+                      : `${formatRate(step.rateFromPrevious)} de capturados`}
+                  </span>
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                <div
+                  className="h-full rounded-full bg-brand-600"
+                  style={{ width: `${Math.round((step.count / maxStep) * 100)}%` }}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+        {leads.length === 0 && (
+          <p className="mt-3 text-xs text-gray-400">Todavía no hay leads capturados que medir.</p>
+        )}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className={CARD}>
+          <h2 className="mb-3 text-sm font-bold text-gray-900">Por fuente</h2>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-gray-400">
+                <th className="pb-2">Fuente</th>
+                <th className="pb-2 text-right">Capturados</th>
+                <th className="pb-2 text-right">Calificados</th>
+                <th className="pb-2 text-right">Convertidos</th>
+                <th className="pb-2 text-right">Conversión</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {bySource.map((row) => (
+                <tr key={row.source}>
+                  <td className="py-2 text-gray-700">{SOURCE_LABEL[row.source] ?? row.source}</td>
+                  <td className="py-2 text-right text-gray-600">{row.total}</td>
+                  <td className="py-2 text-right text-gray-600">{row.qualified}</td>
+                  <td className="py-2 text-right text-gray-600">{row.converted}</td>
+                  <td className="py-2 text-right font-semibold text-gray-800">
+                    {formatRate(row.conversionRate)}
+                  </td>
+                </tr>
+              ))}
+              {bySource.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-4 text-center text-gray-400">
+                    Sin datos
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className={CARD}>
+          <h2 className="mb-3 text-sm font-bold text-gray-900">Por segmento del calificador</h2>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-gray-400">
+                <th className="pb-2">Segmento</th>
+                <th className="pb-2 text-right">Capturados</th>
+                <th className="pb-2 text-right">Convertidos</th>
+                <th className="pb-2 text-right">Conversión</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {bySegment.map((row) => (
+                <tr key={row.segment}>
+                  <td className="py-2 text-gray-700">{SEGMENT_LABEL[row.segment] ?? row.segment}</td>
+                  <td className="py-2 text-right text-gray-600">{row.total}</td>
+                  <td className="py-2 text-right text-gray-600">{row.converted}</td>
+                  <td className="py-2 text-right font-semibold text-gray-800">
+                    {formatRate(row.conversionRate)}
+                  </td>
+                </tr>
+              ))}
+              {bySegment.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="py-4 text-center text-gray-400">
+                    Sin datos
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className={CARD}>
+        <h2 className="mb-3 text-sm font-bold text-gray-900">Antigüedad de lo sin atender</h2>
+        <ul className="space-y-2">
+          {aging.map((bucket) => (
+            <li key={bucket.key} className="flex items-center gap-3">
+              <span className="w-28 shrink-0 text-xs text-gray-600">{bucket.label}</span>
+              <span className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+                <span
+                  className={`block h-full rounded-full ${
+                    bucket.key === "old" || bucket.key === "30d" ? "bg-red-500" : "bg-brand-600"
+                  }`}
+                  style={{ width: `${Math.round((bucket.count / agingMax) * 100)}%` }}
+                />
+              </span>
+              <span className="w-8 shrink-0 text-right text-xs font-semibold text-gray-700">
+                {bucket.count}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </>
   )
 }

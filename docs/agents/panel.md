@@ -16,6 +16,39 @@
   nivel de lealtad (`src/lib/foodos-entitlements.ts`). Verde/Plata/Oro/Diamante
   desbloquean capacidades; una escritura gateada llama `requireFoodosFeature()`
   como primera línea (lanza), una lectura gateada devuelve `[]`/`null` (degrada).
+- **El nivel no oculta los campos; solo bloquea la escritura.** Una herramienta
+  premium se renderiza **completa** en cualquier nivel: los campos se ven y se
+  pueden recorrer, y las lecturas salen reales (o vacías si el nivel no alcanza).
+  El nivel se pide al **usar** — guardar, cobrar, ejecutar— no al mirar. Antes cada
+  página montaba un muro `<NivelGate>` a pantalla completa que escondía la
+  herramienta entera; ese muro ya no existe (`nivel-gate.tsx` solo exporta
+  `featureLabel`, `featureDescription` y `NivelProgress`).
+  - Predicado único: `canUseFeature(tier, feature, { isAdmin })` y su inverso
+    `lockedTierFor(...)` (`src/lib/foodos-entitlements.ts`). No reimplementes el
+    `||` en un componente — el contexto (`entitlements-context.tsx`) y el hook
+    (`use-tier-guard.tsx`) consumen esos dos helpers.
+  - Escrituras: `useTierGuard(feature)` (`src/hooks/use-tier-guard.tsx`) envuelve
+    cada acción. Cuando falta nivel devuelve `{ ran: false }` **sin llamar al
+    servidor** y abre `TierUpsellDialog`. Patrón obligatorio:
+    `const attempt = await run(() => saveX(input)); if (!attempt.ran) return`. Si
+    la página ya tiene un `run(key, task)` local (catering, pos, inbox), el hook se
+    importa **aliasado**: `const { run: guard, upsellDialog } = useTierGuard(...)`.
+  - Aviso y demo: `<ToolPreviewNotice feature="…" />` va montado en cada página
+    premium. Ofrece "Ver demo" (abre el overlay existente de `ToolGuideHost` con
+    el dataset de `TOOL_DEMOS`) y la salida a `/panel/foodos/tablero`.
+  - La guarda de cliente es **de presentación**: el gate del servidor
+    (`requireFoodosFeature`) sigue siendo la autoridad. Se resuelve en cliente
+    porque el mensaje de una Server Action que lanza no está garantizado en
+    producción; esperar el error del servidor para mostrar el aviso sería frágil.
+- **El administrador de plataforma está exento del nivel, en las dos capas.** En
+  el servidor `requireFoodosFeature()` consulta `isCurrentUserAdmin()`
+  (`src/lib/foodos-tier.ts`) **solo en la ruta de fallo** — nunca en el camino
+  normal de un restaurantero, para no añadir una lectura de rol a cada escritura.
+  En el cliente `panel/layout.tsx` calcula `isAdmin = role === "admin"` y lo pasa
+  por `PanelLayoutClient` → `FoodosEntitlementsProvider`. La exención es
+  necesaria porque el nivel real del admin es Verde (no acumula compras propias);
+  sin ella no podría probar ni dar soporte. `ToolPreviewNotice` muestra en su
+  lugar la franja "Vista de administrador: nivel desbloqueado".
 - **Toda lectura de Supabase en una ruta de render degrada, no lanza**: comprobar
   `isSupabaseConfigured()` (`src/lib/supabase/env.ts`) antes de abrir el cliente.
   Sin este guard, `createClient()` lanza y Next renderiza el error boundary
@@ -50,3 +83,13 @@ Los guards de nivel y la degradación de `/panel` están cubiertos por
 guardado **y** que no aparezca el texto "Algo salió mal": el error boundary de
 Next responde 200, así que un status no basta) y por
 `src/lib/foodos-tier.test.ts`.
+
+El contrato "el nivel no oculta los campos" se verifica sin sesión, porque el
+suite de e2e no fabrica una cuenta autenticada a propósito:
+`src/app/panel/foodos/preview-gates.contract.test.ts` recorre las diez
+superficies premium y exige `useTierGuard`, `ToolPreviewNotice`, `{upsellDialog}`
+y **cero** `<NivelGate`; `src/lib/foodos-entitlements.test.ts` fija
+`canUseFeature`/`lockedTierFor` (incluida la exención del admin);
+`src/lib/foodos-tier.test.ts` fija el bypass en `requireFoodosFeature` y que el
+camino normal nunca consulta el rol. Al añadir o renombrar una herramienta
+premium, actualiza esas tres listas.

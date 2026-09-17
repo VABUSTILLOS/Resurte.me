@@ -33,7 +33,7 @@ import { getFoodosPanelData } from "../actions"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import StatCard from "@/components/panel/StatCard"
 import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
-import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
+import { useTierGuard } from "@/hooks/use-tier-guard"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
 import { formatMoney } from "@/lib/foodos"
@@ -72,8 +72,7 @@ const EMPTY_DATA: CajaData = {
 }
 
 export default function CajaPage() {
-  const { can } = useEntitlements()
-  const canCaja = can("pos_mostrador")
+  const { run, upsellDialog } = useTierGuard("pos_mostrador")
 
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
   const [branches, setBranches] = useState<FoodosBranch[]>([])
@@ -152,11 +151,15 @@ export default function CajaPage() {
     setBusy("open")
     setNotice(null)
     try {
-      const result = await openShiftAction({
-        restaurant_id: restaurant.id,
-        branch_id: branchId || null,
-        opening_float: Number(floatDraft || 0),
-      })
+      const attempt = await run(() =>
+        openShiftAction({
+          restaurant_id: restaurant.id,
+          branch_id: branchId || null,
+          opening_float: Number(floatDraft || 0),
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) {
         setNotice({ ok: false, text: result.error ?? t("foodos.caja.openError") })
         return
@@ -179,12 +182,16 @@ export default function CajaPage() {
     setBusy("movement")
     setNotice(null)
     try {
-      const result = await addShiftMovementAction({
-        shift_id: shift.id,
-        type: movement.type,
-        amount: Number(movement.amount || 0),
-        reason: movement.reason,
-      })
+      const attempt = await run(() =>
+        addShiftMovementAction({
+          shift_id: shift.id,
+          type: movement.type,
+          amount: Number(movement.amount || 0),
+          reason: movement.reason,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) {
         setNotice({ ok: false, text: result.error ?? t("foodos.caja.movementError") })
         return
@@ -206,7 +213,11 @@ export default function CajaPage() {
     setBusy("close")
     setNotice(null)
     try {
-      const result = await closeShiftAction({ shift_id: shift.id, counts, notes })
+      const attempt = await run(() =>
+        closeShiftAction({ shift_id: shift.id, counts, notes })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) {
         setNotice({ ok: false, text: result.error ?? t("foodos.caja.closeError") })
         return
@@ -610,6 +621,8 @@ export default function CajaPage() {
           </div>
         </div>
       </BottomSheet>
+
+      {upsellDialog}
     </div>
   )
 }

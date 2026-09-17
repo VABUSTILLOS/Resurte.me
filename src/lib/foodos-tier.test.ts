@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getServerClient: vi.fn(),
   getSessionUser: vi.fn(),
   isSupabaseConfigured: vi.fn(),
+  getUserRole: vi.fn(),
 }))
 
 vi.mock("@/lib/supabase/service", () => ({
@@ -25,11 +26,15 @@ vi.mock("@/lib/supabase/env", () => ({
 vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }))
+vi.mock("@/lib/roles", () => ({
+  getUserRole: mocks.getUserRole,
+}))
 
 import {
   FoodosFeatureLockedError,
   getMyEntitlements,
   getRestaurantEntitlements,
+  isCurrentUserAdmin,
   requireFoodosFeature,
 } from "./foodos-tier"
 
@@ -90,9 +95,14 @@ beforeEach(() => {
   vi.setSystemTime(NOW)
   vi.clearAllMocks()
   mocks.isSupabaseConfigured.mockReturnValue(true)
+  // El client con cookies resuelve la sesión y, cuando hay usuario, la fila del
+  // restaurante (`getMyEntitlements` la busca por `user_id`).
   mocks.getServerClient.mockImplementation(async () => ({
     auth: { getUser: mocks.getSessionUser },
+    from: () => query({ data: { id: "rest-1" }, error: null }),
   }))
+  // Por defecto nadie es admin: el camino del restaurantero es el normal.
+  mocks.getUserRole.mockResolvedValue(null)
 })
 
 describe("getRestaurantEntitlements", () => {
@@ -243,5 +253,70 @@ describe("requireFoodosFeature", () => {
       requiredTier: "Diamante",
       currentTier: "Plata",
     })
+  })
+})
+
+describe("bypass del administrador de plataforma", () => {
+  // El admin no tiene restaurante propio, así que su nivel real siempre es
+  // Verde. Sin el bypass no podría ni probar ni dar soporte a las herramientas
+  // premium que el restaurantero reporta como rotas.
+  it("isCurrentUserAdmin reconoce el rol admin", async () => {
+    mocks.getUserRole.mockResolvedValue("admin")
+    await expect(isCurrentUserAdmin()).resolves.toBe(true)
+  })
+
+  it("isCurrentUserAdmin no confunde a un restaurantero con un admin", async () => {
+    mocks.getUserRole.mockResolvedValue("cliente")
+    await expect(isCurrentUserAdmin()).resolves.toBe(false)
+  })
+
+  it("si la verificación de rol falla degrada a no-admin en vez de romper", async () => {
+    mocks.getUserRole.mockRejectedValue(new Error("boom"))
+    await expect(isCurrentUserAdmin()).resolves.toBe(false)
+  })
+
+  it("un admin en Verde pasa una capacidad de Diamante", async () => {
+    mocks.getUserRole.mockResolvedValue("admin")
+    mocks.getSessionUser.mockResolvedValue({ data: { user: { id: "user-admin" } } })
+    mocks.getServiceClient.mockResolvedValue(
+      serviceClient({
+        restaurant: { data: { user_id: "user-admin" } },
+        orders: { data: [] },
+      })
+    )
+
+    const state = await requireFoodosFeature("comandero")
+
+    expect(state.tier).toBe("Verde")
+  })
+
+  it("un restaurantero en Verde sigue bloqueado en Diamante", async () => {
+    mocks.getUserRole.mockResolvedValue("cliente")
+    mocks.getSessionUser.mockResolvedValue({ data: { user: { id: "user-1" } } })
+    mocks.getServiceClient.mockResolvedValue(
+      serviceClient({
+        restaurant: { data: { user_id: "user-1" } },
+        orders: { data: [] },
+      })
+    )
+
+    await expect(requireFoodosFeature("comandero")).rejects.toBeInstanceOf(
+      FoodosFeatureLockedError
+    )
+  })
+
+  it("el camino del restaurantero no paga la verificación de rol", async () => {
+    // Si el nivel alcanza, `isCurrentUserAdmin` no se consulta.
+    mocks.getSessionUser.mockResolvedValue({ data: { user: { id: "user-1" } } })
+    mocks.getServiceClient.mockResolvedValue(
+      serviceClient({
+        restaurant: { data: { user_id: "user-1" } },
+        orders: { data: qualifyingOrders(4) },
+      })
+    )
+
+    await requireFoodosFeature("comandero")
+
+    expect(mocks.getUserRole).not.toHaveBeenCalled()
   })
 })

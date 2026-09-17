@@ -194,6 +194,32 @@ export function hasFeature(tier: CashbackTier, feature: FoodosFeature): boolean 
   return TIER_RANK[tier] >= TIER_RANK[FEATURE_MIN_TIER[feature]]
 }
 
+/**
+ * ¿Se puede **usar** la capacidad (guardar, cobrar, ejecutar)?
+ *
+ * Es el único predicado que decide si una escritura pasa. El nivel no decide
+ * si la herramienta se **ve**: el contenido completo se renderiza en cualquier
+ * nivel y solo la acción final pide el nivel. El administrador de plataforma
+ * está exento —no tiene restaurante propio, así que su nivel real siempre es
+ * Verde y sin la excepción no podría probar ni dar soporte.
+ */
+export function canUseFeature(
+  tier: CashbackTier,
+  feature: FoodosFeature,
+  opts?: { isAdmin?: boolean }
+): boolean {
+  return opts?.isAdmin === true || hasFeature(tier, feature)
+}
+
+/** Nivel que falta para usar la capacidad, o `null` si ya se puede. */
+export function lockedTierFor(
+  tier: CashbackTier,
+  feature: FoodosFeature,
+  opts?: { isAdmin?: boolean }
+): CashbackTier | null {
+  return canUseFeature(tier, feature, opts) ? null : minTierFor(feature)
+}
+
 /** Capacidades disponibles en un nivel. */
 export function featuresForTier(tier: CashbackTier): FoodosFeature[] {
   return FOODOS_FEATURE_ORDER.filter((f) => hasFeature(tier, f))

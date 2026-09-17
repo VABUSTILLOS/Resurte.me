@@ -39,7 +39,7 @@ import {
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import StatCard from "@/components/panel/StatCard"
 import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
-import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
+import { useTierGuard } from "@/hooks/use-tier-guard"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
 import { formatMoney } from "@/lib/foodos"
@@ -162,8 +162,7 @@ const EMPTY_STATS: FlotillaStats = {
 }
 
 export default function FlotillaPage() {
-  const { can } = useEntitlements()
-  const canFlotilla = can("flotilla")
+  const { run, upsellDialog } = useTierGuard("flotilla")
 
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
   const [branches, setBranches] = useState<FoodosBranch[]>([])
@@ -283,18 +282,21 @@ export default function FlotillaPage() {
     }
     setSaving(true)
     try {
-      await upsertFlotillaCourier({
-        id: courierForm.id,
-        restaurant_id: restaurant.id,
-        name: courierForm.name,
-        phone: courierForm.phone,
-        vehicle: courierForm.vehicle,
-        capacity: Number(courierForm.capacity) || 1,
-        shift_start: courierForm.shift_start || null,
-        shift_end: courierForm.shift_end || null,
-        notes: courierForm.notes,
-        is_active: courierForm.is_active,
-      })
+      const attempt = await run(() =>
+        upsertFlotillaCourier({
+          id: courierForm.id,
+          restaurant_id: restaurant.id,
+          name: courierForm.name,
+          phone: courierForm.phone,
+          vehicle: courierForm.vehicle,
+          capacity: Number(courierForm.capacity) || 1,
+          shift_start: courierForm.shift_start || null,
+          shift_end: courierForm.shift_end || null,
+          notes: courierForm.notes,
+          is_active: courierForm.is_active,
+        })
+      )
+      if (!attempt.ran) return
       setShowCourierForm(false)
       await load()
     } catch (err) {
@@ -322,23 +324,26 @@ export default function FlotillaPage() {
     }
     setSaving(true)
     try {
-      await upsertFlotillaZone({
-        id: zoneForm.id,
-        restaurant_id: restaurant.id,
-        name: zoneForm.name,
-        branch_id: zoneForm.branch_id || null,
-        center_lat: lat,
-        center_lng: lng,
-        radius_km: Number(zoneForm.radius_km),
-        fee: Number(zoneForm.fee) || 0,
-        min_order: Number(zoneForm.min_order) || 0,
-        eta_minutes: Number(zoneForm.eta_minutes) || 35,
-        payout_mode: zoneForm.payout_mode,
-        payout_value: Number(zoneForm.payout_value) || 0,
-        color: zoneForm.color,
-        sort_order: Number(zoneForm.sort_order) || 0,
-        is_active: zoneForm.is_active,
-      })
+      const attempt = await run(() =>
+        upsertFlotillaZone({
+          id: zoneForm.id,
+          restaurant_id: restaurant.id,
+          name: zoneForm.name,
+          branch_id: zoneForm.branch_id || null,
+          center_lat: lat,
+          center_lng: lng,
+          radius_km: Number(zoneForm.radius_km),
+          fee: Number(zoneForm.fee) || 0,
+          min_order: Number(zoneForm.min_order) || 0,
+          eta_minutes: Number(zoneForm.eta_minutes) || 35,
+          payout_mode: zoneForm.payout_mode,
+          payout_value: Number(zoneForm.payout_value) || 0,
+          color: zoneForm.color,
+          sort_order: Number(zoneForm.sort_order) || 0,
+          is_active: zoneForm.is_active,
+        })
+      )
+      if (!attempt.ran) return
       setShowZoneForm(false)
       await load()
     } catch (err) {
@@ -355,7 +360,9 @@ export default function FlotillaPage() {
     setBusyId(id)
     setNotice(null)
     try {
-      const result = await fn()
+      const attempt = await run(() => fn())
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) setNotice({ ok: false, text: result.error ?? t("foodos.flotilla.actionError") })
       await load()
     } catch (err) {
@@ -380,10 +387,17 @@ export default function FlotillaPage() {
 
     setBusyId(courierId)
     try {
-      const result = await ensureFlotillaCourierLink({
-        restaurant_id: restaurant?.id ?? "",
-        courier_id: courierId,
-      })
+      const attempt = await run(() =>
+        ensureFlotillaCourierLink({
+          restaurant_id: restaurant?.id ?? "",
+          courier_id: courierId,
+        })
+      )
+      if (!attempt.ran) {
+        setOpenLinkId(null)
+        return
+      }
+      const result = attempt.value
       if (!result.ok || !result.url) {
         setNotice({ ok: false, text: result.error ?? t("foodos.flotilla.actionError") })
         setOpenLinkId(null)
@@ -403,10 +417,14 @@ export default function FlotillaPage() {
     setBusyId(courierId)
     setNotice(null)
     try {
-      const result = await revokeFlotillaCourierLink({
-        restaurant_id: restaurant?.id ?? "",
-        courier_id: courierId,
-      })
+      const attempt = await run(() =>
+        revokeFlotillaCourierLink({
+          restaurant_id: restaurant?.id ?? "",
+          courier_id: courierId,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) {
         setNotice({ ok: false, text: result.error ?? t("foodos.flotilla.actionError") })
         return
@@ -449,7 +467,9 @@ export default function FlotillaPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-6 h-6 animate-spin text-[#0E7A0E]" />
+        <Loader2 className="w-6 h-6 animate-spin text-[#0E7A0E]"         />
+
+        {upsellDialog}
       </div>
     )
   }
@@ -773,7 +793,8 @@ export default function FlotillaPage() {
                   <button
                     type="button"
                     onClick={async () => {
-                      await toggleFlotillaCourier(c.id, !c.is_active)
+                      const attempt = await run(() => toggleFlotillaCourier(c.id, !c.is_active))
+                      if (!attempt.ran) return
                       await load()
                     }}
                     className="touch-target rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700"
@@ -791,7 +812,8 @@ export default function FlotillaPage() {
                     type="button"
                     onClick={async () => {
                       if (!window.confirm(t("foodos.flotilla.confirmDelete"))) return
-                      await deleteFlotillaCourier(c.id)
+                      const attempt = await run(() => deleteFlotillaCourier(c.id))
+                      if (!attempt.ran) return
                       await load()
                     }}
                     className="touch-target rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-600"
@@ -897,7 +919,8 @@ export default function FlotillaPage() {
                     type="button"
                     onClick={async () => {
                       if (!window.confirm(t("foodos.flotilla.confirmDelete"))) return
-                      await deleteFlotillaZone(z.id)
+                      const attempt = await run(() => deleteFlotillaZone(z.id))
+                      if (!attempt.ran) return
                       await load()
                     }}
                     className="touch-target rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-600"

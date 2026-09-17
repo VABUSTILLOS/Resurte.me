@@ -1155,7 +1155,11 @@ test.describe("móvil: Fase 8 — h2 sin saltos de línea y cart bar sin empalme
     await expect(verMas).toHaveCount(0)
 
     const checkout = page.getByRole("button", { name: "Hacer Checkout" })
-    const verCarrito = page.getByRole("button", { name: /Ver carrito/ })
+    // El botón de la barra lleva `aria-label="Abrir carrito, total $X"`, que
+    // reemplaza al texto visible ("Ver carrito · $X") como nombre accesible —
+    // por eso /Ver carrito/ no lo encuentra. Se asevera por el nombre accesible
+    // real, que es además lo que anuncian los lectores de pantalla.
+    const verCarrito = page.getByRole("button", { name: /^Abrir carrito, total \$/ })
     await expect(checkout).toBeVisible({ timeout: 5000 })
     await expect(verCarrito).toBeVisible({ timeout: 5000 })
 

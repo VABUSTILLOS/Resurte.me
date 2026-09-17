@@ -99,14 +99,26 @@ test.describe("guards de las capacidades premium", { tag: "@ci" }, () => {
     }
   })
 
+  // Superficies premium del panel. Sin sesión se renderiza el estado de
+  // configuración (o el shell de carga), no la herramienta: por eso aquí solo
+  // se puede afirmar que la ruta **no revienta**. El contrato "el nivel ya no
+  // oculta los campos, solo bloquea escrituras" se fija en
+  // src/app/panel/foodos/preview-gates.contract.test.ts y en
+  // src/lib/foodos-entitlements.test.ts, porque verificarlo en navegador
+  // exigiría una sesión autenticada que este suite no fabrica a propósito.
   const PANEL_PATHS = [
     "/panel/foodos",
+    "/panel/foodos/inbox",
+    "/panel/foodos/mostrador",
+    "/panel/foodos/mesas",
+    "/panel/foodos/caja",
     "/panel/foodos/mesero-ia",
     "/panel/foodos/flotilla",
     "/panel/foodos/wallet",
     "/panel/foodos/sitio-ia",
     "/panel/foodos/pos",
     "/panel/foodos/catering",
+    "/panel/foodos/clientes",
   ]
 
   for (const path of PANEL_PATHS) {
@@ -136,7 +148,11 @@ test.describe("micrositio /r/[slug]", { tag: "@ci" }, () => {
     const response = await page.goto("/r/no-existe-este-restaurante", { waitUntil: "domcontentloaded" })
 
     expect(response?.status()).toBe(404)
-    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible()
+    // El boundary viaja en el payload de flight: la cáscara inicial
+    // (id="__next_error__") no lo trae, así que bajo carga paralela la
+    // hidratación puede tardar más que el timeout por defecto (5s) sin que el
+    // 404 esté roto. Medido aislado: pasa.
+    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible({ timeout: 15000 })
     await expect(page.getByText("Página no encontrada")).toBeVisible()
     // Copy del not-found del micrositio: confirma que no cae al boundary raíz.
     await expect(page.getByText("El restaurante que buscas no existe", { exact: false })).toBeVisible()
@@ -147,7 +163,8 @@ test.describe("micrositio /r/[slug]", { tag: "@ci" }, () => {
     const response = await page.goto("/r/no-existe-este-restaurante/carta", { waitUntil: "domcontentloaded" })
 
     expect(response?.status()).toBe(404)
-    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible()
+    // Mismo margen que el test anterior: el boundary se hidrata, no viene en la cáscara.
+    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible({ timeout: 15000 })
     await expect(page.getByText("Página no encontrada")).toBeVisible()
   })
 })

@@ -23,7 +23,7 @@ import type { FoodosRestaurant, FoodosWhatsAppMessage } from "@/types/foodos"
 import { Bot, Inbox, Loader2, Send, Store, UserRound } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
-import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
+import { useTierGuard } from "@/hooks/use-tier-guard"
 
 /** Normaliza un teléfono para casar sesiones del Mesero IA con el hilo. */
 function digits(phone: string): string {
@@ -48,8 +48,7 @@ export default function WaInboxPage() {
   const [aiSessions, setAiSessions] = useState<MeseroSessionRow[]>([])
   const [aiBusy, setAiBusy] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const { can } = useEntitlements()
-  const canMeseroIa = can("mesero_ia")
+  const { run: guard, upsellDialog } = useTierGuard("mesero_ia")
 
   const load = useCallback(async () => {
     try {
@@ -122,8 +121,10 @@ export default function WaInboxPage() {
     setAiBusy(true)
     setError(null)
     try {
-      if (takeOver) await takeOverMeseroSession(activeAi.id)
-      else await resumeMeseroSession(activeAi.id)
+      const attempt = await guard(() =>
+        takeOver ? takeOverMeseroSession(activeAi.id) : resumeMeseroSession(activeAi.id)
+      )
+      if (!attempt.ran) return
       if (restaurant) setAiSessions(await listMeseroSessions(restaurant.id))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cambiar el control de la conversación")
@@ -249,7 +250,7 @@ export default function WaInboxPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {canMeseroIa && activeAi && (
+                  {activeAi && (
                     <button
                       onClick={() => void toggleAi(!activeAi.handoff_at)}
                       disabled={aiBusy}
@@ -323,6 +324,8 @@ export default function WaInboxPage() {
         </div>
       </div>
       <ToolGuideHost toolKey="inbox" pathname="/panel/foodos/inbox" slug={null} icon="📥" title="Inbox de WhatsApp" />
+
+      {upsellDialog}
     </div>
   )
 }

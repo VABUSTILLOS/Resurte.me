@@ -26,7 +26,7 @@ import {
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import StatCard from "@/components/panel/StatCard"
 import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
-import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
+import { useTierGuard } from "@/hooks/use-tier-guard"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
 import { formatMoney } from "@/lib/foodos"
@@ -97,8 +97,7 @@ function meseroConfig(form: FormState) {
 }
 
 export default function MeseroIaPage() {
-  const { can } = useEntitlements()
-  const canMeseroIa = can("mesero_ia")
+  const { run, upsellDialog } = useTierGuard("mesero_ia")
 
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
   const [items, setItems] = useState<FoodosMenuItem[]>([])
@@ -174,16 +173,19 @@ export default function MeseroIaPage() {
     setSaving(true)
     setNotice(null)
     try {
-      await upsertMeseroSettings({
-        restaurant_id: restaurant.id,
-        is_enabled: form.is_enabled,
-        tone: form.tone,
-        greeting: form.greeting,
-        handoff_enabled: form.handoff_enabled,
-        max_items: Number(form.max_items) || 20,
-        daily_reply_cap: Number(form.daily_reply_cap) || 0,
-        business_hours_only: form.business_hours_only,
-      })
+      const attempt = await run(() =>
+        upsertMeseroSettings({
+          restaurant_id: restaurant.id,
+          is_enabled: form.is_enabled,
+          tone: form.tone,
+          greeting: form.greeting,
+          handoff_enabled: form.handoff_enabled,
+          max_items: Number(form.max_items) || 20,
+          daily_reply_cap: Number(form.daily_reply_cap) || 0,
+          business_hours_only: form.business_hours_only,
+        })
+      )
+      if (!attempt.ran) return
       setNotice({ ok: true, text: t("foodos.mesero.saved") })
       await load()
     } catch (err) {
@@ -196,8 +198,10 @@ export default function MeseroIaPage() {
   async function toggleHandoff(row: MeseroSessionRow, takeOver: boolean) {
     setBusySession(row.id)
     try {
-      if (takeOver) await takeOverMeseroSession(row.id)
-      else await resumeMeseroSession(row.id)
+      const attempt = await run(() =>
+        takeOver ? takeOverMeseroSession(row.id) : resumeMeseroSession(row.id)
+      )
+      if (!attempt.ran) return
       await load()
     } catch (err) {
       setNotice({ ok: false, text: err instanceof Error ? err.message : "Error" })
@@ -476,6 +480,8 @@ export default function MeseroIaPage() {
         title={t("foodos.mesero.title")}
         subtitle={t("foodos.mesero.subtitle")}
       />
+
+      {upsellDialog}
     </div>
   )
 }

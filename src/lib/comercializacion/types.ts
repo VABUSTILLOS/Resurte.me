@@ -76,7 +76,8 @@ export const ACTIVITY_OUTCOME_LABEL: Record<string, string> = {
 
 export interface Prospect {
   id: number
-  seller_id: string
+  /** `null` = sin asignar (lead web convertido que aún no tiene vendedor). */
+  seller_id: string | null
   name: string
   restaurant_name: string | null
   phone: string | null

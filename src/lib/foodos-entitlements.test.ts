@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { CashbackTier } from "@/types"
 import {
   asCashbackTier,
+  canUseFeature,
   PUBLIC_TIER_LADDER,
   QUALIFYING_WEEK_MIN,
   effectiveTier,
@@ -14,6 +15,7 @@ import {
   hasFeature,
   isCashbackTier,
   lockedFeatures,
+  lockedTierFor,
   minTierFor,
   nextTier,
   summarizeEntitlements,
@@ -352,5 +354,48 @@ describe("PUBLIC_TIER_LADDER", () => {
 
   it("el mínimo que califica una semana se re-exporta desde utils", () => {
     expect(QUALIFYING_WEEK_MIN).toBe(2500)
+  })
+})
+
+describe("canUseFeature / lockedTierFor", () => {
+  // Invariante "ver vs usar": el nivel decide si se puede USAR, nunca si se
+  // ve. La capa de presentación renderiza la herramienta completa en cualquier
+  // nivel y solo consulta estos dos predicados al ejecutar una escritura.
+  it("coincide con hasFeature para un restaurantero", () => {
+    for (const tier of ALL_TIERS) {
+      for (const feature of FOODOS_FEATURE_ORDER) {
+        expect(canUseFeature(tier, feature)).toBe(hasFeature(tier, feature))
+      }
+    }
+  })
+
+  it("el admin de plataforma puede usar todo, incluso en Verde", () => {
+    for (const feature of FOODOS_FEATURE_ORDER) {
+      expect(canUseFeature("Verde", feature, { isAdmin: true })).toBe(true)
+    }
+  })
+
+  it("isAdmin explícito en false no abre nada extra", () => {
+    expect(canUseFeature("Verde", "comandero", { isAdmin: false })).toBe(false)
+    expect(canUseFeature("Diamante", "comandero", { isAdmin: false })).toBe(true)
+  })
+
+  it("lockedTierFor devuelve el nivel que falta", () => {
+    expect(lockedTierFor("Verde", "comandero")).toBe("Diamante")
+    expect(lockedTierFor("Verde", "flotilla")).toBe("Oro")
+    expect(lockedTierFor("Plata", "marketing_ia")).toBeNull()
+  })
+
+  it("lockedTierFor es null para el admin en cualquier nivel", () => {
+    for (const feature of FOODOS_FEATURE_ORDER) {
+      expect(lockedTierFor("Verde", feature, { isAdmin: true })).toBeNull()
+    }
+  })
+
+  it("en Verde, ninguna capacidad premium es usable sin ser admin", () => {
+    for (const feature of FOODOS_FEATURE_ORDER) {
+      expect(canUseFeature("Verde", feature)).toBe(false)
+      expect(lockedTierFor("Verde", feature)).not.toBeNull()
+    }
   })
 })

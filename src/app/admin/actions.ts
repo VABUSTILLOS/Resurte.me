@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import type * as WaCatalogs from "@/lib/whatsapp-catalogs"
 import { logger } from "@/lib/logger"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logAdminAction } from "@/lib/audit-log"
 import { isMissingColumnError } from "@/lib/sale-window"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import {
@@ -50,6 +51,15 @@ import {
 } from "@/lib/foodos-adoption"
 import type { RewardsOrder } from "@/lib/wallet-progress"
 import type { CashbackTier } from "@/types"
+import { filterLeads } from "@/lib/crm-funnel"
+import { CRM_PAGE_SIZE } from "@/lib/crm-filters"
+import {
+  filterProspects,
+  findMatchingProspect,
+  leadToProspectDraft,
+  type CrmProspect,
+  type ProspectFilters,
+} from "@/lib/crm-pipeline"
 
 interface AdminOrderItem {
   id: number
@@ -672,7 +682,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
   const couponHorizon = new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString()
   const leadsSince = new Date(now - 48 * 60 * 60 * 1000).toISOString()
 
-  const [staleRes, outRes, lowRes, couponsRes, leadsRes] = await Promise.all([
+  const [staleRes, outRes, lowRes, couponsRes, leadsRes, followUpsRes] = await Promise.all([
     supabase
       .from("orders")
       .select("id, created_at", { count: "exact" })
@@ -702,6 +712,11 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
       .from("leads")
       .select("*", { count: "exact", head: true })
       .gte("created_at", leadsSince),
+    supabase
+      .from("crm_prospects")
+      .select("*", { count: "exact", head: true })
+      .not("next_follow_up_at", "is", null)
+      .lte("next_follow_up_at", new Date(now).toISOString()),
   ])
 
   const alerts: AdminAlert[] = []
@@ -763,6 +778,19 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
       title: `${leadsCount} lead${leadsCount === 1 ? "" : "s"} nuevo${leadsCount === 1 ? "" : "s"} (48 h)`,
       detail: "Capturados en checkout; listos para seguimiento.",
       href: buildAlertHref({ kind: "new_leads" }),
+    })
+  }
+
+  // Seguimientos vencidos: el widget ya los contaba, pero sin alerta ni enlace el
+  // número no llevaba a ninguna parte.
+  const followUpsCount = followUpsRes.count ?? 0
+  if (followUpsCount > 0) {
+    alerts.push({
+      kind: "follow_ups_due",
+      severity: "warning",
+      title: `${followUpsCount} seguimiento${followUpsCount === 1 ? "" : "s"} vencido${followUpsCount === 1 ? "" : "s"}`,
+      detail: "Prospectos con fecha de contacto prometida y ya pasada.",
+      href: buildAlertHref({ kind: "follow_ups_due" }),
     })
   }
 
@@ -871,6 +899,10 @@ export interface AdminLeadsSummary {
   leadsWeek: number
   crmProspects: number
   crmFollowUpsDue: number
+  /** Prospectos sin vendedor asignado (leads web convertidos sin repartir). */
+  crmUnassigned: number
+  /** Bandeja de entrada web (migración 00139). */
+  leadsBoard: AdminLeadBoardCounts
   recentLeads: Array<{ id: number; email: string | null; source: string | null; created_at: string }>
 }
 
@@ -886,33 +918,41 @@ export async function getAdminLeadsSummary(): Promise<AdminLeadsSummary> {
   const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   const nowIso = new Date().toISOString()
 
-  const [todayRes, weekRes, recentRes, prospectsRes, followUpsRes] = await Promise.all([
-    supabase
-      .from("leads")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", todayStart.toISOString()),
-    supabase
-      .from("leads")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", weekStart.toISOString()),
-    supabase
-      .from("leads")
-      .select("id, email, source, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5),
-    supabase.from("crm_prospects").select("*", { count: "exact", head: true }),
-    supabase
-      .from("crm_prospects")
-      .select("*", { count: "exact", head: true })
-      .not("next_follow_up_at", "is", null)
-      .lte("next_follow_up_at", nowIso),
-  ])
+  const [todayRes, weekRes, recentRes, prospectsRes, followUpsRes, unassignedRes, leadsBoard] =
+    await Promise.all([
+      supabase
+        .from("leads")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", todayStart.toISOString()),
+      supabase
+        .from("leads")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", weekStart.toISOString()),
+      supabase
+        .from("leads")
+        .select("id, email, source, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase.from("crm_prospects").select("*", { count: "exact", head: true }),
+      supabase
+        .from("crm_prospects")
+        .select("*", { count: "exact", head: true })
+        .not("next_follow_up_at", "is", null)
+        .lte("next_follow_up_at", nowIso),
+      supabase
+        .from("crm_prospects")
+        .select("*", { count: "exact", head: true })
+        .is("seller_id", null),
+      loadLeadBoardCounts(supabase),
+    ])
 
   return {
     leadsToday: todayRes.count ?? 0,
     leadsWeek: weekRes.count ?? 0,
     crmProspects: prospectsRes.count ?? 0,
     crmFollowUpsDue: followUpsRes.count ?? 0,
+    crmUnassigned: unassignedRes.count ?? 0,
+    leadsBoard,
     recentLeads: (recentRes.data ?? []).map((l) => ({
       id: l.id,
       email: l.email ?? null,
@@ -1177,32 +1217,244 @@ export interface AdminLeadRow {
   /** Solo en leads de /restaurantes. */
   restaurant_name: string | null
   qualification: AdminLeadQualification | null
+  /** Bandeja de entrada (migración 00139). */
+  status: string
+  converted_at: string | null
+  converted_prospect_id: number | null
 }
 
-/** Leads web capturados (checkout drawer / exit intent / landing B2B), más recientes primero. */
-export async function getAdminLeads(limit = 100): Promise<AdminLeadRow[]> {
+/** Columnas del lead que se seleccionan siempre; el resto son opcionales. */
+const ADMIN_LEAD_COLUMNS =
+  "id, email, phone, source, coupon_code, created_at, restaurant_name, qualification"
+
+/** Columnas añadidas por 00139; si aún no se aplica, se cae al select base. */
+const ADMIN_LEAD_STATUS_COLUMNS = "status, converted_at, converted_prospect_id"
+
+export interface AdminLeadFilters {
+  /** Texto libre sobre correo, restaurante y teléfono. */
+  q?: string
+  source?: string
+  segment?: string
+  /** Estado exacto del lead (`nuevo` / `convertido` / `descartado`). */
+  status?: string
+  /** `true` = solo la bandeja pendiente (sin atender). */
+  pendingOnly?: boolean
+  /** Ventana aplicada DESPUÉS de filtrar, no en SQL. */
+  limit?: number
+  offset?: number
+}
+
+export interface AdminLeadPage {
+  rows: AdminLeadRow[]
+  /** Filas que cumplen los filtros; puede ser mayor que `rows.length`. */
+  total: number
+}
+
+/**
+ * Techo de filas que se traen de la base. El filtrado fino (texto, segmento,
+ * bandeja) se hace en memoria porque el diagnóstico vive dentro de un JSONB y el
+ * volumen es de miles, no de millones: un `.or()` de PostgREST sobre
+ * `qualification->>` sería más frágil que filtrar aquí.
+ */
+const LEAD_FETCH_CAP = 2000
+
+/**
+ * Leads web capturados (checkout drawer / exit intent / landing B2B).
+ *
+ * La paginación se aplica tras filtrar. Hacerlo al revés (LIMIT/OFFSET en SQL y
+ * filtrar después) devolvería páginas incompletas: la página 2 podría salir vacía
+ * aunque hubiera coincidencias más abajo.
+ */
+export async function getAdminLeads(filters: AdminLeadFilters = {}): Promise<AdminLeadPage> {
   const { response: adminDenied } = await requireAdmin()
   if (adminDenied) {
     throw new Error("Acceso restringido a administradores")
   }
+
+  const limit = filters.limit ?? CRM_PAGE_SIZE
+  const offset = Math.max(0, filters.offset ?? 0)
 
   const supabase = await createServiceClient()
   const { data, error } = await supabase
     .from("leads")
+    .select(`${ADMIN_LEAD_COLUMNS}, ${ADMIN_LEAD_STATUS_COLUMNS}`)
+    .order("created_at", { ascending: false })
+    .limit(LEAD_FETCH_CAP)
+
+  let rows: Record<string, unknown>[]
+  if (error) {
+    if (!isMissingColumnError(error)) {
+      logger.error("[ADMIN-LEADS] Error fetching leads:", error)
+      throw new Error("Error al cargar los leads")
+    }
+    // Entorno sin 00139: se sirve la bandeja sin estado en vez de romper el panel.
+    logger.warn("[ADMIN-LEADS] Migración 00139 no aplicada; se omite el estado del lead")
+    const fallback = await supabase
+      .from("leads")
+      .select(ADMIN_LEAD_COLUMNS)
+      .order("created_at", { ascending: false })
+      .limit(LEAD_FETCH_CAP)
+    if (fallback.error) {
+      logger.error("[ADMIN-LEADS] Error fetching leads:", fallback.error)
+      throw new Error("Error al cargar los leads")
+    }
+    rows = (fallback.data ?? []).map((row) => ({
+      ...row,
+      status: "nuevo",
+      converted_at: null,
+      converted_prospect_id: null,
+    }))
+  } else {
+    rows = (data ?? []) as Record<string, unknown>[]
+  }
+
+  const filtered = filterLeads(rows.map(toAdminLeadRow), filters)
+  return { rows: filtered.slice(offset, offset + limit), total: filtered.length }
+}
+
+function toAdminLeadRow(row: Record<string, unknown>): AdminLeadRow {
+  return {
+    id: Number(row.id),
+    email: String(row.email),
+    phone: (row.phone as string | null) ?? null,
+    source: String(row.source),
+    coupon_code: (row.coupon_code as string | null) ?? null,
+    created_at: String(row.created_at),
+    restaurant_name: (row.restaurant_name as string | null) ?? null,
+    qualification: (row.qualification as AdminLeadQualification | null) ?? null,
+    status: (row.status as string | null) ?? "nuevo",
+    converted_at: (row.converted_at as string | null) ?? null,
+    converted_prospect_id:
+      row.converted_prospect_id != null ? Number(row.converted_prospect_id) : null,
+  }
+}
+
+/** Un lead de la bandeja: el que ya se convirtió o descartó no está pendiente. */
+export interface AdminLeadBoardCounts {
+  pending: number
+  converted: number
+  discarded: number
+  total: number
+}
+
+/**
+ * Conteo de la bandeja de leads. Sin 00139 no existe `status`, así que todo lo
+ * capturado se reporta como "sin atender" en lugar de inventar convertidos.
+ */
+async function loadLeadBoardCounts(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+): Promise<AdminLeadBoardCounts> {
+  const { data, error } = await supabase
+    .from("leads")
+    .select("status, converted_prospect_id")
+    .limit(20000)
+  if (error) {
+    const { count, error: countError } = await supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+    if (countError) {
+      logger.error("[ADMIN-LEADS] Error counting leads:", countError)
+      return { pending: 0, converted: 0, discarded: 0, total: 0 }
+    }
+    const total = count ?? 0
+    return { pending: total, converted: 0, discarded: 0, total }
+  }
+
+  const rows = (data ?? []) as { status: string | null; converted_prospect_id: number | null }[]
+  let pending = 0
+  let converted = 0
+  let discarded = 0
+  for (const row of rows) {
+    const status = row.status ?? "nuevo"
+    if (status === "convertido") converted += 1
+    else if (status === "descartado") discarded += 1
+    else if (row.converted_prospect_id === null) pending += 1
+  }
+  return { pending, converted, discarded, total: rows.length }
+}
+
+/** Conteos de la bandeja, para las pestañas de `/admin/leads`. */
+export async function getAdminLeadBoardCounts(): Promise<AdminLeadBoardCounts> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+  const supabase = await createServiceClient()
+  return loadLeadBoardCounts(supabase)
+}
+
+/** Tablero CRM: prospectos con sus campos de seguimiento. */
+export async function getAdminCrmBoard(
+  filters: ProspectFilters & { limit?: number } = {},
+): Promise<CrmProspect[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const limit = filters.limit ?? 500
+  let query = supabase
+    .from("crm_prospects")
     .select(
-      "id, email, phone, source, coupon_code, created_at, restaurant_name, qualification"
+      "id, seller_id, lead_id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(limit)
+
+  if (filters.status && filters.status !== "todos") query = query.eq("status", filters.status)
+  if (filters.unassigned) query = query.is("seller_id", null)
+  if (filters.due) query = query.not("next_follow_up_at", "is", null).lte(
+    "next_follow_up_at",
+    new Date().toISOString(),
+  )
+
+  let rows: Record<string, unknown>[]
+  const { data, error } = await query
   if (error) {
-    logger.error("[ADMIN-LEADS] Error fetching leads:", error)
-    throw new Error("Error al cargar los leads")
+    // Entorno sin 00139 (sin `lead_id` ni `seller_id` nullable): se degrada.
+    if (!isMissingColumnError(error)) {
+      logger.error("[ADMIN-CRM] Error fetching prospects:", error)
+      throw new Error("Error al cargar el pipeline CRM")
+    }
+    logger.warn("[ADMIN-CRM] Migración 00139 no aplicada; se omite lead_id")
+    const fallback = await supabase
+      .from("crm_prospects")
+      .select(
+        "id, seller_id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(limit)
+    if (fallback.error) {
+      logger.error("[ADMIN-CRM] Error fetching prospects:", fallback.error)
+      throw new Error("Error al cargar el pipeline CRM")
+    }
+    rows = (fallback.data ?? []).map((row) => ({ ...row, lead_id: null }))
+  } else {
+    rows = (data ?? []) as Record<string, unknown>[]
   }
-  return data ?? []
+
+  const prospects: CrmProspect[] = rows.map((row) => ({
+    id: Number(row.id),
+    seller_id: row.seller_id != null ? String(row.seller_id) : null,
+    lead_id: row.lead_id != null ? Number(row.lead_id) : null,
+    name: String(row.name),
+    restaurant_name: (row.restaurant_name as string | null) ?? null,
+    phone: (row.phone as string | null) ?? null,
+    whatsapp: (row.whatsapp as string | null) ?? null,
+    email: (row.email as string | null) ?? null,
+    status: String(row.status),
+    notes: (row.notes as string | null) ?? null,
+    next_follow_up_at: (row.next_follow_up_at as string | null) ?? null,
+    last_contact_at: (row.last_contact_at as string | null) ?? null,
+    created_at: String(row.created_at),
+  }))
+  // `q` se resuelve en memoria para poder ignorar acentos, que PostgREST no hace.
+  return filters.q ? filterProspects(prospects, { q: filters.q }) : prospects
 }
 
-/** Tablero CRM: todos los prospectos con sus campos de seguimiento. */
-export async function getAdminCrmBoard(): Promise<import("@/lib/crm-pipeline").CrmProspect[]> {
+/** Vendedores activos, para el selector de asignación. */
+export async function getAdminSellers(): Promise<{ id: string; name: string; email: string }[]> {
   const { response: adminDenied } = await requireAdmin()
   if (adminDenied) {
     throw new Error("Acceso restringido a administradores")
@@ -1210,21 +1462,295 @@ export async function getAdminCrmBoard(): Promise<import("@/lib/crm-pipeline").C
 
   const supabase = await createServiceClient()
   const { data, error } = await supabase
-    .from("crm_prospects")
-    .select("id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at")
-    .order("created_at", { ascending: false })
-    .limit(500)
+    .from("profiles")
+    .select("id, full_name, email")
+    .eq("role", "vendedor")
+    .order("full_name", { ascending: true })
   if (error) {
-    logger.error("[ADMIN-CRM] Error fetching prospects:", error)
-    throw new Error("Error al cargar el pipeline CRM")
+    logger.error("[ADMIN-CRM] Error fetching sellers:", error)
+    throw new Error("Error al cargar los vendedores")
   }
-  return data ?? []
+  return (data ?? []).map((row) => ({
+    id: String(row.id),
+    name: (row.full_name as string | null)?.trim() || String(row.email ?? "Sin nombre"),
+    email: String(row.email ?? ""),
+  }))
+}
+
+/** Ficha completa de un prospecto: datos, historial y vendedor asignado. */
+export async function getAdminProspectDetail(prospectId: number): Promise<{
+  prospect: import("@/lib/comercializacion/types").Prospect
+  activities: import("@/lib/comercializacion/types").Activity[]
+  seller: { id: string; name: string } | null
+  lead: { id: number; email: string; source: string; created_at: string } | null
+}> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  // Se reutiliza la lectura del CRM de vendedores: un admin pasa el filtro de
+  // rol, así que ve cualquier prospecto sin duplicar la consulta ni el mapeo.
+  const { getProspectDetail } = await import("@/lib/comercializacion/actions/actividades")
+  const detail = await getProspectDetail(prospectId)
+
+  const supabase = await createServiceClient()
+  const seller = detail.prospect.seller_id
+    ? await fetchProfileName(supabase, detail.prospect.seller_id)
+    : null
+
+  let lead: { id: number; email: string; source: string; created_at: string } | null = null
+  const { data: leadRow, error: leadError } = await supabase
+    .from("crm_prospects")
+    .select("leads(id, email, source, created_at)")
+    .eq("id", prospectId)
+    .maybeSingle()
+  if (leadError) {
+    // 00139 ausente: el prospecto simplemente no tiene lead de origen.
+    if (!isMissingColumnError(leadError)) {
+      logger.warn("[ADMIN-CRM] No se pudo leer el lead de origen:", { message: leadError.message })
+    }
+  } else {
+    const embedded = (
+      leadRow as { leads?: { id: number; email: string; source: string; created_at: string } | null } | null
+    )?.leads
+    if (embedded) {
+      lead = {
+        id: Number(embedded.id),
+        email: String(embedded.email),
+        source: String(embedded.source),
+        created_at: String(embedded.created_at),
+      }
+    }
+  }
+
+  return { ...detail, seller, lead }
+}
+
+async function fetchProfileName(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  userId: string,
+): Promise<{ id: string; name: string } | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .eq("id", userId)
+    .maybeSingle()
+  if (error || !data) return null
+  return {
+    id: String(data.id),
+    name: (data.full_name as string | null)?.trim() || String(data.email ?? "Sin nombre"),
+  }
+}
+
+export interface ConvertLeadResult {
+  prospectId: number
+  /** `true` si el lead ya estaba convertido (la llamada fue idempotente). */
+  alreadyConverted: boolean
+  /** Prospecto preexistente con el que se vinculó, si se detectó un duplicado. */
+  duplicateOf: { id: number; name: string } | null
+}
+
+/**
+ * Convierte un lead web en prospecto.
+ *
+ * Idempotente por diseño: si el lead ya tiene `converted_prospect_id` devuelve
+ * ese prospecto en vez de crear otro. Antes de crear, busca un prospecto con el
+ * mismo teléfono o correo (`findMatchingProspect`) para no duplicar una ficha que
+ * un vendedor ya había capturado a mano: en ese caso vincula el lead al
+ * prospecto existente y lo deja sin reasignar.
+ */
+export async function convertLeadToProspect(leadId: number): Promise<ConvertLeadResult> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { data: lead, error: leadError } = await supabase
+    .from("leads")
+    .select(`${ADMIN_LEAD_COLUMNS}, ${ADMIN_LEAD_STATUS_COLUMNS}`)
+    .eq("id", leadId)
+    .maybeSingle()
+  if (leadError) {
+    logger.error("[ADMIN-LEADS] Error reading lead:", leadError)
+    throw new Error("Error al leer el lead")
+  }
+  if (!lead) {
+    throw new Error("Lead no encontrado")
+  }
+
+  const current = toAdminLeadRow(lead as Record<string, unknown>)
+  if (current.converted_prospect_id !== null) {
+    return {
+      prospectId: current.converted_prospect_id,
+      alreadyConverted: true,
+      duplicateOf: null,
+    }
+  }
+
+  const draft = leadToProspectDraft({
+    id: current.id,
+    email: current.email,
+    phone: current.phone,
+    restaurant_name: current.restaurant_name,
+    source: current.source,
+    qualification: current.qualification,
+  })
+
+  const { data: existingRows, error: existingError } = await supabase
+    .from("crm_prospects")
+    .select("id, lead_id, name, restaurant_name, phone, whatsapp, email")
+    .limit(2000)
+  if (existingError) {
+    logger.error("[ADMIN-CRM] Error buscando duplicados:", existingError)
+    throw new Error("Error al buscar prospectos existentes")
+  }
+
+  const existing = (existingRows ?? []).map((row) => ({
+    id: Number(row.id),
+    seller_id: null,
+    lead_id: row.lead_id != null ? Number(row.lead_id) : null,
+    name: String(row.name),
+    restaurant_name: (row.restaurant_name as string | null) ?? null,
+    phone: (row.phone as string | null) ?? null,
+    whatsapp: (row.whatsapp as string | null) ?? null,
+    email: (row.email as string | null) ?? null,
+    status: "nuevo",
+    notes: null,
+    next_follow_up_at: null,
+    last_contact_at: null,
+    created_at: "",
+  }))
+
+  const match = findMatchingProspect(draft, existing)
+  let prospectId: number
+  let duplicateOf: { id: number; name: string } | null = null
+
+  if (match) {
+    prospectId = match.id
+    duplicateOf = { id: match.id, name: match.name }
+    // Se vincula el lead al prospecto ya existente sin sobrescribir lo que el
+    // vendedor haya escrito: sólo se rellena el origen si estaba vacío.
+    const { error: linkError } = await supabase
+      .from("crm_prospects")
+      .update({ lead_id: draft.lead_id, updated_at: new Date().toISOString() })
+      .eq("id", match.id)
+    if (linkError) {
+      logger.error("[ADMIN-CRM] Error vinculando lead a prospecto:", linkError)
+      throw new Error("Error al vincular el lead con el prospecto existente")
+    }
+  } else {
+    const { data: created, error: createError } = await supabase
+      .from("crm_prospects")
+      .insert({
+        lead_id: draft.lead_id,
+        seller_id: draft.seller_id,
+        name: draft.name,
+        restaurant_name: draft.restaurant_name,
+        phone: draft.phone,
+        whatsapp: draft.whatsapp,
+        email: draft.email,
+        status: draft.status,
+        source: draft.source,
+        notes: draft.notes,
+      })
+      .select("id")
+      .single()
+    if (createError || !created) {
+      logger.error("[ADMIN-CRM] Error creando prospecto desde lead:", createError)
+      throw new Error("Error al crear el prospecto")
+    }
+    prospectId = Number(created.id)
+  }
+
+  const convertedAt = new Date().toISOString()
+  const { error: updateError } = await supabase
+    .from("leads")
+    .update({
+      status: "convertido",
+      converted_at: convertedAt,
+      converted_prospect_id: prospectId,
+    })
+    .eq("id", leadId)
+  if (updateError) {
+    logger.error("[ADMIN-LEADS] Error marcando lead convertido:", updateError)
+    throw new Error("Error al marcar el lead como convertido")
+  }
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "lead_convert",
+    entity: "leads",
+    entityId: leadId,
+    detail: { prospectId, duplicateOf: duplicateOf?.id ?? null },
+  })
+
+  revalidatePath("/admin/leads")
+  return { prospectId, alreadyConverted: false, duplicateOf }
+}
+
+/** Descarta un lead de la bandeja (sin borrarlo: se conserva el histórico). */
+export async function discardLead(leadId: number): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { error } = await supabase
+    .from("leads")
+    .update({ status: "descartado" })
+    .eq("id", leadId)
+    .is("converted_prospect_id", null)
+  if (error) {
+    logger.error("[ADMIN-LEADS] Error descartando lead:", error)
+    throw new Error("Error al descartar el lead")
+  }
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "lead_discard",
+    entity: "leads",
+    entityId: leadId,
+  })
+  revalidatePath("/admin/leads")
+}
+
+/** Devuelve un lead descartado a la bandeja. */
+export async function restoreLead(leadId: number): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { error } = await supabase
+    .from("leads")
+    .update({ status: "nuevo" })
+    .eq("id", leadId)
+    .is("converted_prospect_id", null)
+  if (error) {
+    logger.error("[ADMIN-LEADS] Error restaurando lead:", error)
+    throw new Error("Error al restaurar el lead")
+  }
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "lead_restore",
+    entity: "leads",
+    entityId: leadId,
+  })
+  revalidatePath("/admin/leads")
 }
 
 async function patchCrmProspect(
   id: number,
   patch: Record<string, unknown>,
-  alsoTouchLastContact = false
+  alsoTouchLastContact = false,
 ): Promise<void> {
   const { response: adminDenied } = await requireAdmin()
   if (adminDenied) {
@@ -1244,22 +1770,164 @@ async function patchCrmProspect(
 }
 
 export async function updateCrmProspectStatus(id: number, status: string): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
   const { isCrmStatus } = await import("@/lib/crm-pipeline")
   if (!isCrmStatus(status)) {
     throw new Error("Estado CRM inválido")
   }
   await patchCrmProspect(id, { status }, true)
+
+  const supabase = await createServiceClient()
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_prospect_status",
+    entity: "crm_prospects",
+    entityId: id,
+    detail: { status },
+  })
+  revalidatePath("/admin/leads")
 }
 
 export async function updateCrmProspectNotes(id: number, notes: string): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
   await patchCrmProspect(id, { notes: notes.trim() || null })
+
+  const supabase = await createServiceClient()
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_prospect_notes",
+    entity: "crm_prospects",
+    entityId: id,
+  })
+  revalidatePath("/admin/leads")
 }
 
 export async function setCrmProspectFollowUp(id: number, followUpAt: string | null): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
   if (followUpAt !== null && Number.isNaN(new Date(followUpAt).getTime())) {
     throw new Error("Fecha de seguimiento inválida")
   }
   await patchCrmProspect(id, { next_follow_up_at: followUpAt })
+
+  const supabase = await createServiceClient()
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_prospect_follow_up",
+    entity: "crm_prospects",
+    entityId: id,
+    detail: { followUpAt },
+  })
+  revalidatePath("/admin/leads")
+}
+
+/**
+ * Asigna o libera un prospecto. `sellerId = null` lo devuelve al pool sin
+ * asignar, que es el estado natural de un lead web recién convertido.
+ */
+export async function assignCrmProspect(id: number, sellerId: string | null): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  if (sellerId !== null) {
+    const seller = await fetchProfileName(supabase, sellerId)
+    if (!seller) {
+      throw new Error("Vendedor no encontrado")
+    }
+  }
+
+  await patchCrmProspect(id, { seller_id: sellerId })
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_prospect_assign",
+    entity: "crm_prospects",
+    entityId: id,
+    detail: { sellerId },
+  })
+  revalidatePath("/admin/leads")
+}
+
+/** Registra una actividad del prospecto (llamada, WhatsApp, visita, nota…). */
+export async function addCrmActivity(
+  prospectId: number,
+  input: {
+    type: string
+    outcome?: string | null
+    summary?: string | null
+    direction?: string
+    occurred_at?: string
+  },
+): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const { ACTIVITY_TYPES, ACTIVITY_OUTCOMES } = await import("@/lib/comercializacion/types")
+  if (!(ACTIVITY_TYPES as readonly string[]).includes(input.type)) {
+    throw new Error("Tipo de actividad inválido")
+  }
+  if (input.outcome && !(ACTIVITY_OUTCOMES as readonly string[]).includes(input.outcome)) {
+    throw new Error("Resultado de actividad inválido")
+  }
+  if (input.occurred_at && Number.isNaN(new Date(input.occurred_at).getTime())) {
+    throw new Error("Fecha de actividad inválida")
+  }
+
+  const supabase = await createServiceClient()
+  const occurredAt = input.occurred_at ?? new Date().toISOString()
+
+  // `crm_activities.seller_id` es NOT NULL: el admin firma con su propio id,
+  // que es justo lo que se quiere ver en el historial ("quién lo contactó").
+  const { error } = await supabase.from("crm_activities").insert({
+    prospect_id: prospectId,
+    seller_id: user?.id ?? null,
+    type: input.type,
+    direction: input.direction ?? "saliente",
+    outcome: input.outcome ?? null,
+    summary: input.summary?.trim() || null,
+    occurred_at: occurredAt,
+  })
+  if (error) {
+    logger.error("[ADMIN-CRM] Error registrando actividad:", error)
+    throw new Error("Error al registrar la actividad")
+  }
+
+  // La actividad mueve el prospecto: último contacto y, si seguía en `nuevo`,
+  // pasa a `contactado`. Misma regla que la acción del vendedor.
+  const { data: prospect } = await supabase
+    .from("crm_prospects")
+    .select("status")
+    .eq("id", prospectId)
+    .maybeSingle()
+  const patch: Record<string, unknown> = { last_contact_at: occurredAt }
+  if (prospect?.status === "nuevo") patch.status = "contactado"
+  await patchCrmProspect(prospectId, patch)
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_prospect_activity",
+    entity: "crm_prospects",
+    entityId: prospectId,
+    detail: { type: input.type, outcome: input.outcome ?? null },
+  })
+  revalidatePath("/admin/leads")
 }
 
 // ============================================================

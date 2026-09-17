@@ -48,7 +48,7 @@ import { getFoodosPanelData } from "../actions"
 import { createClient } from "@/lib/supabase/client"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
-import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
+import { useTierGuard } from "@/hooks/use-tier-guard"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { ItemOptionsModal } from "@/app/r/[slug]/_components/item-options-modal"
 import { t } from "@/lib/i18n/es"
@@ -225,8 +225,7 @@ function tableBox(table: MesasTable): { w: number; h: number } {
 }
 
 export default function MesasPage() {
-  const { can } = useEntitlements()
-  const canMesas = can(FEATURE)
+  const { run, upsellDialog } = useTierGuard(FEATURE)
 
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
   const [branches, setBranches] = useState<MesasBranch[]>([])
@@ -504,12 +503,16 @@ export default function MesasPage() {
     if (!restaurant) return
     const clamped = clampPosition(drag.x, drag.y, activeZone, TABLE_MIN_SIZE)
     setPosDraft((prev) => ({ ...prev, [drag.id]: clamped }))
-    const res = await moveTable({
-      restaurant_id: restaurant.id,
-      id: drag.id,
-      pos_x: clamped.x,
-      pos_y: clamped.y,
-    })
+    const attempt = await run(() =>
+      moveTable({
+        restaurant_id: restaurant.id,
+        id: drag.id,
+        pos_x: clamped.x,
+        pos_y: clamped.y,
+      })
+    )
+    if (!attempt.ran) return
+    const res = attempt.value
     if (!res.ok) setNotice({ ok: false, text: res.error ?? t("foodos.mesas.actionError") })
     else setPosDraft((prev) => {
       // Guardado: el servidor ya es la fuente del acomodo de esta mesa.
@@ -523,15 +526,19 @@ export default function MesasPage() {
     if (!restaurant) return
     setBusy(true)
     try {
-      const res = await saveZone({
-        restaurant_id: restaurant.id,
-        branch_id: branchId || null,
-        id: layoutSheet?.zone?.id,
-        name: zoneNameDraft,
-        sort_order: layoutSheet?.zone?.sort_order ?? zones.length,
-        width: layoutSheet?.zone?.width ?? ZONE_DEFAULT_WIDTH,
-        height: layoutSheet?.zone?.height ?? ZONE_DEFAULT_HEIGHT,
-      })
+      const attempt = await run(() =>
+        saveZone({
+          restaurant_id: restaurant.id,
+          branch_id: branchId || null,
+          id: layoutSheet?.zone?.id,
+          name: zoneNameDraft,
+          sort_order: layoutSheet?.zone?.sort_order ?? zones.length,
+          width: layoutSheet?.zone?.width ?? ZONE_DEFAULT_WIDTH,
+          height: layoutSheet?.zone?.height ?? ZONE_DEFAULT_HEIGHT,
+        })
+      )
+      if (!attempt.ran) return
+      const res = attempt.value
       if (!res.ok) {
         setNotice({ ok: false, text: res.error ?? t("foodos.mesas.actionError") })
         return
@@ -547,9 +554,14 @@ export default function MesasPage() {
 
   const removeZone = async () => {
     if (!restaurant || !layoutSheet?.zone) return
+    const zoneToRemove = layoutSheet.zone
     setBusy(true)
     try {
-      const res = await deleteZone({ restaurant_id: restaurant.id, id: layoutSheet.zone.id })
+      const attempt = await run(() =>
+        deleteZone({ restaurant_id: restaurant.id, id: zoneToRemove.id })
+      )
+      if (!attempt.ran) return
+      const res = attempt.value
       if (!res.ok) {
         setNotice({ ok: false, text: res.error ?? t("foodos.mesas.actionError") })
         return
@@ -567,19 +579,23 @@ export default function MesasPage() {
     setBusy(true)
     try {
       const existing = layoutSheet?.table
-      const res = await saveTable({
-        restaurant_id: restaurant.id,
-        branch_id: branchId || null,
-        id: existing?.id,
-        zone_id: zone.id,
-        label: tableDraft.label,
-        seats: tableDraft.seats,
-        shape: tableDraft.shape,
-        // Sin mesa previa, la nueva nace al centro del lienzo; después se arrastra.
-        pos_x: existing ? positionOf(existing).x : zone.width / 2,
-        pos_y: existing ? positionOf(existing).y : zone.height / 2,
-        is_active: tableDraft.isActive,
-      })
+      const attempt = await run(() =>
+        saveTable({
+          restaurant_id: restaurant.id,
+          branch_id: branchId || null,
+          id: existing?.id,
+          zone_id: zone.id,
+          label: tableDraft.label,
+          seats: tableDraft.seats,
+          shape: tableDraft.shape,
+          // Sin mesa previa, la nueva nace al centro del lienzo; después se arrastra.
+          pos_x: existing ? positionOf(existing).x : zone.width / 2,
+          pos_y: existing ? positionOf(existing).y : zone.height / 2,
+          is_active: tableDraft.isActive,
+        })
+      )
+      if (!attempt.ran) return
+      const res = attempt.value
       if (!res.ok) {
         setNotice({ ok: false, text: res.error ?? t("foodos.mesas.actionError") })
         return
@@ -593,9 +609,14 @@ export default function MesasPage() {
 
   const removeTable = async () => {
     if (!restaurant || !layoutSheet?.table) return
+    const tableToRemove = layoutSheet.table
     setBusy(true)
     try {
-      const res = await deleteTable({ restaurant_id: restaurant.id, id: layoutSheet.table.id })
+      const attempt = await run(() =>
+        deleteTable({ restaurant_id: restaurant.id, id: tableToRemove.id })
+      )
+      if (!attempt.ran) return
+      const res = attempt.value
       if (!res.ok) {
         setNotice({ ok: false, text: res.error ?? t("foodos.mesas.actionError") })
         return
@@ -624,7 +645,9 @@ export default function MesasPage() {
   ): Promise<boolean> => {
     setBusy(true)
     try {
-      const res = await action()
+      const attempt = await run(() => action())
+      if (!attempt.ran) return false
+      const res = attempt.value
       if (!res.ok) {
         setNotice({ ok: false, text: res.error ?? t("foodos.mesas.actionError") })
         return false
@@ -928,15 +951,19 @@ export default function MesasPage() {
     setBusy(true)
     setNotice(null)
     try {
-      const res = await closeTable({
-        restaurant_id: restaurant.id,
-        ticket_id: accountOf(accountTable).ticket?.id ?? "",
-        items: accountLines,
-        payment_method: breakdown ? null : paymentMethod,
-        payment_breakdown: breakdown,
-        tip,
-        coupon_code: coupon,
-      })
+      const attempt = await run(() =>
+        closeTable({
+          restaurant_id: restaurant.id,
+          ticket_id: accountOf(accountTable).ticket?.id ?? "",
+          items: accountLines,
+          payment_method: breakdown ? null : paymentMethod,
+          payment_breakdown: breakdown,
+          tip,
+          coupon_code: coupon,
+        })
+      )
+      if (!attempt.ran) return
+      const res = attempt.value
 
       if (!res.ok || !res.orderId || !res.folio) {
         setNotice({ ok: false, text: res.error ?? t("foodos.mostrador.chargeError") })
@@ -2418,6 +2445,8 @@ export default function MesasPage() {
         title={t("foodos.mesas.title")}
         subtitle={t("foodos.mesas.guideSubtitle")}
       />
+
+      {upsellDialog}
     </div>
   )
 }

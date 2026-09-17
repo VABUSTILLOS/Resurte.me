@@ -37,6 +37,16 @@ const ROUTES = [
   "/panel/foodos/mesas",
   "/panel/foodos/caja",
   "/panel/foodos/pedidos",
+  // Herramientas premium: e2e/foodos.spec.ts las visita sin sesión, así que
+  // sin calentar cada una era un flake esperando a ocurrir.
+  "/panel/foodos/inbox",
+  "/panel/foodos/pos",
+  "/panel/foodos/wallet",
+  "/panel/foodos/catering",
+  "/panel/foodos/sitio-ia",
+  "/panel/foodos/mesero-ia",
+  "/panel/foodos/flotilla",
+  "/panel/foodos/clientes",
   // Marketplace: el 404 real de una ficha inexistente (ver foodos-pos.spec.ts).
   "/comer/no-existe-este-restaurante",
   // Micrositio de restaurante: el 404 real y su carta. Estas rutas devuelven
@@ -46,6 +56,30 @@ const ROUTES = [
   "/r/no-existe/carta",
   // 404 raíz
   "/ruta-inexistente-xyz",
+  // --- Auditoría de rutas (ronda 4) ---
+  // Estas 17 rutas las visitan specs pero NO estaban calentadas, así que cada
+  // una era un flake esperando a ocurrir: el primero que la tocaba pagaba la
+  // compilación del segmento dentro de su propio timeout. Caso medido:
+  // /compartir fallaba en frío y pasaba en caliente en el mismo server.
+  // Se calienta un slug por segmento — la compilación es del segmento, no del
+  // valor — por eso basta /cdmx/checkout y no también /chihuahua/checkout.
+  "/admin/marketing",
+  "/admin/pedidos",
+  "/admin/productos",
+  "/admin/usuarios",
+  "/auth/login",
+  "/auth/register",
+  "/auth/reset",
+  "/calificar",
+  "/cart",
+  "/compartir",
+  "/negocio/credito",
+  "/panel/comanda",
+  "/panel/rentabilidad",
+  "/cdmx/checkout",
+  "/cdmx/mis-pedidos",
+  "/catalogo/cdmx",
+  "/blog/guia-marketing-restaurantes",
 ]
 
 const ATTEMPTS = 3
