@@ -679,17 +679,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    let out = await loadData(true, COLS)
+    // `hasSales` se apaga en cuanto la vista de ventas (00116) responde que no
+    // existe; a partir de ahí los reintentos no vuelven a pedirla.
+    let hasSales = true
     let schemaDrift = false
+    let out = await loadData(true, COLS, hasSales)
+    if ("error" in out && out.error && isMissingRelationError(out.error)) {
+      // Vista `products_with_sales` pendiente de aplicar: "más vendidos" cae al
+      // orden por defecto y se avisa en el panel. Se comprueba antes que
+      // `isMissingColumnError`, que también acepta mensajes con "does not exist".
+      hasSales = false
+      out = await loadData(true, COLS, hasSales)
+      schemaDrift = true
+    }
     if ("error" in out && out.error && isMissingColumnError(out.error)) {
       // Migraciones de la ronda 7 (00106-00109) pendientes: se mantienen las
       // funciones de la ronda 6 y se avisa en el panel.
-      out = await loadData(true, COLS_BASE)
+      out = await loadData(true, COLS_BASE, hasSales)
       schemaDrift = true
     }
     if ("error" in out && out.error && isMissingColumnError(out.error)) {
       // Migraciones 00096-00099 pendientes: degradar del todo.
-      out = await loadData(false, COLS_LEGACY)
+      out = await loadData(false, COLS_LEGACY, hasSales)
       schemaDrift = true
     }
     if ("error" in out && out.error) {
