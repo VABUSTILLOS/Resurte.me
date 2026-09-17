@@ -108,9 +108,10 @@ export function validateProductForm(input: ProductFormInput): ProductFormValidat
   }
 
   const keys = Object.keys(errors)
+  const [firstInvalid] = keys
   return {
     errors,
-    firstInvalid: keys.length > 0 ? keys[0] : null,
+    firstInvalid: firstInvalid ?? null,
     price,
     salePrice,
     cost,

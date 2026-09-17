@@ -231,8 +231,11 @@
   `beforeunload` y la confirmación de descarte; si un campo nuevo debe contar
   como cambio, va en `FormSnapshot`, y si no debe contar, no entra. (4)
   **Validación completa**: `handleSubmit` acumula TODOS los errores antes de
-  enviar y enfoca el primero vía `FIELD_INPUT_IDS` (mapa campo → `id`), nunca
-  con `document.querySelector`. Las reglas del cliente deben espejar
+  enviar y enfoca el primero vía `PRODUCT_FIELD_INPUT_IDS` (mapa campo → `id`),
+  nunca con `document.querySelector`. Las reglas son puras y viven fuera del
+  componente en `src/lib/product-form.ts` (`validateProductForm()`, regla B5):
+  los cambios de validación van ahí y se cubren en
+  `src/lib/product-form.test.ts`, no dentro del modal. Además deben espejar
   `create`/`update`: al cambiar una allí, cambiar la otra. El error de campo se
   pinta con `fieldCls`/`fieldA11y` y se retira con `clearFieldError` en el
   `onChange` — un error que no se limpia al corregir el campo es un bug.
@@ -542,4 +545,8 @@ descarte; `Escape` otra vez la cierra sin cerrar el modal, y con la pestaña suc
 el navegador debe pedir confirmación al recargar. Con Tab desde el último control
 el foco debe volver al primero, y el listado de atrás no debe scrollear mientras
 el modal está abierto. Repetir en "Editar" sobre un producto con SKU: guardar sin
-tocar nada no debe marcar "Cambios sin guardar".
+tocar nada no debe marcar "Cambios sin guardar". Las reglas de validación se
+cubren además sin navegador: `npx vitest run src/lib/product-form.test.ts`
+(forma válida, formulario vacío, números negativos/`NaN`, cantidades no enteras,
+SKU/código de barras, ventana de oferta invertida y "todos los errores a la vez"
+con el orden de foco).
