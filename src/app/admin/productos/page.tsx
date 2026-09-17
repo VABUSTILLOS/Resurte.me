@@ -61,12 +61,25 @@ import { resolveSalePrice, saleState } from "@/lib/sale-window"
 import { TRASH_RETENTION_DAYS, purgeLabel } from "@/lib/trash"
 import { SEO_DESCRIPTION_MAX, SEO_TITLE_MAX, chunkIds, seoBatchSummary } from "@/lib/seo-batch"
 import { MAX_BULK_IDS, type BulkFailure } from "@/lib/product-bulk"
+import {
+  DEFAULT_PRODUCT_SORT,
+  PRODUCT_SORT_KEYS,
+  PRODUCT_SORT_LABEL,
+  ariaSortFor,
+  nextProductSort,
+  parseProductSort,
+  productSortDirLabel,
+  productSortSearchParams,
+  type ProductSort,
+  type ProductSortKey,
+} from "@/lib/admin-product-sort"
 import { type SalesReportInsights } from "@/lib/sales-report"
 import { deriveStockStatus } from "@/lib/stock"
 import { createClient } from "@/lib/supabase/client"
 import { cropImageToSquare } from "@/lib/crop-image"
 import { getCategoryIcon } from "@/lib/utils"
 import { useMediaQuery } from "@/hooks/use-media-query"
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog"
 import {
   MOBILE_VIEW_MEDIA_QUERY,
   resolveProductsView,
@@ -340,6 +353,11 @@ function AdminProductsContent() {
   // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
   const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
 
+  // Sustituye `window.confirm` / `window.prompt`: diálogo con foco atrapado,
+  // Escape, `aria-modal` y restauración del foco. `confirmDialog` se monta una
+  // sola vez al final del árbol.
+  const { confirm, prompt, dialog: confirmDialog } = useConfirmDialog()
+
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [cities, setCities] = useState<City[]>([])
@@ -397,7 +415,13 @@ function AdminProductsContent() {
     try {
       // Recorte 1:1 opcional (canvas, client-side) antes de subir.
       let upload: File | Blob = file
-      if (window.confirm("¿Recortar la imagen a formato cuadrado (1:1)?\n\nAceptar = recortar · Cancelar = usar original")) {
+      const shouldCrop = await confirm({
+        title: "¿Recortar la imagen a cuadrado (1:1)?",
+        message: "Se recorta el encuadre para que la ficha no se deforme.",
+        confirmLabel: "Recortar",
+        cancelLabel: "Usar original",
+      })
+      if (shouldCrop) {
         try {
           upload = await cropImageToSquare(file)
         } catch {
@@ -522,7 +546,7 @@ function AdminProductsContent() {
   // Fase 5 — filtros de categoría/stock (con deep-link ?stock= desde las
   // alertas del dashboard) y paginación.
   const initialStock = searchParams.get("stock")
-  const initialSort = searchParams.get("sort")
+  const initialSort = parseProductSort(searchParams.get("sort"), searchParams.get("dir"))
   const [categoryFilter, setCategoryFilter] = useState<string>(
     // `||` (no `??`): un `?category=` vacío se trataría como filtro y dejaría el
     // listado en blanco, sin error, hasta que el usuario limpiara la URL.
@@ -560,7 +584,9 @@ function AdminProductsContent() {
     Record<number, { url: string | null; status: number | null; reason: string }>
   >({})
   const [checkingImages, setCheckingImages] = useState(false)
-  const [onlyBrokenImage, setOnlyBrokenImage] = useState(false)
+  const [onlyBrokenImage, setOnlyBrokenImage] = useState(
+    searchParams.get("brokenImage") === "1"
+  )
   const [imagesModalOpen, setImagesModalOpen] = useState(false)
   // Estado de los desplegables de móvil: el encabezado no cabe a 375px, así que
   // las acciones secundarias van a un menú "Más" y los bloques de filtros y
@@ -581,11 +607,10 @@ function AdminProductsContent() {
   const isMobileViewport = useMediaQuery(MOBILE_VIEW_MEDIA_QUERY)
   const [viewOverride, setView] = useState<ProductsView | null>(null)
   const view = resolveProductsView(viewParam, isMobileViewport, viewOverride)
-  // Orden de la tabla (por defecto nombre asc, como la consulta inicial).
-  const [sort, setSort] = useState<{ key: "name" | "price" | "stock"; dir: "asc" | "desc" }>({
-    key: initialSort === "price" || initialSort === "stock" ? initialSort : "name",
-    dir: searchParams.get("dir") === "desc" ? "desc" : "asc",
-  })
+  // Orden de la tabla (por defecto nombre asc, como la consulta inicial). El
+  // parseo lo comparte con la API (`@/lib/admin-product-sort`), así que un
+  // `?sort=` desconocido cae al default en ambos lados.
+  const [sort, setSort] = useState<ProductSort>(initialSort)
   // Deshacer genérico de la última acción en lote (banner temporal).
   const [undoAction, setUndoAction] = useState<{
     message: string
@@ -614,14 +639,16 @@ function AdminProductsContent() {
     if (onlyTrash) sp.set("trash", "1")
     if (onlyStaleSale) sp.set("staleSale", "1")
     if (onlyUnderThreshold) sp.set("underThreshold", "1")
+    // Filtro cliente (la sonda de imágenes rotas solo cubre la página visible),
+    // pero viaja en la URL para que el enlace reproduzca la vista.
+    if (onlyBrokenImage) sp.set("brokenImage", "1")
     if (tagFilter !== "all") sp.set("tag", tagFilter)
     if (cityFilter !== "all") sp.set("city", cityFilter)
     if (brandFilter !== "all") sp.set("brand", brandFilter)
     // Solo se persiste una vista elegida (o un `?view=` ya presente): el
     // default de móvil (tarjetas) no contamina la URL.
     if ((viewOverride ?? viewParam) === "grid") sp.set("view", "grid")
-    if (sort.key !== "name") sp.set("sort", sort.key)
-    if (sort.dir !== "asc") sp.set("dir", sort.dir)
+    for (const [k, v] of Object.entries(productSortSearchParams(sort))) sp.set(k, v)
     if (page > 1) sp.set("page", String(page))
     if (pageSize !== DEFAULT_PAGE_SIZE) sp.set("pageSize", String(pageSize))
     const qs = sp.toString()
@@ -641,6 +668,7 @@ function AdminProductsContent() {
     onlyTrash,
     onlyStaleSale,
     onlyUnderThreshold,
+    onlyBrokenImage,
     tagFilter,
     cityFilter,
     brandFilter,
@@ -821,18 +849,15 @@ function AdminProductsContent() {
   const categoryName = (id: number | null) =>
     categories.find((c) => c.id === id)?.name ?? "Sin categoría"
 
-  const toggleSort = (key: "name" | "price" | "stock") =>
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }
-    )
+  const toggleSort = (key: ProductSortKey) => setSort((prev) => nextProductSort(prev, key))
 
-  const sortIcon = (key: "name" | "price" | "stock") =>
+  const sortIcon = (key: ProductSortKey) =>
     sort.key !== key ? (
-      <ArrowUpDown className="w-3 h-3 text-gray-300" />
+      <ArrowUpDown className="w-3 h-3 text-gray-300" aria-hidden="true" />
     ) : sort.dir === "asc" ? (
-      <ArrowUp className="w-3 h-3 text-brand-600" />
+      <ArrowUp className="w-3 h-3 text-brand-600" aria-hidden="true" />
     ) : (
-      <ArrowDown className="w-3 h-3 text-brand-600" />
+      <ArrowDown className="w-3 h-3 text-brand-600" aria-hidden="true" />
     )
 
   // Paginación server-side: las filas actuales son la página completa.
@@ -868,9 +893,11 @@ function AdminProductsContent() {
       setOnlyUnderThreshold(false)
       setOnlyDupNames(false)
       setOnlyTrash(false)
+      setOnlyBrokenImage(false)
       setTagFilter("all")
       setCityFilter("all")
       setBrandFilter("all")
+      setSort(DEFAULT_PRODUCT_SORT)
     })
   }
 
@@ -1190,15 +1217,30 @@ function AdminProductsContent() {
   /** Duplica un producto pidiendo nombre y categoría de la copia. */
   async function duplicateProduct(p: Product) {
     if (duplicatingId != null) return
-    const name = window.prompt("Nombre de la copia:", `${p.name} (copia)`)
+    const name = await prompt({
+      title: "Nombre de la copia",
+      defaultValue: `${p.name} (copia)`,
+      confirmLabel: "Continuar",
+    })
     if (name === null) return
-    const catInput = window.prompt(
-      `Categoría de la copia (número de la lista, vacío = misma):\n${categories
+    const catInput = await prompt({
+      title: "Categoría de la copia",
+      message: `Número de la lista (vacío = misma categoría):\n${categories
         .map((c, i) => `${i + 1}. ${c.name}`)
-        .join("\n")}`
-    )
+        .join("\n")}`,
+      placeholder: "Vacío = misma categoría",
+      confirmLabel: "Duplicar",
+      validate: (value) => {
+        const trimmed = value.trim()
+        if (!trimmed) return null
+        const idx = parseInt(trimmed, 10)
+        if (!Number.isInteger(idx) || !categories[idx - 1]) return "Categoría inválida"
+        return null
+      },
+    })
+    if (catInput === null) return
     let categoryId: number | undefined
-    if (catInput?.trim()) {
+    if (catInput.trim()) {
       const idx = parseInt(catInput.trim(), 10)
       const chosen = categories[idx - 1]
       if (!Number.isInteger(idx) || !chosen) {
@@ -1262,7 +1304,19 @@ function AdminProductsContent() {
 
   /** Pausa temporal: despublica hoy y programa republicación en N días. */
   async function pauseProduct(p: Product) {
-    const daysInput = window.prompt("¿En cuántos días se republica? (7, 14, 30…)", "7")
+    const daysInput = await prompt({
+      title: "¿En cuántos días se republica?",
+      defaultValue: "7",
+      placeholder: "7, 14, 30…",
+      confirmLabel: "Pausar",
+      validate: (value) => {
+        const days = parseInt(value.trim(), 10)
+        if (!Number.isInteger(days) || days <= 0 || days > 365) {
+          return "Días inválidos (1-365)"
+        }
+        return null
+      },
+    })
     if (daysInput === null) return
     const days = parseInt(daysInput.trim(), 10)
     if (!Number.isInteger(days) || days <= 0 || days > 365) {
@@ -1466,10 +1520,20 @@ function AdminProductsContent() {
 
   /** Reemplaza la imagen rota pegando una URL nueva. */
   async function replaceBrokenImage(p: Product) {
-    const raw = window.prompt(
-      `Nueva URL de imagen para "${p.name}" (debe empezar por https://)`,
-      p.image_url ?? ""
-    )
+    const raw = await prompt({
+      title: "Nueva URL de imagen",
+      message: `Para "${p.name}". Debe empezar por https:// o ser una ruta local (/).`,
+      defaultValue: p.image_url ?? "",
+      placeholder: "https://…",
+      confirmLabel: "Guardar",
+      validate: (value) => {
+        const url = value.trim()
+        if (!url.startsWith("https://") && !url.startsWith("/")) {
+          return "La URL debe empezar por https:// o ser una ruta local (/)"
+        }
+        return null
+      },
+    })
     if (raw == null) return
     const url = raw.trim()
     if (!url.startsWith("https://") && !url.startsWith("/")) {
@@ -1481,7 +1545,13 @@ function AdminProductsContent() {
 
   /** Quita la imagen rota: el producto queda sin foto en la tienda. */
   async function removeBrokenImage(p: Product) {
-    if (!window.confirm(`¿Quitar la imagen de "${p.name}"? El producto queda sin foto en la tienda.`)) return
+    const ok = await confirm({
+      title: "¿Quitar la imagen?",
+      message: `"${p.name}" queda sin foto en la tienda.`,
+      confirmLabel: "Quitar imagen",
+      danger: true,
+    })
+    if (!ok) return
     await saveProductImage(p, null)
   }
 
@@ -1578,7 +1648,13 @@ function AdminProductsContent() {
   /** Elimina un producto (soft delete: va a la papelera, se puede restaurar). */
   async function deleteProduct(p: Product) {
     if (deletingId != null) return
-    if (!window.confirm(`¿Mover "${p.name}" a la papelera? Se despublica y puedes restaurarlo después.`)) return
+    const ok = await confirm({
+      title: "¿Mover a la papelera?",
+      message: `"${p.name}" se despublica y puedes restaurarlo después.`,
+      confirmLabel: "Mover a la papelera",
+      danger: true,
+    })
+    if (!ok) return
     setDeletingId(p.id)
     setError(null)
     try {
@@ -1629,8 +1705,13 @@ function AdminProductsContent() {
     if (purging) return
     const scope = opts.productIds ? `${opts.productIds.length} producto(s)` : "la papelera"
     const extra = opts.ignoreRetention ? " (sin esperar la retención de 30 días)" : ""
-    if (!window.confirm(`¿Borrar definitivamente ${scope}${extra}? Esta acción no se puede deshacer.`))
-      return
+    const ok = await confirm({
+      title: "¿Borrar definitivamente?",
+      message: `Se borra ${scope}${extra}. Esta acción no se puede deshacer.`,
+      confirmLabel: "Borrar definitivamente",
+      danger: true,
+    })
+    if (!ok) return
     setPurging(true)
     setError(null)
     try {
@@ -1843,17 +1924,21 @@ function AdminProductsContent() {
     if (onlyTrash) params.trash = "1"
     if (onlyStaleSale) params.staleSale = "1"
     if (onlyUnderThreshold) params.underThreshold = "1"
+    if (onlyBrokenImage) params.brokenImage = "1"
     if (tagFilter !== "all") params.tag = tagFilter
     if (cityFilter !== "all") params.city = cityFilter
     if (brandFilter !== "all") params.brand = brandFilter
     if (view === "grid") params.view = "grid"
-    if (sort.key !== "name") params.sort = sort.key
-    if (sort.dir !== "asc") params.dir = sort.dir
+    Object.assign(params, productSortSearchParams(sort))
     return params
   }
 
-  function saveCurrentView() {
-    const name = window.prompt("Nombre de la vista:")
+  async function saveCurrentView() {
+    const name = await prompt({
+      title: "Nombre de la vista",
+      placeholder: "Ej.: Sin imagen y sin stock",
+      confirmLabel: "Guardar vista",
+    })
     if (!name?.trim()) return
     const params = currentFilterParams()
     if (Object.keys(params).length === 0) {
@@ -1881,14 +1966,12 @@ function AdminProductsContent() {
       setOnlyTrash(v.params.trash === "1")
       setOnlyStaleSale(v.params.staleSale === "1")
       setOnlyUnderThreshold(v.params.underThreshold === "1")
+      setOnlyBrokenImage(v.params.brokenImage === "1")
       setTagFilter(v.params.tag ?? "all")
       setCityFilter(v.params.city ?? "all")
       setBrandFilter(v.params.brand ?? "all")
       setView(v.params.view === "grid" ? "grid" : "table")
-      setSort({
-        key: (v.params.sort as "name" | "price" | "stock") ?? "name",
-        dir: v.params.dir === "desc" ? "desc" : "asc",
-      })
+      setSort(parseProductSort(v.params.sort, v.params.dir))
     })
     setViewsOpen(false)
     setToast(`Vista "${v.name}" aplicada`)
@@ -1899,9 +1982,12 @@ function AdminProductsContent() {
     const target = products.find((p) => p.id === a)
     const source = products.find((p) => p.id === b)
     if (
-      !window.confirm(
-        `Fusionar duplicados:\n\n✔ Se conserva: ${target?.name ?? `#${a}`} (#${a})\n✖ Va a la papelera: ${source?.name ?? `#${b}`} (#${b})\n\nSe copian disponibilidad e imágenes faltantes. ¿Continuar?`
-      )
+      !(await confirm({
+        title: "Fusionar duplicados",
+        message: `✔ Se conserva: ${target?.name ?? `#${a}`} (#${a})\n✖ Va a la papelera: ${source?.name ?? `#${b}`} (#${b})\n\nSe copian disponibilidad e imágenes faltantes.`,
+        confirmLabel: "Fusionar",
+        danger: true,
+      }))
     )
       return
     setBulkSaving(true)
@@ -1928,9 +2014,12 @@ function AdminProductsContent() {
   async function bulkDelete() {
     if (selected.size === 0 || bulkSaving) return
     if (
-      !window.confirm(
-        `¿Mover ${selected.size} producto${selected.size === 1 ? "" : "s"} a la papelera? Se despublican y puedes restaurarlos después.`
-      )
+      !(await confirm({
+        title: "¿Mover a la papelera?",
+        message: `${selected.size} producto${selected.size === 1 ? "" : "s"} se despublican y puedes restaurarlos después.`,
+        confirmLabel: "Mover a la papelera",
+        danger: true,
+      }))
     )
       return
     setBulkSaving(true)
@@ -2766,6 +2855,7 @@ function AdminProductsContent() {
     onlyUnderThreshold,
     onlyDupNames,
     onlyTrash,
+    onlyBrokenImage,
   ].filter(Boolean).length
 
   // El estado vacío debe explicar POR QUÉ no hay filas: con filtros activos un
@@ -2803,15 +2893,18 @@ function AdminProductsContent() {
 
   // Estilos compartidos de los chips de categoría (activo/inactivo) y de su
   // contador, para no repetir el mismo ternario en cada chip de la fila.
+  // Mismo lenguaje visual que las píldoras de categoría del panel de WhatsApp
+  // (`/admin/whatsapp`): gris relleno sin borde en reposo y verde sólido al
+  // activo. Se conserva el contador de productos, que WhatsApp no tiene. El
+  // gris del texto es explícito (no `--text-secondary`) porque el admin es una
+  // superficie clara fija y ese token se aclara en tema oscuro.
   const categoryChipClass = (active: boolean) =>
-    `inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-      active
-        ? "bg-brand-600 text-white"
-        : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+    `inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+      active ? "bg-brand-500 text-white" : "bg-[#F5F3F0] text-gray-600 hover:bg-[#ECEAE6]"
     }`
   const chipCountClass = (active: boolean) =>
     `text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-      active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+      active ? "bg-white text-brand-600" : "bg-gray-200 text-gray-700"
     }`
 
   const primaryAction = headerActions.find((a) => a.variant === "primary")
@@ -2822,11 +2915,24 @@ function AdminProductsContent() {
       <div className="mb-4 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Productos</h1>
-          <p className="text-sm text-gray-500">
-            {total === counts.catalogTotal
-              ? `${counts.catalogTotal} productos registrados`
-              : `${total} de ${counts.catalogTotal} productos`}
-            {refreshing && <Loader2 className="inline w-3.5 h-3.5 ml-2 animate-spin text-brand-500" />}
+          {/* Región viva: anuncia el resultado del filtro/orden sin mover el
+              foco. El texto del orden va en `sr-only` para que un cambio de
+              orden (que no altera el conteo) también se anuncie. */}
+          <p className="text-sm text-gray-500" role="status">
+            <span>
+              {total === counts.catalogTotal
+                ? `${counts.catalogTotal} productos registrados`
+                : `${total} de ${counts.catalogTotal} productos`}
+            </span>
+            <span className="sr-only">
+              {`. Orden: ${PRODUCT_SORT_LABEL[sort.key]}, ${productSortDirLabel(sort.dir).toLowerCase()}`}
+            </span>
+            {refreshing && (
+              <Loader2
+                aria-hidden="true"
+                className="inline w-3.5 h-3.5 ml-2 animate-spin text-brand-500"
+              />
+            )}
           </p>
         </div>
 
@@ -3551,6 +3657,58 @@ function AdminProductsContent() {
             <LayoutGrid className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Orden del listado. El `select` cubre TODAS las claves (incluidas las
+            que no tienen columna propia, como unidades, costo o fecha de alta);
+            los botones de la cabecera de la tabla siguen siendo el atajo para
+            nombre/precio/stock. */}
+        <div
+          className={`${filtersOpen ? "flex" : "hidden sm:flex"} items-center gap-1 rounded-lg border border-gray-200 bg-white pl-1.5 pr-0.5 py-0.5`}
+        >
+          <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" aria-hidden="true" />
+          <label htmlFor="product-sort-key" className="sr-only">
+            Ordenar por
+          </label>
+          <select
+            id="product-sort-key"
+            value={sort.key}
+            onChange={(e) =>
+              setSort({ key: e.target.value as ProductSortKey, dir: sort.dir })
+            }
+            title="Ordenar el listado por"
+            className="max-w-[9rem] bg-transparent text-xs font-semibold text-gray-600 focus:outline-none"
+          >
+            {PRODUCT_SORT_KEYS.map((k) => (
+              <option key={k} value={k}>
+                {PRODUCT_SORT_LABEL[k]}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setSort((prev) => ({ key: prev.key, dir: prev.dir === "asc" ? "desc" : "asc" }))}
+            aria-label={`Dirección del orden: ${productSortDirLabel(sort.dir)}. Pulsa para invertir`}
+            title={`Dirección: ${productSortDirLabel(sort.dir)}`}
+            className="p-1 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          >
+            {sort.dir === "asc" ? (
+              <ArrowUp className="w-3.5 h-3.5" aria-hidden="true" />
+            ) : (
+              <ArrowDown className="w-3.5 h-3.5" aria-hidden="true" />
+            )}
+          </button>
+          {sort.key !== DEFAULT_PRODUCT_SORT.key && (
+            <button
+              type="button"
+              onClick={() => setSort(DEFAULT_PRODUCT_SORT)}
+              aria-label="Volver al orden por defecto (nombre ascendente)"
+              title="Orden por defecto"
+              className="p-1 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            >
+              <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Barra de acciones para la selección. Es sticky: se ancla DEBAJO del
@@ -3571,7 +3729,7 @@ function AdminProductsContent() {
             <button
               onClick={() => openCityModal()}
               disabled={bulkSaving || cityModalLoading}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50"
             >
               <MapPin className="w-3.5 h-3.5" />
               {cityModalLoading ? "Cargando…" : "Elegir ciudades…"}
@@ -3579,7 +3737,7 @@ function AdminProductsContent() {
             <button
               onClick={() => applyAllCities(true)}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold hover:bg-blue-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold hover:bg-blue-100 disabled:opacity-50"
               title="Disponibles en todas las ciudades (Global)"
             >
               <Globe className="w-3.5 h-3.5" />
@@ -3588,7 +3746,7 @@ function AdminProductsContent() {
             <button
               onClick={() => applyAllCities(false)}
               disabled={bulkSaving}
-              className="touch-target px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-semibold hover:bg-red-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-semibold hover:bg-red-100 disabled:opacity-50"
               title="No disponibles en ninguna ciudad"
             >
               Ninguna
@@ -3597,7 +3755,7 @@ function AdminProductsContent() {
             <button
               onClick={() => bulkSetVisibility(true)}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 text-xs font-semibold hover:bg-green-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 text-xs font-semibold hover:bg-green-100 disabled:opacity-50"
             >
               <Eye className="w-3.5 h-3.5" />
               Mostrar en tienda
@@ -3605,7 +3763,7 @@ function AdminProductsContent() {
             <button
               onClick={() => bulkSetVisibility(false)}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200 text-xs font-semibold hover:bg-gray-200 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200 text-xs font-semibold hover:bg-gray-200 disabled:opacity-50"
             >
               <EyeOff className="w-3.5 h-3.5" />
               Ocultar de tienda
@@ -3613,7 +3771,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setBulkCategoryOpen(true)}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold hover:bg-purple-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold hover:bg-purple-100 disabled:opacity-50"
               title="Cambiar la categoría de la selección"
             >
               <Tag className="w-3.5 h-3.5" />
@@ -3622,7 +3780,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setBulkUnitOpen(true)}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold hover:bg-teal-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold hover:bg-teal-100 disabled:opacity-50"
               title="Asignar unidad (kg, pieza…) a la selección"
             >
               <Package className="w-3.5 h-3.5" />
@@ -3631,7 +3789,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setBulkPriceOpen(true)}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-xs font-semibold hover:bg-orange-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-xs font-semibold hover:bg-orange-100 disabled:opacity-50"
               title="Ajustar precios de la selección en ±%"
             >
               <Percent className="w-3.5 h-3.5" />
@@ -3640,7 +3798,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setBulkSaleOpen(true)}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-50 text-pink-700 border border-pink-200 text-xs font-semibold hover:bg-pink-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-50 text-pink-700 border border-pink-200 text-xs font-semibold hover:bg-pink-100 disabled:opacity-50"
               title="Aplicar o quitar ofertas en la selección"
             >
               <Tag className="w-3.5 h-3.5" />
@@ -3649,7 +3807,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setBulkTagOpen(true)}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold hover:bg-indigo-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold hover:bg-indigo-100 disabled:opacity-50"
               title="Agregar o quitar una etiqueta en la selección"
             >
               <Tag className="w-3.5 h-3.5" />
@@ -3658,7 +3816,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setBulkMarginOpen(true)}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-lime-50 text-lime-700 border border-lime-200 text-xs font-semibold hover:bg-lime-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-lime-50 text-lime-700 border border-lime-200 text-xs font-semibold hover:bg-lime-100 disabled:opacity-50"
               title="Oferta calculada para conservar un margen mínimo (requiere costo)"
             >
               <Percent className="w-3.5 h-3.5" />
@@ -3667,7 +3825,7 @@ function AdminProductsContent() {
             <button
               onClick={generateSeoBatch}
               disabled={bulkSaving || seoGenerating}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-xs font-semibold hover:bg-violet-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-xs font-semibold hover:bg-violet-100 disabled:opacity-50"
               title="Generar título y descripción SEO con IA (solo productos sin SEO)"
             >
               {seoGenerating ? (
@@ -3680,7 +3838,7 @@ function AdminProductsContent() {
             <button
               onClick={() => bulkSetWhatsApp(true)}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
               title="Mostrar la selección en el catálogo de WhatsApp"
             >
               <Eye className="w-3.5 h-3.5" />
@@ -3689,7 +3847,7 @@ function AdminProductsContent() {
             <button
               onClick={() => bulkSetWhatsApp(false)}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
               title="Ocultar la selección del catálogo de WhatsApp"
             >
               <EyeOff className="w-3.5 h-3.5" />
@@ -3698,7 +3856,7 @@ function AdminProductsContent() {
             <button
               onClick={copySelection}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold hover:bg-indigo-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold hover:bg-indigo-100 disabled:opacity-50"
               title="Copiar la selección como lista Nombre — $precio"
             >
               <ClipboardList className="w-3.5 h-3.5" />
@@ -3707,7 +3865,7 @@ function AdminProductsContent() {
             <button
               onClick={bulkGenerateImages}
               disabled={bulkAiBusy}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold hover:bg-purple-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold hover:bg-purple-100 disabled:opacity-50"
               title="Generar imagen con IA para los seleccionados sin imagen (máx 10)"
             >
               {bulkAiBusy ? (
@@ -3721,7 +3879,7 @@ function AdminProductsContent() {
               <button
                 onClick={mergeSelected}
                 disabled={bulkSaving}
-                className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200 text-xs font-semibold hover:bg-fuchsia-100 disabled:opacity-50"
+                className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200 text-xs font-semibold hover:bg-fuchsia-100 disabled:opacity-50"
                 title="Fusionar: conserva el de menor id, el otro va a la papelera"
               >
                 <Copy className="w-3.5 h-3.5" />
@@ -3731,7 +3889,7 @@ function AdminProductsContent() {
             <button
               onClick={bulkDuplicate}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-xs font-semibold hover:bg-sky-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-xs font-semibold hover:bg-sky-100 disabled:opacity-50"
               title="Duplicar la selección (las copias nacen despublicadas)"
             >
               <Copy className="w-3.5 h-3.5" />
@@ -3740,7 +3898,7 @@ function AdminProductsContent() {
             <button
               onClick={bulkDelete}
               disabled={bulkSaving}
-              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-semibold hover:bg-red-100 disabled:opacity-50"
+              className="touch-target whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-semibold hover:bg-red-100 disabled:opacity-50"
               title="Eliminar la selección (los que tengan pedidos se omiten)"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -3749,7 +3907,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setSelected(new Set())}
               disabled={bulkSaving}
-              className="touch-target px-2 py-1.5 text-xs font-semibold text-gray-500 hover:underline disabled:opacity-50"
+              className="touch-target whitespace-nowrap px-2 py-1.5 text-xs font-semibold text-gray-500 hover:underline disabled:opacity-50"
             >
               Limpiar
             </button>
@@ -3758,9 +3916,16 @@ function AdminProductsContent() {
         </div>
       )}
 
-      {/* Products: tabla o grid */}
+      {/* Products: tabla o grid. `aria-busy` cubre el refetch del listado
+          (filtros, orden, página): el contenido se atenúa con una opacidad
+          reducida mientras llega la respuesta. */}
       {view === "table" ? (
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div
+        aria-busy={refreshing}
+        className={`bg-white rounded-xl border border-gray-200 overflow-hidden transition-opacity ${
+          refreshing ? "opacity-60" : ""
+        }`}
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -3774,7 +3939,7 @@ function AdminProductsContent() {
                     className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                   />
                 </th>
-                <th className="px-3 py-3">
+                <th className="px-3 py-3" aria-sort={ariaSortFor("name", sort)}>
                   <button
                     type="button"
                     onClick={() => toggleSort("name")}
@@ -3785,7 +3950,7 @@ function AdminProductsContent() {
                   </button>
                 </th>
                 <th className="px-5 py-3 hidden md:table-cell">Categoría</th>
-                <th className="px-5 py-3">
+                <th className="px-5 py-3" aria-sort={ariaSortFor("price", sort)}>
                   <button
                     type="button"
                     onClick={() => toggleSort("price")}
@@ -3798,7 +3963,7 @@ function AdminProductsContent() {
                 <th className="px-5 py-3 hidden md:table-cell" title="(precio de venta − costo) / precio de venta">
                   Margen
                 </th>
-                <th className="px-5 py-3">
+                <th className="px-5 py-3" aria-sort={ariaSortFor("stock", sort)}>
                   <button
                     type="button"
                     onClick={() => toggleSort("stock")}
@@ -4371,7 +4536,12 @@ function AdminProductsContent() {
         </div>
       </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div
+          aria-busy={refreshing}
+          className={`bg-white rounded-xl border border-gray-200 p-4 transition-opacity ${
+            refreshing ? "opacity-60" : ""
+          }`}
+        >
           {total === 0 && !refreshing ? (
             emptyListState
           ) : (

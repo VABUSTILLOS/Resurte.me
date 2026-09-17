@@ -67,9 +67,10 @@
   /* Alto real del sub-nav de /admin, publicado por AdminSubNav con un
      ResizeObserver. Las barras sticky del área (barra de acciones masivas de
      /admin/productos) se anclan DEBAJO del sub-nav sumando esta var a
-     --header-top-offset. El default es el alto del sub-nav sin JS (32px de
-     contenido + py-2 + borde) para que el primer render ya quede alineado. */
-  --admin-subnav-h: 3.0625rem;
+     --header-top-offset. El default es el alto medido del sub-nav sin JS
+     (28px de píldoras + py-2 + borde = 45px) para que el primer render ya
+     quede alineado y no haya salto al hidratar. */
+  --admin-subnav-h: 2.8125rem;
   --inset-bottom: env(safe-area-inset-bottom, 0px);
   /* Fuente única del offset para elementos flotantes del fondo (WhatsApp,
      StickyCatalogButton, pill de cuenta, cookie banner). Cuando el carrito

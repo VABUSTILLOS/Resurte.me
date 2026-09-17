@@ -2,6 +2,12 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { isMissingColumnError } from "@/lib/sale-window"
 import { resolveLowStockThreshold } from "@/lib/stock"
+import {
+  clampProductSortToColumns,
+  parseProductSort,
+  productSortOrderClauses,
+  type ProductSortKey,
+} from "@/lib/admin-product-sort"
 import { NextResponse, type NextRequest } from "next/server"
 
 const COLS =
@@ -41,7 +47,7 @@ interface ListParams {
   tag: string
   dupNames: boolean
   trash: boolean
-  sort: "name" | "price" | "stock"
+  sort: ProductSortKey
   dir: "asc" | "desc"
   page: number
   pageSize: number
@@ -50,7 +56,7 @@ interface ListParams {
 
 function parseParams(req: NextRequest): ListParams {
   const sp = req.nextUrl.searchParams
-  const rawSort = sp.get("sort")
+  const sort = parseProductSort(sp.get("sort"), sp.get("dir"))
   return {
     q: (sp.get("q") ?? "").trim(),
     // Un parámetro presente pero vacío (`?brand=`) NO significa "sin filtro":
@@ -72,8 +78,8 @@ function parseParams(req: NextRequest): ListParams {
     tag: (sp.get("tag") ?? "all").trim() || "all",
     dupNames: sp.get("dupNames") === "1",
     trash: sp.get("trash") === "1",
-    sort: rawSort === "price" || rawSort === "stock" ? rawSort : "name",
-    dir: sp.get("dir") === "desc" ? "desc" : "asc",
+    sort: sort.key,
+    dir: sort.dir,
     page: Math.max(1, Number(sp.get("page")) || 1),
     pageSize: Math.min(MAX_PAGE_SIZE, Math.max(1, Number(sp.get("pageSize")) || 50)),
     idsOnly: sp.get("idsOnly") === "1",
@@ -498,14 +504,15 @@ export async function GET(request: NextRequest) {
         derived
       )
 
-      // Orden: stock se ordena por severidad (in_stock < low_stock < out_of_stock).
-      const ascending = p.dir === "asc"
-      if (p.sort === "stock") {
-        query = query.order("stock_status", { ascending }).order("name", { ascending: true })
-      } else {
-        query = query.order(p.sort === "price" ? "price" : "name", {
-          ascending,
-          nullsFirst: false,
+      // Orden: `stock` ordena por severidad (in_stock < low_stock < out_of_stock)
+      // con desempate por nombre. `clampProductSortToColumns` evita que una
+      // clave no soportada por el set de columnas degradado (migraciones sin
+      // aplicar) haga fallar la consulta con `42703`.
+      const effectiveSort = clampProductSortToColumns({ key: p.sort, dir: p.dir }, cols)
+      for (const clause of productSortOrderClauses(effectiveSort)) {
+        query = query.order(clause.column, {
+          ascending: clause.ascending,
+          ...(clause.nullsFirst === undefined ? {} : { nullsFirst: clause.nullsFirst }),
         })
       }
 

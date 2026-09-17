@@ -154,6 +154,39 @@ describe("GET /api/admin/products/list", () => {
     expect(order).toHaveBeenNthCalledWith(2, "name", { ascending: true })
   })
 
+  it("mapea las claves nuevas (unidades, costo, fecha de alta) a su columna", async () => {
+    const cases: Array<[string, string, "asc" | "desc"]> = [
+      ["quantity", "stock_quantity", "asc"],
+      ["cost", "cost", "desc"],
+      ["created_at", "created_at", "desc"],
+    ]
+    for (const [key, column, dir] of cases) {
+      vi.clearAllMocks()
+      vi.mocked(requireAdmin).mockResolvedValue({
+        user: { id: "admin-1" },
+        response: null,
+      } as never)
+      const { order } = mockClient()
+
+      const res = await GET(listRequest(`sort=${key}&dir=${dir}&page=1&pageSize=2`))
+
+      expect(res.status).toBe(200)
+      expect(order).toHaveBeenCalledWith(column, {
+        ascending: dir === "asc",
+        nullsFirst: false,
+      })
+    }
+  })
+
+  it("ignora un ?sort= desconocido y cae al orden por defecto", async () => {
+    const { order } = mockClient()
+
+    const res = await GET(listRequest("sort=ventas&dir=asc&page=1&pageSize=2"))
+
+    expect(res.status).toBe(200)
+    expect(order).toHaveBeenCalledWith("name", { ascending: true, nullsFirst: false })
+  })
+
   it("devuelve solo ids en modo idsOnly", async () => {
     mockClient()
 

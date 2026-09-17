@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logAdminAction } from "@/lib/audit-log"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { revalidateTag } from "next/cache"
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
  */
 export async function PATCH(request: Request) {
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { response: adminDenied, user: adminUser } = await requireAdmin()
     if (adminDenied) {
       return adminDenied
     }
@@ -101,6 +102,8 @@ export async function PATCH(request: Request) {
 
     const supabase = await createServiceClient()
     const now = new Date().toISOString()
+    // Resumen de lo aplicado, para la bitácora (una entrada por petición).
+    let auditDetail: Record<string, unknown> = {}
 
     if (Array.isArray(changes)) {
       // Upsert en lote de celdas (productId, cityId, isAvailable).
@@ -127,6 +130,10 @@ export async function PATCH(request: Request) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
+      auditDetail = {
+        mode: "changes",
+        cells: validChanges.map((c) => ({ cityId: c.cityId, isAvailable: c.isAvailable })),
+      }
     } else if (scope === "all") {
       if (typeof isAvailable !== "boolean") {
         return NextResponse.json({ error: "Se requiere isAvailable" }, { status: 400 })
@@ -140,6 +147,7 @@ export async function PATCH(request: Request) {
         if (error) {
           return NextResponse.json({ error: error.message }, { status: 500 })
         }
+        auditDetail = { mode: "all", isAvailable: true }
       } else {
         // Apagar en todas: filas explícitas en cada ciudad activa.
         const { data: cities, error: citiesError } = await supabase
@@ -165,6 +173,7 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: error.message }, { status: 500 })
           }
         }
+        auditDetail = { mode: "all", isAvailable: false, cities: cities?.length ?? 0 }
       }
     } else {
       if (!cityId || typeof isAvailable !== "boolean") {
@@ -185,12 +194,23 @@ export async function PATCH(request: Request) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
+      auditDetail = { mode: "cell", cityId, isAvailable }
     }
 
     // Reflejar el cambio en la tienda sin esperar el TTL del caché.
     revalidateTag("availability", "max")
     revalidateCatalogCache()
     resetCatalogCache()
+
+    // Sin esto, "por qué este producto no aparece en Guadalajara" no tenía
+    // rastro: es la superficie donde un error deja productos invisibles.
+    await logAdminAction(supabase, {
+      actorId: adminUser?.id ?? null,
+      actorEmail: adminUser?.email ?? null,
+      action: "product_city_availability",
+      entity: "product_city_availability",
+      detail: { ids, count: ids.length, ...auditDetail },
+    })
 
     // WA5 — encolar sync incremental del catálogo WhatsApp (best-effort).
     const { enqueueProductsForWaSync } = await import("@/lib/whatsapp-sync-queue")

@@ -171,13 +171,16 @@
   `AdminSubNav` (`sub-nav.tsx`) midiendo su propio `offsetHeight` con un
   `ResizeObserver` y escribiéndolo en `document.documentElement` (mismo patrón
   que `--toast-stack-h` de `toast.tsx`); el default de la var en `globals.css`
-  (49px) cubre el primer render sin JS. No hardcodear el offset del sub-nav:
-  cambiar el sub-nav (fuente, badges, `AdminNotificationCenter`) o el header
-  auto-oculto (`body.header-hidden` ⇒ `--header-top-offset: 0px`) debe seguir
-  funcionando sin tocar la barra. En móvil la barra es **una sola fila con
-  scroll horizontal** (`overflow-x-auto`, sin wrap) con el contador
-  `shrink-0`, padding vertical reducido (`py-1.5`) y `touch-target` en cada
-  acción; en `sm+` recupera el wrap y el padding originales.
+  (45px = el alto medido del sub-nav: 28px de píldoras + `py-2` + borde) cubre
+  el primer render sin JS sin salto al hidratar. No hardcodear el offset del
+  sub-nav: cambiar el sub-nav (fuente, badges, `AdminNotificationCenter`) o el
+  header auto-oculto (`body.header-hidden` ⇒ `--header-top-offset: 0px`) debe
+  seguir funcionando sin tocar la barra. En móvil la barra es **una sola fila
+  con scroll horizontal** (`overflow-x-auto`, sin wrap) con el contador
+  `shrink-0`, padding vertical reducido (`py-1.5`), `touch-target` y
+  `whitespace-nowrap` en cada acción — sin el `whitespace-nowrap` las etiquetas
+  se parten en varias líneas y la barra pasa de 58px a >300px de alto; en
+  `sm+` recupera el wrap y el padding originales.
 
 - Productos — filtro por categoría: conviven **dos controles** y ambos deben
   mantenerse sincronizados. (1) El `<select>` "Todas las categorías" de la barra
@@ -190,7 +193,14 @@
   icono del catálogo; por eso las categorías se cargan con
   `select("id,name,slug,icon")` y `Category.icon` es obligatorio (también en
   `ProductFormModal`, y `/api/admin/categories/create` devuelve `icon` para que
-  una categoría recién creada entre con su icono). Los dos controles usan
+  una categoría recién creada entre con su icono). La fila **reutiliza el
+  lenguaje visual de las píldoras de categoría de `/admin/whatsapp`**
+  (`categoryChipClass`): gris relleno sin borde en reposo (`bg-[#F5F3F0]`) y
+  verde sólido al activo (`bg-brand-500`), `rounded-lg` + `text-xs font-medium`;
+  conserva el contador de productos (que WhatsApp no tiene) en `chipCountClass`.
+  El texto de la píldora usa gris **explícito**, no `--text-secondary`: ese
+  token se aclara en tema oscuro y el admin es una superficie clara fija, así
+  que la píldora quedaría ilegible. Los dos controles usan
   `updateFilters` y limpian `onlyNoCategory`. El conteo lo sirve
   `categoryCounts` del listado (`categoryTally` en
   `route.ts`), que **pagina** hasta `CATEGORY_TALLY_PAGES` (10 × 1000) porque

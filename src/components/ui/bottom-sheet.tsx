@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react"
 import { AnimatePresence, motion, useDragControls } from "framer-motion"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import { useMediaQuery } from "@/hooks/use-media-query"
+import { FOCUSABLE_SELECTOR, nextTrapFocus } from "@/lib/focus-trap"
 
 interface BottomSheetProps {
   open: boolean
@@ -16,9 +17,6 @@ interface BottomSheetProps {
   /** Ancho del panel en desktop (sm+). Default max-w-md. */
   maxWidthClass?: string
 }
-
-const FOCUSABLE =
-  'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
 
 /**
  * Diálogo responsivo: bottom sheet con drag-to-dismiss en móvil (<sm) y
@@ -49,17 +47,12 @@ export function BottomSheet({
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "Tab" || !panel) return
-      const focusables = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE))
-      const first = focusables[0]
-      const last = focusables[focusables.length - 1]
-      if (!first || !last) return
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault()
-        first.focus()
-      }
+      const focusables = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+      const currentIndex = focusables.indexOf(document.activeElement as HTMLElement)
+      const target = nextTrapFocus(currentIndex, focusables.length, e.shiftKey)
+      if (target < 0) return
+      e.preventDefault()
+      focusables[target]?.focus()
     }
 
     document.addEventListener("keydown", onKeyDown)

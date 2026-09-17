@@ -5,10 +5,14 @@ vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }))
 vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn() }))
 vi.mock("@/lib/catalog-cache", () => ({ revalidateCatalogCache: vi.fn() }))
 vi.mock("@/lib/catalog", () => ({ resetCatalogCache: vi.fn() }))
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }))
+vi.mock("@/lib/audit-log", () => ({ logAdminAction: vi.fn() }))
+vi.mock("@/lib/whatsapp-sync-queue", () => ({ enqueueProductsForWaSync: vi.fn() }))
 
-import { GET } from "./route"
+import { GET, PATCH } from "./route"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logAdminAction } from "@/lib/audit-log"
 
 const ROWS = [
   { product_id: 1, city_id: 2, is_available: true },
@@ -105,5 +109,120 @@ describe("GET /api/admin/products/city-availability", () => {
 
     expect(res.status).toBe(401)
     expect(inSpy).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Cliente falso para el PATCH: cubre `upsert`, `delete().in()` y
+ * `select().eq()` (ciudades activas). Los espías permiten afirmar qué filas se
+ * escribieron, que es donde vive la semántica "sin filas = global".
+ */
+function mockWriteClient(
+  opts: { cities?: Array<{ id: number }>; error?: { message: string } | null } = {}
+) {
+  const { cities = [{ id: 2 }, { id: 3 }], error = null } = opts
+  const upsert = vi.fn().mockResolvedValue({ error })
+  const del = vi.fn()
+  const eq = vi.fn().mockResolvedValue({ data: cities, error: null })
+  const chain = {
+    upsert,
+    delete: del.mockReturnValue({ in: vi.fn().mockResolvedValue({ error }) }),
+    select: vi.fn().mockReturnValue({ eq }),
+  }
+  vi.mocked(createServiceClient).mockResolvedValue({ from: vi.fn(() => chain) } as never)
+  return { upsert, delete: del, eq }
+}
+
+function patchRequest(body: unknown) {
+  return new NextRequest("http://localhost/api/admin/products/city-availability", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+  })
+}
+
+describe("PATCH /api/admin/products/city-availability", () => {
+  it("registra en la bitácora el cambio de una celda", async () => {
+    const { upsert } = mockWriteClient()
+
+    const res = await PATCH(patchRequest({ productIds: [1, 2], cityId: 3, isAvailable: false }))
+
+    expect(res.status).toBe(200)
+    expect(upsert).toHaveBeenCalledTimes(1)
+    const entry = vi.mocked(logAdminAction).mock.calls[0]![1]
+    expect(entry).toMatchObject({
+      action: "product_city_availability",
+      entity: "product_city_availability",
+      actorId: "admin-1",
+    })
+    expect(entry.detail).toEqual({
+      ids: [1, 2],
+      count: 2,
+      mode: "cell",
+      cityId: 3,
+      isAvailable: false,
+    })
+  })
+
+  it("registra el modo changes con las celdas aplicadas", async () => {
+    mockWriteClient()
+
+    await PATCH(
+      patchRequest({
+        productId: 7,
+        changes: [
+          { cityId: 2, isAvailable: true },
+          { cityId: 3, isAvailable: false },
+        ],
+      })
+    )
+
+    const entry = vi.mocked(logAdminAction).mock.calls[0]![1]
+    expect(entry.detail).toEqual({
+      ids: [7],
+      count: 1,
+      mode: "changes",
+      cells: [
+        { cityId: 2, isAvailable: true },
+        { cityId: 3, isAvailable: false },
+      ],
+    })
+  })
+
+  it("registra scope all: borra filas al reactivar el global y las crea al apagarlo", async () => {
+    const on = mockWriteClient()
+    await PATCH(patchRequest({ productId: 5, scope: "all", isAvailable: true }))
+    expect(on.delete).toHaveBeenCalledTimes(1)
+    expect(on.upsert).not.toHaveBeenCalled()
+    expect(vi.mocked(logAdminAction).mock.calls[0]![1].detail).toMatchObject({
+      mode: "all",
+      isAvailable: true,
+    })
+
+    vi.clearAllMocks()
+    const off = mockWriteClient()
+    await PATCH(patchRequest({ productId: 5, scope: "all", isAvailable: false }))
+    expect(off.upsert).toHaveBeenCalledWith(
+      [
+        { product_id: 5, city_id: 2, is_available: false, updated_at: expect.any(String) },
+        { product_id: 5, city_id: 3, is_available: false, updated_at: expect.any(String) },
+      ],
+      { onConflict: "product_id,city_id" }
+    )
+    expect(vi.mocked(logAdminAction).mock.calls[0]![1].detail).toMatchObject({
+      mode: "all",
+      isAvailable: false,
+      cities: 2,
+    })
+  })
+
+  it("no escribe ni registra si la validación falla", async () => {
+    const { upsert } = mockWriteClient()
+
+    const res = await PATCH(patchRequest({ productIds: [1], cityId: 3 }))
+
+    expect(res.status).toBe(400)
+    expect(upsert).not.toHaveBeenCalled()
+    expect(logAdminAction).not.toHaveBeenCalled()
   })
 })
