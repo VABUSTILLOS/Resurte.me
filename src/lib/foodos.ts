@@ -374,6 +374,42 @@ export function resolveOrderChannel(input: {
   return "web"
 }
 
+/**
+ * Etiquetas de canal. `mesero` dice "Mesa" y no "Mesero" porque lo que el
+ * dueño quiere distinguir es el servicio en mesa, no quién lo levantó.
+ *
+ * Vive junto a `resolveOrderChannel` a propósito: quien escribe el canal y
+ * quien lo pinta tienen que usar la misma tabla, o la lista de pedidos acaba
+ * mostrando el slug crudo ("mostrador") donde debería decir "Mostrador".
+ */
+export const CHANNEL_LABELS: Record<FoodosOrderChannel, string> = {
+  web: "Web",
+  qr: "QR",
+  whatsapp: "WhatsApp",
+  marketplace: "HoyQueComemos",
+  mostrador: "Mostrador",
+  mesero: "Mesa",
+}
+
+/**
+ * Todos los canales, del más digital al más presencial. Es el orden en el que
+ * se pintan las barras y los filtros: quien mira el reporte ve primero de dónde
+ * viene el comensal y al final cómo lo atendió el local.
+ */
+export const FOODOS_ORDER_CHANNELS: FoodosOrderChannel[] = [
+  "web",
+  "qr",
+  "whatsapp",
+  "marketplace",
+  "mostrador",
+  "mesero",
+]
+
+/** Etiqueta de un canal desconocido: el canal tal cual, nunca un hueco. */
+export function channelLabel(channel: string): string {
+  return CHANNEL_LABELS[channel as FoodosOrderChannel] ?? channel
+}
+
 export function normalizePhone(phone: string): string {
   return (phone ?? "").replace(/\D/g, "")
 }

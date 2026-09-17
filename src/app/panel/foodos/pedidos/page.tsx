@@ -21,7 +21,7 @@ import {
   rejectPaymentProof,
   type PaymentProofWithOrder,
 } from "../payment-proofs"
-import { formatMoney, modifiersSummary } from "@/lib/foodos"
+import { channelLabel, FOODOS_ORDER_CHANNELS, formatMoney, modifiersSummary } from "@/lib/foodos"
 import { createClient } from "@/lib/supabase/client"
 import type {
   FoodosRestaurant,
@@ -88,9 +88,7 @@ const METHOD_LABEL: Record<string, string> = {
 
 const CHANNEL_OPTIONS: { id: FoodosOrderChannel | "all"; label: string }[] = [
   { id: "all", label: t("foodos.common.allChannels") },
-  { id: "web", label: "Web" },
-  { id: "qr", label: "QR" },
-  { id: "whatsapp", label: "WhatsApp" },
+  ...FOODOS_ORDER_CHANNELS.map((id) => ({ id, label: channelLabel(id) })),
 ]
 
 export default function PedidosPage() {
@@ -480,12 +478,12 @@ export default function PedidosPage() {
       </div>
 
       {/* Filtro por canal */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex flex-wrap gap-2 mb-6">
         {CHANNEL_OPTIONS.map((c) => (
           <button
             key={c.id}
             onClick={() => setChannelFilter(c.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            className={`min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               channelFilter === c.id ? "bg-emerald-600 text-white" : "bg-white text-stone-600 border border-stone-200"
             }`}
           >
@@ -570,7 +568,7 @@ export default function PedidosPage() {
                       {order.tip > 0 && `propina ${formatMoney(order.tip)}`}
                     </p>
                   )}
-                  <p className="text-[11px] text-stone-400 uppercase tracking-wide mt-1">{t("foodos.common.channel", { channel: order.channel })}</p>
+                  <p className="text-[11px] text-stone-400 uppercase tracking-wide mt-1">{t("foodos.common.channel", { channel: channelLabel(order.channel) })}</p>
                 </div>
               </div>
 

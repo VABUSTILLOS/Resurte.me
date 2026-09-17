@@ -12,6 +12,9 @@
 import { dayKeyOf, DEFAULT_TIMEZONE } from "@/lib/local-date"
 import type { FoodosOrder, FoodosOrderChannel } from "@/types/foodos"
 import { cashPartOfSale, fromCents, toCents } from "./foodos-cash"
+import { channelLabel, FOODOS_ORDER_CHANNELS } from "./foodos"
+
+export { CHANNEL_LABELS, channelLabel } from "./foodos"
 
 const DAY_MS = 86_400_000
 
@@ -22,36 +25,18 @@ export const NO_SHIFT = "sin_turno"
 export const NO_BRANCH = "sin_sucursal"
 
 /**
- * Orden canónico de los canales. Es el orden en el que se pintan las barras,
- * y va de lo más digital a lo más presencial para que el dueño lea de un
- * vistazo cuánto de su venta ya no depende del salón.
+ * Orden canónico de los canales, tal como los reporta el tablero. Es el mismo
+ * conjunto que usa el filtro de pedidos: va de lo más digital a lo más
+ * presencial para que el dueño lea de un vistazo cuánto de su venta ya no
+ * depende del salón.
  */
-export const FOODOS_REPORT_CHANNELS: FoodosOrderChannel[] = [
-  "web",
-  "qr",
-  "whatsapp",
-  "marketplace",
-  "mostrador",
-  "mesero",
-]
+export const FOODOS_REPORT_CHANNELS: FoodosOrderChannel[] = FOODOS_ORDER_CHANNELS
 
 /**
- * Etiquetas de canal. `mesero` dice "Mesa" y no "Mesero" porque lo que el
- * dueño quiere distinguir es el servicio en mesa, no quién lo levantó.
+ * Etiquetas de canal. Se reexportan desde `@/lib/foodos` para que exista una
+ * sola tabla: la lista de pedidos y el tablero tienen que decir lo mismo.
  */
-export const CHANNEL_LABELS: Record<FoodosOrderChannel, string> = {
-  web: "Web",
-  qr: "QR",
-  whatsapp: "WhatsApp",
-  marketplace: "HoyQueComemos",
-  mostrador: "Mostrador",
-  mesero: "Mesa",
-}
-
-/** Etiqueta de un canal desconocido: el canal tal cual, nunca un hueco. */
-export function channelLabel(channel: string): string {
-  return CHANNEL_LABELS[channel as FoodosOrderChannel] ?? channel
-}
+export { CHANNEL_LABELS, channelLabel } from "./foodos"
 
 /** True si el pedido ya puso dinero. Es la única fuente de ingresos. */
 export function isPaidOrder(order: Pick<FoodosOrder, "payment_status">): boolean {
