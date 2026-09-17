@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import Link from "next/link"
 import { logger } from "@/lib/logger"
+import { reportClientError } from "@/lib/report-client-error"
 
 /**
  * Error boundary raíz: sin él, cualquier excepción en una página pública
@@ -18,6 +19,7 @@ export default function RootError({
 }) {
   useEffect(() => {
     logger.error("Error no controlado en la app", error)
+    reportClientError(error, { context: "app.root_error_boundary" })
   }, [error])
 
   return (

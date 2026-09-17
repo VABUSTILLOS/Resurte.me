@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { logger } from "@/lib/logger"
+import { reportClientError } from "@/lib/report-client-error"
 
 export default function StorefrontError({
   error,
@@ -12,6 +13,7 @@ export default function StorefrontError({
 }) {
   useEffect(() => {
     logger.error("storefront.error_boundary", error, { digest: error.digest })
+    reportClientError(error, { context: "storefront.error_boundary" })
   }, [error])
 
   return (

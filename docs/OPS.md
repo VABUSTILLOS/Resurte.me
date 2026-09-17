@@ -368,30 +368,39 @@ dashboard. Eso fue la causa del drift histórico (ver `supabase/ESQUEMA.md`).
    la tabla legado `product_stores` ya no se escribe ni se lee (la ruta admin
    `seed-products` aún hace upsert histórico — pendiente de limpieza).
 
-### ⚠️ Migración `00114` pendiente de aplicar (`orders.coupon_code`)
+### ✅ Migración `00114` aplicada (`orders.coupon_code`)
 
-`supabase/migrations/00114_orders_coupon_code.sql` está escrita, revisada y
-commiteada, pero **no aplicada** al proyecto vinculado (`isogthougrpctnfzcdes`).
-Es la única pieza que falta del arreglo del panel de pedidos.
+`supabase/migrations/00114_orders_coupon_code.sql` ya está aplicada al proyecto
+vinculado (`isogthougrpctnfzcdes`). Era la última pieza del arreglo del panel
+de pedidos.
 
-**Estado verificado (16-sep-2026):** se reportó haber ejecutado el script en el
-SQL Editor del dashboard, pero la verificación contra el REST de producción
-**no lo confirma**: `orders?select=id,coupon_code` sigue devolviendo
-`400 42703`. No es caché obsoleta de PostgREST — la sonda diferencial de más
-abajo lo descarta, porque la misma caché sí ve `user_carts.bumps` (00113). El
-script hay que volver a ejecutarlo y confirmar con la sonda REST. Nota: hacerlo
-desde el SQL Editor es la excepción documentada a la regla de §9 (*prohibido*
-editar el esquema de producción a mano); se usa aquí solo porque el entorno
-donde se escribió el arreglo tiene las credenciales enmascaradas. Un
-`npx supabase db push` desde una máquina con sesión válida sigue siendo la vía
-preferida.
+**Estado verificado (16-sep-2026):** la columna existe. Sonda REST con la clave
+publicable, `200` en las tres consultas relevantes:
+
+| Sonda | Resultado |
+|---|---|
+| `orders?select=id,coupon_code` | `200` |
+| SELECT completo del panel (con `coupon_code`, hint `orders_user_id_fkey`, `addresses`) | `200` |
+| SELECT del ticket imprimible (con `coupon_code`) | `200` |
+
+Hubo un intento previo que **no** commiteó: durante ~30 min `orders?select=id,coupon_code`
+devolvía `400 42703` mientras la sonda diferencial (ver más abajo) confirmaba
+que la caché de PostgREST era fresca — es decir, la migración realmente no se
+había aplicado, no era caché obsoleta. Al re-ejecutar el script quedó aplicada.
+Lección: **verificar con la sonda REST después de ejecutar**, nunca asumir que
+el script del SQL Editor commiteó. Ejecutarlo desde el SQL Editor es la
+excepción documentada a la regla de §9 (*prohibido* editar el esquema de
+producción a mano); se usó solo porque el entorno donde se escribió el arreglo
+tiene las credenciales enmascaradas. Un `npx supabase db push` desde una máquina
+con sesión válida sigue siendo la vía preferida.
 
 Qué pasó: la columna `orders.coupon_code` se escribía desde el checkout pero
 **nunca se versionó en una migración** (00049 la añadió a `leads` y 00080 a
 `foodos_restaurants`, pero no a `orders`). En el esquema desplegado la consulta
 del panel respondía `42703` y la UI mostraba *"Error al cargar los pedidos"*.
-El código de la app ya reintenta sin la columna, así que **hoy el panel carga**;
-lo que sigue roto hasta aplicar la migración es la persistencia del cupón:
+El código de la app además reintenta sin la columna, así que el panel cargaba
+incluso antes de aplicar la migración; lo que estuvo roto mientras tanto fue la
+persistencia del cupón:
 
 | Superficie | Sin `coupon_code` en el esquema |
 |---|---|
@@ -400,11 +409,13 @@ lo que sigue roto hasta aplicar la migración es la persistencia del cupón:
 | Webhook Stripe (`payment_failed` / `canceled`) | El cupón reservado **no se libera** ⇒ el cliente lo pierde (peor caso: cupones personales de recompra con `max_uses = 1`) |
 | Panel admin / ticket imprimible | La columna "Cupón" sale vacía |
 
-Consecuencia operativa: mientras no se aplique, un pago rechazado por el banco
-**consume** el cupón del cliente sin devolverlo. No hay pérdida de pedidos ni
-de dinero, pero sí de cupones.
+Consecuencia operativa mientras estuvo sin aplicar: un pago rechazado por el
+banco **consumía** el cupón del cliente sin devolverlo. No hubo pérdida de
+pedidos ni de dinero, pero sí de cupones.
 
-Aplicar (idempotente, aditiva, sin downtime ni backfill):
+La migración es idempotente, aditiva y sin backfill. **Ya está aplicada**;
+queda documentado el procedimiento por si hay que replicarla en otro entorno
+o en una base nueva:
 
 ```bash
 npx supabase login          # requiere token de cuenta con acceso al proyecto
@@ -416,8 +427,75 @@ Verificar (REST, con la clave publicable):
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
   "https://isogthougrpctnfzcdes.supabase.co/rest/v1/orders?select=id,coupon_code&limit=1"
-# 200 = la columna existe · 400 42703 = sigue sin aplicarse
+# 200 = la columna existe · 400 42703 = no aplicada
 ```
+
+### ⚠️ Migración `00116` pendiente de aplicar (vista de ventas por producto)
+
+`supabase/migrations/00116_product_sales_view.sql` añade el índice
+`order_items (product_id)` y la vista `products_with_sales` (todas las columnas
+de `products` más `sales_units` y `sales_revenue`, NULL cuando el producto no
+vendió, pedidos cancelados excluidos). Es lo que permite ordenar
+`/admin/productos` por **más vendidos**: el orden tiene que aplicarlo Postgres
+*antes* del `range()` de la paginación, y PostgREST no puede ordenar por un
+agregado de `order_items`.
+
+**Estado verificado (17-sep-2026):** pendiente. La sonda con la clave
+publicable responde `404 PGRST205` (*"Could not find the table
+'public.products_with_sales' in the schema cache"*), que es exactamente el
+error que `GET /api/admin/products/list?sort=sales` interpreta como "vista
+ausente".
+
+Sin ella el panel **no se rompe**: el listado reintenta sin el orden por
+ventas, cae al orden por nombre y marca `schemaDrift` (aviso ámbar de
+migraciones). Lo que falta es el orden en sí — la columna "Ventas" sigue
+mostrando sus cifras.
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
+  "https://isogthougrpctnfzcdes.supabase.co/rest/v1/products_with_sales?select=id&limit=1"
+# 404 PGRST205 = pendiente · 401/403 = aplicada (el rol anónimo no tiene
+# permiso, que es justo lo que impone la propia migración con su REVOKE)
+```
+
+La vista **no** es pública: la migración revoca `anon`/`authenticated` y concede
+solo a `service_role`, porque `products_with_sales` incluye `cost` y el
+histórico de ventas. Ese REVOKE es necesario porque Supabase concede
+privilegios por defecto a esos roles en cada objeto nuevo de `public`.
+
+### ⚠️ Migración `00117` pendiente de aplicar (libro de direcciones del checkout)
+
+`supabase/migrations/00117_address_book.sql` añade a `addresses`:
+
+- `last_used_at TIMESTAMPTZ` (backfill `= created_at`) — la preselección del
+  checkout usa la **última usada** cuando la cuenta no tiene predeterminada, y
+  `POST /api/orders` la toca en cada compra (best-effort: si la columna no
+  existe, solo registra un `warn` y la orden continúa).
+- `deleted_at TIMESTAMPTZ` — **soft delete**: `orders.address_id` es
+  `ON DELETE SET NULL` y el ticket/panel imprimen la dirección, así que un
+  DELETE físico vaciaría el historial. Todas las listas filtran
+  `deleted_at IS NULL`; sin la columna, `fetchOwnAddresses` y
+  `/mis-direcciones` reintentan sin el filtro y descartan en memoria.
+- Índices parciales (`guest_token, last_used_at DESC WHERE user_id IS NULL AND
+  deleted_at IS NULL` y `deleted_at WHERE deleted_at IS NOT NULL`).
+- Reescribe el RPC `cleanup_orphan_guest_addresses(days)` del job
+  **  `cleanup-guest-addresses`** (§2): ahora purga por
+  `COALESCE(deleted_at, last_used_at, created_at)` y **omite** las direcciones
+  referenciadas por un pedido (`NOT EXISTS orders`) — antes el libro del
+  invitado recurrente desaparecía cada 30 días y rompía el historial.
+
+**Estado verificado (17-sep-2026):** pendiente (es la última migración del
+repo). Sonda con la clave publicable:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
+  "https://isogthougrpctnfzcdes.supabase.co/rest/v1/addresses?select=id,last_used_at,deleted_at&limit=1"
+# 200 = aplicada · 400 42703 = pendiente (columna inexistente)
+```
+
+Sin ella **nada se rompe**: el invitado no ve su libro (su endpoint cae a la
+lista vacía y el checkout arranca en blanco), el usuario con sesión sigue con
+el prefill clásico y las migraciones se reportan por `schemaDrift`.
 
 ### Cómo distinguir "caché de esquema obsoleta" de "no se aplicó"
 
@@ -459,14 +537,14 @@ Resultado esperado: una fila `coupon_code | text`. Si no aparece ninguna fila, e
 esa sesión, **no** que haya commiteado: la confirmación definitiva es la sonda
 REST de arriba.
 
-**Por qué quedó pendiente:** el entorno donde se hizo el arreglo enmascara
+**Por qué costó tanto:** el entorno donde se hizo el arreglo enmascara
 `POSTGRES_PASSWORD` y `POSTGRES_URL*` (se leen como la cadena literal
-`[SENSITIVE]`), y el token guardado en `~/.supabase/access-token` responde
+`[SENSITIVE]`), y el token guardado en `~/.supabase/access-token` respondía
 `401` en la Management API. El host directo
 (`db.<ref>.supabase.co:5432`) es solo IPv6 y no era alcanzable, y el pooler
-rechazaba la conexión por falta de contraseña. Es un bloqueo de credenciales,
-no de código: **aplicar la migración desde una máquina con `npx supabase login`
-válido es todo lo que falta.**
+rechazaba la conexión por falta de contraseña. Fue un bloqueo de credenciales,
+no de código, y se resolvió ejecutando la migración desde una sesión con
+credenciales válidas (§9 arriba).
 
 ### Si el SQL Editor responde `Failed to fetch (api.supabase.com)`
 
@@ -709,18 +787,23 @@ En el SQL Editor de Supabase, en este orden:
 2. `00083_foodos_order_notifications.sql` — sin ella los avisos se envían pero sin dedupe.
 3. `00084_foodos_orders_updated_at.sql` — sin ella nada se rompe, pero el timestamp queda congelado.
 4. `00085_stripe_connect.sql` — sin ella el panel de cobros falla al leer `stripe_*`.
-5. `00114_orders_coupon_code.sql` — sin ella el panel de pedidos carga (el código
-   reintenta sin la columna) pero **un pago rechazado consume el cupón del
-   cliente sin devolverlo**. Detalle en §9. Ojo: el 16-sep-2026 se reportó
-   haberla corrido en el SQL Editor y la sonda REST demostró que **no
-   commiteó**; usar el script con comprobación incluida de §9 y confirmar con
-   `orders?select=id,coupon_code` → `200`.
+5. `00116_product_sales_view.sql` — sin ella el panel de productos carga igual
+   (el listado detecta la vista ausente y vuelve al orden por nombre, con el
+   aviso ámbar de migraciones), pero **el orden "Más vendidos" no ordena**.
+   Aditiva e idempotente. Sonda: `products_with_sales?select=id&limit=1` →
+   `404`/`PGRST205` pendiente · `200` aplicada.
+6. `00117_address_book.sql` — sin ella el checkout sigue funcionando (el
+   invitado arranca en blanco y el usuario cae al prefill clásico), pero **no
+   se guarda la última dirección usada** ni hay soft delete de direcciones.
+   Aditiva e idempotente; reescribe el RPC del job `cleanup-guest-addresses`
+   (§2). Sonda: `addresses?select=id,last_used_at,deleted_at&limit=1` →
+   `400`/`42703` pendiente · `200` aplicada.
 
 ### Migraciones recientes ya aplicadas a producción
 
-`00112_bump_affinity.sql` y `00113_user_carts_bumps.sql` se aplicaron a
-producción el **16-sep-2026**. Quedan documentadas por el síntoma que provocan
-si faltan en un entorno nuevo:
+`00112_bump_affinity.sql`, `00113_user_carts_bumps.sql` y
+`00114_orders_coupon_code.sql` se aplicaron a producción el **16-sep-2026**.
+Quedan documentadas por el síntoma que provocan si faltan en un entorno nuevo:
 
 - `00112_bump_affinity.sql` — sin ella el ranking de bumps cae al motor por
   tags y el panel *Afinidad entre productos* (`/admin/marketing`) devuelve
@@ -736,6 +819,12 @@ si faltan en un entorno nuevo:
   `POST /api/cart/bumps/hydrate` devuelven 500 y la selección de bumps solo
   sobrevive en `localStorage` (el cliente degrada en silencio, no rompe la
   app). Aditiva e idempotente.
+- `00114_orders_coupon_code.sql` — sin ella el panel de pedidos carga igual (el
+  código reintenta sin la columna vía `src/lib/admin/order-selects.ts`), pero
+  **un pago rechazado consume el cupón del cliente sin devolverlo**: el
+  checkout no audita el descuento, `PATCH /api/orders/[id]/status` omite la
+  liberación y el webhook de Stripe no devuelve el cupón reservado. Aditiva e
+  idempotente. Detalle del incidente en §9.
 
 Verificación contra el REST de producción con la clave publicable (basta el
 `apikey`; un `200` confirma que la tabla o la columna existe, **no** que tenga

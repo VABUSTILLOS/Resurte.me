@@ -148,6 +148,11 @@ export interface Address {
   city_id: number | null
   lat: number
   lng: number
+  /** Última vez que se usó en un pedido (preselección del checkout, 00117). */
+  last_used_at?: string | null
+  /** Papelera: oculta de las listas, conservada para pedidos históricos (00117). */
+  deleted_at?: string | null
+  created_at?: string | null
 }
 
 export type OrderStatus =

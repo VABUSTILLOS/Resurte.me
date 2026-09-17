@@ -28,11 +28,14 @@ cubiertos por las migraciones versionadas (detalle en
    (`npx supabase db pull`) y comparar contra `supabase/migrations/` — nunca
    `db reset --linked` ni escrituras directas.
 
-## 🟠 `orders.coupon_code` (migración 00114)
+## ✅ `orders.coupon_code` (migración 00114) — resuelto
 
 Segundo drift encontrado después de 00071: **`orders.coupon_code` se usaba en
 el código pero nunca se versionó.** `00049` la añadió a `leads` y `00080` a
 `foodos_restaurants`; `orders` se quedó sin ella.
+
+**Estado: `00114_orders_coupon_code.sql` está aplicada a producción
+(verificado 16-sep-2026 con sonda REST → `200`).**
 
 Consumidores que la escriben o leen:
 
@@ -53,11 +56,12 @@ actualización, porque el error de lectura se confundía con "el pedido no exist
 `coupons.code`, **sin FK**: el histórico del descuento debe sobrevivir al
 borrado del cupón). Es aditiva e idempotente, sin backfill.
 
-**Mientras la migración no esté aplicada**, el código no se cae:
+**Si la migración falta en un entorno nuevo**, el código no se cae:
 `src/lib/admin/order-selects.ts` centraliza los SELECT de `orders` y expone
 `missingOptionalOrderColumn()`, que detecta el `42703` de una columna opcional
 (`coupon_code`, `driver_id`) y reintenta la consulta sin ella. El cupón
-simplemente no aparece en el panel ni en el ticket.
+simplemente no aparece en el panel ni en el ticket, y el checkout no audita el
+descuento.
 
 ## 🔴 Drift histórico (ya versionado): `products` vs `product_stores`
 

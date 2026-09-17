@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { MapPin, ArrowRight, History } from "lucide-react"
+import { useEffect, useState } from "react"
+import { MapPin, ArrowRight, Trash2, Loader2 } from "lucide-react"
 import Link from "next/link"
 import type { City, Address } from "@/types"
 import type { AddressForm } from "./checkout-shared"
@@ -32,12 +32,11 @@ interface AddressStepProps {
   /** Guardar la dirección editada como predeterminada (solo logged-in). */
   saveAsDefault?: boolean
   onSaveAsDefaultChange?: (value: boolean) => void
+  /** Elimina una dirección guardada (invitado: endpoint anónimo). */
+  onDeleteSavedAddress?: (addr: Address) => void
+  /** Dirección cuya eliminación está en curso (deshabilita su botón). */
+  deletingAddressId?: number | null
 }
-
-/** Última dirección usada (guests): el cliente B2B pide cada semana a la
-    misma cocina; no debe reescribirla en cada checkout. Mismo patrón que
-    guest-address.ts (direcciones anónimas del navegador). */
-const LAST_ADDRESS_KEY = "resurte-last-address"
 
 export function AddressStep({
   address,
@@ -57,9 +56,14 @@ export function AddressStep({
   onEmailBlur,
   saveAsDefault = false,
   onSaveAsDefaultChange,
+  onDeleteSavedAddress,
+  deletingAddressId = null,
 }: AddressStepProps) {
   // Autocompletado de colonia por CP (catálogo postal_codes; fail-open).
   const [colonias, setColonias] = useState<ColoniasResult | null>(null)
+
+  // Confirmación en dos pasos del borrado (sin diálogos nativos en móvil).
+  const [confirmingId, setConfirmingId] = useState<number | null>(null)
 
   // Las colonias solo aplican mientras el CP tiene 5 dígitos; si el CP se
   // edita y queda inválido, se ocultan sin necesidad de un setState síncrono.
@@ -85,49 +89,21 @@ export function AddressStep({
     }
   }, [address.zip_code])
 
-  // ── Última dirección usada (autoguardado local) ──
-  const [lastSaved, setLastSaved] = useState<(AddressForm & { phone?: string }) | null>(null)
-  const hydrated = useRef(false)
-
-  useEffect(() => {
-    // Diferido a microtask: ningún setState corre síncrono en el efecto.
-    void Promise.resolve().then(() => {
-      try {
-        const raw = localStorage.getItem(LAST_ADDRESS_KEY)
-        if (raw) setLastSaved(JSON.parse(raw))
-      } catch {
-        /* datos corruptos o storage no disponible */
-      }
-    })
-    hydrated.current = true
-  }, [])
-
-  // Autoguardar cada cambio (solo cuando hay algo que valga la pena guardar).
-  useEffect(() => {
-    if (!hydrated.current) return
-    if (!address.street.trim()) return
-    try {
-      localStorage.setItem(LAST_ADDRESS_KEY, JSON.stringify({ ...address, phone }))
-    } catch {
-      /* storage lleno */
-    }
-  }, [address, phone])
-
-  const applyLastAddress = () => {
-    if (!lastSaved) return
-    const fields = ["label", "street", "number", "interior", "neighborhood", "zip_code", "references"] as const
-    for (const f of fields) {
-      const v = lastSaved[f]
-      if (typeof v === "string") onUpdateAddress(f, v)
-    }
-    if (typeof lastSaved.phone === "string" && lastSaved.phone && !phone) {
-      onPhoneChange(lastSaved.phone)
-    }
-    setLastSaved(null)
+  const handleDelete = (addr: Address) => {
+    setConfirmingId(null)
+    onDeleteSavedAddress?.(addr)
   }
 
-  const showApplyLast =
-    !address.street.trim() && !selectedAddressId && lastSaved !== null
+  const rowClass = (selected: boolean) =>
+    `flex items-center gap-1 rounded-xl border pr-1 transition-colors ${
+      selected ? "border-brand-500 bg-brand-50" : "border-gray-200 bg-white hover:border-gray-300"
+    }`
+
+  const radio = (selected: boolean) => (
+    <span className="w-4 h-4 rounded-full border-2 border-brand-500 flex items-center justify-center shrink-0">
+      {selected && <span className="w-2 h-2 rounded-full bg-brand-600" />}
+    </span>
+  )
 
   return (
     <div>
@@ -139,80 +115,98 @@ export function AddressStep({
         Selecciona o agrega una dirección en {city.name}, {city.state}.
       </p>
 
-      {/* Rellenar con la última dirección usada (guests recurrentes) */}
-      {showApplyLast && (
-        <button
-          type="button"
-          onClick={applyLastAddress}
-          className="mb-5 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-50 text-brand-700 text-xs font-semibold hover:bg-brand-100 transition-colors"
-        >
-          <History className="w-3.5 h-3.5" aria-hidden="true" />
-          Usar mi última dirección: {lastSaved.street} {lastSaved.number}
-        </button>
-      )}
-
-      {/* Direcciones guardadas (solo usuarios con sesión) */}
-      {isLoggedIn && savedAddresses.length > 0 && (
+      {/* Libro de direcciones: la misma lista para invitados y usuarios con
+          sesión (antes solo se mostraba con sesión y el invitado reescribía
+          su dirección en cada compra). */}
+      {savedAddresses.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <span className="block text-sm font-medium text-gray-700">
-              Mis direcciones
+              {isLoggedIn ? "Mis direcciones" : "Tus direcciones"}
             </span>
-            <Link
-              href={`/${city.slug}/mis-direcciones`}
-              className="text-xs font-medium text-brand-600 hover:text-brand-700 touch-target -my-[14px]"
-            >
-              Gestionar direcciones
-            </Link>
+            {isLoggedIn && (
+              <Link
+                href={`/${city.slug}/mis-direcciones`}
+                className="text-xs font-medium text-brand-600 hover:text-brand-700 touch-target -my-[14px]"
+              >
+                Gestionar direcciones
+              </Link>
+            )}
           </div>
           <div className="space-y-2" role="radiogroup" aria-label="Direcciones guardadas">
-            <button
-              type="button"
-              onClick={onNewAddress}
-              role="radio"
-              aria-checked={selectedAddressId === null}
-              className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
-                selectedAddressId === null
-                  ? "border-brand-500 bg-brand-50"
-                  : "border-gray-200 bg-white hover:border-gray-300"
-              }`}
-            >
-              <span className="w-4 h-4 rounded-full border-2 border-brand-500 flex items-center justify-center shrink-0">
-                {selectedAddressId === null && <span className="w-2 h-2 rounded-full bg-brand-600" />}
-              </span>
-              <span className="text-sm font-medium text-gray-700">+ Nueva dirección</span>
-            </button>
-            {savedAddresses.map((addr) => (
+            <div className={rowClass(selectedAddressId === null)}>
               <button
-                key={addr.id}
                 type="button"
-                onClick={() => onSelectSavedAddress(addr)}
+                onClick={onNewAddress}
                 role="radio"
-                aria-checked={selectedAddressId === addr.id}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
-                  selectedAddressId === addr.id
-                    ? "border-brand-500 bg-brand-50"
-                    : "border-gray-200 bg-white hover:border-gray-300"
-                }`}
+                aria-checked={selectedAddressId === null}
+                className="flex-1 flex items-center gap-3 p-3 text-left min-w-0"
               >
-                <span className="w-4 h-4 rounded-full border-2 border-brand-500 flex items-center justify-center shrink-0">
-                  {selectedAddressId === addr.id && <span className="w-2 h-2 rounded-full bg-brand-600" />}
-                </span>
-                <span className="min-w-0">
-                  <span className="flex items-center gap-1.5">
-                    <span className="block text-sm font-semibold text-gray-900 truncate">{addr.label}</span>
-                    {addr.is_default && (
-                      <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-700 text-[10px] font-bold uppercase tracking-wide">
-                        Predeterminada
-                      </span>
-                    )}
-                  </span>
-                  <span className="block text-xs text-gray-500 truncate">
-                    {addr.street} {addr.number}
-                    {addr.neighborhood ? `, ${addr.neighborhood}` : ""}, CP {addr.zip_code}
-                  </span>
-                </span>
+                {radio(selectedAddressId === null)}
+                <span className="text-sm font-medium text-gray-700">+ Nueva dirección</span>
               </button>
+            </div>
+            {savedAddresses.map((addr) => (
+              <div key={addr.id} className={rowClass(selectedAddressId === addr.id)}>
+                <button
+                  type="button"
+                  onClick={() => onSelectSavedAddress(addr)}
+                  role="radio"
+                  aria-checked={selectedAddressId === addr.id}
+                  className="flex-1 flex items-center gap-3 p-3 text-left min-w-0"
+                >
+                  {radio(selectedAddressId === addr.id)}
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1.5">
+                      <span className="block text-sm font-semibold text-gray-900 truncate">
+                        {addr.label}
+                      </span>
+                      {addr.is_default && (
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand-100 text-brand-700 text-[10px] font-bold uppercase tracking-wide">
+                          Predeterminada
+                        </span>
+                      )}
+                    </span>
+                    <span className="block text-xs text-gray-500 truncate">
+                      {addr.street} {addr.number}
+                      {addr.neighborhood ? `, ${addr.neighborhood}` : ""}, CP {addr.zip_code}
+                    </span>
+                  </span>
+                </button>
+                {onDeleteSavedAddress &&
+                  (confirmingId === addr.id ? (
+                    <span className="flex items-center gap-1 shrink-0 pr-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(addr)}
+                        disabled={deletingAddressId === addr.id}
+                        className="px-2 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {deletingAddressId === addr.id ? "Eliminando…" : "Eliminar"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingId(null)}
+                        className="px-2 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-semibold hover:bg-gray-200"
+                      >
+                        No
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingId(addr.id)}
+                      aria-label={`Eliminar dirección ${addr.label}`}
+                      className="shrink-0 p-2.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      {deletingAddressId === addr.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
+                      )}
+                    </button>
+                  ))}
+              </div>
             ))}
           </div>
         </div>

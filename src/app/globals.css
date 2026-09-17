@@ -71,6 +71,11 @@
      (28px de píldoras + py-2 + borde = 45px) para que el primer render ya
      quede alineado y no haya salto al hidratar. */
   --admin-subnav-h: 2.8125rem;
+  /* Alto real de la fila sticky de categorías de /admin/productos, publicada
+     por la propia página con un ResizeObserver. La barra de acciones masivas
+     se ancla debajo del sub-nav MÁS esta var, para no taparse cuando ambas
+     filas están pegadas. Default 0: la fila solo existe si hay categorías. */
+  --admin-catbar-h: 0px;
   --inset-bottom: env(safe-area-inset-bottom, 0px);
   /* Fuente única del offset para elementos flotantes del fondo (WhatsApp,
      StickyCatalogButton, pill de cuenta, cookie banner). Cuando el carrito
@@ -615,6 +620,16 @@ textarea:focus-visible,
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+}
+
+/* Pantallas ≤340px (iPhone SE 1ª gen): el header móvil aloja 5 accesos
+   (Todo, buscar, ciudad, carrito, cuenta) + el logo. Con 44px de ancho cada
+   uno el logo no cabe (verificado: 46px de desborde a 360px). Se recorta
+   SOLO el ancho del área táctil; la altura se mantiene en 44px. */
+@media (max-width: 340px) {
+  .touch-target:not(.hidden) {
+    min-width: 40px;
   }
 }
 

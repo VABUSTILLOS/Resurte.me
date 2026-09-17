@@ -112,8 +112,23 @@
 - El drawer es un diálogo: foco inicial, Escape, `aria-modal`, scroll lock del body
   y cierre por swipe-down con handle visual (umbral 80px + haptic).
 - Formulario de dirección: `autocomplete` + `inputMode` + `enterKeyHint` por campo;
-  CP siempre 5 dígitos numéricos; teléfono 10 dígitos. La última dirección se
-  autoguarda en `resurte-last-address` y se ofrece con "Usar mi última dirección".
+  CP siempre 5 dígitos numéricos; teléfono 10 dígitos.
+- **Libro de direcciones** (migración `00117`): el servidor guarda cada
+  dirección (`user_id` con sesión, `guest_token` sin sesión) y el checkout
+  **preselecciona y rellena** una sola: `pickPreferredAddress`
+  (`src/lib/address-book.ts`, regla pura) elige `is_default` → última usada
+  (`last_used_at`, que `POST /api/orders` toca en cada compra) → más reciente.
+  `use-checkout-order` es el único dueño de la lista (carga y borra, para
+  invitado y usuario); `AddressStep` solo pinta el `radiogroup` con las
+  guardadas + "Nueva dirección" + eliminar. Ambos flujos la activan
+  (`autoSelectSavedAddress: true` en el drawer **y** en `/[slug]/checkout`).
+  El invitado lista por `GET /api/addresses/guest?guest_token=` (endpoint
+  anónimo, `service_role`: RLS no deja leer filas sin dueño); `localStorage`
+  (`resurte_last_address`) queda solo como respaldo de teléfono/email.
+- **Eliminar dirección = soft delete** (`deleted_at`): `orders.address_id` es
+  `ON DELETE SET NULL` y el ticket/panel imprimen la dirección, así que un
+  DELETE físico vaciaría pedidos históricos. Lo aplican `/mis-direcciones` y el
+  checkout; todas las listas filtran `deleted_at IS NULL`.
 - Stripe: el `clientSecret` se obtiene de `/api/payments/stripe/create-intent`;
   `/api/orders` solo registra. Webhooks verifican firma.
 

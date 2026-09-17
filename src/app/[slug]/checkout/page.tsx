@@ -173,6 +173,8 @@ export default function CheckoutPage() {
     setSelectedAddressId,
     captureLead,
     refreshSavedAddresses,
+    deleteSavedAddress,
+    deletingAddressId,
     handlePlaceOrder,
     handleExpressCheckout,
     handleStripeSuccess,
@@ -197,11 +199,15 @@ export default function CheckoutPage() {
     setAddress,
     setPhone,
     setEmail,
+    // La página también autoselecciona la dirección guardada (predeterminada
+    // → última usada): antes arrancaba en blanco y obligaba a reescribirla en
+    // cada compra, aunque el servidor ya la tuviera guardada.
+    autoSelectSavedAddress: true,
     // Tras crear la orden: limpia los bumps (ya incluidos en la orden) y
-    // refresca las direcciones guardadas si el usuario está autenticado.
+    // refresca el libro de direcciones (invitado o con sesión).
     onAfterOrderCreated: () => {
       setSelectedBumps([])
-      if (isLoggedIn === true) void refreshSavedAddresses()
+      void refreshSavedAddresses()
     },
     // Post-pago: persiste last_order (con items + total), limpia el carrito y
     // navega a la confirmación. `city` es City | null en el closure (el hook se
@@ -409,6 +415,8 @@ export default function CheckoutPage() {
           onEmailChange={setEmail}
           onEmailBlur={captureLead}
           onContinue={() => setStep("schedule")}
+          onDeleteSavedAddress={(addr) => void deleteSavedAddress(addr.id)}
+          deletingAddressId={deletingAddressId}
         />
       )}
 

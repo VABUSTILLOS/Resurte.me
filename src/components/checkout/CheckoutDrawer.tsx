@@ -156,6 +156,8 @@ export function CheckoutDrawer() {
     selectedSavedAddress,
     selectedAddressUnedited,
     refreshSavedAddresses,
+    deleteSavedAddress,
+    deletingAddressId,
     captureLead,
     handlePlaceOrder,
     handleExpressCheckout,
@@ -198,8 +200,9 @@ export function CheckoutDrawer() {
 
       // Refresca "Mis direcciones" sin recargar: la dirección que se guardó
       // con esta orden debe aparecer al abrir el drawer de nuevo (misma
-      // lógica que la página completa /checkout tras crear la orden).
-      if (isLoggedIn === true) refreshSavedAddresses()
+      // lógica que la página completa /checkout tras crear la orden). Aplica
+      // también a invitados: su libro vive en el servidor, por guest_token.
+      void refreshSavedAddresses()
 
       // El UpsellModal escucha este evento para interceptar la navegación y
       // ofrecer el 1-click upsell. `dispatchEvent` retorna false si un
@@ -479,6 +482,8 @@ export function CheckoutDrawer() {
               onContinue={() => setStep("schedule")}
               saveAsDefault={saveAsDefault}
               onSaveAsDefaultChange={setSaveAsDefault}
+              onDeleteSavedAddress={(addr) => void deleteSavedAddress(addr.id)}
+              deletingAddressId={deletingAddressId}
             />
           )}
 

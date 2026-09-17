@@ -814,4 +814,97 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
       await expect.poll(pillBottom).toBeGreaterThan(toastBottomY - stackH - 9)
     }
   })
+
+  /**
+   * Libro de direcciones del checkout (migración 00117).
+   *
+   * El invitado ya no reescribe su dirección en cada compra: el servidor le
+   * guarda las que usa (por `guest_token`) y el checkout le preselecciona la
+   * predeterminada / última usada. Se stubea el endpoint anónimo para no
+   * depender de la BD y se verifica la mecánica completa: preselección, cambio
+   * a otra guardada, "Nueva dirección" y borrado con confirmación.
+   */
+  test("checkout: el invitado ve sus direcciones guardadas y elige entre ellas", async ({ page }) => {
+    const savedAddresses = [
+      {
+        id: 7001,
+        label: "Casa",
+        street: "Av. Reforma",
+        number: "100",
+        interior: null,
+        neighborhood: "Centro",
+        zip_code: "31000",
+        references: null,
+        is_default: true,
+        last_used_at: "2026-09-01T10:00:00.000Z",
+      },
+      {
+        id: 7002,
+        label: "Oficina",
+        street: "Calle Aldama",
+        number: "45",
+        interior: "2B",
+        neighborhood: "Cuauhtémoc",
+        zip_code: "31020",
+        references: null,
+        is_default: false,
+        last_used_at: "2026-09-10T10:00:00.000Z",
+      },
+    ]
+
+    await page.route("**/api/addresses/guest*", (route) => {
+      if (route.request().method() === "DELETE") {
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ deleted: true }),
+        })
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ addresses: savedAddresses }),
+      })
+    })
+
+    seedCart(page, [aguacate])
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
+    await openCheckoutDrawer(page)
+
+    await page.getByRole("button", { name: "Continuar al envío" }).click()
+    await expect(page.getByRole("heading", { name: "Dirección de entrega" })).toBeVisible()
+
+    const group = page.getByRole("radiogroup", { name: "Direcciones guardadas" })
+    await expect(group).toBeVisible()
+    // Invitado: sin enlace a "Mis direcciones" (esa página exige sesión).
+    await expect(group.getByRole("radio")).toHaveCount(3) // + Nueva dirección + 2 guardadas
+    await expect(page.getByRole("link", { name: "Gestionar direcciones" })).toHaveCount(0)
+
+    // Preselección: la predeterminada rellena el formulario sin escribir nada.
+    await expect(group.getByRole("radio", { name: /Casa/ })).toHaveAttribute("aria-checked", "true")
+    await expect(page.getByPlaceholder("Av. Insurgentes Sur")).toHaveValue("Av. Reforma")
+    await expect(page.getByPlaceholder("1234", { exact: true })).toHaveValue("100")
+    await expect(page.getByPlaceholder("Roma Norte")).toHaveValue("Centro")
+    await expect(page.getByPlaceholder("06700")).toHaveValue("31000")
+
+    // Cambiar a otra guardada: rellena el formulario con esa dirección.
+    await group.getByRole("radio", { name: /Oficina/ }).click()
+    await expect(page.getByPlaceholder("Av. Insurgentes Sur")).toHaveValue("Calle Aldama")
+    await expect(page.getByPlaceholder("Depto 4B")).toHaveValue("2B")
+    await expect(group.getByRole("radio", { name: /Oficina/ })).toHaveAttribute("aria-checked", "true")
+
+    // "Nueva dirección" limpia el formulario (y deselecciona la guardada).
+    await group.getByRole("radio", { name: "+ Nueva dirección" }).click()
+    await expect(page.getByPlaceholder("Av. Insurgentes Sur")).toHaveValue("")
+
+    // Eliminar pide confirmación en dos pasos y luego hace DELETE al endpoint.
+    await page.getByRole("button", { name: "Eliminar dirección Oficina" }).click()
+    const deleteRequest = page.waitForRequest(
+      (req) => req.method() === "DELETE" && req.url().includes("/api/addresses/guest")
+    )
+    await page.getByRole("button", { name: "Eliminar", exact: true }).click()
+    await deleteRequest
+    await expect(group.getByRole("radio", { name: /Oficina/ })).toHaveCount(0)
+    await expect(group.getByRole("radio", { name: /Casa/ })).toBeVisible()
+  })
 })

@@ -76,6 +76,10 @@ export async function GET(request: Request) {
  *     restricciones (borra las filas; vuelve al default global)
  *   { productId | productIds, scope: "all", isAvailable: false } -> crea
  *     filas is_available=false en todas las ciudades activas
+ *   { productIds, restore: [{ productId, cityId, isAvailable }] } -> vuelve a
+ *     "global" y reescribe exactamente las celdas indicadas. Es la vía de
+ *     "Deshacer": reproduce el estado capturado antes del cambio en una sola
+ *     petición, sin importar cuántos productos abarque la selección.
  */
 export async function PATCH(request: Request) {
   try {
@@ -85,7 +89,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json()
-    const { productId, productIds, cityId, isAvailable, scope, changes } = body ?? {}
+    const { productId, productIds, cityId, isAvailable, scope, changes, restore } = body ?? {}
 
     const ids: number[] = Array.isArray(productIds)
       ? productIds.filter((n): n is number => typeof n === "number" && Number.isInteger(n))
@@ -105,7 +109,42 @@ export async function PATCH(request: Request) {
     // Resumen de lo aplicado, para la bitácora (una entrada por petición).
     let auditDetail: Record<string, unknown> = {}
 
-    if (Array.isArray(changes)) {
+    if (Array.isArray(restore)) {
+      // Deshacer: primero se vuelve al default global (borra las filas) y luego
+      // se reescriben las celdas capturadas antes del cambio. Las dos escrituras
+      // van en la misma petición para que el estado intermedio no sea visible.
+      const idSet = new Set(ids)
+      const validRestore = restore.filter(
+        (r) =>
+          r &&
+          typeof r.productId === "number" &&
+          typeof r.cityId === "number" &&
+          typeof r.isAvailable === "boolean" &&
+          idSet.has(r.productId)
+      )
+      const { error: resetError } = await supabase
+        .from("product_city_availability")
+        .delete()
+        .in("product_id", ids)
+      if (resetError) {
+        return NextResponse.json({ error: resetError.message }, { status: 500 })
+      }
+      if (validRestore.length > 0) {
+        const { error } = await supabase.from("product_city_availability").upsert(
+          validRestore.map((r) => ({
+            product_id: r.productId,
+            city_id: r.cityId,
+            is_available: r.isAvailable,
+            updated_at: now,
+          })),
+          { onConflict: "product_id,city_id" }
+        )
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 500 })
+        }
+      }
+      auditDetail = { mode: "restore", cells: validRestore.length }
+    } else if (Array.isArray(changes)) {
       // Upsert en lote de celdas (productId, cityId, isAvailable).
       const validChanges = changes.filter(
         (c) => c && typeof c.cityId === "number" && typeof c.isAvailable === "boolean"

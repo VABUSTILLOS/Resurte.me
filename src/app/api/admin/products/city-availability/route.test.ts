@@ -216,6 +216,54 @@ describe("PATCH /api/admin/products/city-availability", () => {
     })
   })
 
+  it("restore vuelve a global y reescribe exactamente las celdas capturadas", async () => {
+    const { upsert, delete: del } = mockWriteClient()
+
+    await PATCH(
+      patchRequest({
+        productIds: [1, 2],
+        restore: [
+          { productId: 1, cityId: 3, isAvailable: false },
+          { productId: 1, cityId: 2, isAvailable: true },
+          { productId: 9, cityId: 2, isAvailable: true },
+          { productId: 2, cityId: 2, isAvailable: "sí" },
+        ],
+      })
+    )
+
+    // 1) se borran las filas de los ids seleccionados (vuelven a "global")
+    expect(del).toHaveBeenCalledTimes(1)
+    // 2) se reescriben solo las celdas válidas y de esos ids (se descarta el 9
+    //    y el isAvailable no booleano)
+    expect(upsert).toHaveBeenCalledTimes(1)
+    expect(upsert).toHaveBeenCalledWith(
+      [
+        { product_id: 1, city_id: 3, is_available: false, updated_at: expect.any(String) },
+        { product_id: 1, city_id: 2, is_available: true, updated_at: expect.any(String) },
+      ],
+      { onConflict: "product_id,city_id" }
+    )
+    expect(vi.mocked(logAdminAction).mock.calls[0]![1].detail).toEqual({
+      ids: [1, 2],
+      count: 2,
+      mode: "restore",
+      cells: 2,
+    })
+  })
+
+  it("restore sin celdas solo devuelve a global (productos que no tenían filas)", async () => {
+    const { upsert, delete: del } = mockWriteClient()
+
+    await PATCH(patchRequest({ productIds: [4, 5], restore: [] }))
+
+    expect(del).toHaveBeenCalledTimes(1)
+    expect(upsert).not.toHaveBeenCalled()
+    expect(vi.mocked(logAdminAction).mock.calls[0]![1].detail).toMatchObject({
+      mode: "restore",
+      cells: 0,
+    })
+  })
+
   it("no escribe ni registra si la validación falla", async () => {
     const { upsert } = mockWriteClient()
 

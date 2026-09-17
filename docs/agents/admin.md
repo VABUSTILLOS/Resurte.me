@@ -26,6 +26,13 @@
   `redirects()` permanentes (308) en `next.config.ts`; al mover una superficie,
   agrega el redirect correspondiente en vez de dejar un 404.
 - Errores con reintento (`error.tsx` del área + botón Reintentar en página).
+  El boundary de `/admin` además **reporta a `error_logs`** con
+  `reportClientError()` (`src/lib/report-client-error.ts`): antes solo escribía
+  en consola, así que la pestaña *Errores* de `/admin/bitacoras` quedaba siempre
+  vacía y un fallo en producción era indiagnosticable. Muestra el detalle
+  técnico (sección, mensaje, digest) con botón de copiar. El helper nunca lanza
+  y deduplica por mensaje+digest, porque el endpoint tiene rate limit de 30/min
+  y un boundary que re-monta en bucle agotaría la cuota.
 - Productos (`/admin/productos`): la tabla es server-side
   (`GET /api/admin/products/list` con búsqueda/filtros/orden/paginación y
   conteos para los chips); "seleccionar todo" abarca todas las páginas vía
@@ -121,6 +128,32 @@
   subconjunto con costo. La clase ABC usa el punto medio de la banda
   acumulada de ingreso (A < 80 %, B < 95 %, resto C). `format=json` es
   aditivo y alimenta el resumen del rango.
+- Productos ronda 8 — orden por más vendidos: `sort=sales` ordena en Postgres
+  **antes** de paginar, así que no puede resolverse en JS tras el `range()`
+  (traería el catálogo entero). `products` no tiene columna de ventas y
+  PostgREST no ordena por agregados de `order_items`, así que la lectura usa la
+  vista `products_with_sales` (00116: `p.*` + `sales_units` + `sales_revenue`).
+  Es un reemplazo directo de `products` para el `select`, los filtros y el
+  `count: "exact"`.
+  La semántica de ventas es la del reporte: pedidos con `status <> 'cancelled'`
+  (si se cambia una, cambiar la otra). `sales_units` es NULL —no 0— cuando el
+  producto no vendió, para que `DESC NULLS LAST` deje los no vendidos al final;
+  la app lo pinta como 0.
+  El orden vive en `src/lib/admin-product-sort.ts` (fuente única, junto a
+  `parseProductSort`/`nextProductSort`/`productSortOrderClauses`): al añadir o
+  tocar un criterio de orden, es ahí donde se toca. Cada clave tiene su
+  dirección por defecto (`defaultProductSortDir`): `sales` abre en `desc` (los
+  más vendidos primero), el resto en `asc`.
+  Degradación en DOS capas, y ambas deben seguir funcionando: (1)
+  `clampProductSortToColumns(..., { hasSales })` convierte `sales` en el orden
+  por defecto si la vista no está disponible; (2) la ruta detecta la vista
+  ausente con `isMissingRelationError` (`PGRST205`/`42P01`, que hay que
+  comprobar ANTES de `isMissingColumnError` porque este acepta cualquier
+  "does not exist"), reintenta contra `products` y marca `schemaDrift` (aviso
+  ámbar). Nunca un 5xx.
+  La columna "Ventas" (header) y el `<select>` de orden aplican el mismo
+  criterio: `GET /api/admin/products/row-meta` excluye cancelados
+  (`orders!inner(status)`) para que el número mostrado coincida con el orden.
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
@@ -164,10 +197,12 @@
   lleva `touch-target` (44px).
 
 - Productos — barra de acciones masivas (sticky): la barra que aparece con la
-  selección se ancla **debajo del sub-nav** de `/admin` con
-  `sticky z-30 top-[calc(var(--header-top-offset)+var(--admin-subnav-h))]`; el
-  sub-nav es `z-40` y el header global `z-50`, así que `z-30` la deja por debajo
-  de ambos y de los modales (`z-50`) de la página. `--admin-subnav-h` lo publica
+  selección se ancla **debajo del sub-nav y de la fila de categorías** con
+  `sticky z-20
+  top-[calc(var(--header-top-offset)+var(--admin-subnav-h)+var(--admin-catbar-h))]`;
+  el sub-nav es `z-40`, la fila de categorías `z-30` y el header global `z-50`,
+  así que `z-20` la deja por debajo de los tres (y de los modales `z-50` de la
+  página). `--admin-subnav-h` lo publica
   `AdminSubNav` (`sub-nav.tsx`) midiendo su propio `offsetHeight` con un
   `ResizeObserver` y escribiéndolo en `document.documentElement` (mismo patrón
   que `--toast-stack-h` de `toast.tsx`); el default de la var en `globals.css`
@@ -187,18 +222,22 @@
   de filtros plegable (`aria-label="Filtrar por categoría"`), pedido por el
   equipo — no eliminarlo. (2) Una fila de **chips con el conteo de productos de
   cada categoría** (`role="group"` + `aria-label="Filtros rápidos por
-  categoría"`, `aria-pressed`, scroll horizontal en móvil y wrap en `sm+`),
-  cada uno con el emoji de su categoría resuelto con `getCategoryIcon(c.icon,
-  c.slug)` — misma fuente que la tienda, así que el chip nunca diverge del
-  icono del catálogo; por eso las categorías se cargan con
-  `select("id,name,slug,icon")` y `Category.icon` es obligatorio (también en
+  categoría"`, `aria-pressed`), cada uno con el emoji de su categoría resuelto
+  con `getCategoryIcon(c.icon, c.slug)` — misma fuente que la tienda, así que el
+  chip nunca diverge del icono del catálogo; por eso las categorías se cargan
+  con `select("id,name,slug,icon")` y `Category.icon` es obligatorio (también en
   `ProductFormModal`, y `/api/admin/categories/create` devuelve `icon` para que
-  una categoría recién creada entre con su icono). La fila **reutiliza el
-  lenguaje visual de las píldoras de categoría de `/admin/whatsapp`**
-  (`categoryChipClass`): gris relleno sin borde en reposo (`bg-[#F5F3F0]`) y
-  verde sólido al activo (`bg-brand-500`), `rounded-lg` + `text-xs font-medium`;
-  conserva el contador de productos (que WhatsApp no tiene) en `chipCountClass`.
-  El texto de la píldora usa gris **explícito**, no `--text-secondary`: ese
+  una categoría recién creada entre con su icono). La fila **copia el lenguaje
+  visual de las píldoras de categoría de la tienda**
+  (`src/components/shop/user-shop-view.tsx`, la referencia canónica de píldoras
+  de categoría con icono): `rounded-full` blanco con borde `warm-200`
+  (`#E8E9EB`) en reposo y verde WhatsApp sólido al activo (`bg-brand-500` =
+  `#0E7A0E` + `shadow-md shadow-brand-500/20`), `px-4 py-2 text-sm
+  font-semibold`, emoji + nombre + contador en `chipCountClass`
+  (`text-[11px] font-bold tabular-nums`, `white/90` sobre el verde y `#6E737B`
+  sobre blanco: ambos ≥4.5:1; **no** usar `white/80` ni `#8F939B`, que bajan de
+  4.5:1). El texto de la píldora usa gris **explícito**, no `--text-secondary`:
+  ese
   token se aclara en tema oscuro y el admin es una superficie clara fija, así
   que la píldora quedaría ilegible. Los dos controles usan
   `updateFilters` y limpian `onlyNoCategory`. El conteo lo sirve
@@ -212,6 +251,31 @@
   categoría limpia "Sin categoría", porque un producto sin categoría nunca
   cae en una categoría concreta y la combinación dejaría el listado vacío.
   El chip "Todas" usa `counts.catalogTotal`.
+
+- Productos — fila de categorías (sticky): la fila queda pegada **debajo del
+  sub-nav** con `sticky z-30
+  top-[calc(var(--header-top-offset)+var(--admin-subnav-h))]`, una **sola línea
+  con scroll horizontal en todos los breakpoints** (`flex` + `overflow-x-auto` +
+  `snap-x snap-mandatory` + `snap-start` por píldora + `scrollbar-hide
+  scroll-fade-x`; **sin** `flex-wrap`, a diferencia de los chips de estado, para
+  que su alto sea estable y publicable). El sangrado a todo el ancho se hace con
+  `-mx-4 px-4 sm:-mx-6 sm:px-6` dentro del `max-w-7xl mx-auto` del área, y el
+  fondo es `bg-gray-50/95` + `backdrop-blur-md` — **`gray-50`, no el `#faf8f5`
+  del `body`**: el shell de `/admin` es `bg-gray-50` (`admin/layout.tsx`) y con
+  el otro tono la franja desentonaría. La fila publica su alto real en
+  `--admin-catbar-h` (default `0px` en `globals.css`) con un `ResizeObserver`
+  sobre `categoryBarRef` y deps **`[categories.length]`**: las categorías llegan
+  por fetch, así que un efecto con deps `[]` correría antes de que exista el
+  nodo; escribir la var con `setProperty` no es `set-state-in-effect`. Por eso
+  la barra de acciones masivas se ancla **debajo de las dos filas**:
+  `sticky z-20 top-[calc(var(--header-top-offset)+var(--admin-subnav-h)+var(--admin-catbar-h))]`.
+  El orden de apilado es header `z-50` > sub-nav `z-40` > **categorías `z-30`**
+  > **barra masiva `z-20`** > contenido: la barra va por debajo para que, al
+  pasar, se deslice **por detrás** de las píldoras en vez de cortarlas con su
+  borde superior. Medido: píldoras de 38px de alto (fila de 55px) en escritorio
+  y **44px con `touch-target`** en móvil (fila de 61px); no hardcodear esos
+  números, la var los sigue. En móvil la píldora lleva `touch-target` porque es
+  el filtro principal y la fila está pegada (targets de 44px).
 
 - Pedidos (`/admin/pedidos`) — acciones masivas: la selección vive en un
   `ReadonlySet<number>` y se **poda con `pruneSelection` dentro de un
@@ -269,6 +333,18 @@ encima del pliegue, sin scroll horizontal, con la búsqueda visible y "Nuevo
 producto" + "Más" alcanzables (44px); a 768/1440 se conserva la tabla con todas
 sus columnas y las 7 acciones en la barra.
 
+Orden por más vendidos (requiere 00116 aplicada; sin ella el panel sigue
+funcionando en orden por nombre + aviso ámbar): en `/admin/productos` pulsar el
+encabezado "Ventas" y comprobar que la primera fila es la de más unidades
+vendidas, que la URL queda en `?sort=sales` y que la columna muestra la flecha
+descendente; volver a pulsarlo invierte el orden y deja `dir=asc`. Recargar la
+URL: debe seguir ordenado por ventas (la dirección por defecto es `desc`, así
+que `?sort=sales` sin `dir` muestra primero los más vendidos). Los productos sin
+ventas van al final con `desc` y al principio con `asc`, y su "Ventas" es 0 (no
+vacío). Comprobar que el número de "Ventas" de un producto con pedidos
+cancelados NO los cuenta. A 375×812 el encabezado "Ventas" está oculto: el orden
+se cambia desde el `<select>` (elegir "Más vendidos" y ver que abre en `desc`).
+
 Barra de acciones masivas sticky de `/admin/productos` (requiere sesión admin +
 productos): seleccionar 2+ productos y bajar ~3 pantallas; la barra debe seguir
 visible pegada justo debajo del sub-nav (sin taparlo ni tapar el header) y sus
@@ -277,6 +353,24 @@ el modal queda por encima). A 375×812 la barra es una sola fila que desliza en
 horizontal, con el contador visible y targets de 44px; a 768/1440 conserva el
 wrap. Repetir con el header global oculto (scroll hacia abajo) para confirmar
 que la barra sube con el sub-nav.
+
+Fila de categorías sticky de `/admin/productos` (requiere sesión admin +
+categorías): bajar ~3 pantallas y comprobar que la fila de píldoras se queda
+pegada **justo debajo del sub-nav**, sin hueco ni solape, y que el contenido
+pasa **por detrás** de ella (el fondo `bg-gray-50/95` cubre todo el ancho, de
+borde a borde: si aparece una franja del color del `body` a los lados, el
+`-mx-4 px-4 sm:-mx-6 sm:px-6` se rompió). Las píldoras deben verse como las de
+la tienda: redondas, blancas con borde claro en reposo y verde WhatsApp sólido
+con sombra al activo, cada una con su emoji y su conteo. A 375×812 la fila debe
+ser de **una sola línea** (nada de wrap: la altura tiene que ser estable) que
+desliza en horizontal con targets de 44px; en 1280 también es una sola línea,
+con las píldoras que no caben accesibles por scroll. Seleccionar 2+ productos y
+comprobar que la barra de acciones masivas aparece **debajo** de la fila de
+categorías y que al bajar se desliza por detrás de las píldoras sin cortarlas.
+Repetir con el header global oculto (scroll hacia abajo): las tres filas
+(header/sub-nav/categorías) deben seguir pegadas entre sí. Con cero categorías
+la fila desaparece y la barra masiva se ancla como antes (no debe quedar un
+hueco).
 
 Acciones masivas de pedidos (requiere sesión admin + datos): en `/admin/pedidos`
 marcar un subconjunto y comprobar que el checkbox del encabezado queda

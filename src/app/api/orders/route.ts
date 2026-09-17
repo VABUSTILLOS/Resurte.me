@@ -525,6 +525,22 @@ export async function POST(request: NextRequest) {
       addressId = addr.id
     }
 
+    // ── Marcar como última usada (best-effort) ──────────────────────────
+    // El checkout preselecciona la dirección predeterminada y, si no hay
+    // ninguna marcada, la usada más recientemente (`last_used_at`). Se toca
+    // tanto si la dirección se creó como si se reutilizó, y tanto para
+    // usuarios como para invitados (cliente service_role: RLS no aplica).
+    // Un fallo aquí no bloquea la orden.
+    if (addressId !== null) {
+      const { error: touchErr } = await supabase
+        .from("addresses")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", addressId)
+      if (touchErr) {
+        logger.warn("last_used_at update error (best-effort):", { message: touchErr.message })
+      }
+    }
+
     // ── Guardar como dirección predeterminada (atómico, solo logged-in) ──
     // Se aplica después de resolver addressId (creada o reutilizada) para que
     // el UPDATE condicional desmarque las demás y marque la elegida. Si falla,

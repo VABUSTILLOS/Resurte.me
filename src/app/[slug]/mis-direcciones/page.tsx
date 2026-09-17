@@ -41,6 +41,32 @@ const INPUT_CLASS =
   "w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
 const LABEL_CLASS = "block text-sm font-medium text-gray-700 mb-1.5"
 
+type AddressClient = NonNullable<ReturnType<typeof createClient>>
+
+/**
+ * Direcciones activas del usuario: sin papelera, la predeterminada primero y,
+ * entre las demás, la más reciente. Si el esquema desplegado aún no tiene
+ * `deleted_at` / `is_default` (00117/00050 pendientes) PostgREST devuelve
+ * error: se reintenta con el orden clásico y se descartan las borradas en
+ * memoria, para no dejar la página vacía.
+ */
+async function fetchActiveAddresses(client: AddressClient): Promise<Address[]> {
+  const preferred = await client
+    .from("addresses")
+    .select("*")
+    .is("deleted_at", null)
+    .order("is_default", { ascending: false })
+    .order("last_used_at", { ascending: false })
+  if (!preferred.error) return (preferred.data ?? []) as Address[]
+
+  const legacy = await client
+    .from("addresses")
+    .select("*")
+    .order("created_at", { ascending: false })
+  if (legacy.error) return []
+  return ((legacy.data ?? []) as Address[]).filter((a) => !a.deleted_at)
+}
+
 export default function MisDireccionesPage() {
   const { city } = useCity()
   const [supabase] = useState(() =>
@@ -71,11 +97,7 @@ export default function MisDireccionesPage() {
       return
     }
     setUserId(session.user.id)
-    const { data, error } = await supabase
-      .from("addresses")
-      .select("*")
-      .order("created_at", { ascending: false })
-    if (!error && data) setAddresses(data as Address[])
+    setAddresses(await fetchActiveAddresses(supabase))
     setLoading(false)
   }, [supabase])
 
@@ -90,15 +112,11 @@ export default function MisDireccionesPage() {
         return
       }
       setUserId(data.session.user.id)
-      return supabase
-        .from("addresses")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .then(({ data: rows, error }) => {
-          if (cancelled) return
-          if (!error && rows) setAddresses(rows as Address[])
-          setLoading(false)
-        })
+      return fetchActiveAddresses(supabase).then((rows) => {
+        if (cancelled) return
+        setAddresses(rows)
+        setLoading(false)
+      })
     })
     return () => {
       cancelled = true
@@ -198,7 +216,13 @@ export default function MisDireccionesPage() {
     if (!supabase) return
     if (!window.confirm(`¿Eliminar "${addr.label}" — ${addr.street} ${addr.number}?`)) return
     setDeletingId(addr.id)
-    const { error } = await supabase.from("addresses").delete().eq("id", addr.id)
+    // Soft delete: `orders.address_id` referencia esta fila (ON DELETE SET
+    // NULL) y el ticket/panel imprimen la dirección, así que un DELETE físico
+    // vaciaría el historial de pedidos ya hechos.
+    const { error } = await supabase
+      .from("addresses")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", addr.id)
     setDeletingId(null)
     if (error) {
       setError(error.message || "No se pudo eliminar la dirección.")

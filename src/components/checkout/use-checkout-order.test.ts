@@ -52,7 +52,7 @@ vi.mock("@/lib/supabase/client", () => ({
   createClient: vi.fn(() => {
     // Builder encadenable genérico (profiles / addresses) que resuelve vacío
     const builder: Record<string, unknown> = {}
-    for (const m of ["select", "eq", "order"]) builder[m] = vi.fn().mockReturnValue(builder)
+    for (const m of ["select", "eq", "is", "order", "limit", "update"]) builder[m] = vi.fn().mockReturnValue(builder)
     builder.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
     builder.then = (resolve: (v: unknown) => void) => resolve({ data: [], error: null })
     return {
@@ -67,6 +67,7 @@ vi.mock("@/lib/supabase/client", () => ({
 vi.mock("@/lib/analytics", () => ({ AnalyticsEvents: { lead: vi.fn() } }))
 vi.mock("@/lib/guest-address", () => ({
   getGuestToken: vi.fn(() => "gt-0"),
+  ensureGuestToken: vi.fn(() => "gt-0"),
   saveGuestToken: vi.fn(),
   getLastAddress: vi.fn(() => null),
   saveLastAddress: vi.fn(),
@@ -186,7 +187,9 @@ describe("useCheckoutOrder · createOrder", () => {
     const r = await mount(opts)
     const result = await r.createOrder()
     expect(result).toBeNull()
-    expect(fetchMock).not.toHaveBeenCalled()
+    // Solo se cuenta /api/orders: el libro de direcciones del invitado puede
+    // consultar /api/addresses/guest en paralelo.
+    expect(fetchMock.mock.calls.filter((c) => c[0] === "/api/orders")).toHaveLength(0)
     expect(useRenderHook(opts).checkoutError).toBe(
       "No se pudo determinar tu ciudad. Recarga la página."
     )
@@ -358,8 +361,8 @@ describe("useCheckoutOrder · flujo onPaid", () => {
     const opts = makeOptions()
     await (await mount(opts)).handlePlaceOrder("spei")
 
-    // SPEI no debe inicializar Stripe: solo 1 fetch (la creación de la orden)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    // SPEI no debe inicializar Stripe: solo 1 llamada a la creación de la orden
+    expect(fetchMock.mock.calls.filter((c) => c[0] === "/api/orders")).toHaveLength(1)
     expect(opts.onPaid).toHaveBeenCalledWith({
       orderId: 101,
       cashback: { credits: 20, tier: "Verde" },

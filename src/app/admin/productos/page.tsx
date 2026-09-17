@@ -47,6 +47,7 @@ import {
   Bookmark,
   Clock,
   QrCode,
+  Pause,
   Sparkles,
   Store,
   ImageOff,
@@ -59,8 +60,17 @@ import { AUDIT_ACTION_LABEL, type AuditAction } from "@/lib/audit-log"
 import { auditDiffRows, auditExtraFields, priceSeries } from "@/lib/audit-diff"
 import { resolveSalePrice, saleState } from "@/lib/sale-window"
 import { TRASH_RETENTION_DAYS, purgeLabel } from "@/lib/trash"
-import { SEO_DESCRIPTION_MAX, SEO_TITLE_MAX, chunkIds, seoBatchSummary } from "@/lib/seo-batch"
-import { MAX_BULK_IDS, type BulkFailure } from "@/lib/product-bulk"
+import { SEO_DESCRIPTION_MAX, SEO_TITLE_MAX, seoBatchSummary } from "@/lib/seo-batch"
+import {
+  bulkPatch,
+  bulkPatchEach,
+  runPerId,
+  summarizeBulkFailures,
+  type BulkOptions,
+  type BulkResult,
+  type BulkFailureSummary,
+} from "@/lib/admin-product-bulk-run"
+import type { BulkFailure } from "@/lib/product-bulk"
 import {
   DEFAULT_PRODUCT_SORT,
   PRODUCT_SORT_KEYS,
@@ -167,7 +177,9 @@ const STOCK_LABELS: Record<StockStatus, string> = {
   out_of_stock: "Agotado",
 }
 
-/** Fase 5 — paginación del catálogo (424+ productos). */
+/** Fase 5 — paginación del catálogo (424+ productos).
+ *  Sin virtualización: cada fila es DOM real, así que 200 es el techo que
+ *  mantiene el render fluido en móvil (el endpoint admite más, la UI no). */
 const DEFAULT_PAGE_SIZE = 50
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200]
 
@@ -207,78 +219,87 @@ function buildMap(rows: AvailabilityRow[]): AvailabilityMap {
   return map
 }
 
-type BulkResult = { updated: number[]; failed: BulkFailure[] }
-
-/**
- * Trocea por el tope del endpoint y devuelve qué ids se guardaron y cuáles no.
- * Los errores de red o HTTP se traducen a fallos **por id** en vez de lanzar:
- * en una acción sobre 300 productos, abortar por un fallo parcial es peor que
- * reportarlo.
- */
-async function postBulk(
-  ids: number[],
-  payload: { patch?: Record<string, unknown>; patches?: Record<string, Record<string, unknown>> }
-): Promise<BulkResult> {
-  const updated: number[] = []
-  const failed: BulkFailure[] = []
-  if (ids.length === 0) return { updated, failed }
-  for (const idsChunk of chunkIds(ids, MAX_BULK_IDS)) {
-    const body: Record<string, unknown> = { ids: idsChunk }
-    const patches = payload.patches
-    if (patches) {
-      body.patches = Object.fromEntries(idsChunk.map((id) => [String(id), patches[String(id)]]))
-    } else {
-      body.patch = payload.patch
-    }
-    try {
-      const res = await fetch("/api/admin/products/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        const reason: string = data.error ?? "Error al actualizar en lote"
-        for (const id of idsChunk) failed.push({ id, reason })
-        continue
-      }
-      if (Array.isArray(data.updated)) updated.push(...data.updated)
-      if (Array.isArray(data.failed)) failed.push(...data.failed)
-    } catch {
-      for (const id of idsChunk) failed.push({ id, reason: "Sin conexión" })
-    }
-  }
-  return { updated, failed }
-}
-
-/** El mismo cambio para todos: una sola petición por bloque de ids. */
-function bulkPatch(ids: number[], patch: Record<string, unknown>): Promise<BulkResult> {
-  return postBulk(ids, { patch })
-}
-
-/**
- * Un cambio calculado por producto (subir precios un %, sumar una etiqueta a
- * las que ya tiene). Devolver `null` omite ese producto sin reportarlo como
- * fallo: el llamador decide si lo menciona.
- */
-function bulkPatchEach<T extends { id: number }>(
-  products: T[],
-  patchFor: (product: T) => Record<string, unknown> | null
-): Promise<BulkResult> {
-  const ids: number[] = []
-  const patches: Record<string, Record<string, unknown>> = {}
-  for (const product of products) {
-    const patch = patchFor(product)
-    if (!patch) continue
-    ids.push(product.id)
-    patches[String(product.id)] = patch
-  }
-  return postBulk(ids, { patches })
-}
-
 /** "N productos" con la concordancia correcta en singular. */
 function productCount(n: number): string {
   return `${n} producto${n === 1 ? "" : "s"}`
+}
+
+/**
+ * Tope de ids por petición. Espejo del `MAX_IDS` de city-availability y del
+ * `MAX_PAGE_SIZE` de list: por encima de esto el servidor recorta en silencio,
+ * así que el panel trocea en lugar de perder parte de la selección.
+ */
+const IDS_PER_REQUEST = 1000
+
+function chunkIds(ids: number[]): number[][] {
+  const chunks: number[][] = []
+  for (let i = 0; i < ids.length; i += IDS_PER_REQUEST) {
+    chunks.push(ids.slice(i, i + IDS_PER_REQUEST))
+  }
+  return chunks
+}
+
+/**
+ * Valor previo de un campo para los ids dados. La selección puede abarcar
+ * otras páginas, así que el estado anterior se pide al servidor.
+ *
+ * Devuelve `null` si no se pudo leer completo: sin estado previo fiable no se
+ * ofrece Deshacer, en vez de restaurar valores inventados.
+ */
+async function fetchPreviousField<K extends keyof Product>(
+  ids: number[],
+  field: K
+): Promise<Map<number, Product[K]> | null> {
+  const previous = new Map<number, Product[K]>()
+  for (const chunk of chunkIds(ids)) {
+    const res = await fetch(`/api/admin/products/list?ids=${chunk.join(",")}`)
+    if (!res.ok) return null
+    const data = await res.json().catch(() => ({}))
+    for (const row of (data.rows ?? []) as Product[]) previous.set(row.id, row[field])
+  }
+  return ids.every((id) => previous.has(id)) ? previous : null
+}
+
+/**
+ * Productos completos de los ids dados, por bloques. Se usa cuando la acción
+ * necesita valores frescos del servidor (p. ej. ajustar precios en %): leerlos
+ * de una sola vez truncaría la selección al tope del endpoint.
+ *
+ * `null` si algún bloque falla: el llamador aborta en vez de operar a medias.
+ */
+async function fetchProductsByIds(ids: number[]): Promise<Product[] | null> {
+  const rows: Product[] = []
+  for (const chunk of chunkIds(ids)) {
+    const res = await fetch(`/api/admin/products/list?ids=${chunk.join(",")}`)
+    if (!res.ok) return null
+    const data = await res.json().catch(() => ({}))
+    rows.push(...((data.rows ?? []) as Product[]))
+  }
+  return rows
+}
+
+/**
+ * Celdas de disponibilidad actuales de los ids, tal cual las devuelve el
+ * servidor. Es el estado que reproduce el "Deshacer" de las acciones por
+ * ciudad (la ausencia de filas significa "global").
+ *
+ * Se pide por bloques porque el endpoint acota la consulta: sin trocear, una
+ * selección grande devolvía solo las primeras celdas y el resto se leía como
+ * "global", que es justo lo contrario de lo que hay. `null` si algún bloque
+ * falla o el servidor marca la respuesta como truncada.
+ */
+async function fetchAvailabilityRows(ids: number[]): Promise<AvailabilityRow[] | null> {
+  const rows: AvailabilityRow[] = []
+  for (const chunk of chunkIds(ids)) {
+    const res = await fetch(
+      `/api/admin/products/city-availability?ids=${encodeURIComponent(chunk.join(","))}`
+    )
+    if (!res.ok) return null
+    const data = await res.json().catch(() => ({}))
+    if (data.truncated) return null
+    rows.push(...((data.rows ?? []) as AvailabilityRow[]))
+  }
+  return rows
 }
 
 /**
@@ -332,14 +353,7 @@ function MobileCollapsible({
 
 export default function AdminProductsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center py-20 text-gray-400">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" />
-          Cargando productos...
-        </div>
-      }
-    >
+    <Suspense fallback={<ProductsSkeleton />}>
       <AdminProductsContent />
     </Suspense>
   )
@@ -348,6 +362,8 @@ export default function AdminProductsPage() {
 import { RestockPanel } from "../components/RestockPanel"
 import { ImportProductsModal } from "../components/ImportProductsModal"
 import { ProductFormModal } from "../components/ProductFormModal"
+import { ProductsSkeleton } from "../components/ProductsSkeleton"
+import { RowActionMenu, type RowActionItem } from "../components/RowActionMenu"
 
 function AdminProductsContent() {
   // Lazy browser-only client: creating it during SSR would throw when
@@ -460,7 +476,18 @@ function AdminProductsContent() {
   const [cityModalOpen, setCityModalOpen] = useState(false)
   const [draftCities, setDraftCities] = useState<Set<number>>(new Set())
   const [bulkSaving, setBulkSaving] = useState(false)
+  // Progreso de la acción masiva en curso: `null` cuando no hay ninguna. La
+  // barra es real (bloques terminados), no un spinner indefinido.
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
+  // Fallos parciales de la última acción masiva, agrupados por motivo.
+  const [bulkFailures, setBulkFailures] = useState<BulkFailureSummary | null>(null)
+  // Bandera de cancelación: `postBulk`/`runPerId` la consultan entre bloques.
+  const bulkCancelledRef = useRef(false)
+  const [bulkCancelling, setBulkCancelling] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
+  // Fila sticky de categorías: su alto se publica en `--admin-catbar-h` para
+  // que la barra de acciones masivas se ancle justo debajo y no la tape.
+  const categoryBarRef = useRef<HTMLDivElement>(null)
   // Fase 16 — importación masiva vía CSV
   const [importOpen, setImportOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
@@ -501,6 +528,25 @@ function AdminProductsContent() {
   const [seoProposals, setSeoProposals] = useState<SeoDraft[]>([])
   const [seoSkipped, setSeoSkipped] = useState<SeoNote[]>([])
   const [seoFailed, setSeoFailed] = useState<SeoNote[]>([])
+
+  // Publica el alto real de la fila sticky de categorías en la var CSS
+  // `--admin-catbar-h`, para que la barra de acciones masivas (que comparte el
+  // mismo offset sticky) se ancle debajo en vez de solaparse. El default de la
+  // var es 0px porque la fila solo se monta cuando hay categorías cargadas; el
+  // efecto se re-ejecuta al llegar la primera categoría para medir el nodo.
+  useEffect(() => {
+    const el = categoryBarRef.current
+    if (!el) return
+    const root = document.documentElement
+    const publish = () => root.style.setProperty("--admin-catbar-h", `${el.offsetHeight}px`)
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      root.style.removeProperty("--admin-catbar-h")
+    }
+  }, [categories.length])
 
   // Atajos de teclado: "/" enfoca búsqueda, "n" nuevo producto, Esc cierra
   // el modal más superficial abierto.
@@ -974,12 +1020,9 @@ function AdminProductsContent() {
     setCityModalLoading(true)
     setError(null)
     try {
-      const res = await fetch(
-        `/api/admin/products/city-availability?ids=${encodeURIComponent(ids.join(","))}`
-      )
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error ?? "Error al cargar la disponibilidad")
-      const map = buildMap((data.rows ?? []) as AvailabilityRow[])
+      const rows = await fetchAvailabilityRows(ids)
+      if (!rows) throw new Error("Error al cargar la disponibilidad")
+      const map = buildMap(rows)
       setModalAvailability(map)
       // Pre-marcar: una ciudad queda activa si TODOS los productos del grupo la
       // tienen disponible (los globales cuentan como disponibles en todas).
@@ -1012,24 +1055,98 @@ function AdminProductsContent() {
   }
 
   // ---------- Acciones bulk ----------
-  // El servidor es la única fuente de la disponibilidad: tras guardar se
-  // recarga el listado (que ya trae el contador por fila de la página) en vez
-  // de mantener un mapa completo en el navegador.
+  /**
+   * Arranca una acción masiva: progreso a cero, sin cancelar y sin fallos
+   * heredados de la acción anterior.
+   */
+  function beginBulk() {
+    bulkCancelledRef.current = false
+    setBulkCancelling(false)
+    setBulkProgress({ done: 0, total: 0 })
+    setBulkFailures(null)
+  }
+
+  /**
+   * Pide cancelar la acción en curso. No aborta la petición ya enviada (deja
+   * el servidor terminar ese bloque, que es la unidad atómica); corta antes de
+   * enviar el siguiente.
+   */
+  function cancelBulk() {
+    bulkCancelledRef.current = true
+    setBulkCancelling(true)
+  }
+
+  /** Opciones que conectan `bulkPatch*`/`runPerId` con la barra de progreso. */
+  function bulkRunOptions(): BulkOptions {
+    return {
+      onProgress: (done, total) => setBulkProgress({ done, total }),
+      isCancelled: () => bulkCancelledRef.current,
+    }
+  }
+
+  /**
+   * Cierra una acción masiva y decide si hay algo que reportar.
+   *
+   * Devuelve `true` cuando terminó entera y sin fallos: solo entonces el
+   * llamador muestra su mensaje de éxito. Si se canceló o hubo fallos, el
+   * detalle va al panel de fallos y no a un toast genérico.
+   */
+  function finishBulk(result: {
+    cancelled: boolean
+    failed: BulkFailure[]
+    updated?: number[]
+    ok?: number[]
+  }): boolean {
+    setBulkProgress(null)
+    setBulkCancelling(false)
+    const applied = (result.updated?.length ?? 0) + (result.ok?.length ?? 0)
+    if (result.cancelled) {
+      setToast(`Cancelado · ${productCount(applied)} ya se habían actualizado`)
+      return false
+    }
+    if (result.failed.length > 0) {
+      setBulkFailures(summarizeBulkFailures(result.failed))
+      return false
+    }
+    return true
+  }
+
   const applyBulk = async (body: Record<string, unknown>) => {
     if (selected.size === 0) return
+    const ids = [...selected]
     setBulkSaving(true)
     setError(null)
     try {
+      // Estado previo para el Deshacer: el servidor es la única fuente de la
+      // disponibilidad, así que se captura antes de escribir.
+      const previous = await fetchAvailabilityRows(ids)
       const res = await fetch("/api/admin/products/city-availability", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productIds: [...selected], ...body }),
+        body: JSON.stringify({ productIds: ids, ...body }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? "Error al actualizar disponibilidad")
       }
       setToast("Disponibilidad actualizada")
+      if (previous) {
+        setUndoAction({
+          message: `Disponibilidad actualizada en ${productCount(ids.length)}.`,
+          run: async () => {
+            const undoRes = await fetch("/api/admin/products/city-availability", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ productIds: ids, restore: previous }),
+            })
+            if (!undoRes.ok) {
+              const data = await undoRes.json().catch(() => ({}))
+              throw new Error(data.error ?? "Error al restaurar la disponibilidad")
+            }
+            setReloadKey((k) => k + 1)
+          },
+        })
+      }
       setReloadKey((k) => k + 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al actualizar disponibilidad")
@@ -1057,36 +1174,53 @@ function AdminProductsContent() {
     setCityModalOpen(false)
   }
 
-  /** Aplica is_visible a un conjunto de ids; devuelve los que se guardaron. */
-  async function applyVisibilityToIds(ids: number[], isVisible: boolean): Promise<number[]> {
-    const { updated, failed } = await bulkPatch(ids, { is_visible: isVisible })
+  /** Aplica is_visible a un conjunto de ids y devuelve el resultado del lote. */
+  async function applyVisibilityToIds(ids: number[], isVisible: boolean): Promise<BulkResult> {
+    const result = await bulkPatch(ids, { is_visible: isVisible }, bulkRunOptions())
     setProducts((prev) =>
-      prev.map((p) => (updated.includes(p.id) ? { ...p, is_visible: isVisible } : p))
+      prev.map((p) => (result.updated.includes(p.id) ? { ...p, is_visible: isVisible } : p))
     )
-    if (failed.length > 0) {
-      setError(`${productCount(failed.length)} no se pudieron actualizar`)
-    }
-    return updated
+    return result
   }
 
   /** Muestra/oculta en el catálogo de WhatsApp toda la selección. */
   async function bulkSetWhatsApp(show: boolean) {
     if (selected.size === 0 || bulkSaving) return
+    const ids = [...selected]
     setBulkSaving(true)
     setError(null)
+    beginBulk()
     try {
-      const { updated, failed } = await bulkPatch([...selected], { show_in_whatsapp: show })
+      const previous = await fetchPreviousField(ids, "show_in_whatsapp")
+      const result = await bulkPatch(ids, { show_in_whatsapp: show }, bulkRunOptions())
+      const { updated } = result
       setProducts((prev) =>
         prev.map((p) => (updated.includes(p.id) ? { ...p, show_in_whatsapp: show } : p))
       )
-      if (failed.length > 0) {
-        setError(`${productCount(failed.length)} no se pudieron actualizar`)
-      }
-      if (updated.length > 0) {
+      if (finishBulk(result) && updated.length > 0) {
         setToast(`${productCount(updated.length)} actualizado${updated.length === 1 ? "" : "s"} en WhatsApp`)
+        if (previous) {
+          setUndoAction({
+            message: `WhatsApp actualizado en ${productCount(updated.length)}.`,
+            run: async () => {
+              await bulkPatchEach(
+                updated.map((id) => ({ id, show_in_whatsapp: previous.get(id) ?? false })),
+                (p) => ({ show_in_whatsapp: p.show_in_whatsapp })
+              )
+              setProducts((prev) =>
+                prev.map((p) =>
+                  updated.includes(p.id)
+                    ? { ...p, show_in_whatsapp: previous.get(p.id) ?? false }
+                    : p
+                )
+              )
+            },
+          })
+        }
       }
       setSelected(new Set())
     } catch {
+      setBulkProgress(null)
       setError("Error al actualizar WhatsApp en lote")
     } finally {
       setBulkSaving(false)
@@ -1098,10 +1232,12 @@ function AdminProductsContent() {
     if (selected.size === 0 || bulkSaving) return
     setBulkSaving(true)
     setError(null)
+    beginBulk()
     try {
-      const succeededIds = await applyVisibilityToIds([...selected], isVisible)
+      const result = await applyVisibilityToIds([...selected], isVisible)
+      const succeededIds = result.updated
       setSelected(new Set())
-      if (succeededIds.length > 0) {
+      if (finishBulk(result) && succeededIds.length > 0) {
         setToast(
           `${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"} ${
             isVisible ? "publicado" : "despublicado"
@@ -1116,6 +1252,7 @@ function AdminProductsContent() {
         })
       }
     } catch {
+      setBulkProgress(null)
       setError("Error al actualizar la visibilidad en lote")
     } finally {
       setBulkSaving(false)
@@ -1564,6 +1701,7 @@ function AdminProductsContent() {
     // Los sin imagen pueden estar en otras páginas: datos frescos del servidor.
     setBulkAiBusy(true)
     setError(null)
+    beginBulk()
     try {
       const ids = [...selected]
       const listRes = await fetch(`/api/admin/products/list?ids=${ids.join(",")}`)
@@ -1576,9 +1714,14 @@ function AdminProductsContent() {
         setToast("Todos los seleccionados ya tienen imagen")
         return
       }
-      let done = 0
-      let failed = 0
+      const doneIds: number[] = []
+      const failures: BulkFailure[] = []
+      let cancelled = false
       for (const p of missing) {
+        if (bulkCancelledRef.current) {
+          cancelled = true
+          break
+        }
         try {
           const res = await fetch("/api/admin/kie-ai/image", {
             method: "POST",
@@ -1610,19 +1753,19 @@ function AdminProductsContent() {
             body: JSON.stringify({ productId: p.id, image_url: url, images: [url] }),
           })
           if (!patch.ok) throw new Error("error al guardar la imagen")
-          done++
-          setToast(`Imágenes IA: ${done}/${missing.length}…`)
-        } catch {
-          failed++
+          doneIds.push(p.id)
+          setBulkProgress({ done: doneIds.length, total: missing.length })
+        } catch (err) {
+          failures.push({ id: p.id, reason: err instanceof Error ? err.message : "Error al generar" })
         }
       }
       setReloadKey((k) => k + 1)
       setSelected(new Set())
-      setToast(`Imágenes IA: ${done} generada${done === 1 ? "" : "s"}`)
-      if (failed > 0) {
-        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron generar`)
+      if (finishBulk({ cancelled, failed: failures, ok: doneIds })) {
+        setToast(`Imágenes IA: ${doneIds.length} generada${doneIds.length === 1 ? "" : "s"}`)
       }
     } catch (err) {
+      setBulkProgress(null)
       setError(err instanceof Error ? err.message : "Error en la generación en lote")
     } finally {
       setBulkAiBusy(false)
@@ -2025,26 +2168,26 @@ function AdminProductsContent() {
       return
     setBulkSaving(true)
     setError(null)
+    beginBulk()
     try {
       const ids = [...selected]
-      let deleted = 0
-      let failed = 0
-      for (const productId of ids) {
-        const res = await fetch("/api/admin/products/delete", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productId }),
-        })
-        if (res.ok) deleted++
-        else failed++
-      }
+      const result = await runPerId(
+        ids,
+        (productId) =>
+          fetch("/api/admin/products/delete", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId }),
+          }),
+        bulkRunOptions()
+      )
       setSelected(new Set())
       setReloadKey((k) => k + 1)
-      setToast(`${deleted} movido${deleted === 1 ? "" : "s"} a la papelera`)
-      if (failed > 0) {
-        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron eliminar`)
+      if (finishBulk(result)) {
+        setToast(`${result.ok.length} movido${result.ok.length === 1 ? "" : "s"} a la papelera`)
       }
     } catch {
+      setBulkProgress(null)
       setError("Error al eliminar en lote")
     } finally {
       setBulkSaving(false)
@@ -2056,27 +2199,29 @@ function AdminProductsContent() {
     if (selected.size === 0 || bulkSaving) return
     setBulkSaving(true)
     setError(null)
+    beginBulk()
     try {
-      const ids = [...selected]
-      const results = await Promise.all(
-        ids.map(async (productId) => {
-          const res = await fetch("/api/admin/products/duplicate", {
+      const result = await runPerId(
+        [...selected],
+        (productId) =>
+          fetch("/api/admin/products/duplicate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ productId }),
-          })
-          return res.ok
-        })
+          }),
+        bulkRunOptions()
       )
-      const ok = results.filter(Boolean).length
-      const failed = results.filter((r) => !r).length
       setSelected(new Set())
       setReloadKey((k) => k + 1)
-      setToast(`${ok} copia${ok === 1 ? "" : "s"} creada${ok === 1 ? "" : "s"} (despublicadas)`)
-      if (failed > 0) {
-        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron duplicar`)
+      if (finishBulk(result)) {
+        setToast(
+          `${result.ok.length} copia${result.ok.length === 1 ? "" : "s"} creada${
+            result.ok.length === 1 ? "" : "s"
+          } (despublicadas)`
+        )
       }
     } catch {
+      setBulkProgress(null)
       setError("Error al duplicar en lote")
     } finally {
       setBulkSaving(false)
@@ -2197,6 +2342,7 @@ function AdminProductsContent() {
     }
     setBulkSaving(true)
     setError(null)
+    beginBulk()
     try {
       const ids = [...selected]
       const listRes = await fetch(`/api/admin/products/list?ids=${ids.join(",")}`)
@@ -2216,23 +2362,28 @@ function AdminProductsContent() {
       const rows = ids
         .map((id) => current.get(id))
         .filter((p): p is Product => p !== undefined)
-      const { updated } = await bulkPatchEach(rows, (p) => {
-        const salePrice =
-          bulkSaleMode === "remove"
-            ? null
-            : p.price != null
-            ? Math.round(p.price * factor * 100) / 100
-            : undefined
-        if (salePrice === undefined) return null // sin precio base no aplica
-        newSalePrices.set(p.id, salePrice)
-        return {
-          sale_price: salePrice,
-          // Quitar la oferta también borra su ventana; al aplicarla se
-          // reemplaza por la capturada (vacío = sin límite).
-          sale_starts_at: nextStart,
-          sale_ends_at: nextEnd,
-        }
-      })
+      const result = await bulkPatchEach(
+        rows,
+        (p) => {
+          const salePrice =
+            bulkSaleMode === "remove"
+              ? null
+              : p.price != null
+              ? Math.round(p.price * factor * 100) / 100
+              : undefined
+          if (salePrice === undefined) return null // sin precio base no aplica
+          newSalePrices.set(p.id, salePrice)
+          return {
+            sale_price: salePrice,
+            // Quitar la oferta también borra su ventana; al aplicarla se
+            // reemplaza por la capturada (vacío = sin límite).
+            sale_starts_at: nextStart,
+            sale_ends_at: nextEnd,
+          }
+        },
+        bulkRunOptions()
+      )
+      const { updated } = result
       setProducts((prev) =>
         prev.map((p) => {
           const sp = updated.includes(p.id) ? newSalePrices.get(p.id) : undefined
@@ -2241,14 +2392,15 @@ function AdminProductsContent() {
             : p
         })
       )
+      const finished = finishBulk(result)
       // Los omitidos son los que no están en la página o no tienen precio base.
       const skipped = ids.length - updated.length
-      if (skipped > 0) {
+      if (finished && skipped > 0) {
         setError(
-          `${productCount(skipped)} omitido${skipped === 1 ? "" : "s"} (sin precio base o error)`
+          `${productCount(skipped)} omitido${skipped === 1 ? "" : "s"} (sin precio base)`
         )
       }
-      if (updated.length > 0) {
+      if (finished && updated.length > 0) {
         setToast(
           bulkSaleMode === "apply"
             ? `Oferta aplicada en ${productCount(updated.length)}`
@@ -2284,6 +2436,7 @@ function AdminProductsContent() {
       setBulkSaleOpen(false)
       setSelected(new Set())
     } catch {
+      setBulkProgress(null)
       setError("Error al actualizar ofertas en lote")
     } finally {
       setBulkSaving(false)
@@ -2304,6 +2457,7 @@ function AdminProductsContent() {
     }
     setBulkSaving(true)
     setError(null)
+    beginBulk()
     try {
       const ids = [...selected]
       const listRes = await fetch(`/api/admin/products/list?ids=${ids.join(",")}`)
@@ -2316,24 +2470,29 @@ function AdminProductsContent() {
       const rows = ids
         .map((id) => current.get(id))
         .filter((p): p is Product => p !== undefined)
-      const { updated } = await bulkPatchEach(rows, (p) => {
-        const prev = p.tags ?? []
-        const tags =
-          bulkTagMode === "add"
-            ? prev.includes(value)
-              ? prev
-              : [...prev, value].slice(0, 20)
-            : prev.filter((t) => t !== value)
-        nextTags.set(p.id, tags)
-        return { tags }
-      })
+      const result = await bulkPatchEach(
+        rows,
+        (p) => {
+          const prev = p.tags ?? []
+          const tags =
+            bulkTagMode === "add"
+              ? prev.includes(value)
+                ? prev
+                : [...prev, value].slice(0, 20)
+              : prev.filter((t) => t !== value)
+          nextTags.set(p.id, tags)
+          return { tags }
+        },
+        bulkRunOptions()
+      )
+      const { updated } = result
       setProducts((prev) =>
         prev.map((p) => {
           const tags = updated.includes(p.id) ? nextTags.get(p.id) : undefined
           return tags ? { ...p, tags } : p
         })
       )
-      if (updated.length > 0) {
+      if (finishBulk(result) && updated.length > 0) {
         setToast(
           bulkTagMode === "add"
             ? `Etiqueta "${value}" agregada a ${productCount(updated.length)}`
@@ -2360,6 +2519,7 @@ function AdminProductsContent() {
       setBulkTagOpen(false)
       setBulkTagValue("")
     } catch {
+      setBulkProgress(null)
       setError("Error al actualizar etiquetas en lote")
     } finally {
       setBulkSaving(false)
@@ -2387,12 +2547,18 @@ function AdminProductsContent() {
     }
     setBulkSaving(true)
     setError(null)
+    beginBulk()
     try {
-      const ids = (await bulkPatchEach(stale, () => ({
-        sale_price: null,
-        sale_starts_at: null,
-        sale_ends_at: null,
-      }))).updated
+      const result = await bulkPatchEach(
+        stale,
+        () => ({
+          sale_price: null,
+          sale_starts_at: null,
+          sale_ends_at: null,
+        }),
+        bulkRunOptions()
+      )
+      const ids = result.updated
       setProducts((prev) =>
         prev.map((p) =>
           ids.includes(p.id)
@@ -2400,6 +2566,10 @@ function AdminProductsContent() {
             : p
         )
       )
+      if (!finishBulk(result)) {
+        setReloadKey((k) => k + 1)
+        return
+      }
       setToast(`Ofertas vencidas limpiadas en ${productCount(ids.length)}`)
       setUndoAction({
         message: `Ofertas vencidas limpiadas en ${productCount(ids.length)}.`,
@@ -2429,6 +2599,7 @@ function AdminProductsContent() {
       })
       setReloadKey((k) => k + 1)
     } catch {
+      setBulkProgress(null)
       setError("Error al limpiar ofertas vencidas")
     } finally {
       setBulkSaving(false)
@@ -2445,6 +2616,7 @@ function AdminProductsContent() {
     }
     setBulkSaving(true)
     setError(null)
+    beginBulk()
     try {
       const ids = [...selected]
       const listRes = await fetch(`/api/admin/products/list?ids=${ids.join(",")}`)
@@ -2457,27 +2629,33 @@ function AdminProductsContent() {
       const rows = ids
         .map((id) => current.get(id))
         .filter((p): p is Product => p !== undefined)
-      const { updated } = await bulkPatchEach(rows, (p) => {
-        if (p.cost == null || p.cost <= 0) return null
-        // Precio mínimo para conservar el margen objetivo; solo aplica si
-        // queda por debajo del precio base (si no, no es oferta).
-        const minPrice = p.cost / (1 - margin / 100)
-        const salePrice = Math.round(minPrice * 100) / 100
-        if (p.price != null && salePrice >= p.price) return null
-        newSalePrices.set(p.id, salePrice)
-        return { sale_price: salePrice }
-      })
+      const result = await bulkPatchEach(
+        rows,
+        (p) => {
+          if (p.cost == null || p.cost <= 0) return null
+          // Precio mínimo para conservar el margen objetivo; solo aplica si
+          // queda por debajo del precio base (si no, no es oferta).
+          const minPrice = p.cost / (1 - margin / 100)
+          const salePrice = Math.round(minPrice * 100) / 100
+          if (p.price != null && salePrice >= p.price) return null
+          newSalePrices.set(p.id, salePrice)
+          return { sale_price: salePrice }
+        },
+        bulkRunOptions()
+      )
+      const { updated } = result
       setProducts((prev) =>
         prev.map((p) => {
           const sp = updated.includes(p.id) ? newSalePrices.get(p.id) : undefined
           return sp !== undefined ? { ...p, sale_price: sp } : p
         })
       )
+      const finished = finishBulk(result)
       const skipped = ids.length - updated.length
-      if (updated.length > 0) {
+      if (finished && updated.length > 0) {
         setToast(`Oferta con margen ≥${margin}% en ${productCount(updated.length)}`)
       }
-      if (skipped > 0) {
+      if (finished && skipped > 0) {
         setError(
           `${skipped} omitido${skipped === 1 ? "" : "s"} (sin costo o el precio ya está por debajo del mínimo)`
         )
@@ -2485,6 +2663,7 @@ function AdminProductsContent() {
       setBulkMarginOpen(false)
       setSelected(new Set())
     } catch {
+      setBulkProgress(null)
       setError("Error al aplicar oferta por margen")
     } finally {
       setBulkSaving(false)
@@ -2497,19 +2676,36 @@ function AdminProductsContent() {
     const unit = bulkUnitValue.trim() || null
     setBulkSaving(true)
     setError(null)
+    beginBulk()
     try {
       const ids = [...selected]
-      const { updated, failed } = await bulkPatch(ids, { unit })
+      const previous = await fetchPreviousField(ids, "unit")
+      const result = await bulkPatch(ids, { unit }, bulkRunOptions())
+      const { updated } = result
       setProducts((prev) => prev.map((p) => (updated.includes(p.id) ? { ...p, unit } : p)))
-      if (updated.length > 0) {
+      if (finishBulk(result) && updated.length > 0) {
         setToast(`Unidad "${unit ?? "—"}" en ${productCount(updated.length)}`)
-      }
-      if (failed.length > 0) {
-        setError(`${productCount(failed.length)} no se pudieron actualizar`)
+        if (previous) {
+          setUndoAction({
+            message: `Unidad asignada a ${productCount(updated.length)}.`,
+            run: async () => {
+              await bulkPatchEach(
+                updated.map((id) => ({ id, unit: previous.get(id) ?? null })),
+                (p) => ({ unit: p.unit })
+              )
+              setProducts((prev) =>
+                prev.map((p) =>
+                  updated.includes(p.id) ? { ...p, unit: previous.get(p.id) ?? null } : p
+                )
+              )
+            },
+          })
+        }
       }
       setBulkUnitOpen(false)
       setSelected(new Set())
     } catch {
+      setBulkProgress(null)
       setError("Error al asignar la unidad en lote")
     } finally {
       setBulkSaving(false)
@@ -2522,43 +2718,41 @@ function AdminProductsContent() {
     const categoryId = bulkCategoryId === "" ? null : Number(bulkCategoryId)
     setBulkSaving(true)
     setError(null)
+    beginBulk()
     try {
       const ids = [...selected]
       // Estado previo para el Deshacer (la selección puede estar en otra página).
-      const prevRes = await fetch(`/api/admin/products/list?ids=${ids.join(",")}`)
-      const prevData = await prevRes.json().catch(() => ({}))
-      const prevCategories = new Map<number, number | null>(
-        (prevData.rows ?? []).map((r: Product) => [r.id, r.category_id])
-      )
-      const { updated, failed } = await bulkPatch(ids, { category_id: categoryId })
+      const previous = await fetchPreviousField(ids, "category_id")
+      const result = await bulkPatch(ids, { category_id: categoryId }, bulkRunOptions())
+      const { updated } = result
       setProducts((prev) =>
         prev.map((p) => (updated.includes(p.id) ? { ...p, category_id: categoryId } : p))
       )
-      if (failed.length > 0) {
-        setError(`${productCount(failed.length)} no se pudieron actualizar`)
-      }
-      if (updated.length > 0) {
+      if (finishBulk(result) && updated.length > 0) {
         setToast(`Categoría actualizada en ${productCount(updated.length)}`)
-        setUndoAction({
-          message: `Categoría actualizada en ${productCount(updated.length)}.`,
-          run: async () => {
-            await bulkPatchEach(
-              updated.map((id) => ({ id, category_id: prevCategories.get(id) ?? null })),
-              (p) => ({ category_id: p.category_id })
-            )
-            setProducts((prev) =>
-              prev.map((p) =>
-                updated.includes(p.id)
-                  ? { ...p, category_id: prevCategories.get(p.id) ?? null }
-                  : p
+        if (previous) {
+          setUndoAction({
+            message: `Categoría actualizada en ${productCount(updated.length)}.`,
+            run: async () => {
+              await bulkPatchEach(
+                updated.map((id) => ({ id, category_id: previous.get(id) ?? null })),
+                (p) => ({ category_id: p.category_id })
               )
-            )
-          },
-        })
+              setProducts((prev) =>
+                prev.map((p) =>
+                  updated.includes(p.id)
+                    ? { ...p, category_id: previous.get(p.id) ?? null }
+                    : p
+                )
+              )
+            },
+          })
+        }
       }
       setBulkCategoryOpen(false)
       setSelected(new Set())
     } catch {
+      setBulkProgress(null)
       setError("Error al cambiar la categoría en lote")
     } finally {
       setBulkSaving(false)
@@ -2576,36 +2770,36 @@ function AdminProductsContent() {
     const factor = bulkPriceMode === "increase" ? 1 + pct / 100 : 1 - pct / 100
     setBulkSaving(true)
     setError(null)
+    beginBulk()
     try {
       const ids = [...selected]
       // Los seleccionados pueden estar en otras páginas: precios frescos del servidor.
-      const listRes = await fetch(`/api/admin/products/list?ids=${ids.join(",")}`)
-      const listData = await listRes.json().catch(() => ({}))
-      if (!listRes.ok) throw new Error(listData.error ?? "Error al leer precios actuales")
-      const current = new Map<number, Product>(
-        (listData.rows ?? []).map((r: Product) => [r.id, r])
-      )
+      const freshRows = await fetchProductsByIds(ids)
+      if (!freshRows) throw new Error("Error al leer precios actuales")
+      const current = new Map<number, Product>(freshRows.map((r) => [r.id, r]))
       const newPrices = new Map<number, { price: number | null; sale_price: number | null }>()
       const rows = ids
         .map((id) => current.get(id))
         .filter((p): p is Product => p !== undefined)
-      const { updated, failed } = await bulkPatchEach(rows, (p) => {
-        const price = p.price != null ? Math.round(p.price * factor * 100) / 100 : null
-        const salePrice =
-          p.sale_price != null ? Math.round(p.sale_price * factor * 100) / 100 : null
-        newPrices.set(p.id, { price, sale_price: salePrice })
-        return { price, sale_price: salePrice }
-      })
+      const result = await bulkPatchEach(
+        rows,
+        (p) => {
+          const price = p.price != null ? Math.round(p.price * factor * 100) / 100 : null
+          const salePrice =
+            p.sale_price != null ? Math.round(p.sale_price * factor * 100) / 100 : null
+          newPrices.set(p.id, { price, sale_price: salePrice })
+          return { price, sale_price: salePrice }
+        },
+        bulkRunOptions()
+      )
+      const { updated } = result
       setProducts((prev) =>
         prev.map((p) => {
           const next = updated.includes(p.id) ? newPrices.get(p.id) : undefined
           return next ? { ...p, ...next } : p
         })
       )
-      if (failed.length > 0) {
-        setError(`${productCount(failed.length)} no se pudieron actualizar`)
-      }
-      if (updated.length > 0) {
+      if (finishBulk(result) && updated.length > 0) {
         setToast(`Precios ajustados en ${productCount(updated.length)}`)
         const undoRows = updated
           .map((id) => current.get(id))
@@ -2629,6 +2823,7 @@ function AdminProductsContent() {
       setBulkPriceOpen(false)
       setSelected(new Set())
     } catch {
+      setBulkProgress(null)
       setError("Error al ajustar precios en lote")
     } finally {
       setBulkSaving(false)
@@ -2679,9 +2874,13 @@ function AdminProductsContent() {
     patchProduct(p.id, { is_visible: !p.is_visible })
   }
 
+  // La edición inline opera SIEMPRE sobre el precio base (`price`), no sobre la
+  // oferta. Antes precargaba `sale_price ?? price` y guardaba en `price`: editar
+  // un producto en oferta sobrescribía el precio base con el valor de la oferta
+  // y conservaba la oferta vieja. La oferta se edita en el formulario.
   const startEditPrice = (p: Product) => {
     setEditingPrice(p.id)
-    setDraftPrice(String(p.sale_price ?? p.price ?? ""))
+    setDraftPrice(String(p.price ?? ""))
   }
 
   const savePrice = async (p: Product) => {
@@ -2702,10 +2901,7 @@ function AdminProductsContent() {
   if (loading) {
     return (
       <>
-        <div className="flex items-center justify-center py-20 text-gray-400">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" />
-          Cargando productos...
-        </div>
+        <ProductsSkeleton />
         {confirmDialog}
       </>
     )
@@ -2840,6 +3036,13 @@ function AdminProductsContent() {
     )
   }
 
+  // Porcentaje de la acción en lote en curso. Mientras el primer bloque no ha
+  // respondido el total es 0: ahí la barra se queda en 0 y el texto ya informa.
+  const bulkPercent =
+    bulkProgress && bulkProgress.total > 0
+      ? Math.min(100, Math.round((bulkProgress.done / bulkProgress.total) * 100))
+      : 0
+
   // Filtros secundarios plegados en móvil: se revelan con el mismo botón
   // "Filtros" que los selects. En escritorio (sm+) quedan siempre visibles.
   const secondaryFilterClass = filtersOpen ? "inline-flex" : "hidden sm:inline-flex"
@@ -2897,21 +3100,105 @@ function AdminProductsContent() {
     brokenItems.length
   const stockAlertCount = (counts.lowStock ?? 0) + (counts.outStock ?? 0)
 
-  // Estilos compartidos de los chips de categoría (activo/inactivo) y de su
-  // contador, para no repetir el mismo ternario en cada chip de la fila.
-  // Mismo lenguaje visual que las píldoras de categoría del panel de WhatsApp
-  // (`/admin/whatsapp`): gris relleno sin borde en reposo y verde sólido al
-  // activo. Se conserva el contador de productos, que WhatsApp no tiene. El
-  // gris del texto es explícito (no `--text-secondary`) porque el admin es una
+  // Estilos compartidos de las píldoras de categoría (activo/inactivo) y de su
+  // contador, para no repetir el mismo ternario en cada píldora de la fila.
+  // Mismo lenguaje visual que las píldoras de categoría del catálogo que ve el
+  // cliente (`/r/[slug]`, `/admin/whatsapp`): píldora redonda, blanca con borde
+  // en reposo y verde WhatsApp (`brand-500` = #0E7A0E) sólido al activo, con el
+  // emoji de la categoría al frente. Se conserva el contador de productos, que
+  // el catálogo no tiene, porque en el admin es información de trabajo. El gris
+  // del texto es explícito (no `--text-secondary`) porque el admin es una
   // superficie clara fija y ese token se aclara en tema oscuro.
   const categoryChipClass = (active: boolean) =>
-    `inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-      active ? "bg-brand-500 text-white" : "bg-[#F5F3F0] text-gray-600 hover:bg-[#ECEAE6]"
+    `touch-target inline-flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+      active
+        ? "bg-brand-500 text-white shadow-md shadow-brand-500/20"
+        : "border border-[#E8E9EB] bg-white text-[#5C6068] hover:border-brand-500/30 hover:text-brand-600"
     }`
   const chipCountClass = (active: boolean) =>
-    `text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-      active ? "bg-white text-brand-600" : "bg-gray-200 text-gray-700"
+    `text-[11px] font-bold tabular-nums ${
+      active ? "text-white/90" : "text-[#6E737B]"
     }`
+
+  // Acciones secundarias de una fila/tarjeta. Se agrupan en un menú "⋯"
+  // para que cada fila no acumule ~10 iconos idénticos e indistinguibles.
+  const productMenuItems = (product: Product): RowActionItem[] =>
+    onlyTrash
+      ? [
+          {
+            key: "restore",
+            label: "Restaurar (queda despublicado)",
+            icon: <RotateCcw className="w-4 h-4" />,
+            onSelect: () => restoreProduct(product),
+            disabled: deletingId === product.id,
+          },
+          {
+            key: "purge",
+            label: "Borrar definitivamente",
+            icon: <Trash2 className="w-4 h-4" />,
+            destructive: true,
+            separatorBefore: true,
+            onSelect: () => purgeTrash({ productIds: [product.id], ignoreRetention: true }),
+            disabled: purging,
+          },
+        ]
+      : [
+          {
+            key: "up",
+            label: "Subir en el orden",
+            icon: <ChevronUp className="w-4 h-4" />,
+            onSelect: () => moveProduct(product, "up"),
+            disabled: reorderingId === product.id,
+          },
+          {
+            key: "down",
+            label: "Bajar en el orden",
+            icon: <ChevronDown className="w-4 h-4" />,
+            onSelect: () => moveProduct(product, "down"),
+            disabled: reorderingId === product.id,
+          },
+          {
+            key: "duplicate",
+            label: "Duplicar (nace despublicado)",
+            icon: <Copy className="w-4 h-4" />,
+            onSelect: () => duplicateProduct(product),
+            disabled: duplicatingId === product.id,
+          },
+          {
+            key: "history",
+            label: "Historial de cambios",
+            icon: <History className="w-4 h-4" />,
+            onSelect: () => openHistory(product),
+          },
+          {
+            key: "pause",
+            label: "Pausar y republicar en N días",
+            icon: <Pause className="w-4 h-4" />,
+            onSelect: () => pauseProduct(product),
+            disabled: saving.has(product.id),
+          },
+          {
+            key: "qr",
+            label: "Descargar QR",
+            icon: <QrCode className="w-4 h-4" />,
+            onSelect: () => downloadQr(product),
+          },
+          {
+            key: "store-prices",
+            label: "Precios por tienda",
+            icon: <Store className="w-4 h-4" />,
+            onSelect: () => openStorePrices(product),
+          },
+          {
+            key: "delete",
+            label: "Eliminar (va a la papelera)",
+            icon: <Trash2 className="w-4 h-4" />,
+            destructive: true,
+            separatorBefore: true,
+            onSelect: () => deleteProduct(product),
+            disabled: deletingId === product.id,
+          },
+        ]
 
   const primaryAction = headerActions.find((a) => a.variant === "primary")
   const secondaryActions = headerActions.filter((a) => a.variant !== "primary")
@@ -2934,10 +3221,13 @@ function AdminProductsContent() {
               {`. Orden: ${PRODUCT_SORT_LABEL[sort.key]}, ${productSortDirLabel(sort.dir).toLowerCase()}`}
             </span>
             {refreshing && (
-              <Loader2
-                aria-hidden="true"
-                className="inline w-3.5 h-3.5 ml-2 animate-spin text-brand-500"
-              />
+              <>
+                <Loader2
+                  aria-hidden="true"
+                  className="inline w-3.5 h-3.5 ml-2 animate-spin text-brand-500"
+                />
+                <span className="sr-only">Actualizando el listado…</span>
+              </>
             )}
           </p>
         </div>
@@ -2980,6 +3270,82 @@ function AdminProductsContent() {
         </div>
       )}
 
+      {/* Progreso de la acción en lote: barra + cancelar. Una acción sobre
+          cientos de productos puede tardar; sin esto el panel parecía colgado
+          y no había forma de pararla. */}
+      {bulkProgress && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-white text-gray-700 text-sm rounded-xl border border-gray-200">
+          <div className="flex-1 min-w-0">
+            <div className="mb-1.5 flex items-center justify-between gap-2 text-xs font-semibold text-gray-600">
+              <span>Aplicando cambios en lote…</span>
+              <span aria-hidden="true">
+                {bulkProgress.done} / {bulkProgress.total || "?"}
+              </span>
+            </div>
+            <div
+              role="progressbar"
+              aria-label="Productos actualizados"
+              aria-valuemin={0}
+              aria-valuemax={bulkProgress.total || undefined}
+              aria-valuenow={bulkProgress.total > 0 ? bulkProgress.done : undefined}
+              className="h-2 w-full overflow-hidden rounded-full bg-gray-100"
+            >
+              <div
+                className="h-full rounded-full bg-brand-600 transition-[width] duration-200 motion-reduce:transition-none"
+                style={{ width: `${bulkPercent}%` }}
+              />
+            </div>
+            <p role="status" aria-live="polite" className="sr-only">
+              {bulkProgress.done} de {bulkProgress.total || "?"} productos actualizados
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={cancelBulk}
+            disabled={bulkCancelling}
+            className="touch-target flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-gray-700 border border-gray-200 rounded-xl disabled:opacity-50"
+          >
+            <X className="w-4 h-4" />
+            {bulkCancelling ? "Cancelando…" : "Cancelar"}
+          </button>
+        </div>
+      )}
+
+      {/* Fallos parciales de la última acción en lote, agrupados por motivo:
+          antes se perdían en un toast de éxito engañoso. */}
+      {bulkFailures && (
+        <div
+          role="alert"
+          className="mb-4 px-4 py-3 bg-amber-50 text-amber-900 text-sm rounded-xl border border-amber-200"
+        >
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold">
+                {bulkFailures.count} {bulkFailures.count === 1 ? "producto" : "productos"} no se
+                pudieron actualizar
+              </p>
+              <ul className="mt-1.5 space-y-0.5">
+                {bulkFailures.reasons.map((r) => (
+                  <li key={r.reason} className="flex items-baseline gap-1.5">
+                    <span className="font-semibold tabular-nums">{r.count}×</span>
+                    <span className="min-w-0 break-words">{r.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBulkFailures(null)}
+              className="p-1 rounded-lg text-amber-600 hover:bg-amber-100"
+              aria-label="Cerrar aviso de fallos"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Aviso de esquema degradado: migraciones 00096-00099 sin aplicar */}
       {schemaDrift && (
         <div
@@ -2988,8 +3354,9 @@ function AdminProductsContent() {
         >
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>
-            Faltan migraciones por aplicar en Supabase (00096–00104). El panel funciona en modo
-            limitado (sin papelera, publicación programada ni nota interna) hasta aplicarlas con{" "}
+            Faltan migraciones por aplicar en Supabase (00096–00116). El panel funciona en modo
+            limitado (sin papelera, publicación programada, nota interna ni orden por más vendidos)
+            hasta aplicarlas con{" "}
             <code className="font-mono text-xs">npx supabase db push</code>.
           </span>
         </div>
@@ -3370,61 +3737,70 @@ function AdminProductsContent() {
         </MobileCollapsible>
       )}
 
-      {/* Chips de categoría con el conteo de productos y el emoji de la
+      {/* Píldoras de categoría con el conteo de productos y el emoji de la
           categoría: atajo de un toque para escoger categoría sin abrir el
-          `<select>` (y en móvil, donde los filtros van plegados). La fila hace
-          scroll horizontal en móvil y envuelve en escritorio. */}
+          `<select>` (y en móvil, donde los filtros van plegados). La fila es
+          sticky debajo del sub-nav para poder cambiar de categoría en
+          cualquier punto del listado, hace scroll horizontal (con máscara de
+          degradado) y su alto se publica en `--admin-catbar-h`. */}
       {categories.length > 0 && (
         <div
-          role="group"
-          aria-label="Filtros rápidos por categoría"
-          className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1 sm:mb-4 sm:flex-wrap sm:pb-0"
+          ref={categoryBarRef}
+          className="sticky z-30 top-[calc(var(--header-top-offset)+var(--admin-subnav-h))] -mx-4 mb-3 border-b border-gray-200 bg-gray-50/95 px-4 py-2 backdrop-blur-md sm:-mx-6 sm:mb-4 sm:px-6"
         >
-          <button
-            type="button"
-            onClick={() =>
-              updateFilters(() => {
-                setCategoryFilter("all")
-                setOnlyNoCategory(false)
-              })
-            }
-            aria-pressed={categoryFilter === "all" && !onlyNoCategory}
-            className={categoryChipClass(categoryFilter === "all" && !onlyNoCategory)}
+          <div
+            role="group"
+            aria-label="Filtros rápidos por categoría"
+            className="scrollbar-hide scroll-fade-x flex snap-x snap-mandatory items-center gap-2 overflow-x-auto"
           >
-            <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" />
-            Todas
-            <span className={chipCountClass(categoryFilter === "all" && !onlyNoCategory)}>
-              {counts.catalogTotal}
-            </span>
-          </button>
-          {categories.map((c) => {
-            const active = categoryFilter === String(c.id)
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() =>
-                  updateFilters(() => {
-                    setCategoryFilter(String(c.id))
-                    // Un producto sin categoría nunca cae en una categoría
-                    // concreta: elegir una limpia ese filtro para que la
-                    // combinación no deje el listado vacío.
-                    setOnlyNoCategory(false)
-                  })
-                }
-                aria-pressed={active}
-                title={`Ver solo los productos de ${c.name}`}
-                className={categoryChipClass(active)}
-              >
-                {/* Mismo icono que la tienda (`getCategoryIcon`): la categoría
-                    trae su emoji en `categories.icon` y el helper resuelve el
-                    fallback por slug y el genérico cuando falta. */}
-                <span aria-hidden="true">{getCategoryIcon(c.icon, c.slug)}</span>
-                {c.name}
-                <span className={chipCountClass(active)}>{categoryCounts[String(c.id)] ?? 0}</span>
-              </button>
-            )
-          })}
+            <button
+              type="button"
+              onClick={() =>
+                updateFilters(() => {
+                  setCategoryFilter("all")
+                  setOnlyNoCategory(false)
+                })
+              }
+              aria-pressed={categoryFilter === "all" && !onlyNoCategory}
+              className={categoryChipClass(categoryFilter === "all" && !onlyNoCategory)}
+            >
+              <LayoutGrid className="w-4 h-4" aria-hidden="true" />
+              Todas
+              <span className={chipCountClass(categoryFilter === "all" && !onlyNoCategory)}>
+                {counts.catalogTotal}
+              </span>
+            </button>
+            {categories.map((c) => {
+              const active = categoryFilter === String(c.id)
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() =>
+                    updateFilters(() => {
+                      setCategoryFilter(String(c.id))
+                      // Un producto sin categoría nunca cae en una categoría
+                      // concreta: elegir una limpia ese filtro para que la
+                      // combinación no deje el listado vacío.
+                      setOnlyNoCategory(false)
+                    })
+                  }
+                  aria-pressed={active}
+                  title={`Ver solo los productos de ${c.name}`}
+                  className={categoryChipClass(active)}
+                >
+                  {/* Mismo icono que la tienda (`getCategoryIcon`): la categoría
+                      trae su emoji en `categories.icon` y el helper resuelve el
+                      fallback por slug y el genérico cuando falta. */}
+                  <span aria-hidden="true" className="text-base leading-none">
+                    {getCategoryIcon(c.icon, c.slug)}
+                  </span>
+                  {c.name}
+                  <span className={chipCountClass(active)}>{categoryCounts[String(c.id)] ?? 0}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -3722,14 +4098,17 @@ function AdminProductsContent() {
 
       {/* Barra de acciones para la selección. Es sticky: se ancla DEBAJO del
           sub-nav de /admin (--admin-subnav-h, publicado por AdminSubNav con un
-          ResizeObserver) para poder aplicar acciones sin volver a subir. En
-          móvil es una sola fila con scroll horizontal (sin wrap) para no
+          ResizeObserver) y debajo de la fila sticky de categorías
+          (--admin-catbar-h), para poder aplicar acciones sin volver a subir.
+          Va en z-20 —por debajo del z-30 de las categorías— para pasar por
+          debajo de ellas al desplazarse.
+          En móvil es una sola fila con scroll horizontal (sin wrap) para no
           comerse la pantalla; en sm+ se conserva el wrap. */}
       {selected.size > 0 && (
         <div
           role="region"
           aria-label="Acciones masivas"
-          className="sticky z-30 top-[calc(var(--header-top-offset)+var(--admin-subnav-h))] mb-4 flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-1.5 shadow-sm sm:px-4 sm:py-3"
+          className="sticky z-20 top-[calc(var(--header-top-offset)+var(--admin-subnav-h)+var(--admin-catbar-h))] mb-4 flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-1.5 shadow-sm sm:px-4 sm:py-3"
         >
           <span className="shrink-0 text-sm font-semibold text-brand-900">
             {selected.size} seleccionado{selected.size === 1 ? "" : "s"}
@@ -3926,14 +4305,14 @@ function AdminProductsContent() {
       )}
 
       {/* Products: tabla o grid. `aria-busy` cubre el refetch del listado
-          (filtros, orden, página): el contenido se atenúa con una opacidad
-          reducida mientras llega la respuesta. */}
+          (filtros, orden, página). Antes se atenuaba todo el bloque con
+          `opacity-60`, lo que bajaba el contraste del texto ya renderizado; ahora
+          la señal de "actualizando" es el spinner de la cabecera (junto al
+          conteo, en la región viva) y el anuncio `sr-only`, sin tocar el texto. */}
       {view === "table" ? (
       <div
         aria-busy={refreshing}
-        className={`bg-white rounded-xl border border-gray-200 overflow-hidden transition-opacity ${
-          refreshing ? "opacity-60" : ""
-        }`}
+        className="bg-white rounded-xl border border-gray-200 overflow-hidden"
       >
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -4167,12 +4546,16 @@ function AdminProductsContent() {
                     <td className="px-5 py-3">
                       {editingPrice === product.id ? (
                         <div className="flex items-center gap-1">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                            Precio
+                          </span>
                           <input
                             type="number"
                             min="0"
                             step="0.01"
                             value={draftPrice}
                             onChange={(e) => setDraftPrice(e.target.value)}
+                            aria-label={`Precio base de ${product.name}`}
                             className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-brand-500"
                           />
                           <button
@@ -4193,7 +4576,8 @@ function AdminProductsContent() {
                         <button
                           onClick={() => startEditPrice(product)}
                           className="group flex items-center gap-1.5"
-                          title="Editar precio"
+                          title="Editar precio base (la oferta se edita en el formulario)"
+                          aria-label={`Editar precio base de ${product.name}`}
                         >
                           {resolveSalePrice(product) != null ? (
                             <div className="flex items-center">
@@ -4404,59 +4788,12 @@ function AdminProductsContent() {
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => moveProduct(product, "up")}
-                          disabled={reorderingId === product.id}
-                          title="Subir en el orden del catálogo"
-                          aria-label={`Subir ${product.name} en el orden`}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors disabled:opacity-50"
-                        >
-                          {reorderingId === product.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <ChevronUp className="w-4 h-4" />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moveProduct(product, "down")}
-                          disabled={reorderingId === product.id}
-                          title="Bajar en el orden del catálogo"
-                          aria-label={`Bajar ${product.name} en el orden`}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors disabled:opacity-50"
-                        >
-                          <ChevronDown className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => setProductForm(product)}
                           title={`Editar ${product.name}`}
                           aria-label={`Editar ${product.name}`}
                           className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                         >
                           <SquarePen className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => duplicateProduct(product)}
-                          disabled={duplicatingId === product.id}
-                          title={`Duplicar ${product.name} (nace despublicado)`}
-                          aria-label={`Duplicar ${product.name}`}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors disabled:opacity-50"
-                        >
-                          {duplicatingId === product.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openHistory(product)}
-                          title={`Historial de cambios de ${product.name}`}
-                          aria-label={`Historial de ${product.name}`}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                        >
-                          <History className="w-4 h-4" />
                         </button>
                         {cities[0] && (
                           <Link
@@ -4469,79 +4806,10 @@ function AdminProductsContent() {
                             <ExternalLink className="w-4 h-4" />
                           </Link>
                         )}
-                        {onlyTrash ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => restoreProduct(product)}
-                              disabled={deletingId === product.id}
-                              title={`Restaurar ${product.name} (queda despublicado)`}
-                              aria-label={`Restaurar ${product.name}`}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
-                            >
-                              {deletingId === product.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <RotateCcw className="w-4 h-4" />
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => purgeTrash({ productIds: [product.id], ignoreRetention: true })}
-                              disabled={purging}
-                              title={`Borrar ${product.name} definitivamente`}
-                              aria-label={`Borrar ${product.name} definitivamente`}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => pauseProduct(product)}
-                              disabled={saving.has(product.id)}
-                              title={`Pausar ${product.name} y republicar en N días`}
-                              aria-label={`Pausar ${product.name}`}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors disabled:opacity-50"
-                            >
-                              <span className="text-sm leading-none">⏸</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => downloadQr(product)}
-                              title={`Descargar QR de ${product.name}`}
-                              aria-label={`Descargar QR de ${product.name}`}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-                            >
-                              <QrCode className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openStorePrices(product)}
-                              title={`Precios por tienda de ${product.name}`}
-                              aria-label={`Precios por tienda de ${product.name}`}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                            >
-                              <Store className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteProduct(product)}
-                              disabled={deletingId === product.id}
-                              title={`Eliminar ${product.name}`}
-                              aria-label={`Eliminar ${product.name}`}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                            >
-                              {deletingId === product.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-4 h-4" />
-                              )}
-                            </button>
-                          </>
-                        )}
+                        <RowActionMenu
+                          label={`Más acciones para ${product.name}`}
+                          items={productMenuItems(product)}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -4555,9 +4823,7 @@ function AdminProductsContent() {
       ) : (
         <div
           aria-busy={refreshing}
-          className={`bg-white rounded-xl border border-gray-200 p-4 transition-opacity ${
-            refreshing ? "opacity-60" : ""
-          }`}
+          className="bg-white rounded-xl border border-gray-200 p-4"
         >
           {total === 0 && !refreshing ? (
             emptyListState
@@ -4675,32 +4941,9 @@ function AdminProductsContent() {
                           onClick={() => setProductForm(product)}
                           title={`Editar ${product.name}`}
                           aria-label={`Editar ${product.name}`}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                          className="touch-target p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                         >
                           <SquarePen className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => duplicateProduct(product)}
-                          disabled={duplicatingId === product.id}
-                          title={`Duplicar ${product.name} (nace despublicado)`}
-                          aria-label={`Duplicar ${product.name}`}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors disabled:opacity-50"
-                        >
-                          {duplicatingId === product.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openHistory(product)}
-                          title={`Historial de ${product.name}`}
-                          aria-label={`Historial de ${product.name}`}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                        >
-                          <History className="w-4 h-4" />
                         </button>
                         {cities[0] && (
                           <Link
@@ -4708,54 +4951,15 @@ function AdminProductsContent() {
                             target="_blank"
                             title={`Ver ${product.name} en la tienda`}
                             aria-label={`Ver ${product.name} en la tienda`}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                            className="touch-target p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                           >
                             <ExternalLink className="w-4 h-4" />
                           </Link>
                         )}
-                        {onlyTrash ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => restoreProduct(product)}
-                              disabled={deletingId === product.id}
-                              title={`Restaurar ${product.name}`}
-                              aria-label={`Restaurar ${product.name}`}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
-                            >
-                              {deletingId === product.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <RotateCcw className="w-4 h-4" />
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => purgeTrash({ productIds: [product.id], ignoreRetention: true })}
-                              disabled={purging}
-                              title={`Borrar ${product.name} definitivamente`}
-                              aria-label={`Borrar ${product.name} definitivamente`}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => deleteProduct(product)}
-                            disabled={deletingId === product.id}
-                            title={`Eliminar ${product.name}`}
-                            aria-label={`Eliminar ${product.name}`}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                          >
-                            {deletingId === product.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
-                          </button>
-                        )}
+                        <RowActionMenu
+                          label={`Más acciones para ${product.name}`}
+                          items={productMenuItems(product)}
+                        />
                       </div>
                     </div>
                   </div>

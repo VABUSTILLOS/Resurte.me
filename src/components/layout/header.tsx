@@ -146,16 +146,18 @@ export function Header() {
         transform: headerHidden ? "translateY(-100%)" : undefined,
       }}
     >
-      <div className="max-w-7xl mx-auto px-3 sm:px-6">
-        <div className="relative flex items-center justify-between h-16 gap-2 sm:gap-3">
-          {/* Logo — Erewhon-style with refined type */}
+      <div className="max-w-7xl mx-auto px-2 min-[400px]:px-3 sm:px-6">
+        <div className="relative flex items-center justify-between h-16 gap-1 min-[400px]:gap-2 sm:gap-3">
+          {/* Logo — Erewhon-style with refined type. El tamaño es fluido
+              (clamp) porque el header móvil lleva 5 accesos táctiles de 44px
+              (40px ≤340px) y un logo fijo desbordaba en ≤375px. */}
           <Link
             href="/"
             aria-label="Resurte — ir al inicio"
-            className="flex items-center gap-1.5 shrink-0 self-stretch px-2 -ml-2 select-none"
+            className="flex items-center gap-1.5 shrink-0 self-stretch px-1.5 -ml-1.5 min-[400px]:px-2 min-[400px]:-ml-2 select-none"
           >
-            <span className="text-base min-[360px]:text-lg min-[400px]:text-[1.25rem] md:text-[1.35rem] font-bold text-[#0E7A0E] tracking-tight">Resurte</span>
-            <span className="text-base min-[360px]:text-lg min-[400px]:text-[1.25rem] md:text-[1.35rem] font-bold text-[#1a1a1a] tracking-tight">.me</span>
+            <span className="text-[clamp(0.8125rem,4vw,1.25rem)] md:text-[1.35rem] font-bold text-[#0E7A0E] tracking-tight">Resurte</span>
+            <span className="text-[clamp(0.8125rem,4vw,1.25rem)] md:text-[1.35rem] font-bold text-[#1a1a1a] tracking-tight">.me</span>
           </Link>
 
           {/* Recompensas badge — shown when user has balance */}
@@ -198,7 +200,7 @@ export function Header() {
           )}
 
           {/* Right actions */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-0.5 min-[400px]:gap-1.5 sm:gap-2 shrink-0">
             {/* Desktop: acceso directo al catálogo por categoría (N11) */}
             {city && (
               <CategoryMegaMenu
@@ -207,20 +209,21 @@ export function Header() {
               />
             )}
 
-            {/* Mobile: acceso persistente a "todos los productos" de la tienda */}
+            {/* Mobile: acceso persistente a "todos los productos" de la tienda.
+                Solo icono: la etiqueta de texto ensanchaba el bloque y desbordaba
+                el header en ≤375px. El aria-label mantiene el nombre accesible. */}
             {city && (
               <Link
                 href={`/${city.slug}/buscar`}
                 aria-label="Ver todos los productos"
                 aria-current={pathname === `/${city.slug}/buscar` ? "page" : undefined}
-                className={`sm:hidden flex items-center gap-1 p-2 min-[360px]:pr-2.5 rounded-[10px] transition-colors touch-target ${
+                className={`sm:hidden flex items-center justify-center p-2 rounded-[10px] transition-colors touch-target ${
                   pathname === `/${city.slug}/buscar`
                     ? "bg-[#0E7A0E]/10 text-[#0E7A0E]"
                     : "hover:bg-[#F7F5F0] text-[#343538]"
                 }`}
               >
                 <LayoutGrid className="w-5 h-5" aria-hidden="true" />
-                <span className="hidden min-[360px]:inline text-xs font-semibold">Todo</span>
               </Link>
             )}
 

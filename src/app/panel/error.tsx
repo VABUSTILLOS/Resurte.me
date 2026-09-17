@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { logger } from "@/lib/logger"
+import { reportClientError } from "@/lib/report-client-error"
 
 export default function PanelError({
   error,
@@ -12,6 +13,7 @@ export default function PanelError({
 }) {
   useEffect(() => {
     logger.error("panel.error_boundary", error, { digest: error.digest })
+    reportClientError(error, { context: "panel.error_boundary" })
   }, [error])
 
   return (

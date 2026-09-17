@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { logger } from "@/lib/logger"
+import { reportClientError } from "@/lib/report-client-error"
 
 /**
  * Error boundary de /recompensas: la app de recompensas corre casi toda en
@@ -17,6 +18,7 @@ export default function RecompensasError({
 }) {
   useEffect(() => {
     logger.error("Error en /recompensas", error)
+    reportClientError(error, { context: "recompensas.error_boundary" })
   }, [error])
 
   return (

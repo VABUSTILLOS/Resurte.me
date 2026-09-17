@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, type Dispatch, type SetStateAction } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { isSupabaseConfigured } from "@/lib/supabase/env"
 import { AnalyticsEvents } from "@/lib/analytics"
 import type { Address, City, PaymentMethod, CartItem, RepurchaseCouponInfo } from "@/types"
 import {
@@ -10,9 +11,19 @@ import {
   getLastAddress,
   saveLastAddress,
   claimGuestAddresses,
+  ensureGuestToken,
 } from "@/lib/guest-address"
+import {
+  addressesMatch,
+  pickPreferredAddress,
+  toAddressForm,
+} from "@/lib/address-book"
 import { getStoredUtm } from "@/lib/utm"
-import type { AddressForm, ScheduleForm } from "@/components/checkout/checkout-shared"
+import {
+  DEFAULT_ADDRESS_FORM,
+  type AddressForm,
+  type ScheduleForm,
+} from "@/components/checkout/checkout-shared"
 import type { SelectedBump } from "@/components/checkout/BumpCards"
 
 /**
@@ -28,10 +39,16 @@ import type { SelectedBump } from "@/components/checkout/BumpCards"
  * Diferencias intencionales conservadas:
  *  - `saveDefault`: solo el drawer envía save_default (checkbox "predeterminada").
  *  - `saveCard`: solo el drawer envía save_card en create-intent (consentimiento).
- *  - `autoSelectSavedAddress`: el drawer auto-selecciona + autocompleta al cargar.
+ *  - `autoSelectSavedAddress`: ambos flujos auto-seleccionan + autocompletan al
+ *    cargar (antes solo el drawer: la página obligaba a reescribir la dirección).
  *  - `onAfterOrderCreated`: la página limpia los bumps y refresca direcciones.
  *  - `onPaid`: el drawer dispara ORDER_PAID_EVENT (UpsellModal) y navega; la
  *    página navega directo a pedido-confirmado.
+ *
+ * Libro de direcciones (migración 00117): la lista de direcciones guardadas y
+ * la preselección funcionan igual con y sin sesión. Con sesión se leen de
+ * `addresses` por RLS; sin sesión, del endpoint anónimo /api/addresses/guest
+ * (el `guest_token` del navegador es la credencial).
  */
 
 export type CreatedOrder = {
@@ -86,6 +103,47 @@ export interface CheckoutOrderOptions {
   onPaid: (info: CheckoutPaidInfo) => void
 }
 
+/** Direcciones guardadas del usuario con sesión (RLS: solo las suyas). */
+async function fetchOwnAddresses(): Promise<Address[]> {
+  const supabase = createClient()
+  if (!supabase) return []
+
+  // Orden preferido: sin papelera, la predeterminada primero y, entre las
+  // demás, la usada más recientemente (`last_used_at`, que el servidor toca en
+  // cada POST /api/orders). Si el esquema desplegado aún no tiene `deleted_at`
+  // / `is_default` / `last_used_at` (00117/00050 pendientes), PostgREST
+  // devuelve error y se reintenta con el orden clásico: la preselección se
+  // recalcula igual en el cliente con `pickPreferredAddress`.
+  const preferred = await supabase
+    .from("addresses")
+    .select("*")
+    .is("deleted_at", null)
+    .order("is_default", { ascending: false })
+    .order("last_used_at", { ascending: false })
+  if (!preferred.error) return (preferred.data ?? []) as Address[]
+
+  const legacy = await supabase
+    .from("addresses")
+    .select("*")
+    .order("created_at", { ascending: false })
+  if (legacy.error) return []
+  return ((legacy.data ?? []) as Address[]).filter((a) => !a.deleted_at)
+}
+
+/** Direcciones guardadas del navegador sin sesión (por `guest_token`). */
+async function fetchGuestAddresses(): Promise<Address[]> {
+  const token = ensureGuestToken()
+  if (!token) return []
+  try {
+    const res = await fetch(`/api/addresses/guest?guest_token=${encodeURIComponent(token)}`)
+    if (!res.ok) return []
+    const data = (await res.json()) as { addresses?: Address[] }
+    return Array.isArray(data.addresses) ? data.addresses : []
+  } catch {
+    return []
+  }
+}
+
 export function useCheckoutOrder(options: CheckoutOrderOptions) {
   const {
     city,
@@ -122,7 +180,13 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
   }, [onPaid])
 
   // ── Estado de sesión + detección de tarjeta guardada ──
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(() =>
+    // `null` = sesión aún sin resolver. Sin Supabase configurado no existe
+    // sesión posible (createClient() devuelve null), así que se arranca como
+    // invitado para que el libro de direcciones anónimo —que vive en
+    // /api/addresses/guest, no en el cliente de auth— cargue igual.
+    isSupabaseConfigured() ? null : false
+  )
   const [savedCard, setSavedCard] = useState<{
     hasSavedCard: boolean
     last4?: string
@@ -131,6 +195,7 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
   const [loadingSavedAddresses, setLoadingSavedAddresses] = useState(false)
+  const [deletingAddressId, setDeletingAddressId] = useState<number | null>(null)
 
   // ── Estado del flujo de pago (compartido por ambos flujos) ──
   const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null)
@@ -148,43 +213,56 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
   // ── Sesión + precarga de dirección anónima ──
   useEffect(() => {
     let cancelled = false
+
+    // Datos que la DIRECCIÓN no guarda (la dirección la resuelve
+    // refreshSavedAddresses con el libro del servidor y localStorage como
+    // respaldo): teléfono y email del último checkout.
+    const prefillGuestContact = () => {
+      const last = getLastAddress()
+      if (!last) return
+      setPhone((prev) => last.phone ?? prev)
+      setEmail((prev) => (prev || last.email) ?? "")
+    }
+
     const supabase = createClient()
-    if (!supabase) return
-    supabase.auth.getUser().then(({ data }) => {
-      if (cancelled) return
-      const user = data.user
-      const loggedIn = !!user
-      setIsLoggedIn(loggedIn)
-      if (!loggedIn) {
-        const last = getLastAddress()
-        if (last) {
-          setAddress((prev) => ({
-            ...prev,
-            label: last.label ?? prev.label,
-            street: last.street ?? prev.street,
-            number: last.number ?? prev.number,
-            interior: last.interior ?? prev.interior,
-            neighborhood: last.neighborhood ?? prev.neighborhood,
-            zip_code: last.zip_code ?? prev.zip_code,
-            references: last.references ?? prev.references,
-          }))
-          setPhone((prev) => last.phone ?? prev)
-          setEmail((prev) => (prev || last.email) ?? "")
+    if (!supabase) {
+      // Sin Supabase configurado no hay sesión que resolver (el estado inicial
+      // ya es "invitado"): solo se precargan teléfono y email.
+      prefillGuestContact()
+      return
+    }
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        if (cancelled) return
+        const user = data.user
+        const loggedIn = !!user
+        setIsLoggedIn(loggedIn)
+        if (!loggedIn) {
+          prefillGuestContact()
+        } else {
+          // Logueado: pre-llenar email del auth y teléfono desde profiles.phone.
+          setEmail((prev) => (prev ? prev : user.email ?? ""))
+          void supabase
+            .from("profiles")
+            .select("phone")
+            .eq("id", user.id)
+            .maybeSingle()
+            .then(({ data: profile }) => {
+              if (cancelled || !profile?.phone) return
+              setPhone((prev) => (prev ? prev : profile.phone))
+            })
         }
-      } else {
-        // Logueado: pre-llenar email del auth y teléfono desde profiles.phone.
-        setEmail((prev) => (prev ? prev : user.email ?? ""))
-        void supabase
-          .from("profiles")
-          .select("phone")
-          .eq("id", user.id)
-          .maybeSingle()
-          .then(({ data: profile }) => {
-            if (cancelled || !profile?.phone) return
-            setPhone((prev) => (prev ? prev : profile.phone))
-          })
-      }
-    })
+      })
+      .catch(() => {
+        // La sesión no se pudo resolver (red o servidor de auth caído): se opera
+        // como invitado en lugar de quedarse en `null`, que dejaba el checkout
+        // sin libro de direcciones. El servidor manda: con cookie válida el
+        // pedido se vincula al usuario igual (ver src/app/api/orders/route.ts).
+        if (cancelled) return
+        setIsLoggedIn(false)
+        prefillGuestContact()
+      })
     return () => {
       cancelled = true
     }
@@ -214,48 +292,29 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
     }
   }, [isLoggedIn])
 
-  // ── Carga de direcciones guardadas (reutilizable tras crear una orden) ──
+  // ── Carga del libro de direcciones (reutilizable tras crear una orden) ──
   const refreshSavedAddresses = useCallback(
     async (opts?: { autoSelect?: boolean }) => {
-      if (isLoggedIn !== true) return
-      const supabase = createClient()
-      if (!supabase) return
+      // Con la sesión aún sin resolver no se consulta: el efecto vuelve a
+      // ejecutarse cuando `isLoggedIn` ya es true/false.
+      if (isLoggedIn === null) return
       setLoadingSavedAddresses(true)
       try {
-        // Orden preferido: predeterminada primero. Si el esquema desplegado
-        // aún no tiene `is_default` (migración 00050), PostgREST devuelve
-        // error y se reintenta con el orden clásico.
-        const preferred = await supabase
-          .from("addresses")
-          .select("*")
-          .order("is_default", { ascending: false })
-          .order("created_at", { ascending: false })
-        const result =
-          preferred.data && !preferred.error
-            ? preferred
-            : await supabase
-                .from("addresses")
-                .select("*")
-                .order("created_at", { ascending: false })
-        const { data, error } = result
-        if (!error && data) {
-          const rows = data as Address[]
-          setSavedAddresses(rows)
-          if (opts?.autoSelect) {
-            const preferredAddr = rows.find((a) => a.is_default) ?? rows[0]
-            setSelectedAddressId(preferredAddr?.id ?? null)
-            if (preferredAddr) {
-              setAddress({
-                label: preferredAddr.label,
-                street: preferredAddr.street,
-                number: preferredAddr.number,
-                interior: preferredAddr.interior ?? "",
-                neighborhood: preferredAddr.neighborhood,
-                zip_code: preferredAddr.zip_code,
-                references: preferredAddr.references ?? "",
-              })
-            }
-          }
+        const rows = isLoggedIn ? await fetchOwnAddresses() : await fetchGuestAddresses()
+        setSavedAddresses(rows)
+        if (!opts?.autoSelect) return
+
+        const preferredAddr = pickPreferredAddress(rows)
+        if (preferredAddr) {
+          setSelectedAddressId(preferredAddr.id)
+          setAddress(toAddressForm(preferredAddr))
+        } else {
+          setSelectedAddressId(null)
+          // Sin direcciones en el servidor: se conserva lo que el usuario ya
+          // haya escrito y, si el formulario está vacío, se precarga el
+          // respaldo de localStorage (navegadores sin libro aún).
+          const last = getLastAddress()
+          if (last) setAddress((prev) => (prev.street ? prev : toAddressForm(last)))
         }
       } finally {
         setLoadingSavedAddresses(false)
@@ -264,12 +323,11 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
     [isLoggedIn, setAddress]
   )
 
-  // ── Al iniciar sesión: reclama direcciones anónimas y carga las guardadas ──
+  // ── Al resolver la sesión: reclama direcciones anónimas (si hay cuenta) y
+  //    carga el libro de direcciones (invitado o usuario) ──
   useEffect(() => {
-    if (isLoggedIn !== true) return
-    const supabase = createClient()
-    if (!supabase) return
-    claimGuestAddresses()
+    if (isLoggedIn === null) return
+    if (isLoggedIn) claimGuestAddresses()
     // Se difiere para no disparar setState de forma síncrona dentro del efecto
     // (evita renders en cascada; ver react-hooks/set-state-in-effect).
     const timeout = setTimeout(() => {
@@ -283,13 +341,59 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
     savedAddresses.find((a) => a.id === selectedAddressId) ?? null
 
   const selectedAddressUnedited =
-    selectedSavedAddress !== null &&
-    selectedSavedAddress.street === address.street &&
-    selectedSavedAddress.number === address.number &&
-    (selectedSavedAddress.interior ?? "") === address.interior &&
-    selectedSavedAddress.neighborhood === address.neighborhood &&
-    selectedSavedAddress.zip_code === address.zip_code &&
-    (selectedSavedAddress.references ?? "") === address.references
+    selectedSavedAddress !== null && addressesMatch(selectedSavedAddress, address)
+
+  // ── Eliminar una dirección guardada (papelera: los pedidos históricos la
+  //    siguen referenciando, ver migración 00117) ──
+  const deleteSavedAddress = useCallback(
+    async (id: number): Promise<boolean> => {
+      setDeletingAddressId(id)
+      try {
+        if (isLoggedIn === true) {
+          const supabase = createClient()
+          if (!supabase) return false
+          const { error } = await supabase
+            .from("addresses")
+            .update({ deleted_at: new Date().toISOString() })
+            .eq("id", id)
+          if (error) {
+            setCheckoutError("No se pudo eliminar la dirección. Intenta de nuevo.")
+            return false
+          }
+        } else {
+          const token = getGuestToken()
+          if (!token) return false
+          const res = await fetch("/api/addresses/guest", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ guest_token: token, address_id: id }),
+          })
+          if (!res.ok) {
+            setCheckoutError("No se pudo eliminar la dirección. Intenta de nuevo.")
+            return false
+          }
+        }
+
+        const remaining = savedAddresses.filter((a) => a.id !== id)
+        setSavedAddresses(remaining)
+        if (selectedAddressId === id) {
+          // La dirección borrada era la seleccionada: se limpia la selección
+          // y, si el formulario aún la mostraba sin editar, el formulario.
+          setSelectedAddressId(null)
+          if (selectedSavedAddress && addressesMatch(selectedSavedAddress, address)) {
+            setAddress(DEFAULT_ADDRESS_FORM)
+          }
+        }
+        return true
+      } catch {
+        setCheckoutError("No se pudo eliminar la dirección. Intenta de nuevo.")
+        return false
+      } finally {
+        setDeletingAddressId(null)
+      }
+    },
+    [isLoggedIn, savedAddresses, selectedAddressId, selectedSavedAddress, address, setAddress]
+  )
 
   // ── Captura de lead onBlur (fire-and-forget, fail-open) ──
   const captureLead = useCallback(
@@ -654,6 +758,8 @@ export function useCheckoutOrder(options: CheckoutOrderOptions) {
     selectedAddressUnedited,
     loadingSavedAddresses,
     refreshSavedAddresses,
+    deleteSavedAddress,
+    deletingAddressId,
     captureLead,
     createOrder,
     initializeCardPayment,

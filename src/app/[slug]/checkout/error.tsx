@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { logger } from "@/lib/logger"
+import { reportClientError } from "@/lib/report-client-error"
 
 export default function CheckoutError({
   error,
@@ -12,6 +13,7 @@ export default function CheckoutError({
 }) {
   useEffect(() => {
     logger.error("checkout.error_boundary", error, { digest: error.digest })
+    reportClientError(error, { context: "checkout.error_boundary" })
   }, [error])
 
   return (

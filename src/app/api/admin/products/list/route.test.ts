@@ -104,14 +104,15 @@ function mockClient() {
 
 /**
  * Cliente falso en el que la vista `products_with_sales` (00116) todavía no
- * existe: PostgREST responde `42P01` al consultarla y el listado debe
+ * existe: PostgREST responde `PGRST205` al consultarla (comprobado contra el
+ * proyecto real mientras la migración está pendiente) y el listado debe
  * reintentar sin el orden por ventas en vez de devolver 500.
  */
 function mockClientWithoutSalesView() {
   const { spies, makeChain } = fakeBuilder()
   const missingView = {
-    code: "42P01",
-    message: 'relation "public.products_with_sales" does not exist',
+    code: "PGRST205",
+    message: "Could not find the table 'public.products_with_sales' in the schema cache",
   }
   const from = vi.fn((table: string) =>
     table === "products_with_sales" ? makeChain(ROWS, missingView) : makeChain(ROWS)
