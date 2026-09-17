@@ -163,6 +163,22 @@
   debajo (`hidden md:table-cell`, pares `th`/`td`). Todo control móvil nuevo
   lleva `touch-target` (44px).
 
+- Productos — barra de acciones masivas (sticky): la barra que aparece con la
+  selección se ancla **debajo del sub-nav** de `/admin` con
+  `sticky z-30 top-[calc(var(--header-top-offset)+var(--admin-subnav-h))]`; el
+  sub-nav es `z-40` y el header global `z-50`, así que `z-30` la deja por debajo
+  de ambos y de los modales (`z-50`) de la página. `--admin-subnav-h` lo publica
+  `AdminSubNav` (`sub-nav.tsx`) midiendo su propio `offsetHeight` con un
+  `ResizeObserver` y escribiéndolo en `document.documentElement` (mismo patrón
+  que `--toast-stack-h` de `toast.tsx`); el default de la var en `globals.css`
+  (49px) cubre el primer render sin JS. No hardcodear el offset del sub-nav:
+  cambiar el sub-nav (fuente, badges, `AdminNotificationCenter`) o el header
+  auto-oculto (`body.header-hidden` ⇒ `--header-top-offset: 0px`) debe seguir
+  funcionando sin tocar la barra. En móvil la barra es **una sola fila con
+  scroll horizontal** (`overflow-x-auto`, sin wrap) con el contador
+  `shrink-0`, padding vertical reducido (`py-1.5`) y `touch-target` en cada
+  acción; en `sm+` recupera el wrap y el padding originales.
+
 - Productos — filtro por categoría: conviven **dos controles** y ambos deben
   mantenerse sincronizados. (1) El `<select>` "Todas las categorías" de la barra
   de filtros plegable (`aria-label="Filtrar por categoría"`), pedido por el
@@ -242,6 +258,15 @@ Móvil de `/admin/productos`: a 375×812 y 320×568 el primer producto queda por
 encima del pliegue, sin scroll horizontal, con la búsqueda visible y "Nuevo
 producto" + "Más" alcanzables (44px); a 768/1440 se conserva la tabla con todas
 sus columnas y las 7 acciones en la barra.
+
+Barra de acciones masivas sticky de `/admin/productos` (requiere sesión admin +
+productos): seleccionar 2+ productos y bajar ~3 pantallas; la barra debe seguir
+visible pegada justo debajo del sub-nav (sin taparlo ni tapar el header) y sus
+acciones deben seguir funcionando desde ahí (abrir "Categoría…" y comprobar que
+el modal queda por encima). A 375×812 la barra es una sola fila que desliza en
+horizontal, con el contador visible y targets de 44px; a 768/1440 conserva el
+wrap. Repetir con el header global oculto (scroll hacia abajo) para confirmar
+que la barra sube con el sub-nav.
 
 Acciones masivas de pedidos (requiere sesión admin + datos): en `/admin/pedidos`
 marcar un subconjunto y comprobar que el checkbox del encabezado queda

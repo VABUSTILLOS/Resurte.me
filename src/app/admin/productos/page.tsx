@@ -60,6 +60,7 @@ import { auditDiffRows, auditExtraFields, priceSeries } from "@/lib/audit-diff"
 import { resolveSalePrice, saleState } from "@/lib/sale-window"
 import { TRASH_RETENTION_DAYS, purgeLabel } from "@/lib/trash"
 import { SEO_DESCRIPTION_MAX, SEO_TITLE_MAX, chunkIds, seoBatchSummary } from "@/lib/seo-batch"
+import { MAX_BULK_IDS, type BulkFailure } from "@/lib/product-bulk"
 import { type SalesReportInsights } from "@/lib/sales-report"
 import { deriveStockStatus } from "@/lib/stock"
 import { createClient } from "@/lib/supabase/client"
@@ -190,6 +191,80 @@ function buildMap(rows: AvailabilityRow[]): AvailabilityMap {
     map.set(row.product_id, inner)
   }
   return map
+}
+
+type BulkResult = { updated: number[]; failed: BulkFailure[] }
+
+/**
+ * Trocea por el tope del endpoint y devuelve qué ids se guardaron y cuáles no.
+ * Los errores de red o HTTP se traducen a fallos **por id** en vez de lanzar:
+ * en una acción sobre 300 productos, abortar por un fallo parcial es peor que
+ * reportarlo.
+ */
+async function postBulk(
+  ids: number[],
+  payload: { patch?: Record<string, unknown>; patches?: Record<string, Record<string, unknown>> }
+): Promise<BulkResult> {
+  const updated: number[] = []
+  const failed: BulkFailure[] = []
+  if (ids.length === 0) return { updated, failed }
+  for (const idsChunk of chunkIds(ids, MAX_BULK_IDS)) {
+    const body: Record<string, unknown> = { ids: idsChunk }
+    const patches = payload.patches
+    if (patches) {
+      body.patches = Object.fromEntries(idsChunk.map((id) => [String(id), patches[String(id)]]))
+    } else {
+      body.patch = payload.patch
+    }
+    try {
+      const res = await fetch("/api/admin/products/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const reason: string = data.error ?? "Error al actualizar en lote"
+        for (const id of idsChunk) failed.push({ id, reason })
+        continue
+      }
+      if (Array.isArray(data.updated)) updated.push(...data.updated)
+      if (Array.isArray(data.failed)) failed.push(...data.failed)
+    } catch {
+      for (const id of idsChunk) failed.push({ id, reason: "Sin conexión" })
+    }
+  }
+  return { updated, failed }
+}
+
+/** El mismo cambio para todos: una sola petición por bloque de ids. */
+function bulkPatch(ids: number[], patch: Record<string, unknown>): Promise<BulkResult> {
+  return postBulk(ids, { patch })
+}
+
+/**
+ * Un cambio calculado por producto (subir precios un %, sumar una etiqueta a
+ * las que ya tiene). Devolver `null` omite ese producto sin reportarlo como
+ * fallo: el llamador decide si lo menciona.
+ */
+function bulkPatchEach<T extends { id: number }>(
+  products: T[],
+  patchFor: (product: T) => Record<string, unknown> | null
+): Promise<BulkResult> {
+  const ids: number[] = []
+  const patches: Record<string, Record<string, unknown>> = {}
+  for (const product of products) {
+    const patch = patchFor(product)
+    if (!patch) continue
+    ids.push(product.id)
+    patches[String(product.id)] = patch
+  }
+  return postBulk(ids, { patches })
+}
+
+/** "N productos" con la concordancia correcta en singular. */
+function productCount(n: number): string {
+  return `${n} producto${n === 1 ? "" : "s"}`
 }
 
 /**
@@ -956,25 +1031,14 @@ function AdminProductsContent() {
 
   /** Aplica is_visible a un conjunto de ids; devuelve los que se guardaron. */
   async function applyVisibilityToIds(ids: number[], isVisible: boolean): Promise<number[]> {
-    const results = await Promise.all(
-      ids.map(async (productId) => {
-        const res = await fetch("/api/admin/products/update", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productId, is_visible: isVisible }),
-        })
-        return res.ok
-      })
-    )
-    const succeededIds = ids.filter((_, i) => results[i])
+    const { updated, failed } = await bulkPatch(ids, { is_visible: isVisible })
     setProducts((prev) =>
-      prev.map((p) => (succeededIds.includes(p.id) ? { ...p, is_visible: isVisible } : p))
+      prev.map((p) => (updated.includes(p.id) ? { ...p, is_visible: isVisible } : p))
     )
-    const failed = results.filter((ok) => !ok).length
-    if (failed > 0) {
-      setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
+    if (failed.length > 0) {
+      setError(`${productCount(failed.length)} no se pudieron actualizar`)
     }
-    return succeededIds
+    return updated
   }
 
   /** Muestra/oculta en el catálogo de WhatsApp toda la selección. */
@@ -983,29 +1047,15 @@ function AdminProductsContent() {
     setBulkSaving(true)
     setError(null)
     try {
-      const ids = [...selected]
-      const results = await Promise.all(
-        ids.map(async (productId) => {
-          const res = await fetch("/api/admin/products/update", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, show_in_whatsapp: show }),
-          })
-          return res.ok
-        })
-      )
-      const succeededIds = ids.filter((_, i) => results[i])
+      const { updated, failed } = await bulkPatch([...selected], { show_in_whatsapp: show })
       setProducts((prev) =>
-        prev.map((p) =>
-          succeededIds.includes(p.id) ? { ...p, show_in_whatsapp: show } : p
-        )
+        prev.map((p) => (updated.includes(p.id) ? { ...p, show_in_whatsapp: show } : p))
       )
-      const failed = results.filter((ok) => !ok).length
-      if (failed > 0) {
-        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
+      if (failed.length > 0) {
+        setError(`${productCount(failed.length)} no se pudieron actualizar`)
       }
-      if (succeededIds.length > 0) {
-        setToast(`${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"} actualizado${succeededIds.length === 1 ? "" : "s"} en WhatsApp`)
+      if (updated.length > 0) {
+        setToast(`${productCount(updated.length)} actualizado${updated.length === 1 ? "" : "s"} en WhatsApp`)
       }
       setSelected(new Set())
     } catch {
@@ -2066,92 +2116,68 @@ function AdminProductsContent() {
         (listData.rows ?? []).map((r: Product) => [r.id, r])
       )
       const factor = 1 - pct / 100
-      const newSalePrices = new Map<number, number | null>()
-      const results = await Promise.all(
-        ids.map(async (productId) => {
-          const p = current.get(productId)
-          if (!p) return false
-          const salePrice =
-            bulkSaleMode === "remove"
-              ? null
-              : p.price != null
-              ? Math.round(p.price * factor * 100) / 100
-              : undefined
-          if (salePrice === undefined) return false // sin precio base no aplica
-          newSalePrices.set(productId, salePrice)
-          const res = await fetch("/api/admin/products/update", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              productId,
-              sale_price: salePrice,
-              // Quitar la oferta también borra su ventana; al aplicarla se
-              // reemplaza por la capturada (vacío = sin límite).
-              sale_starts_at:
-                bulkSaleMode === "remove" || !bulkSaleStart
-                  ? null
-                  : new Date(bulkSaleStart).toISOString(),
-              sale_ends_at:
-                bulkSaleMode === "remove" || !bulkSaleEnd
-                  ? null
-                  : new Date(bulkSaleEnd).toISOString(),
-            }),
-          })
-          return res.ok
-        })
-      )
-      const succeededIds = ids.filter((_, i) => results[i])
       const nextStart =
         bulkSaleMode === "remove" || !bulkSaleStart
           ? null
           : new Date(bulkSaleStart).toISOString()
       const nextEnd =
         bulkSaleMode === "remove" || !bulkSaleEnd ? null : new Date(bulkSaleEnd).toISOString()
+      const newSalePrices = new Map<number, number | null>()
+      const rows = ids
+        .map((id) => current.get(id))
+        .filter((p): p is Product => p !== undefined)
+      const { updated } = await bulkPatchEach(rows, (p) => {
+        const salePrice =
+          bulkSaleMode === "remove"
+            ? null
+            : p.price != null
+            ? Math.round(p.price * factor * 100) / 100
+            : undefined
+        if (salePrice === undefined) return null // sin precio base no aplica
+        newSalePrices.set(p.id, salePrice)
+        return {
+          sale_price: salePrice,
+          // Quitar la oferta también borra su ventana; al aplicarla se
+          // reemplaza por la capturada (vacío = sin límite).
+          sale_starts_at: nextStart,
+          sale_ends_at: nextEnd,
+        }
+      })
       setProducts((prev) =>
         prev.map((p) => {
-          const sp = succeededIds.includes(p.id) ? newSalePrices.get(p.id) : undefined
+          const sp = updated.includes(p.id) ? newSalePrices.get(p.id) : undefined
           return sp !== undefined
             ? { ...p, sale_price: sp, sale_starts_at: nextStart, sale_ends_at: nextEnd }
             : p
         })
       )
-      const failed = results.filter((ok) => !ok).length
-      if (failed > 0) {
+      // Los omitidos son los que no están en la página o no tienen precio base.
+      const skipped = ids.length - updated.length
+      if (skipped > 0) {
         setError(
-          `${failed} producto${failed === 1 ? "" : "s"} omitido${failed === 1 ? "" : "s"} (sin precio base o error)`
+          `${productCount(skipped)} omitido${skipped === 1 ? "" : "s"} (sin precio base o error)`
         )
       }
-      if (succeededIds.length > 0) {
+      if (updated.length > 0) {
         setToast(
           bulkSaleMode === "apply"
-            ? `Oferta aplicada en ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`
-            : `Ofertas quitadas en ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`
+            ? `Oferta aplicada en ${productCount(updated.length)}`
+            : `Ofertas quitadas en ${productCount(updated.length)}`
         )
+        const undoRows = updated
+          .map((id) => current.get(id))
+          .filter((p): p is Product => p !== undefined)
         setUndoAction({
-          message: `Ofertas actualizadas en ${succeededIds.length} producto${
-            succeededIds.length === 1 ? "" : "s"
-          }.`,
+          message: `Ofertas actualizadas en ${productCount(updated.length)}.`,
           run: async () => {
-            await Promise.all(
-              succeededIds.map(async (productId) => {
-                const prev = current.get(productId)
-                if (!prev) return false
-                const res = await fetch("/api/admin/products/update", {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    productId,
-                    sale_price: prev.sale_price,
-                    sale_starts_at: prev.sale_starts_at,
-                    sale_ends_at: prev.sale_ends_at,
-                  }),
-                })
-                return res.ok
-              })
-            )
+            await bulkPatchEach(undoRows, (prev) => ({
+              sale_price: prev.sale_price,
+              sale_starts_at: prev.sale_starts_at,
+              sale_ends_at: prev.sale_ends_at,
+            }))
             setProducts((prevList) =>
               prevList.map((p) => {
-                const old = succeededIds.includes(p.id) ? current.get(p.id) : undefined
+                const old = updated.includes(p.id) ? current.get(p.id) : undefined
                 return old
                   ? {
                       ...p,
@@ -2197,59 +2223,42 @@ function AdminProductsContent() {
         (listData.rows ?? []).map((r: Product) => [r.id, r])
       )
       const nextTags = new Map<number, string[]>()
-      const results = await Promise.all(
-        ids.map(async (productId) => {
-          const p = current.get(productId)
-          if (!p) return false
-          const prev = p.tags ?? []
-          const tags =
-            bulkTagMode === "add"
-              ? prev.includes(value)
-                ? prev
-                : [...prev, value].slice(0, 20)
-              : prev.filter((t) => t !== value)
-          nextTags.set(productId, tags)
-          const res = await fetch("/api/admin/products/update", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, tags }),
-          })
-          return res.ok
-        })
-      )
-      const succeededIds = ids.filter((_, i) => results[i])
+      const rows = ids
+        .map((id) => current.get(id))
+        .filter((p): p is Product => p !== undefined)
+      const { updated } = await bulkPatchEach(rows, (p) => {
+        const prev = p.tags ?? []
+        const tags =
+          bulkTagMode === "add"
+            ? prev.includes(value)
+              ? prev
+              : [...prev, value].slice(0, 20)
+            : prev.filter((t) => t !== value)
+        nextTags.set(p.id, tags)
+        return { tags }
+      })
       setProducts((prev) =>
         prev.map((p) => {
-          const tags = succeededIds.includes(p.id) ? nextTags.get(p.id) : undefined
+          const tags = updated.includes(p.id) ? nextTags.get(p.id) : undefined
           return tags ? { ...p, tags } : p
         })
       )
-      if (succeededIds.length > 0) {
+      if (updated.length > 0) {
         setToast(
           bulkTagMode === "add"
-            ? `Etiqueta "${value}" agregada a ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`
-            : `Etiqueta "${value}" quitada de ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`
+            ? `Etiqueta "${value}" agregada a ${productCount(updated.length)}`
+            : `Etiqueta "${value}" quitada de ${productCount(updated.length)}`
         )
+        const undoRows = updated
+          .map((id) => current.get(id))
+          .filter((p): p is Product => p !== undefined)
         setUndoAction({
-          message: `Etiquetas actualizadas en ${succeededIds.length} producto${
-            succeededIds.length === 1 ? "" : "s"
-          }.`,
+          message: `Etiquetas actualizadas en ${productCount(updated.length)}.`,
           run: async () => {
-            await Promise.all(
-              succeededIds.map(async (productId) => {
-                const prev = current.get(productId)
-                if (!prev) return false
-                const res = await fetch("/api/admin/products/update", {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ productId, tags: prev.tags ?? [] }),
-                })
-                return res.ok
-              })
-            )
+            await bulkPatchEach(undoRows, (prev) => ({ tags: prev.tags ?? [] }))
             setProducts((prevList) =>
               prevList.map((p) => {
-                const old = succeededIds.includes(p.id) ? current.get(p.id) : undefined
+                const old = updated.includes(p.id) ? current.get(p.id) : undefined
                 return old ? { ...p, tags: old.tags ?? [] } : p
               })
             )
@@ -2287,22 +2296,11 @@ function AdminProductsContent() {
     setBulkSaving(true)
     setError(null)
     try {
-      const results = await Promise.all(
-        stale.map(async (p) => {
-          const res = await fetch("/api/admin/products/update", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              productId: p.id,
-              sale_price: null,
-              sale_starts_at: null,
-              sale_ends_at: null,
-            }),
-          })
-          return res.ok
-        })
-      )
-      const ids = stale.filter((_, i) => results[i]).map((p) => p.id)
+      const ids = (await bulkPatchEach(stale, () => ({
+        sale_price: null,
+        sale_starts_at: null,
+        sale_ends_at: null,
+      }))).updated
       setProducts((prev) =>
         prev.map((p) =>
           ids.includes(p.id)
@@ -2310,26 +2308,17 @@ function AdminProductsContent() {
             : p
         )
       )
-      setToast(`Ofertas vencidas limpiadas en ${ids.length} producto${ids.length === 1 ? "" : "s"}`)
+      setToast(`Ofertas vencidas limpiadas en ${productCount(ids.length)}`)
       setUndoAction({
-        message: `Ofertas vencidas limpiadas en ${ids.length} producto${ids.length === 1 ? "" : "s"}.`,
+        message: `Ofertas vencidas limpiadas en ${productCount(ids.length)}.`,
         run: async () => {
-          await Promise.all(
-            stale
-              .filter((p) => ids.includes(p.id))
-              .map(async (p) => {
-                const res = await fetch("/api/admin/products/update", {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    productId: p.id,
-                    sale_price: p.sale_price,
-                    sale_starts_at: p.sale_starts_at,
-                    sale_ends_at: p.sale_ends_at,
-                  }),
-                })
-                return res.ok
-              })
+          await bulkPatchEach(
+            stale.filter((p) => ids.includes(p.id)),
+            (p) => ({
+              sale_price: p.sale_price,
+              sale_starts_at: p.sale_starts_at,
+              sale_ends_at: p.sale_ends_at,
+            })
           )
           setProducts((prev) =>
             prev.map((p) => {
@@ -2373,38 +2362,28 @@ function AdminProductsContent() {
         (listData.rows ?? []).map((r: Product) => [r.id, r])
       )
       const newSalePrices = new Map<number, number>()
-      const results = await Promise.all(
-        ids.map(async (productId) => {
-          const p = current.get(productId)
-          if (!p || p.cost == null || p.cost <= 0) return false
-          // Precio mínimo para conservar el margen objetivo; solo aplica si
-          // queda por debajo del precio base (si no, no es oferta).
-          const minPrice = p.cost / (1 - margin / 100)
-          const salePrice = Math.round(minPrice * 100) / 100
-          if (p.price != null && salePrice >= p.price) return false
-          newSalePrices.set(productId, salePrice)
-          const res = await fetch("/api/admin/products/update", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, sale_price: salePrice }),
-          })
-          return res.ok
-        })
-      )
-      const succeededIds = ids.filter((_, i) => results[i])
+      const rows = ids
+        .map((id) => current.get(id))
+        .filter((p): p is Product => p !== undefined)
+      const { updated } = await bulkPatchEach(rows, (p) => {
+        if (p.cost == null || p.cost <= 0) return null
+        // Precio mínimo para conservar el margen objetivo; solo aplica si
+        // queda por debajo del precio base (si no, no es oferta).
+        const minPrice = p.cost / (1 - margin / 100)
+        const salePrice = Math.round(minPrice * 100) / 100
+        if (p.price != null && salePrice >= p.price) return null
+        newSalePrices.set(p.id, salePrice)
+        return { sale_price: salePrice }
+      })
       setProducts((prev) =>
         prev.map((p) => {
-          const sp = succeededIds.includes(p.id) ? newSalePrices.get(p.id) : undefined
+          const sp = updated.includes(p.id) ? newSalePrices.get(p.id) : undefined
           return sp !== undefined ? { ...p, sale_price: sp } : p
         })
       )
-      const skipped = results.filter((ok) => !ok).length
-      if (succeededIds.length > 0) {
-        setToast(
-          `Oferta con margen ≥${margin}% en ${succeededIds.length} producto${
-            succeededIds.length === 1 ? "" : "s"
-          }`
-        )
+      const skipped = ids.length - updated.length
+      if (updated.length > 0) {
+        setToast(`Oferta con margen ≥${margin}% en ${productCount(updated.length)}`)
       }
       if (skipped > 0) {
         setError(
@@ -2428,26 +2407,13 @@ function AdminProductsContent() {
     setError(null)
     try {
       const ids = [...selected]
-      const results = await Promise.all(
-        ids.map(async (productId) => {
-          const res = await fetch("/api/admin/products/update", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, unit }),
-          })
-          return res.ok
-        })
-      )
-      const succeededIds = ids.filter((_, i) => results[i])
-      setProducts((prev) =>
-        prev.map((p) => (succeededIds.includes(p.id) ? { ...p, unit } : p))
-      )
-      if (succeededIds.length > 0) {
-        setToast(`Unidad "${unit ?? "—"}" en ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`)
+      const { updated, failed } = await bulkPatch(ids, { unit })
+      setProducts((prev) => prev.map((p) => (updated.includes(p.id) ? { ...p, unit } : p)))
+      if (updated.length > 0) {
+        setToast(`Unidad "${unit ?? "—"}" en ${productCount(updated.length)}`)
       }
-      const failed = results.filter((ok) => !ok).length
-      if (failed > 0) {
-        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
+      if (failed.length > 0) {
+        setError(`${productCount(failed.length)} no se pudieron actualizar`)
       }
       setBulkUnitOpen(false)
       setSelected(new Set())
@@ -2472,47 +2438,25 @@ function AdminProductsContent() {
       const prevCategories = new Map<number, number | null>(
         (prevData.rows ?? []).map((r: Product) => [r.id, r.category_id])
       )
-      const results = await Promise.all(
-        ids.map(async (productId) => {
-          const res = await fetch("/api/admin/products/update", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, category_id: categoryId }),
-          })
-          return res.ok
-        })
-      )
-      const succeededIds = ids.filter((_, i) => results[i])
+      const { updated, failed } = await bulkPatch(ids, { category_id: categoryId })
       setProducts((prev) =>
-        prev.map((p) => (succeededIds.includes(p.id) ? { ...p, category_id: categoryId } : p))
+        prev.map((p) => (updated.includes(p.id) ? { ...p, category_id: categoryId } : p))
       )
-      const failed = results.filter((ok) => !ok).length
-      if (failed > 0) {
-        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
+      if (failed.length > 0) {
+        setError(`${productCount(failed.length)} no se pudieron actualizar`)
       }
-      if (succeededIds.length > 0) {
-        setToast(`Categoría actualizada en ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`)
+      if (updated.length > 0) {
+        setToast(`Categoría actualizada en ${productCount(updated.length)}`)
         setUndoAction({
-          message: `Categoría actualizada en ${succeededIds.length} producto${
-            succeededIds.length === 1 ? "" : "s"
-          }.`,
+          message: `Categoría actualizada en ${productCount(updated.length)}.`,
           run: async () => {
-            await Promise.all(
-              succeededIds.map(async (productId) => {
-                const res = await fetch("/api/admin/products/update", {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    productId,
-                    category_id: prevCategories.get(productId) ?? null,
-                  }),
-                })
-                return res.ok
-              })
+            await bulkPatchEach(
+              updated.map((id) => ({ id, category_id: prevCategories.get(id) ?? null })),
+              (p) => ({ category_id: p.category_id })
             )
             setProducts((prev) =>
               prev.map((p) =>
-                succeededIds.includes(p.id)
+                updated.includes(p.id)
                   ? { ...p, category_id: prevCategories.get(p.id) ?? null }
                   : p
               )
@@ -2550,59 +2494,40 @@ function AdminProductsContent() {
         (listData.rows ?? []).map((r: Product) => [r.id, r])
       )
       const newPrices = new Map<number, { price: number | null; sale_price: number | null }>()
-      const results = await Promise.all(
-        ids.map(async (productId) => {
-          const p = current.get(productId)
-          if (!p) return false
-          const price = p.price != null ? Math.round(p.price * factor * 100) / 100 : null
-          const salePrice =
-            p.sale_price != null ? Math.round(p.sale_price * factor * 100) / 100 : null
-          newPrices.set(productId, { price, sale_price: salePrice })
-          const res = await fetch("/api/admin/products/update", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId, price, sale_price: salePrice }),
-          })
-          return res.ok
-        })
-      )
-      const succeededIds = ids.filter((_, i) => results[i])
+      const rows = ids
+        .map((id) => current.get(id))
+        .filter((p): p is Product => p !== undefined)
+      const { updated, failed } = await bulkPatchEach(rows, (p) => {
+        const price = p.price != null ? Math.round(p.price * factor * 100) / 100 : null
+        const salePrice =
+          p.sale_price != null ? Math.round(p.sale_price * factor * 100) / 100 : null
+        newPrices.set(p.id, { price, sale_price: salePrice })
+        return { price, sale_price: salePrice }
+      })
       setProducts((prev) =>
         prev.map((p) => {
-          const next = succeededIds.includes(p.id) ? newPrices.get(p.id) : undefined
+          const next = updated.includes(p.id) ? newPrices.get(p.id) : undefined
           return next ? { ...p, ...next } : p
         })
       )
-      const failed = results.filter((ok) => !ok).length
-      if (failed > 0) {
-        setError(`${failed} producto${failed === 1 ? "" : "s"} no se pudieron actualizar`)
+      if (failed.length > 0) {
+        setError(`${productCount(failed.length)} no se pudieron actualizar`)
       }
-      if (succeededIds.length > 0) {
-        setToast(`Precios ajustados en ${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"}`)
+      if (updated.length > 0) {
+        setToast(`Precios ajustados en ${productCount(updated.length)}`)
+        const undoRows = updated
+          .map((id) => current.get(id))
+          .filter((p): p is Product => p !== undefined)
         setUndoAction({
-          message: `Precios ajustados en ${succeededIds.length} producto${
-            succeededIds.length === 1 ? "" : "s"
-          }.`,
+          message: `Precios ajustados en ${productCount(updated.length)}.`,
           run: async () => {
-            await Promise.all(
-              succeededIds.map(async (productId) => {
-                const prev = current.get(productId)
-                if (!prev) return false
-                const res = await fetch("/api/admin/products/update", {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    productId,
-                    price: prev.price,
-                    sale_price: prev.sale_price,
-                  }),
-                })
-                return res.ok
-              })
-            )
+            await bulkPatchEach(undoRows, (prev) => ({
+              price: prev.price,
+              sale_price: prev.sale_price,
+            }))
             setProducts((prevList) =>
               prevList.map((p) => {
-                const old = succeededIds.includes(p.id) ? current.get(p.id) : undefined
+                const old = updated.includes(p.id) ? current.get(p.id) : undefined
                 return old ? { ...p, price: old.price, sale_price: old.sale_price } : p
               })
             )
