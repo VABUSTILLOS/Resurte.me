@@ -108,8 +108,8 @@ export default function TableroPage() {
     run()
   }, [loadReport])
 
-  const orders = data?.orders ?? []
-  const shifts = data?.shifts ?? []
+  const orders = useMemo(() => data?.orders ?? [], [data])
+  const shifts = useMemo(() => data?.shifts ?? [], [data])
 
   const report = useMemo(
     () =>
