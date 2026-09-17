@@ -231,6 +231,7 @@ describe("resolveBumps", () => {
     insertedRule?: BumpRuleRow | null
     catalog?: AffinityProduct[]
     affinityPairs?: AffinityPairRow[]
+    affinityRules?: BumpRuleRow[]
   }) {
     const {
       rules = [perishableRule],
@@ -242,14 +243,27 @@ describe("resolveBumps", () => {
       insertedRule = null,
       catalog = [],
       affinityPairs = [],
+      affinityRules = [],
     } = opts
 
     // Espía accesible para verificar que el fallback dinámico registró la regla.
-    const insertBumpRules = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        maybeSingle: vi.fn().mockResolvedValue({ data: insertedRule ?? null, error: null }),
+    // Soporta las dos formas: individual (`.select().maybeSingle()`) y en lote
+    // (`insert(array).select()` esperado directo). El lote devuelve las filas
+    // del payload con ids sintéticos, como haría Postgres.
+    let nextRuleId = 9000
+    const insertBumpRules = vi.fn().mockImplementation((payload: unknown) => ({
+      select: vi.fn().mockImplementation(() => {
+        const rows = (Array.isArray(payload) ? payload : [payload]).filter(
+          (row): row is Record<string, unknown> => Boolean(row)
+        )
+        const data = rows.map((row) => ({ ...row, id: nextRuleId++ }))
+        return {
+          maybeSingle: vi.fn().mockResolvedValue({ data: insertedRule ?? null, error: null }),
+          then: (resolve: (value: { data: unknown; error: null }) => unknown) =>
+            Promise.resolve({ data, error: null }).then(resolve),
+        }
       }),
-    })
+    }))
 
     const supabase = {
       __insertBumpRules: insertBumpRules,
@@ -262,9 +276,16 @@ describe("resolveBumps", () => {
                   order: vi.fn().mockResolvedValue({ data: rules, error: null }),
                 }
               }
-              // Recuperación de carrera: eq(trigger_type) → eq(collection_slug)
+              // Recuperación de carrera: eq(trigger_type) → eq(collection_slug).
+              // Resolución en lote: eq(trigger_type) → in(product_id).
               return {
                 eq: vi.fn().mockResolvedValue({ data: insertedRule ?? null, error: null }),
+                in: vi.fn().mockImplementation((_col: string, ids: number[]) =>
+                  Promise.resolve({
+                    data: affinityRules.filter((r) => ids.includes(r.product_id)),
+                    error: null,
+                  })
+                ),
               }
             }),
             maybeSingle: vi.fn().mockResolvedValue({ data: insertedRule ?? null, error: null }),
@@ -743,6 +764,70 @@ describe("resolveBumps", () => {
 
       expect(bumps.map((b) => b.product.id)).toEqual([300])
       expect(bumps[0]?.trigger_type).toBe("ingredient_affinity")
+    })
+
+    it("resuelve las reglas en lote: cero inserts si ya existen (estado estable)", async () => {
+      const stored = rule("ingredient_affinity", {
+        id: 900,
+        product_id: 300,
+        title: "Chile Serrano",
+        description: "Ideal con Cebolla Blanca",
+        discount_pct: 0.1,
+        display_order: 100,
+      })
+      const supabase = makeSupabase({
+        rules: [],
+        cartProducts: [product({ id: 1, name: "Cebolla Blanca" })],
+        categories: [],
+        catalog: [cebolla, chile],
+        affinityPairs: [
+          { source_product_id: 1, target_product_id: 300, kind: "curated", weight: 5 },
+        ],
+        bumpProducts: { 300: product({ id: 300, name: "Chile Serrano" }) },
+        affinityRules: [stored],
+      })
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+
+      const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+
+      expect(bumps).toHaveLength(1)
+      expect(bumps[0]?.ruleId).toBe(900)
+      // Antes: un INSERT→SELECT por bump (~87 ms cada uno) aunque la regla
+      // existiera, porque el índice único hacía fallar siempre el insert.
+      expect(
+        (supabase as unknown as { __insertBumpRules: ReturnType<typeof vi.fn> })
+          .__insertBumpRules
+      ).not.toHaveBeenCalled()
+    })
+
+    it("registra las reglas faltantes en un solo insert (entorno frío)", async () => {
+      const supabase = makeSupabase({
+        rules: [],
+        cartProducts: [product({ id: 1, name: "Cebolla Blanca" })],
+        categories: [],
+        catalog: [cebolla, chile, { id: 301, name: "Jitomate Bola", slug: "jitomate-bola" }],
+        affinityPairs: [
+          { source_product_id: 1, target_product_id: 300, kind: "curated", weight: 9 },
+          { source_product_id: 1, target_product_id: 301, kind: "curated", weight: 8 },
+        ],
+        bumpProducts: {
+          300: product({ id: 300, name: "Chile Serrano" }),
+          301: product({ id: 301, name: "Jitomate Bola" }),
+        },
+        affinityRules: [],
+      })
+      vi.mocked(createServiceClient).mockResolvedValue(supabase as never)
+
+      const bumps = await resolveBumps({ items: [{ product_id: 1, quantity: 1 }] })
+      const insert = (
+        supabase as unknown as { __insertBumpRules: ReturnType<typeof vi.fn> }
+      ).__insertBumpRules
+
+      expect(bumps.map((b) => b.product.id)).toEqual([300, 301])
+      expect(bumps.every((b) => b.trigger_type === "ingredient_affinity")).toBe(true)
+      // Un insert con las dos reglas, no dos inserts de una.
+      expect(insert).toHaveBeenCalledTimes(1)
+      expect(insert.mock.calls[0]?.[0]).toHaveLength(2)
     })
 
     it("fail-open: si bump_affinity no está disponible no rompe el checkout", async () => {

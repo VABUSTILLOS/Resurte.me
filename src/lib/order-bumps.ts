@@ -401,9 +401,63 @@ async function loadCatalogIndex(
   return (data ?? []) as AffinityProduct[]
 }
 
+/** Payload de la fila `bump_rules` de un bump de afinidad. */
+function affinityRuleRow(product: BumpProduct, reason: string) {
+  return {
+    trigger_type: "ingredient_affinity",
+    category_slugs: [] as string[],
+    product_id: product.id,
+    title: product.name,
+    description: reason,
+    discount_pct: AFFINITY_DISCOUNT,
+    is_active: true,
+    display_order: ENGINE_RULE_DISPLAY_ORDER,
+    collection_slug: null,
+  }
+}
+
 /**
- * Registra (idempotente) la regla `bump_rules` de un bump de afinidad para que
- * POST /api/orders lo valide igual que cualquier otro bump. El índice único
+ * Carga en UNA query las reglas de afinidad ya registradas de estos productos.
+ * Evita el N+1 de un INSERT→SELECT por oferta: con 00112 sembrada el INSERT
+ * siempre choca contra el índice único y el SELECT siempre corre, o sea 2
+ * roundtrips (~87 ms) por bump — la causa de los ~6.6 s del checkout, que pide
+ * todas las ofertas. Fail-open: Map vacío si la BD falla (el llamador cae al
+ * registro individual).
+ */
+async function loadAffinityRulesForProducts(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  productIds: number[]
+): Promise<Map<number, BumpRuleRow>> {
+  if (productIds.length === 0) return new Map()
+  const { data, error } = await supabase
+    .from("bump_rules")
+    .select("*")
+    .eq("trigger_type", "ingredient_affinity")
+    .in("product_id", productIds)
+  if (error) return new Map()
+  return new Map(((data ?? []) as BumpRuleRow[]).map((row) => [row.product_id, row]))
+}
+
+/**
+ * Registra en UN insert las reglas de afinidad que faltan (entorno frío: 00112
+ * siembra `bump_affinity`, no `bump_rules`). Fail-open: Map vacío si el lote
+ * falla —carrera con otro request contra el índice único, o 00112 pendiente—
+ * para que el llamador caiga al registro individual.
+ */
+async function registerAffinityRulesBatch(
+  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+  rows: ReturnType<typeof affinityRuleRow>[]
+): Promise<Map<number, BumpRuleRow>> {
+  if (rows.length === 0) return new Map()
+  const { data, error } = await supabase.from("bump_rules").insert(rows).select("*")
+  if (error) return new Map()
+  return new Map(((data ?? []) as BumpRuleRow[]).map((row) => [row.product_id, row]))
+}
+
+/**
+ * Registra (idempotente) la regla `bump_rules` de UN bump de afinidad para que
+ * POST /api/orders lo valide igual que cualquier otro bump. Es el camino de
+ * recuperación cuando el lote no pudo resolver la regla. El índice único
  * parcial `idx_bump_rules_ingredient_affinity` (product_id) de la migración
  * 00112 garantiza una sola regla por producto incluso con requests
  * concurrentes. Fail-open: devuelve null si no se puede registrar.
@@ -415,17 +469,7 @@ async function registerAffinityRule(
 ): Promise<BumpRuleRow | null> {
   const { data: inserted, error } = await supabase
     .from("bump_rules")
-    .insert({
-      trigger_type: "ingredient_affinity",
-      category_slugs: [] as string[],
-      product_id: product.id,
-      title: product.name,
-      description: reason,
-      discount_pct: AFFINITY_DISCOUNT,
-      is_active: true,
-      display_order: ENGINE_RULE_DISPLAY_ORDER,
-      collection_slug: null,
-    })
+    .insert(affinityRuleRow(product, reason))
     .select("*")
     .maybeSingle()
 
@@ -626,13 +670,40 @@ async function resolveAffinityBumps(
     candidates.slice(0, MAX_BUMPS_REQUEST_LIMIT).map((c) => c.productId)
   )
 
-  const bumps: OrderBump[] = []
+  // 1ª pasada: candidatos usables, en el orden de afinidad ya resuelto.
+  const selected: { product: BumpProduct; reason: string }[] = []
   for (const candidate of candidates) {
-    if (bumps.length >= maxBumps) break
+    if (selected.length >= maxBumps) break
     const product = productMap.get(candidate.productId)
     // Agotado, invisible o inexistente: se descarta el candidato, no el tier.
     if (!isUsableBumpProduct(product)) continue
-    const rule = await registerAffinityRule(supabase, product, candidate.reason)
+    selected.push({ product, reason: candidate.reason })
+  }
+  if (selected.length === 0) {
+    return { pairsLoaded: pairs.length, candidateCount: candidates.length, bumps: [] }
+  }
+
+  // 2ª pasada: resolver las reglas en lote (1 query, +1 insert sólo si faltan)
+  // en vez del INSERT→SELECT por bump. El dedup por producto es defensivo:
+  // `computeAffinity` ya deduplica, pero un lote con product_id repetido lo
+  // rechazaría el índice único entero.
+  const ruleMap = await loadAffinityRulesForProducts(
+    supabase,
+    selected.map((s) => s.product.id)
+  )
+  const pending = new Map<number, ReturnType<typeof affinityRuleRow>>()
+  for (const { product, reason } of selected) {
+    if (!ruleMap.has(product.id)) pending.set(product.id, affinityRuleRow(product, reason))
+  }
+  if (pending.size > 0) {
+    const created = await registerAffinityRulesBatch(supabase, [...pending.values()])
+    for (const [id, row] of created) ruleMap.set(id, row)
+  }
+
+  // 3ª pasada: construir. Sólo cae al registro individual si el lote falló.
+  const bumps: OrderBump[] = []
+  for (const { product, reason } of selected) {
+    const rule = ruleMap.get(product.id) ?? (await registerAffinityRule(supabase, product, reason))
     if (!rule) continue
     bumps.push(buildBump(rule, product))
   }
