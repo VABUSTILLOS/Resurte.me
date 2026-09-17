@@ -10,9 +10,11 @@ import {
   CRM_STATUS_LABEL,
   applyCrmScope,
   assertProspectInScope,
+  filterProspects,
   isCrmStatus,
   isProspectInScope,
   mapCrmProspect,
+  matchesProspectFilters,
   readTags,
   sellerScope,
   withCityJoin,
@@ -277,6 +279,41 @@ describe("escalera de columnas", () => {
     const joined = withCityJoin(CRM_PROSPECT_COLUMN_SETS[0]!)
     expect(joined).toContain("cities(name)")
     expect(joined.match(/cities\(name\)/g)).toHaveLength(1)
+  })
+})
+
+describe("filtro de estados múltiple", () => {
+  // El módulo `agente` necesita "los cinco estados vivos" en una sola consulta
+  // (la cola diaria). Antes eso se resolvía con un `.in()` suelto en su propio
+  // archivo, que era la cuarta definición de "prospecto vivo".
+  it("sin `statuses` no filtra nada", () => {
+    const rows = [crmProspect({ status: "nuevo" }), crmProspect({ status: "perdido" })]
+    expect(filterProspects(rows, {})).toHaveLength(2)
+  })
+
+  it("`statuses` deja pasar solo los estados listados", () => {
+    const rows = [
+      crmProspect({ id: 1, status: "nuevo" }),
+      crmProspect({ id: 2, status: "perdido" }),
+      crmProspect({ id: 3, status: "inactivo" }),
+    ]
+    const result = filterProspects(rows, { statuses: ["nuevo", "inactivo"] })
+    expect(result.map((r) => r.id)).toEqual([1, 3])
+  })
+
+  it("un arreglo vacío no filtra nada", () => {
+    const rows = [crmProspect({ status: "perdido" })]
+    expect(matchesProspectFilters(rows[0]!, { statuses: [] })).toBe(true)
+  })
+
+  it("`status` y `statuses` son independientes: el singular se aplica antes", () => {
+    // `readCrmProspects` manda los dos al servidor y los vuelve a aplicar en
+    // memoria. Es idempotente, pero solo si ambos son la misma regla.
+    const prospect = crmProspect({ status: "contactado" })
+    expect(matchesProspectFilters(prospect, { status: "contactado" })).toBe(true)
+    expect(matchesProspectFilters(prospect, { statuses: ["contactado", "nuevo"] })).toBe(true)
+    expect(matchesProspectFilters(prospect, { status: "nuevo" })).toBe(false)
+    expect(matchesProspectFilters(prospect, { statuses: ["nuevo", "perdido"] })).toBe(false)
   })
 })
 

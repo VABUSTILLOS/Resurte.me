@@ -62,7 +62,15 @@ const JUSTIFICATIONS: Record<string, string> = {
     "`deleteQuickReply`, `distributeCrmProspects`, `getAdminSellerLoads`, " +
     "`cancelSequenceEnrollment`. La mitad *lectora* sí está cableada " +
     "(`LeadConversations.tsx` llama `getAdminQuickReplies`; `LeadSequences.tsx` muestra " +
-    "`activeEnrollments`), así que no es código abandonado: es una función sin terminar.",
+    "`activeEnrollments`), así que no es código abandonado: es una función sin terminar. " +
+    "La categoría `types` se añadió en la ronda 9 con la misma razón: `LeadTimelineSource` " +
+    "(`actions.ts:1965`, la unión del origen de un evento del hilo) quedó huérfano al " +
+    "moverse el hilo a `src/lib/crm-conversation.ts`, donde la misma unión se escribe " +
+    "en línea (`source`, L55). El símbolo se midió muerto en el árbol **y** en `HEAD`, y " +
+    "el archivo está en vuelo en otra sesión, así que se suprime en vez de borrarse: " +
+    "una supresión por archivo y categoría es lo único que knip admite —el intento de " +
+    "suprimir un símbolo concreto (`[\"LeadTimelineSource\"]`) devuelve `Invalid input` " +
+    "y sale con código 2—. Se retira cuando el refactor del CRM aterrice (fila `CI13`).",
   "src/lib/ai/kie-ai.ts":
     "`pollTaskUntilComplete` se declara en su docstring como API cómoda para usos " +
     "piloto/demo de corta duración. Es superficie pública deliberada, no residuo.",
@@ -154,7 +162,7 @@ describe("contrato de configuración de knip", () => {
     expect(KNIP.ignoreDependencies?.slice().sort()).toEqual(["sharp", "supabase", "vercel"])
 
     expect(KNIP.ignoreIssues).toEqual({
-      "src/app/admin/actions.ts": ["exports"],
+      "src/app/admin/actions.ts": ["exports", "types"],
       "src/lib/ai/kie-ai.ts": ["exports"],
       "src/lib/cart-sync-queue.ts": ["exports"],
       "src/lib/crm-filters.ts": ["exports"],

@@ -814,6 +814,64 @@
     **no** se relaja ninguna política de `crm_prospects` ni de
     `whatsapp_messages`. `crm_prospects` **no** denormaliza el último mensaje:
     se deriva en lectura.
+- **Núcleo CRM compartido con el vendedor (`/admin/leads`, Ronda 10 — fusión
+  Comercialización × Leads)**: la misma entidad `crm_prospects` la leían **tres**
+  pilas independientes —el admin (rondas 5 y 6), el módulo del vendedor
+  (`src/lib/comercializacion/**`) y el del agente (`src/lib/agente/**`)—, cada
+  una con su tipo de fila, su mapeo y (dos de ellas) su propia ficha. La fusión
+  deja **un núcleo puro y dos superficies por rol**. Invariantes que no se pueden
+  romper:
+  - **El lector de listas es uno solo.** `readCrmProspects`
+    (`@/lib/crm-prospects`) es la **única** función que lee listas de
+    `crm_prospects`; recibe `scope` + `filters` y devuelve `CrmProspectRow`. El
+    mismo lector sirve al board del admin, a la cartera del vendedor, a la cola
+    diaria del agente y a la bandeja. **No se crea un segundo lector**: si hace
+    falta una consulta nueva, se añade un filtro al contrato, no una consulta
+    paralela. `src/lib/crm-reader.contract.test.ts` mantiene la **lista exacta**
+    de los archivos que tocan la tabla y **falla tanto si aparece uno nuevo como
+    si una entrada de la lista deja de tocarla** (una entrada muerta ya no
+    protege nada).
+  - **El alcance se pasa explícito, nunca se infiere del rol dentro del lector.**
+    `scopeForRole(role, userId)` devuelve `ADMIN_SCOPE` o `sellerScope(userId)`, y
+    `applyCrmScope(query, scope)` es lo único que añade el `eq`/`is`. La
+    distinción importa porque **`createServiceClient()` ignora RLS**: la política
+    `crm_prospects_owner_all` protege las lecturas con el cliente del usuario,
+    pero las server actions del admin y del vendedor usan el cliente de servicio.
+    El alcance es la primera capa; la RLS, la segunda.
+  - **`applyCrmScope` tiene firma laxa a propósito.** Era
+    `T extends { eq(column: string, value: string): T }` y TypeScript abortaba con
+    `TS2589: Type instantiation is excessively deep` al envolver el builder de
+    PostgREST, que ya es genérico y filtrado: el compilador intentaba unificar el
+    tipo consigo mismo. La firma actual es `applyCrmScope<T>(query: T, scope:
+    CrmScope): T` con un cast interno. **No se "arregla" volviendo a apretarla**:
+    el error reaparece en cada sitio de llamada.
+  - **La ficha y el panel de conversación son componentes compartidos.**
+    `src/components/crm/ProspectDetailDrawer.tsx` y
+    `src/components/crm/ConversationPanel.tsx` viven en `components/crm/`, **no**
+    en la carpeta del admin, y los consumen las dos superficies. El admin los
+    usa a través de un adaptador delgado (`LeadDetailDrawer.tsx`, que mantiene
+    ruta y API) para no reescribir sus llamadores. **Un componente compartido no
+    puede importar de `@/app/admin/**` en runtime**: `ConversationPanel` importa
+    de `@/app/admin/actions` **solo con `import type`**, y el contrato lo
+    verifica. Lo que necesita ejecutar lo recibe inyectado.
+  - **`ConversationPanel` recibe `actions: ConversationPanelActions` y lo que no
+    se inyecta no se renderiza.** `load` es obligatorio; `send`, `suggest`,
+    `quickReplies` y `templates` son opcionales. El admin los pasa todos
+    (`admin-conversation-actions.ts`); el vendedor pasa **solo** `load`, así que
+    su bandeja no tiene compositor ni asistente de IA. La prop **no tiene valor
+    por defecto**: un default convertiría un olvido en un panel completo con
+    botones que fallan en el servidor.
+  - **La cola diaria del agente usa el mismo lector con columnas extra.**
+    `readCrmProspects` acepta `extraColumns` y cuelga las columnas que el CRM no
+    muestra (`employees`, `instagram`, `weekly_volume_min/max` de 00059) en un
+    campo **opcional** `extra` del contrato. Es preferible a ensanchar
+    `CrmProspectRow` con cuatro columnas que el CRM nunca pinta. Cuando no se
+    piden columnas extra, `extra` está **ausente** (no `{}`), y una columna extra
+    ausente se normaliza a `null`, no a `undefined`.
+  - **`src/app/api/workflows/trigger/route.ts` NO lleva alcance y no debe
+    llevarlo.** El lookup por `referral_code` es el webhook público de registro:
+    no hay sesión y **no** se filtra por vendedor. Es la excepción declarada en la
+    allowlist del contrato.
 - **Conversión (`/admin/conversion`, Ronda CV)**: el embudo tiene **una sola
   fuente de verdad**, el motor puro `@/lib/conversion-funnel`; la página y la
   ruta nunca recalculan una tasa por su cuenta. Invariantes que no se pueden
@@ -1193,6 +1251,37 @@ La migración **00140 tampoco se puede aplicar en local** (misma razón): queda
 escrita y lista para `supabase db push`. `fetchConversationMessages` empareja
 por `.in("from_number", phoneLookupVariants(...))` y **no** por la columna
 generada, así que la bandeja funciona incluso con 00140 sin aplicar.
+
+
+Núcleo CRM compartido (Ronda 10, fusión Comercialización × Leads): tocar
+`@/lib/crm-core`, `@/lib/crm-prospects`, `@/lib/crm-conversation`,
+`components/crm/ProspectDetailDrawer` o `components/crm/ConversationPanel`
+**afecta también a `/comercializacion`**. Antes de cambiar el alcance, el mapeo o
+la escalera de columnas, correr los contratos del núcleo:
+
+```bash
+npx vitest run src/lib/crm-core.contract.test.ts \
+               src/lib/crm-prospects.test.ts \
+               src/lib/crm-reader.contract.test.ts \
+               src/lib/use-server.contract.test.ts
+```
+
+El **criterio de aceptación** de la fusión fue que
+`npx playwright test e2e/admin-leads.spec.ts` pasara **sin modificar el spec**
+(34/34): una fusión que obliga a reescribir la prueba de la superficie que no
+cambia de comportamiento no es una fusión, es una regresión con test nuevo.
+`e2e/comercializacion.spec.ts` es el spec **nuevo** que cierra el hueco del
+vendedor (hasta la ronda 10 `/comercializacion` no tenía ninguna prueba e2e).
+
+Dos trampas que `tsc` y ESLint **no** detectan y que costaron tiempo real en esta
+ronda:
+
+1. **Un `export const` dentro de un módulo `"use server"` invalida el módulo
+   entero.** Turbopack falla el build con `The export setProspectTags was not
+   found in module …/actions.ts` y el `export *` del barrel resuelve a nada. La
+   constante va **sin `export`**. Lo fija `src/lib/use-server.contract.test.ts`.
+2. **`applyCrmScope` no se aprieta.** Ver la invariante del núcleo compartido: la
+   firma estricta reintroduce `TS2589` en cada sitio de llamada.
 
 
 ## Operar como restaurante (P14, Ronda 9)

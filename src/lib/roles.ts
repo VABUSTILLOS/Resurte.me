@@ -9,7 +9,9 @@ export type AppRole = "admin" | "vendedor" | "cliente" | null
 
 /**
  * Obtiene el rol del usuario actual.
- * - `admin`    → ADMIN_EMAILS / admin_users (ve todo el sitio).
+ * - `admin`    → `profiles.role = 'admin'` (fuente de verdad). ADMIN_EMAILS y
+ *                `admin_users` conceden acceso, pero `isAdminUser()` espeja el
+ *                permiso a `profiles.role` para que RLS coincida.
  * - `vendedor` → profiles.role = 'vendedor' (solo Comercialización).
  * - `cliente`  → cualquier otro usuario (no ve Comercialización).
  * - `null`     → sin sesión.

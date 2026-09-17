@@ -1,0 +1,42 @@
+#!/bin/sh
+# Hook de pre-push: AVISA, nunca bloquea.
+#
+# Varias sesiones comparten este checkout y se empujan cambios entre sí. Un hook
+# que bloqueara dejaría a cualquiera preso de un archivo que dejó otra sesión.
+# Por eso este hook solo imprime un aviso y termina siempre con éxito: el candado
+# real es el CI (concurrency + npm run verify).
+#
+# Activar:    git config core.hooksPath .githooks
+# Desactivar: git config --unset core.hooksPath
+#
+# Invariante 5: la verificación mínima antes de commit. Aquí se ejecuta la parte
+# rápida (typecheck + lint). `npm test` y `npm run build` quedan al CI por
+# latencia: correrlos en cada push de 4 sesiones no es viable.
+
+# Sin node_modules no hay nada que verificar.
+if [ ! -d node_modules ]; then
+  exit 0
+fi
+
+if ! command -v npm >/dev/null 2>&1; then
+  exit 0
+fi
+
+problems=""
+
+if ! npm run typecheck >/dev/null 2>&1; then
+  problems="${problems}  - npm run typecheck\n"
+fi
+
+if ! npm run lint >/dev/null 2>&1; then
+  problems="${problems}  - npm run lint\n"
+fi
+
+if [ -n "$problems" ]; then
+  printf '\n\033[33m⚠  Verificación previa al push: hay avisos\033[0m\n'
+  printf '%b' "$problems"
+  printf '   El hook NO bloquea el push; el CI decide.\n'
+  printf '   Detalle:  npm run typecheck   /   npm run lint\n\n'
+fi
+
+exit 0

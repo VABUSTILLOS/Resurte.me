@@ -54,8 +54,6 @@ import type { CashbackTier } from "@/types"
 import { filterLeads } from "@/lib/crm-funnel"
 import {
   ADMIN_SCOPE,
-  CRM_PROSPECT_COLUMNS,
-  CRM_PROSPECT_COLUMNS_WITHOUT_TAGS,
 } from "@/lib/crm-core"
 import { readCrmProspects } from "@/lib/crm-prospects"
 import { CRM_PAGE_SIZE } from "@/lib/crm-filters"
@@ -2740,7 +2738,7 @@ export async function getAdminCrmInbox(): Promise<AdminCrmInbox> {
     loadSellerRefs(supabase).catch(() => [] as SellerRef[]),
   ])
 
-  const prospects = prospectRows.map(toConversationProspect)
+  const prospects = prospectRows
   const messages: InboxMessage[] = messageRows.map((row) => ({
     id: Number(row.id),
     direction: normalizeDirection(row.direction as string | null),
@@ -2808,34 +2806,18 @@ export async function getAdminCrmInbox(): Promise<AdminCrmInbox> {
 }
 
 /**
- * Prospectos de la bandeja con etiquetas. `tags` llega con 00140: sin esa
- * columna la bandeja sigue abriendo, solo sin chips.
+ * Prospectos de la bandeja.
+ *
+ * La bandeja y el tablero de SLA son vistas de **admin** sobre toda la cartera,
+ * así que van por el lector compartido con alcance de admin: mismo orden, misma
+ * escalera de columnas (sin 00140 la bandeja abre igual, solo sin chips) y una
+ * sola definición de qué es un prospecto.
  */
-async function loadInboxProspects(supabase: ServiceClient): Promise<Record<string, unknown>[]> {
-  const { data, error } = await supabase
-    .from("crm_prospects")
-    .select(CRM_PROSPECT_COLUMNS)
-    .order("created_at", { ascending: false })
-    .limit(INBOX_PROSPECT_LIMIT)
-
-  if (!error) return (data ?? []) as unknown as Record<string, unknown>[]
-
-  if (!isMissingColumnError(error)) {
-    logger.error("[ADMIN-CRM] Error cargando la bandeja:", error)
-    throw new Error("Error al cargar la bandeja")
-  }
-
-  logger.warn("[ADMIN-CRM] Migración 00140 no aplicada; se omite tags")
-  const fallback = await supabase
-    .from("crm_prospects")
-    .select(CRM_PROSPECT_COLUMNS_WITHOUT_TAGS)
-    .order("created_at", { ascending: false })
-    .limit(INBOX_PROSPECT_LIMIT)
-  if (fallback.error) {
-    logger.error("[ADMIN-CRM] Error cargando la bandeja:", fallback.error)
-    throw new Error("Error al cargar la bandeja")
-  }
-  return (fallback.data ?? []) as unknown as Record<string, unknown>[]
+async function loadInboxProspects(supabase: ServiceClient): Promise<ConversationProspect[]> {
+  return readCrmProspects(supabase, {
+    scope: ADMIN_SCOPE,
+    limit: INBOX_PROSPECT_LIMIT,
+  })
 }
 
 /** Mensajes recientes de todos los números, para indexarlos en un solo paso. */
@@ -2900,7 +2882,7 @@ export async function getAdminCrmSla(): Promise<AdminCrmSla> {
     loadSellerRefs(supabase).catch(() => [] as SellerRef[]),
   ])
 
-  const prospects = prospectRows.map(toConversationProspect)
+  const prospects = prospectRows
   const messages: InboxMessage[] = messageRows.map((row) => ({
     id: Number(row.id),
     direction: normalizeDirection(row.direction as string | null),

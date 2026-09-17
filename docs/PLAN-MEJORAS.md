@@ -500,7 +500,7 @@ documento.
 | K4 | **`courierLink` se cablea en vez de duplicarse**: `panel/foodos/actions.ts` armaba el enlace del repartidor **inline** teniendo el helper al lado. Ahora lo llama. La duplicación era la razón de que knip lo viera muerto, y el arreglo no era borrarlo sino usarlo → **21** | ✅ |
 | K5 | **Triaje símbolo por símbolo, verificando antes de borrar**: `ScoredCustomer` (`foodos-rfm.ts`) no tenía una sola referencia —ni dentro de su módulo— y se borró. El resto va a **allowlist con motivo escrito**, no a borrado: los cinco server actions de escritura del CRM (K9), `pollTaskUntilComplete` (API de piloto declarada en su propio docstring), `readCartSyncEntry` e `INBOX_VIEW_LABEL` (fuentes únicas escritas y no adoptadas), `integration-status.ts` (archivo sin trackear de otra sesión) y los 8 interfaces de `types/foodos.ts`/`types/index.ts`, que **espejan tablas que sí existen** en migraciones. Más `sharp`, `supabase` y `vercel` como `ignoreDependencies`: los dos últimos son los **CLI de los runbooks** de `docs/OPS.md` (12 invocaciones de `npx supabase` y las de `vercel`), y `sharp` lo importan scripts que knip no analiza porque `scripts/**` está en `ignore`. De 21 quedaba **1**: un archivo sin trackear de otra sesión | ✅ |
 | K6 | **El gate entra en CI y se ata**: `ci.yml` pasa de `npx knip --production` a **`npm run knip`** —medir con un flag que nadie usa es medir otra cosa—, y `src/lib/knip-config.contract.test.ts` (8 pruebas) hace de **ratchet**: fija la allowlist y sus motivos por igualdad exacta, exige que cada entrada tenga justificación escrita, que no queden justificaciones huérfanas, que solo se supriman `exports`/`types` (nunca `files`, que escondería un archivo entero) y que CI no vuelva al flag. Probado por mutación: añadir una entrada sin motivo hace fallar tres pruebas | ✅ |
-| K7 | **Los punteros de este plan dejan de mentir** (`src/lib/docs-pointers.contract.test.ts`): había tres referencias a una **ronda 9** que **nunca se escribió** —las actas se interrumpen después de la ronda 6— y dos punteros vagos del tipo *ver esa sección* sin destino. Los punteros se sanean (el contenido de esa ronda vive en la fila **U14** y en § Verificación, y ahora ahí apuntan) y el contrato falla ante un puntero a una sección o a una fila inexistente, ante un puntero vago y ante dos actas con el mismo número. Incluye el discriminador que hacía falta: en este documento **"Productos ronda N"** (filas A18–A37 y B1–B32) es el nombre de una tanda del panel de productos, **no** un acta. Nota para quien escriba aquí: las frases exactas que el contrato prohíbe no se pueden citar literalmente ni para explicarlas —el contrato no distingue prosa de puntero—, así que van en cursiva o con el número en negrita | ✅ |
+| K7 | **Los punteros de este plan dejan de mentir** (`src/lib/docs-pointers.contract.test.ts`): había tres referencias a una *ronda 9* que **no existía** —las actas se interrumpían después de la ronda 6, y las de las rondas 8 y 9 llegaron más tarde— y dos punteros vagos del tipo *ver esa sección* sin destino. Los punteros se sanean (el contenido de esa ronda vive en la fila **U14** y en § Verificación, y ahora ahí apuntan) y el contrato falla ante un puntero a una sección o a una fila inexistente, ante un puntero vago y ante dos actas con el mismo número. Incluye el discriminador que hacía falta: en este documento **"Productos ronda N"** (filas A18–A37 y B1–B32) es el nombre de una tanda del panel de productos, **no** un acta. Nota para quien escriba aquí: las frases exactas que el contrato prohíbe no se pueden citar literalmente ni para explicarlas —el contrato no distingue prosa de puntero—, así que van en cursiva o con el número en negrita | ✅ |
 | K8 | **Invariante 11** en `docs/agents/README.md`: *todo gate de CI está verificado y verde, o no está en CI*. Un paso en rojo permanente no protege: entrena a ignorar el resultado | ✅ |
 | K9 | **Los cinco server actions de la ronda 6 se investigan, no se borran**: `saveQuickReply`, `deleteQuickReply`, `distributeCrmProspects`, `getAdminSellerLoads` y `cancelSequenceEnrollment` no tienen consumidor, pero la mitad **lectora** sí está cableada (`LeadConversations.tsx` llama `getAdminQuickReplies`; `LeadSequences.tsx` muestra `activeEnrollments`). No es código abandonado: es una función a medio construir, y queda declarada como backlog en la fila **C12** | ✅ |
 
@@ -547,6 +547,168 @@ ninguna prueba puede llamar a Postgres: el contrato lee la migración como
 general es la de K6 y K7 en otro sitio: **lo que no se mide se desvía**, y en
 código duplicado se desvía en silencio.
 
+### Ronda 9 — El pipeline que sí protege
+
+`.github/workflows/ci.yml` declaraba cinco verificaciones y **ninguna
+protegía**: el pipeline medía con un comando que el desarrollador no usaba, se
+**pisaba a sí mismo** y escondía su gate más caro. Medido sobre 100 corridas
+antes de tocar nada: **66 failure · 32 success · 2 in_progress**. Por job, el
+reparto no era el que parecía —`verify` iba **38 rojas de 40**, mientras `e2e`
+pasaba **25 de 40**—, así que la mitad "rota" del pipeline estaba en realidad
+**cancelada**, y el paso que rompía `verify` era casi siempre `Knip` (10) o
+`Lint` (8), no los tests (2) ni los tipos (2). Y `Build` salía **`-`** en todos
+los listados de pasos: no fallaba, **nunca llegaba a ejecutarse**, porque `Knip`
+iba delante.
+
+La ronda no arregla tests: arregla el **instrumento**. Pone el candado de
+concurrencia, unifica el comando entre CI y local, ordena los gates, y añade un
+ejecutor local que avisa sin castigar — más un contrato que impide que cualquiera
+de las cuatro cosas se pierda otra vez.
+
+| # | Fase | Estado |
+|---|---|---|
+| CI1 | **La línea base se mide antes de tocar el YAML**: cinco consultas `gh` sobre las últimas 100 corridas (`run list`, jobs por corrida, pasos fallidos por job, duración real, gap entre corridas). Sin esto "el CI está roto" es una impresión, no un dato: el desglose por job y por paso es lo que descartó que el problema fueran los tests. Todo en `files/r8-baseline.md` | ✅ |
+| CI2 | **El candado que faltaba**: bloque `concurrency` a nivel de workflow con `group: ${{ github.workflow }}-${{ github.ref }}` y `cancel-in-progress: true`. La evidencia: **33 de 99** corridas arrancaron a **menos de 180 s** de la anterior mientras `e2e` tarda **155–244 s**; la cancelación llega a los **~91 s**, muy por debajo del `timeout-minutes: 25` del job, y GitHub la reporta **igual que un fallo**. La coincidencia **32,5 % canceladas ≈ 33 % solapadas** es la que identifica la causa: el grupo incluye `github.ref`, así que un push a `main` no cancela el PR de otra rama | ✅ |
+| CI3 | **El comando deja de ser dos comandos**: `package.json` gana `"typecheck": "tsc --noEmit"` y `"verify": "npm run typecheck && npm run lint && npm test && npm run knip"`, y `ci.yml` pasa de `npx tsc --noEmit` a **`npm run typecheck`**. Es el corolario de la invariante 11 aplicado a la propia invariante 5: mientras la lista de verificación nombraba un binario suelto que nadie tecleaba, medía otra cosa | ✅ |
+| CI4 | **El orden de los gates**: `Install` → `Typecheck` → `Lint` → `Unit tests` → **`Build`** → `Knip`. `Knip` **sigue bloqueando** (no se le pone `continue-on-error`); lo único que cambia es que deja de esconder al gate más caro del repo, que llevaba sin medir nada mientras el pipeline parecía tenerlo | ✅ |
+| CI5 | **El ejecutor local que avisa y no bloquea** (`.githooks/pre-push`): corre `npm run typecheck` y `npm run lint` con la salida silenciada, imprime un aviso si algo sale rojo y **termina siempre en `exit 0`**. La decisión es explícita: este checkout lo comparten varias sesiones a la vez, así que un hook que aborte el push castigaría a quien no hizo el cambio — el CI decide. Degrada en silencio si falta `node_modules` o `npm`. Se probó en cuatro escenarios (sin `node_modules`, con `npm` falso que falla, sin `npm` en el `PATH` y contra el repo real: **exit 0** en los cuatro, 26 s en el real) | ✅ |
+| CI6 | **El contrato que lo ata todo** (`src/lib/ci-config.contract.test.ts`, 10 pruebas): existen los siete scripts que el pipeline necesita; todo `npm run X` del workflow apunta a un script real; `concurrency` existe, cancela y agrupa por `github.ref`; ninguna línea `run:` vuelve a invocar `npx tsc` ni `knip --production`; `Build` corre después de los tests y antes de `Knip`; **toda variable `env:` del workflow está documentada en `.env.local.example`**; `test:e2e` conserva `--grep @ci`; el hook existe, es ejecutable y no puede bloquear; y no se reintroduce un gestor de hooks que bloquee. Probado por **mutación en sandbox**: 17 mutaciones, 17 detectadas (ver la lección) | ✅ |
+| CI7 | **Documentación y un defecto de nombre**: **invariante 12** en `docs/agents/README.md` (*todo pipeline declara su concurrencia y su orden de gates, o mide otra cosa*), la **invariante 5** reescrita con `npm run verify` y el motivo de por qué antes no tenía ejecutor, la sección **`docs/OPS.md` §12** (comandos, activación del hook con `git config core.hooksPath .githooks`, y el aviso de que no bloquea) y la corrección de la tabla de §3: la variable se llamaba `SERVICE_ROLE_KEY` y se llama **`SUPABASE_SERVICE_ROLE_KEY`** — el nombre equivocado en el runbook de una variable que `createServiceClient()` exige para no lanzar | ✅ |
+| CI8 | **La hipótesis que se descarta, escrita**: que al job `e2e` le faltara `SUPABASE_SERVICE_ROLE_KEY` era el candidato obvio, y **es falso**: el job pasa 25 de 40 con ese mismo `env`. Añadir una clave *placeholder* sería **estrictamente peor**, porque `createServiceClient()` lanza en sincrónico y sus llamadores lo capturan (fail-open), así que con una clave falsa `createClient` tendría éxito y convertiría un `throw` inmediato en llamadas de red contra un host inexistente dentro de las 64 rutas de `e2e/global-setup.ts`. Queda declarado en § Verificación, sin fila de backlog: no hay trabajo pendiente, hay una decisión | ✅ |
+
+**Lección — un pipeline sin candado no falla: cancela, y una cancelación se lee
+como fallo.** La lectura ingenua del panel de Actions era "los tests están
+roto" (38 de 40 corridas de `verify` en rojo); el desglose por job y por paso
+dijo lo contrario —los tests rompían 2 veces, los tipos 2, y el job `e2e` pasaba
+la mayoría de las veces—. Un workflow sin `concurrency` convierte cada push
+rápido en la **muerte del anterior**, y como GitHub reporta la cancelación con
+el mismo color que el fallo, el síntoma se confunde con el de un test roto y se
+"arregla" mirando el código equivocado. Corolario, el mismo de la invariante 11
+en otro plano: **antes de arreglar un gate hay que comprobar que el gate mida lo
+que su nombre dice** —`Build` aparecía en el YAML y nunca corría—, y antes de
+atribuirse un rojo hay que leer **qué paso** lo produjo, no solo que el job esté
+rojo.
+
+**Lección — la mutación se hace en un sandbox, no en el repo.** En este checkout
+conviven varias sesiones que commitean con `git add -A`, así que mutar
+`package.json` o `ci.yml` en el sitio correcto deja una ventana en la que el
+árbol está roto a propósito y otra sesión puede capturarlo en un commit. La
+prueba por mutación se hizo sobre una **copia** del árbol en el directorio de
+sesión (`package.json`, `ci.yml`, `.env.local.example`, `.githooks/pre-push` y el
+propio contrato, con `node_modules` enlazado), y el contrato se escribió para
+leer siempre desde `process.cwd()`: 17 mutaciones —quitar un script, invertir
+`Build` y `Knip`, borrar `concurrency`, poner `cancel-in-progress: false`,
+reintroducir `npx tsc --noEmit` y `knip --production`, declarar una variable
+`env` sin documentar, perder `--grep @ci`, declarar `husky`, añadir `prepare`,
+quitar el bit de ejecución del hook, meterle `exit 1` y meterle `set -e`— y
+**las 17 pusieron el contrato en rojo**. Una aserción que no se puede romper a
+propósito no es un contrato, es un comentario.
+
+
+### Ronda 10 — Fusión Comercialización × Leads: un núcleo, dos superficies
+
+`crm_prospects` es una sola tabla y la leían **tres pilas independientes**:
+`/admin/leads` (rondas 5 y 6), el CRM del vendedor
+(`src/lib/comercializacion/**`) y el módulo del agente (`src/lib/agente/**`).
+Cada una tenía su **tipo de fila**, su **mapeo** y —en dos de los tres casos— su
+propia **ficha de detalle**, así que la misma entidad se veía distinta según
+quién mirara. La fusión **no** unifica las superficies (los dos roles ven cosas
+distintas y siguen teniendo su ruta), unifica el **núcleo**: un tipo, un lector,
+un mapeo, una ficha y un panel de conversación, con el **alcance inyectado**.
+
+El estado de partida, medido antes de tocar nada:
+
+| Preocupación | Admin | Vendedor | Agente |
+|---|---|---|---|
+| Lector de listas | `getAdminCrmBoard()` | `getProspects()` | `getDailyQueue()` |
+| Tipo de fila | `CrmProspect` | `Prospect` | `ProspectRow` |
+| Ficha | `LeadDetailDrawer.tsx` | `prospecto-detail.tsx` (528 líneas) | — |
+| Búsqueda | `filterProspects()` en memoria, insensible a acentos | `escapeOrTerm()` + `ilike`, sensible a acentos | — |
+
+**El vocabulario de estados ya era idéntico** en las tres
+(`nuevo, contactado, en_seguimiento, cliente_activo, inactivo, perdido`), así que
+**la ronda no necesitó ninguna migración** — dato que solo se sabe leyendo las
+tres implementaciones, no los planes.
+
+**Alcance acordado** (tres decisiones explícitas, no supuestos):
+*Núcleo único compartido + dos superficies por rol* (se conservan **las dos**
+rutas: `/admin/leads` ve todo, incluido el pozo sin asignar; `/comercializacion`
+solo ve la cartera propia); **`src/lib/agente/**` entra** en la fusión como
+consumidor del lector y los tipos, **sin cambios de UI ni de features**;
+**paridad selectiva** para el vendedor, que gana **etiquetas** y la **bandeja de
+conversación de sus propios prospectos** (misma ventana de 24 h) pero **no** SLA
+ni secuencias de goteo.
+
+| # | Fase | Estado |
+|---|---|---|
+| F1 | **Núcleo puro `src/lib/crm-core.ts`**: vocabulario de estados, `CrmProspectRow`, `mapCrmProspect`, `readTags`, la **escalera de columnas** (`00052` → `00059` → `00139` → `00140`) y el **alcance** (`CrmScope`, `ADMIN_SCOPE`, `sellerScope`, `scopeForRole`, `isProspectInScope`, `assertProspectInScope`, `crmScopeFilter`, `applyCrmScope`). Re-apuntados `crm-pipeline`, `crm-tags`, `comercializacion/types`, `actions/helpers`, `crm-assignment`, `crm-inbox`, `crm-sequences-engine` y `admin/actions` a la **fuente única**. Fixture compartida `crm-fixtures.ts` + `crm-core.contract.test.ts` | ✅ |
+| F2 | **Lector único `src/lib/crm-prospects.ts`** (`readCrmProspects`): recibe `scope` + `filters`, devuelve `CrmProspectRow`. Re-apuntados `getProspects`, `getAdminCrmBoard` y `loadAssignableProspects` (usando los parámetros `ids`/`sellerPresence` que existían sin consumidor). `PAGE_SIZE` duplicado como `50` literal en `prospectos-page.tsx` pasa a importar `CRM_PAGE_SIZE` | ✅ |
+| F3 | **Ficha única `src/components/crm/ProspectDetailDrawer.tsx`**: la del vendedor era **superior** (línea de tiempo de actividades) y es la que se generalizó. `LeadDetailDrawer.tsx` queda como **adaptador delgado** en la misma ruta y con la misma API exportada; `prospecto-detail.tsx` (528 líneas) **borrado** | ✅ |
+| F4 | **Etiquetas para el vendedor** (`actions/etiquetas.ts`: `setProspectTags`, `bulkTagProspects`, con `.eq("seller_id", userId)` y degradación si `00140` no está aplicada). UI: `<Select>` de etiqueta en los filtros, selección múltiple, barra de acciones masivas, chips por fila (clicables para filtrar) y chips de solo lectura en el kanban. El filtro `?tag=` sobrevive al refresco | ✅ |
+| F5 | **Bandeja de conversación compartida**: el lector privado sale de `admin/actions.ts` a `src/lib/crm-conversation.ts` (un solo lector, no dos); `ConversationPanel.tsx` se mueve a `components/crm/` y pasa a recibir `actions: ConversationPanelActions` (**lo que no se inyecta no se renderiza**). El admin inyecta `load`+`send`+`suggest`+`quickReplies`+`templates`; el vendedor **solo `load`** | ✅ |
+| F6 | **El agente entra al núcleo**: `getDailyQueue`, `generateAgentMessage`, `registerAgentTouch`, `getAgentKpis` y `getDailyBriefing` migrados a `scopeForRole` + `applyCrmScope` + `readCrmProspects`; el `interface ProspectRow` local **borrado**. Para no ensanchar el contrato con columnas que el CRM nunca pinta, `readCrmProspects` acepta `extraColumns` y las cuelga en un `extra` **opcional** | ✅ |
+| F7 | **Contratos, guardas y e2e**: `crm-reader.contract.test.ts` mantiene la **lista exacta** de los 13 archivos que leen `crm_prospects` y **falla tanto si aparece uno nuevo como si una entrada deja de tocarla**; `crm-prospects.test.ts` (18 pruebas de comportamiento sobre un cliente PostgREST de mentira, con la escalera de degradación); `crm-core.contract.test.ts` ampliado al filtro `statuses`; `use-server.contract.test.ts` para la regla del `"use server"`; y **`e2e/comercializacion.spec.ts`**, que cierra el hueco de que `/comercializacion` **no tenía ninguna prueba e2e** | ✅ |
+| F8 | **Documentación**: playbook nuevo `docs/agents/comercializacion.md`, invariantes del núcleo compartido en `docs/agents/admin.md`, fila y aviso de núcleo compartido en `docs/agents/README.md` y esta sección | ✅ |
+
+**Desviaciones registradas** (lo que el plan dijo y lo que resultó ser cierto):
+
+- **F2**: el lector **no** ordena por urgencia; ordena `created_at DESC`. El
+  `compareByUrgency` del admin se aplica en la superficie, no en el lector, porque
+  el vendedor y el agente tienen su propio criterio de orden.
+- **F5**: la prop del panel es un objeto `actions` en vez de un `loadConversation`
+  suelto — con una prop por capacidad el panel se llenaba de opcionales y el
+  vendedor tenía que pasar `undefined` explícito en cuatro sitios. Además el panel
+  se movió a `components/crm/`: dejarlo en `components/admin/` habría hecho que el
+  vendedor importara de la carpeta del admin.
+- **F5 — decisión de alcance, no descuido**: el vendedor tiene la bandeja en
+  **solo lectura** y **el envío queda diferido**. `sendLeadMessage` y
+  `suggestLeadReply` están gateados a admin, así que inyectarlos habría puesto un
+  botón que solo sabe responder *"Acceso restringido a administradores"*.
+  Habilitar el envío del vendedor es una ronda propia: exige decidir el gate de rol
+  del pipeline de WhatsApp y auditar la ventana de 24 h para un rol nuevo.
+- **F6**: el alcance es `scopeForRole(role, userId)` y no un alcance de vendedor
+  fijo — el admin también usa el módulo del agente. `trigger/route.ts` **no** se
+  tocó: su lookup por `referral_code` es el webhook público de registro y no lleva
+  alcance por diseño. Y la firma de `applyCrmScope` se **aflojó** de
+  `T extends { eq(column: string, value: string): T }` a `applyCrmScope<T>(query:
+  T, scope: CrmScope): T` porque la estricta hacía abortar a TypeScript con
+  `TS2589: Type instantiation is excessively deep` al envolver el builder de
+  PostgREST, que ya es genérico y filtrado.
+- **F7**: `loadInboxProspects` se migró al lector único aunque el plan solo lo
+  listaba como "migrable más tarde" — era el último lector paralelo del admin. Y
+  el plan hablaba de conservar `null` ≠ `0` en `duration_seconds` y
+  `days_since_order`, que **no son columnas de `crm_prospects`** (viven en
+  `crm_activities` y en un campo calculado del dashboard del vendedor): el
+  contrato lo fija sobre `tier`, `city_id` y `lead_id`.
+
+**Hallazgos que el plan no previó y el contrato sí**: además de `admin/actions.ts`
+y el módulo del agente, leían `crm_prospects` cinco archivos que el plan no había
+inventariado — `comercializacion/actions/{dashboard,pedidos,commissions-admin}.ts`
+y `crm-sequences-engine.ts`, más un segundo escaneo dentro de `admin/actions.ts`.
+No se migraron (están fuera del alcance acordado), pero quedaron **congelados** en
+la allowlist del contrato con su motivo escrito, para que el siguiente que los
+toque sepa que existen.
+
+**Trampa de plataforma medida en esta ronda**: un `export const BULK_TAG_LIMIT =
+200` dentro de un módulo `"use server"` **invalida el módulo entero**. El build de
+Turbopack falló con `The export setProspectTags was not found in module
+…/actions.ts` y el `export *` del barrel resolvía a nada — y ni `tsc` ni ESLint lo
+detectan. La constante va sin `export`, y `src/lib/use-server.contract.test.ts` lo
+fija para que no vuelva. Un barrido del repo confirmó **0 infracciones previas**:
+el defecto se introdujo y se cerró en la misma ronda.
+
+**Criterio de aceptación**: `npx playwright test e2e/admin-leads.spec.ts` tenía que
+pasar **sin modificar el spec**. Una fusión que obliga a reescribir la prueba de la
+superficie que **no** cambia de comportamiento no es una fusión. Resultado:
+**34/34 sin tocar el archivo**, más los 30 casos nuevos de
+`e2e/comercializacion.spec.ts` (64 pasando entre los dos, en `chromium` y
+`mobile-chromium`).
+
+**Verificación de la ronda**: `npx tsc --noEmit` → 0 · `npm run lint` → 0 ·
+`npm test` → **4830 passed / 0 failed (288 archivos)** · `npm run build` → 0 ·
+`npx playwright test e2e/admin-leads.spec.ts e2e/comercializacion.spec.ts` →
+**64 passed**.
+
 ## 9. Blog
 
 | # | Fase | Estado |
@@ -568,11 +730,32 @@ código duplicado se desvía en silencio.
 
 ## Verificación
 
-El pipeline `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run knip` y
-`npm run build` corre en CI (`.github/workflows/ci.yml`) y en el build de Vercel
+El pipeline `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` y
+`npm run knip` corre en CI (`.github/workflows/ci.yml`) y en el build de Vercel
 al hacer merge. Revisión estática completa del diff sin errores evidentes (los
 puntos de riesgo — imports, tipos estrictos, componentes nuevos — fueron
 verificados uno a uno).
+
+**Sobre el comando, la concurrencia y el orden** (ronda 9): los cinco pasos son
+**scripts de `package.json`**, no binarios sueltos, porque CI y local tienen que
+medir lo mismo (invariante 11). `npm run verify` encadena los cuatro rápidos
+—`typecheck` → `lint` → `test` → `knip`— y `.githooks/pre-push` los avisa **sin
+bloquear el push**; el detalle está en `docs/OPS.md` §12 y en el acta de la ronda
+9. El workflow declara `concurrency` con `cancel-in-progress`, porque sin ella
+una corrida **cancelada se reporta igual que un fallo**, y ordena `Build`
+**antes** de `Knip`: con `Knip` delante, `Build` nunca llegaba a ejecutarse y
+aparecía como `-` en todos los listados de pasos.
+
+**El `env` del job `e2e` no incluye `SUPABASE_SERVICE_ROLE_KEY`, y se midió que
+eso no es un defecto.** El job pasa **25 de 40** corridas con exactamente ese
+`env`, así que la ausencia de la clave no puede romperlo; añadir una clave
+*placeholder* sería **peor**, porque `createServiceClient()` lanza en sincrónico
+y sus llamadores lo capturan (fail-open), de modo que con una clave falsa
+`createClient` tendría éxito y convertiría un `throw` inmediato en llamadas de
+red contra un host inexistente dentro de las **64 rutas** que calienta
+`e2e/global-setup.ts`. La consecuencia aceptada es que el smoke de CI ejercita
+solo el camino de degradación del cliente de servicio; el camino con credenciales
+reales no se prueba en CI.
 
 **Sobre el quinto gate:** hasta la **ronda 7** `knip` no se había medido nunca y
 llevaba rojo permanente (479 hallazgos), así que en la práctica eran cuatro
@@ -670,6 +853,31 @@ Smoke escritorio (1280px):
    fijo en lugar del selector.
    Automatizado (guards y render sin sesión): `npx playwright test
    e2e/admin-deep-links.spec.ts`.
+
+**Lección — una allowlist con la categoría equivocada no suprime nada, y knip no
+admite supresión por símbolo.** La entrada de `knip.ignoreIssues` para
+`src/app/admin/actions.ts` decía `["exports"]`, y el hallazgo que mantenía el
+gate en rojo era un **tipo**: `LeadTimelineSource` (`actions.ts:1965`), la unión
+del origen de un evento del hilo, que quedó huérfana al moverse el hilo a
+`src/lib/crm-conversation.ts`, donde la misma unión se escribe en línea (`source`,
+L55). Medido en un proyecto mínimo, no recordado: `["exports"]` → **exit 1** con
+`Unused exported types`; `["exports", "types"]` → **exit 0**; `["types"]` →
+**exit 0**; y `["LeadTimelineSource"]` → `ERROR: Invalid input (location:
+ignoreIssues.a.ts.0)`, **exit 2**, porque la supresión es por archivo y
+categoría, nunca por nombre. Es el error de la ronda 7 en otra escala: allí
+fueron 65 entradas inertes por un `--config` que **reemplazaba** la lista en vez
+de fusionarla; aquí, una entrada medio inerte por una categoría que no cubría el
+hallazgo. El símbolo se midió muerto en el árbol **y** en `HEAD`, y el archivo lo
+tiene otra sesión en vuelo (13 altas / 31 bajas), así que se suprime en vez de
+borrarse —una sesión que reescribe ese archivo ahora mismo es la forma más rápida
+de perder su trabajo o el mío— y la supresión queda declarada como deuda en la
+fila `CI13`.
+
+**Backlog declarado de esta sección** (ronda 9):
+
+| # | Fase | Estado |
+|---|---|---|
+| CI13 | **Retirar la categoría `types` de la entrada de `src/app/admin/actions.ts`** 🔜: la ronda 9 la añadió —junto a la `exports` que ya estaba— para que `Knip` dejara de estar rojo por `LeadTimelineSource` (`actions.ts:1965`), un tipo sin ningún consumidor en el árbol ni en `HEAD` que quedó huérfano al moverse el hilo a `src/lib/crm-conversation.ts`. Cuando el refactor de esa sesión aterrice —el símbolo se consume o se borra— la entrada debe volver a `["exports"]` y su justificación en `src/lib/knip-config.contract.test.ts` recortarse; el ratchet por igualdad exacta obliga a editar el test para poder hacerlo, que es exactamente para lo que existe | 🔜 |
 
 ## Agentes de mantenimiento por dominio
 

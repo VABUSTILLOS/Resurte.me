@@ -5,6 +5,15 @@ posee, qué invariantes no puede romper y cómo verificar su trabajo. Un agente 
 toca su dominio; los cambios compartidos (globals.css, layout.tsx, toast, cart-context)
 requieren revisar todos los playbooks que dependen de esa superficie.
 
+> **El núcleo del CRM es compartido.** Desde la Ronda 10, `src/lib/crm-core.ts`,
+> `src/lib/crm-prospects.ts`, `src/lib/crm-conversation.ts`,
+> `src/components/crm/ProspectDetailDrawer.tsx` y
+> `src/components/crm/ConversationPanel.tsx` los consumen **dos** agentes: Admin
+> (`/admin/leads`) y Comercialización (`/comercializacion`). Tocarlos exige leer
+> [admin.md](admin.md) **y** [comercializacion.md](comercializacion.md).
+> `src/lib/crm-reader.contract.test.ts` mantiene la lista exacta de quién lee
+> `crm_prospects`.
+
 | Agente | Playbook | Superficie principal |
 |---|---|---|
 | Catálogo | [catalogo.md](catalogo.md) | `src/components/product`, `src/components/city`, `src/components/search`, `src/app/[slug]`, `src/app/catalogo` |
@@ -14,6 +23,7 @@ requieren revisar todos los playbooks que dependen de esa superficie.
 | Admin | [admin.md](admin.md) | `src/app/admin`, `src/app/api/admin`, `src/lib/admin-*` |
 | UX móvil global | [ux-movil.md](ux-movil.md) | `src/app/globals.css`, `src/app/layout.tsx`, `src/components/layout`, `src/components/toast.tsx`, `src/components/pwa`, `public/sw.js` |
 | Punto de venta y comandero | [pos-mesas.md](pos-mesas.md) | `src/app/panel/foodos/{mostrador,mesas,caja,tablero,pedidos}`, `src/lib/foodos-{order-create,cash,tables,payments,reportes,shift,owner,printing}`, `src/lib/panel-roles.ts` |
+| Comercialización (CRM del vendedor) | [comercializacion.md](comercializacion.md) | `src/app/comercializacion`, `src/lib/comercializacion`, `src/components/comercializacion` |
 
 ## Reglas comunes a todos los agentes
 
@@ -27,8 +37,20 @@ requieren revisar todos los playbooks que dependen de esa superficie.
    `body.cookie-consent-visible`, `body.has-sticky-atc`).
 4. **Reduced motion**: toda animación nueva entra en el bloque
    `@media (prefers-reduced-motion: reduce)` de `globals.css`.
-5. **Verificación mínima antes de commit**: `npx tsc --noEmit`, `npm run lint`,
-   `npm test` y `npm run build`.
+5. **Verificación mínima antes de commit**: `npm run verify` —que encadena
+   `npm run typecheck`, `npm run lint`, `npm test` y `npm run knip`— más
+   `npm run build`, que se deja aparte por latencia. **Son los mismos scripts
+   que corre el pipeline** (CI los declara como pasos separados para poder
+   atribuir el rojo a un gate concreto, y `src/lib/ci-config.contract.test.ts`
+   falla si invoca un `npm run X` que no existe). Mientras la invariante decía
+   `npx tsc --noEmit` y CI invocaba `npx tsc --noEmit` pero el desarrollador
+   tecleaba otra cosa, la lista era una promesa **sin ejecutor** (no existía
+   script `typecheck`, ni `verify`, ni `.githooks/`, ni `core.hooksPath`) y el
+   resultado se medía en los dos sitios a la vez: de 22 corridas rojas de
+   `verify`, **8** murieron en `Lint` y **2** en `Typecheck`. Es el mismo
+   corolario de la invariante 11 —**medir con un comando distinto es medir otra
+   cosa**—. El ejecutor local es `.githooks/pre-push`, que **avisa y no
+   bloquea** (ver `docs/OPS.md` §12).
 6. **Accesibilidad**: diálogos con foco inicial + Escape + `aria-modal`; cambios de
    estado anunciados con `aria-live`; iconos decorativos con `aria-hidden`.
 7. **Ninguna frontera `loading.tsx` por encima de un `notFound()` posterior a un
@@ -94,14 +116,36 @@ requieren revisar todos los playbooks que dependen de esa superficie.
    Matiz que conviene recordar antes de atribuirse un rojo: `knip` analiza el
    **working tree**, no `HEAD`, así que su recuento depende de lo que haya sin
    commitear; lo que el contrato fija es la configuración.
+12. **Todo pipeline declara su concurrencia y su orden de gates, o mide otra
+   cosa**: un workflow sin `concurrency` no solo desperdicia minutos —**cancela
+   evidencia**. Medido sobre 99 corridas: **33** arrancaron a menos de 180 s de
+   la anterior, mientras el job `e2e` tarda **155–244 s**; el resultado fue
+   **13 cancelaciones de 40** (`##[error]The operation was canceled.` a los
+   ~91 s, muy por debajo de su `timeout-minutes: 25`), y una cancelación se
+   reporta igual que un fallo. La coincidencia con el solape (**32,5 %** vs
+   **33 %**) descartó las hipótesis de contenido: el job `e2e` pasaba **25 de
+   40** con **exactamente el mismo `env`**, así que le faltaba un candado, no
+   una variable. Y el **orden** es la otra mitad: con `Knip` antes de `Build`,
+   `Build` **nunca llegó a ejecutarse** en CI —aparecía como `-` en todos los
+   listados de pasos—, de modo que el gate más caro del repo llevaba quién sabe
+   cuánto sin medir nada mientras el pipeline parecía tenerlo. Un paso que no
+   puede llegar a correr no es un gate. `src/lib/ci-config.contract.test.ts`
+   **falla** si desaparece `concurrency`, si deja de cancelar, si el grupo pierde
+   `github.ref`, si un `npm run X` del workflow apunta a un script inexistente,
+   si vuelve `npx tsc --noEmit` o `knip --production` a una línea `run:`, si
+   `Build` sale de su sitio (después de los tests, antes de `Knip`), si una
+   variable `env:` no está documentada en `.env.local.example`, si `test:e2e`
+   pierde `--grep @ci`, si el hook de pre-push deja de ser ejecutable o gana
+   `exit 1`/`set -e`, o si se reintroduce un gestor de hooks que bloquee
+   (`husky`, `lint-staged`, `simple-git-hooks`, script `prepare`).
 
 ## Sin agente asignado: cuenta y autenticación
 
 `src/app/auth/**`, `src/components/auth/**`, `src/lib/supabase/**` y
-`src/lib/passkeys.ts` (fase U del plan) no pertenecen a ninguno de los siete
+`src/lib/passkeys.ts` (fase U del plan) no pertenecen a ninguno de los ocho
 perímetros. **Todos** los agentes dependen de ellos, porque todos asumen una
 sesión: `createClient()` devuelve `null` sin configuración y los consumidores
-hacen `if (!supabase) return`. Antes de tocarlos, revisar los siete playbooks.
+hacen `if (!supabase) return`. Antes de tocarlos, revisar los ocho playbooks.
 Reglas propias de esta superficie:
 
 1. `src/lib/supabase/client.ts` enciende `auth: { experimental: { passkey: true } }`.

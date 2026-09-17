@@ -5,6 +5,15 @@ on:
     branches: [main]
   pull_request:
 
+# Una corrida por rama y workflow: un push nuevo cancela el anterior en vez de
+# competir por el mismo runner. Sin esto, `e2e` (155-244 s) moría a los ~91 s con
+# `##[error]The operation was canceled.` cada vez que un push llegaba a <180 s
+# de la corrida anterior — 33 de 99 corridas lo hacían. El grupo incluye
+# `github.ref`, así que un PR y `main` no se cancelan entre sí.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -25,8 +34,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # `npm run typecheck`, no `npx tsc --noEmit`: CI y local deben invocar el
+      # mismo comando (invariante 11). Si el script cambia, cambia en los dos.
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Lint
         run: npm run lint
@@ -34,11 +45,15 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Knip (dead code audit)
-        run: npm run knip
-
+      # `Build` va ANTES de `Knip` a propósito. Con `Knip` delante, toda corrida
+      # que knip rompía dejaba `Build` sin ejecutar (conclusión `-`): el gate más
+      # caro era el único que nunca daba señal. `Knip` sigue bloqueando, solo
+      # deja de esconder lo que viene después.
       - name: Build
         run: npm run build
+
+      - name: Knip (dead code audit)
+        run: npm run knip
 
   e2e:
     runs-on: ubuntu-latest

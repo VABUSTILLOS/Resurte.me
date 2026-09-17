@@ -101,7 +101,7 @@ Si el proyecto Vercel está en plan **Hobby**, el límite es **2 crons** — añ
 | `CRON_SECRET` | **Sí (crons)** | Autoriza los endpoints cron (`/api/cron/daily`, `/api/cron/reconcile-payments`, `/api/cron/cleanup-guest-addresses`) | Fail-closed: sin ella los crons devuelven 401. Rotar vía Vercel dashboard → Settings → Environment Variables. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Sí | Cliente Supabase (browser + server) | Pública. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Sí | Cliente browser | Pública; RLS protege las tablas. |
-| `SERVICE_ROLE_KEY` | Sí | Server actions + endpoints con `createServiceClient` | **Nunca** exponer al browser. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Sí | Server actions + endpoints con `createServiceClient` | **Nunca** exponer al browser. Nombre exacto: `createServiceClient()` (`src/lib/supabase/service.ts`) lanza si falta, y sus llamadores lo capturan (fail-open). |
 | `STRIPE_SECRET_KEY` | Sí | Crear intents, confirmar pagos | `sk_live_...` en producción. |
 | `STRIPE_WEBHOOK_SECRET` | Sí | Validar webhooks Stripe | `whsec_...`. |
 | `STRIPE_CONNECT_ENABLED` | No | Enruta los cargos de tarjeta de FoodOS a la cuenta Connect del restaurante | `true` / `1`. **Por defecto apagado.** Requiere activar Connect antes en el Dashboard de Stripe (ver §11). |
@@ -1024,6 +1024,57 @@ ningún payload construido desde el cliente.**
 - `application_fee_amount` y `connected_account_id` se persisten en
   `foodos_orders` **sólo** cuando el cargo realmente se enrutó, para no dejar
   registros de una comisión que nunca se cobró.
+
+---
+
+## 12. Verificación mínima antes de push (local y CI)
+
+### Los comandos
+
+| Comando | Qué encadena | Cuándo |
+| --- | --- | --- |
+| `npm run verify` | `typecheck` → `lint` → `test` → `knip` | antes de cada commit |
+| `npm run build` | `next build` | antes de cerrar una ronda (es el más lento) |
+
+`npm run typecheck` (`tsc --noEmit`) existe como script propio desde la ronda 8.
+Antes el pipeline invocaba `npx tsc --noEmit` mientras el desarrollador tecleaba
+otra cosa — exactamente lo que prohíbe la invariante 11 de
+`docs/agents/README.md` (`medir con un comando distinto es medir otra cosa`).
+
+### El hook de pre-push: avisa, no bloquea
+
+El checkout de este repositorio **lo comparten varias sesiones a la vez**, así que
+un hook que aborte el push castigaría a quien no hizo el cambio. `.githooks/pre-push`
+corre `npm run typecheck` y `npm run lint` con la salida silenciada y, si algo sale
+rojo, imprime un aviso — **siempre termina en `exit 0`**. El CI decide.
+
+Está **desactivado por defecto** (git solo mira `.git/hooks/`). Para activarlo:
+
+```bash
+git config core.hooksPath .githooks     # activar
+git config --unset core.hooksPath       # desactivar
+```
+
+Degrada en silencio —sin ruido y con `exit 0`— si no hay `node_modules` o no hay
+`npm` en el `PATH`. No corre `knip` a propósito: su latencia no se justifica en un
+hook de push, y `knip` mide el **working tree**, no `HEAD`.
+
+### El pipeline
+
+`.github/workflows/ci.yml` declara `concurrency` con
+`group: ${{ github.workflow }}-${{ github.ref }}` y `cancel-in-progress: true`, y
+ordena los gates así:
+
+`Install` → `Typecheck` → `Lint` → `Unit tests` → **`Build`** → `Knip`
+
+`Knip` sigue bloqueando el pipeline; lo único que cambió es que dejó de **esconder**
+`Build`. Con `Knip` delante, `Build` nunca llegaba a ejecutarse y aparecía como `-`
+en todos los listados de pasos: el gate más caro del repo llevaba sin medir nada
+mientras el pipeline parecía tenerlo. El job `e2e` va aparte y corre
+`npm run test:e2e` (`playwright test --grep @ci`).
+
+`src/lib/ci-config.contract.test.ts` vigila todo lo anterior y falla si alguna de
+esas piezas se pierde.
 
 ---
 

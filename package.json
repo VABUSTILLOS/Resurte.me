@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "knip": "knip",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run knip",
     "test:e2e": "playwright test --grep @ci",
     "test:e2e:all": "playwright test",
     "admin": "node scripts/admin-credentials.mjs"
@@ -75,7 +77,8 @@
     ],
     "ignoreIssues": {
       "src/app/admin/actions.ts": [
-        "exports"
+        "exports",
+        "types"
       ],
       "src/lib/ai/kie-ai.ts": [
         "exports"
