@@ -185,6 +185,22 @@
   columnas que el export completo. La cancelación masiva es la única acción
   destructiva y siempre pide `window.confirm` (`bulkCancelConfirmMessage`).
 
+- Deep-links del dashboard: las alertas **no escriben su `href` a mano** — lo
+  resuelve `buildAlertHref` (`src/lib/admin-alerts.ts`) y se ordenan con
+  `sortAlertsBySeverity` (crítica → aviso → informativa). Parámetros aceptados:
+  `/admin/pedidos` → `status` (allowlist `ORDER_STATUS_VALUES`), `q`, `from`,
+  `to` (fechas ISO, validados; los helpers puros viven en `order-filters.ts`);
+  `/admin/marketing` → `code` (enfoca el cupón sin distinguir mayúsculas,
+  con banner dismissible y `scrollIntoView` que respeta
+  `prefers-reduced-motion`); `/admin/productos` → `stock`/`view`/… (ronda 2).
+  Todo parámetro se lee con `useSearchParams()` dentro de un `<Suspense>`, se
+  valida contra una allowlist y se escribe de vuelta con `router.replace`
+  (`{ scroll: false }`) — nunca con `useState` inicializado una sola vez ni
+  con un efecto que fije estado (`set-state-in-effect` es error).
+  La asignación de repartidor del dashboard reusa `canAssignDriver`
+  (`order-bulk.ts`) y `activeDrivers` (`src/lib/drivers.ts`): no duplicar
+  ninguna de las dos reglas.
+
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de
 visibilidad de un producto y confirmación de que el caché de catálogo se invalida.
@@ -206,3 +222,14 @@ indeterminado; que el cambio de estado omite los pedidos terminales (la barra
 lo dice); que cancelar en lote pide confirmación; y que "Exportar selección"
 descarga solo las filas marcadas. Los guards sin sesión están automatizados:
 `npx playwright test e2e/compartir.spec.ts --grep "acciones masivas"`.
+
+Deep-links y repartidor (requiere sesión admin + datos): en `/admin`, la alerta
+"N pedidos sin confirmar" debe abrir `/admin/pedidos` con el filtro "Pendientes"
+aplicado y reflejado en la URL; la alerta de cupón por expirar debe abrir
+`/admin/marketing?code=<cupón>` con el cupón resaltado (y poder quitar el foco);
+la alerta de leads debe abrir `/admin/leads`. En "Pedidos recientes", asignar y
+desasignar repartidor con el selector de un pedido no terminal (con toast de
+confirmación), y comprobar que un pedido entregado o cancelado muestra el nombre
+fijo en lugar del selector. Probar además `?status=../etc/passwd`,
+`?from=no-es-fecha&to=2026-13-45` y `?code=NO-EXISTE`: nunca un 5xx.
+Automatizado: `npx playwright test e2e/admin-deep-links.spec.ts`.

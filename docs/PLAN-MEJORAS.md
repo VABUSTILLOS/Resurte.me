@@ -162,9 +162,9 @@
 | A36 | Productos ronda 7: detección de imágenes rotas en lote (`product-images.ts` + `check-images`, reemplazar/quitar URL), retención y purga de papelera (`trash.ts`, 30 días, `purge-trash` en cron diario y botón "Vaciar papelera") y diff antes/después en el historial (`audit-diff.ts`, sparkline de precios) | ✅ |
 | A37 | Productos ronda 7: SEO con IA en lote (`seo-batch.ts` + `bulk-seo`, solo propuestas con vista previa editable) y reporte de ventas ampliado con margen, costo faltante y clasificación ABC (`sales-report.ts`, CSV + `format=json` con resumen del rango) | ✅ |
 | A38 | Productos en móvil: contenedor `max-w-7xl`, barra de acciones con CTA primario + menú "Más", bloques de diagnóstico plegables (`MobileCollapsible`), vista grid por defecto en móvil y tabla en escritorio (`admin-products-view.ts`, derivada con `useMediaQuery`), columnas secundarias ocultas bajo `md` | ✅ |
-| A12 | Asignación de repartidor desde el dashboard | 🔜 |
+| A12 | Asignación de repartidor desde el dashboard: columna "Repartidor" en "Pedidos recientes" con selector de repartidores **activos** (`activeDrivers` de `src/lib/drivers.ts`, compartido con `/admin/pedidos`) en los pedidos no terminales y nombre fijo en los cerrados. Reutiliza `canAssignDriver` (`order-bulk.ts`) como fuente única de la regla y el `PATCH /api/orders/[id]/status` existente (`driver_id: null` desasigna), con actualización optimista y reversión + toast si falla | ✅ |
 | A14 | Pedidos: filtros guardados ✅ (`admin_saved_filters`) **y acciones masivas de estado** ✅: checkbox por renglón + "seleccionar todos los visibles" (indeterminado), barra de acciones con cambio de estado, confirmación de pago y asignación de repartidor, y exportación CSV de la selección. Las reglas puras viven en `src/lib/order-bulk.ts` (28 tests): los pedidos en estado terminal (`delivered`/`cancelled`) se omiten de las acciones de estado pero siguen seleccionables a mano para correcciones puntuales, y la partición devuelve `{eligible, skipped}` por acción. La barra hace fan-out **secuencial** al `PATCH /api/orders/[id]/status` existente (no hay endpoint batch) para no duplicar ni perder efectos por pedido — cupones, `payment_status: "failed"` al cancelar, workflows de WhatsApp, cashback y auditoría. La cancelación masiva es la única acción destructiva: pide `window.confirm` | ✅ |
-| A15 | Dashboard: alertas accionables con deep-link al recurso | 🔜 |
+| A15 | Dashboard: alertas accionables con deep-link al recurso. Las alertas ya enlazaban, pero 3 de los 5 enlaces no llevaban al recurso concreto; la ronda 2 lo cierra: los `href` los resuelve `buildAlertHref` (`src/lib/admin-alerts.ts`) en lugar de escribirse a mano, y las alertas se devuelven con `sortAlertsBySeverity` (crítica → aviso → informativa) para que una crítica no quede debajo de una informativa. `/admin/pedidos` acepta `?status=&q=&from=&to=` (lectura validada con allowlist + escritura de vuelta a la URL, mismo patrón que `/admin/productos`), `/admin/marketing` acepta `?code=` y enfoca el cupón (banner dismissible + anillo + `scrollIntoView` respetando `prefers-reduced-motion`, y aviso propio si el cupón ya no existe), y la alerta de leads apunta a `/admin/leads` en vez de al propio dashboard (era un enlace a sí mismo). El badge "N pendientes por atender" enlaza a `/admin/pedidos?status=pending` | ✅ |
 
 ## 9. Blog
 
@@ -229,6 +229,16 @@ Smoke escritorio (1280px):
    pide confirmación, y "Exportar selección" descarga solo las filas marcadas.
    Automatizado (guards sin sesión): `npx playwright test
    e2e/compartir.spec.ts --grep "acciones masivas"`.
+4. `/admin` con sesión admin: la alerta "N pedidos sin confirmar" abre
+   `/admin/pedidos` ya filtrado por "Pendientes" (y la URL refleja el filtro);
+   la alerta de cupón por expirar abre `/admin/marketing?code=<cupón>`, que
+   resalta el cupón y permite quitar el foco; la alerta de leads abre
+   `/admin/leads`. En "Pedidos recientes", el selector de "Repartidor" de un
+   pedido no terminal asigna/desasigna sin salir del dashboard (y el toast
+   confirma), mientras que un pedido entregado o cancelado muestra el nombre
+   fijo en lugar del selector.
+   Automatizado (guards y render sin sesión): `npx playwright test
+   e2e/admin-deep-links.spec.ts`.
 
 ## Agentes de mantenimiento por dominio
 

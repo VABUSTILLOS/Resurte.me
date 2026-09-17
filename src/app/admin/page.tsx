@@ -28,6 +28,9 @@ import {
 } from "./actions"
 import { STATUS_LABEL, STATUS_COLOR, PAYMENT_METHOD_LABEL } from "@/lib/order-labels"
 import { formatRelativeTime } from "@/lib/relative-time"
+import { activeDrivers, driverNameById, type DriverLike } from "@/lib/drivers"
+import { canAssignDriver } from "@/lib/order-bulk"
+import { ToastProvider, useToast } from "@/components/toast"
 import { AdminAlerts } from "./components/AdminAlerts"
 import { LeadsCrmWidget } from "./components/LeadsCrmWidget"
 import { DashboardSkeleton } from "./components/DashboardSkeleton"
@@ -85,6 +88,15 @@ function buildDelta(
 }
 
 export default function AdminDashboardPage() {
+  return (
+    <ToastProvider>
+      <AdminDashboardContent />
+    </ToastProvider>
+  )
+}
+
+function AdminDashboardContent() {
+  const { toast } = useToast()
   const [period, setPeriod] = useState<"daily" | "weekly" | "monthly">("daily")
   const [metrics, setMetrics] = useState<{
     points: Array<{ period: string; revenue: number; orders: number; aov: number; conversion: number }>
@@ -102,6 +114,10 @@ export default function AdminDashboardPage() {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // A12 — asignación de repartidor directo desde el dashboard.
+  const [drivers, setDrivers] = useState<DriverLike[]>([])
+  const [assigningId, setAssigningId] = useState<number | null>(null)
 
   // Bitácora: últimas acciones admin sobre pedidos (C5).
   const [auditEntries, setAuditEntries] = useState<
@@ -159,7 +175,64 @@ export default function AdminDashboardPage() {
     }
   }, [])
 
+  // Repartidores (best-effort: si falla, la columna muestra el nombre ya
+  // asignado o "—" y no se ofrece el selector). Se guardan todos —incluidos los
+  // inactivos— para poder etiquetar pedidos ya entregados.
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/admin/drivers", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { drivers?: DriverLike[] } | null) => {
+        if (!cancelled && data?.drivers) setDrivers(data.drivers)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const assignDriver = useCallback(
+    async (orderId: number, driverId: number | null) => {
+      const previous =
+        orders.find((o) => o.id === orderId)?.driver_id ?? null
+      setAssigningId(orderId)
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, driver_id: driverId } : o))
+      )
+      try {
+        const res = await fetch(`/api/orders/${orderId}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ driver_id: driverId }),
+        })
+        const data = await res.json().catch(() => null)
+        if (!res.ok) {
+          throw new Error(data?.error || "Error al asignar el repartidor")
+        }
+        const name = driverId === null ? null : driverNameById(drivers, driverId)
+        toast(
+          name
+            ? `Repartidor ${name} asignado al pedido #${orderId}`
+            : `Pedido #${orderId} sin repartidor`,
+          "success"
+        )
+      } catch (e) {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? { ...o, driver_id: previous } : o))
+        )
+        toast(
+          e instanceof Error ? e.message : "Error de conexión",
+          "error"
+        )
+      } finally {
+        setAssigningId(null)
+      }
+    },
+    [drivers, orders, toast]
+  )
+
   const recentOrders = orders.slice(0, 5)
+  const assignableDrivers = activeDrivers(drivers)
   const statCards: {
     label: string
     value: string
@@ -239,7 +312,7 @@ export default function AdminDashboardPage() {
         </div>
         {stats && stats.pendingCount > 0 && (
           <Link
-            href="/admin/pedidos"
+            href="/admin/pedidos?status=pending"
             className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
           >
             <Clock className="w-3.5 h-3.5" />
@@ -327,6 +400,7 @@ export default function AdminDashboardPage() {
                 <th className="px-5 py-2.5">Total</th>
                 <th className="px-5 py-2.5">Pago</th>
                 <th className="px-5 py-2.5">Estado</th>
+                <th className="px-5 py-2.5">Repartidor</th>
                 <th className="px-5 py-2.5">Fecha</th>
               </tr>
             </thead>
@@ -347,6 +421,35 @@ export default function AdminDashboardPage() {
                       {STATUS_LABEL[order.status]}
                     </span>
                   </td>
+                  {/* A12 — asignar repartidor sin salir del dashboard. Solo en
+                      pedidos no terminales; el resto muestra el nombre fijo. */}
+                  <td className="px-5 py-3">
+                    {canAssignDriver(order) ? (
+                      <select
+                        value={order.driver_id ?? ""}
+                        onChange={(e) =>
+                          assignDriver(
+                            order.id,
+                            e.target.value === "" ? null : Number(e.target.value)
+                          )
+                        }
+                        disabled={assigningId === order.id}
+                        aria-label={`Repartidor del pedido #${order.id}`}
+                        className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:outline-none disabled:opacity-50"
+                      >
+                        <option value="">Sin asignar</option>
+                        {assignableDrivers.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-xs text-gray-500">
+                        {driverNameById(drivers, order.driver_id) ?? "—"}
+                      </span>
+                    )}
+                  </td>
                   {/* Fase 7 — fecha relativa con la absoluta en el tooltip */}
                   <td
                     className="px-5 py-3 text-xs text-gray-400"
@@ -358,7 +461,7 @@ export default function AdminDashboardPage() {
               ))}
               {recentOrders.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={6} className="px-5 py-12 text-center text-gray-400 text-sm">
                     No hay pedidos aún.
                   </td>
                 </tr>

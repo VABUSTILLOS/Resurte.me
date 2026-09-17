@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   getAdminOrders,
   type AdminOrder,
@@ -11,7 +12,7 @@ import {
   PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_LABEL,
 } from "@/lib/order-labels"
-import { Search, RefreshCw, X, Printer, Bike, Download } from "lucide-react"
+import { Search, RefreshCw, X, Printer, Bike, Download, Loader2 } from "lucide-react"
 import { toCsv, downloadCsv } from "@/lib/csv"
 import type { OrderStatus } from "@/types"
 import { ToastProvider, useToast } from "@/components/toast"
@@ -20,12 +21,15 @@ import { useOrderAutoRefresh } from "@/hooks/use-order-auto-refresh"
 import { formatRelativeTime } from "@/lib/relative-time"
 import {
   normalizeDateRange,
+  orderFilterQuery,
+  parseOrderFilterParams,
   parseSavedFilters,
   serializeSavedFilters,
   makeSavedFilter,
   SAVED_FILTERS_STORAGE_KEY,
   type SavedOrderFilter,
 } from "@/lib/order-filters"
+import { activeDrivers, type DriverLike } from "@/lib/drivers"
 import {
   BULK_STATUS_TARGETS,
   areAllSelected,
@@ -69,26 +73,46 @@ const STATUS_FILTERS: { label: string; value: OrderStatus | "all" }[] = [
 export default function AdminOrdersPage() {
   return (
     <ToastProvider>
-      <AdminOrdersContent />
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center py-20 text-gray-400">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            Cargando pedidos...
+          </div>
+        }
+      >
+        <AdminOrdersContent />
+      </Suspense>
     </ToastProvider>
   )
 }
 
 function AdminOrdersContent() {
   const { toast } = useToast()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  // A15 ronda 2 — los filtros viven en la URL para que las alertas del
+  // dashboard puedan enlazar al subconjunto exacto de pedidos.
+  const initialFilters = useMemo(
+    () => parseOrderFilterParams(searchParams),
+    [searchParams]
+  )
   const [orders, setOrders] = useState<AdminOrder[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all")
-  const [search, setSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">(
+    initialFilters.status
+  )
+  const [search, setSearch] = useState(initialFilters.search)
+  const [debouncedSearch, setDebouncedSearch] = useState(initialFilters.search)
   // Fase 9 — rango de fechas (YYYY-MM-DD) y presets guardados en localStorage.
   // Lazy init: lee localStorage en el primer render del cliente (este componente
   // no hace SSR de datos, no hay riesgo de mismatch de hidratación).
-  const [fromDate, setFromDate] = useState("")
-  const [toDate, setToDate] = useState("")
+  const [fromDate, setFromDate] = useState(initialFilters.from)
+  const [toDate, setToDate] = useState(initialFilters.to)
   const [savedFilters, setSavedFilters] = useState<SavedOrderFilter[]>(() => {
     try {
       return parseSavedFilters(localStorage.getItem(SAVED_FILTERS_STORAGE_KEY))
@@ -99,7 +123,7 @@ function AdminOrdersContent() {
   })
   const [updatingId, setUpdatingId] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [drivers, setDrivers] = useState<{ id: number; name: string; is_active: boolean }[]>([])
+  const [drivers, setDrivers] = useState<DriverLike[]>([])
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null)
   // Fase 14 — selección múltiple para acciones masivas
   const [selected, setSelected] = useState<Selection>(() => new Set<number>())
@@ -110,18 +134,35 @@ function AdminOrdersContent() {
 
   useEscapeKey(useCallback(() => setSelectedOrder(null), []), !!selectedOrder)
 
+  const assignableDrivers = useMemo(() => activeDrivers(drivers), [drivers])
+
   // Debounce: el filtro se aplica en SQL, no sobre la página cargada.
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search.trim()), 300)
     return () => clearTimeout(id)
   }, [search])
 
-  // Repartidores activos para asignación (migración 00076).
+  // A15 ronda 2 — sincroniza los filtros activos a la URL (sin recargar ni
+  // scroll) para que la vista sea compartible y las alertas del dashboard
+  // puedan enlazar al subconjunto exacto de pedidos.
+  useEffect(() => {
+    const qs = orderFilterQuery({
+      status: statusFilter,
+      search: debouncedSearch,
+      from: fromDate,
+      to: toDate,
+    })
+    router.replace(qs ? `?${qs}` : pathname, { scroll: false })
+  }, [debouncedSearch, statusFilter, fromDate, toDate, router, pathname])
+
+  // Repartidores para asignación (migración 00076). Se conservan también los
+  // inactivos para poder etiquetar pedidos ya cerrados; el selector solo
+  // ofrece los activos (ver `assignableDrivers`).
   useEffect(() => {
     fetch("/api/admin/drivers", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { drivers?: { id: number; name: string; is_active: boolean }[] } | null) => {
-        if (data?.drivers) setDrivers(data.drivers.filter((d) => d.is_active))
+      .then((data: { drivers?: DriverLike[] } | null) => {
+        if (data?.drivers) setDrivers(data.drivers)
       })
       .catch(() => {})
   }, [refreshKey])
@@ -649,7 +690,7 @@ function AdminOrdersContent() {
             className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 disabled:opacity-50"
           >
             <option value="">Asignar repartidor…</option>
-            {drivers.map((d) => (
+            {assignableDrivers.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
               </option>
@@ -948,7 +989,7 @@ function AdminOrdersContent() {
               </div>
 
               {/* Repartidor asignado (migración 00076) */}
-              {drivers.length > 0 &&
+              {assignableDrivers.length > 0 &&
                 selectedOrder.status !== "cancelled" &&
                 selectedOrder.status !== "delivered" && (
                   <div className="flex items-center gap-2 pt-1">
@@ -966,7 +1007,7 @@ function AdminOrdersContent() {
                       aria-label="Asignar repartidor"
                     >
                       <option value="">Sin repartidor asignado</option>
-                      {drivers.map((d) => (
+                      {assignableDrivers.map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.name}
                         </option>

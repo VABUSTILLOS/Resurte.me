@@ -1,7 +1,10 @@
 /**
  * Fase 9 — utilidades puras para la búsqueda avanzada de pedidos admin:
- * rango de fechas y filtros guardados (presets en localStorage).
+ * rango de fechas, filtros guardados (presets en localStorage) y los mismos
+ * filtros viajando en la URL (deep-link desde las alertas del dashboard).
  */
+
+import type { OrderStatus } from "@/types"
 
 export interface OrderDateRange {
   /** ISO date (YYYY-MM-DD) inclusive, día calendario local */
@@ -96,3 +99,76 @@ export function makeSavedFilter(
   if (!clean) return null
   return { name: clean, ...current }
 }
+
+/** Estado de filtro de la página: un estado concreto o todos. */
+export type OrderStatusFilter = OrderStatus | "all"
+
+/**
+ * Allowlist runtime de estados aceptados por el filtro.
+ * Un test verifica que coincide con `STATUS_LABEL` (`src/lib/order-labels.ts`)
+ * para que no se desincronice del catálogo real de estados.
+ */
+export const ORDER_STATUS_VALUES: readonly OrderStatus[] = [
+  "pending",
+  "confirmed",
+  "preparing",
+  "out_for_delivery",
+  "delivered",
+  "cancelled",
+]
+
+/** Subconjunto de la página que viaja en la URL. */
+export interface OrderFilterState {
+  status: OrderStatusFilter
+  search: string
+  from: string
+  to: string
+}
+
+/** Estado inicial de la página, también usado como forma del preset guardado. */
+export const EMPTY_ORDER_FILTER: OrderFilterState = {
+  status: "all",
+  search: "",
+  from: "",
+  to: "",
+}
+
+function isOrderStatus(value: string): value is OrderStatus {
+  return (ORDER_STATUS_VALUES as readonly string[]).includes(value)
+}
+
+/**
+ * Lee los filtros de la query string. Cada valor se valida antes de usarse como
+ * estado: un `status` fuera de la allowlist o una fecha mal formada se
+ * descartan en lugar de propagarse (la URL la puede escribir cualquiera).
+ *
+ * Las claves (`status`, `q`, `from`, `to`) son las mismas que serializa
+ * `orderFilterQuery`, de modo que un enlace profundo y un filtro guardado
+ * describen lo mismo y no compiten entre sí.
+ */
+export function parseOrderFilterParams(params: URLSearchParams): OrderFilterState {
+  const rawStatus = params.get("status")?.trim() ?? ""
+  const rawFrom = params.get("from")?.trim() ?? ""
+  const rawTo = params.get("to")?.trim() ?? ""
+  return {
+    status: isOrderStatus(rawStatus) ? rawStatus : "all",
+    search: params.get("q")?.trim() ?? "",
+    from: isValidIsoDate(rawFrom) ? rawFrom : "",
+    to: isValidIsoDate(rawTo) ? rawTo : "",
+  }
+}
+
+/**
+ * Serializa el filtro activo a query string (sin `?`). Se omiten los valores por
+ * defecto para que la URL limpia siga siendo la de la vista sin filtrar.
+ */
+export function orderFilterQuery(current: OrderFilterState): string {
+  const sp = new URLSearchParams()
+  if (current.status !== "all") sp.set("status", current.status)
+  const search = current.search.trim()
+  if (search) sp.set("q", search)
+  if (isValidIsoDate(current.from.trim())) sp.set("from", current.from.trim())
+  if (isValidIsoDate(current.to.trim())) sp.set("to", current.to.trim())
+  return sp.toString()
+}
+

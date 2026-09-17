@@ -7,6 +7,12 @@ import { logger } from "@/lib/logger"
 import { requireAdmin } from "@/lib/admin-auth"
 import { isMissingColumnError } from "@/lib/sale-window"
 import { deriveStockStatus } from "@/lib/stock"
+import {
+  buildAlertHref,
+  sortAlertsBySeverity,
+  type AdminAlertKind,
+  type AdminAlertSeverity,
+} from "@/lib/admin-alerts"
 import { format } from "date-fns"
 
 interface AdminOrderItem {
@@ -604,8 +610,8 @@ export async function getAdminTodayStats(): Promise<AdminTodayStats> {
 // ============================================================
 
 export interface AdminAlert {
-  kind: "stale_pending" | "out_of_stock" | "low_stock" | "coupon_expiring" | "new_leads"
-  severity: "critical" | "warning" | "info"
+  kind: AdminAlertKind
+  severity: AdminAlertSeverity
   title: string
   detail: string
   href: string
@@ -615,6 +621,11 @@ export interface AdminAlert {
  * Alertas accionables para el dashboard: pedidos pendientes viejos (>30 min),
  * productos agotados / con stock bajo, cupones que expiran en 7 días y leads
  * capturados en las últimas 48 h.
+ *
+ * El `href` no se escribe aquí: lo resuelve `buildAlertHref` para que cada
+ * alerta aterrice en el recurso concreto (ver `src/lib/admin-alerts.ts`). Las
+ * alertas se devuelven ordenadas por severidad para que una crítica no quede
+ * debajo de una informativa.
  */
 export async function getAdminAlerts(): Promise<AdminAlert[]> {
   const { response: adminDenied } = await requireAdmin()
@@ -673,7 +684,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
       severity: "critical",
       title: `${staleCount} pedido${staleCount === 1 ? "" : "s"} sin confirmar`,
       detail: `El más antiguo lleva ${minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`} esperando.`,
-      href: "/admin/pedidos",
+      href: buildAlertHref({ kind: "stale_pending" }),
     })
   }
 
@@ -684,7 +695,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
       severity: "warning",
       title: `${outCount} producto${outCount === 1 ? "" : "s"} agotado${outCount === 1 ? "" : "s"}`,
       detail: "Siguen visibles en la tienda pero sin stock disponible.",
-      href: "/admin/productos?stock=out_of_stock",
+      href: buildAlertHref({ kind: "out_of_stock" }),
     })
   }
 
@@ -695,7 +706,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
       severity: "info",
       title: `${lowCount} producto${lowCount === 1 ? "" : "s"} con stock bajo`,
       detail: "Conviene resurtir antes de que se agoten.",
-      href: "/admin/productos?stock=low_stock",
+      href: buildAlertHref({ kind: "low_stock" }),
     })
   }
 
@@ -707,7 +718,7 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
       severity: "info",
       title: `Cupón ${c.code} expira pronto`,
       detail: days <= 1 ? "Expira en menos de 24 h." : `Expira en ${days} días.`,
-      href: "/admin/marketing",
+      href: buildAlertHref({ kind: "coupon_expiring", code: c.code }),
     })
   }
 
@@ -718,11 +729,11 @@ export async function getAdminAlerts(): Promise<AdminAlert[]> {
       severity: "info",
       title: `${leadsCount} lead${leadsCount === 1 ? "" : "s"} nuevo${leadsCount === 1 ? "" : "s"} (48 h)`,
       detail: "Capturados en checkout; listos para seguimiento.",
-      href: "/admin",
+      href: buildAlertHref({ kind: "new_leads" }),
     })
   }
 
-  return alerts
+  return sortAlertsBySeverity(alerts)
 }
 
 // ============================================================

@@ -266,6 +266,13 @@
       ],
       "src/lib/share-list.ts": [
         "exports"
+      ],
+      "src/lib/admin-alerts.ts": [
+        "exports"
+      ],
+      "src/lib/order-filters.ts": [
+        "exports",
+        "types"
       ]
     }
   }

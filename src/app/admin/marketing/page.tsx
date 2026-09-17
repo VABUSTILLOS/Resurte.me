@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { Copy, Megaphone, Pencil, Percent, Plus, Power, TicketPercent, Trash2 } from "lucide-react"
+import { Suspense, useCallback, useEffect, useRef, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { Copy, Megaphone, Pencil, Percent, Plus, Power, TicketPercent, Trash2, X } from "lucide-react"
 import { suggestDuplicateCode } from "@/lib/admin-marketing-validation"
 import BumpAffinitySection, { type AffinityPair } from "@/components/admin/bump-affinity-section"
 
@@ -44,13 +45,41 @@ const TRIGGER_LABEL: Record<string, string> = {
  * /admin/marketing — CRUD de order bumps y cupones públicos (antes solo
  * configurable por SQL/seed). Toggle on/off inmediato, alta de cupones y
  * expiración sin deploy. Las ofertas de upsell comparten bump_rules.
+ *
+ * Acepta `?code=XYZ` para enfocar un cupón concreto: así la alerta de "cupón
+ * por expirar" del dashboard aterriza en el cupón que la disparó.
  */
 export default function MarketingAdminPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+          <div className="h-6 w-72 animate-pulse rounded bg-gray-100 mb-6" />
+          <div className="h-40 animate-pulse rounded-xl bg-gray-100" />
+        </div>
+      }
+    >
+      <MarketingContent />
+    </Suspense>
+  )
+}
+
+function MarketingContent() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [rules, setRules] = useState<BumpRule[]>([])
   const [pairs, setPairs] = useState<AffinityPair[]>([])
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  // A15 ronda 2 — cupón enfocado por deep-link (dismissible).
+  const [focusedCode, setFocusedCode] = useState(
+    () => searchParams.get("code")?.trim() ?? ""
+  )
+  const couponRefs = useRef<Map<number, HTMLLIElement>>(new Map())
+  const scrolledCodeRef = useRef<string | null>(null)
 
   // Form de cupón nuevo
   const [newCode, setNewCode] = useState("")
@@ -76,6 +105,8 @@ export default function MarketingAdminPage() {
       setCoupons(((await c.json()) as { coupons: Coupon[] }).coupons)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar datos")
+    } finally {
+      setLoaded(true)
     }
   }, [])
 
@@ -89,6 +120,34 @@ export default function MarketingAdminPage() {
     setError(null)
     await load()
   }, [load])
+
+  const focusedCoupon = focusedCode
+    ? coupons.find((c) => c.code.toLowerCase() === focusedCode.toLowerCase()) ?? null
+    : null
+
+  // Lleva el cupón enfocado a la vista una sola vez por código; el resto de
+  // rerenders (edición, expiración) no vuelven a saltar.
+  useEffect(() => {
+    if (!focusedCode) {
+      scrolledCodeRef.current = null
+      return
+    }
+    if (!focusedCoupon || scrolledCodeRef.current === focusedCode) return
+    const el = couponRefs.current.get(focusedCoupon.id)
+    if (!el) return
+    scrolledCodeRef.current = focusedCode
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" })
+  }, [focusedCode, focusedCoupon])
+
+  const clearFocusedCode = useCallback(() => {
+    setFocusedCode("")
+    scrolledCodeRef.current = null
+    const sp = new URLSearchParams(searchParams.toString())
+    sp.delete("code")
+    const qs = sp.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [pathname, router, searchParams])
 
   const toggleRule = async (rule: BumpRule) => {
     const res = await fetch(`/api/admin/bump-rules/${rule.id}`, {
@@ -255,6 +314,35 @@ export default function MarketingAdminPage() {
       </h1>
 
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+
+      {/* A15 ronda 2 — deep-link ?code= desde la alerta de cupón por expirar.
+          Se renderiza sin depender de que los datos hayan cargado. */}
+      {focusedCode && (
+        <div
+          role="status"
+          className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-4 py-2.5 text-sm text-brand-800"
+        >
+          <TicketPercent className="w-4 h-4 shrink-0" />
+          {!loaded ? (
+            <span>Buscando el cupón <strong>{focusedCode}</strong>…</span>
+          ) : focusedCoupon ? (
+            <span>Enfocando el cupón <strong>{focusedCoupon.code}</strong>.</span>
+          ) : (
+            <span>
+              No encontramos ningún cupón <strong>{focusedCode}</strong>. Puede
+              haber sido eliminado o renombrado.
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={clearFocusedCode}
+            className="ml-auto inline-flex items-center gap-1 rounded-lg border border-brand-200 bg-white px-2 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-100 transition-colors"
+          >
+            <X className="w-3 h-3" />
+            Ver todos los cupones
+          </button>
+        </div>
+      )}
 
       {/* ── Order bumps ─────────────────────────────────────── */}
       <section className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
@@ -440,8 +528,19 @@ export default function MarketingAdminPage() {
         <ul className="divide-y divide-gray-100">
           {coupons.map((c) => {
             const inactive = isExpired(c) || isExhausted(c)
+            const isFocused =
+              !!focusedCode && c.code.toLowerCase() === focusedCode.toLowerCase()
             return (
-              <li key={c.id} className="py-2.5 flex items-center gap-3 text-sm">
+              <li
+                key={c.id}
+                ref={(el) => {
+                  if (el) couponRefs.current.set(c.id, el)
+                  else couponRefs.current.delete(c.id)
+                }}
+                className={`py-2.5 flex items-center gap-3 text-sm rounded-lg transition-shadow ${
+                  isFocused ? "ring-2 ring-brand-300 bg-brand-50/50 px-2" : ""
+                }`}
+              >
                 <span className={`font-mono font-bold ${inactive ? "text-gray-400 line-through" : "text-gray-900"}`}>
                   {c.code}
                 </span>
