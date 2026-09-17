@@ -28,6 +28,12 @@ export const AUDIT_ACTIONS = [
   "crm_prospect_notes",
   "crm_prospect_follow_up",
   "crm_prospect_activity",
+  "crm_prospect_message",
+  "crm_prospect_tags",
+  "crm_prospect_bulk_assign",
+  "crm_quick_reply_save",
+  "crm_quick_reply_delete",
+  "crm_sequence_enroll",
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -57,6 +63,12 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   crm_prospect_notes: "Notas de prospecto",
   crm_prospect_follow_up: "Seguimiento de prospecto",
   crm_prospect_activity: "Actividad de prospecto",
+  crm_prospect_message: "Mensaje enviado al prospecto",
+  crm_prospect_tags: "Etiquetas de prospecto",
+  crm_prospect_bulk_assign: "Reparto masivo de prospectos",
+  crm_quick_reply_save: "Respuesta rápida guardada",
+  crm_quick_reply_delete: "Respuesta rápida eliminada",
+  crm_sequence_enroll: "Prospecto inscrito en secuencia",
 }
 
 function isAuditAction(value: string): value is AuditAction {

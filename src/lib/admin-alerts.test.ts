@@ -42,6 +42,12 @@ describe("buildAlertHref", () => {
     expect(href).not.toBe("/admin")
   })
 
+  it("lleva los seguimientos vencidos al pipeline filtrado por vencidos", () => {
+    const href = buildAlertHref({ kind: "follow_ups_due" })
+    expect(href).toContain("tab=pipeline")
+    expect(href).toContain("due=1")
+  })
+
   it("cubre todos los tipos de alerta sin devolver enlaces vacíos", () => {
     const kinds: AdminAlertKind[] = [
       "stale_pending",
@@ -49,6 +55,7 @@ describe("buildAlertHref", () => {
       "low_stock",
       "coupon_expiring",
       "new_leads",
+      "follow_ups_due",
     ]
     for (const kind of kinds) {
       expect(buildAlertHref({ kind })).toMatch(/^\/admin(\/|\?)/)

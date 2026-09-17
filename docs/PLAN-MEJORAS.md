@@ -328,6 +328,46 @@ del root layout, mientras el test espera el que aporta `generateMetadata` de
 otras sesiones (un `TS2300` por identificador duplicado, Knip), así que la
 comparación válida es **local y con `--retries=2`**, como corre CI.
 
+### Ronda 5 — Leads CRM: el lead deja de morir en su bandeja
+
+`/admin/leads` era la única superficie del panel con **dos listas que no se
+hablaban**: arriba los leads capturados por el checkout y la landing, abajo el
+pipeline de `crm_prospects`, y nada unía un lead con un prospecto. La edición
+era `window.prompt`, no había filtros, ni detalle, ni export, ni asignación.
+Peor: existía un CRM de vendedores **más rico** en `src/lib/comercializacion/**`
+que el panel nunca reutilizaba, así que la misma entidad se leía de dos maneras
+distintas según quién mirara.
+
+La ronda cierra el ciclo **lead → prospecto** y lo hace reutilizando el motor
+existente en vez de duplicarlo. La decisión de esquema que lo habilita:
+`crm_prospects.seller_id` deja de ser `NOT NULL` (un lead web no tiene vendedor)
+y el prospecto entra al pipeline **sin asignar**; la RLS que ya existía
+(`USING seller_id = auth.uid()`) hace que esa cartera sea **invisible para los
+vendedores** sin tocar ninguna política, y el admin la reparte desde el panel.
+
+| # | Fase | Estado |
+|---|---|---|
+| L1 | **Migración `00139`**: `crm_prospects.seller_id` nullable (+ `COMMENT`), `lead_id BIGINT → leads(id) ON DELETE SET NULL` con índice **único parcial** `WHERE lead_id IS NOT NULL`, `leads.converted_prospect_id` / `converted_at` / `status TEXT NOT NULL DEFAULT 'nuevo'` con `CHECK ('nuevo','convertido','descartado')`, y cuatro índices alineados al patrón real de consulta (no sueltos): `(status, next_follow_up_at)`, `(created_at DESC) WHERE seller_id IS NULL`, `(status, created_at DESC)` y un parcial para el contador de pendientes. **RLS sin cambios, a propósito** | ✅ |
+| L2 | **Motor puro** (`src/lib/crm-pipeline.ts`): embudo de `crm_prospects` (`CRM_BOARD_COLUMNS`, `groupIntoBoard`), bandeja de leads (`LEAD_STATUSES`, `isLeadPending`), urgencia (`prospectUrgency`, `compareByUrgency`, `isFollowUpDue`), conversión (`leadToProspectDraft`, `prospectNameFromLead`, `leadDiagnosisNotes`) y búsqueda/dedupe (`normalizeForSearch`, `phoneKey`, `matchesSearch`, `findMatchingProspect`). 33 pruebas | ✅ |
+| L3 | **Server actions** (Fase 13 de `src/app/admin/actions.ts`): `getAdminLeads` devuelve `AdminLeadPage { rows, total }` y pagina **después** de filtrar (el filtro usa campos derivados; un `LIMIT` en SQL antes de filtrar daría páginas vacías), `getAdminCrmBoard`, `getAdminSellers`, `getAdminProspectDetail`, `convertLeadToProspect` (idempotente), `discardLead` / `restoreLead`, `patchCrmProspect` y `assignCrmProspect(id, sellerId \| null)`. Ocho acciones de auditoría nuevas en `@/lib/audit-log` | ✅ |
+| L4 | **Tres pestañas** en `/admin/leads` (*Leads* / *Pipeline* / *Embudo*) con `role="tablist"` y navegación por flechas con `tabIndex` móvil | ✅ |
+| L5 | **Bandeja de leads**: bandejas *Pendientes* / *Convertidos* / *Descartados* / *Todos* con conteos, búsqueda, filtro por origen y por segmento, acciones por fila (convertir, descartar, restaurar) con confirmación real y toasts | ✅ |
+| L6 | **Drawer de detalle** (`LeadDetailDrawer.tsx`): `role="dialog"` + `aria-modal`, trampa de foco, Escape, bloqueo del scroll del body, línea de tiempo de actividad, cambio de estado, notas, fecha de seguimiento y asignación de vendedor. Objetivos táctiles de 44 px | ✅ |
+| L7 | **Filtros con una sola fuente de verdad** (`src/lib/crm-filters.ts`): allowlist de `tab`/`box`/`status`/`page`, `parseCrmSearchParams` → `buildCrmQuery` → `crmHref`, escritos de vuelta a la URL con `router.replace`. Las alertas y el widget del dashboard **dejan de escribir rutas a mano** | ✅ |
+| L8 | **Export CSV** de la vista filtrada reutilizando `@/lib/csv` (`toCsv` + `downloadCsv`), con el nombre de archivo construido sobre el día **local** | ✅ |
+| L9 | **Embudo medido, no inventado** (`src/lib/crm-funnel.ts`): pasos con tasa, desglose por origen y por segmento, y antigüedad de pendientes (`hoy`/`3d`/`7d`/`30d`/`old`). Regla central: **una tasa sin denominador es `null` y se pinta "No medido", nunca `0%`** — un 0% se lee como un dato. 28 pruebas | ✅ |
+| L10 | **Móvil y a11y**: kanban del pipeline con scroll `snap-x`, objetivos de 44 px, regiones vivas en las acciones asíncronas, contraste verificado con el contrato del panel | ✅ |
+| L11 | **Alerta y widget**: nueva alerta `follow_ups_due` (prospectos con `next_follow_up_at` vencido) con deep-link al pipeline filtrado, y el widget `LeadsCrmWidget` pasa de 3 a 4 tarjetas mostrando *Sin asignar*; **cada número enlaza** a la vista que lo contiene, así que deja de ser un dato muerto | ✅ |
+| L12 | **Contratos y documentación**: `src/lib/crm-pipeline.contract.test.ts` (16 pruebas) ata el esquema de `00139`/`00052` al motor puro — `LEAD_STATUSES` ↔ `CHECK` de `leads.status`, índice único **parcial** de `lead_id`, `seller_id` nullable y la RLS **no** relajada; `e2e/admin-leads.spec.ts` cubre guards de anónimo y descarte de parámetros inválidos | ✅ |
+
+**Verificación de la ronda**: `npx tsc --noEmit` → 0 · `npm run lint` → 0 ·
+`npm test` → 4250 passed / 0 failed · `npm run build` → 0.
+
+**La migración `00139` no se pudo aplicar en este entorno** (no hay Docker ni
+`psql`): queda escrita y lista para `supabase db push`. El código está escrito
+para degradar avisando (`logger.warn`) en vez de romper cuando la migración no
+está aplicada, así que el orden de despliegue no es un riesgo de caída.
+
 ## 9. Blog
 
 | # | Fase | Estado |

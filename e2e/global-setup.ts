@@ -85,6 +85,42 @@ const ROUTES = [
 const ATTEMPTS = 3
 const TIMEOUT_MS = 60_000
 
+/**
+ * Rutas de API que los specs golpean **directamente** (`request.post`) o que
+ * las páginas llaman desde el cliente al montar. Un `GET` basta para
+ * compilarlas: las que solo exportan `POST`/`PATCH` responden 405, pero el
+ * módulo queda compilado — que es todo lo que buscamos aquí.
+ *
+ * Se añadieron tras medir el caso contrario: con las páginas calentadas pero
+ * estas sin calentar, `/api/addresses/guest` tardó **10,9 s** en su primera
+ * petición y tumbó el primer test de `compartir.spec.ts` en el primer
+ * proyecto. Es el mismo fallo que el agujero de páginas, una capa más abajo.
+ */
+const API_ROUTES = [
+  "/api/addresses/guest",
+  "/api/orders",
+  "/api/orders/1/status",
+  "/api/reviews",
+  "/api/redeem",
+  "/api/foodos/orders",
+  "/api/foodos/catering/request",
+  "/api/payments/stripe/create-intent",
+  "/api/admin/audit-log",
+  "/api/admin/drivers",
+  "/api/admin/products/list",
+  "/api/admin/products/update",
+  "/api/admin/products/city-availability",
+  "/api/admin/products/bulk",
+  // Carrito y cupón: los llama la UI del carrito al montar. `/api/cart/bumps`
+  // se midió compilando en frío dentro de un test (money-flows, cupón válido).
+  "/api/cart",
+  "/api/cart/bumps",
+  "/api/coupons/validate",
+  "/manifest.json",
+]
+
+const ALL_ROUTES = [...ROUTES, ...API_ROUTES]
+
 async function warm(baseURL: string, route: string): Promise<boolean> {
   for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
     const controller = new AbortController()
@@ -112,7 +148,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
 
   // Secuencial a propósito: en paralelo, varias compilaciones simultáneas de
   // Next en dev se pelean por la CPU y tardan más que una tras otra.
-  for (const route of ROUTES) {
+  for (const route of ALL_ROUTES) {
     const ok = await warm(baseURL, route)
     if (!ok) failures.push(route)
   }
@@ -123,6 +159,6 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
       `[e2e] Calentamiento incompleto en ${seconds}s — sin respuesta: ${failures.join(", ")}`
     )
   } else {
-    console.log(`[e2e] Calentamiento de ${ROUTES.length} rutas en ${seconds}s`)
+    console.log(`[e2e] Calentamiento de ${ALL_ROUTES.length} rutas en ${seconds}s`)
   }
 }

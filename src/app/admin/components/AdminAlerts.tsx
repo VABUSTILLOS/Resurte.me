@@ -7,6 +7,7 @@ import {
   PackageSearch,
   TicketPercent,
   UserPlus,
+  CalendarClock,
   CheckCircle2,
   ArrowUpRight,
   type LucideIcon,
@@ -19,6 +20,7 @@ const KIND_ICON: Record<AdminAlert["kind"], LucideIcon> = {
   low_stock: PackageSearch,
   coupon_expiring: TicketPercent,
   new_leads: UserPlus,
+  follow_ups_due: CalendarClock,
 }
 
 const SEVERITY_STYLE: Record<AdminAlert["severity"], string> = {

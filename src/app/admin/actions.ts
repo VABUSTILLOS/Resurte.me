@@ -6,7 +6,7 @@ import type * as WaCatalogs from "@/lib/whatsapp-catalogs"
 import { logger } from "@/lib/logger"
 import { requireAdmin } from "@/lib/admin-auth"
 import { logAdminAction } from "@/lib/audit-log"
-import { isMissingColumnError } from "@/lib/sale-window"
+import { isMissingColumnError, isMissingRelationError } from "@/lib/sale-window"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import {
   ADMIN_ORDER_OPTIONAL_COLUMNS,
@@ -57,9 +57,46 @@ import {
   filterProspects,
   findMatchingProspect,
   leadToProspectDraft,
+  phoneKey,
   type CrmProspect,
   type ProspectFilters,
 } from "@/lib/crm-pipeline"
+import {
+  buildThread,
+  indexMessagesByPhone,
+  mergeTimeline,
+  needsReply,
+  firstResponseMinutes,
+  normalizeDirection,
+  phoneLookupVariants,
+  prospectPhoneKey,
+  quickReplyVariables,
+  renderQuickReply,
+  quickReplyValuesFor,
+  requiresTemplate,
+  whatsappWindowState,
+  type ConversationProspect,
+  type InboxBucket,
+  type InboxMessage,
+  type WhatsAppWindowState,
+} from "@/lib/crm-inbox"
+import {
+  addTags,
+  normalizeTags,
+  readTags,
+  removeTags,
+} from "@/lib/crm-tags"
+import {
+  buildSellerLoad,
+  distributeProspects,
+  isAssignmentStrategy,
+  type Assignment,
+  type AssignmentStrategy,
+  type AssignableProspect,
+  type SellerLoad,
+  type SellerRef,
+} from "@/lib/crm-assignment"
+import type { SendTemplateParams } from "@/lib/whatsapp"
 
 interface AdminOrderItem {
   id: number
@@ -1373,6 +1410,25 @@ async function loadLeadBoardCounts(
   return { pending, converted, discarded, total: rows.length }
 }
 
+/** Mapea una fila de `crm_prospects` al tipo del CRM. Compartido por el tablero y la bandeja. */
+function toCrmProspectRow(row: Record<string, unknown>): CrmProspect {
+  return {
+    id: Number(row.id),
+    seller_id: row.seller_id != null ? String(row.seller_id) : null,
+    lead_id: row.lead_id != null ? Number(row.lead_id) : null,
+    name: String(row.name),
+    restaurant_name: (row.restaurant_name as string | null) ?? null,
+    phone: (row.phone as string | null) ?? null,
+    whatsapp: (row.whatsapp as string | null) ?? null,
+    email: (row.email as string | null) ?? null,
+    status: String(row.status),
+    notes: (row.notes as string | null) ?? null,
+    next_follow_up_at: (row.next_follow_up_at as string | null) ?? null,
+    last_contact_at: (row.last_contact_at as string | null) ?? null,
+    created_at: String(row.created_at),
+  }
+}
+
 /** Conteos de la bandeja, para las pestañas de `/admin/leads`. */
 export async function getAdminLeadBoardCounts(): Promise<AdminLeadBoardCounts> {
   const { response: adminDenied } = await requireAdmin()
@@ -1434,21 +1490,7 @@ export async function getAdminCrmBoard(
     rows = (data ?? []) as Record<string, unknown>[]
   }
 
-  const prospects: CrmProspect[] = rows.map((row) => ({
-    id: Number(row.id),
-    seller_id: row.seller_id != null ? String(row.seller_id) : null,
-    lead_id: row.lead_id != null ? Number(row.lead_id) : null,
-    name: String(row.name),
-    restaurant_name: (row.restaurant_name as string | null) ?? null,
-    phone: (row.phone as string | null) ?? null,
-    whatsapp: (row.whatsapp as string | null) ?? null,
-    email: (row.email as string | null) ?? null,
-    status: String(row.status),
-    notes: (row.notes as string | null) ?? null,
-    next_follow_up_at: (row.next_follow_up_at as string | null) ?? null,
-    last_contact_at: (row.last_contact_at as string | null) ?? null,
-    created_at: String(row.created_at),
-  }))
+  const prospects: CrmProspect[] = rows.map(toCrmProspectRow)
   // `q` se resuelve en memoria para poder ignorar acentos, que PostgREST no hace.
   return filters.q ? filterProspects(prospects, { q: filters.q }) : prospects
 }
@@ -1928,6 +1970,849 @@ export async function addCrmActivity(
     detail: { type: input.type, outcome: input.outcome ?? null },
   })
   revalidatePath("/admin/leads")
+}
+
+// ============================================================
+// RONDA 6 — BANDEJA DE CONVERSACIONES, ETIQUETAS Y REPARTO
+// ============================================================
+
+/** Mensajes por conversación. Un hilo se lee, no se archiva. */
+const CONVERSATION_LIMIT = 200
+/** Prospectos que un reparto masivo puede mover de una sola vez. */
+const BULK_ASSIGN_LIMIT = 200
+/**
+ * Ventana de cálculo de carga. `least_loaded` necesita ver a los vendedores
+ * ocupados para no cargarles más; por encima de este tope la carga se estima
+ * sobre los prospectos más recientes, que son los que mueven la decisión.
+ */
+const ASSIGN_SCAN_LIMIT = 2000
+/** Respuestas rápidas que se devuelven al compositor. */
+const QUICK_REPLIES_LIMIT = 200
+const QUICK_REPLY_TITLE_MAX = 60
+const QUICK_REPLY_BODY_MAX = 1024
+/** Lo que se guarda como resumen de la actividad de WhatsApp. */
+const ACTIVITY_SUMMARY_MAX = 280
+
+const CRM_PROSPECT_COLUMNS =
+  "id, seller_id, lead_id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at"
+
+/** De dónde viene un evento del hilo, para no confundir un mensaje con una nota. */
+export type LeadTimelineSource = "whatsapp" | "automation" | "activity"
+
+/** Evento del hilo de un prospecto: mensaje real, automatización o actividad. */
+export interface LeadTimelineEntry extends InboxMessage {
+  source: LeadTimelineSource
+  /**
+   * Clave estable dentro del hilo. Los ids de `whatsapp_messages`,
+   * `whatsapp_automation_sends` y `crm_activities` viven en secuencias
+   * distintas, así que como clave de lista se pisarían entre sí.
+   */
+  key: string
+}
+
+export interface AdminLeadConversation {
+  prospect: ConversationProspect
+  /** Solo WhatsApp: es lo que decide la ventana de 24 h. */
+  messages: InboxMessage[]
+  /** WhatsApp + automatizaciones + actividades, para pintar el hilo completo. */
+  timeline: LeadTimelineEntry[]
+  window: WhatsAppWindowState
+  bucket: InboxBucket | null
+  needsReply: boolean
+  firstResponseMinutes: number | null
+  /** Número con el que se emparejó la conversación; `null` sin teléfono. */
+  phoneKey: string | null
+  seller: { id: string; name: string } | null
+  lead: { id: number; email: string; source: string; created_at: string } | null
+}
+
+type ServiceClient = Awaited<ReturnType<typeof createServiceClient>>
+
+/**
+ * Carga la ficha del prospecto. `tags` se pide aparte porque la columna llega
+ * con la migración 00140: sin ella el prospecto sigue existiendo, solo sin
+ * etiquetas, y la bandeja no puede dejar de abrirse por eso.
+ */
+async function loadProspectRow(
+  supabase: ServiceClient,
+  prospectId: number,
+): Promise<Record<string, unknown> | null> {
+  const { data, error } = await supabase
+    .from("crm_prospects")
+    .select(`${CRM_PROSPECT_COLUMNS}, tags`)
+    .eq("id", prospectId)
+    .maybeSingle()
+  if (!error) return (data as Record<string, unknown> | null) ?? null
+
+  if (isMissingColumnError(error)) {
+    const fallback = await supabase
+      .from("crm_prospects")
+      .select(CRM_PROSPECT_COLUMNS)
+      .eq("id", prospectId)
+      .maybeSingle()
+    if (!fallback.error) return (fallback.data as Record<string, unknown> | null) ?? null
+  }
+
+  logger.error("[ADMIN-CRM] Error fetching prospect:", error)
+  throw new Error("Error al cargar el prospecto")
+}
+
+function toConversationProspect(row: Record<string, unknown>): ConversationProspect {
+  return { ...toCrmProspectRow(row), tags: readTags(row.tags) }
+}
+
+/**
+ * Mensajes de WhatsApp de un número.
+ *
+ * Se filtra por `from_number` y no por la columna generada `from_digits`: en
+ * ambos sentidos `from_number` guarda el número del cliente (el webhook al
+ * recibir, el envío al mandar), así que las variantes con y sin lada cubren el
+ * hilo completo sin depender de que 00140 esté aplicada.
+ */
+async function fetchConversationMessages(
+  supabase: ServiceClient,
+  variants: readonly string[],
+): Promise<InboxMessage[]> {
+  const { data, error } = await supabase
+    .from("whatsapp_messages")
+    .select("id, direction, content, created_at, message_type, from_number")
+    .in("from_number", variants)
+    .order("created_at", { ascending: false })
+    .limit(CONVERSATION_LIMIT)
+
+  if (error) {
+    logger.warn("[ADMIN-CRM] No se pudo leer la conversación:", { message: error.message })
+    return []
+  }
+
+  return (data ?? []).map((row) => ({
+    id: Number(row.id),
+    direction: normalizeDirection(row.direction as string | null),
+    content: (row.content as string | null) ?? null,
+    created_at: String(row.created_at),
+    message_type: (row.message_type as string | null) ?? null,
+    from_number: (row.from_number as string | null) ?? null,
+  }))
+}
+
+/**
+ * Automatizaciones enviadas a ese número. `whatsapp_automation_sends` es la
+ * bitácora de envíos masivos; sin ella el hilo mostraría un hueco entre dos
+ * mensajes del cliente que en realidad sí recibió algo.
+ */
+async function fetchAutomationSends(
+  supabase: ServiceClient,
+  variants: readonly string[],
+): Promise<InboxMessage[]> {
+  const { data, error } = await supabase
+    .from("whatsapp_automation_sends")
+    .select("id, automation_type, status, created_at")
+    .in("recipient", variants)
+    .order("created_at", { ascending: false })
+    .limit(CONVERSATION_LIMIT)
+
+  if (error) {
+    if (!isMissingRelationError(error)) {
+      logger.warn("[ADMIN-CRM] No se pudieron leer las automatizaciones:", {
+        message: error.message,
+      })
+    }
+    return []
+  }
+
+  return (data ?? []).map((row) => ({
+    id: Number(row.id),
+    direction: "outbound" as const,
+    content: String(row.status ?? ""),
+    created_at: String(row.created_at),
+    message_type: `automation:${String(row.automation_type ?? "desconocida")}`,
+    from_number: null,
+  }))
+}
+
+/** Actividades registradas en el CRM (llamadas, visitas, notas). */
+async function fetchProspectActivities(
+  supabase: ServiceClient,
+  prospectId: number,
+): Promise<InboxMessage[]> {
+  const { data, error } = await supabase
+    .from("crm_activities")
+    .select("id, type, direction, outcome, summary, occurred_at")
+    .eq("prospect_id", prospectId)
+    .order("occurred_at", { ascending: false })
+    .limit(CONVERSATION_LIMIT)
+
+  if (error) {
+    logger.warn("[ADMIN-CRM] No se pudieron leer las actividades:", { message: error.message })
+    return []
+  }
+
+  return (data ?? []).map((row) => ({
+    id: Number(row.id),
+    direction: row.direction === "entrante" ? ("inbound" as const) : ("outbound" as const),
+    content: (row.summary as string | null) ?? (row.outcome as string | null) ?? null,
+    created_at: String(row.occurred_at),
+    message_type: `activity:${String(row.type ?? "nota")}`,
+    from_number: null,
+  }))
+}
+
+/** Lead del que nació el prospecto, para poder volver al origen. */
+async function fetchProspectLead(
+  supabase: ServiceClient,
+  prospectId: number,
+): Promise<{ id: number; email: string; source: string; created_at: string } | null> {
+  const { data, error } = await supabase
+    .from("crm_prospects")
+    .select("leads(id, email, source, created_at)")
+    .eq("id", prospectId)
+    .maybeSingle()
+
+  if (error) {
+    logger.warn("[ADMIN-CRM] No se pudo leer el lead de origen:", { message: error.message })
+    return null
+  }
+
+  const embedded = (data as { leads?: Record<string, unknown> | null } | null)?.leads
+  if (!embedded) return null
+  return {
+    id: Number(embedded.id),
+    email: String(embedded.email ?? ""),
+    source: String(embedded.source ?? ""),
+    created_at: String(embedded.created_at ?? ""),
+  }
+}
+
+/**
+ * Conversación completa de un prospecto: mensajes, automatizaciones,
+ * actividades y el estado de la ventana de 24 h calculado en el servidor.
+ */
+export async function getAdminLeadConversation(
+  prospectId: number,
+): Promise<AdminLeadConversation> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const row = await loadProspectRow(supabase, prospectId)
+  if (!row) {
+    throw new Error("Prospecto no encontrado")
+  }
+
+  const prospect = toConversationProspect(row)
+  const variants = phoneLookupVariants(prospectPhoneKey(prospect))
+
+  const [waMessages, automationSends, activities, seller, lead] = await Promise.all([
+    variants.length > 0 ? fetchConversationMessages(supabase, variants) : Promise.resolve([]),
+    variants.length > 0 ? fetchAutomationSends(supabase, variants) : Promise.resolve([]),
+    fetchProspectActivities(supabase, prospectId),
+    prospect.seller_id ? fetchProfileName(supabase, prospect.seller_id) : Promise.resolve(null),
+    fetchProspectLead(supabase, prospectId),
+  ])
+
+  const messages = mergeTimeline(waMessages)
+  const thread = buildThread(prospect, indexMessagesByPhone(messages))
+
+  return {
+    prospect,
+    messages,
+    timeline: mergeTimeline<LeadTimelineEntry>([
+      ...messages.map((m) => ({ ...m, source: "whatsapp" as const, key: `wa:${m.id}` })),
+      ...automationSends.map((m) => ({ ...m, source: "automation" as const, key: `auto:${m.id}` })),
+      ...activities.map((m) => ({ ...m, source: "activity" as const, key: `act:${m.id}` })),
+    ]),
+    window: thread.window,
+    bucket: thread.bucket,
+    needsReply: needsReply(messages),
+    firstResponseMinutes: firstResponseMinutes(messages),
+    phoneKey: thread.phoneKey,
+    seller,
+    lead,
+  }
+}
+
+/** Motivos por los que la bandeja se niega a enviar, que la UI debe explicar. */
+export type LeadMessageRefusal =
+  | "not_found"
+  | "no_phone"
+  | "empty_message"
+  | "requires_template"
+  | "quick_reply_not_found"
+
+export type LeadMessageResult =
+  | { ok: true; messageId: string | null; messageType: string }
+  | { ok: false; error: LeadMessageRefusal }
+
+export interface SendLeadMessageInput {
+  /** Texto libre. Se ignora si viene `quickReplyId`. */
+  body?: string
+  /** Respuesta rápida guardada: el servidor la renderiza con datos reales. */
+  quickReplyId?: number
+  /** Plantilla aprobada, para cuando la ventana de 24 h está cerrada. */
+  templateName?: string
+  languageCode?: string
+  components?: unknown[]
+}
+
+/** Cuerpo a enviar: texto libre o plantilla de respuesta rápida ya renderizada. */
+async function resolveLeadMessageBody(
+  supabase: ServiceClient,
+  prospect: ConversationProspect,
+  input: SendLeadMessageInput,
+): Promise<string | null> {
+  if (input.quickReplyId != null) {
+    const { data, error } = await supabase
+      .from("crm_quick_replies")
+      .select("body")
+      .eq("id", input.quickReplyId)
+      .maybeSingle()
+
+    if (error) {
+      if (isMissingRelationError(error)) {
+        throw new Error("Las respuestas rápidas aún no están disponibles")
+      }
+      logger.error("[ADMIN-CRM] Error leyendo respuesta rápida:", error)
+      throw new Error("Error al leer la respuesta rápida")
+    }
+    if (!data) {
+      return null
+    }
+
+    const seller = prospect.seller_id
+      ? await fetchProfileName(supabase, prospect.seller_id)
+      : null
+    const rendered = renderQuickReply(
+      String(data.body ?? ""),
+      quickReplyValuesFor(prospect, seller?.name ?? null),
+    ).trim()
+    return rendered || null
+  }
+
+  return input.body?.trim() || null
+}
+
+/**
+ * Envía un mensaje al prospecto desde la bandeja.
+ *
+ * La ventana de 24 h se revalida aquí, no en la UI: el compositor puede estar
+ * abierto desde hace media hora y WhatsApp rechazaría el texto libre. Fuera de
+ * ventana solo pasa una plantilla aprobada.
+ */
+export async function sendLeadMessage(
+  prospectId: number,
+  input: SendLeadMessageInput,
+): Promise<LeadMessageResult> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const row = await loadProspectRow(supabase, prospectId)
+  if (!row) return { ok: false, error: "not_found" }
+
+  const prospect = toConversationProspect(row)
+  const to = phoneKey(prospectPhoneKey(prospect))
+  if (!to) return { ok: false, error: "no_phone" }
+
+  const templateName = input.templateName?.trim() || null
+  const languageCode = input.languageCode?.trim() || "es_MX"
+  const components = input.components ?? []
+
+  if (templateName) {
+    const { data: template, error } = await supabase
+      .from("whatsapp_templates")
+      .select("template_name, status")
+      .eq("template_name", templateName)
+      .maybeSingle()
+    if (error) {
+      logger.error("[ADMIN-CRM] Error verificando plantilla:", error)
+      throw new Error("Error al verificar la plantilla")
+    }
+    if (!template) {
+      throw new Error(`La plantilla "${templateName}" no existe`)
+    }
+    if (String(template.status) !== "approved") {
+      throw new Error(`La plantilla "${templateName}" no está aprobada por Meta`)
+    }
+  } else {
+    const window = whatsappWindowState(await fetchConversationMessages(supabase, [to]))
+    if (requiresTemplate(window)) return { ok: false, error: "requires_template" }
+  }
+
+  let body: string | null = null
+  if (!templateName) {
+    body = await resolveLeadMessageBody(supabase, prospect, input)
+    if (!body) {
+      return {
+        ok: false,
+        error: input.quickReplyId != null ? "quick_reply_not_found" : "empty_message",
+      }
+    }
+  }
+
+  const { sendTemplate, sendTextMessage } = await import("@/lib/whatsapp")
+  const result = templateName
+    ? await sendTemplate({
+        to,
+        templateName,
+        languageCode,
+      components: components as SendTemplateParams["components"],
+      })
+    : await sendTextMessage({ to, text: body as string })
+
+  const messageId = result.messages?.[0]?.id ?? null
+  const messageType = templateName ? `template:${templateName}` : "text"
+
+  // El mensaje ya salió: que la bitácora falle no puede convertirse en un error
+  // que haga creer al admin que no se envió.
+  try {
+    await supabase.from("whatsapp_messages").insert({
+      from_number: to,
+      message_type: messageType,
+      content: templateName
+        ? JSON.stringify({
+            template_name: templateName,
+            language_code: languageCode,
+            message_id: messageId,
+            components,
+          })
+        : (body as string),
+      direction: "outbound",
+    })
+  } catch (logError) {
+    logger.error("[ADMIN-CRM] El mensaje se envió pero no se pudo registrar:", logError)
+  }
+
+  // Reutiliza la acción de actividad: deja el historial, mueve `last_contact_at`
+  // y promueve `nuevo` → `contactado` con una sola regla.
+  try {
+    await addCrmActivity(prospectId, {
+      type: "whatsapp",
+      direction: "saliente",
+      summary: (templateName ? `Plantilla: ${templateName}` : (body as string)).slice(
+        0,
+        ACTIVITY_SUMMARY_MAX,
+      ),
+    })
+  } catch (activityError) {
+    logger.error("[ADMIN-CRM] El mensaje se envió pero no se registró la actividad:", activityError)
+  }
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_prospect_message",
+    entity: "crm_prospects",
+    entityId: prospectId,
+    // El cuerpo no entra en la bitácora: es contenido del cliente, no metadato.
+    detail: { template: templateName, characters: body?.length ?? null },
+  })
+  revalidatePath("/admin/leads")
+  return { ok: true, messageId, messageType }
+}
+
+export interface AdminQuickReply {
+  id: number
+  title: string
+  body: string
+  category: string | null
+  isActive: boolean
+  sortOrder: number
+  /** Variables `{{...}}` que el compositor debe resolver antes de enviar. */
+  variables: string[]
+}
+
+/**
+ * Respuestas rápidas activas e inactivas. Sin la migración 00140 devuelve una
+ * lista vacía en vez de reventar: el compositor sigue sirviendo, solo sin atajos.
+ */
+export async function getAdminQuickReplies(): Promise<AdminQuickReply[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { data, error } = await supabase
+    .from("crm_quick_replies")
+    .select("id, title, body, category, is_active, sort_order")
+    .order("sort_order", { ascending: true })
+    .order("title", { ascending: true })
+    .limit(QUICK_REPLIES_LIMIT)
+
+  if (error) {
+    if (isMissingRelationError(error)) return []
+    logger.error("[ADMIN-CRM] Error fetching quick replies:", error)
+    throw new Error("Error al cargar las respuestas rápidas")
+  }
+
+  return (data ?? []).map((row) => ({
+    id: Number(row.id),
+    title: String(row.title ?? ""),
+    body: String(row.body ?? ""),
+    category: (row.category as string | null) ?? null,
+    isActive: Boolean(row.is_active),
+    sortOrder: Number(row.sort_order ?? 0),
+    variables: quickReplyVariables(String(row.body ?? "")),
+  }))
+}
+
+export interface QuickReplyInput {
+  /** Presente = actualizar; ausente = crear. */
+  id?: number
+  title: string
+  body: string
+  category?: string | null
+  isActive?: boolean
+  sortOrder?: number
+}
+
+export async function saveQuickReply(input: QuickReplyInput): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const title = input.title?.trim() ?? ""
+  const body = input.body?.trim() ?? ""
+  if (!title) throw new Error("El título es obligatorio")
+  if (title.length > QUICK_REPLY_TITLE_MAX) {
+    throw new Error(`El título no puede pasar de ${QUICK_REPLY_TITLE_MAX} caracteres`)
+  }
+  if (!body) throw new Error("El texto es obligatorio")
+  if (body.length > QUICK_REPLY_BODY_MAX) {
+    throw new Error(`El texto no puede pasar de ${QUICK_REPLY_BODY_MAX} caracteres`)
+  }
+
+  const supabase = await createServiceClient()
+  const patch = {
+    title,
+    body,
+    category: input.category?.trim() || null,
+    is_active: input.isActive ?? true,
+    sort_order: Number.isFinite(input.sortOrder) ? Number(input.sortOrder) : 0,
+  }
+
+  const { error } = input.id
+    ? await supabase.from("crm_quick_replies").update(patch).eq("id", input.id)
+    : await supabase.from("crm_quick_replies").insert({ ...patch, created_by: user?.id ?? null })
+
+  if (error) {
+    if (isMissingRelationError(error)) {
+      throw new Error("Las respuestas rápidas aún no están disponibles")
+    }
+    if (error.code === "23505") {
+      throw new Error("Ya existe una respuesta rápida con ese título")
+    }
+    logger.error("[ADMIN-CRM] Error guardando respuesta rápida:", error)
+    throw new Error("Error al guardar la respuesta rápida")
+  }
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_quick_reply_save",
+    entity: "crm_quick_replies",
+    entityId: input.id ?? null,
+    detail: { title },
+  })
+  revalidatePath("/admin/leads")
+}
+
+export async function deleteQuickReply(id: number): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { error } = await supabase.from("crm_quick_replies").delete().eq("id", id)
+  if (error) {
+    if (isMissingRelationError(error)) {
+      throw new Error("Las respuestas rápidas aún no están disponibles")
+    }
+    logger.error("[ADMIN-CRM] Error borrando respuesta rápida:", error)
+    throw new Error("Error al borrar la respuesta rápida")
+  }
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_quick_reply_delete",
+    entity: "crm_quick_replies",
+    entityId: id,
+  })
+  revalidatePath("/admin/leads")
+}
+
+/** Reemplaza las etiquetas de un prospecto. Devuelve la lista ya normalizada. */
+export async function setCrmProspectTags(
+  prospectId: number,
+  tags: readonly string[],
+): Promise<string[]> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const next = normalizeTags(tags)
+  const supabase = await createServiceClient()
+  try {
+    await patchCrmProspect(prospectId, { tags: next })
+  } catch (error) {
+    if (isMissingColumnError(error)) {
+      throw new Error("Las etiquetas todavía no están disponibles en este entorno")
+    }
+    throw error
+  }
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_prospect_tags",
+    entity: "crm_prospects",
+    entityId: prospectId,
+    detail: { tags: next },
+  })
+  revalidatePath("/admin/leads")
+  return next
+}
+
+/**
+ * Pone y quita etiquetas en bloque. Devuelve cuántos prospectos cambiaron.
+ *
+ * Se agrupa por resultado idéntico antes de escribir: "marcar 80 prospectos
+ * como vip" es un solo UPDATE, no ochenta.
+ */
+export async function bulkTagProspects(
+  prospectIds: readonly number[],
+  add: readonly string[] = [],
+  remove: readonly string[] = [],
+): Promise<number> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const ids = [...new Set(prospectIds.filter((id) => Number.isFinite(id)))].slice(
+    0,
+    BULK_ASSIGN_LIMIT,
+  )
+  if (ids.length === 0) return 0
+
+  const toAdd = normalizeTags(add)
+  const toRemove = normalizeTags(remove)
+  if (toAdd.length === 0 && toRemove.length === 0) return 0
+
+  const supabase = await createServiceClient()
+  const { data, error } = await supabase
+    .from("crm_prospects")
+    .select("id, tags")
+    .in("id", ids)
+
+  if (error) {
+    if (isMissingColumnError(error)) {
+      throw new Error("Las etiquetas todavía no están disponibles en este entorno")
+    }
+    logger.error("[ADMIN-CRM] Error leyendo etiquetas:", error)
+    throw new Error("Error al leer las etiquetas")
+  }
+
+  const groups = new Map<string, number[]>()
+  for (const row of data ?? []) {
+    const next = addTags(removeTags(readTags(row.tags), toRemove), toAdd)
+    const key = JSON.stringify(next)
+    const group = groups.get(key)
+    if (group) group.push(Number(row.id))
+    else groups.set(key, [Number(row.id)])
+  }
+  if (groups.size === 0) return 0
+
+  for (const [key, groupIds] of groups) {
+    const { error: updateError } = await supabase
+      .from("crm_prospects")
+      .update({ tags: JSON.parse(key) as string[], updated_at: new Date().toISOString() })
+      .in("id", groupIds)
+    if (updateError) {
+      logger.error("[ADMIN-CRM] Error guardando etiquetas en bloque:", updateError)
+      throw new Error("Error al guardar las etiquetas")
+    }
+  }
+
+  const touched = [...groups.values()].reduce((sum, group) => sum + group.length, 0)
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_prospect_tags",
+    entity: "crm_prospects",
+    entityId: null,
+    detail: { add: toAdd, remove: toRemove, prospects: touched },
+  })
+  revalidatePath("/admin/leads")
+  return touched
+}
+
+/**
+ * Vendedores con ciudad por defecto, para repartir y para medir carga.
+ *
+ * La ciudad sale de `profiles.default_city_id`: la tabla de perfiles no tiene
+ * `city_id`, y `crm_prospects.city_id` es la del cliente, no la del vendedor.
+ */
+async function loadSellerRefs(supabase: ServiceClient): Promise<SellerRef[]> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, email, default_city_id")
+    .eq("role", "vendedor")
+    .order("full_name", { ascending: true })
+
+  if (error) {
+    logger.error("[ADMIN-CRM] Error fetching sellers:", error)
+    throw new Error("Error al cargar los vendedores")
+  }
+
+  return (data ?? []).map((row) => ({
+    id: String(row.id),
+    name: (row.full_name as string | null)?.trim() || String(row.email ?? "") || "Sin nombre",
+    city_id: row.default_city_id != null ? Number(row.default_city_id) : null,
+  }))
+}
+
+async function loadAssignableProspects(
+  supabase: ServiceClient,
+  ids: readonly number[] | null,
+  scope: "all" | "assigned" | "unassigned",
+): Promise<AssignableProspect[]> {
+  let query = supabase
+    .from("crm_prospects")
+    .select(`${CRM_PROSPECT_COLUMNS}, city_id`)
+    .order("created_at", { ascending: false })
+    .limit(ASSIGN_SCAN_LIMIT)
+
+  if (scope === "assigned") query = query.not("seller_id", "is", null)
+  if (scope === "unassigned") query = query.is("seller_id", null)
+  if (ids) query = query.in("id", [...ids])
+
+  const { data, error } = await query
+  if (error) {
+    logger.error("[ADMIN-CRM] Error cargando prospectos para reparto:", error)
+    throw new Error("Error al cargar los prospectos")
+  }
+
+  return (data ?? []).map((row) => ({
+    ...toCrmProspectRow(row),
+    city_id: row.city_id != null ? Number(row.city_id) : null,
+  }))
+}
+
+export interface DistributeCrmInput {
+  strategy?: AssignmentStrategy
+  /** Vacío o ausente = todos los abiertos sin asignar. */
+  prospectIds?: readonly number[]
+}
+
+export interface DistributeCrmResult {
+  assigned: number
+  strategy: AssignmentStrategy
+  /** Detalle por prospecto, para poder explicar el reparto en la interfaz. */
+  assignments: Assignment[]
+}
+
+/**
+ * Reparte prospectos sin asignar entre los vendedores.
+ *
+ * Solo toca `seller_id` y agrupa por vendedor, así que asignar 200 prospectos
+ * son tantos UPDATEs como vendedores haya. Reasignar a alguien que ya tiene
+ * dueño NO entra aquí: eso es una decisión manual, no un reparto automático.
+ */
+export async function distributeCrmProspects(
+  input: DistributeCrmInput = {},
+): Promise<DistributeCrmResult> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const strategy = input.strategy ?? "round_robin"
+  if (!isAssignmentStrategy(strategy)) {
+    throw new Error("Estrategia de reparto inválida")
+  }
+
+  const supabase = await createServiceClient()
+  const sellers = await loadSellerRefs(supabase)
+
+  const ids =
+    input.prospectIds && input.prospectIds.length > 0
+      ? [...new Set(input.prospectIds.filter((id) => Number.isFinite(id)))].slice(
+          0,
+          BULK_ASSIGN_LIMIT,
+        )
+      : null
+
+  // Sin lista explícita se reparte todo lo que entre en la ventana de carga.
+  // Con lista, la carga se mide con los ya asignados y solo se reparten esos.
+  const pool = ids
+    ? [
+        ...(await loadAssignableProspects(supabase, null, "assigned")),
+        ...(await loadAssignableProspects(supabase, ids, "unassigned")),
+      ]
+    : await loadAssignableProspects(supabase, null, "all")
+
+  const assignments = distributeProspects(pool, sellers, { strategy })
+  if (assignments.length === 0) {
+    return { assigned: 0, strategy, assignments: [] }
+  }
+
+  const bySeller = new Map<string, number[]>()
+  for (const assignment of assignments) {
+    const group = bySeller.get(assignment.sellerId)
+    if (group) group.push(assignment.prospectId)
+    else bySeller.set(assignment.sellerId, [assignment.prospectId])
+  }
+
+  let assigned = 0
+  for (const [sellerId, prospectIds] of bySeller) {
+    const { error } = await supabase
+      .from("crm_prospects")
+      .update({ seller_id: sellerId, updated_at: new Date().toISOString() })
+      .in("id", prospectIds)
+    if (error) {
+      logger.error("[ADMIN-CRM] Error asignando prospectos:", error)
+      throw new Error("Error al asignar los prospectos")
+    }
+    assigned += prospectIds.length
+  }
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_prospect_bulk_assign",
+    entity: "crm_prospects",
+    entityId: null,
+    detail: { strategy, assigned, sellers: bySeller.size },
+  })
+  revalidatePath("/admin/leads")
+  return { assigned, strategy, assignments }
+}
+
+/** Carga de cada vendedor, de más a menos ocupado. */
+export async function getAdminSellerLoads(): Promise<SellerLoad[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const [sellers, prospects] = await Promise.all([
+    loadSellerRefs(supabase),
+    loadAssignableProspects(supabase, null, "all"),
+  ])
+
+  return buildSellerLoad(sellers, prospects).sort(
+    (a, b) => b.open - a.open || a.name.localeCompare(b.name, "es"),
+  )
 }
 
 // ============================================================

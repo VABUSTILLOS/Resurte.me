@@ -731,6 +731,41 @@
   (`/admin/productos?city=`, `/admin/pedidos?status=cancelled`,
   `/admin/marketing`, `/admin/whatsapp`); el tip informativo `referencia` no
   tiene enlace (`href: null`) y la UI no debe renderizar el "Ir" en ese caso.
+- **Leads CRM (`/admin/leads`, Ronda 5)**: la superficie conecta la bandeja de
+  captación (`leads`) con el pipeline (`crm_prospects`) y **reutiliza** los
+  módulos puros del CRM de vendedores (`@/lib/crm-pipeline`,
+  `@/lib/crm-funnel`, `@/lib/crm-filters`); no los duplica ni reimplementa sus
+  reglas. Invariantes que no se pueden romper:
+  - **La conversión es idempotente.** `convertLeadToProspect` devuelve el
+    prospecto existente si `leads.converted_prospect_id` ya está puesto, y el
+    índice único **parcial** `uq_crm_prospects_lead_id` (00139) es la red de
+    seguridad de la base. Dos clics o dos pestañas no pueden crear dos
+    prospectos del mismo lead. Al encontrar un prospecto equivalente (por
+    `lead_id` → teléfono → email) **solo se enlaza**: nunca se sobrescriben los
+    campos que escribió un vendedor.
+  - **`seller_id NULL` = sin asignar**, y es **invisible para vendedores** por
+    RLS (`crm_prospects_owner_all` es `USING seller_id = auth.uid()`). No añadir
+    `OR seller_id IS NULL` a ninguna política: expondría la cartera sin
+    repartir a todos los vendedores. El admin la ve y la reparte desde el panel.
+  - **Una sola fuente de filtros: la URL.** El estado vive en
+    `@/lib/crm-filters` (`parseCrmSearchParams` / `buildCrmQuery` / `crmHref`)
+    con allowlist; la página lo lee de `searchParams` y lo escribe de vuelta con
+    `router.replace`. Las alertas y el widget del dashboard **no escriben rutas
+    a mano**: usan `crmHref`. Un `tab`/`box`/`page` inválido cae al default, no
+    lanza.
+  - **`window.prompt` está prohibido** en esta superficie (era el editor
+    original). Los diálogos son componentes con `role="dialog"`,
+    `aria-modal`, trampa de foco y Escape.
+  - **Paginación después de filtrar.** `getAdminLeads` lee con un tope
+    (`LEAD_FETCH_CAP = 2000`) y pagina en memoria, porque el filtro se aplica
+    sobre campos derivados: un `LIMIT/OFFSET` en SQL antes de filtrar devuelve
+    páginas vacías. Mismo criterio que el resto del panel.
+  - **Una tasa sin denominador es `null`, nunca `0`.** `@/lib/crm-funnel`
+    devuelve `null` y la UI pinta "No medido": un 0% se lee como un dato real.
+  - **Orden por urgencia** (`compareByUrgency`): lo vencido y lo más antiguo
+    primero, no por `id` ni por `created_at` a secas.
+  - **El "día" es local.** Nunca `toISOString()` para claves de día; usar
+    `dayKeyOf(DEFAULT_TIMEZONE, …)` de `@/lib/local-date` (regla común 8).
 
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de
@@ -999,3 +1034,29 @@ Ronda 13 de `/admin/productos` (sin migraciones nuevas: se apoya en 00116 y 0011
   el hover destructivo se quedaba en 2.99:1. La lista blanca también documenta
   por qué lo demás no se toca (`bg-brand-600` 6.12:1, `bg-red-600` 4.77:1, puntos
   de estado no textuales).
+
+Leads CRM (Ronda 5, requiere **00139** aplicada): en `/admin/leads` convertir un
+lead de la bandeja y comprobar que (a) aparece un prospecto con `seller_id`
+NULL y `source = 'lead_web'`, (b) el lead pasa a la bandeja *Convertidos*, y
+(c) **pulsar Convertir otra vez no crea un segundo prospecto** — la acción es
+idempotente y devuelve el mismo `prospectId`. Descartar y restaurar un lead
+debe dejar `leads.status` en `descartado` / `nuevo` y registrar la acción
+distinta en la bitácora (`lead_discard` / `lead_restore`, no `lead_convert`).
+
+Los filtros viven en la URL: poner `?tab=pipeline&due=1&unassigned=1` y recargar
+debe reproducir exactamente la misma vista; un `?box=` inventado tiene que caer
+al default sin 5xx. Los deep-links de las alertas y del widget del dashboard
+salen de `crmHref`, así que no se escriben a mano.
+
+El contrato del esquema está fijado en
+`npx vitest run src/lib/crm-pipeline.contract.test.ts`: lee `00139` (y `00052`)
+y exige que `LEAD_STATUSES` coincida con el `CHECK` de `leads.status`, que el
+índice de `lead_id` sea **único y parcial**, que `seller_id` siga siendo
+nullable y que la migración **no** relaje la RLS (`OR seller_id IS NULL` falla
+la prueba). `e2e/admin-leads.spec.ts` cubre los guards de anónimo y el descarte
+de parámetros inválidos.
+
+La migración **00139 no se puede aplicar en local** (no hay Docker ni `psql` en
+este entorno): queda escrita y lista para `supabase db push`. Sin ella, las
+acciones degradan avisando (`logger.warn`) en vez de romper, y la bandeja sigue
+funcionando en modo lectura.
