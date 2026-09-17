@@ -2374,11 +2374,13 @@ function AdminProductsContent() {
       return
     }
     if (
-      !window.confirm(
-        `Se borrará el precio de oferta y su ventana en ${stale.length} producto${
+      !(await confirm({
+        title: "¿Limpiar ofertas vencidas?",
+        message: `Se borrará el precio de oferta y su ventana en ${stale.length} producto${
           stale.length === 1 ? "" : "s"
-        }. La tienda ya cobra el precio normal. ¿Continuar?`
-      )
+        }. La tienda ya cobra el precio normal.`,
+        confirmLabel: "Limpiar ofertas",
+      }))
     ) {
       return
     }
@@ -6178,6 +6180,9 @@ function AdminProductsContent() {
           </div>
         </div>
       )}
+
+      {/* Confirmación/prompt accesibles (reemplazo de window.confirm/prompt) */}
+      {confirmDialog}
     </div>
   )
 }
