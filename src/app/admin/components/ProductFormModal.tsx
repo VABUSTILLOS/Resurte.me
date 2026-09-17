@@ -187,11 +187,11 @@ function SectionNav({ activeId, variant }: { activeId: string; variant: "rail" |
   )
 }
 
-/** Error de un campo, anunciado por lectores de pantalla. */
+/** Error de un campo; se anuncia al enfocar el control vía `aria-describedby`. */
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null
   return (
-    <p id={id} role="alert" className="mt-1 text-[11px] font-semibold text-red-600">
+    <p id={id} className="mt-1 text-[11px] font-semibold text-red-600">
       {message}
     </p>
   )
@@ -740,6 +740,11 @@ export function ProductFormModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    await submitForm()
+  }
+
+  /** Guarda el producto. También se llama sin evento desde "Guardar y cerrar". */
+  async function submitForm() {
     if (saving) return
     // Valida todo antes de enviar y marca cada campo, en vez de detenerse en el
     // primer problema: así se ve de una vez qué falta por corregir. Las reglas
