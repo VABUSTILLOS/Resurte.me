@@ -5,6 +5,58 @@ import { resetCatalogCache } from "@/lib/catalog"
 import { revalidateTag } from "next/cache"
 import { NextResponse } from "next/server"
 
+/** Tope de ids por consulta: "seleccionar todo" puede abarcar el catálogo. */
+const MAX_IDS = 1000
+
+/**
+ * GET /api/admin/products/city-availability?ids=1,2,3
+ *
+ * Filas de disponibilidad de esos productos, para el modal de ciudades del
+ * panel. La selección puede abarcar todas las páginas, así que no basta con lo
+ * que ya trae el listado (`availability` solo cubre la página visible).
+ *
+ * Solo se devuelven filas existentes: la ausencia de filas para un producto
+ * significa "Global" (disponible en todas las ciudades).
+ */
+export async function GET(request: Request) {
+  try {
+    const { response: adminDenied } = await requireAdmin()
+    if (adminDenied) {
+      return adminDenied
+    }
+
+    const requested = [
+      ...new Set(
+        (new URL(request.url).searchParams.get("ids") ?? "")
+          .split(",")
+          .map((s) => Number(s.trim()))
+          .filter((n) => Number.isInteger(n) && n > 0)
+      ),
+    ]
+    if (requested.length === 0) {
+      return NextResponse.json({ error: "Se requiere ids" }, { status: 400 })
+    }
+
+    const ids = requested.slice(0, MAX_IDS)
+    const supabase = await createServiceClient()
+    const { data, error } = await supabase
+      .from("product_city_availability")
+      .select("product_id,city_id,is_available")
+      .in("product_id", ids)
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      rows: data ?? [],
+      truncated: requested.length > MAX_IDS,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error interno del servidor"
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
 /**
  * PATCH /api/admin/products/city-availability
  *

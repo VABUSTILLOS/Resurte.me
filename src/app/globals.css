@@ -64,23 +64,31 @@
   /* iOS safe areas + header offset (header h-16 = 4rem) */
   --header-inset-top: env(safe-area-inset-top, 0px);
   --header-top-offset: calc(4rem + var(--header-inset-top));
+  /* Alto real del sub-nav de /admin, publicado por AdminSubNav con un
+     ResizeObserver. Las barras sticky del área (barra de acciones masivas de
+     /admin/productos) se anclan DEBAJO del sub-nav sumando esta var a
+     --header-top-offset. El default es el alto del sub-nav sin JS (32px de
+     contenido + py-2 + borde) para que el primer render ya quede alineado. */
+  --admin-subnav-h: 3.0625rem;
   --inset-bottom: env(safe-area-inset-bottom, 0px);
   /* Fuente única del offset para elementos flotantes del fondo (WhatsApp,
      StickyCatalogButton, pill de cuenta, cookie banner). Cuando el carrito
      tiene items, `body.cart-bar-active` sube todos los flotantes por encima
      del MobileCartBar para evitar colisiones. */
   --floating-bottom-offset: calc(1rem + var(--inset-bottom));
-  /* Aire entre el aviso (toast) y el carril inferior. En mobile el aviso va
-     pegado al carril; en sm+ sube un escalón para librar los pills flotantes
-     de la izquierda (StickyCatalogButton/pill de cuenta: 46px de alto + 10px
-     de aire) sin tapar el CTA "Hacer Checkout". */
+  /* Aire entre el aviso (toast) y el carril inferior. En sm+ es 0: el aviso
+     comparte fila con el WhatsApp FAB (misma altura, esquinas opuestas). */
   --toast-bottom-gap: 1rem;
+  /* Alto real del stack de avisos, publicado por ToastProvider. Lo consume
+     `body.has-toast .sticky-catalog-button` para apartar el pill mientras hay
+     avisos (ver más abajo). */
+  --toast-stack-h: 0px;
 }
 
 @media (min-width: 640px) {
   :root {
     --floating-bottom-offset: calc(1.5rem + var(--inset-bottom));
-    --toast-bottom-gap: 3.5rem;
+    --toast-bottom-gap: 0px;
   }
 }
 
@@ -104,6 +112,19 @@ body.cart-bar-active {
   body.has-account-pill .sticky-catalog-button {
     display: none;
   }
+}
+
+/* El aviso (toast) comparte la fila inferior con el WhatsApp FAB: en sm+ ambos
+   se anclan al carril (--floating-bottom-offset) y quedan a la misma altura, uno
+   en cada esquina. El StickyCatalogButton vive en esa misma esquina izquierda, así
+   que mientras hay avisos sube por encima del alto real del stack
+   (--toast-stack-h, publicado por ToastProvider) + 10px de aire, y vuelve al
+   carril (transition-all 300ms del pill) cuando expira el último aviso. */
+body.has-toast .sticky-catalog-button {
+  bottom: calc(
+    var(--floating-bottom-offset) + var(--toast-bottom-gap, 0px) +
+      var(--toast-stack-h, 0px) + 0.625rem
+  );
 }
 
 /* Sticky add-to-cart de la página de producto (solo móvil). Cuando el carrito

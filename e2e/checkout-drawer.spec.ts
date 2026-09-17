@@ -737,8 +737,10 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
   /**
    * El aviso "… agregado al carrito" (toast.tsx) se anclaba abajo-derecha en
    * desktop y tapaba el CTA "Hacer Checkout" de la barra de carrito (162×29px).
-   * Ahora vive abajo-izquierda y en sm+ sube --toast-bottom-gap por encima del
-   * pill flotante "Ver todos los productos".
+   * Ahora vive abajo-izquierda y en sm+ a la MISMA altura que el WhatsApp FAB
+   * (--toast-bottom-gap: 0), en la esquina opuesta; el StickyCatalogButton, que
+   * ocupa esa misma esquina, se aparta mientras hay avisos (body.has-toast +
+   * --toast-stack-h) en vez de quedar debajo del aviso.
    *
    * El contenedor de toasts existe siempre (ToastProvider en layout.tsx) pero su
    * caja mide 0 sin avisos, así que validamos su posición computada contra las
@@ -780,10 +782,36 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     const toastBottomY = viewport.height - anchor.bottom
     expect(toastBottomY).toBeLessThanOrEqual(checkoutBox.y)
 
-    // 3) En desktop libra además el pill "Ver todos los productos".
-    const stickyBox = await page.locator(".sticky-catalog-button").boundingBox()
-    if (!isMobile && stickyBox) {
-      expect(toastBottomY).toBeLessThanOrEqual(stickyBox.y)
+    // 3) En desktop comparte fila con el WhatsApp FAB y libra el pill "Ver todos
+    //    los productos" (misma esquina): el pill sube por encima del stack de
+    //    avisos. Simulamos el estado que publica ToastProvider (clase + token)
+    //    porque disparar un aviso real exige catálogo con productos.
+    const whatsapp = await page.locator(".whatsapp-floating").boundingBox()
+    if (!isMobile && whatsapp) {
+      expect(Math.abs(whatsapp.y + whatsapp.height - toastBottomY)).toBeLessThanOrEqual(2)
+    }
+
+    const sticky = page.locator(".sticky-catalog-button")
+    const railBox = (await sticky.count()) > 0 ? await sticky.boundingBox() : null
+    if (!isMobile && railBox) {
+      const stackH = 50 // alto de un aviso de una línea (px-4 py-3 + borde)
+      await page.evaluate((h) => {
+        document.body.classList.add("has-toast")
+        document.documentElement.style.setProperty("--toast-stack-h", `${h}px`)
+      }, stackH)
+      // El pill se aparta con transition-all 300ms: se sondea hasta que su borde
+      // inferior libra el borde superior del aviso (alto del stack + 10px de aire).
+      const pillBottom = async () => {
+        const b = await sticky.boundingBox()
+        return b ? b.y + b.height : Number.POSITIVE_INFINITY
+      }
+      await expect.poll(pillBottom).toBeLessThanOrEqual(toastBottomY - stackH - 9)
+      // Y vuelve al carril cuando expira el último aviso (no queda desplazado).
+      await page.evaluate(() => {
+        document.body.classList.remove("has-toast")
+        document.documentElement.style.removeProperty("--toast-stack-h")
+      })
+      await expect.poll(pillBottom).toBeGreaterThan(toastBottomY - stackH - 9)
     }
   })
 })

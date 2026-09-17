@@ -163,11 +163,20 @@
   debajo (`hidden md:table-cell`, pares `th`/`td`). Todo control móvil nuevo
   lleva `touch-target` (44px).
 
-- Productos — filtro por categoría: es una fila de **chips con el conteo de
-  productos de cada categoría** (`role="group"` + `aria-label="Filtrar por
-  categoría"`, `aria-pressed`, scroll horizontal en móvil y wrap en `sm+`);
-  el `<select>` "Todas las categorías" ya no existe — no reintroducirlo. El
-  conteo lo sirve `categoryCounts` del listado (`categoryTally` en
+- Productos — filtro por categoría: conviven **dos controles** y ambos deben
+  mantenerse sincronizados. (1) El `<select>` "Todas las categorías" de la barra
+  de filtros plegable (`aria-label="Filtrar por categoría"`), pedido por el
+  equipo — no eliminarlo. (2) Una fila de **chips con el conteo de productos de
+  cada categoría** (`role="group"` + `aria-label="Filtros rápidos por
+  categoría"`, `aria-pressed`, scroll horizontal en móvil y wrap en `sm+`),
+  cada uno con el emoji de su categoría resuelto con `getCategoryIcon(c.icon,
+  c.slug)` — misma fuente que la tienda, así que el chip nunca diverge del
+  icono del catálogo; por eso las categorías se cargan con
+  `select("id,name,slug,icon")` y `Category.icon` es obligatorio (también en
+  `ProductFormModal`, y `/api/admin/categories/create` devuelve `icon` para que
+  una categoría recién creada entre con su icono). Los dos controles usan
+  `updateFilters` y limpian `onlyNoCategory`. El conteo lo sirve
+  `categoryCounts` del listado (`categoryTally` en
   `route.ts`), que **pagina** hasta `CATEGORY_TALLY_PAGES` (10 × 1000) porque
   PostgREST corta en 1000 filas y una sola página subcontaría los chips;
   cuenta el catálogo acotado (respeta la papelera) y devuelve `{}` si la

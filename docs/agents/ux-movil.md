@@ -14,10 +14,14 @@
   estado son clases en `body` (ver regla 3 del README de agentes). Nuevo flotante
   ⇒ registrar su regla de colisión (InstallPrompt y BackToTop ya tienen la suya).
 - El contenedor de toasts se ancla abajo-izquierda en `sm+` (nunca sobre los CTAs
-  del carril: "Hacer Checkout" vive abajo-derecha). Su separación del rail es
-  `--toast-bottom-gap` (1rem en mobile, 3.5rem en `sm+` = 46px del
-  StickyCatalogButton + 10px de aire); no volver a fijarlo con `sm:bottom-6`,
-  que ignora `--floating-bottom-offset`.
+  del carril: "Hacer Checkout" vive abajo-derecha) y a la MISMA altura que el
+  WhatsApp FAB (`.whatsapp-floating`), en la esquina opuesta. Su separación del
+  rail es `--toast-bottom-gap` (1rem en mobile, 0 en `sm+`); no volver a fijarlo
+  con `sm:bottom-6`, que ignora `--floating-bottom-offset`.
+- Mientras hay avisos, `ToastProvider` marca `body.has-toast` y publica el alto
+  real del stack en `--toast-stack-h`; el CSS sube el `StickyCatalogButton` por
+  encima del aviso (misma esquina) y lo devuelve al rail al expirar el último.
+  No sustituir por `:has()` (el repo no lo usa) ni ocultar el pill.
 - Header sticky: cualquier anchor nuevo respeta `scroll-padding-top`.
 - La regla `.touch-target:not(.hidden)` es unlayered a propósito — ver nota en
   `globals.css`; no moverla a una capa de Tailwind.

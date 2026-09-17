@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { createContext, useContext } from "react"
 import { CheckCircle2, XCircle, AlertCircle, X } from "lucide-react"
 
@@ -47,17 +47,41 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }
 
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // El aviso comparte la fila inferior con el WhatsApp FAB, así que el CSS
+  // (body.has-toast .sticky-catalog-button) aparta el pill de catálogo por
+  // encima del aviso mientras hay avisos visibles: publicamos el alto real del
+  // stack en --toast-stack-h. Al expirar el último aviso se limpia. El chequeo
+  // del DOM evita que un provider secundario (panel/admin, que montan el suyo)
+  // apague la clase mientras otro sigue mostrando avisos.
+  useEffect(() => {
+    const root = document.documentElement
+    if (toasts.length > 0) {
+      root.style.setProperty("--toast-stack-h", `${containerRef.current?.offsetHeight ?? 0}px`)
+      document.body.classList.add("has-toast")
+      return
+    }
+    root.style.removeProperty("--toast-stack-h")
+    if (!document.querySelector('div[aria-live="polite"].fixed > *')) {
+      document.body.classList.remove("has-toast")
+    }
+  }, [toasts])
+
   return (
     <ToastCtx.Provider value={{ toast: addToast }}>
       {children}
-      {/* Toast container — mobile: centrado arriba de las barras flotantes
-          (MobileCartBar z-50 / sticky ATC z-40). Desktop: esquina inferior
-          izquierda, un escalón (--toast-bottom-gap) por encima del
-          StickyCatalogButton, para no tapar el CTA "Hacer Checkout" del carril.
-          aria-live anuncia las notificaciones a lectores de pantalla. */}
+      {/* Toast container — mobile: full-width, un paso (--toast-bottom-gap) por
+          encima de las barras flotantes (MobileCartBar z-50 / sticky ATC z-40).
+          sm+: esquina inferior izquierda a la MISMA altura que el WhatsApp FAB
+          (misma fila del carril, esquinas opuestas); el StickyCatalogButton se
+          aparta por CSS mientras hay avisos (body.has-toast). Nunca pisa el CTA
+          "Hacer Checkout": ese vive dentro del MobileCartBar, por debajo del
+          carril. aria-live anuncia las notificaciones a lectores de pantalla. */}
       <div
+        ref={containerRef}
         aria-live="polite"
-        className="fixed z-[100] space-y-2 max-w-sm left-4 right-4 sm:left-6 sm:right-auto bottom-[calc(var(--floating-bottom-offset,0px)+var(--toast-bottom-gap,1rem))] mx-auto sm:mx-0"
+        className="fixed z-[100] space-y-2 max-w-sm left-4 right-4 sm:left-6 sm:right-auto bottom-[calc(var(--floating-bottom-offset,0px)+var(--toast-bottom-gap,0px))] mx-auto sm:mx-0"
       >
         {toasts.map((t) => {
           const iconMap = {

@@ -88,6 +88,51 @@ interface FilterCounts {
   categoryCounts: Record<string, number>
 }
 
+interface AvailabilityRow {
+  product_id: number
+  city_id: number
+  is_available: boolean
+}
+
+/**
+ * Disponibilidad por ciudad SOLO de la página visible.
+ *
+ * El panel descargaba `product_city_availability` completa (catálogo ×
+ * ciudades) en el navegador solo para pintar el badge "Global" y el contador
+ * `n/ciudades` de las filas en pantalla. Se calcula aquí, sobre los ids de la
+ * página, y el cliente solo intersecta con sus ciudades activas.
+ *
+ * La clave AUSENTE significa "Global" (el producto no tiene filas = visible en
+ * todas las ciudades); el valor es cuántas ciudades activas lo tienen
+ * disponible.
+ */
+async function pageAvailability(
+  supabase: ServiceClient,
+  ids: number[]
+): Promise<Record<number, number>> {
+  if (ids.length === 0) return {}
+  const [cityRes, availRes] = await Promise.all([
+    supabase.from("cities").select("id").eq("is_active", true),
+    supabase
+      .from("product_city_availability")
+      .select("product_id,city_id,is_available")
+      .in("product_id", ids),
+  ])
+  // Si la lista de ciudades falla, se cuentan todas las filas disponibles en
+  // vez de reportar 0 (el contador es informativo, no bloquea la tabla).
+  const active = cityRes.error
+    ? null
+    : new Set(((cityRes.data ?? []) as { id: number }[]).map((c) => c.id))
+  const counts: Record<number, number> = {}
+  for (const row of (availRes.data ?? []) as AvailabilityRow[]) {
+    // Se asigna siempre (aunque sea 0): tener filas = no es "Global".
+    const current = counts[row.product_id] ?? 0
+    const available = row.is_available && (!active || active.has(row.city_id))
+    counts[row.product_id] = current + (available ? 1 : 0)
+  }
+  return counts
+}
+
 function toIdList(value: unknown): number[] {
   if (!Array.isArray(value)) return []
   return value.filter((v): v is number => typeof v === "number" && Number.isInteger(v) && v > 0)
@@ -356,7 +401,10 @@ async function applyFilters(
 }
 
 /** Tope de páginas del conteo por categoría (10 × 1000 filas): evita que un
- *  catálogo anómalo convierta el listado en un bucle sin fin. */
+ *  catálogo anómalo convierta el listado en un bucle sin fin.
+ *
+ *  Solo lo usa el fallback de `filterCounts` cuando la migración 00115 aún no
+ *  está aplicada; con el RPC disponible el tally es un `GROUP BY` sin tope. */
 const CATEGORY_TALLY_PAGES = 10
 
 /**
@@ -510,8 +558,6 @@ export async function GET(request: NextRequest) {
             .select("id", { count: "exact", head: true })
             .eq("stock_status", "out_of_stock")
         ),
-        noCitiesProductIds(supabase, withDeletedAt),
-        noCitiesProductIds(supabase, withDeletedAt),
         alive(
           supabase.from("products").select("id", { count: "exact", head: true }).is("price", null)
         ),
@@ -542,8 +588,6 @@ export async function GET(request: NextRequest) {
             .not("sale_ends_at", "is", null)
             .lt("sale_ends_at", new Date().toISOString())
         ),
-        duplicateNameProductIds(supabase, withDeletedAt),
-        underThresholdProductIds(supabase, withDeletedAt),
         withDeletedAt
           ? supabase
               .from("products")
@@ -583,7 +627,12 @@ export async function GET(request: NextRequest) {
 
       // Conteo por categoría para los chips de categoría (mismo catálogo
       // acotado que marcas y etiquetas).
-      const categoryCounts = await categoryTally(supabase, withDeletedAt)
+      const categoryCounts = derived.categoryCounts
+
+      // Disponibilidad por ciudad de la página visible (reemplaza la descarga
+      // completa de `product_city_availability` que hacía el panel).
+      const pageIds = (result.data ?? []).map((r: { id: number }) => r.id)
+      const availability = await pageAvailability(supabase, pageIds)
 
       return {
         rows: result.data ?? [],
@@ -591,6 +640,7 @@ export async function GET(request: NextRequest) {
         brands,
         tags,
         categoryCounts,
+        availability,
         counts: {
           catalogTotal: catalogTotal.count ?? 0,
           published: published.count ?? 0,
@@ -598,14 +648,14 @@ export async function GET(request: NextRequest) {
           noImage: noImage.count ?? 0,
           lowStock: lowStock.count ?? 0,
           outStock: outStock.count ?? 0,
-          noCities: noCitiesIds.length,
+          noCities: derived.noCitiesIds.length,
           noPrice: noPrice.count ?? 0,
           noCategory: noCategory.count ?? 0,
           waMismatch: waMismatch.count ?? 0,
           onSale: onSale.count ?? 0,
           staleSale: staleSale.count ?? 0,
-          dupNames: dupNameIds.length,
-          underThreshold: underThresholdIds.length,
+          dupNames: derived.dupNameIds.length,
+          underThreshold: derived.underThresholdIds.length,
           trash: trashCount.count ?? 0,
         },
       }

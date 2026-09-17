@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ShieldCheck } from "lucide-react"
@@ -76,8 +77,33 @@ export function AdminSubNav() {
   const isActive = (href: string, exact: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
 
+  const navRef = useRef<HTMLDivElement>(null)
+
+  // Publica el alto real del sub-nav en --admin-subnav-h para que las barras
+  // sticky del área (barra de acciones masivas de /admin/productos) se anclen
+  // justo DEBAJO de él en vez de quedar ocultas detrás (el sub-nav es z-40).
+  // El alto no es una constante fiable (fuente, badge de pedidos, zoom), así
+  // que se mide con ResizeObserver en lugar de hardcodearlo en el CSS; el
+  // default de la var cubre el primer render antes de este efecto.
+  useEffect(() => {
+    const el = navRef.current
+    if (!el) return
+    const root = document.documentElement
+    const publish = () => root.style.setProperty("--admin-subnav-h", `${el.offsetHeight}px`)
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      root.style.removeProperty("--admin-subnav-h")
+    }
+  }, [])
+
   return (
-    <div className="sticky top-[var(--header-top-offset)] z-40 bg-white/90 backdrop-blur-md border-b border-gray-200 print:hidden">
+    <div
+      ref={navRef}
+      className="sticky top-[var(--header-top-offset)] z-40 bg-white/90 backdrop-blur-md border-b border-gray-200 print:hidden"
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-3 overflow-x-auto">
         <span className="inline-flex items-center gap-1.5 shrink-0 rounded-full bg-gray-900 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
           <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />

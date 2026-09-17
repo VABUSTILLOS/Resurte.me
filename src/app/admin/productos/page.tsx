@@ -64,6 +64,7 @@ import { type SalesReportInsights } from "@/lib/sales-report"
 import { deriveStockStatus } from "@/lib/stock"
 import { createClient } from "@/lib/supabase/client"
 import { cropImageToSquare } from "@/lib/crop-image"
+import { getCategoryIcon } from "@/lib/utils"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import {
   MOBILE_VIEW_MEDIA_QUERY,
@@ -111,6 +112,7 @@ interface Category {
   id: number
   name: string
   slug: string
+  icon: string | null
 }
 
 /** R7-10 — propuesta de SEO editable en el preview del lote. */
@@ -180,7 +182,8 @@ function isNewProduct(p: { created_at: string | null }): boolean {
   return Date.now() - new Date(p.created_at).getTime() < 7 * 24 * 60 * 60 * 1000
 }
 
-function buildMap(rows: AvailabilityRow[]): AvailabilityMap {  const map: AvailabilityMap = new Map()
+function buildMap(rows: AvailabilityRow[]): AvailabilityMap {
+  const map: AvailabilityMap = new Map()
   for (const row of rows) {
     const inner = map.get(row.product_id) ?? new Map<number, boolean>()
     inner.set(row.city_id, row.is_available)
@@ -265,7 +268,14 @@ function AdminProductsContent() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [cities, setCities] = useState<City[]>([])
-  const [availability, setAvailability] = useState<AvailabilityMap>(new Map())
+  /** Disponibilidad por ciudad SOLO de las filas visibles (la sirve el
+   *  listado): clave ausente = "Global". Antes se descargaba la tabla
+   *  `product_city_availability` completa en el navegador. */
+  const [availability, setAvailability] = useState<Record<number, number>>({})
+  /** Disponibilidad de los ids seleccionados, cargada al abrir el modal de
+   *  ciudades (la selección puede abarcar todas las páginas). */
+  const [modalAvailability, setModalAvailability] = useState<AvailabilityMap>(new Map())
+  const [cityModalLoading, setCityModalLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<Set<number>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -627,22 +637,19 @@ function AdminProductsContent() {
     return sp.toString()
   }
 
-  // Datos estáticos: categorías, ciudades y disponibilidad por ciudad.
+  // Datos estáticos: categorías y ciudades. La disponibilidad por ciudad de las
+  // filas visibles llega con el listado (ya no se descarga la tabla completa).
   useEffect(() => {
     if (!supabase) return
     let cancelled = false
     ;(async () => {
-      const [catRes, cityRes, availRes] = await Promise.all([
-        supabase.from("categories").select("id,name,slug").order("name"),
+      const [catRes, cityRes] = await Promise.all([
+        supabase.from("categories").select("id,name,slug,icon").order("name"),
         supabase.from("cities").select("id,name,slug,state").eq("is_active", true).order("name"),
-        supabase
-          .from("product_city_availability")
-          .select("product_id,city_id,is_available"),
       ])
       if (cancelled) return
       if (catRes.data) setCategories(catRes.data)
       if (cityRes.data) setCities(cityRes.data)
-      if (availRes.data) setAvailability(buildMap(availRes.data as AvailabilityRow[]))
     })()
     return () => {
       cancelled = true
@@ -666,6 +673,7 @@ function AdminProductsContent() {
         }
         setProducts(data.rows ?? [])
         setTotal(data.total ?? 0)
+        setAvailability(data.availability ?? {})
         if (data.counts) setCounts(data.counts)
         if (data.brands) setBrands(data.brands)
         setCategoryCounts(data.categoryCounts ?? {})
@@ -792,18 +800,12 @@ function AdminProductsContent() {
   }
 
   // ---------- Disponibilidad por ciudad ----------
-  // Sin filas en product_city_availability = "Global" (todas las ciudades).
-  const isGlobal = (productId: number) => !availability.has(productId)
+  // Clave ausente en `availability` = sin filas en product_city_availability =
+  // "Global" (visible en todas las ciudades).
+  const isGlobal = (productId: number) => !(productId in availability)
 
-  const citiesAvailableCount = (productId: number): number => {
-    const rows = availability.get(productId)
-    if (!rows) return cities.length
-    let count = 0
-    for (const city of cities) {
-      if (rows.get(city.id)) count++
-    }
-    return count
-  }
+  const citiesAvailableCount = (productId: number): number =>
+    availability[productId] ?? cities.length
 
   // ---------- Selección ----------
   const lastSelectedRef = useRef<number | null>(null)
@@ -860,22 +862,39 @@ function AdminProductsContent() {
   }
 
   // ---------- Modal de ciudades ----------
-  const openCityModal = (onlyProductId?: number) => {
+  // La selección puede abarcar todas las páginas, así que la disponibilidad de
+  // esos ids se pide al abrir (antes se tenía el mapa completo en memoria).
+  const openCityModal = async (onlyProductId?: number) => {
     const ids = onlyProductId != null ? [onlyProductId] : [...selected]
     if (ids.length === 0) return
     if (onlyProductId != null) setSelected(new Set([onlyProductId]))
-    // Pre-marcar: una ciudad queda activa si TODOS los productos del grupo la
-    // tienen disponible (los globales cuentan como disponibles en todas).
-    const pre = new Set<number>()
-    for (const city of cities) {
-      const all = ids.every((id) => {
-        const rows = availability.get(id)
-        return rows ? rows.get(city.id) === true : true
-      })
-      if (all) pre.add(city.id)
+    setCityModalLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(
+        `/api/admin/products/city-availability?ids=${encodeURIComponent(ids.join(","))}`
+      )
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error ?? "Error al cargar la disponibilidad")
+      const map = buildMap((data.rows ?? []) as AvailabilityRow[])
+      setModalAvailability(map)
+      // Pre-marcar: una ciudad queda activa si TODOS los productos del grupo la
+      // tienen disponible (los globales cuentan como disponibles en todas).
+      const pre = new Set<number>()
+      for (const city of cities) {
+        const all = ids.every((id) => {
+          const rows = map.get(id)
+          return rows ? rows.get(city.id) === true : true
+        })
+        if (all) pre.add(city.id)
+      }
+      setDraftCities(pre)
+      setCityModalOpen(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cargar la disponibilidad")
+    } finally {
+      setCityModalLoading(false)
     }
-    setDraftCities(pre)
-    setCityModalOpen(true)
   }
 
   // "mixto": la ciudad está activa en unos productos seleccionados y en otros no.
@@ -883,17 +902,17 @@ function AdminProductsContent() {
     const ids = [...selected]
     if (ids.length <= 1) return false
     const states = ids.map((id) => {
-      const rows = availability.get(id)
+      const rows = modalAvailability.get(id)
       return rows ? rows.get(cityId) === true : true
     })
     return states.some(Boolean) && states.some((s) => !s)
   }
 
   // ---------- Acciones bulk ----------
-  const applyBulk = async (
-    body: Record<string, unknown>,
-    apply: (prev: AvailabilityMap) => AvailabilityMap
-  ) => {
+  // El servidor es la única fuente de la disponibilidad: tras guardar se
+  // recarga el listado (que ya trae el contador por fila de la página) en vez
+  // de mantener un mapa completo en el navegador.
+  const applyBulk = async (body: Record<string, unknown>) => {
     if (selected.size === 0) return
     setBulkSaving(true)
     setError(null)
@@ -907,8 +926,8 @@ function AdminProductsContent() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? "Error al actualizar disponibilidad")
       }
-      setAvailability(apply)
       setToast("Disponibilidad actualizada")
+      setReloadKey((k) => k + 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al actualizar disponibilidad")
     } finally {
@@ -917,14 +936,7 @@ function AdminProductsContent() {
   }
 
   const applyAllCities = (available: boolean) =>
-    applyBulk({ scope: "all", isAvailable: available }, (prev) => {
-      const next: AvailabilityMap = new Map(prev)
-      for (const id of selected) {
-        if (available) next.delete(id) // sin filas = Global
-        else next.set(id, new Map(cities.map((c) => [c.id, false])))
-      }
-      return next
-    })
+    applyBulk({ scope: "all", isAvailable: available })
 
   const applyDraftCities = async () => {
     if (draftCities.size === cities.length) {
@@ -937,13 +949,7 @@ function AdminProductsContent() {
         cityId: c.id,
         isAvailable: draftCities.has(c.id),
       }))
-      await applyBulk({ changes }, (prev) => {
-        const next: AvailabilityMap = new Map(prev)
-        for (const id of selected) {
-          next.set(id, new Map(cities.map((c) => [c.id, draftCities.has(c.id)])))
-        }
-        return next
-      })
+      await applyBulk({ changes })
     }
     setCityModalOpen(false)
   }
@@ -3091,6 +3097,26 @@ function AdminProductsContent() {
           className={`${filtersOpen ? "flex" : "hidden sm:flex"} flex-col gap-3 sm:flex-row`}
         >
           <select
+            value={categoryFilter}
+            onChange={(e) =>
+              updateFilters(() => {
+                setCategoryFilter(e.target.value)
+                // Igual que en los chips: elegir categoría limpia "Sin
+                // categoría" para no dejar el listado vacío.
+                setOnlyNoCategory(false)
+              })
+            }
+            className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+            aria-label="Filtrar por categoría"
+          >
+            <option value="all">Todas las categorías</option>
+            {categories.map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {getCategoryIcon(c.icon, c.slug)} {c.name}
+              </option>
+            ))}
+          </select>
+          <select
             value={stockFilter}
             onChange={(e) => updateFilters(() => setStockFilter(e.target.value as StockStatus | "all"))}
             className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white focus:outline-none focus:border-brand-500"
@@ -3307,13 +3333,14 @@ function AdminProductsContent() {
         </MobileCollapsible>
       )}
 
-      {/* Chips de categoría con el conteo de productos: escoger categoría sin
-          abrir los selects (y en móvil, donde los filtros van plegados). La
-          fila hace scroll horizontal en móvil y envuelve en escritorio. */}
+      {/* Chips de categoría con el conteo de productos y el emoji de la
+          categoría: atajo de un toque para escoger categoría sin abrir el
+          `<select>` (y en móvil, donde los filtros van plegados). La fila hace
+          scroll horizontal en móvil y envuelve en escritorio. */}
       {categories.length > 0 && (
         <div
           role="group"
-          aria-label="Filtrar por categoría"
+          aria-label="Filtros rápidos por categoría"
           className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1 sm:mb-4 sm:flex-wrap sm:pb-0"
         >
           <button
@@ -3327,6 +3354,7 @@ function AdminProductsContent() {
             aria-pressed={categoryFilter === "all" && !onlyNoCategory}
             className={categoryChipClass(categoryFilter === "all" && !onlyNoCategory)}
           >
+            <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" />
             Todas
             <span className={chipCountClass(categoryFilter === "all" && !onlyNoCategory)}>
               {counts.catalogTotal}
@@ -3351,6 +3379,10 @@ function AdminProductsContent() {
                 title={`Ver solo los productos de ${c.name}`}
                 className={categoryChipClass(active)}
               >
+                {/* Mismo icono que la tienda (`getCategoryIcon`): la categoría
+                    trae su emoji en `categories.icon` y el helper resuelve el
+                    fallback por slug y el genérico cuando falta. */}
+                <span aria-hidden="true">{getCategoryIcon(c.icon, c.slug)}</span>
                 {c.name}
                 <span className={chipCountClass(active)}>{categoryCounts[String(c.id)] ?? 0}</span>
               </button>
@@ -3605,11 +3637,11 @@ function AdminProductsContent() {
           <div className="flex flex-wrap items-center gap-2 ml-auto">
             <button
               onClick={() => openCityModal()}
-              disabled={bulkSaving}
+              disabled={bulkSaving || cityModalLoading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50"
             >
               <MapPin className="w-3.5 h-3.5" />
-              Elegir ciudades…
+              {cityModalLoading ? "Cargando…" : "Elegir ciudades…"}
             </button>
             <button
               onClick={() => applyAllCities(true)}
@@ -4218,7 +4250,7 @@ function AdminProductsContent() {
                     <td className="px-5 py-3 hidden md:table-cell">
                       <button
                         onClick={() => openCityModal(product.id)}
-                        disabled={cities.length === 0}
+                        disabled={cities.length === 0 || cityModalLoading}
                         title="Elegir en qué ciudades se ve este producto"
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
                           global
