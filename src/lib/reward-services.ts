@@ -25,6 +25,7 @@ interface RewardServiceRow {
   icon: string | null
   is_active: boolean
   display_order: number
+  sla_days: number | null
 }
 
 function rowToService(row: RewardServiceRow): ServiceItem {
@@ -39,6 +40,7 @@ function rowToService(row: RewardServiceRow): ServiceItem {
     estimatedImpact: row.estimated_impact ?? "",
     testimonials: row.testimonial ?? undefined,
     icon: row.icon ?? "🎁",
+    slaDays: row.sla_days ?? undefined,
   }
 }
 

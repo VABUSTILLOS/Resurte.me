@@ -4,6 +4,10 @@ import {
   INBOX_BUCKETS,
   INBOX_BUCKET_LABEL,
   QUICK_REPLY_VARIABLES,
+  QUICK_REPLY_TITLE_MAX,
+  QUICK_REPLY_BODY_MAX,
+  activeQuickReplies,
+  quickReplyDraftError,
   normalizeDirection,
   mergeTimeline,
   lastMessage,
@@ -568,5 +572,60 @@ describe("buildThread", () => {
       NOW,
     )
     expect(threads.map((t) => t.prospect.id)).toEqual([5, 2])
+  })
+})
+
+describe("gestor de respuestas rápidas", () => {
+  it("filtra las apagadas: es lo que hacía que el interruptor no hiciera nada", () => {
+    const replies = [
+      { id: 1, isActive: true },
+      { id: 2, isActive: false },
+      { id: 3, isActive: true },
+    ]
+    expect(activeQuickReplies(replies).map((r) => r.id)).toEqual([1, 3])
+  })
+
+  it("no reordena ni muta la lista original", () => {
+    const replies = [
+      { id: 3, isActive: false },
+      { id: 1, isActive: true },
+    ]
+    expect(activeQuickReplies(replies).map((r) => r.id)).toEqual([1])
+    expect(replies.map((r) => r.id)).toEqual([3, 1])
+  })
+
+  it("una lista vacía o toda apagada devuelve vacío, no undefined", () => {
+    expect(activeQuickReplies([])).toEqual([])
+    expect(activeQuickReplies([{ id: 1, isActive: false }])).toEqual([])
+  })
+
+  it("el borrador vacío pide título", () => {
+    expect(quickReplyDraftError({ title: "", body: "Hola" })).toBe("El título es obligatorio")
+    expect(quickReplyDraftError({ title: "   ", body: "Hola" })).toBe("El título es obligatorio")
+  })
+
+  it("un título de solo espacios no pasa", () => {
+    expect(quickReplyDraftError({ title: " x ", body: "Hola" })).toBeNull()
+  })
+
+  it("el cuerpo vacío pide texto", () => {
+    expect(quickReplyDraftError({ title: "Saludo", body: "   " })).toBe("El texto es obligatorio")
+  })
+
+  it("los topes son exactos: justo en el límite pasa, uno más no", () => {
+    const title = "a".repeat(QUICK_REPLY_TITLE_MAX)
+    const body = "b".repeat(QUICK_REPLY_BODY_MAX)
+    expect(quickReplyDraftError({ title, body })).toBeNull()
+    expect(quickReplyDraftError({ title: `${title}a`, body })).toBe(
+      `El título no puede pasar de ${QUICK_REPLY_TITLE_MAX} caracteres`,
+    )
+    expect(quickReplyDraftError({ title, body: `${body}b` })).toBe(
+      `El texto no puede pasar de ${QUICK_REPLY_BODY_MAX} caracteres`,
+    )
+  })
+
+  it("el largo se mide sobre el texto recortado", () => {
+    const title = `${" ".repeat(10)}${"a".repeat(QUICK_REPLY_TITLE_MAX)}${" ".repeat(10)}`
+    expect(quickReplyDraftError({ title, body: "Hola" })).toBeNull()
   })
 })

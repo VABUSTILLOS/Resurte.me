@@ -363,17 +363,35 @@ export async function handlePaymentIntentProcessing(
 ): Promise<void> {
   logger.info("stripe.payment.processing", { paymentIntent: paymentIntent.id })
 
-  await supabase
+  // `orders.payment_status` es un enum: un valor ausente del enum hace fallar
+  // el UPDATE sin lanzar excepción. Sin este log el pedido se quedaba en
+  // 'pending' en silencio — exactamente la deriva que motivó la migración
+  // 00153. No se relanza: la reconciliación periódica reintenta los 'pending'.
+  const { error: ordersError } = await supabase
     .from("orders")
     .update({ payment_status: "processing", updated_at: new Date().toISOString() })
     .eq("stripe_payment_intent_id", paymentIntent.id)
     .eq("payment_status", "pending")
+  if (ordersError) {
+    logger.error("stripe.payment.processing.orders", {
+      paymentIntent: paymentIntent.id,
+      error: ordersError.message,
+    })
+  }
 
-  await supabase
+  // `foodos_orders.payment_status` es TEXT, no enum: este UPDATE no podía
+  // fallar por deriva. Se registra igual para no perder el diagnóstico.
+  const { error: foodosError } = await supabase
     .from("foodos_orders")
     .update({ payment_status: "processing" })
     .eq("stripe_payment_intent_id", paymentIntent.id)
     .eq("payment_status", "pending")
+  if (foodosError) {
+    logger.error("stripe.foodos.payment.processing", {
+      paymentIntent: paymentIntent.id,
+      error: foodosError.message,
+    })
+  }
 }
 
 /**

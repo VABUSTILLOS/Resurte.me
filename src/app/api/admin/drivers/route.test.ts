@@ -3,11 +3,13 @@ import { NextRequest } from "next/server"
 
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }))
 vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn() }))
+vi.mock("@/lib/audit-log", () => ({ logAdminAction: vi.fn() }))
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
 
 import { GET, POST, PATCH } from "./route"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logAdminAction } from "@/lib/audit-log"
 
 function asAdmin() {
   vi.mocked(requireAdmin).mockResolvedValue({ user: { id: "admin-1" }, response: null } as never)
@@ -78,6 +80,37 @@ describe("/api/admin/drivers", () => {
     )
     expect(res.status).toBe(201)
     expect(builder.insert).toHaveBeenCalledWith({ name: "Ana", phone: "6141234567" })
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "driver_create",
+        entity: "delivery_drivers",
+        entityId: 5,
+      })
+    )
+  })
+
+  it("PATCH activa/desactiva y lo deja en bitácora", async () => {
+    asAdmin()
+    const eq = vi.fn().mockResolvedValue({ error: null })
+    const builder = { update: vi.fn().mockReturnValue({ eq }) }
+    serviceWith(builder)
+    const res = await PATCH(
+      new NextRequest("http://localhost/api/admin/drivers", {
+        method: "PATCH",
+        body: JSON.stringify({ id: 5, is_active: false }),
+      })
+    )
+    expect(res.status).toBe(200)
+    expect(builder.update).toHaveBeenCalledWith({ is_active: false })
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "driver_update",
+        entityId: 5,
+        detail: { is_active: false },
+      })
+    )
   })
 
   it("PATCH 400 con payload inválido", async () => {

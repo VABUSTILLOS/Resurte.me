@@ -4,12 +4,14 @@ import { NextRequest } from "next/server"
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }))
 vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn() }))
 vi.mock("@/lib/notifications", () => ({ notifyUser: vi.fn() }))
+vi.mock("@/lib/audit-log", () => ({ logAdminAction: vi.fn() }))
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
 
 import { POST } from "./route"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { notifyUser } from "@/lib/notifications"
+import { logAdminAction } from "@/lib/audit-log"
 
 const ADMIN = { id: "admin-1", email: "admin@resurte.me" }
 const SUBMISSION = {
@@ -96,6 +98,14 @@ describe("POST /api/admin/facturas", () => {
       p_credits: 50,
       p_admin: ADMIN.id,
     })
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "invoice_approve",
+        entityId: 7,
+        detail: expect.objectContaining({ credits_granted: 50 }),
+      })
+    )
   })
 
   it("aprueba con créditos explícitos redondeados a 2 decimales", async () => {
@@ -141,6 +151,10 @@ describe("POST /api/admin/facturas", () => {
     expect(notifyUser).toHaveBeenCalledWith(
       expect.objectContaining({ type: "invoice_rejected", userId: "u-1" })
     )
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "invoice_reject", entityId: 7 })
+    )
   })
 
   it("409 al rechazar un envío ya aprobado", async () => {
@@ -170,6 +184,15 @@ describe("POST /api/admin/facturas", () => {
     })
     expect(notifyUser).toHaveBeenCalledWith(
       expect.objectContaining({ type: "invoice_revoked", userId: "u-1" })
+    )
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "invoice_revoke",
+        entity: "invoice_submissions",
+        entityId: 7,
+        detail: expect.objectContaining({ credits_reversed: 50 }),
+      })
     )
   })
 

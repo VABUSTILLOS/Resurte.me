@@ -109,8 +109,11 @@ describe("paridad HTML ↔ JSON-LD en los posts reales", () => {
     expect(files.length).toBeGreaterThan(100)
   })
 
-  // Corre el pipeline de remark sobre los 226 posts: ~1.3s en local, pero el
-  // runner de CI (2 núcleos) supera el default de 5s. Timeout holgado a propósito.
+  // Corre el pipeline de remark sobre los 226 posts. Medido en la ronda 11:
+  // 1.33 s de archivo completo / 1.41 s aislado, 11/11 en verde. El runner de CI
+  // (2 núcleos) es varias veces más lento que esta máquina y supera el default de
+  // 5 s, así que el timeout holgado es defensivo, no una necesidad viva: la fila
+  // `BL13` se cierra por medición, no arreglando nada.
   it("extractHeadings devuelve exactamente los mismos ids que el HTML", { timeout: 30_000 }, () => {
     const mismatches: string[] = []
     let totalHeadings = 0

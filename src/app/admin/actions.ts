@@ -91,6 +91,9 @@ import {
   requiresTemplate,
   nextSequenceRun,
   whatsappWindowState,
+  QUICK_REPLIES_LIMIT,
+  QUICK_REPLY_BODY_MAX,
+  QUICK_REPLY_TITLE_MAX,
   type ConversationProspect,
   type InboxBucket,
   type InboxMessage,
@@ -112,6 +115,14 @@ import {
   MAX_SEQUENCE_STEPS,
   type SequenceStep,
 } from "@/lib/crm-sequences-engine"
+import {
+  buildEnrollmentList,
+  describeEnrollmentResult,
+  planEnrollmentUpsert,
+  type AdminEnrollment,
+  type EnrollmentProspect,
+  type EnrollmentRow,
+} from "@/lib/crm-enrollments"
 import {
   buildSellerLoad,
   buildSlaBoard,
@@ -1488,17 +1499,29 @@ export async function getAdminSellers(): Promise<{ id: string; name: string; ema
   const supabase = await createServiceClient()
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, email")
+    .select("id, full_name")
     .eq("role", "vendedor")
     .order("full_name", { ascending: true })
   if (error) {
     logger.error("[ADMIN-CRM] Error fetching sellers:", error)
     throw new Error("Error al cargar los vendedores")
   }
+
+  // `profiles` NO tiene columna `email` (el correo vive en `auth.users`):
+  // seleccionarla devolvía 42703 y rompía /admin/leads entero.
+  const { data: authData, error: authError } = await supabase.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  })
+  if (authError) {
+    logger.warn("[ADMIN-CRM] Error fetching seller emails:", { message: authError.message })
+  }
+  const emails = new Map((authData?.users ?? []).map((u) => [u.id, u.email ?? ""]))
+
   return (data ?? []).map((row) => ({
     id: String(row.id),
-    name: (row.full_name as string | null)?.trim() || String(row.email ?? "Sin nombre"),
-    email: String(row.email ?? ""),
+    name: (row.full_name as string | null)?.trim() || emails.get(String(row.id)) || "Sin nombre",
+    email: emails.get(String(row.id)) ?? "",
   }))
 }
 
@@ -1954,15 +1977,8 @@ const BULK_ASSIGN_LIMIT = 200
  * sobre los prospectos más recientes, que son los que mueven la decisión.
  */
 const ASSIGN_SCAN_LIMIT = 2000
-/** Respuestas rápidas que se devuelven al compositor. */
-const QUICK_REPLIES_LIMIT = 200
-const QUICK_REPLY_TITLE_MAX = 60
-const QUICK_REPLY_BODY_MAX = 1024
 /** Lo que se guarda como resumen de la actividad de WhatsApp. */
 const ACTIVITY_SUMMARY_MAX = 280
-
-/** De dónde viene un evento del hilo, para no confundir un mensaje con una nota. */
-export type LeadTimelineSource = "whatsapp" | "automation" | "activity"
 
 /**
  * Ronda 7: el hilo y la conversación se leen en `crm-conversation.ts`, porque la
@@ -2544,7 +2560,7 @@ export async function bulkTagProspects(
 async function loadSellerRefs(supabase: ServiceClient): Promise<SellerRef[]> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, email, default_city_id")
+    .select("id, full_name, default_city_id")
     .eq("role", "vendedor")
     .order("full_name", { ascending: true })
 
@@ -2555,7 +2571,7 @@ async function loadSellerRefs(supabase: ServiceClient): Promise<SellerRef[]> {
 
   return (data ?? []).map((row) => ({
     id: String(row.id),
-    name: (row.full_name as string | null)?.trim() || String(row.email ?? "") || "Sin nombre",
+    name: (row.full_name as string | null)?.trim() || "Sin nombre",
     city_id: row.default_city_id != null ? Number(row.default_city_id) : null,
   }))
 }
@@ -3049,6 +3065,80 @@ export async function listCrmSequences(): Promise<AdminSequence[]> {
 }
 
 /**
+ * Inscripciones de una secuencia, con el nombre del prospecto ya resuelto.
+ *
+ * Se lee **por secuencia y bajo demanda**: es la lista que abre el botón de
+ * cancelar, no un panel global de todas las secuencias. La mitad *escritora*
+ * (`cancelSequenceEnrollment`) existía desde la ronda 6 sin nadie que le diera
+ * un `id`; esto es lo que le faltaba.
+ *
+ * Sin la migración 00140 devuelve una lista vacía en vez de reventar, igual que
+ * `getAdminQuickReplies`.
+ */
+export async function listCrmSequenceEnrollments(
+  sequenceId: number,
+): Promise<AdminEnrollment[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { data, error } = await supabase
+    .from("crm_sequence_enrollments")
+    .select("id, sequence_id, prospect_id, current_step, next_run_at, status, created_at")
+    .eq("sequence_id", sequenceId)
+    .order("created_at", { ascending: false })
+    .limit(MAX_SEQUENCE_ENROLLMENTS_PER_BATCH)
+
+  if (error) {
+    if (isMissingRelationError(error)) return []
+    logger.error("[ADMIN-CRM] Error leyendo las inscripciones:", error)
+    throw new Error("Error al cargar las inscripciones")
+  }
+
+  const raw = (data ?? []) as unknown as Array<Record<string, unknown>>
+  if (raw.length === 0) return []
+
+  const rows: EnrollmentRow[] = raw.map((row) => ({
+    id: Number(row.id),
+    sequence_id: Number(row.sequence_id),
+    prospect_id: Number(row.prospect_id),
+    current_step: Number(row.current_step ?? 0),
+    next_run_at: (row.next_run_at as string | null) ?? null,
+    status: String(row.status ?? ""),
+    created_at: (row.created_at as string | null) ?? null,
+  }))
+
+  // Una sola lectura para todos los ids: nunca una por fila.
+  const prospectIds = [...new Set(rows.map((row) => row.prospect_id))]
+  const { data: prospectRows, error: prospectError } = await supabase
+    .from("crm_prospects")
+    .select("id, name, phone, whatsapp")
+    .in("id", prospectIds)
+
+  if (prospectError && !isMissingRelationError(prospectError)) {
+    logger.warn("[ADMIN-CRM] No se pudieron resolver los prospectos inscritos:", {
+      error: prospectError.message,
+    })
+  }
+
+  const prospects: EnrollmentProspect[] = (prospectRows ?? []).map((row) => ({
+    id: Number(row.id),
+    name: String(row.name ?? ""),
+    phone: (row.phone as string | null) ?? null,
+    whatsapp: (row.whatsapp as string | null) ?? null,
+  }))
+
+  const { count } = await supabase
+    .from("crm_sequence_steps")
+    .select("id", { count: "exact", head: true })
+    .eq("sequence_id", sequenceId)
+
+  return buildEnrollmentList(rows, prospects, count ?? 0)
+}
+
+/**
  * Crea o reemplaza una secuencia. Nace apagada salvo que el admin la active.
  *
  * Los pasos se reemplazan en bloque (delete + insert): editar un paso intermedio
@@ -3164,15 +3254,25 @@ export async function toggleCrmSequence(id: number, isActive: boolean): Promise<
 }
 
 export interface EnrollResult {
+  /** Filas que ahora van a correr: nuevas + reactivadas. */
   enrolled: number
+  /** Filas que ya corrían y no se han tocado. */
   skipped: number
+  /** Subconjunto de `enrolled` que venía de una inscripción no activa. */
+  reactivated: number
   /** Motivo del primer rechazo, para poder decirlo en la interfaz. */
   reason: string | null
 }
 
 /**
  * Inscribe prospectos en una secuencia. Solo ENCOLA: programa el primer paso y
- * nada más. Un prospecto ya inscrito no se reinscribe (UNIQUE en la tabla).
+ * nada más.
+ *
+ * Un prospecto ya inscrito **y corriendo** no se toca. Uno cuya inscripción está
+ * `pausada`, `completada` o `cancelada` se **reactiva**: sin eso, cancelar era
+ * un camino de ida, porque el `UNIQUE (sequence_id, prospect_id)` de 00140 hace
+ * imposible reinsertar la fila y tratarla como "ya inscrito" la dejaba atrapada
+ * para siempre. La reactivación es siempre `UPDATE`, nunca `INSERT`.
  */
 export async function enrollProspectsInSequence(
   sequenceId: number,
@@ -3187,7 +3287,7 @@ export async function enrollProspectsInSequence(
     0,
     MAX_SEQUENCE_ENROLLMENTS_PER_BATCH,
   )
-  if (ids.length === 0) return { enrolled: 0, skipped: 0, reason: null }
+  if (ids.length === 0) return { enrolled: 0, skipped: 0, reactivated: 0, reason: null }
 
   const supabase = await createServiceClient()
   const { data: stepRows, error: stepError } = await supabase
@@ -3210,7 +3310,7 @@ export async function enrollProspectsInSequence(
 
   const { data: existing, error: existingError } = await supabase
     .from("crm_sequence_enrollments")
-    .select("prospect_id")
+    .select("prospect_id, status")
     .eq("sequence_id", sequenceId)
     .in("prospect_id", ids)
   if (existingError && !isMissingRelationError(existingError)) {
@@ -3218,29 +3318,58 @@ export async function enrollProspectsInSequence(
       error: existingError.message,
     })
   }
-  const alreadyIn = new Set((existing ?? []).map((row) => Number(row.prospect_id)))
-  const fresh = ids.filter((id) => !alreadyIn.has(id))
-  if (fresh.length === 0) {
-    return { enrolled: 0, skipped: ids.length, reason: "Ya estaban inscritos en esta secuencia" }
-  }
+
+  const plan = planEnrollmentUpsert(
+    (existing ?? []).map((row) => ({
+      prospect_id: Number(row.prospect_id),
+      status: String(row.status ?? ""),
+    })),
+    ids,
+  )
+  const result = describeEnrollmentResult(plan)
+  if (result.enrolled === 0) return result
 
   const nextRunAt = nextSequenceRun(new Date(), first.delay_hours)
-  const { error: insertError } = await supabase.from("crm_sequence_enrollments").insert(
-    fresh.map((prospectId) => ({
-      sequence_id: sequenceId,
-      prospect_id: prospectId,
-      current_step: 0,
-      next_run_at: nextRunAt,
-      status: "activa",
-      enrolled_by: user?.id ?? null,
-    })),
-  )
-  if (insertError) {
-    if (isMissingRelationError(insertError)) {
-      throw new Error("Las secuencias todavía no están disponibles en este entorno")
+
+  if (plan.insert.length > 0) {
+    const { error: insertError } = await supabase.from("crm_sequence_enrollments").insert(
+      plan.insert.map((prospectId) => ({
+        sequence_id: sequenceId,
+        prospect_id: prospectId,
+        current_step: 0,
+        next_run_at: nextRunAt,
+        status: "activa",
+        enrolled_by: user?.id ?? null,
+      })),
+    )
+    if (insertError) {
+      if (isMissingRelationError(insertError)) {
+        throw new Error("Las secuencias todavía no están disponibles en este entorno")
+      }
+      logger.error("[ADMIN-CRM] Error inscribiendo prospectos:", insertError)
+      throw new Error("Error al inscribir los prospectos")
     }
-    logger.error("[ADMIN-CRM] Error inscribiendo prospectos:", insertError)
-    throw new Error("Error al inscribir los prospectos")
+  }
+
+  if (plan.reactivate.length > 0) {
+    const { error: reactivateError } = await supabase
+      .from("crm_sequence_enrollments")
+      .update({
+        status: "activa",
+        current_step: 0,
+        next_run_at: nextRunAt,
+        enrolled_by: user?.id ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("sequence_id", sequenceId)
+      .in("prospect_id", plan.reactivate)
+    if (reactivateError) {
+      if (isMissingRelationError(reactivateError)) {
+        throw new Error("Las secuencias todavía no están disponibles en este entorno")
+      }
+      logger.error("[ADMIN-CRM] Error reactivando inscripciones:", reactivateError)
+      throw new Error("Error al reactivar las inscripciones")
+    }
   }
 
   await logAdminAction(supabase, {
@@ -3249,14 +3378,14 @@ export async function enrollProspectsInSequence(
     action: "crm_sequence_enroll",
     entity: "crm_sequence_enrollments",
     entityId: sequenceId,
-    detail: { enrolled: fresh.length, skipped: ids.length - fresh.length },
+    detail: {
+      enrolled: result.enrolled,
+      skipped: result.skipped,
+      reactivated: result.reactivated,
+    },
   })
   revalidatePath("/admin/leads")
-  return {
-    enrolled: fresh.length,
-    skipped: ids.length - fresh.length,
-    reason: null,
-  }
+  return result
 }
 
 /** Cancela la inscripción activa de un prospecto en una secuencia. */

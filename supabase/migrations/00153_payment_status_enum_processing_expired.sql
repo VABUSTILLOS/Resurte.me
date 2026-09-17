@@ -1,0 +1,41 @@
+-- ============================================================
+-- 00153: Reconciliación del enum payment_status con el código
+--
+-- Contexto (auditoría de drift código-vs-producción, sep-2026):
+--
+-- El enum `payment_status` de Postgres tiene SEIS valores (pending,
+-- paid, failed, refunded, amount_mismatch, disputed), pero el código
+-- declara OCHO: `processing` y `expired` nunca llegaron a la base.
+--
+-- Consecuencia 1 (producción viva): `reconcile-payments.ts` pasa
+-- TERMINAL_STATUSES a `.not("payment_status", "in", …)`; esa lista
+-- incluía 'canceled', que no existe en el enum, así que Postgres
+-- rechazaba la consulta ENTERA con 22P02 y el cron diario de
+-- reconciliación fallaba por completo (dejando sin reconciliar todos
+-- los pagos, no solo los cancelados).
+--
+-- Consecuencia 2: `handlePaymentIntentProcessing()` escribía
+-- payment_status = 'processing' sobre `orders` sin comprobar el
+-- error; el UPDATE fallaba en silencio y el pedido se quedaba en
+-- 'pending'. La rama "En proceso" de order-tracking.tsx era
+-- inalcanzable y ningún pedido podía registrar ese estado.
+--
+-- Esta es la MISMA deriva que ya ocurrió en 00135 (entonces el webhook
+-- escribía 'amount_mismatch', valor ausente del enum, y los pedidos con
+-- monto incorrecto quedaban 'pending' en silencio). La guardia que
+-- debía detectarla comparaba dos constantes de TypeScript entre sí, de
+-- modo que no podía ver la divergencia con Postgres por construcción.
+-- 00153 la sustituye por un contrato que lee este directorio.
+--
+-- NOTA: 'canceled' (una sola L) NO se agrega a propósito. La
+-- cancelación de pedidos vive en `orders.status`; en Stripe, `canceled`
+-- es un estado del PaymentIntent que el webhook mapea a 'failed'
+-- (stripe-webhook-handlers.ts → handlePaymentIntentCanceled).
+--
+-- Aditivo e idempotente. `ALTER TYPE … ADD VALUE` no puede usar el
+-- valor recién añadido dentro de la misma transacción, así que aquí
+-- solo se añade: ningún otro statement de este archivo lo referencia.
+-- ============================================================
+
+ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'processing';
+ALTER TYPE payment_status ADD VALUE IF NOT EXISTS 'expired';

@@ -12,7 +12,7 @@ import {
   PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_LABEL,
 } from "@/lib/order-labels"
-import { Search, RefreshCw, X, Printer, Bike, Download, Loader2 } from "lucide-react"
+import { Search, RefreshCw, X, Printer, Bike, Download, Loader2, AlertTriangle, Undo2 } from "lucide-react"
 import { toCsv, downloadCsv } from "@/lib/csv"
 import type { OrderStatus } from "@/types"
 import { ToastProvider, useToast } from "@/components/toast"
@@ -35,9 +35,14 @@ import { activeDrivers, type DriverLike } from "@/lib/drivers"
 import {
   BULK_STATUS_TARGETS,
   areAllSelected,
+  bulkAssignDriverConfirmMessage,
   bulkCancelConfirmMessage,
+  bulkConfirmPaymentConfirmMessage,
   bulkOutcomeMessage,
   bulkOutcomeTone,
+  bulkUndoMessage,
+  bulkUndoOutcomeMessage,
+  isBulkActionUndoable,
   isPartiallySelected,
   partitionForDriver,
   partitionForPayment,
@@ -46,6 +51,7 @@ import {
   selectAll,
   summarizeBulkResult,
   toggleSelection,
+  type BulkAction,
   type BulkResult,
   type Selection,
 } from "@/lib/order-bulk"
@@ -138,6 +144,10 @@ function AdminOrdersContent() {
   const [bulkTarget, setBulkTarget] = useState("")
   const [bulkDriverId, setBulkDriverId] = useState("")
   const [bulkRunning, setBulkRunning] = useState(false)
+  // Última acción masiva que movió dinero, para ofrecer deshacer. Solo se
+  // guarda la confirmación de pago (ver isBulkActionUndoable).
+  const [undoable, setUndoable] = useState<{ ids: number[] } | null>(null)
+  const [undoRunning, setUndoRunning] = useState(false)
   const selectAllRef = useRef<HTMLInputElement>(null)
 
   useEscapeKey(useCallback(() => setSelectedOrder(null), []), !!selectedOrder)
@@ -474,7 +484,12 @@ function AdminOrdersContent() {
    * log) que un batch tendría que duplicar y podría perder. Secuencial y no
    * en paralelo para no saturar Supabase ni disparar los workflows a la vez.
    */
-  async function runBulk(eligible: number[], skipped: number, bodyFor: () => Record<string, unknown>) {
+  async function runBulk(
+    action: BulkAction,
+    eligible: number[],
+    skipped: number,
+    bodyFor: () => Record<string, unknown>
+  ) {
     setBulkRunning(true)
     try {
       const results: BulkResult[] = []
@@ -482,6 +497,14 @@ function AdminOrdersContent() {
       const outcome = summarizeBulkResult(results, skipped)
       toast(bulkOutcomeMessage(outcome), bulkOutcomeTone(outcome))
       setSelected(new Set<number>())
+      // Se registran los ids que sí se aplicaron (no los omitidos ni los que
+      // fallaron), y solo cuando la acción movió dinero. Cualquier acción
+      // posterior reemplaza el deshacer pendiente.
+      setUndoable(
+        outcome.ok > 0 && isBulkActionUndoable(action)
+          ? { ids: results.filter((r) => r.ok).map((r) => r.id) }
+          : null
+      )
       if (outcome.ok > 0) refresh()
     } finally {
       setBulkRunning(false)
@@ -496,18 +519,64 @@ function AdminOrdersContent() {
     if (bulkTarget === "cancelled" && eligible.length > 0) {
       if (!window.confirm(bulkCancelConfirmMessage(eligible.length))) return
     }
-    void runBulk(eligible, skipped.length, () => ({ status: bulkTarget }))
+    void runBulk("status", eligible, skipped.length, () => ({ status: bulkTarget }))
   }
 
   function bulkConfirmPayment() {
     const { eligible, skipped } = partitionForPayment(filtered, selection)
-    void runBulk(eligible, skipped.length, () => ({ payment_status: "paid" }))
+    // Confirmar el pago abona cashback real a la wallet de cada cliente: es la
+    // única acción masiva de dinero, así que se confirma antes de ejecutarse.
+    if (eligible.length > 0 && !window.confirm(bulkConfirmPaymentConfirmMessage(eligible.length))) {
+      return
+    }
+    void runBulk("payment", eligible, skipped.length, () => ({ payment_status: "paid" }))
   }
 
   function bulkAssignDriver() {
     if (!bulkDriverId) return
     const { eligible, skipped } = partitionForDriver(filtered, selection)
-    void runBulk(eligible, skipped.length, () => ({ driver_id: Number(bulkDriverId) }))
+    const driverName =
+      assignableDrivers.find((d) => String(d.id) === bulkDriverId)?.name ?? "el repartidor"
+    if (eligible.length > 0 && !window.confirm(bulkAssignDriverConfirmMessage(eligible.length, driverName))) {
+      return
+    }
+    void runBulk("driver", eligible, skipped.length, () => ({ driver_id: Number(bulkDriverId) }))
+  }
+
+  /**
+   * Deshace la última confirmación masiva de pago.
+   *
+   * La reversión del cashback la hace el trigger de la base (00146); aquí solo
+   * se pide la transición `paid -> pending` y se reporta el resultado.
+   */
+  async function undoLastBulk() {
+    if (!undoable || undoable.ids.length === 0) return
+    const ids = undoable.ids
+    setUndoRunning(true)
+    try {
+      const res = await fetch("/api/admin/orders/undo-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      })
+      const data = (await res.json().catch(() => null)) as {
+        ok?: number
+        failed?: number
+        error?: string
+      } | null
+      if (!res.ok) {
+        toast(data?.error ?? "No se pudo deshacer", "error")
+        return
+      }
+      const outcome = { ok: data?.ok ?? 0, skipped: 0, failed: data?.failed ?? 0 }
+      toast(bulkUndoOutcomeMessage(outcome), bulkOutcomeTone(outcome))
+      setUndoable(null)
+      if (outcome.ok > 0) refresh()
+    } catch {
+      toast("Error de conexión", "error")
+    } finally {
+      setUndoRunning(false)
+    }
   }
 
   if (loading) {
@@ -779,6 +848,36 @@ function AdminOrdersContent() {
           >
             <X className="w-3.5 h-3.5" />
             Limpiar
+          </button>
+        </div>
+      )}
+
+      {/* Deshacer de la última acción masiva que movió dinero */}
+      {undoable && undoable.ids.length > 0 && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-2 mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5"
+        >
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
+          <span className="text-xs text-amber-800">{bulkUndoMessage(undoable.ids.length)}</span>
+
+          <button
+            type="button"
+            onClick={() => void undoLastBulk()}
+            disabled={undoRunning}
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Undo2 className="w-3.5 h-3.5" aria-hidden="true" />
+            {undoRunning ? "Revirtiendo…" : "Deshacer"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setUndoable(null)}
+            disabled={undoRunning}
+            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium text-amber-700 hover:text-amber-900 disabled:opacity-50 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" aria-hidden="true" />
+            Descartar
           </button>
         </div>
       )}

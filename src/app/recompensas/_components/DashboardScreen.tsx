@@ -19,6 +19,7 @@ import { AchievementsSection } from "./AchievementsSection";
 import { ReferralDashboard } from "@/components/referral-dashboard";
 import { useOnboardingCompleted } from "@/components/onboarding-wizard";
 import { createClient } from "@/lib/supabase/client";
+import RedemptionsList from "./RedemptionsList";
 import { serviceAffordability } from "@/lib/store-affordability";
 import {
   getWalletBalance,
@@ -400,7 +401,7 @@ function WalletView() {
 
   return (
     <div className="px-4 pt-6 pb-6 md:px-6 lg:px-8 lg:max-w-6xl lg:mx-auto">
-      <h1 className="text-warm-700 text-xl font-bold mb-5">Mis Pedidos</h1>
+      <h1 className="text-warm-700 text-xl font-bold mb-5">Mis créditos</h1>
 
       {/* Cashback rate banner */}
       <div className="rounded-2xl bg-brand-50 border border-brand-200 p-5 mb-4">
@@ -515,6 +516,11 @@ function WalletView() {
           </div>
         )}
       </div>
+
+      {/* Ciclo de vida de los servicios canjeados: va aquí, junto a los
+          movimientos, porque cada solicitud es el destino de un débito
+          "Canje: …" que aparece arriba. */}
+      <RedemptionsList />
     </div>
   );
 }

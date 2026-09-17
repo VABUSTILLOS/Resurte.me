@@ -39,6 +39,7 @@ import type {
   SendLeadMessageInput,
   WaTemplateRow,
 } from "@/app/admin/actions"
+import { activeQuickReplies } from "@/lib/crm-inbox"
 import { formatMinutes } from "@/lib/crm-assignment"
 import { formatRelativeTime } from "@/lib/relative-time"
 import { useToast } from "@/components/toast"
@@ -318,18 +319,20 @@ export function LeadConversationPanel({
                   Sugerir respuesta
                 </button>
               )}
-              {quickReplies.slice(0, 8).map((qr) => (
-                <button
-                  key={qr.id}
-                  type="button"
-                  disabled={sending}
-                  title={qr.body}
-                  onClick={() => void send({ quickReplyId: qr.id })}
-                  className="rounded-full border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {qr.title}
-                </button>
-              ))}
+              {activeQuickReplies(quickReplies)
+                .slice(0, 8)
+                .map((qr) => (
+                  <button
+                    key={qr.id}
+                    type="button"
+                    disabled={sending}
+                    title={qr.body}
+                    onClick={() => void send({ quickReplyId: qr.id })}
+                    className="rounded-full border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {qr.title}
+                  </button>
+                ))}
             </div>
             <div className="flex items-end gap-2">
               <label className="flex-1">

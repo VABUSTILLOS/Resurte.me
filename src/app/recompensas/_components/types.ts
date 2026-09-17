@@ -90,6 +90,13 @@ export interface ServiceItem {
   estimatedImpact: string;
   testimonials?: string;
   icon: string;
+  /**
+   * Días comprometidos de entrega (`reward_services.sla_days`, migración 00151).
+   * Es el mismo valor que usa el trigger `set_redemption_due_at()` para fijar
+   * `redemptions.due_at`, así que lo que se promete antes de canjear y la fecha
+   * que se guarda no pueden divergir.
+   */
+  slaDays?: number;
 }
 
 export interface ActivityItem {

@@ -194,9 +194,11 @@ describe("orderFilterQuery", () => {
 })
 
 describe("ORDER_PAYMENT_STATUS_VALUES", () => {
-  it("cubre exactamente las etiquetas del catálogo real", () => {
-    // Guardia de deriva contra el enum `payment_status` de Postgres: si la
-    // migración añade un valor y aquí no, el filtro no podría aislarlo.
+  it("cubre exactamente las etiquetas del catálogo", () => {
+    // Coherencia INTERNA: un valor filtrable sin etiqueta se renderiza en
+    // blanco. Esto NO dice nada sobre el enum de Postgres — son dos constantes
+    // de TypeScript y se moverían juntas. La paridad con la base la verifica
+    // `order-enum.contract.test.ts`, que lee `supabase/migrations/`.
     expect([...ORDER_PAYMENT_STATUS_VALUES].sort()).toEqual(
       Object.keys(PAYMENT_STATUS_LABEL).sort()
     )

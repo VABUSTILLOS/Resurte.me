@@ -2,9 +2,10 @@
 
 import { useCallback } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Gift, FileText } from "lucide-react"
+import { Gift, FileText, PackageCheck } from "lucide-react"
 import { ServiciosTab } from "./servicios-tab"
 import { FacturasTab } from "./facturas-tab"
+import { CanjesTab } from "./canjes-tab"
 
 const TABS = [
   {
@@ -12,6 +13,12 @@ const TABS = [
     label: "Servicios",
     description: "Catálogo canjeable de la Tienda de Crecimiento",
     icon: Gift,
+  },
+  {
+    id: "canjes",
+    label: "Canjes",
+    description: "Servicios que los clientes pagaron con créditos",
+    icon: PackageCheck,
   },
   {
     id: "facturas",
@@ -28,9 +35,9 @@ function resolveTab(value: string | null): TabId {
 }
 
 /**
- * /admin/recompensas — programa de créditos: el catálogo canjeable y la cola de
- * facturas por revisar. Antes eran dos entradas de navegación separadas aunque
- * ambas operan sobre el mismo programa de créditos.
+ * /admin/recompensas — programa de créditos: el catálogo canjeable, la cola de
+ * servicios ya canjeados y la cola de facturas por revisar. Antes eran entradas
+ * de navegación separadas aunque todas operan sobre el mismo programa.
  */
 export function RecompensasClient() {
   const router = useRouter()
@@ -81,6 +88,7 @@ export function RecompensasClient() {
       </div>
 
       {active === "servicios" && <ServiciosTab />}
+      {active === "canjes" && <CanjesTab />}
       {active === "facturas" && <FacturasTab />}
     </div>
   )

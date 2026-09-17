@@ -36,10 +36,14 @@ import {
 // payment_status terminales: no se tocan. `expired` y `amount_mismatch` son
 // estados finales del cobro; `processing` NO es terminal (hay que seguir
 // vigilando hasta que se acredite o caduque).
-const TERMINAL_STATUSES = [
+//
+// `canceled` (una L) NO pertenece aquí: no es un valor del enum
+// `payment_status`. Es un estado del PaymentIntent de Stripe, que el webhook
+// ya traduce a 'failed'. Al incluirlo, Postgres rechazaba la consulta ENTERA
+// con 22P02 y el cron de reconciliación fallaba por completo.
+export const TERMINAL_STATUSES = [
   "paid",
   "failed",
-  "canceled",
   "refunded",
   "expired",
   "amount_mismatch",

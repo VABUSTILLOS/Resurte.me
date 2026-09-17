@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { notifyUser } from "@/lib/notifications"
+import { logAdminAction } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
 
 export const runtime = "nodejs"
@@ -136,6 +137,20 @@ export async function POST(request: NextRequest) {
       if (!result.ok) return rpcFailure(result)
 
       const reversed = Number(result.reversed ?? 0)
+      // La revocación mueve dinero de la cartera del usuario: queda en bitácora.
+      await logAdminAction(supabase, {
+        actorId: adminUser?.id ?? null,
+        actorEmail: adminUser?.email ?? null,
+        action: "invoice_revoke",
+        entity: "invoice_submissions",
+        entityId: id,
+        detail: {
+          credits_reversed: reversed,
+          shortfall: Number(result.shortfall ?? 0),
+          reason,
+          user_id: submission.user_id,
+        },
+      })
       void notifyUser({
         userId: submission.user_id,
         type: "invoice_revoked",
@@ -168,6 +183,14 @@ export async function POST(request: NextRequest) {
         logger.error("[ADMIN FACTURAS] reject error:", error)
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
+      await logAdminAction(supabase, {
+        actorId: adminUser?.id ?? null,
+        actorEmail: adminUser?.email ?? null,
+        action: "invoice_reject",
+        entity: "invoice_submissions",
+        entityId: id,
+        detail: { total_amount: submission.total_amount, user_id: submission.user_id },
+      })
       void notifyUser({
         userId: submission.user_id,
         type: "invoice_rejected",
@@ -209,6 +232,19 @@ export async function POST(request: NextRequest) {
     if (!result.ok) return rpcFailure(result)
 
     const granted = Number(result.credits ?? credits)
+    // El abono a la cartera es dinero real: queda en bitácora con el monto.
+    await logAdminAction(supabase, {
+      actorId: adminUser?.id ?? null,
+      actorEmail: adminUser?.email ?? null,
+      action: "invoice_approve",
+      entity: "invoice_submissions",
+      entityId: id,
+      detail: {
+        credits_granted: granted,
+        total_amount: submission.total_amount,
+        user_id: submission.user_id,
+      },
+    })
     void notifyUser({
       userId: submission.user_id,
       type: "invoice_approved",

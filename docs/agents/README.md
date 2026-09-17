@@ -12,7 +12,10 @@ requieren revisar todos los playbooks que dependen de esa superficie.
 > (`/admin/leads`) y Comercialización (`/comercializacion`). Tocarlos exige leer
 > [admin.md](admin.md) **y** [comercializacion.md](comercializacion.md).
 > `src/lib/crm-reader.contract.test.ts` mantiene la lista exacta de quién lee
-> `crm_prospects`.
+> `crm_prospects`, y `src/lib/crm-writers.contract.test.ts` —desde la Ronda 11—
+> la de quién **escribe** en el CRM: cada escritura tiene que tener un consumidor
+> de producción, y el archivo de acciones del admin no puede volver a la
+> allowlist de `knip`.
 
 | Agente | Playbook | Superficie principal |
 |---|---|---|
@@ -138,6 +141,71 @@ requieren revisar todos los playbooks que dependen de esa superficie.
    pierde `--grep @ci`, si el hook de pre-push deja de ser ejecutable o gana
    `exit 1`/`set -e`, o si se reintroduce un gestor de hooks que bloquee
    (`husky`, `lint-staged`, `simple-git-hooks`, script `prepare`).
+
+13. **Una migración "aplicada" no prueba que su efecto exista**: el historial de
+   migraciones es una *afirmación*, y en este repo llegó a ser falsa. Comparar el
+   cuerpo **desplegado** de cada función contra el que la migración declara
+   (md5 del texto normalizado) dio **45 de 47 coincidencias y 2 drifts reales**:
+   `process_cashback_for_order` (`00029`) y `redeem_service` (`00035`) figuraban
+   como aplicadas sin haber aterrizado. El primero era grave —producción corría
+   el cuerpo viejo, con las tablas sin calificar y `search_path = ''`— y
+   reventaba con `42P01` **todo `INSERT` de pedido con `total >= 2500`**: el
+   checkout devolvía HTTP 500 para todo carrito grande, y además acreditaba
+   cashback real **antes** de que el cliente pagara. Restaurados en `00147` y
+   `00148`. Tres corolarios de método, porque el primer barrido reportó **18
+   drifts** y 16 eran artefactos: (a) **en Postgres `.` coincide con el salto de
+   línea**, así que `regexp_replace(prosrc, '--.*', '', 'g')` borra desde el
+   primer comentario hasta el **final del cuerpo**; hace falta la bandera `'gn'`;
+   (b) `btrim` va **después** de colapsar `[[:space:]]+`, o queda un espacio
+   inicial; (c) `prosrc` es solo el cuerpo —firma, `LANGUAGE`, `SET` y `SECURITY`
+   viven en `pg_proc.proconfig`—. Y para escribir la corrección, **empalmar es
+   más seguro que reescribir**: `sed -n 'A,Bp' origen.sql` y verificar que el md5
+   del cuerpo empalmado coincide.
+   Los guards que evitan que esto vuelva van **dentro de las migraciones**, no en
+   un contrato de test, y fallan la migración entera:
+   * **`search_path` vacío**: ninguna función `public` con `search_path=''` puede
+     referenciar una tabla sin calificar el esquema. Corrió 7 pares ofensores
+     antes de `00147` y devuelve **vacío** desde entonces (`00147`, `00148`,
+     `00149`, `00150`).
+   * **`RETURNS TABLE` que no emite fila**: en plpgsql, un `RETURN;` desnudo en
+     una función `RETURNS TABLE` (= `SETOF record`) **no emite ninguna fila**;
+     hace falta `RETURN NEXT;`, que emite pero **no termina**, así que una salida
+     temprana necesita **ambos**. `redeem_service` cerraba sus cuatro salidas con
+     `RETURN;` desnudo: debitaba la wallet, insertaba la transacción, creaba el
+     canje y devolvía **cero filas**, de modo que el llamador —que lee
+     `data?.[0]`— mostraba "No se pudo completar el canje" **después** de que el
+     saldo ya se había ido. Pérdida silenciosa de saldo, y el mensaje invitaba a
+     reintentar. Era **anterior a todo el trabajo de la Fase C** y la **única**
+     de 800 funciones `public` con ese patrón. El guard de `00149` lo detecta
+     (probado en seco: devuelve exactamente `redeem_service`).
+
+14. **Toda ruta admin que muta negocio deja fila en `admin_audit_log`**: de las 32
+   rutas admin con export mutante, **17 no escribían nada**. Entre las que
+   faltaban había dos que mueven dinero (`facturas` abona créditos de monedero,
+   `reward-services` fija el costo en créditos de un servicio canjeable) y dos que
+   cambian precios de checkout (`bump-rules`, `discount_pct`). La bitácora es el
+   **único** registro de quién cambió un precio, quién otorgó créditos y quién
+   activó un repartidor: sin esa fila, una discrepancia de saldo no tiene
+   respuesta. Reglas:
+   * `logAdminAction` es **best-effort por diseño** (su `try/catch` interno se
+     traga todo). Se llama con `await logAdminAction(supabase, {...})` a secas,
+     **sin `try/catch` local**: envolverlo sugiere que el helper es inseguro y
+     contradice las 18 llamadas previas del repo.
+   * `detail` es `Record<string, unknown> | undefined`, así que `detail: null` es
+     error de tipo: se **omite la clave**, no se pone `null`.
+   * Cuando el cambio es de **precio**, la fila registra el **valor anterior**
+     (`previous_cost`, `previous_discount_pct`): un `action` sin contexto no sirve
+     para reconstruir el cambio.
+   * Las rutas sin sesión de admin (`update-images`, `seed-products`, que
+     autentican por secreto compartido) escriben con `actorId: null` y
+     `detail.via = "script:<nombre>"`. La ausencia de actor es honesta; la
+     ausencia de fila no.
+   * Las excepciones están en `src/lib/admin-audit.contract.test.ts` con motivo
+     escrito, y ese contrato **falla** si aparece una ruta mutante nueva sin
+     auditar o si una exención queda obsoleta. `orders/[id]/status` **no** es una
+     excepción: escribe en `admin_audit_log` (`:204`, `:214`) **y** en
+     `notifications` (`:279`, `:287`) a propósito — libro de admin y espejo del
+     cliente son audiencias distintas.
 
 ## Sin agente asignado: cuenta y autenticación
 

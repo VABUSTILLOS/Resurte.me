@@ -76,10 +76,6 @@
       "vercel"
     ],
     "ignoreIssues": {
-      "src/app/admin/actions.ts": [
-        "exports",
-        "types"
-      ],
       "src/lib/ai/kie-ai.ts": [
         "exports"
       ],

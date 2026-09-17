@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Check, CheckCircle, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle, Clock, Sparkles } from "lucide-react";
 import type { ServiceItem } from "./types";
 import { createClient } from "@/lib/supabase/client";
 import { formatNumber } from "@/lib/money";
+import {
+  REDEMPTION_BRIEF_LIMITS,
+  formatRedemptionDueDate,
+  type RedemptionStatus,
+} from "@/lib/redemptions";
 interface CheckoutFlowScreenProps {
   service: ServiceItem;
   onBack: () => void;
@@ -17,6 +22,15 @@ interface RedemptionResult {
   folio: number | null;
   newBalance?: number;
   alreadyRedeemed: boolean;
+  status: RedemptionStatus | null;
+  dueAt: string | null;
+}
+
+interface RedemptionBriefInput {
+  restaurant_name: string;
+  maps_url: string | null;
+  social_handle: string | null;
+  notes: string | null;
 }
 
 export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }: CheckoutFlowScreenProps) {
@@ -56,7 +70,7 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
     loadName();
   }, [supabase]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (brief: RedemptionBriefInput) => {
     if (isRedeeming) return;
     setIsRedeeming(true);
     setRedeemError("");
@@ -65,7 +79,7 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
       const response = await fetch("/api/redeem", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service_id: service.id }),
+        body: JSON.stringify({ service_id: service.id, brief }),
       });
 
       const data = await response.json();
@@ -81,6 +95,8 @@ export function CheckoutFlowScreen({ service, onBack, onComplete, balance = 0 }:
         folio: typeof data.redemption?.id === "number" ? data.redemption.id : null,
         newBalance: typeof data.newBalance === "number" ? data.newBalance : undefined,
         alreadyRedeemed: data.already_redeemed === true,
+        status: (data.redemption?.status as RedemptionStatus | undefined) ?? null,
+        dueAt: typeof data.redemption?.due_at === "string" ? data.redemption.due_at : null,
       });
     } catch {
       setRedeemError("Error de conexión. Intenta de nuevo.");
@@ -220,6 +236,19 @@ function Step1Confirm({
             ))}
           </ul>
         </div>
+
+        {/* Fecha comprometida ANTES de gastar créditos: es el mismo sla_days que
+            el trigger set_redemption_due_at() usa para fijar due_at. */}
+        {service.slaDays ? (
+          <div className="mt-3 flex items-center gap-2 rounded-xl bg-cream-50 border border-cream-300 p-3">
+            <Clock className="h-4 w-4 text-warm-700 flex-shrink-0" />
+            <p className="text-[#5c6069] text-xs">
+              Comprometido en{" "}
+              <strong className="text-warm-700">{service.slaDays} días</strong>. Puedes
+              cancelar cuando quieras desde tu historial y se te devuelven los créditos.
+            </p>
+          </div>
+        ) : null}
       </div>
 
       {/* Balance Check */}
@@ -265,7 +294,7 @@ function Step2Context({
   redeemError,
 }: {
   restaurantName: string;
-  onNext: () => void;
+  onNext: (brief: RedemptionBriefInput) => void;
   isRedeeming?: boolean;
   redeemError?: string;
 }) {
@@ -275,6 +304,21 @@ function Step2Context({
   const [mapsLink, setMapsLink] = useState("");
   const [social, setSocial] = useState("");
   const [notes, setNotes] = useState("");
+
+  // El nombre del restaurante es obligatorio en el servidor: ningún servicio
+  // del catálogo se puede ejecutar sin saber sobre qué negocio se trabaja.
+  // Se valida aquí para no gastar un viaje de red (ni el rate limit) en vano.
+  const nameMissing = name.trim().length < 2;
+
+  const submit = () => {
+    if (nameMissing) return;
+    onNext({
+      restaurant_name: name.trim(),
+      maps_url: mapsLink.trim() || null,
+      social_handle: social.trim() || null,
+      notes: notes.trim() || null,
+    });
+  };
 
   return (
     <motion.div
@@ -288,26 +332,42 @@ function Step2Context({
 
       <div className="mt-4 space-y-4">
         <div className="rounded-2xl bg-white border border-cream-300 shadow-sm p-4">
-          <label className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2 block">
+          <label
+            htmlFor="redeem-restaurant-name"
+            className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2 block"
+          >
             Nombre de tu restaurante
           </label>
           <input
+            id="redeem-restaurant-name"
             type="text"
             value={name}
+            maxLength={REDEMPTION_BRIEF_LIMITS.restaurantName}
             onChange={(e) => setName(e.target.value)}
             placeholder="Nombre de tu restaurante"
+            aria-invalid={nameMissing}
             className="w-full rounded-xl bg-white border border-cream-300 px-4 py-3 text-warm-700 text-sm 
               focus:outline-none focus:border-brand-500 placeholder:text-warm-400"
           />
+          {nameMissing && (
+            <p className="mt-2 text-xs font-semibold text-amber-700">
+              Necesitamos el nombre para poder ejecutar el servicio.
+            </p>
+          )}
         </div>
 
         <div className="rounded-2xl bg-white border border-cream-300 shadow-sm p-4">
-          <label className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2 block">
+          <label
+            htmlFor="redeem-maps"
+            className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2 block"
+          >
             Link de Google Maps
           </label>
           <input
+            id="redeem-maps"
             type="text"
             value={mapsLink}
+            maxLength={REDEMPTION_BRIEF_LIMITS.mapsUrl}
             onChange={(e) => setMapsLink(e.target.value)}
             placeholder="https://maps.google.com/..."
             className="w-full rounded-xl bg-white border border-cream-300 px-4 py-3 text-warm-700 text-sm 
@@ -316,12 +376,17 @@ function Step2Context({
         </div>
 
         <div className="rounded-2xl bg-white border border-cream-300 shadow-sm p-4">
-          <label className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2 block">
+          <label
+            htmlFor="redeem-social"
+            className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2 block"
+          >
             Instagram / Facebook
           </label>
           <input
+            id="redeem-social"
             type="text"
             value={social}
+            maxLength={REDEMPTION_BRIEF_LIMITS.social}
             onChange={(e) => setSocial(e.target.value)}
             placeholder="@taqueriaelpariente"
             className="w-full rounded-xl bg-white border border-cream-300 px-4 py-3 text-warm-700 text-sm 
@@ -330,11 +395,16 @@ function Step2Context({
         </div>
 
         <div className="rounded-2xl bg-white border border-cream-300 shadow-sm p-4">
-          <label className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2 block">
+          <label
+            htmlFor="redeem-notes"
+            className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-2 block"
+          >
             Notas para el equipo
           </label>
           <textarea
+            id="redeem-notes"
             value={notes}
+            maxLength={REDEMPTION_BRIEF_LIMITS.notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Ej. Quiero atraer más clientes en horario de comida (2-5pm)..."
             rows={3}
@@ -345,8 +415,9 @@ function Step2Context({
       </div>
 
       <button
-        onClick={onNext}
-        disabled={isRedeeming}
+        type="button"
+        onClick={submit}
+        disabled={isRedeeming || nameMissing}
         className="mt-5 w-full rounded-2xl bg-brand-500 py-4 text-base font-bold text-white 
           shadow-lg transition-all active:scale-[0.98] 
           hover:bg-brand-600 disabled:opacity-60 disabled:active:scale-100 flex items-center justify-center gap-2"
@@ -354,6 +425,10 @@ function Step2Context({
         <Sparkles className="h-4 w-4" />
         {isRedeeming ? "Canjeando..." : "Solicitar Servicio"}
       </button>
+
+      <p className="mt-3 text-center text-[11px] text-[#6e737b]">
+        Estos datos se quedan con tu solicitud: son los que el equipo usa para ejecutarla.
+      </p>
 
       {redeemError && (
         <p className="mt-3 text-center text-sm font-semibold text-red-600">
@@ -375,6 +450,26 @@ function Step3Confirmation({
   onGoWallet: () => void;
   onGoStore: () => void;
 }) {
+  // Etapas REALES de la solicitud: son las tres que implementa
+  // advance_redemption() (requested → in_progress → delivered).
+  //
+  // Antes esta lista era un guion fijo —"Creación de contenido 1-3 días",
+  // "Reporte de resultados 30 días"— que no correspondía al SLA del servicio
+  // ni a ningún estado de la base, y que además prometía un reporte que no
+  // existe. Ahora se deriva del estatus y de la fecha comprometida reales.
+  const dueLabel = formatRedemptionDueDate(result?.dueAt);
+  const stageIndex =
+    result?.status === "delivered" ? 2 : result?.status === "in_progress" ? 1 : 0;
+  const stages = [
+    { label: "Solicitud recibida", detail: "Hoy", done: stageIndex >= 0 },
+    { label: "En proceso", detail: "Pendiente", done: stageIndex >= 1 },
+    {
+      label: "Entregado",
+      detail: dueLabel ? `Comprometido para el ${dueLabel}` : "Fecha por confirmar",
+      done: stageIndex >= 2,
+    },
+  ];
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
@@ -416,7 +511,6 @@ function Step3Confirmation({
       >
         Tu <strong className="text-warm-700">{service.name}</strong> está en marcha. Te avisaremos en cada paso del proceso.
       </motion.p>
-
       {result?.alreadyRedeemed && (
         <motion.p
           className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700"
@@ -474,27 +568,21 @@ function Step3Confirmation({
       >
         <p className="text-[#6e737b] text-xs uppercase tracking-wider font-semibold mb-3">¿Qué sigue?</p>
         <div className="space-y-3">
-          {[
-            { step: "Revisión de datos", status: "completed", time: "Hoy" },
-            { step: "Creación de contenido", status: "in-progress", time: "1-3 días" },
-            { step: "Lanzamiento", status: "pending", time: "3-5 días" },
-            { step: "Reporte de resultados", status: "pending", time: "30 días" },
-          ].map((s, i) => (
-            <div key={i} className="flex items-center gap-3">
+          {stages.map((s) => (
+            <div key={s.label} className="flex items-center gap-3">
               <div
                 className={`h-2.5 w-2.5 rounded-full ${
-                  s.status === "completed"
-                    ? "bg-brand-500"
-                    : s.status === "in-progress"
-                      ? "bg-amber-500 animate-pulse"
-                      : "bg-cream-300"
+                  s.done ? "bg-brand-500" : "bg-cream-300"
                 }`}
               />
-              <span className="text-warm-700 text-sm flex-1">{s.step}</span>
-              <span className="text-[#6e737b] text-xs">{s.time}</span>
+              <span className="text-warm-700 text-sm flex-1">{s.label}</span>
+              <span className="text-[#6e737b] text-xs">{s.detail}</span>
             </div>
           ))}
         </div>
+        <p className="text-[#6e737b] text-[10px] mt-3">
+          Cada cambio de etapa te llega como aviso y queda registrado en tu historial de solicitudes.
+        </p>
       </motion.div>
 
       {/* CTAs explícitos: sin redirección automática sorpresiva */}

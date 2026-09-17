@@ -57,20 +57,6 @@ const JUSTIFICATIONS: Record<string, string> = {
     "Es el CLI de los runbooks de operación de `docs/OPS.md` " +
     "(`vercel redeploy`, `vercel api`, `vercel metrics`). Uso real, no código.",
 
-  "src/app/admin/actions.ts":
-    "Cinco server actions de escritura del CRM a medio construir: `saveQuickReply`, " +
-    "`deleteQuickReply`, `distributeCrmProspects`, `getAdminSellerLoads`, " +
-    "`cancelSequenceEnrollment`. La mitad *lectora* sí está cableada " +
-    "(`LeadConversations.tsx` llama `getAdminQuickReplies`; `LeadSequences.tsx` muestra " +
-    "`activeEnrollments`), así que no es código abandonado: es una función sin terminar. " +
-    "La categoría `types` se añadió en la ronda 9 con la misma razón: `LeadTimelineSource` " +
-    "(`actions.ts:1965`, la unión del origen de un evento del hilo) quedó huérfano al " +
-    "moverse el hilo a `src/lib/crm-conversation.ts`, donde la misma unión se escribe " +
-    "en línea (`source`, L55). El símbolo se midió muerto en el árbol **y** en `HEAD`, y " +
-    "el archivo está en vuelo en otra sesión, así que se suprime en vez de borrarse: " +
-    "una supresión por archivo y categoría es lo único que knip admite —el intento de " +
-    "suprimir un símbolo concreto (`[\"LeadTimelineSource\"]`) devuelve `Invalid input` " +
-    "y sale con código 2—. Se retira cuando el refactor del CRM aterrice (fila `CI13`).",
   "src/lib/ai/kie-ai.ts":
     "`pollTaskUntilComplete` se declara en su docstring como API cómoda para usos " +
     "piloto/demo de corta duración. Es superficie pública deliberada, no residuo.",
@@ -161,8 +147,10 @@ describe("contrato de configuración de knip", () => {
     // editar este test, y editarlo exige escribir su justificación abajo.
     expect(KNIP.ignoreDependencies?.slice().sort()).toEqual(["sharp", "supabase", "vercel"])
 
+    // `src/app/admin/actions.ts` ya NO está aquí: la ronda 11 le puso interfaz a
+    // las cinco escrituras huérfanas y borró `LeadTimelineSource`, así que la
+    // entrada dejó de ser cierta y se retiró entera (fila `CI13`).
     expect(KNIP.ignoreIssues).toEqual({
-      "src/app/admin/actions.ts": ["exports", "types"],
       "src/lib/ai/kie-ai.ts": ["exports"],
       "src/lib/cart-sync-queue.ts": ["exports"],
       "src/lib/crm-filters.ts": ["exports"],

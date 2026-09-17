@@ -141,8 +141,11 @@ export type OrderPaymentStatusFilter =
   | "all"
 
 /**
- * Allowlist runtime de estados de pago aceptados por el filtro. Un test la
- * compara con `PAYMENT_STATUS_LABEL` para que no se desincronice del enum real.
+ * Allowlist runtime de estados de pago aceptados por el filtro. Su paridad con
+ * el enum `payment_status` de Postgres la verifica
+ * `order-enum.contract.test.ts`, que lee `supabase/migrations/`. Compararla con
+ * `PAYMENT_STATUS_LABEL` (como se hacía antes) no probaba nada sobre la base:
+ * son dos constantes de TypeScript y se mueven juntas.
  */
 export const ORDER_PAYMENT_STATUS_VALUES: readonly OrderPaymentStatusFilter[] = [
   "pending",

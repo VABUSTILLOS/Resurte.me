@@ -12,6 +12,7 @@ export const SERVICES: ServiceItem[] = [
     tier: "verde",
     cost: 2200,
     category: "presencia",
+    slaDays: 14,
     description:
       "Estrategia completa para conseguir más reseñas de 5 estrellas y responderlas de forma profesional. La forma más rápida de subir tu rating local.",
     deliverables: [
@@ -31,6 +32,7 @@ export const SERVICES: ServiceItem[] = [
     tier: "verde",
     cost: 2800,
     category: "presencia",
+    slaDays: 14,
     description:
       "Perfil de negocio optimizado con fotos profesionales y keywords locales para que te encuentren más clientes.",
     deliverables: ["30 fotos profesionales", "Descripción SEO local", "Horarios y menú actualizados"],
@@ -44,6 +46,7 @@ export const SERVICES: ServiceItem[] = [
     tier: "verde",
     cost: 3500,
     category: "presencia",
+    slaDays: 14,
     description:
       "Sesión de fotos profesional para tus platillos estrella. Imágenes que venden antes que las palabras.",
     deliverables: [
@@ -63,6 +66,7 @@ export const SERVICES: ServiceItem[] = [
     tier: "verde",
     cost: 4500,
     category: "presencia",
+    slaDays: 14,
     description:
       "Community management básico: 3 posts por semana, historias diarias y respuesta a comentarios.",
     deliverables: [
@@ -82,6 +86,7 @@ export const SERVICES: ServiceItem[] = [
     tier: "plata",
     cost: 16000,
     category: "trafico",
+    slaDays: 21,
     description:
       "Campaña publicitaria completa en Facebook e Instagram geolocalizada en un radio de 5km de tu restaurante.",
     deliverables: [
@@ -100,6 +105,7 @@ export const SERVICES: ServiceItem[] = [
     tier: "plata",
     cost: 14000,
     category: "trafico",
+    slaDays: 21,
     description:
       "Anuncios en Google para aparecer cuando alguien busque 'restaurante cerca de mí' o 'mejor comida en [tu zona]'.",
     deliverables: [
@@ -119,6 +125,7 @@ export const SERVICES: ServiceItem[] = [
     tier: "plata",
     cost: 12000,
     category: "trafico",
+    slaDays: 21,
     description:
       "Estrategia de contenido en TikTok: videos de tus platillos, detrás de cámaras, y trends adaptados a tu marca.",
     deliverables: ["8 videos editados al mes", "Estrategia de hashtags", "Análisis de tendencias locales"],
@@ -133,6 +140,7 @@ export const SERVICES: ServiceItem[] = [
     tier: "oro",
     cost: 20000,
     category: "trafico",
+    slaDays: 21,
     description:
       "Campañas de remarketing por WhatsApp Business y correo para recuperar clientes y llenar tus días flojos con promociones segmentadas.",
     deliverables: [
@@ -152,6 +160,7 @@ export const SERVICES: ServiceItem[] = [
     tier: "oro",
     cost: 25000,
     category: "infraestructura",
+    slaDays: 30,
     description:
       "Menú digital responsive con fotos, descripciones y precios. Accesible vía QR en tu restaurante y en línea.",
     deliverables: ["Diseño web responsive", "Código QR para mesas", "Panel para actualizar precios"],
@@ -166,6 +175,7 @@ export const SERVICES: ServiceItem[] = [
     tier: "oro",
     cost: 45000,
     category: "infraestructura",
+    slaDays: 30,
     description:
       "Sitio web completo con sistema de pedidos en línea integrado con WhatsApp y pasarela de pago.",
     deliverables: [
@@ -185,6 +195,7 @@ export const SERVICES: ServiceItem[] = [
     tier: "diamante",
     cost: 55000,
     category: "infraestructura",
+    slaDays: 30,
     description:
       "Auditoría completa de tus números: costeo de platillos, ingeniería de menú y estrategia de precios para subir tu margen sin perder clientes.",
     deliverables: [
@@ -204,6 +215,7 @@ export const SERVICES: ServiceItem[] = [
     tier: "diamante",
     cost: 60000,
     category: "infraestructura",
+    slaDays: 30,
     description:
       "Sitio web profesional completo con SEO, blog integrado, menú digital y sistema de reservaciones.",
     deliverables: [

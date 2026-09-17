@@ -934,6 +934,48 @@ puede leer por canal privilegiado (Management API `POST /v1/projects/<ref>/datab
 o `psql`), no por REST: `supabase_migrations` no está expuesto por PostgREST
 (`406 PGRST106`).
 
+### Regla: las migraciones numeradas se aplican por CLI, nunca por MCP
+
+`apply_migration` del MCP de Supabase registra la fila del ledger con un
+**timestamp generado** (`20260917172228`) en vez del número del archivo
+(`00141`). Eso rompe la regla de prefijo de la CLI v2 —el historial remoto debe
+ser un prefijo de la lista local— y a partir de ahí `db push` falla con
+`LegacyDbPushMissingLocalError`. El daño secundario es peor: la versión del
+ledger deja de corresponder al nombre del archivo, así que las pruebas que
+barren `supabase/migrations/*.sql` por nombre de archivo (por ejemplo
+`src/lib/order-enum.contract.test.ts`, que reconstruye el enum `payment_status`
+desde las migraciones) **no pueden reconciliar** lo aplicado con lo declarado.
+La regla, entonces: `supabase migration new <nombre>` para crear y
+`supabase db push` para aplicar. El SQL Editor sirve para una urgencia, pero
+deja el ledger sin fila (párrafo anterior) y la CLI lo reintentará.
+
+El **17-sep-2026** se reparó un arrastre de 13 filas con timestamp: 12 se
+renumeraron a `00141`–`00152` —mapeadas por nombre, posición y md5 insensible a
+espacios contra el archivo local, 7 de ellas coincidencia exacta— y 1
+(`20260917180922_admin_role_trigger_hardening`) se eliminó porque su cuerpo
+completo, un único `REVOKE ALL ON FUNCTION public.sync_admin_users_to_profile()
+FROM PUBLIC, anon, authenticated;`, ya estaba byte a byte en
+`00145_admin_role_single_source.sql:90` y su efecto estaba vivo en la base
+(`has_function_privilege` → `anon_exec = false`, `auth_exec = false`). Antes de
+la reparación el ledger tenía 152 filas y 13 versiones sin cinco dígitos;
+después, 152 filas con `00001`…`00152` y cero.
+
+**Cinco divergencias de contenido que NO son drift de ledger.** Las filas
+`00144`, `00145`, `00146`, `00147` y `00152` comparten nombre y posición con su
+archivo local pero tienen texto distinto: son **revisiones** de la misma
+migración, con la local más nueva (el caso de `00145` es explícito: la local
+fusiona la migración huérfana de arriba). La regla de prefijo mira números de
+versión, no cuerpos de archivo, así que no bloquean `db push`. Sobrescribir la
+local con el texto remoto destruiría la revisión nueva: se documentan y se
+dejan como están.
+
+Sonda del estado del ledger:
+
+```bash
+npx supabase db push --dry-run        # {"upToDate":true,...}
+npx supabase migration list --linked  # local == remote en todas las filas
+```
+
 
 ---
 

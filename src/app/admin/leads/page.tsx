@@ -86,6 +86,8 @@ import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import { ToastProvider, useToast } from "@/components/toast"
 import { LeadDetailDrawer } from "../components/LeadDetailDrawer"
 import { LeadConversations } from "../components/LeadConversations"
+import { LeadDistribution } from "../components/LeadDistribution"
+import { LeadQuickReplies } from "../components/LeadQuickReplies"
 import { LeadSequences, SequenceEnrollControl } from "../components/LeadSequences"
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -172,7 +174,9 @@ function AdminLeadsContent() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [bulkTagDraft, setBulkTagDraft] = useState("")
   const [bulkBusy, setBulkBusy] = useState(false)
-  const [inboxSection, setInboxSection] = useState<"conversaciones" | "secuencias">("conversaciones")
+  const [inboxSection, setInboxSection] = useState<
+    "conversaciones" | "secuencias" | "respuestas rápidas"
+  >("conversaciones")
 
   // Debounce: teclear no debe disparar una recarga por letra.
   useEffect(() => {
@@ -848,6 +852,15 @@ function AdminLeadsContent() {
                     refresh()
                   }}
                 />
+                <LeadDistribution
+                  selectedIds={selectedIds}
+                  disabled={bulkBusy}
+                  onDistributed={(message) => {
+                    toast(message, "success")
+                    setSelectedIds([])
+                    refresh()
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() => setSelectedIds([])}
@@ -1051,7 +1064,7 @@ function AdminLeadsContent() {
           className="space-y-3"
         >
           <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1">
-            {(["conversaciones", "secuencias"] as const).map((key) => (
+            {(["conversaciones", "secuencias", "respuestas rápidas"] as const).map((key) => (
               <button
                 key={key}
                 type="button"
@@ -1063,7 +1076,11 @@ function AdminLeadsContent() {
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                {key === "conversaciones" ? "Conversaciones" : "Secuencias de goteo"}
+                {key === "conversaciones"
+                  ? "Conversaciones"
+                  : key === "secuencias"
+                    ? "Secuencias de goteo"
+                    : "Respuestas rápidas"}
               </button>
             ))}
           </div>
@@ -1082,8 +1099,10 @@ function AdminLeadsContent() {
                 setPage(1)
               }}
             />
-          ) : (
+          ) : inboxSection === "secuencias" ? (
             <LeadSequences onChanged={refresh} />
+          ) : (
+            <LeadQuickReplies />
           )}
         </div>
       )}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logAdminAction } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
 
 export const runtime = "nodejs"
@@ -42,7 +43,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { user: adminUser, response: adminDenied } = await requireAdmin()
     if (adminDenied) return adminDenied
 
     const body = await request.json().catch(() => null)
@@ -67,6 +68,15 @@ export async function POST(request: NextRequest) {
     const category = VALID_CATEGORIES.includes(body?.category) ? body.category : "presencia"
 
     const supabase = await createServiceClient()
+    // El costo está denominado en créditos de cartera (dinero del usuario):
+    // se lee el valor anterior para que la bitácora registre el cambio, no
+    // solo el valor final.
+    const { data: previous } = await supabase
+      .from("reward_services")
+      .select("cost, name, is_active")
+      .eq("id", id)
+      .maybeSingle()
+
     const { error } = await supabase.from("reward_services").upsert(
       {
         id,
@@ -87,6 +97,23 @@ export async function POST(request: NextRequest) {
       logger.error("[ADMIN REWARD-SERVICES] upsert error:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    await logAdminAction(supabase, {
+      actorId: adminUser?.id ?? null,
+      actorEmail: adminUser?.email ?? null,
+      action: "reward_service_upsert",
+      entity: "reward_services",
+      entityId: id,
+      detail: {
+        created: previous == null,
+        cost,
+        previous_cost: previous?.cost ?? null,
+        tier,
+        category,
+        is_active: body?.is_active !== false,
+      },
+    })
+
     return NextResponse.json({ ok: true })
   } catch (err) {
     logger.error("[ADMIN REWARD-SERVICES] POST unexpected:", err)

@@ -204,3 +204,45 @@ export function bulkOutcomeTone(outcome: BulkOutcome): ToastTone {
 export function bulkCancelConfirmMessage(count: number): string {
   return `¿Cancelar ${plural(count, "pedido", "pedidos")}? Se devolverá el cupón usado y, si el pago estaba pendiente, quedará como fallido.`
 }
+
+/** Acciones que la barra masiva puede aplicar. */
+export type BulkAction = "status" | "payment" | "driver"
+
+/**
+ * Confirmar el pago abona cashback **real** a la wallet de cada cliente, así
+ * que la acción pide confirmación explícita antes de ejecutarse.
+ */
+export function bulkConfirmPaymentConfirmMessage(count: number): string {
+  return `¿Confirmar el pago de ${plural(count, "pedido", "pedidos")}? Se abonará cashback real a la wallet de cada cliente.`
+}
+
+/** Asignar repartidor pisa la asignación previa de cada pedido. */
+export function bulkAssignDriverConfirmMessage(count: number, driverName: string): string {
+  return `¿Asignar ${driverName} a ${plural(count, "pedido", "pedidos")}? Se reemplaza la asignación anterior.`
+}
+
+/**
+ * Solo la confirmación de pago ofrece deshacer.
+ *
+ * Es la única acción masiva que mueve dinero (abona cashback a la wallet), y
+ * equivocarse no se arregla volviendo a aplicar otra acción. El resto no lo
+ * necesita: asignar repartidor se corrige asignando otro, y el estado se
+ * vuelve a cambiar con el mismo control. La cancelación tampoco lo ofrece
+ * porque es irreversible por diseño (devuelve el cupón y marca el pago como
+ * fallido), y por eso se confirma aparte antes de ejecutarse.
+ */
+export function isBulkActionUndoable(action: BulkAction): boolean {
+  return action === "payment"
+}
+
+/** Texto de la barra de deshacer, con la advertencia de que hubo dinero de por medio. */
+export function bulkUndoMessage(count: number): string {
+  return `Se confirmó el pago de ${plural(count, "pedido", "pedidos")} y se abonó cashback.`
+}
+
+/** Resultado del deshacer, con el mismo formato de un renglón que el toast. */
+export function bulkUndoOutcomeMessage(outcome: BulkOutcome): string {
+  const parts = [`${plural(outcome.ok, "revertido", "revertidos")}`]
+  if (outcome.failed > 0) parts.push(`${outcome.failed} con error`)
+  return parts.join(" · ")
+}

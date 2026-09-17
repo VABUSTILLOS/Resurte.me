@@ -11,10 +11,13 @@ import {
   RefreshCw,
   Send,
   Trash2,
+  XCircle,
   Zap,
 } from "lucide-react"
 import {
+  cancelSequenceEnrollment,
   enrollProspectsInSequence,
+  listCrmSequenceEnrollments,
   listCrmSequences,
   listWaTemplates,
   saveCrmSequence,
@@ -23,6 +26,16 @@ import {
 } from "../actions"
 import { MAX_SEQUENCE_DELAY_HOURS, MAX_SEQUENCE_STEPS } from "@/lib/crm-sequences-engine"
 import { QUICK_REPLY_VARIABLES } from "@/lib/crm-inbox"
+import {
+  ENROLLMENT_STATUSES,
+  ENROLLMENT_STATUS_LABEL,
+  enrollmentStepLabel,
+  enrollmentSummary,
+  isEnrollmentOpen,
+  type AdminEnrollment,
+  type EnrollmentStatus,
+  type EnrollmentSummary,
+} from "@/lib/crm-enrollments"
 import { useToast } from "@/components/toast"
 
 const CARD = "rounded-xl border border-gray-200 bg-white"
@@ -43,6 +56,185 @@ function delayLabel(hours: number): string {
   if (hours < 24) return `${hours} h`
   const days = Math.round((hours / 24) * 10) / 10
   return days === 1 ? "1 día" : `${days} días`
+}
+
+const ENROLLMENT_PILL: Record<EnrollmentStatus, string> = {
+  activa: "bg-emerald-100 text-emerald-800",
+  pausada: "bg-amber-100 text-amber-800",
+  completada: "bg-sky-100 text-sky-800",
+  cancelada: "bg-gray-100 text-gray-600",
+}
+
+/** "3 activas · 1 completada" — solo los estados que de verdad existen. */
+function summaryLabel(summary: EnrollmentSummary): string {
+  const parts = ENROLLMENT_STATUSES.filter((status) => summary[status] > 0).map(
+    (status) => `${summary[status]} ${ENROLLMENT_STATUS_LABEL[status].toLowerCase()}`,
+  )
+  return parts.length > 0 ? parts.join(" · ") : "Sin inscripciones"
+}
+
+/**
+ * Las inscripciones de una secuencia, plegadas hasta que se piden.
+ *
+ * Se leen al abrir y no antes: son la única lectura del panel que trae una fila
+ * por prospecto, y una secuencia con cientos de inscripciones no debe costar
+ * nada mientras el desplegable esté cerrado. Cancelar aquí es lo que hace útil
+ * la reactivación: la fila se queda, vuelve a estar disponible para reinscribir.
+ */
+function SequenceEnrollments({
+  sequence,
+  onChanged,
+}: {
+  sequence: AdminSequence
+  onChanged: () => void
+}) {
+  const { toast } = useToast()
+  const [open, setOpen] = useState(false)
+  const [rows, setRows] = useState<AdminEnrollment[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<number | null>(null)
+  const [confirmId, setConfirmId] = useState<number | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      setRows(await listCrmSequenceEnrollments(sequence.id))
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudieron leer las inscripciones")
+    } finally {
+      setLoading(false)
+    }
+  }, [sequence.id])
+
+  function toggle() {
+    const next = !open
+    setOpen(next)
+    if (next && rows === null && !loading) void load()
+  }
+
+  async function cancel(enrollment: AdminEnrollment) {
+    setBusyId(enrollment.id)
+    try {
+      await cancelSequenceEnrollment(enrollment.id)
+      toast(`Inscripción de ${enrollment.prospectName} cancelada`, "success")
+      setConfirmId(null)
+      await load()
+      onChanged()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo cancelar la inscripción", "error")
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const summary = rows === null ? null : enrollmentSummary(rows)
+
+  return (
+    <div className="mt-2 border-t border-gray-100 pt-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={toggle}
+        className="inline-flex min-h-[32px] items-center gap-1 text-[11px] font-semibold text-gray-500 hover:text-gray-700"
+      >
+        <ChevronDown
+          className={`h-3 w-3 transition-transform motion-reduce:transition-none ${open ? "" : "-rotate-90"}`}
+        />
+        Inscripciones
+        {summary && <span className="font-normal text-gray-400">· {summaryLabel(summary)}</span>}
+      </button>
+
+      {open && (
+        <div className="mt-1.5">
+          {loading && rows === null ? (
+            <p className="flex items-center gap-2 py-2 text-[11px] text-gray-400">
+              <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" /> Cargando...
+            </p>
+          ) : error ? (
+            <div className="flex items-center gap-2 py-2">
+              <p className="flex-1 text-[11px] text-red-600">{error}</p>
+              <button
+                type="button"
+                onClick={() => void load()}
+                className="min-h-[32px] rounded-lg border border-gray-200 px-2.5 text-[11px] font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Reintentar
+              </button>
+            </div>
+          ) : rows !== null && rows.length === 0 ? (
+            <p className="py-2 text-[11px] text-gray-400">
+              Nadie inscrito todavía. Selecciona prospectos en el embudo y usa «Inscribir en
+              secuencia».
+            </p>
+          ) : (
+            <ul className="divide-y divide-gray-50">
+              {(rows ?? []).map((enrollment) => (
+                <li key={enrollment.id} className="flex flex-wrap items-center gap-2 py-1.5">
+                  <span className="min-w-[8rem] flex-1 truncate text-[11px] font-medium text-gray-700">
+                    {enrollment.prospectName}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${ENROLLMENT_PILL[enrollment.status]}`}
+                  >
+                    {enrollment.statusLabel}
+                  </span>
+                  <span className="w-20 shrink-0 text-[11px] tabular-nums text-gray-500">
+                    {enrollmentStepLabel(enrollment.currentStep, enrollment.totalSteps)}
+                  </span>
+                  <span className="w-32 shrink-0 truncate text-[11px] text-gray-400">
+                    {enrollment.nextRunAt
+                      ? new Date(enrollment.nextRunAt).toLocaleString("es-MX", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "—"}
+                  </span>
+                  {isEnrollmentOpen(enrollment.status) &&
+                    (confirmId === enrollment.id ? (
+                      <span className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={busyId !== null}
+                          onClick={() => void cancel(enrollment)}
+                          className="min-h-[32px] rounded-lg bg-red-600 px-2.5 text-[11px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                        >
+                          {busyId === enrollment.id ? "Cancelando..." : "Sí, cancelar"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyId !== null}
+                          onClick={() => setConfirmId(null)}
+                          className="min-h-[32px] rounded-lg border border-gray-200 px-2.5 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          No
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmId(enrollment.id)}
+                        aria-label={`Cancelar la inscripción de ${enrollment.prospectName}`}
+                        className="inline-flex min-h-[32px] items-center gap-1 rounded-lg border border-gray-200 px-2.5 text-[11px] font-semibold text-gray-600 hover:bg-gray-50"
+                      >
+                        <XCircle className="h-3 w-3" /> Cancelar
+                      </button>
+                    ))}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-1.5 text-[10px] text-gray-400">
+            Cancelar no borra la fila: el prospecto deja de recibir pasos y puede volver a
+            inscribirse en esta misma secuencia.
+          </p>
+        </div>
+      )}
+    </div>
+  )
 }
 
 /**
@@ -261,6 +453,8 @@ export function LeadSequences({ onChanged }: { onChanged: () => void }) {
                   </li>
                 ))}
               </ol>
+
+              <SequenceEnrollments sequence={sequence} onChanged={onChanged} />
             </li>
           ))}
         </ul>
@@ -518,6 +712,7 @@ export function SequenceEnrollControl({
       const result = await enrollProspectsInSequence(sequence.id, selectedIds)
       const parts: string[] = []
       if (result.enrolled > 0) parts.push(`${result.enrolled} en «${sequence.name}»`)
+      if (result.reactivated > 0) parts.push(`${result.reactivated} reactivados`)
       if (result.skipped > 0) parts.push(`${result.skipped} sin cambios`)
       onEnrolled(parts.length > 0 ? parts.join(" · ") : (result.reason ?? "Sin cambios"))
       setOpen(false)

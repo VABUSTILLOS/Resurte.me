@@ -1,12 +1,17 @@
 import { describe, it, expect } from "vitest"
 import {
   areAllSelected,
+  bulkAssignDriverConfirmMessage,
   bulkCancelConfirmMessage,
+  bulkConfirmPaymentConfirmMessage,
   bulkOutcomeMessage,
   bulkOutcomeTone,
+  bulkUndoMessage,
+  bulkUndoOutcomeMessage,
   canAssignDriver,
   canChangeStatusTo,
   canConfirmPayment,
+  isBulkActionUndoable,
   isPartiallySelected,
   isTerminalStatus,
   partitionForDriver,
@@ -206,5 +211,43 @@ describe("resumen del resultado", () => {
     expect(bulkCancelConfirmMessage(1)).toContain("1 pedido")
     expect(bulkCancelConfirmMessage(4)).toContain("4 pedidos")
     expect(bulkCancelConfirmMessage(4)).toContain("cupón")
+  })
+})
+
+describe("confirmaciones de las acciones masivas de dinero", () => {
+  it("solo la confirmación de pago ofrece deshacer", () => {
+    expect(isBulkActionUndoable("payment")).toBe(true)
+    expect(isBulkActionUndoable("status")).toBe(false)
+    expect(isBulkActionUndoable("driver")).toBe(false)
+  })
+
+  it("advierte que confirmar el pago abona cashback real", () => {
+    expect(bulkConfirmPaymentConfirmMessage(1)).toContain("1 pedido")
+    expect(bulkConfirmPaymentConfirmMessage(3)).toContain("3 pedidos")
+    expect(bulkConfirmPaymentConfirmMessage(3)).toContain("cashback real")
+  })
+
+  it("nombra al repartidor y avisa que pisa la asignación previa", () => {
+    const message = bulkAssignDriverConfirmMessage(2, "Ana López")
+    expect(message).toContain("Ana López")
+    expect(message).toContain("2 pedidos")
+    expect(message).toContain("reemplaza")
+  })
+
+  it("la barra de deshacer usa singular y plural", () => {
+    expect(bulkUndoMessage(1)).toContain("1 pedido")
+    expect(bulkUndoMessage(4)).toContain("4 pedidos")
+    expect(bulkUndoMessage(4)).toContain("cashback")
+  })
+
+  it("resume el resultado de deshacer en un renglón", () => {
+    expect(bulkUndoOutcomeMessage({ ok: 1, skipped: 0, failed: 0 })).toBe("1 revertido")
+    expect(bulkUndoOutcomeMessage({ ok: 3, skipped: 0, failed: 0 })).toBe("3 revertidos")
+    expect(bulkUndoOutcomeMessage({ ok: 3, skipped: 0, failed: 2 })).toBe(
+      "3 revertidos · 2 con error"
+    )
+    expect(bulkUndoOutcomeMessage({ ok: 0, skipped: 0, failed: 2 })).toBe(
+      "0 revertidos · 2 con error"
+    )
   })
 })

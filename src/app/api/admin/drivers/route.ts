@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logAdminAction } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
 
 export const runtime = "nodejs"
@@ -37,7 +38,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { user: adminUser, response: adminDenied } = await requireAdmin()
     if (adminDenied) return adminDenied
 
     const body = await request.json().catch(() => null)
@@ -58,6 +59,17 @@ export async function POST(request: NextRequest) {
       logger.error("[ADMIN DRIVERS] create error:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    // Quién puede repartir pedidos es una decisión de acceso, no solo de datos.
+    await logAdminAction(supabase, {
+      actorId: adminUser?.id ?? null,
+      actorEmail: adminUser?.email ?? null,
+      action: "driver_create",
+      entity: "delivery_drivers",
+      entityId: data?.id ?? null,
+      detail: { name, phone },
+    })
+
     return NextResponse.json({ driver: data }, { status: 201 })
   } catch (err) {
     logger.error("[ADMIN DRIVERS] POST unexpected:", err)
@@ -67,7 +79,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { response: adminDenied } = await requireAdmin()
+    const { user: adminUser, response: adminDenied } = await requireAdmin()
     if (adminDenied) return adminDenied
 
     const body = await request.json().catch(() => null)
@@ -86,6 +98,16 @@ export async function PATCH(request: NextRequest) {
       logger.error("[ADMIN DRIVERS] patch error:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    await logAdminAction(supabase, {
+      actorId: adminUser?.id ?? null,
+      actorEmail: adminUser?.email ?? null,
+      action: "driver_update",
+      entity: "delivery_drivers",
+      entityId: id,
+      detail: { is_active: body.is_active },
+    })
+
     return NextResponse.json({ ok: true })
   } catch (err) {
     logger.error("[ADMIN DRIVERS] PATCH unexpected:", err)

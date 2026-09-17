@@ -872,6 +872,48 @@
     llevarlo.** El lookup por `referral_code` es el webhook público de registro:
     no hay sesión y **no** se filtra por vendedor. Es la excepción declarada en la
     allowlist del contrato.
+- **Ninguna escritura del CRM se queda sin interfaz (`/admin/leads`, Ronda 11)**:
+  la ronda 6 dejó cinco server actions de escritura —`saveQuickReply`,
+  `deleteQuickReply`, `distributeCrmProspects`, `getAdminSellerLoads`,
+  `cancelSequenceEnrollment`— sin **ningún** consumidor, y la lectura sí estaba
+  cableada. El archivo entero estaba suprimido en `knip.ignoreIssues`, así que el
+  gate pasaba en verde y nadie notó que faltaba la mitad del ciclo. La regla que
+  queda es la inversa: **la escritura y su consumidor se escriben juntos**.
+  Invariantes que no se pueden romper:
+  - **Cada escritura del CRM tiene consumidor de producción.**
+    `src/lib/crm-writers.contract.test.ts` falla si uno de los cinco nombres deja
+    de estar referenciado fuera de `actions.ts` y de los tests, y también si el
+    consumidor declarado en el propio test deja de ser el real. Añadir una
+    escritura nueva exige añadirla a la lista y decir quién la llama.
+  - **`src/app/admin/actions.ts` no vuelve a la allowlist de `knip`.** La entrada
+    se retiró en la Ronda 11 tras medir `npm run knip` **exit 0 sin ella**; el
+    contrato lo verifica, porque una supresión por archivo apaga la auditoría en
+    el archivo con más escrituras del panel, que es exactamente cómo se perdió la
+    mitad escrita. La entrada suprimía también la categoría `types` por
+    `LeadTimelineSource`, un tipo huérfano **borrado** en esta ronda: el contrato
+    falla si el símbolo reaparece.
+  - **El conjunto de acciones auditadas está congelado.** El contrato fija los 17
+    nombres que escriben en `log_admin_action` desde `actions.ts`. Es un ratchet,
+    no un inventario: una acción nueva obliga a editar la lista, y editarla obliga
+    a decidir si tiene interfaz.
+  - **Reinscribir es reactivar, nunca reinsertar.** `crm_sequence_enrollments`
+    tiene `UNIQUE (sequence_id, prospect_id)` (`00140`), así que un `INSERT` sobre
+    una inscripción cancelada choca y el `23505` cuenta como `skipped`:
+    `enrollProspectsInSequence` parte las coincidencias en `insert` y `reactivate`
+    según el estado y devuelve `reactivated` en `EnrollResult`. **`enrolled`
+    conserva su significado** ("filas que van a correr" = alta + reactivación);
+    `reactivated` es aditivo, para no romper a quien ya lo leía.
+  - **Una inscripción se puede listar para poder cancelarla.**
+    `cancelSequenceEnrollment(enrollmentId)` no tenía lector que le diera un id
+    —`listCrmSequences` solo devuelve el **conteo**—, así que la cancelación era
+    inalcanzable aunque existiera la acción. `listCrmSequenceEnrollments` es ese
+    lector; el vocabulario de estado y la regla de reactivación viven en el módulo
+    puro `@/lib/crm-enrollments` (29 pruebas), que es lo que la UI y la acción
+    comparten.
+  - **`is_active` se filtra antes de cortar.** `ConversationPanel` hacía
+    `quickReplies.slice(0, 8)` sin mirar el estado: el interruptor del gestor de
+    respuestas rápidas no habría hecho nada. Ahora pasa por `activeQuickReplies`
+    **antes** del `slice`.
 - **Conversión (`/admin/conversion`, Ronda CV)**: el embudo tiene **una sola
   fuente de verdad**, el motor puro `@/lib/conversion-funnel`; la página y la
   ruta nunca recalculan una tasa por su cuenta. Invariantes que no se pueden
@@ -929,6 +971,17 @@
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de
 visibilidad de un producto y confirmación de que el caché de catálogo se invalida.
+
+Escrituras del CRM (Ronda 11, `/admin/leads`): en el tablero, seleccionar
+prospectos y usar "Repartir" (elegir estrategia y ver el resultado por vendedor con
+su motivo); en la pestaña **Bandeja**, abrir "Respuestas rápidas" y crear, editar,
+desactivar y borrar una —un título repetido debe mostrar el mensaje del servidor
+tal cual, no uno genérico—; y en "Secuencias", desplegar una secuencia, cancelar una
+inscripción (confirmación en dos pasos) y volver a inscribir al mismo prospecto:
+debe **reactivarse** y el aviso debe decir "reactivada", no "omitida". Los tres
+caminos están cubiertos por `src/lib/crm-enrollments.test.ts` (29),
+`src/lib/crm-writers.contract.test.ts` (7) y 8 pruebas nuevas de respuestas rápidas
+en `src/lib/crm-inbox.test.ts`.
 
 Los KPIs de adopción y el override de nivel se prueban en
 `src/app/admin/restaurantes.test.ts` (23 tests). `e2e/foodos.spec.ts` comprueba
@@ -1263,8 +1316,15 @@ la escalera de columnas, correr los contratos del núcleo:
 npx vitest run src/lib/crm-core.contract.test.ts \
                src/lib/crm-prospects.test.ts \
                src/lib/crm-reader.contract.test.ts \
+               src/lib/crm-writers.contract.test.ts \
+               src/lib/crm-enrollments.test.ts \
                src/lib/use-server.contract.test.ts
 ```
+
+Si el cambio toca una **escritura** del CRM (respuestas rápidas, reparto,
+inscripciones), el criterio es el de la Ronda 11: la escritura y su interfaz se
+entregan juntas, y `crm-writers.contract.test.ts` lo verifica —una escritura sin
+consumidor deja la suite en rojo, no una fila 🔜 en un documento.
 
 El **criterio de aceptación** de la fusión fue que
 `npx playwright test e2e/admin-leads.spec.ts` pasara **sin modificar el spec**

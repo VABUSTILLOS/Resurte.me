@@ -6,6 +6,7 @@
 export const AUDIT_ACTIONS = [
   "order_status",
   "order_payment",
+  "order_payment_revert",
   "product_update",
   "product_bulk_update",
   "product_city_availability",
@@ -20,6 +21,17 @@ export const AUDIT_ACTIONS = [
   "coupon_delete",
   "stock_adjust",
   "user_role",
+  "invoice_approve",
+  "invoice_reject",
+  "invoice_revoke",
+  "reward_service_upsert",
+  "bump_rule_create",
+  "bump_rule_update",
+  "bump_rule_delete",
+  "driver_create",
+  "driver_update",
+  "product_images_update",
+  "products_seed",
   "lead_convert",
   "lead_discard",
   "lead_restore",
@@ -40,6 +52,7 @@ export const AUDIT_ACTIONS = [
   "foodos_operating_start",
   "foodos_operating_stop",
   "foodos_operating_action",
+  "redemption_status_update",
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -47,6 +60,7 @@ export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   order_status: "Estado de pedido",
   order_payment: "Confirmación de pago",
+  order_payment_revert: "Reversión de confirmación de pago",
   product_update: "Edición de producto",
   product_bulk_update: "Edición masiva de productos",
   product_city_availability: "Disponibilidad por ciudad",
@@ -61,6 +75,17 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   coupon_delete: "Cupón eliminado",
   stock_adjust: "Ajuste de stock",
   user_role: "Cambio de rol",
+  invoice_approve: "Factura aprobada",
+  invoice_reject: "Factura rechazada",
+  invoice_revoke: "Aprobación de factura revocada",
+  reward_service_upsert: "Servicio de recompensa guardado",
+  bump_rule_create: "Regla de bump creada",
+  bump_rule_update: "Regla de bump editada",
+  bump_rule_delete: "Regla de bump eliminada",
+  driver_create: "Repartidor creado",
+  driver_update: "Repartidor editado",
+  product_images_update: "Imágenes de catálogo actualizadas por script",
+  products_seed: "Catálogo sembrado por script",
   lead_convert: "Lead convertido a prospecto",
   lead_discard: "Lead descartado",
   lead_restore: "Lead restaurado a la bandeja",
@@ -81,6 +106,7 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   foodos_operating_start: "Sesión de soporte iniciada",
   foodos_operating_stop: "Sesión de soporte terminada",
   foodos_operating_action: "Acción de soporte en restaurante",
+  redemption_status_update: "Movimiento de solicitud de servicio",
 }
 
 function isAuditAction(value: string): value is AuditAction {

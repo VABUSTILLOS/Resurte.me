@@ -12,6 +12,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { safeSecretEqual } from "@/lib/secret-equal"
+import { logAdminAction } from "@/lib/audit-log"
 
 // Requerido: ADMIN_API_SECRET debe estar definido en el entorno (ver .env.local.example).
 // Sin fallback hardcodeado: si falta la env, el endpoint no opera (fail-closed).
@@ -363,6 +364,18 @@ export async function POST(req: NextRequest) {
     // Reflejar las imágenes actualizadas en la tienda sin esperar el TTL.
     revalidateCatalogCache()
     resetCatalogCache()
+
+    // Este endpoint no tiene sesión de admin (autentica por secreto compartido),
+    // así que la bitácora queda sin actor y con el nombre del script en `via`:
+    // es la única constancia de que se borraron productos del catálogo público.
+    await logAdminAction(supabase, {
+      actorId: null,
+      actorEmail: null,
+      action: "product_images_update",
+      entity: "products",
+      entityId: null,
+      detail: { via: "script:update-images", updated: count, deleted, errors: errors.length },
+    })
 
     return NextResponse.json({
       success: errors.length === 0,

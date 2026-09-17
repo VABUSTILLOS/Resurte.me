@@ -229,6 +229,50 @@ export function inboxDayKey(
 // Respuestas rápidas
 // ============================================================
 
+/** Tope de respuestas rápidas que se devuelven al panel de una vez. */
+export const QUICK_REPLIES_LIMIT = 200
+export const QUICK_REPLY_TITLE_MAX = 60
+export const QUICK_REPLY_BODY_MAX = 1024
+
+export interface QuickReplyDraft {
+  title: string
+  body: string
+}
+
+/**
+ * Valida un borrador con los mismos mensajes que devuelve el servidor.
+ *
+ * Existe para que el gestor del panel pueda decir "el título no puede pasar de
+ * 60 caracteres" mientras se escribe, sin un viaje de ida, y para que el texto
+ * sea literalmente el mismo que el del error del servidor: dos redacciones
+ * distintas para la misma regla es cómo se acaba mostrando dos reglas distintas.
+ */
+export function quickReplyDraftError(draft: QuickReplyDraft): string | null {
+  const title = draft.title.trim()
+  const body = draft.body.trim()
+  if (!title) return "El título es obligatorio"
+  if (title.length > QUICK_REPLY_TITLE_MAX) {
+    return `El título no puede pasar de ${QUICK_REPLY_TITLE_MAX} caracteres`
+  }
+  if (!body) return "El texto es obligatorio"
+  if (body.length > QUICK_REPLY_BODY_MAX) {
+    return `El texto no puede pasar de ${QUICK_REPLY_BODY_MAX} caracteres`
+  }
+  return null
+}
+
+/**
+ * Las que el compositor puede ofrecer.
+ *
+ * `getAdminQuickReplies` devuelve activas e inactivas a propósito —el gestor
+ * necesita ver ambas para poder reactivarlas—, así que el filtro de `is_active`
+ * tiene que existir en algún punto antes de pintar los atajos. Sin él, apagar
+ * una respuesta rápida no hacía nada.
+ */
+export function activeQuickReplies<T extends { isActive: boolean }>(replies: readonly T[]): T[] {
+  return replies.filter((reply) => reply.isActive)
+}
+
 /** Variables que el panel sabe rellenar. Cualquier otra se deja literal. */
 export const QUICK_REPLY_VARIABLES = ["nombre", "restaurante", "vendedor", "telefono"] as const
 export type QuickReplyVariable = (typeof QUICK_REPLY_VARIABLES)[number]

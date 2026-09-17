@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { revalidateCatalogCache } from "@/lib/catalog-cache";
 import { resetCatalogCache } from "@/lib/catalog";
 import { safeSecretEqual } from "@/lib/secret-equal";
+import { logAdminAction } from "@/lib/audit-log";
 
 // Fail-closed: el seed solo corre con SEED_API_TOKEN configurado en el
 // entorno. No hay fallback hardcodeado.
@@ -256,6 +257,23 @@ export async function POST(request: Request) {
   // Reflejar los productos sembrados en la tienda sin esperar el TTL.
   revalidateCatalogCache();
   resetCatalogCache();
+
+  // Sin sesión de admin (autentica por token compartido): la bitácora queda sin
+  // actor y con el script en `via`. Es la constancia de qué se insertó y a qué
+  // precios, porque este endpoint reescribe el catálogo público.
+  await logAdminAction(supabase, {
+    actorId: null,
+    actorEmail: null,
+    action: "products_seed",
+    entity: "products",
+    entityId: null,
+    detail: {
+      via: "script:seed-products",
+      products_inserted: results.products_inserted,
+      prices_upserted: results.prices_upserted,
+      errors: results.errors.length,
+    },
+  });
 
   return NextResponse.json(results);
 }

@@ -2,9 +2,13 @@
 
 > Programa de mejora continua por feature. **Oleadas 1 y 2 implementadas**
 > (fases 1-10 por feature + fases 11+ de compra fácil priorizando móvil).
-> **Backlog cerrado**: no queda ninguna fila 🔜, así que las rondas siguientes no
-> salen de un inventario pendiente sino de **deuda medida con herramientas**
-> (ver la Ronda 3). Si aparece backlog nuevo, se declara al final de su sección.
+> **Backlog abierto, medido**: cada ronda empieza midiendo el backlog declarado
+> antes de tocarlo, porque una fila 🔜 envejece mal —la `BL13` se declaró con una
+> medición de 25 s que hoy es de 1,4 s, y la `C12` afirmaba que sus cinco
+> escrituras estaban cubiertas por pruebas cuando ninguna tenía consumidor—. El
+> trabajo real sale de **deuda medida con herramientas** (ver la Ronda 3), no de
+> la prosa de la ronda anterior. Si aparece backlog nuevo, se declara al final de
+> su sección. Estado tras la Ronda 11: **no queda ninguna fila 🔜**.
 >
 > Convenciones: ✅ implementada · 🔜 backlog priorizado.
 
@@ -462,7 +466,7 @@ trabajaba el prospecto.
 | C9 | **Asistente de respuesta** (`src/lib/crm-ai.ts`): arma el contexto del hilo redactando PII (`maskPhone`, `maskEmail`, `redactFreeText`) y **propone** un borrador; `suggestLeadReply` cae a `buildFallbackReply` (plantilla) cuando el proveedor no responde. **Nunca auto-envía** y nunca pone un teléfono o correo completo en el prompt. 29 pruebas | ✅ |
 | C10 | **Contratos y e2e**: `src/lib/crm-inbox.contract.test.ts` (43 pruebas) ata `00140`/`00097` al motor puro — columna generada equivalente a `phoneKey()`, `is_active` en `false`, `CHECK` de `status` ↔ `SequenceAdvance`, RLS sin políticas, y la **ausencia** de columnas desnormalizadas de último mensaje; cinco bloques `@ci` nuevos en `e2e/admin-leads.spec.ts` (guard de la pestaña, allowlist de `?view=`, `?tag=`, combinación completa de filtros y "las secuencias no se activan por URL") | ✅ |
 | C11 | **Documentación**: invariantes de la ronda en `docs/agents/admin.md` y esta sección | ✅ |
-| C12 | **Backlog declarado, no código muerto** 🔜: cinco server actions de escritura existen y están cubiertas por pruebas, pero **ninguna tiene consumidor en la UI** — `saveQuickReply` y `deleteQuickReply` (su lectura, `getAdminQuickReplies`, sí está cableada en `LeadConversations.tsx`), `distributeCrmProspects` y `getAdminSellerLoads` (el reparto se hace hoy prospecto a prospecto desde `LeadDetailDrawer.tsx`, con `assignCrmProspect`) y `cancelSequenceEnrollment` (`LeadSequences.tsx` importa `enrollProspectsInSequence` pero **no** permite cancelar una inscripción). Se declaran aquí en vez de borrarlas porque la mitad del ciclo está construida y en uso. Viven en la allowlist de `knip` con este motivo escrito (ronda 7, K5) | 🔜 |
+| C12 | **Cerrada en la Ronda 11**: las cinco escrituras tienen interfaz. Al medirla se descubrió que la fila era falsa por partida doble —decía "cubiertas por pruebas" y ninguna tenía consumidor **ni** prueba de comportamiento— y que escondía tres defectos: `cancelSequenceEnrollment` no tenía lector que le diera un id (`listCrmSequences` solo cuenta inscripciones), `enrollProspectsInSequence` ignoraba el estado y hacía **irrecuperable** una inscripción cancelada (`UNIQUE (sequence_id, prospect_id)` bloquea el re-insert), y `is_active` de las respuestas rápidas era un campo muerto (`ConversationPanel.tsx` cortaba a 8 sin filtrar). Detalle y evidencia en la Ronda 11 | ✅ |
 
 **Verificación de la ronda**: `npx tsc --noEmit` → 0 · `npm run lint` → 0 ·
 `npm test` → 4506 passed / 0 failed (271 archivos) · `npm run build` → 0.
@@ -709,6 +713,84 @@ superficie que **no** cambia de comportamiento no es una fusión. Resultado:
 `npx playwright test e2e/admin-leads.spec.ts e2e/comercializacion.spec.ts` →
 **64 passed**.
 
+### Ronda 11 — Cerrar la mitad escrita del CRM
+
+El backlog declarado tenía tres filas: `C12`, `BL13` y `CI13`. Antes de tocar
+nada se midieron las tres, y las tres estaban mal —una por vieja y dos por
+incompletas—, así que la ronda no fue ejecutar el backlog: fue **corregir el
+inventario y cerrar lo que decía**.
+
+**Medición previa (lo que la prosa no contaba)**
+
+| Fila | Lo que decía | Lo que se midió |
+|---|---|---|
+| `C12` | 5 escrituras sin UI, "cubiertas por pruebas" | Sin UI ✓ · **sin prueba de comportamiento ✗** · y tres defectos que la fila no mencionaba |
+| `BL13` | `heading-slug.test.ts` revienta por timeout en la suite | **Falsa**: 1,33 s de archivo, 11/11 en verde, suite completa 4927/4927 |
+| `CI13` | `LeadTimelineSource` huérfano en `actions.ts:1965` | **Cierta**, pero la fila pedía recortar la entrada cuando había que retirarla entera |
+
+**Los tres defectos que la fila `C12` escondía**
+
+1. **`cancelSequenceEnrollment` no tenía quién le diera un id.** La acción existía
+   y estaba probada, pero `listCrmSequences` solo devolvía el **conteo** de
+   inscripciones: no había lector que listara las filas, así que la cancelación
+   era inalcanzable aunque tuviera interfaz. Fase G1: `listCrmSequenceEnrollments`.
+2. **Una inscripción cancelada era irrecuperable.** `enrollProspectsInSequence`
+   armaba su lista de "ya están dentro" con **cualquier** coincidencia de
+   `prospect_id`, sin mirar el estado. Como `00140` tiene
+   `UNIQUE (sequence_id, prospect_id)`, un `INSERT` chocaba y el `23505` contaba
+   como `skipped`: cancelar una inscripción la mataba para siempre, y el admin no
+   tenía forma de saberlo. Fase G2: reactivar por `UPDATE`, nunca por `INSERT`.
+3. **`is_active` de las respuestas rápidas era un campo muerto.**
+   `ConversationPanel.tsx` hacía `quickReplies.slice(0, 8)` sin filtrar, así que
+   el interruptor de "activa" del nuevo gestor no habría hecho nada. Fase G6.
+
+**Fases**
+
+| # | Fase | Estado |
+|---|---|---|
+| G1 | **Módulo puro de inscripciones** (`src/lib/crm-enrollments.ts`, 29 pruebas): vocabulario de estado (`activa`/`pausada`/`completada`/`cancelada`), `isEnrollmentOpen`, `isReenrollable`, `buildEnrollmentList`, `enrollmentSummary`, `enrollmentStepLabel` y `planEnrollmentUpsert`/`describeEnrollmentResult`, que es la regla de G2 en forma testeable. Contrato contra el `CHECK` de `00140` y contra el `.eq("status", "activa")` del motor | ✅ |
+| G2 | **Reinscripción**: `enrollProspectsInSequence` parte las coincidencias en `insert` y `reactivate` según el estado, y devuelve `reactivated` en `EnrollResult`. `enrolled` conserva su significado ("filas que van a correr" = alta + reactivación) y `reactivated` es aditivo, para no cambiar el contrato de quien ya lo leía | ✅ |
+| G3 | **Lista de inscripciones en `LeadSequences.tsx`**: divulgación perezosa por secuencia, píldoras de estado, paso actual, próxima ejecución en hora local y cancelación con confirmación en dos pasos. La carga vive en el handler, no en un `useEffect` (`react-hooks/set-state-in-effect` es error bajo `--max-warnings 0`) | ✅ |
+| G4 | **Reparto masivo en el pipeline** (`LeadDistribution.tsx`): carga por vendedor, estrategia como radios desde `ASSIGNMENT_STRATEGIES`/`ASSIGNMENT_STRATEGY_LABEL` (por defecto `least_loaded`), y resultado por vendedor con su `assignmentReason`. Desviación consciente: la previsualización **es** la llamada que aplica, porque `distributeCrmProspects` no tiene modo seco; la previsualización honesta es la tabla de carga, que sí se lee antes | ✅ |
+| G5 | **Gestor de respuestas rápidas** (`LeadQuickReplies.tsx`) como tercera sección de la pestaña Bandeja: alta, edición, borrado en dos pasos, activar/desactivar, contadores contra los topes y el `23505` de título único mostrado **literal** (lo escribe el servidor, no el cliente). Los topes se mudaron de `actions.ts` a `crm-inbox.ts` porque un módulo `"use server"` no puede exportar valores no-asíncronos | ✅ |
+| G6 | **`activeQuickReplies`**: el filtro que le faltaba al panel de conversación, con 8 pruebas nuevas | ✅ |
+| G7 | **`CI13` + `BL13`**: `LeadTimelineSource` borrado; la entrada de `src/app/admin/actions.ts` retirada **entera** de `knip.ignoreIssues` tras medir `exit 0` sin ella; la justificación de `knip-config.contract.test.ts` eliminada junto con la entrada; y la medición de `BL13` escrita en el comentario del test para no volver a medirla | ✅ |
+| G8 | **Guard**: `src/lib/crm-writers.contract.test.ts` (7 pruebas) — cada escritura debe tener consumidor de producción, el consumidor declarado debe ser el real, `src/app/admin/actions.ts` no puede volver a la allowlist de knip, `LeadTimelineSource` no puede reaparecer, y el conjunto de acciones que escriben en `log_admin_action` está congelado (17 nombres). Documentación en esta sección y en `docs/agents/admin.md` | ✅ |
+
+**Decisión de diseño — una acción de servidor sin interfaz es una función sin
+terminar.** La ronda 6 dejó las cinco escrituras suprimidas en knip con la
+justificación "la mitad del ciclo está construida y en uso". Ese argumento era
+cierto para la lectura y falso para la escritura, y la supresión por archivo
+apagaba la auditoría en el archivo más grande del panel: por eso nadie notó los
+tres defectos de arriba. La regla que queda es la inversa —la escritura y su
+consumidor se escriben juntos— y `crm-writers.contract.test.ts` la vuelve
+mecánica en vez de una convención que hay que recordar.
+
+**Trampa medida — la prosa del backlog envejece en silencio.** `BL13` declaraba
+un timeout de 25 s que hoy es de 1,4 s. No hubo ninguna regresión: hubo una
+medición de la ronda 7 que dejó de ser cierta y nadie volvió a comprobarla, y una
+fila 🔜 que se lee como trabajo pendiente. El encabezado de este documento
+afirmaba que "no queda ninguna fila 🔜" mientras quedaban tres. Cerrar una fila
+🔜 exige **medirla otra vez**, no leerla.
+
+**Criterio de aceptación**: `e2e/admin-leads.spec.ts` tenía que pasar **sin
+tocar el archivo**. La pestaña Bandeja ganó una sección y el pipeline ganó un
+control en la barra masiva; si eso obliga a reescribir la prueba de la
+superficie, la superficie cambió de contrato. Resultado: **34/34 sin
+modificar**, con el servidor de desarrollo del usuario en el puerto 3100.
+
+**Verificación de la ronda**: `npx tsc --noEmit` → 0 · `npm run lint` → 0 ·
+`npm test` → **4927 passed / 0 failed (296 archivos)**, de los cuales **44 son
+nuevos** (29 de `crm-enrollments`, 7 de `crm-writers`, 8 de respuestas rápidas) ·
+`npm run knip` → **exit 0 con la entrada de `src/app/admin/actions.ts` retirada** ·
+`npm run build` → 0 · `npx playwright test e2e/admin-leads.spec.ts` → **34
+passed**.
+
+**Fuera de alcance, declarado**: los 42 de 61 archivos de `src/app/admin/**` que
+arrastran patrones de la familia B36 (contraste y foco) siguen sin tocar. No
+entraron en esta ronda porque el foco elegido era la mitad escrita del CRM, y
+mezclar las dos cosas habría hecho irrevisable el diff.
+
 ## 9. Blog
 
 | # | Fase | Estado |
@@ -717,7 +799,7 @@ superficie que **no** cambia de comportamiento no es una fusión. Resultado:
 | BL11 | **Barra de progreso de lectura** en artículos (`reading-progress.tsx`, `role="progressbar"` con `aria-valuenow` actualizado por rAF) | ✅ |
 | BL12 | **Índice del artículo con scroll-spy**: `article-toc.tsx` reutiliza `extractHeadings` (los ids ya coinciden con los anclajes de `rehypeHeadingAnchors`), se muestra a partir de 3 H2 y marca la sección activa con `aria-current="location"`; la barra de progreso respeta `prefers-reduced-motion`. Automatizado en `e2e/smoke.spec.ts` (verifica que cada enlace apunte a un encabezado real y que el activo siga al scroll) | ✅ |
 
-| BL13 | 🔜 **El timeout del test de paridad de anclas está al límite**: `src/lib/heading-slug.test.ts:114` recorre los 226 posts con el pipeline de remark y se le dio `timeout: 30_000` (commit `4af28723`) pensando en "~1.3 s en local". Medido en la ronda 7: **25 s aislado** y **>30 s dentro de `npm test`** — falla por timeout en la suite completa (dos corridas: 3 rojos y 1 rojo, siempre este). Aislado pasa 11/11. No es una regresión de código: es un timeout calibrado sobre una medición vieja | 🔜 |
+| BL13 | ✅ **Cerrada por medición, no por arreglo** (Ronda 11). La fila se declaró con una medición de la ronda 7 —25 s aislado, >30 s en la suite— que hoy **ya no reproduce**: `src/lib/heading-slug.test.ts:114` mide **1,33 s** de archivo y **1,41 s** aislado, 11/11 en verde, y la suite completa pasa 4927/4927 con este test dentro. El `timeout: 30_000` se queda: el runner de CI tiene 2 núcleos y supera el default de 5 s, así que es defensivo, no una necesidad viva. El comentario del test ahora lleva la medición de esta ronda para que la próxima vez no haya que volver a medirla | ✅ |
 
 ## 10. Navegación global
 
@@ -873,11 +955,19 @@ borrarse —una sesión que reescribe ese archivo ahora mismo es la forma más r
 de perder su trabajo o el mío— y la supresión queda declarada como deuda en la
 fila `CI13`.
 
+**Resolución (ronda 11)**: la deuda se cerró retirando la entrada **entera**, no
+recortándola a `["exports"]` como pedía la fila. `LeadTimelineSource` se borró y
+las cinco escrituras huérfanas ganaron interfaz, así que ninguna de las dos
+categorías tapaba ya nada; con la entrada fuera de `package.json`, `npm run knip`
+sale **exit 0 sin un solo hallazgo**. La lección se queda porque el mecanismo
+—suprimir por archivo y categoría, nunca por símbolo— no cambia; lo que cambia
+es que ahora `src/lib/crm-writers.contract.test.ts` impide que la entrada vuelva.
+
 **Backlog declarado de esta sección** (ronda 9):
 
 | # | Fase | Estado |
 |---|---|---|
-| CI13 | **Retirar la categoría `types` de la entrada de `src/app/admin/actions.ts`** 🔜: la ronda 9 la añadió —junto a la `exports` que ya estaba— para que `Knip` dejara de estar rojo por `LeadTimelineSource` (`actions.ts:1965`), un tipo sin ningún consumidor en el árbol ni en `HEAD` que quedó huérfano al moverse el hilo a `src/lib/crm-conversation.ts`. Cuando el refactor de esa sesión aterrice —el símbolo se consume o se borra— la entrada debe volver a `["exports"]` y su justificación en `src/lib/knip-config.contract.test.ts` recortarse; el ratchet por igualdad exacta obliga a editar el test para poder hacerlo, que es exactamente para lo que existe | 🔜 |
+| CI13 | ✅ **Cerrada en la Ronda 11, y mejor de lo que pedía la fila**: la fila pedía recortar la entrada de `["exports", "types"]` a `["exports"]`. Se retiró **entera**, porque la premisa de las dos categorías ya no era cierta. `LeadTimelineSource` se borró (`actions.ts` dejó de tener el símbolo huérfano) y las cinco escrituras huérfanas ganaron interfaz, así que la `exports` tampoco tapaba nada. Medido, no supuesto: con la entrada retirada de `package.json`, `npm run knip` sale **exit 0 sin un solo hallazgo**. `src/lib/knip-config.contract.test.ts` pierde la justificación —el ratchet por igualdad exacta obliga a editar el test, que es para lo que existe— y gana una aserción nueva en `src/lib/crm-writers.contract.test.ts` que impide que `src/app/admin/actions.ts` **vuelva** a la allowlist | ✅ |
 
 ## Agentes de mantenimiento por dominio
 

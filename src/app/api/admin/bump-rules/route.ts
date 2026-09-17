@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { requireAdmin } from "@/lib/admin-auth"
 import { createServiceClient } from "@/lib/supabase/service"
+import { logAdminAction } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
 import { validateBumpRuleInput } from "@/lib/admin-marketing-validation"
 
@@ -30,7 +31,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { response: adminDenied } = await requireAdmin()
+  const { user: adminUser, response: adminDenied } = await requireAdmin()
   if (adminDenied) return adminDenied
 
   try {
@@ -47,6 +48,22 @@ export async function POST(request: NextRequest) {
       .select("id")
       .single()
     if (error) throw error
+
+    // discount_pct es un descuento real aplicado en el checkout.
+    await logAdminAction(supabase, {
+      actorId: adminUser?.id ?? null,
+      actorEmail: adminUser?.email ?? null,
+      action: "bump_rule_create",
+      entity: "bump_rules",
+      entityId: data.id,
+      detail: {
+        trigger_type: parsed.value.trigger_type,
+        product_id: parsed.value.product_id,
+        discount_pct: parsed.value.discount_pct,
+        is_active: parsed.value.is_active,
+      },
+    })
+
     return NextResponse.json({ id: data.id }, { status: 201 })
   } catch (error) {
     logger.error("[ADMIN-BUMPS] create error:", error)
