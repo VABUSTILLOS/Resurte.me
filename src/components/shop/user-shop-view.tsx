@@ -140,7 +140,7 @@ export function UserShopView({ categories, products, citySlug }: Props) {
               >
                 <ShoppingBag className="w-4 h-4" />
                 Todos
-                <span className="text-[11px] opacity-70 ml-0.5">{products.length}</span>
+                <span className="text-[11px] ml-0.5">{products.length}</span>
               </button>
 
               {activeCategories.map((cat) => {
@@ -160,7 +160,7 @@ export function UserShopView({ categories, products, citySlug }: Props) {
                       {getCategoryIcon(cat.icon, cat.slug)}
                     </span>
                     {cat.name}
-                    <span className="text-[11px] opacity-70 ml-0.5">{count}</span>
+                    <span className="text-[11px] ml-0.5">{count}</span>
                   </button>
                 )
               })}

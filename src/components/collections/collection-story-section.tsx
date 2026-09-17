@@ -28,7 +28,7 @@ export function CollectionStorySection({
           {/* ── Text column — takes more space ── */}
           <ScrollReveal className="lg:col-span-3 order-2 lg:order-1">
             {/* Label — collection-specific */}
-            <span className="inline-block text-[10px] sm:text-[11px] font-semibold tracking-[0.25em] uppercase text-[#0E7A0E]/70 mb-4 sm:mb-6">
+            <span className="inline-block text-[10px] sm:text-[11px] font-semibold tracking-[0.25em] uppercase text-[#0E7A0E] mb-4 sm:mb-6">
               {story.storyLabel || "Nuestra Historia"}
             </span>
 

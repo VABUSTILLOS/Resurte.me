@@ -231,11 +231,11 @@ export const ProductCard = memo(function ProductCard({
           {/* Precio por unidad real cuando la presentación es comparable;
               si no, se mantiene la pista genérica de mayoreo. */}
           {perUnit ? (
-            <p className="text-[10px] sm:text-[11px] text-[#0E7A0E]/70 font-medium mt-0.5">
+            <p className="text-[10px] sm:text-[11px] text-[#0E7A0E] font-medium mt-0.5">
               {formatUnitPrice(perUnit)}
             </p>
           ) : product.unit && (["por kilo", "por pieza", "charola"].some(u => product.unit?.includes(u))) ? (
-            <p className="text-[10px] text-[#0E7A0E]/70 font-medium mt-0.5">
+            <p className="text-[10px] text-[#0E7A0E] font-medium mt-0.5">
               💰 Precio de mayoreo — compra más y ahorra
             </p>
           ) : null}

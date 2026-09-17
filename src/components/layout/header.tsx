@@ -171,7 +171,7 @@ export function Header() {
               <span className="font-semibold text-[#0E7A0E]">
                 ${cashbackBalance.toLocaleString("es-MX")}
               </span>
-              <span className="text-xs text-[#0E7A0E]/70 hidden lg:inline">recompensas</span>
+              <span className="text-xs text-[#0E7A0E] hidden lg:inline">recompensas</span>
             </Link>
           )}
 

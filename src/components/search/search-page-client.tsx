@@ -286,7 +286,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
               >
                 <ShoppingBag className="w-3.5 h-3.5" />
                 Todo
-                <span className="text-[13px] opacity-70 ml-0.5">{allCount}</span>
+                <span className="text-[13px] ml-0.5">{allCount}</span>
               </button>
               {orderedCategories.map((cat) => {
                 const count = categoryCounts.get(cat.id) ?? 0
@@ -303,7 +303,7 @@ export function SearchPageClient({ citySlug, cityName, products, categories, tot
                   >
                     <span className="text-base">{getCategoryIcon(cat.icon, cat.slug)}</span>
                     {cat.name}
-                    <span className="text-[13px] opacity-70 ml-0.5">{count}</span>
+                    <span className="text-[13px] ml-0.5">{count}</span>
                   </button>
                 )
               })}

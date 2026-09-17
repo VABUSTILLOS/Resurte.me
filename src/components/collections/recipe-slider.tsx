@@ -267,7 +267,7 @@ export default function RecipeSlider({ recipes, products, citySlug }: RecipeSlid
       {/* Header — premium editorial */}
       <div className="flex items-end justify-between mb-6">
         <div>
-          <span className="inline-block text-[11px] font-semibold tracking-[0.25em] uppercase text-[#0E7A0E]/70 mb-2">
+          <span className="inline-block text-[11px] font-semibold tracking-[0.25em] uppercase text-[#0E7A0E] mb-2">
             Recetario
           </span>
           <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#1a1a1a] tracking-tight leading-[1.12]">
