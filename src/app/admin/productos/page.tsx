@@ -762,6 +762,32 @@ function AdminProductsContent() {
     setPage(1)
   }
 
+  // Deja el listado sin ningún filtro. `activeFilterCount` es la lista de
+  // filtros que ocultan filas: si se agrega uno nuevo, hay que limpiarlo aquí
+  // (y contarlo allí), o el estado vacío volvería a ser un callejón sin salida.
+  function clearFilters() {
+    updateFilters(() => {
+      setSearch("")
+      setDebouncedSearch("")
+      setCategoryFilter("all")
+      setStockFilter("all")
+      setStatusFilter("all")
+      setOnlyNoImage(false)
+      setOnlyNoCities(false)
+      setOnlyNoPrice(false)
+      setOnlyNoCategory(false)
+      setOnlyWaMismatch(false)
+      setOnlyOnSale(false)
+      setOnlyStaleSale(false)
+      setOnlyUnderThreshold(false)
+      setOnlyDupNames(false)
+      setOnlyTrash(false)
+      setTagFilter("all")
+      setCityFilter("all")
+      setBrandFilter("all")
+    })
+  }
+
   // ---------- Disponibilidad por ciudad ----------
   // Sin filas en product_city_availability = "Global" (todas las ciudades).
   const isGlobal = (productId: number) => !availability.has(productId)
@@ -2789,16 +2815,47 @@ function AdminProductsContent() {
   // "Filtros" que los selects. En escritorio (sm+) quedan siempre visibles.
   const secondaryFilterClass = filtersOpen ? "inline-flex" : "hidden sm:inline-flex"
   const activeFilterCount = [
+    debouncedSearch.trim() !== "",
     categoryFilter !== "all",
     stockFilter !== "all",
+    statusFilter !== "all",
     cityFilter !== "all",
     brandFilter !== "all",
     tagFilter !== "all",
+    onlyNoImage,
+    onlyNoCities,
+    onlyNoPrice,
+    onlyNoCategory,
+    onlyWaMismatch,
     onlyOnSale,
     onlyStaleSale,
     onlyUnderThreshold,
+    onlyDupNames,
     onlyTrash,
   ].filter(Boolean).length
+
+  // El estado vacío debe explicar POR QUÉ no hay filas: con filtros activos un
+  // listado vacío no es un catálogo vacío, y sin una salida "Limpiar filtros" el
+  // panel solo muestra una pantalla en blanco sin error (el síntoma reportado).
+  const emptyListState = (
+    <div className="px-5 py-12 text-center text-gray-400 text-sm">
+      <p>
+        {activeFilterCount > 0
+          ? "Ningún producto coincide con los filtros activos"
+          : "No se encontraron productos"}
+      </p>
+      {activeFilterCount > 0 && (
+        <button
+          type="button"
+          onClick={clearFilters}
+          className="touch-target mt-4 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          <SlidersHorizontal className="w-4 h-4 text-gray-400" />
+          Limpiar filtros
+        </button>
+      )}
+    </div>
+  )
   const healthIssues =
     counts.noImage +
     counts.noCities +
@@ -4281,19 +4338,13 @@ function AdminProductsContent() {
               })}
             </tbody>
           </table>
-          {total === 0 && !refreshing && (
-            <div className="px-5 py-12 text-center text-gray-400 text-sm">
-              No se encontraron productos
-            </div>
-          )}
+          {total === 0 && !refreshing && emptyListState}
         </div>
       </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           {total === 0 && !refreshing ? (
-            <div className="px-5 py-12 text-center text-gray-400 text-sm">
-              No se encontraron productos
-            </div>
+            emptyListState
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {(filterBroken ? brokenItems : pageItems).map((product) => (
