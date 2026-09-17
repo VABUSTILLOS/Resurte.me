@@ -407,6 +407,9 @@ fueron eliminados por estar cubiertos por migraciones versionadas.
 ### Crear y aplicar un cambio de esquema
 
 ```bash
+# 0. ¿Falta algo por aplicar? (read-only, una línea)
+npm run db:status
+
 # 1. Crear la migración (archivo vacío numerado en supabase/migrations/)
 npx supabase migration new nombre_descriptivo
 
@@ -427,15 +430,21 @@ dashboard. Eso fue la causa del drift histórico (ver `supabase/ESQUEMA.md`).
 
 1. **Idempotencia obligatoria** — cada migración debe poder re-ejecutarse sin
    error (convención del repo).
-2. **Solo lectura contra producción** desde el CLI local: `npx supabase db pull`
-   o `npx supabase migration diff` para auditar drift. **Nunca** correr
-   `supabase db reset --linked` ni comandos que escriban en la BD vinculada
-   desde una máquina local; `db push` se reserva para CI o la consola con
-   autorización explícita.
-3. Ante drift sospechado: documentar en `supabase/ESQUEMA.md`, versionar el
+2. **Aplicar con `db push`, que es la vía única.** `npx supabase migration new
+   <nombre>` para crear y `npx supabase db push` para aplicar. El agente puede
+   correr `db push` contra la BD vinculada **con autorización explícita del
+   usuario por lote**: una confirmación cubre el lote que se le presenta, no
+   todos los futuros. Para auditar drift sin escribir nada, `npx supabase db
+   pull` o `npx supabase migration diff`. Antes de crear una migración, `npm run
+   db:status` responde si falta algo por aplicar.
+3. **Prohibido `supabase db reset --linked`** desde una máquina local, y
+   prohibido editar el esquema de producción a mano en el SQL Editor (párrafo
+   anterior). Aplicar a mano deja el ledger sin fila y `db push` **no** la
+   re-aplica después: ver §«Migraciones históricas de aplicación manual».
+4. Ante drift sospechado: documentar en `supabase/ESQUEMA.md`, versionar el
    cambio real como migración nueva y reconciliar — no repetir ediciones
    manuales.
-4. El seed (`supabase/seed.sql`) escribe precios/stock directo en `products`;
+5. El seed (`supabase/seed.sql`) escribe precios/stock directo en `products`;
    la tabla legado `product_stores` ya no se escribe ni se lee (la ruta admin
    `seed-products` aún hace upsert histórico — pendiente de limpieza).
 
@@ -501,7 +510,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
 # 200 = la columna existe · 400 42703 = no aplicada
 ```
 
-### ⚠️ Migración `00116` pendiente de aplicar (vista de ventas por producto)
+### ✅ Migración `00116` aplicada (vista de ventas por producto)
 
 `supabase/migrations/00116_product_sales_view.sql` añade el índice
 `order_items (product_id)` y la vista `products_with_sales` (todas las columnas
@@ -511,11 +520,18 @@ vendió, pedidos cancelados excluidos). Es lo que permite ordenar
 *antes* del `range()` de la paginación, y PostgREST no puede ordenar por un
 agregado de `order_items`.
 
-**Estado verificado (17-sep-2026):** pendiente. La sonda con la clave
-publicable responde `404 PGRST205` (*"Could not find the table
-'public.products_with_sales' in the schema cache"*), que es exactamente el
-error que `GET /api/admin/products/list?sort=sales` interpreta como "vista
-ausente".
+**Estado verificado (17-sep-2026):** **aplicada**. La sonda con la clave
+publicable responde `401`, no `404 PGRST205`: la vista existe y el `REVOKE` de
+la propia migración deja a `anon` sin `SELECT`, así que `200` **nunca** es el
+resultado esperado aquí. Un `404 PGRST205` (*"Could not find the table
+'public.products_with_sales' in the schema cache"*) es lo que
+`GET /api/admin/products/list?sort=sales` interpreta como "vista ausente", y es
+lo que sí hay que ver en un entorno nuevo sin la migración.
+
+Esta migración **no tiene fila en el ledger** (se aplicó pegando el SQL en el
+editor, que no registra migraciones). Como `db push` solo empuja versiones
+locales mayores que la máxima remota, no se re-aplica: en un entorno nuevo hay
+que aplicarla a mano o por CLI.
 
 Sin ella el panel **no se rompe**: el listado reintenta sin el orden por
 ventas, cae al orden por nombre y marca `schemaDrift` (aviso ámbar de
@@ -534,7 +550,7 @@ solo a `service_role`, porque `products_with_sales` incluye `cost` y el
 histórico de ventas. Ese REVOKE es necesario porque Supabase concede
 privilegios por defecto a esos roles en cada objeto nuevo de `public`.
 
-### ⚠️ Migración `00117` pendiente de aplicar (libro de direcciones del checkout)
+### ✅ Migración `00117` aplicada (libro de direcciones del checkout)
 
 `supabase/migrations/00117_address_book.sql` añade a `addresses`:
 
@@ -555,8 +571,9 @@ privilegios por defecto a esos roles en cada objeto nuevo de `public`.
   referenciadas por un pedido (`NOT EXISTS orders`) — antes el libro del
   invitado recurrente desaparecía cada 30 días y rompía el historial.
 
-**Estado verificado (17-sep-2026):** pendiente (es la última migración del
-repo). Sonda con la clave publicable:
+**Estado verificado (17-sep-2026):** **aplicada**. No es "la última migración del
+repo" —el repositorio va por `00154`— sino una de las que se aplicaron a mano y
+quedaron sin fila en el ledger. Sonda con la clave publicable:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
@@ -850,9 +867,16 @@ operativa: con Hobby, 538 páginas ISR a `revalidate = 300` bastan para agotar
 las 4 h/mes de Active CPU; en Pro el recurso se cobra por uso, pero conviene
 subir el `revalidate` igual para no pagar regeneraciones que nadie mira.
 
-### Migraciones pendientes de aplicar a mano
+### Migraciones históricas de aplicación manual (hoy aplicadas)
 
-En el SQL Editor de Supabase, en este orden:
+Se aplicaron pegando el SQL en el editor, así que **no tienen fila en
+`supabase_migrations.schema_migrations`** (el editor no registra migraciones).
+Sus objetos están vivos en producción —verificado por sonda REST y por
+`npx supabase inspect db`—, pero el hueco del ledger importa: como `db push`
+solo empuja versiones locales **mayores** que la máxima remota, y la remota
+máxima ya es `00153`, estas migraciones **no se re-aplican solas**. En un
+entorno nuevo hay que aplicarlas a mano o por CLI. Se documentan por el síntoma
+que provocan si faltan:
 
 1. `00082_foodos_payment_proofs.sql` — sin ella subir un comprobante falla.
 2. `00083_foodos_order_notifications.sql` — sin ella los avisos se envían pero sin dedupe.
@@ -862,13 +886,31 @@ En el SQL Editor de Supabase, en este orden:
    (el listado detecta la vista ausente y vuelve al orden por nombre, con el
    aviso ámbar de migraciones), pero **el orden "Más vendidos" no ordena**.
    Aditiva e idempotente. Sonda: `products_with_sales?select=id&limit=1` →
-   `404`/`PGRST205` pendiente · `200` aplicada.
+   `404`/`PGRST205` pendiente · `401`/`403` aplicada. **No esperes `200`:** el
+   REVOKE de la propia migración deja a `anon` sin permiso.
 6. `00117_address_book.sql` — sin ella el checkout sigue funcionando (el
    invitado arranca en blanco y el usuario cae al prefill clásico), pero **no
    se guarda la última dirección usada** ni hay soft delete de direcciones.
    Aditiva e idempotente; reescribe el RPC del job `cleanup-guest-addresses`
    (§2). Sonda: `addresses?select=id,last_used_at,deleted_at&limit=1` →
    `400`/`42703` pendiente · `200` aplicada.
+
+Las filas ausentes del ledger son nueve: `00043`, `00082`, `00083`, `00084`,
+`00085`, `00116`, `00117`, `00143` y `00144`.
+
+**Para saber si te falta algo, no adivines ni pegues SQL "por si acaso": corre
+`npm run db:status`.** Read-only, y compara el ledger en las dos direcciones.
+
+Estado medido el **17-sep-2026**: los objetos de las seis están vivos, pero el
+ledger **no está limpio**. Tiene una versión remota huérfana, `20260917190303`,
+que es `00154_marketplace_delivery_proof.sql` aplicada por **MCP**:
+`apply_migration` registra un timestamp generado en vez del número del archivo.
+No es cosmético — la CLI exige que el historial remoto sea un prefijo de la lista
+local, así que esa fila deja `db push` **bloqueado por completo** con
+`LegacyDbPushMissingLocalError`: no se puede aplicar ninguna migración nueva
+hasta repararla. `npm run db:status` lo detecta y te da el comando exacto. La
+regla y el historial de incidentes están en «Regla: las migraciones numeradas se
+aplican por CLI, nunca por MCP».
 
 ### Migraciones recientes ya aplicadas a producción
 
@@ -960,6 +1002,23 @@ FROM PUBLIC, anon, authenticated;`, ya estaba byte a byte en
 la reparación el ledger tenía 152 filas y 13 versiones sin cinco dígitos;
 después, 152 filas con `00001`…`00152` y cero.
 
+**Recaída el mismo 17-sep-2026.** Horas después de esa reparación apareció una
+fila nueva con timestamp, `20260917190303`, correspondiente a
+`00154_marketplace_delivery_proof.sql`: el MCP se volvió a usar. No es un
+arrastre histórico, es la regla de arriba incumpliéndose otra vez — por eso la
+detección tiene que ser un comando y no una revisión a ojo. El DDL de `00154` **sí
+está aplicado** (sus tres columnas `orders.delivery_proof_*` responden en
+producción), así que la reparación es solo de ledger:
+
+```bash
+npx supabase migration repair --status reverted 20260917190303
+npx supabase migration repair --status applied 00154
+```
+
+`migration repair` escribe **solo** `supabase_migrations.schema_migrations`; no
+ejecuta el SQL de la migración. Mientras esa fila siga ahí, `db push` falla
+entero y **ninguna** migración nueva se puede aplicar.
+
 **Cinco divergencias de contenido que NO son drift de ledger.** Las filas
 `00144`, `00145`, `00146`, `00147` y `00152` comparten nombre y posición con su
 archivo local pero tienen texto distinto: son **revisiones** de la misma
@@ -972,10 +1031,14 @@ dejan como están.
 Sonda del estado del ledger:
 
 ```bash
-npx supabase db push --dry-run        # {"upToDate":true,...}
-npx supabase migration list --linked  # local == remote en todas las filas
+npm run db:status                     # resumen + comandos de reparación si hace falta
+npx supabase migration list --linked  # detalle fila por fila
 ```
 
+`db push --dry-run` responde `{"upToDate":true}` solo cuando el ledger está sano.
+Si hay una versión remota sin archivo local (típico de `apply_migration` por MCP),
+`dry-run` y `push` **fallan** con `LegacyDbPushMissingLocalError`; `db:status` lo
+detecta y te da la reparación.
 
 ---
 

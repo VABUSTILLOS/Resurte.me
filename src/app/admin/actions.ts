@@ -165,6 +165,8 @@ export interface AdminOrder {
   source: string
   created_at: string
   driver_id?: number | null
+  /** Ruta del comprobante de entrega en el bucket `entregas` (00154). */
+  delivery_proof_path?: string | null
   address: {
     street: string
     number: string
@@ -292,6 +294,7 @@ export async function getAdminOrders(
     buildAdminOrdersSelect({
       coupon: !dropped.has("coupon_code"),
       driver: !dropped.has("driver_id"),
+      proof: !dropped.has("delivery_proof_path"),
     })
 
   // El SELECT se arma en runtime (columnas opcionales), así que supabase-js no
@@ -377,6 +380,7 @@ export async function getAdminOrders(
         source: o.source,
         created_at: o.created_at,
         driver_id: o.driver_id ?? null,
+        delivery_proof_path: o.delivery_proof_path ?? null,
         address: addr
           ? {
               street: addr.street,

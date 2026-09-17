@@ -53,6 +53,14 @@ export const AUDIT_ACTIONS = [
   "foodos_operating_stop",
   "foodos_operating_action",
   "redemption_status_update",
+  "order_delivery_proof",
+  "order_delivery_proof_removed",
+  "supplier_create",
+  "supplier_update",
+  "supplier_delete",
+  "supplier_product_link",
+  "supplier_product_update",
+  "supplier_product_unlink",
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -107,6 +115,14 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   foodos_operating_stop: "Sesión de soporte terminada",
   foodos_operating_action: "Acción de soporte en restaurante",
   redemption_status_update: "Movimiento de solicitud de servicio",
+  order_delivery_proof: "Comprobante de entrega subido",
+  order_delivery_proof_removed: "Comprobante de entrega eliminado",
+  supplier_create: "Proveedor creado",
+  supplier_update: "Proveedor editado",
+  supplier_delete: "Proveedor eliminado",
+  supplier_product_link: "Producto vinculado a proveedor",
+  supplier_product_update: "Vínculo de proveedor editado",
+  supplier_product_unlink: "Producto desvinculado de proveedor",
 }
 
 function isAuditAction(value: string): value is AuditAction {

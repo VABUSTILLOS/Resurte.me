@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { MotionConfig, motion, AnimatePresence } from "framer-motion"
 import { X, Gift, Mail, Tag } from "lucide-react"
 import { useCart } from "@/contexts/cart-context"
 import { useEscapeKey } from "@/hooks/use-escape-key"
@@ -154,141 +154,143 @@ export function ExitIntentCoupon() {
   }, [captureLead, handleApplyCoupon])
 
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Espera, tu carrito está casi listo"
-        >
-          <motion.div
-            initial={{ scale: 0.95, y: 16 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.95, y: 16 }}
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative max-h-[min(90dvh,640px)] overflow-y-auto overscroll-contain"
-          >
-            <button
-              type="button"
-              onClick={() => setVisible(false)}
-              aria-label="Cerrar"
-              className="absolute top-3 right-3 p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors touch-target"
+    <MotionConfig reducedMotion="user">
+        <AnimatePresence>
+          {visible && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Espera, tu carrito está casi listo"
             >
-              <X className="w-5 h-5" />
-            </button>
-
-            {couponApplied ? (
-              <div className="text-center py-4">
-                <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-                  <Gift className="w-7 h-7 text-[#0E7A0E]" />
-                </div>
-                <h2 className="text-xl font-black text-[#242529] mb-1">
-                  ¡Cupón aplicado!
-                </h2>
-                <p className="text-sm text-gray-500">
-                  Tu descuento ya está reflejado en el carrito. ¡No dejes tu
-                  pedido a medias!
-                </p>
+              <motion.div
+                initial={{ scale: 0.95, y: 16 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 16 }}
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative max-h-[min(90dvh,640px)] overflow-y-auto overscroll-contain"
+              >
                 <button
                   type="button"
                   onClick={() => setVisible(false)}
-                  className="mt-6 w-full px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] transition-colors"
+                  aria-label="Cerrar"
+                  className="absolute top-3 right-3 p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors touch-target"
                 >
-                  Terminar mi pedido
+                  <X className="w-5 h-5" />
                 </button>
-              </div>
-            ) : (
-              <>
-                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-4">
-                  <Tag className="w-6 h-6 text-amber-600" />
-                </div>
-                <h2 className="text-xl font-black text-[#242529] mb-1">
-                  ¡Espera! Tu carrito está casi listo 🛒
-                </h2>
-                <p className="text-sm text-gray-500 mb-3">
-                  {EXIT_INTENT_COUPON
-                    ? "Déjanos tu email y te damos un cupón exclusivo para que no dejes tu pedido pendiente."
-                    : "Déjanos tu email y te avisamos cuando tus productos favoritos vuelvan a estar disponibles."}
-                </p>
 
-                {EXIT_INTENT_COUPON && secondsLeft > 0 && (
-                  <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4 text-center">
-                    ⏳ Tu cupón se reserva por {countdownLabel} min
-                  </p>
-                )}
-
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    handleClaim()
-                  }}
-                  className="space-y-3"
-                >
-                  <div className="relative">
-                    <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      onBlur={captureLead}
-                      placeholder="tu@email.com"
-                      required
-                      className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
-                    />
-                  </div>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Teléfono (opcional)"
-                    className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
-                  />
-
-                  {emailSent && (
-                    <p className="text-xs text-green-600">
-                      ¡Gracias! Te enviaremos tu cupón al correo.
+                {couponApplied ? (
+                  <div className="text-center py-4">
+                    <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                      <Gift className="w-7 h-7 text-[#0E7A0E]" />
+                    </div>
+                    <h2 className="text-xl font-black text-[#242529] mb-1">
+                      ¡Cupón aplicado!
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      Tu descuento ya está reflejado en el carrito. ¡No dejes tu
+                      pedido a medias!
                     </p>
-                  )}
-
-                  {EXIT_INTENT_COUPON && (
                     <button
-                      type="submit"
-                      disabled={isApplying}
-                      className="w-full px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
+                      type="button"
+                      onClick={() => setVisible(false)}
+                      className="mt-6 w-full px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] transition-colors"
                     >
-                      {isApplying ? (
-                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <Gift className="w-4 h-4" />
-                          {EXIT_INTENT_COUPON
-                            ? `Aplicar cupón ${EXIT_INTENT_COUPON}`
-                            : "Recibir aviso"}
-                        </>
-                      )}
+                      Terminar mi pedido
                     </button>
-                  )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-4">
+                      <Tag className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <h2 className="text-xl font-black text-[#242529] mb-1">
+                      ¡Espera! Tu carrito está casi listo 🛒
+                    </h2>
+                    <p className="text-sm text-gray-500 mb-3">
+                      {EXIT_INTENT_COUPON
+                        ? "Déjanos tu email y te damos un cupón exclusivo para que no dejes tu pedido pendiente."
+                        : "Déjanos tu email y te avisamos cuando tus productos favoritos vuelvan a estar disponibles."}
+                    </p>
 
-                  {couponError && (
-                    <p className="text-xs text-red-600">{couponError}</p>
-                  )}
+                    {EXIT_INTENT_COUPON && secondsLeft > 0 && (
+                      <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4 text-center">
+                        ⏳ Tu cupón se reserva por {countdownLabel} min
+                      </p>
+                    )}
 
-                  <button
-                    type="button"
-                    onClick={() => setVisible(false)}
-                    className="w-full text-center text-xs text-gray-400 hover:text-gray-600 transition-colors pt-1"
-                  >
-                    No, gracias — seguir comprando
-                  </button>
-                </form>
-              </>
-            )}
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        handleClaim()
+                      }}
+                      className="space-y-3"
+                    >
+                      <div className="relative">
+                        <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          onBlur={captureLead}
+                          placeholder="tu@email.com"
+                          required
+                          className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                        />
+                      </div>
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="Teléfono (opcional)"
+                        className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0E7A0E]/30 focus:border-[#0E7A0E]"
+                      />
+
+                      {emailSent && (
+                        <p className="text-xs text-green-600">
+                          ¡Gracias! Te enviaremos tu cupón al correo.
+                        </p>
+                      )}
+
+                      {EXIT_INTENT_COUPON && (
+                        <button
+                          type="submit"
+                          disabled={isApplying}
+                          className="w-full px-6 py-3 bg-[#0E7A0E] text-white font-bold rounded-xl hover:bg-[#0D720D] disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
+                        >
+                          {isApplying ? (
+                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ) : (
+                            <>
+                              <Gift className="w-4 h-4" />
+                              {EXIT_INTENT_COUPON
+                                ? `Aplicar cupón ${EXIT_INTENT_COUPON}`
+                                : "Recibir aviso"}
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {couponError && (
+                        <p className="text-xs text-red-600">{couponError}</p>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setVisible(false)}
+                        className="w-full text-center text-xs text-gray-400 hover:text-gray-600 transition-colors pt-1"
+                      >
+                        No, gracias — seguir comprando
+                      </button>
+                    </form>
+                  </>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+    </MotionConfig>
   )
 }

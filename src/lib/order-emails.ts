@@ -20,14 +20,31 @@ import type { OrderStatus } from "@/types"
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://resurte.me").replace(/\/$/, "")
 
-/** Estados que notifican por email al cliente (además del WhatsApp). */
-export const EMAILED_STATUSES: OrderStatus[] = ["confirmed", "out_for_delivery", "delivered"]
+/**
+ * Estados que notifican por email al cliente (además del WhatsApp).
+ *
+ * `preparing` está incluido a propósito: es un paso visible en el stepper del
+ * seguimiento y el WhatsApp ya lo avisa (workflows.ts). Dejarlo fuera hacía que
+ * el cliente viera avanzar la barra sin recibir correo, push ni campana —
+ * cuatro canales contando cosas distintas sobre el mismo pedido.
+ */
+export const EMAILED_STATUSES: OrderStatus[] = [
+  "confirmed",
+  "preparing",
+  "out_for_delivery",
+  "delivered",
+]
 
 const STATUS_EMAIL_CONTENT: Record<string, { emoji: string; label: string; headline: string }> = {
   confirmed: {
     emoji: "✅",
     label: "Confirmado",
     headline: "La tienda confirmó tu pedido y comenzará a prepararlo.",
+  },
+  preparing: {
+    emoji: "👨‍🍳",
+    label: "En preparación",
+    headline: "La tienda está preparando tu pedido. Te avisamos cuando salga a ruta.",
   },
   out_for_delivery: {
     emoji: "🛵",

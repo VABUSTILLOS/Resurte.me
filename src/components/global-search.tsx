@@ -287,7 +287,7 @@ export function GlobalSearch({ open, onClose, slug }: { open: boolean; onClose: 
             value={query}
             onChange={(e) => { setQuery(e.target.value); setSelectedIdx(0) }}
             placeholder="Buscar platillos, productos, inventario..."
-            className="flex-1 text-base text-gray-900 placeholder:text-gray-400 bg-transparent focus:outline-none"
+            className="flex-1 text-base text-gray-900 placeholder:text-gray-400 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           />
           <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-gray-100 text-[10px] font-medium text-gray-400 font-mono">
             esc

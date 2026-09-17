@@ -75,7 +75,7 @@ export default function CategorySection({
                             const val = parseFloat(e.target.value) || 0
                             onQtyChange(item, val, unit, mq?.price ?? item.price)
                           }}
-                          className={`w-20 text-right text-sm font-mono font-bold py-1 px-2 rounded-lg border focus:outline-none ${
+                          className={`w-20 text-right text-sm font-mono font-bold py-1 px-2 rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
                             isManual ? "border-amber-300 bg-amber-50 text-amber-800" : "border-transparent bg-gray-50 text-gray-900 hover:border-gray-200"
                           }`}
                           step={unit === "kg" || unit === "L" ? "0.01" : "1"}
@@ -88,7 +88,7 @@ export default function CategorySection({
                             const newUnit = e.target.value
                             onUnitChange(item, newUnit, parseFloat(needed.toFixed(2)), mq?.price ?? item.price)
                           }}
-                          className={`text-xs py-1 px-1 rounded-lg border focus:outline-none w-14 ${
+                          className={`text-xs py-1 px-1 rounded-lg border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 w-14 ${
                             isManual ? "border-amber-300 bg-amber-50 text-amber-800" : "border-gray-200 bg-gray-50 text-gray-500"
                           }`}
                           title={t("planificador.unitTitle")}

@@ -3990,7 +3990,7 @@ function AdminProductsContent() {
             <select
               value={tagFilter}
               onChange={(e) => updateFilters(() => setTagFilter(e.target.value))}
-              className="bg-transparent text-xs font-semibold text-gray-700 focus:outline-none"
+              className="bg-transparent text-xs font-semibold text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
               title="Etiquetas usadas por las colecciones de la tienda"
             >
               <option value="all">Todas las etiquetas</option>
@@ -4159,7 +4159,7 @@ function AdminProductsContent() {
               setSort({ key, dir: defaultProductSortDir(key) })
             }}
             title="Ordenar el listado por"
-            className="max-w-[9rem] bg-transparent text-xs font-semibold text-gray-600 focus:outline-none"
+            className="max-w-[9rem] bg-transparent text-xs font-semibold text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             {PRODUCT_SORT_KEYS.map((k) => (
               <option key={k} value={k}>

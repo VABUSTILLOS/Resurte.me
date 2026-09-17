@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, type ReactNode } from "react"
-import { AnimatePresence, motion, useDragControls } from "framer-motion"
+import { AnimatePresence, MotionConfig, motion, useDragControls } from "framer-motion"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { FOCUSABLE_SELECTOR, nextTrapFocus } from "@/lib/focus-trap"
@@ -63,51 +63,53 @@ export function BottomSheet({
   }, [open])
 
   return (
-    <AnimatePresence>
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black/40"
-            onClick={onClose}
-            aria-hidden="true"
-          />
-          <motion.div
-            ref={panelRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={ariaLabel}
-            aria-labelledby={ariaLabelledby}
-            tabIndex={-1}
-            initial={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.96 }}
-            animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1 }}
-            exit={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.96 }}
-            transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
-            drag={isMobile ? "y" : false}
-            dragListener={false}
-            dragControls={dragControls}
-            dragConstraints={{ top: 0 }}
-            dragElastic={{ top: 0, bottom: 0.5 }}
-            onDragEnd={(_, info) => {
-              if (info.offset.y > 80 || info.velocity.y > 500) onClose()
-            }}
-            className={`relative w-full ${maxWidthClass} bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[88vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] outline-none`}
-          >
-            {/* Handle de arrastre — solo móvil */}
-            <div
-              className="sm:hidden sticky top-0 z-10 flex justify-center pt-2 pb-1 bg-white rounded-t-2xl touch-none cursor-grab active:cursor-grabbing"
-              onPointerDown={(e) => dragControls.start(e)}
-              aria-hidden="true"
-            >
-              <span className="w-10 h-1 rounded-full bg-gray-300" />
+    <MotionConfig reducedMotion="user">
+        <AnimatePresence>
+          {open && (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="absolute inset-0 bg-black/40"
+                onClick={onClose}
+                aria-hidden="true"
+              />
+              <motion.div
+                ref={panelRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={ariaLabel}
+                aria-labelledby={ariaLabelledby}
+                tabIndex={-1}
+                initial={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.96 }}
+                animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1 }}
+                exit={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.96 }}
+                transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
+                drag={isMobile ? "y" : false}
+                dragListener={false}
+                dragControls={dragControls}
+                dragConstraints={{ top: 0 }}
+                dragElastic={{ top: 0, bottom: 0.5 }}
+                onDragEnd={(_, info) => {
+                  if (info.offset.y > 80 || info.velocity.y > 500) onClose()
+                }}
+                className={`relative w-full ${maxWidthClass} bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[88vh] overflow-y-auto pb-[env(safe-area-inset-bottom)] outline-none`}
+              >
+                {/* Handle de arrastre — solo móvil */}
+                <div
+                  className="sm:hidden sticky top-0 z-10 flex justify-center pt-2 pb-1 bg-white rounded-t-2xl touch-none cursor-grab active:cursor-grabbing"
+                  onPointerDown={(e) => dragControls.start(e)}
+                  aria-hidden="true"
+                >
+                  <span className="w-10 h-1 rounded-full bg-gray-300" />
+                </div>
+                {children}
+              </motion.div>
             </div>
-            {children}
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+          )}
+        </AnimatePresence>
+    </MotionConfig>
   )
 }

@@ -64,8 +64,9 @@ describe("estados que ameritan push", () => {
   })
 
   it("calla en los estados que no son hito", () => {
-    // "pending" es el estado de entrada: el cliente acaba de hacer el pedido.
-    for (const status of ["pending", "cancelled", "preparing", "ready", ""]) {
+    // "pending" es el estado de entrada: el cliente acaba de hacer el pedido y
+    // ya recibió el correo de confirmación. "cancelled" se comunica aparte.
+    for (const status of ["pending", "cancelled", "ready", ""]) {
       expect(isPushableOrderStatus(status)).toBe(false)
     }
   })

@@ -141,7 +141,7 @@ function RecipeIngredient({
       {open && matched && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-full left-0 mb-2 z-50 w-64 bg-white rounded-xl border border-[#ede8df] shadow-[0_16px_48px_rgba(0,0,0,0.12)] overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="absolute bottom-full left-0 mb-2 z-50 w-64 bg-white rounded-xl border border-[#ede8df] shadow-[0_16px_48px_rgba(0,0,0,0.12)] overflow-hidden duration-200">
             {/* Product image + info */}
             <div className="flex gap-3 p-3">
               <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-[#f7f4ef] shrink-0">

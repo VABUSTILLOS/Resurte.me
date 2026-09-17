@@ -129,12 +129,25 @@ describe("sendOrderStatusEmail", () => {
   beforeEach(() => vi.clearAllMocks())
 
   it("solo notifica los hitos logísticos", async () => {
-    expect(EMAILED_STATUSES).toEqual(["confirmed", "out_for_delivery", "delivered"])
+    // `preparing` es un hito: el stepper del seguimiento lo muestra y el
+    // WhatsApp ya lo avisa. Dejarlo fuera del correo era la inconsistencia.
+    expect(EMAILED_STATUSES).toEqual([
+      "confirmed",
+      "preparing",
+      "out_for_delivery",
+      "delivered",
+    ])
     serviceWith({})
     await sendOrderStatusEmail(42, "pending")
-    await sendOrderStatusEmail(42, "preparing")
     await sendOrderStatusEmail(42, "cancelled")
     expect(sendEmail).not.toHaveBeenCalled()
+  })
+
+  it("avisa el paso de preparación con su propio tipo", async () => {
+    const { inserts } = serviceWith({})
+    await sendOrderStatusEmail(42, "preparing")
+    expect(sendEmail).toHaveBeenCalledOnce()
+    expect(inserts[0]).toMatchObject({ email_type: "order_status_preparing" })
   })
 
   it("envía con tipo por estado y dedupe propio", async () => {
@@ -165,8 +178,16 @@ describe("sendOrderStatusEmail", () => {
 
   it("no manda push de un estado que no es hito", async () => {
     serviceWith({})
-    await sendOrderStatusEmail(42, "preparing")
+    await sendOrderStatusEmail(42, "pending")
     expect(vi.mocked(sendOrderStatusPush)).not.toHaveBeenCalled()
+  })
+
+  it("manda push del paso de preparación", async () => {
+    serviceWith({})
+    await sendOrderStatusEmail(42, "preparing")
+    expect(vi.mocked(sendOrderStatusPush)).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: 42, status: "preparing" })
+    )
   })
 
   it("sin usuario no hay push (el pedido de invitado no tiene a quién avisar)", async () => {

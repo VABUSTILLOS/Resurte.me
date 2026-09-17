@@ -41,7 +41,7 @@ const eslintConfig = [
     },
   },
   {
-    ignores: ["node_modules/**", ".next/**", ".vercel/**", "out/**", "build/**", "next-env.d.ts", "scripts/archive/**"],
+    ignores: ["node_modules/**", ".next/**", ".vercel/**", "out/**", "build/**", "next-env.d.ts", "scripts/archive/**", "test-results/**", "playwright-report/**", "blob-report/**"],
   },
 ];
 

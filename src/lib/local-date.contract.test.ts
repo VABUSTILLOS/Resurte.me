@@ -67,6 +67,12 @@ const UTC_TRUNCATION_ALLOWED: Allowance[] = [
     reason:
       "Nombre del CSV de cortes. Pendiente de migrar a dayKeyOf; el archivo está en vuelo en otra sesión y no se toca desde aquí para no pisar cambios.",
   },
+  {
+    path: "src/lib/supplier-admin.ts",
+    max: 1,
+    reason:
+      "validateListDate valida por round-trip: ISO_DATE_RE no puede comprobar el calendario (acepta 2026-02-30) y solo la fecha reconstruida en UTC lo rechaza. Es un validador de formato, no un día de negocio; migrarlo a dayKeyOf aceptaría el 30 de febrero.",
+  },
 ]
 
 function walkSources(dir: string, acc: string[] = []): string[] {

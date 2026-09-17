@@ -57,6 +57,7 @@ import {
 } from "@/lib/order-bulk"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import { orderCustomerLabel } from "@/lib/admin/order-selects"
+import { ProofSection } from "./proof-section"
 
 function formatAdminAddress(a: NonNullable<AdminOrder["address"]>): string {
   const parts = [
@@ -981,6 +982,13 @@ function AdminOrdersContent() {
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </select>
+                    {/* Evidencia faltante: avisa, no bloquea (00154). */}
+                    {order.status === "delivered" && !order.delivery_proof_path && (
+                      <span className="mt-1 flex items-center gap-1 text-[10px] font-medium text-amber-600">
+                        <AlertTriangle className="w-3 h-3" />
+                        Sin comprobante
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-3">
                     {order.source === "whatsapp" ? (
@@ -1172,6 +1180,14 @@ function AdminOrdersContent() {
                       `#${selectedOrder.driver_id}`}
                   </p>
                 )}
+
+              {/* Comprobante de entrega (migración 00154) */}
+              <ProofSection
+                orderId={selectedOrder.id}
+                proofPath={selectedOrder.delivery_proof_path ?? null}
+                status={selectedOrder.status}
+                onChanged={refresh}
+              />
 
               {/* Imprimir ticket */}
               <a

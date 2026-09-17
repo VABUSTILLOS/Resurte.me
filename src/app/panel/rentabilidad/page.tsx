@@ -583,7 +583,7 @@ export default function RentabilidadPage() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="text-xs font-semibold text-gray-700 bg-transparent focus:outline-none"
+            className="text-xs font-semibold text-gray-700 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
             <option value="name">{t("rentabilidad.sortName")}</option>
             <option value="margin">{t("rentabilidad.sortMargin")}</option>
@@ -596,7 +596,7 @@ export default function RentabilidadPage() {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="text-xs font-semibold text-gray-700 bg-transparent focus:outline-none"
+            className="text-xs font-semibold text-gray-700 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             aria-label={t("rentabilidad.categoryFilterLabel")}
           >
             <option value="all">{t("rentabilidad.categoryAll", { count: dishes.length })}</option>

@@ -16,11 +16,12 @@
  *
  * ## Columnas opcionales
  *
- * `coupon_code` y `driver_id` se leen como best-effort: si el esquema
- * desplegado aún no las tiene, PostgREST responde `42703` y el consumidor
- * reintenta sin ellas en lugar de romper la superficie (ver
+ * `coupon_code`, `driver_id` y `delivery_proof_path` se leen como best-effort:
+ * si el esquema desplegado aún no las tiene, PostgREST responde `42703` y el
+ * consumidor reintenta sin ellas en lugar de romper la superficie (ver
  * `missingOptionalOrderColumn`). El esquema de referencia las define en
- * `supabase/migrations/` (driver_id en 00076, coupon_code en 00114).
+ * `supabase/migrations/` (driver_id en 00076, coupon_code en 00114,
+ * delivery_proof_path en 00154).
  */
 
 /** FK que desambigua el embed `orders → profiles` (cliente, no vendedor). */
@@ -36,7 +37,11 @@ export const ORDERS_ADDRESS_COLUMNS =
  * error real de esquema (una columna obligatoria ausente) se enmascare como
  * una degradación silenciosa.
  */
-export const ADMIN_ORDER_OPTIONAL_COLUMNS = ["coupon_code", "driver_id"] as const
+export const ADMIN_ORDER_OPTIONAL_COLUMNS = [
+  "coupon_code",
+  "driver_id",
+  "delivery_proof_path",
+] as const
 
 export type AdminOrderOptionalColumn = (typeof ADMIN_ORDER_OPTIONAL_COLUMNS)[number]
 
@@ -51,16 +56,23 @@ export type AdminOrdersSelectOptions = {
   coupon?: boolean
   /** Incluir `driver_id` (omitir cuando la columna no existe en el esquema). */
   driver?: boolean
+  /** Incluir `delivery_proof_path` (omitir cuando la columna no existe). */
+  proof?: boolean
 }
 
 /**
  * SELECT de la lista de pedidos del panel (`getAdminOrders`).
  * Solo las columnas que el panel mapea: la tabla `orders` es ancha (utm,
  * tokens, ids de Stripe, etc. no se usan aquí).
+ *
+ * De `delivery_proof_*` solo viaja la ruta: el panel necesita saber si hay
+ * comprobante (y de qué objeto borrarlo), pero la fecha y la nota se piden
+ * al abrirlo por `/api/orders/[id]/proof`, junto con la URL firmada.
  */
 export function buildAdminOrdersSelect({
   coupon = true,
   driver = true,
+  proof = true,
 }: AdminOrdersSelectOptions = {}): string {
   return [
     "id",
@@ -78,6 +90,7 @@ export function buildAdminOrdersSelect({
     `profiles!${ORDERS_PROFILE_FK}(full_name)`,
     `addresses(${ORDERS_ADDRESS_COLUMNS})`,
     ...(driver ? ["driver_id"] : []),
+    ...(proof ? ["delivery_proof_path"] : []),
   ].join(", ")
 }
 
@@ -169,6 +182,8 @@ export interface AdminOrderRow {
   created_at: string
   /** Ausente cuando la columna no existe en el esquema desplegado (00076). */
   driver_id?: number | null
+  /** Ausente cuando la columna no existe en el esquema desplegado (00154). */
+  delivery_proof_path?: string | null
   profiles: { full_name: string | null } | { full_name: string | null }[] | null
   addresses: AdminOrderAddressRow | AdminOrderAddressRow[] | null
 }

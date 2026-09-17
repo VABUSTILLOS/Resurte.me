@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Image from "next/image"
-import { AnimatePresence, motion } from "framer-motion"
+import { AnimatePresence, MotionConfig, motion } from "framer-motion"
 import { Sparkles, Check, Plus } from "lucide-react"
 import { MAX_BUMPS } from "@/lib/checkout-config"
 import type { OrderBump } from "@/lib/order-bumps"
@@ -330,113 +330,115 @@ export function BumpCards({
   }
 
   return (
-    <div className="space-y-3" role="group" aria-label="Artículos especiales">
-      <div className="flex items-center gap-1.5">
-        <Sparkles className="w-4 h-4 text-[#B87A3A]" />
-        <p className="text-xs font-semibold text-[#B87A3A] uppercase tracking-wide">
-          {headlineVariant === "urgencia"
-            ? "Antes de pagar, ¿sumamos algo?"
-            : "Agrega a tu pedido"}
-        </p>
-      </div>
-      <AnimatePresence>
-        {visible.map((bump) => {
-          const isSelected = selected.some((s) => s.ruleId === bump.ruleId)
-          return (
-            <motion.div
-              key={bump.ruleId}
-              layout
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 380, damping: 30 }}
-              whileTap={{ scale: 0.99 }}
-              className="w-full"
-            >
-              <button
-                type="button"
-                onClick={() => toggle(bump)}
-                aria-pressed={revealNext ? undefined : isSelected}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-colors ${
-                  isSelected
-                    ? "border-brand-500 bg-brand-50"
-                    : "border-gray-200 bg-white hover:border-brand-200"
-                }`}
-              >
-                <div className="w-14 h-14 rounded-lg bg-[#F7F5F0] flex items-center justify-center shrink-0 overflow-hidden">
-                  {bump.product.image_url ? (
-                    <Image
-                      src={bump.product.image_url}
-                      alt={bump.product.name}
-                      width={56}
-                      height={56}
-                      className="w-full h-full object-contain p-1"
-                    />
-                  ) : (
-                    <Sparkles className="w-5 h-5 text-[#C7C8CD]" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start gap-1.5">
-                    {bump.badgeLabel ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">
-                        <Sparkles className="w-3 h-3" />
-                        {bump.badgeLabel}
-                      </span>
-                    ) : bump.discount_pct > 0 ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-full px-2 py-0.5 shrink-0">
-                        <Check className="w-3 h-3" />
-                        Ahorra {Math.round(bump.discount_pct * 100)}% al agregar ahora
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="text-sm font-semibold text-gray-900 leading-tight mt-1">
-                    {bump.product.name}
-                  </p>
-                  <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">
-                    {bump.description}
-                  </p>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className="text-sm font-bold text-brand-700">
-                      ${bump.price.toFixed(2)}
-                    </span>
-                    {bump.original_price > bump.price && (
-                      <span className="text-xs text-gray-400 line-through">
-                        ${bump.original_price.toFixed(2)}
-                      </span>
-                    )}
-                    {bump.discount_pct > 0 && (
-                      <span className="text-[10px] font-semibold text-white bg-brand-600 px-1.5 py-0.5 rounded">
-                        -{Math.round(bump.discount_pct * 100)}%
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                    isSelected
-                      ? "border-brand-600 bg-brand-600"
-                      : revealNext
-                        ? "border-brand-300 text-brand-600"
-                        : "border-gray-300"
-                  }`}
+    <MotionConfig reducedMotion="user">
+        <div className="space-y-3" role="group" aria-label="Artículos especiales">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-[#B87A3A]" />
+            <p className="text-xs font-semibold text-[#B87A3A] uppercase tracking-wide">
+              {headlineVariant === "urgencia"
+                ? "Antes de pagar, ¿sumamos algo?"
+                : "Agrega a tu pedido"}
+            </p>
+          </div>
+          <AnimatePresence>
+            {visible.map((bump) => {
+              const isSelected = selected.some((s) => s.ruleId === bump.ruleId)
+              return (
+                <motion.div
+                  key={bump.ruleId}
+                  layout
+                  initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  whileTap={{ scale: 0.99 }}
+                  className="w-full"
                 >
-                  {isSelected ? (
-                    <Check className="w-4 h-4 text-white" />
-                  ) : revealNext ? (
-                    <Plus className="w-4 h-4" />
-                  ) : null}
-                </div>
-              </button>
-            </motion.div>
-          )
-        })}
-      </AnimatePresence>
-      <p className="text-[11px] text-gray-400">
-        {revealNext
-          ? "Elige una oferta: entra a tu pedido y aparece la siguiente."
-          : `Hasta ${MAX_BUMPS} artículos especiales por pedido.`}
-      </p>
-    </div>
+                  <button
+                    type="button"
+                    onClick={() => toggle(bump)}
+                    aria-pressed={revealNext ? undefined : isSelected}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-colors ${
+                      isSelected
+                        ? "border-brand-500 bg-brand-50"
+                        : "border-gray-200 bg-white hover:border-brand-200"
+                    }`}
+                  >
+                    <div className="w-14 h-14 rounded-lg bg-[#F7F5F0] flex items-center justify-center shrink-0 overflow-hidden">
+                      {bump.product.image_url ? (
+                        <Image
+                          src={bump.product.image_url}
+                          alt={bump.product.name}
+                          width={56}
+                          height={56}
+                          className="w-full h-full object-contain p-1"
+                        />
+                      ) : (
+                        <Sparkles className="w-5 h-5 text-[#C7C8CD]" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-1.5">
+                        {bump.badgeLabel ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">
+                            <Sparkles className="w-3 h-3" />
+                            {bump.badgeLabel}
+                          </span>
+                        ) : bump.discount_pct > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-full px-2 py-0.5 shrink-0">
+                            <Check className="w-3 h-3" />
+                            Ahorra {Math.round(bump.discount_pct * 100)}% al agregar ahora
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900 leading-tight mt-1">
+                        {bump.product.name}
+                      </p>
+                      <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">
+                        {bump.description}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-sm font-bold text-brand-700">
+                          ${bump.price.toFixed(2)}
+                        </span>
+                        {bump.original_price > bump.price && (
+                          <span className="text-xs text-gray-400 line-through">
+                            ${bump.original_price.toFixed(2)}
+                          </span>
+                        )}
+                        {bump.discount_pct > 0 && (
+                          <span className="text-[10px] font-semibold text-white bg-brand-600 px-1.5 py-0.5 rounded">
+                            -{Math.round(bump.discount_pct * 100)}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div
+                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                        isSelected
+                          ? "border-brand-600 bg-brand-600"
+                          : revealNext
+                            ? "border-brand-300 text-brand-600"
+                            : "border-gray-300"
+                      }`}
+                    >
+                      {isSelected ? (
+                        <Check className="w-4 h-4 text-white" />
+                      ) : revealNext ? (
+                        <Plus className="w-4 h-4" />
+                      ) : null}
+                    </div>
+                  </button>
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
+          <p className="text-[11px] text-gray-400">
+            {revealNext
+              ? "Elige una oferta: entra a tu pedido y aparece la siguiente."
+              : `Hasta ${MAX_BUMPS} artículos especiales por pedido.`}
+          </p>
+        </div>
+    </MotionConfig>
   )
 }

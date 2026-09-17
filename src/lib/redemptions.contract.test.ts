@@ -133,7 +133,7 @@ describe("cobertura del vocabulario", () => {
   })
 
   it("ningún estado apunta a uno inexistente", () => {
-    for (const [from, targets] of Object.entries(REDEMPTION_TRANSITIONS)) {
+    for (const targets of Object.values(REDEMPTION_TRANSITIONS)) {
       for (const to of targets as RedemptionStatus[]) {
         expect(REDEMPTION_STATUSES).toContain(to)
       }

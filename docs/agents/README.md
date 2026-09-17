@@ -39,7 +39,16 @@ requieren revisar todos los playbooks que dependen de esa superficie.
    (patrón `body.cart-bar-active`, `body.has-bottom-tab`, `body.has-panel-bottom-nav`,
    `body.cookie-consent-visible`, `body.has-sticky-atc`).
 4. **Reduced motion**: toda animación nueva entra en el bloque
-   `@media (prefers-reduced-motion: reduce)` de `globals.css`.
+   `@media (prefers-reduced-motion: reduce)` de `globals.css`. El bloque cubre
+   **CSS**, no JavaScript: una animación dirigida por `framer-motion` esquiva el
+   bloque entero y necesita `<MotionConfig reducedMotion="user">` envolviendo el
+   subárbol (patrón en `src/app/recompensas/page.tsx`). Para los valores
+   arbitrarios (`animate-[fadeUp_0.15s_ease-out]`) no hay nombre que listar, así
+   que el bloque lleva un `[class*="animate-["]` de captura. La guardia es
+   `npx vitest run src/lib/a11y-static.contract.test.ts` (R5 para clases CSS, R6
+   para `framer-motion`); el bloque existe desde antes, pero hasta la Ronda 13
+   nadie medía qué clases se usaban de verdad contra las que estaban listadas, y
+   `animate-pulse`/`animate-ping`/los `animate-[…]` se habían escapado.
 5. **Verificación mínima antes de commit**: `npm run verify` —que encadena
    `npm run typecheck`, `npm run lint`, `npm test` y `npm run knip`— más
    `npm run build`, que se deja aparte por latencia. **Son los mismos scripts
@@ -206,6 +215,58 @@ requieren revisar todos los playbooks que dependen de esa superficie.
      excepción: escribe en `admin_audit_log` (`:204`, `:214`) **y** en
      `notifications` (`:279`, `:287`) a propósito — libro de admin y espejo del
      cliente son audiencias distintas.
+
+15. **El ciclo de vida de un canje lo mueve `advance_redemption()` y nadie más.**
+   Un canje gasta créditos reales, así que el estado y el dinero tienen que
+   moverse juntos o no moverse. Reglas:
+   * **Ninguna otra función escribe `redemptions.status`** (guard de `00151`) y
+     **ninguna ruta lo hace con un `update` directo**: todas pasan por
+     `advanceRedemption()`. Un `update` suelto se saltaría la bitácora, el
+     reembolso y las transiciones válidas a la vez.
+   * `requested → {in_progress, cancelled}`, `in_progress → {delivered, cancelled}`,
+     `delivered` y `cancelled` son terminales. Un estado terminal responde **409**
+     antes de tocar el saldo, no después.
+   * El reembolso es **idempotente por `refunded_at IS NULL`**: repetir la
+     cancelación no devuelve los créditos dos veces. `changed = false` en la salida
+     significa "ya estaba así" y la interfaz lo dice así; `ok = true` con
+     `changed = false` **no** es un éxito que se pueda anunciar.
+   * `advance_redemption` es `SECURITY DEFINER`, `search_path = ''` y
+     **service_role-only**; recibe el `id` por parámetro y **no comprueba dueño**.
+     Por eso toda ruta de cliente verifica la propiedad **en el predicado**
+     (`.eq("id", …).eq("user_id", …)`), no después de leer.
+   * El brief del cliente se valida **antes** de debitar: un dato obligatorio que
+     se valida después del cobro no es obligatorio. Guardarlo es best-effort —un
+     fallo al persistirlo no revierte el canje— porque el brief es contexto y el
+     débito es el hecho.
+   * `src/lib/redemptions.contract.test.ts` compara la máquina de estados de
+     TypeScript contra el SQL de `00152` (matriz, vocabulario, bloque de
+     reembolso y ACL) y **falla si dejan de coincidir**. Si cambias una transición,
+     cambia las dos o la prueba te detiene.
+   * Los plazos (`reward_services.sla_days`) se anuncian **antes** de la compra.
+     No existe devolución automática por incumplimiento de SLA: no prometerla.
+
+16. **Un artefacto de bucket privado se guarda como ruta, se sube antes de la
+   transición que lo referencia, y su fallo nunca bloquea esa transición.**
+   Aplica a los comprobantes de entrega del marketplace (`orders.delivery_proof_*`,
+   `00154`) y es el mismo criterio del comprobante de FoodOS.
+   * Se persiste la **ruta** del objeto, jamás una URL firmada: una URL caduca y
+     quedaría guardada muerta. La firma es un acto de lectura
+     (`createSignedUrl`, 3600 s) y sólo la hace una ruta de servidor.
+   * La foto **respalda, no autoriza**: subirla no cambia `orders.status` y no es
+     requisito para marcar `delivered`. Si bloqueara el cierre, se subiría
+     cualquier cosa con tal de desbloquearse. Un pedido `cancelled` sí rechaza el
+     comprobante con **409** — aceptarlo sería una contradicción.
+   * Al reemplazar, el objeto anterior se borra **después** de que la base apunte
+     al nuevo; si el `update` falla, se borra el objeto recién subido, no el
+     vigente. Un borrado a ciegas nunca toca una ruta que no sea del propio
+     espacio de nombres (`isMarketplaceProofPath`).
+   * La coherencia la impone la base: o las tres columnas son `NULL`, o hay ruta
+     **y** fecha. Una nota sin foto no significa nada.
+   * El comprobante es visible para el admin y para el cliente por el
+     *capability token* del pedido (`?t=<restore_token>`), además de por sesión de
+     dueño o de admin. La ruta de lectura responde `404` genérico, limita por IP
+     y nunca devuelve la ruta del objeto.
+
 
 ## Sin agente asignado: cuenta y autenticación
 

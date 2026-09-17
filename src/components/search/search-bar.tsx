@@ -79,7 +79,7 @@ export function SearchBar({
   return (
     <form onSubmit={handleSubmit} role="search" aria-label="Buscar en el catálogo" className={`relative ${className}`}>
       <div
-        className={`flex items-center bg-white border rounded-xl transition-all ${
+        className={`flex items-center bg-white border rounded-xl transition-all focus-within:border-[#0E7A0E] focus-within:ring-2 focus-within:ring-[#0E7A0E]/10 ${
           focused
             ? "border-[#0E7A0E] ring-2 ring-[#0E7A0E]/10 shadow-[0_0_0_3px_rgba(16,137,16,0.06)]"
             : "border-[#e0dbd2] hover:border-[#c0bab0] shadow-sm"

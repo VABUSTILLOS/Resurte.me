@@ -574,10 +574,20 @@ input.marquee-input:placeholder-shown:not(:focus) + .marquee-placeholder {
   .product-card-img-swap .product-card-img-secondary,
   .marquee-placeholder,
   .reading-progress-fill,
-  .animate-spin {
+  .animate-spin,
+  .animate-pulse,
+  .animate-ping {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* Los valores arbitrarios (`animate-[fadeUp_0.15s_ease-out]`) no tienen un
+     nombre predecible que listar, así que se cubren por atributo. Sin esto,
+     un `animate-[...]` esquiva el bloque entero y sigue animando. */
+  [class*="animate-["] {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 
   .reveal-hidden,

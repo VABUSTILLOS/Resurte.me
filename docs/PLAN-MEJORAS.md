@@ -8,7 +8,12 @@
 > escrituras estaban cubiertas por pruebas cuando ninguna tenía consumidor—. El
 > trabajo real sale de **deuda medida con herramientas** (ver la Ronda 3), no de
 > la prosa de la ronda anterior. Si aparece backlog nuevo, se declara al final de
-> su sección. Estado tras la Ronda 11: **no queda ninguna fila 🔜**.
+> su sección. Estado tras la Ronda 13: las filas abiertas son las **cuatro que la
+> propia ronda 13 declaró al medir** (A14–A17); ninguna de las rondas 12 y 13
+> salió del backlog —la 12 encontró un defecto vivo (el enum `payment_status`
+> declaraba dos valores que la base no tenía) y la 13 midió el backlog heredado y
+> lo **desmintió** (decía "42 de 61 archivos con patrones de foco" donde hay
+> 11)—, que son las otras dos fuentes legítimas de trabajo.
 >
 > Convenciones: ✅ implementada · 🔜 backlog priorizado.
 
@@ -786,10 +791,104 @@ nuevos** (29 de `crm-enrollments`, 7 de `crm-writers`, 8 de respuestas rápidas)
 `npm run build` → 0 · `npx playwright test e2e/admin-leads.spec.ts` → **34
 passed**.
 
-**Fuera de alcance, declarado**: los 42 de 61 archivos de `src/app/admin/**` que
-arrastran patrones de la familia B36 (contraste y foco) siguen sin tocar. No
-entraron en esta ronda porque el foco elegido era la mitad escrita del CRM, y
-mezclar las dos cosas habría hecho irrevisable el diff.
+**Fuera de alcance, declarado**: la deuda de **contraste** de `src/app/admin/**`
+(B36/B37) sigue sin tocar. La frase que estaba aquí —"los 42 de 61 archivos de
+`src/app/admin/**` que arrastran patrones de la familia B36 (contraste y foco)"—
+**se midió en la Ronda 13 y era falsa en la mitad que hablaba de foco**: era un
+número de contraste extrapolado al foco sin contarlo. Contados con el AST sobre
+los 391 `.tsx` del perímetro, los controles que pierden el indicador de foco son
+**12 en total, 11 míos**, y no 42 de 61 archivos. El contraste sí es de esa
+magnitud; el foco nunca lo fue.
+
+### Ronda 12 — El enum que la guardia no miraba
+
+La ronda anterior cerró el backlog escrito. Esta no ejecutó backlog: encontró un
+**defecto vivo en producción** que ninguna prueba del repositorio podía ver, y de
+paso reparó el historial de migraciones que lo había estado escondiendo.
+
+**El desfase.** `orders.payment_status` es un enum de Postgres. Las migraciones lo
+crearon con 4 valores (`00001`) y `00135` añadió dos (`amount_mismatch`,
+`disputed`). El código, en cambio, declaraba **ocho** en `src/lib/order-filters.ts`:
+los seis reales más `processing` y `expired`, que **nunca existieron en la base**.
+Un enum de Postgres rechaza con `22P02` cualquier comparación contra una etiqueta
+inexistente, y ese rechazo no degrada: **aborta la sentencia entera**.
+
+**Cuatro consecuencias medidas**
+
+1. **El cron diario de reconciliación fallaba completo.** `nonTerminalFilter()`
+   (`src/lib/reconcile-payments.ts:88`) además pasaba `canceled` a
+   `.not("payment_status", "in", …)` — y `canceled` tampoco es del enum: es un
+   estado de *PaymentIntent* de Stripe, no de `orders`. Los pares de errores de
+   producción `[reconcile-payments: orders fetch error:]` +
+   `[[CRON-DAILY] reconcile-payments error:]` iban del 13 al 17 de septiembre:
+   durante esos días **ningún pedido se reconcilió**.
+2. **`handlePaymentIntentProcessing` fallaba en silencio.** Escribía `'processing'`,
+   Postgres lo rechazaba y el error no se leía.
+3. **`order-tracking.tsx` tenía una rama inalcanzable**: el `case "processing"` no
+   podía dispararse porque ese valor no podía estar en la base.
+4. **`/admin/leads` estaba roto**: dos `select` pedían `profiles.email`, columna que
+   no existe (`profiles` tiene 13 columnas y el correo vive en `auth.users`), así que
+   la lista de vendedores devolvía `42703`.
+
+**Por qué la guardia no lo vio.** `order-filters.test.ts` comparaba
+`ORDER_PAYMENT_STATUS_VALUES` con `Object.keys(PAYMENT_STATUS_LABEL)`. Las dos son
+constantes de TypeScript del mismo módulo: **se mueven juntas**. La prueba no podía
+fallar mientras alguien editara ambas, y no miraba la base en absoluto.
+
+**Fases**
+
+| # | Fase | Estado |
+|---|---|---|
+| A1 | **Migración `00153`**: `ALTER TYPE payment_status ADD VALUE IF NOT EXISTS` para `processing` y `expired`. Aditiva, idempotente, y **no** añade `canceled` — el webhook ya mapea el `canceled` de Stripe a `failed` (`stripe-webhook-handlers.ts:303-327`), que es la prueba de que ese valor no pertenece al dominio de `orders` | ✅ |
+| A2 | **`reconcile-payments.ts`**: `canceled` fuera de `TERMINAL_STATUSES`, con el comentario que lo explica. Las líneas 137/227 (`case "canceled":`) **no** se tocan: ahí el vocabulario sí es el de Stripe | ✅ |
+| A3 | **`stripe-webhook-handlers.ts`**: `handlePaymentIntentProcessing` lee y registra `ordersError` y `foodosError`. No relanza a propósito — el cron reintenta los `pending` | ✅ |
+| A4 | **`admin/actions.ts`**: los dos `select` de `profiles.email` (`getAdminSellers`, `loadSellerRefs`) leen el correo de `auth.admin.listUsers`, siguiendo el patrón que ya usaban `admin/usuarios/actions.ts:41` y `lib/order-emails.ts:85` | ✅ |
+| A5 | **`src/lib/order-enum.contract.test.ts`**: la guardia que faltaba. Reconstruye el enum **desde `supabase/migrations/*.sql`** (el `CREATE TYPE` de `00001` más cada `ALTER TYPE … ADD VALUE`) y lo compara con `ORDER_PAYMENT_STATUS_VALUES`; además exige que `TERMINAL_STATUSES` sea subconjunto del enum | ✅ |
+| B1 | **Reparación del ledger**: 12 filas con versión-timestamp renumeradas a `00141`–`00152`, mapeadas por nombre, posición y md5 insensible a espacios | ✅ |
+| B2 | **La fila 13** (`20260917180922_admin_role_trigger_hardening`) eliminada: su cuerpo entero era un `REVOKE` que ya estaba byte a byte en `00145:90`, con su efecto vivo en la base | ✅ |
+| B3 | **Verificación**: `db push --dry-run` → `upToDate: true`; `migration list --linked` → `local == remote`; enum vivo → **8 valores** | ✅ |
+| B4 | **Convención anti-desfase** en `docs/OPS.md`: las migraciones numeradas se aplican por CLI, nunca por `apply_migration` del MCP, que registra una versión-timestamp | ✅ |
+
+**La prueba negativa, dos veces.** Una guardia nueva no vale nada hasta que se la ve
+fallar. Se hizo dos veces, restaurando el archivo byte a byte después (md5
+verificado):
+
+- Se comentó el `ALTER TYPE … 'expired'` de `00153` → el contrato **falló 2 de 4**,
+  con el diff `+["expired"]`.
+- Se reinyectó `"canceled"` en `TERMINAL_STATUSES` → el contrato **falló 1 de 4**,
+  con el diff `+["canceled"]`: exactamente el defecto de producción.
+
+**El techo declarado de la guardia.** Es un barrido de texto, no un parser de SQL, y
+solo ve los archivos que están en el repositorio. Una migración aplicada fuera de
+banda —por MCP `apply_migration`— seguiría siendo invisible. Esa limitación está
+escrita en el encabezado del propio contrato y es la razón de ser de B4: el contrato
+y la convención se necesitan mutuamente.
+
+**Colisión de rondas, declarada.** Mientras esta ronda se planificaba, el agente que
+trabaja en CRM escribió **su propia Ronda 11** y cerró las tres filas que esta ronda
+pensaba atender (`C12`, `BL13`, `CI13`). No se duplicó el trabajo: `BL13` se
+reverificó por medición independiente —`heading-slug.test.ts` en **1,69 s** aislado,
+11/11 en verde— y coincide con su conclusión. Esta ronda renumera a **12** y su
+Front C queda subsumido.
+
+**Verificación de la ronda**: `npx vitest run` → **4966 passed / 0 failed (299
+archivos)** · `npm run lint` → 0 · contrato + `order-filters` → **29/29** ·
+`npx supabase db push --dry-run` → `{"upToDate":true}` · `migration list --linked` →
+**153 filas, `local == remote` en todas, cero versiones sin cinco dígitos** ·
+`pg_enum` de `payment_status` → **8 valores**.
+
+**Nota sobre `tsc` y el build.** La ronda deja `npx tsc --noEmit` y `npm run build`
+en rojo por **3 errores, todos en `src/lib/redemption-actions.test.ts`**, un archivo
+**sin seguimiento y ajeno** que existe solo en el árbol de trabajo del agente
+concurrente (el patrón `mock.calls[0][1]` que `strict` marca como posiblemente
+indefinido). Los archivos de esta ronda pasan limpios y el contrato nuevo no
+introduce errores de tipo; se declara aquí para que el rojo no se atribuya a esta
+ronda.
+
+**Lección.** Una guardia que compara el código consigo mismo no es una guardia: hay
+que enfrentarla a la **fuente de verdad externa**. Y un esquema aplicado por una vía
+que no deja rastro en el repositorio no lo ve ninguna prueba, por muy bien escrita
+que esté.
 
 ## 9. Blog
 
@@ -968,6 +1067,117 @@ es que ahora `src/lib/crm-writers.contract.test.ts` impide que la entrada vuelva
 | # | Fase | Estado |
 |---|---|---|
 | CI13 | ✅ **Cerrada en la Ronda 11, y mejor de lo que pedía la fila**: la fila pedía recortar la entrada de `["exports", "types"]` a `["exports"]`. Se retiró **entera**, porque la premisa de las dos categorías ya no era cierta. `LeadTimelineSource` se borró (`actions.ts` dejó de tener el símbolo huérfano) y las cinco escrituras huérfanas ganaron interfaz, así que la `exports` tampoco tapaba nada. Medido, no supuesto: con la entrada retirada de `package.json`, `npm run knip` sale **exit 0 sin un solo hallazgo**. `src/lib/knip-config.contract.test.ts` pierde la justificación —el ratchet por igualdad exacta obliga a editar el test, que es para lo que existe— y gana una aserción nueva en `src/lib/crm-writers.contract.test.ts` que impide que `src/app/admin/actions.ts` **vuelva** a la allowlist | ✅ |
+
+### Ronda 13 — La accesibilidad que axe no puede ver
+
+La ronda anterior encontró un defecto que ninguna prueba podía ver. Esta buscó
+**una clase entera de defectos que ningún gate miraba**, y el punto de partida fue
+leer el gate que ya existía: `e2e/a11y.spec.ts` corre axe sobre **8 rutas
+públicas** (`/`, `/comer`, `/busqueda`, `/ciudad`, el storefront, `/recetas`,
+`/compartir`, `/rastreo`). `/admin/**` exige sesión de admin y `/panel/**` exige
+sesión de comercio, así que **axe nunca los ha mirado**: 391 archivos `.tsx`
+viven fuera del alcance de la única prueba de accesibilidad del repositorio. Eso
+no es una opinión sobre la calidad del código, es un agujero en la cobertura, y
+es exactamente el mismo agujero que B36 ya había explotado una vez.
+
+**El backlog declarado se midió antes de tocarlo, y esta vez salió mal parado.**
+La frase heredada —"los 42 de 61 archivos de `src/app/admin/**` que arrastran
+patrones de la familia B36 (contraste y foco)"— mezcla dos deudas con tamaños
+incomparables. Contado con el AST: **12 elementos en todo el perímetro** pierden
+el indicador de foco (11 míos, 1 ajeno), no 42 archivos. La deuda de contraste sí
+es sistémica; la de foco era un puñado. La fila se corrigió en § 8 y el número
+queda escrito aquí para que no vuelva a extrapolarse.
+
+**Por qué no bastaba un `grep`.** El primer barrido fue de línea y dio resultados
+que no resistieron la comprobación: `focus:outline-none` aparecía en **251
+instancias / 78 archivos**, pero un `<tag …>` de regex solo casaba **4** de esas
+251 (las listas de atributos multilínea rompen el patrón), y el AST encontró
+**12** elementos. `img` sin `alt` daba **9** por línea —casaba `<img` dentro de
+comentarios y cadenas— y **0** por AST. El detector de diálogos sin nombre daba
+**4** falsos positivos; el preciso, **0 de 17**. La lección se queda: para hechos
+sobre atributos JSX en este repositorio, **el compilador de TypeScript o nada**.
+
+**Los seis defectos medidos, y qué se hizo con cada uno:**
+
+| Regla | Hallazgo medido | Acción |
+|---|---|---|
+| R1 foco | **12** controles con `focus:outline-none` y sin indicador sustituto (11 del perímetro) | 9 elementos con anillo propio; 2 que ya tenían anillo en el contenedor, no se tocaron |
+| R2 diálogos | 17 diálogos, **0** sin nombre accesible | nada: el hallazgo previo era falso |
+| R3 `img` sin `alt` | **0** | nada |
+| R4 `tabIndex` positivo | **0** | nada |
+| R5 reduced motion | **4** clases usadas fuera del bloque (`animate-pulse`, `animate-ping`, `animate-[fadeUp_0.15s_ease-out]`, `animate-[slideIn_0.25s_ease-out]`) + 3 clases **muertas** | 2 al bloque, 1 regla de captura, 3 borradas |
+| R6 `framer-motion` | **28** archivos importan la librería; **1** declara `MotionConfig` | 8 míos envueltos; 20 ajenos declarados |
+
+**El detalle de R1 que casi produce un arreglo peor que el defecto.** Dos de los
+11 sitios eran las cajas de búsqueda, cuyo **contenedor** ya pinta
+`focus-within:ring-2`: el indicador existe y es visible, solo que lo pinta el
+padre. Añadir un anillo al input habría dibujado **dos** anillos en la misma
+píldora. En vez de eso se enseñó a R1 que un contenedor que reacciona a
+`focus-within` con una señal visible —anillo, borde, contorno— es un indicador
+válido; `focus-within:outline-none` **no** cuenta, porque quita en lugar de
+pintar. La regla no queda vacua: en los 391 archivos hay **3** ocurrencias de
+`focus-within:`, todas envoltorios estrechos. Y la lección es la inversa de la
+habitual: **el detector estaba mal, no el código**, y el que estaba mal era el
+detector que yo acababa de escribir.
+
+**El detalle de R5: el bloque existía desde antes y no cubría lo que se usaba.**
+`globals.css` tiene un `@media (prefers-reduced-motion: reduce)` con una lista
+escrita a mano. Nadie había comparado esa lista contra las clases realmente
+usadas. Al hacerlo aparecieron cuatro huecos y tres clases que **no existen**:
+`animate-in`, `fade-in` y `slide-in-from-bottom-2` en `recipe-slider.tsx:144` son
+de `tailwindcss-animate`, que **no está instalado** ni registrado en Tailwind v4
+—llevaban ahí sin hacer nada—. Para los valores arbitrarios no hay nombre que
+listar, así que el bloque gana un `[class*="animate-["]` de captura; sin él,
+`animate-[fadeUp_0.15s_ease-out]` esquiva el bloque entero y sigue animando.
+
+**El detalle de R6: el bloque de CSS no ve JavaScript.** Las 28 importaciones de
+`framer-motion` animan desde JS, así que la preferencia del sistema no las
+alcanza: necesitan `<MotionConfig reducedMotion="user">`. El patrón ya existía en
+el repositorio —una sola vez, en `src/app/recompensas/page.tsx:212`, de otra
+sesión— y no estaba escrito en ningún sitio como convención. Se envolvieron los 8
+archivos del perímetro; los 20 ajenos quedan declarados como backlog.
+
+**Lo que sostiene la ronda es un contrato que se prueba a sí mismo primero.**
+`src/lib/a11y-static.contract.test.ts` (20 pruebas: 13 de detector + 7 de
+perímetro) no es axe y no lo pretende: lee el árbol de sintaxis y afirma hechos
+sobre atributos. Su estructura responde a un riesgo concreto —un detector roto
+que no encuentra nada también devuelve cero hallazgos, es decir **un ✅ mentiroso**
+— así que los 13 primeros casos corren sobre fixtures sintéticos y solo después
+se mira el perímetro. No es ceremonia: **los autotests encontraron dos defectos
+reales en el propio contrato**. El primero, `textos()` no manejaba
+`ts.isNumericLiteral`, así que `tabIndex={2}` no producía texto y R4 informaba
+"nada" en silencio; el mismo defecto en R1 habría escondido hallazgos reales
+mientras el gate decía verde. El segundo, la aserción de perímetro usaba
+`includes("panel/foodos")` para excluir un directorio ajeno, y eso es cierto para
+`src/components/panel/foodos/*`, que **sí** pertenece al perímetro: el `includes`
+fallaba con el recorrido correcto. Se cambió a `startsWith`, que es la misma
+lógica que usa la exclusión.
+
+**La jerarquía que decide si esto son defectos de verdad.** `globals.css:598`
+declara un `:focus-visible { outline: 2px solid #0E7A0E }` global. Si esa regla
+ganara, los 11 hallazgos de R1 no serían nada: el anillo global ya estaría ahí.
+Gana la utilidad, no la regla: el selector global pesa `(0,1,0)` y
+`focus:outline-none` compila a `.focus\:outline-none:focus`, que pesa `(0,2,0)`.
+**La utilidad suprime el anillo global**, y por eso los 11 son incumplimientos
+reales de 2.4.7 (AA). La regla global se conserva —es la que hace visible el foco
+en todo lo que no la desactiva—; lo que se corrigió fue cada sitio que la anulaba
+sin reponer nada.
+
+**Verificación de la ronda**: `npx tsc --noEmit` → 0 en los archivos de la ronda ·
+`npx vitest run src/lib/a11y-static.contract.test.ts` → **20/20 verde**, y se
+comprobó que **falla** rompiendo un archivo a propósito (nombra el archivo y la
+línea) · `npm run knip` → exit 0 · `npm run verify` → ver la nota de la ronda 12
+sobre las sesiones en vuelo · `E2E_PORT=3100 npx playwright test e2e/a11y.spec.ts
+e2e/keyboard.spec.ts` → verde. El contrato recorre 391 archivos en ~1,1 s.
+
+**Backlog declarado de esta ronda** (nada de esto se tocó, y se declara medido):
+
+| # | Deuda | Estado |
+|---|---|---|
+| A14 | **`framer-motion` sin `MotionConfig` en 20 archivos ajenos** al perímetro de esta ronda (`src/app/panel/foodos/**`, `src/app/recompensas/**`, `src/components/auth/**`). R6 los cuenta y los excluye por perímetro; la deuda es real y es de la otra sesión | 🔜 |
+| A15 | **Un sitio con foco sin indicador, ajeno**: `src/app/recompensas/_components/InvoiceScannerScreen.tsx:468`. R1 lo detecta y lo excluye. Mismo arreglo de una línea que los 9 de esta ronda | 🔜 |
+| A16 | **Contraste de `/admin/**` y `/panel/**`**: axe sigue sin mirarlos y B36/B37 cubren solo `/admin/productos`. La técnica de esta ronda (contrato estático por AST) es la que hace falta; el alcance es de otra ronda | 🔜 |
+| A17 | **`iconOnlyButton` (113) y `inputNoName` (135)** medidos por AST y **deliberadamente fuera del contrato**: su tasa de falsos positivos es alta (iconos con `title`, inputs con `htmlFor`+`id` o dentro de un `<label>`), y congelar una línea base ruidosa consagra el ruido. Se declaran medidos, no aprobados | 🔜 |
 
 ## Agentes de mantenimiento por dominio
 

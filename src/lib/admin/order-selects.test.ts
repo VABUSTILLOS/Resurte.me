@@ -50,6 +50,7 @@ describe("buildAdminOrdersSelect", () => {
       "source",
       "created_at",
       "driver_id",
+      "delivery_proof_path",
     ]) {
       expect(select).toContain(column)
     }
@@ -71,10 +72,27 @@ describe("buildAdminOrdersSelect", () => {
     expect(select).toContain("coupon_code")
   })
 
-  it("puede omitir ambas columnas opcionales a la vez", () => {
-    const select = buildAdminOrdersSelect({ coupon: false, driver: false })
+  it("omite delivery_proof_path cuando el esquema no lo tiene (reintento por 42703)", () => {
+    const select = buildAdminOrdersSelect({ proof: false })
+    expect(select).not.toContain("delivery_proof_path")
+    expect(select).toContain("driver_id")
+    expect(select).toContain("coupon_code")
+  })
+
+  it("solo pide la ruta del comprobante, no su fecha ni su nota", () => {
+    // La fecha y la nota llegan al abrir el comprobante, junto con la URL
+    // firmada; la lista solo necesita saber si hay y de qué objeto borrarlo.
+    const select = buildAdminOrdersSelect()
+    expect(select).toContain("delivery_proof_path")
+    expect(select).not.toContain("delivery_proof_at")
+    expect(select).not.toContain("delivery_proof_note")
+  })
+
+  it("puede omitir las tres columnas opcionales a la vez", () => {
+    const select = buildAdminOrdersSelect({ coupon: false, driver: false, proof: false })
     expect(select).not.toContain("coupon_code")
     expect(select).not.toContain("driver_id")
+    expect(select).not.toContain("delivery_proof_path")
     expect(select).toContain("profiles!")
   })
 })

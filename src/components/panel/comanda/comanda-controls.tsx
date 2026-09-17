@@ -25,7 +25,7 @@ export default function ComandaControls({
           type="date"
           value={selectedDate}
           onChange={(e) => onDateChange(e.target.value || todayStr())}
-          className="text-xs font-semibold text-gray-700 bg-transparent focus:outline-none"
+          className="text-xs font-semibold text-gray-700 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           aria-label={t("comanda.dayAria")}
         />
       </div>

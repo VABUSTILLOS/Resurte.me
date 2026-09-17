@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
@@ -12,6 +12,7 @@ import {
   DollarSign,
   Store,
   MessageCircle,
+  Camera,
 } from "lucide-react"
 import { useCity } from "@/contexts/city-context"
 import {
@@ -76,6 +77,33 @@ export function TrackingClient() {
   const [order, setOrder] = useState<TrackedOrder | null>(null)
   const [notFound, setNotFound] = useState(() => !orderId || !token)
   const [loading, setLoading] = useState(() => Boolean(orderId && token))
+  const [proof, setProof] = useState<{ url: string; at: string | null; note: string | null } | null>(
+    null
+  )
+
+  // El comprobante se pide aparte del tracking: la ruta de track expone a
+  // propósito cero datos del pedido más allá del estado, y el comprobante vive
+  // en un bucket privado (se firma al leer). Solo tiene sentido si ya se
+  // entregó, así que se consulta al llegar a ese estado.
+  const loadProof = useCallback(async () => {
+    if (!orderId || !token) return
+    try {
+      const res = await fetch(
+        `/api/orders/${orderId}/proof?t=${encodeURIComponent(token)}`,
+        { cache: "no-store" }
+      )
+      if (!res.ok) return
+      const data = (await res.json()) as { url: string | null; at: string | null; note: string | null }
+      if (data.url) setProof({ url: data.url, at: data.at, note: data.note })
+    } catch {
+      // Best-effort: sin comprobante la página sigue siendo correcta.
+    }
+  }, [orderId, token])
+
+  useEffect(() => {
+    if (order?.status !== "delivered") return
+    void Promise.resolve().then(loadProof)
+  }, [order?.status, loadProof])
 
   // Ajuste de estado durante el render (patrón oficial de React) cuando los
   // params desaparecen después del mount — equivale al antiguo useEffect.
@@ -264,6 +292,40 @@ export function TrackingClient() {
             </p>
           </div>
         </div>
+        {proof && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-3 sm:col-span-2">
+            <Camera className="w-4 h-4 text-gray-400 mt-0.5" />
+            <div className="min-w-0">
+              <p className="text-xs text-gray-400">Comprobante de entrega</p>
+              <a
+                href={proof.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 block overflow-hidden rounded-lg border border-gray-200"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- URL firmada de vida corta: next/image no puede optimizarla ni cachearla */}
+                <img
+                  src={proof.url}
+                  alt="Comprobante de entrega"
+                  className="w-full max-h-64 object-contain bg-white"
+                />
+              </a>
+              {proof.at && (
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Entregado el{" "}
+                  {new Date(proof.at).toLocaleDateString("es-MX", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </p>
+              )}
+              {proof.note && (
+                <p className="mt-1 text-xs text-gray-600 whitespace-pre-wrap">{proof.note}</p>
+              )}
+            </div>
+          </div>
+        )}
         <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-start gap-3 sm:col-span-2">
           <DollarSign className="w-4 h-4 text-gray-400 mt-0.5" />
           <div>

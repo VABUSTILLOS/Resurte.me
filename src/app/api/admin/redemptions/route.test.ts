@@ -13,10 +13,13 @@ import { requireAdmin } from "@/lib/admin-auth"
 import { logAdminAction } from "@/lib/audit-log"
 import { advanceRedemption } from "@/lib/redemption-actions"
 
-const ADMIN = { id: "admin-1", email: "vabustillos@gmail.com" }
+const URL = "http://localhost/api/admin/redemptions"
 
 function asAdmin() {
-  vi.mocked(requireAdmin).mockResolvedValue({ user: ADMIN, response: null } as never)
+  vi.mocked(requireAdmin).mockResolvedValue({
+    user: { id: "admin-1", email: "admin@resurte.me" },
+    response: null,
+  } as never)
 }
 
 function asDenied() {
@@ -26,148 +29,190 @@ function asDenied() {
   } as never)
 }
 
-const ROW = {
-  id: 9,
-  user_id: "user-1",
-  service_id: "resenas-google",
-  service_name: "Gestión de Reseñas Google",
-  cost_credits: 2200,
-  status: "requested",
-  brief: { restaurant_name: "El Buen Pastor" },
-  assigned_to: null,
-  due_at: "2026-02-01T00:00:00.000Z",
-  created_at: "2026-01-15T00:00:00.000Z",
+type StoreOptions = {
+  list?: Record<string, unknown>[]
+  listError?: unknown
+  before?: Record<string, unknown> | null
+  emails?: Record<string, string>
 }
 
 /**
- * Builder que imita al de PostgREST: encadenable Y "thenable".
- *
- * El `then` no es decorativo. La ruta hace `query.limit(300)` y después
- * `query = query.in(...)`, así que si `limit()` devolviera una promesa el
- * segundo eslabón se llamaría sobre la promesa y no sobre el builder —igual
- * que en producción, donde el builder real implementa `then`.
+ * Cliente de servicio mínimo con las dos formas que usa la ruta:
+ * `select().order().limit()[.in()]` (encadenable y "awaitable") y
+ * `select().eq().maybeSingle()`.
  */
-function serviceWith(opts: { rows?: unknown[]; before?: unknown; rowError?: unknown } = {}) {
-  const builder: Record<string, unknown> = {}
-  for (const m of ["select", "in", "eq"]) builder[m] = vi.fn().mockReturnValue(builder)
-  builder.order = vi.fn().mockReturnValue(builder)
-  builder.limit = vi.fn().mockReturnValue(builder)
-  builder.then = (resolve: (v: unknown) => unknown) =>
-    resolve({ data: opts.rows ?? [], error: opts.rowError ?? null })
-  builder.maybeSingle = vi.fn().mockResolvedValue({
-    data: opts.before ?? null,
-    error: opts.rowError ?? null,
-  })
+function serviceWith(opts: StoreOptions = {}) {
+  const listResult = { data: opts.list ?? [], error: opts.listError ?? null }
+  const inSpy = vi.fn(() => ({ then: (r: (v: unknown) => unknown) => r(listResult) }))
+  const limit = vi.fn(() => ({
+    in: inSpy,
+    then: (r: (v: unknown) => unknown) => r(listResult),
+  }))
+  const order = vi.fn(() => ({ limit }))
+
+  const maybeSingle = vi
+    .fn()
+    .mockResolvedValue({ data: opts.before ?? null, error: null })
+  const eq = vi.fn(() => ({ maybeSingle }))
+
+  const select = vi.fn((columns?: string) =>
+    typeof columns === "string" && columns.includes("due_at") ? { order } : { eq }
+  )
+
+  const getUserById = vi.fn(async (uid: string) => ({
+    data: { user: { email: opts.emails?.[uid] ?? null } },
+  }))
+
+  const from = vi.fn(() => ({ select }))
   vi.mocked(createServiceClient).mockResolvedValue({
-    from: vi.fn(() => builder),
-    auth: { admin: { getUserById: vi.fn().mockResolvedValue({ data: { user: { email: "c@d.com" } } }) } },
+    from,
+    auth: { admin: { getUserById } },
   } as never)
-  return builder
+  return { select, order, limit, in: inSpy, eq, getUserById }
 }
 
-function post(body: unknown) {
-  return new NextRequest("http://localhost/api/admin/redemptions", {
+function getRequest(query = "") {
+  return new NextRequest(`${URL}${query}`)
+}
+
+function postRequest(body: unknown) {
+  return new NextRequest(URL, {
     method: "POST",
     body: JSON.stringify(body),
     headers: { "content-type": "application/json" },
   })
 }
 
-function get(url = "http://localhost/api/admin/redemptions") {
-  return new NextRequest(url)
+const ROW = {
+  id: 7,
+  user_id: "user-1",
+  service_id: "google-maps",
+  service_name: "Google Maps",
+  cost_credits: 2800,
+  concept: "Canje: Google Maps",
+  status: "requested",
+  brief: { restaurant_name: "Taquería" },
+  assigned_to: null,
+  due_at: "2026-10-15T00:00:00.000Z",
+  started_at: null,
+  delivered_at: null,
+  cancelled_at: null,
+  refunded_at: null,
+  cancel_reason: null,
+  deliverable_url: null,
+  deliverable_note: null,
+  created_at: "2026-10-01T00:00:00.000Z",
+  status_updated_at: "2026-10-01T00:00:00.000Z",
 }
 
-describe("/api/admin/redemptions", () => {
+describe("GET /api/admin/redemptions", () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it("GET 403 sin rol admin", async () => {
+  it("403 sin rol admin y no consulta nada", async () => {
     asDenied()
-    const res = await GET(get())
+    const res = await GET(getRequest())
     expect(res.status).toBe(403)
+    expect(createServiceClient).not.toHaveBeenCalled()
   })
 
-  it("GET resuelve el email del cliente: el brief no lo trae", async () => {
+  it("por defecto filtra a las solicitudes abiertas", async () => {
     asAdmin()
-    serviceWith({ rows: [ROW] })
-    const res = await GET(get())
+    const store = serviceWith({ list: [ROW] })
+    const res = await GET(getRequest())
     expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.redemptions[0]).toMatchObject({ id: 9, email: "c@d.com" })
+    expect(store.in).toHaveBeenCalledWith("status", ["requested", "in_progress"])
   })
 
-  it("GET filtra a abiertas por defecto y a todas con ?status=all", async () => {
+  it("?status=all no filtra por estado", async () => {
     asAdmin()
-    const builder = serviceWith({ rows: [] })
-    await GET(get())
-    expect(builder.in).toHaveBeenCalledWith("status", ["requested", "in_progress"])
+    const store = serviceWith({ list: [{ ...ROW, status: "delivered" }] })
+    const res = await GET(getRequest("?status=all"))
+    expect(res.status).toBe(200)
+    expect(store.in).not.toHaveBeenCalled()
+    expect((await res.json()).redemptions[0].status).toBe("delivered")
+  })
 
+  it("ordena por vencimiento y acota a 300", async () => {
+    asAdmin()
+    const store = serviceWith({ list: [] })
+    await GET(getRequest())
+    expect(store.order).toHaveBeenCalledWith("due_at", { ascending: true, nullsFirst: false })
+    expect(store.limit).toHaveBeenCalledWith(300)
+  })
+
+  it("resuelve el correo desde auth, no desde el brief", async () => {
+    asAdmin()
+    serviceWith({ list: [ROW], emails: { "user-1": "dueno@taqueria.mx" } })
+    const res = await GET(getRequest())
+    const body = await res.json()
+    expect(body.redemptions[0].email).toBe("dueno@taqueria.mx")
+  })
+
+  it("entrega la cola aunque falte el correo", async () => {
+    asAdmin()
+    serviceWith({ list: [ROW] })
+    const res = await GET(getRequest())
+    expect((await res.json()).redemptions[0].email).toBe(null)
+  })
+
+  it("500 si falla la consulta", async () => {
+    asAdmin()
+    serviceWith({ listError: { message: "boom" } })
+    const res = await GET(getRequest())
+    expect(res.status).toBe(500)
+  })
+})
+
+describe("POST /api/admin/redemptions", () => {
+  beforeEach(() => {
     vi.clearAllMocks()
     asAdmin()
-    const all = serviceWith({ rows: [] })
-    await GET(get("http://localhost/api/admin/redemptions?status=all"))
-    expect(all.in).not.toHaveBeenCalled()
   })
 
-  it("GET 500 si la consulta falla", async () => {
-    asAdmin()
-    serviceWith({ rows: undefined, rowError: { message: "boom" } })
-    const res = await GET(get())
-    expect(res.status).toBe(500)
-    expect((await res.json()).error).toBe("boom")
-  })
-
-  it("POST 400 con id inválido", async () => {
-    asAdmin()
-    for (const id of [undefined, 0, -3, 1.5, "abc"]) {
-      const res = await POST(post({ id }))
-      expect(res.status).toBe(400)
-    }
+  it("403 sin rol admin", async () => {
+    asDenied()
+    const res = await POST(postRequest({ id: 7, status: "in_progress" }))
+    expect(res.status).toBe(403)
     expect(advanceRedemption).not.toHaveBeenCalled()
   })
 
-  it("POST 400 con estado desconocido y no llega a la base", async () => {
-    asAdmin()
-    serviceWith({ before: ROW })
-    const res = await POST(post({ id: 9, status: "shipped" }))
+  it("400 con id inválido", async () => {
+    const res = await POST(postRequest({ id: "abc", status: "in_progress" }))
+    expect(res.status).toBe(400)
+    expect(advanceRedemption).not.toHaveBeenCalled()
+  })
+
+  it("400 con un estado desconocido", async () => {
+    // Un typo no debe convertirse en una transición silenciosa.
+    const res = await POST(postRequest({ id: 7, status: "shipped" }))
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe("Estado desconocido")
     expect(advanceRedemption).not.toHaveBeenCalled()
   })
 
-  it("POST 404 si la solicitud no existe", async () => {
-    asAdmin()
+  it("404 si la solicitud no existe", async () => {
     serviceWith({ before: null })
-    const res = await POST(post({ id: 9, status: "in_progress" }))
+    const res = await POST(postRequest({ id: 7, status: "in_progress" }))
     expect(res.status).toBe(404)
     expect(advanceRedemption).not.toHaveBeenCalled()
   })
 
-  it("POST avanza y deja bitácora con el antes y el después", async () => {
-    asAdmin()
+  it("sin `status` solo actualiza metadatos (no transiciona)", async () => {
     serviceWith({ before: ROW })
     vi.mocked(advanceRedemption).mockResolvedValue({
       ok: true,
-      status: "in_progress",
-      changed: true,
+      status: "requested",
+      changed: false,
       refunded: false,
     })
-    const res = await POST(post({ id: 9, status: "in_progress" }))
+    const res = await POST(postRequest({ id: 7, assigned_to: "Ana" }))
     expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ success: true, status: "in_progress", changed: true })
-
-    expect(logAdminAction).toHaveBeenCalledTimes(1)
-    const entry = vi.mocked(logAdminAction).mock.calls[0]![1]
-    expect(entry).toMatchObject({
-      actorEmail: "vabustillos@gmail.com",
-      action: "redemption_status_update",
-      entity: "redemptions",
-      entityId: 9,
-    })
-    expect(entry.detail).toMatchObject({ previous_status: "requested", new_status: "in_progress" })
+    expect(advanceRedemption).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 7, status: undefined, assignedTo: "Ana" })
+    )
   })
 
-  it("POST sin `status` sólo toca metadatos: no hay transición", async () => {
-    asAdmin()
+  it("`status: null` explícito tampoco transiciona", async () => {
     serviceWith({ before: ROW })
     vi.mocked(advanceRedemption).mockResolvedValue({
       ok: true,
@@ -175,15 +220,13 @@ describe("/api/admin/redemptions", () => {
       changed: false,
       refunded: false,
     })
-    const res = await POST(post({ id: 9, assigned_to: "Ana" }))
-    expect(res.status).toBe(200)
-    const args = vi.mocked(advanceRedemption).mock.calls[0]![0]
-    expect(args.status).toBeUndefined()
-    expect(args.assignedTo).toBe("Ana")
+    await POST(postRequest({ id: 7, status: null, note: "Llamado" }))
+    expect(advanceRedemption).toHaveBeenCalledWith(
+      expect.objectContaining({ status: null, note: "Llamado" })
+    )
   })
 
-  it("POST con status null significa explícitamente 'no transiciones'", async () => {
-    asAdmin()
+  it("normaliza cadenas vacías a null", async () => {
     serviceWith({ before: ROW })
     vi.mocked(advanceRedemption).mockResolvedValue({
       ok: true,
@@ -191,43 +234,27 @@ describe("/api/admin/redemptions", () => {
       changed: false,
       refunded: false,
     })
-    await POST(post({ id: 9, status: null, note: "Llamado" }))
-    expect(vi.mocked(advanceRedemption).mock.calls[0]![0].status).toBeNull()
+    await POST(postRequest({ id: 7, note: "   ", deliverable_url: "" }))
+    expect(advanceRedemption).toHaveBeenCalledWith(
+      expect.objectContaining({ note: null, deliverableUrl: null })
+    )
   })
 
-  it("POST normaliza cadenas vacías a null", async () => {
-    asAdmin()
-    serviceWith({ before: ROW })
-    vi.mocked(advanceRedemption).mockResolvedValue({
-      ok: true,
-      status: "requested",
-      changed: false,
-      refunded: false,
-    })
-    await POST(post({ id: 9, assigned_to: "   ", note: "" }))
-    const args = vi.mocked(advanceRedemption).mock.calls[0]![0]
-    expect(args.assignedTo).toBeNull()
-    expect(args.note).toBeNull()
-  })
-
-  it("POST propaga el rechazo de la base como 400, sin bitácora falsa", async () => {
-    asAdmin()
+  it("400 cuando la función rechaza la transición", async () => {
     serviceWith({ before: { ...ROW, status: "delivered" } })
     vi.mocked(advanceRedemption).mockResolvedValue({
       ok: false,
-      status: null,
+      status: "delivered",
       changed: false,
       refunded: false,
       error: "Transición inválida: delivered → cancelled",
     })
-    const res = await POST(post({ id: 9, status: "cancelled" }))
+    const res = await POST(postRequest({ id: 7, status: "cancelled" }))
     expect(res.status).toBe(400)
-    expect((await res.json()).error).toBe("Transición inválida: delivered → cancelled")
     expect(logAdminAction).not.toHaveBeenCalled()
   })
 
-  it("POST propaga el reembolso: el equipo debe saber que se devolvieron créditos", async () => {
-    asAdmin()
+  it("mueve el estado, audita y reporta changed/refunded", async () => {
     serviceWith({ before: ROW })
     vi.mocked(advanceRedemption).mockResolvedValue({
       ok: true,
@@ -235,8 +262,47 @@ describe("/api/admin/redemptions", () => {
       changed: true,
       refunded: true,
     })
-    const res = await POST(post({ id: 9, status: "cancelled" }))
-    expect(await res.json()).toMatchObject({ refunded: true })
-    expect(vi.mocked(logAdminAction).mock.calls[0]![1].detail).toMatchObject({ refunded: true })
+    const res = await POST(postRequest({ id: 7, status: "cancelled", note: "No aplica" }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({
+      success: true,
+      status: "cancelled",
+      changed: true,
+      refunded: true,
+    })
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "redemption_status_update",
+        entity: "redemptions",
+        entityId: 7,
+        detail: expect.objectContaining({
+          service_name: "Google Maps",
+          previous_status: "requested",
+          new_status: "cancelled",
+          changed: true,
+          refunded: true,
+          credits: 2800,
+        }),
+      })
+    )
+  })
+
+  it("el actor del registro es el admin que movió la solicitud", async () => {
+    serviceWith({ before: ROW })
+    vi.mocked(advanceRedemption).mockResolvedValue({
+      ok: true,
+      status: "in_progress",
+      changed: true,
+      refunded: false,
+    })
+    await POST(postRequest({ id: 7, status: "in_progress" }))
+    expect(advanceRedemption).toHaveBeenCalledWith(
+      expect.objectContaining({ actor: "admin@resurte.me" })
+    )
+    expect(logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ actorId: "admin-1", actorEmail: "admin@resurte.me" })
+    )
   })
 })

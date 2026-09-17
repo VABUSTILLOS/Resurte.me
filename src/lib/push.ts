@@ -18,6 +18,7 @@ import type { OrderStatus } from "@/types"
 /** Estados que disparan push: los mismos hitos logísticos que el correo. */
 export const PUSHABLE_ORDER_STATUSES: OrderStatus[] = [
   "confirmed",
+  "preparing",
   "out_for_delivery",
   "delivered",
 ]

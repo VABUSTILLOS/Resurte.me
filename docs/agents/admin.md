@@ -1109,7 +1109,15 @@ pestaña/API para mover la fila por detrás):
 - Dinero en es-MX: el diff debe mostrar `$90`, nunca `$90,00`.
 - "Recargar y descartar lo mío" recarga la página y el valor mostrado es el de la
   base.
-- Reduced motion: con `prefers-reduced-motion: reduce` el panel no anima.
+- Reduced motion: el modal **no tiene animación de entrada** —ni transición ni
+  `animate-*` en su raíz—, así que "el panel no anima" era cierto por no haber
+  animación, no por el bloque de `prefers-reduced-motion`. Lo único que se mueve
+  son los indicadores de carga (`animate-spin`, y `animate-pulse` en el micrófono
+  del dictado) y el desplazamiento a sección, que ya consulta la preferencia en
+  `goToSection` (`scrollIntoView({ behavior: reduce ? "auto" : "smooth" })`).
+  Medido en la Ronda 13: `animate-pulse` **no** estaba en el bloque y se escapaba;
+  desde entonces sí. La afirmación no tiene ejecutor —ningún gate la mide—, así
+  que vale como descripción, no como criterio de aceptación.
 Automatizado: `npx playwright test e2e/admin-productos-modal.spec.ts --grep @ci`
 (el caso de conflicto se salta solo sin credenciales de admin). Ese caso cambia
 **umbral de stock bajo** desde el modal y, por detrás, **título SEO** desde la
