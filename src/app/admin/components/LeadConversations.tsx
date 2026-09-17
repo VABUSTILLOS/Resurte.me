@@ -320,6 +320,34 @@ interface ConversationPanelProps {
   onBack?: () => void
   onSent: () => void
   className?: string
+  /** Lector y acciones de la bandeja. Por defecto, los de administración. */
+  actions?: ConversationPanelActions
+}
+
+/**
+ * Todo lo que la bandeja hace contra el servidor, inyectable.
+ *
+ * Existe por el vendedor (Ronda 7): su bandeja lee la conversación con alcance
+ * de cartera (`getSellerLeadConversation`) en vez de con el lector de
+ * administración. Lo que no se inyecta **no se pinta**: `send` y `suggest`
+ * ausentes dejan el pie en modo lectura, en vez de mostrar un compositor que
+ * respondería "Acceso restringido a administradores" al primer clic.
+ */
+export interface ConversationPanelActions {
+  load: (prospectId: number) => Promise<AdminLeadConversation>
+  quickReplies?: typeof getAdminQuickReplies
+  templates?: typeof listWaTemplates
+  send?: typeof sendLeadMessage
+  suggest?: typeof suggestLeadReply
+}
+
+/** El juego completo, el que usa el admin. */
+const ADMIN_CONVERSATION_ACTIONS: ConversationPanelActions = {
+  load: getAdminLeadConversation,
+  quickReplies: getAdminQuickReplies,
+  templates: listWaTemplates,
+  send: sendLeadMessage,
+  suggest: suggestLeadReply,
 }
 
 /**
@@ -331,6 +359,7 @@ export function LeadConversationPanel({
   onBack,
   onSent,
   className = "h-[70vh] lg:h-[calc(100vh-15rem)]",
+  actions = ADMIN_CONVERSATION_ACTIONS,
 }: ConversationPanelProps) {
   const { toast } = useToast()
   const [conversation, setConversation] = useState<AdminLeadConversation | null>(null)
@@ -346,24 +375,31 @@ export function LeadConversationPanel({
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setConversation(await getAdminLeadConversation(prospectId))
+      setConversation(await actions.load(prospectId))
     } catch (e) {
       toast(e instanceof Error ? e.message : "No se pudo abrir la conversación", "error")
       setConversation(null)
     } finally {
       setLoading(false)
     }
-  }, [prospectId, toast])
+  }, [actions, prospectId, toast])
 
   useEffect(() => {
     void Promise.resolve().then(load)
   }, [load])
 
   useEffect(() => {
-    void getAdminQuickReplies()
+    if (!actions.quickReplies) return
+    void actions
+      .quickReplies()
       .then(setQuickReplies)
       .catch(() => setQuickReplies([]))
-    void listWaTemplates()
+  }, [actions])
+
+  useEffect(() => {
+    if (!actions.templates) return
+    void actions
+      .templates()
       .then((rows) =>
         setTemplates(
           rows
@@ -372,7 +408,7 @@ export function LeadConversationPanel({
         ),
       )
       .catch(() => setTemplates([]))
-  }, [])
+  }, [actions])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" })
@@ -381,9 +417,10 @@ export function LeadConversationPanel({
   const windowOpen = conversation?.window.open ?? false
 
   async function send(input: { body?: string; quickReplyId?: number; templateName?: string }) {
+    if (!actions.send) return
     setSending(true)
     try {
-      const result = await sendLeadMessage(prospectId, {
+      const result = await actions.send(prospectId, {
         ...input,
         languageCode: "es_MX",
       })
@@ -403,9 +440,10 @@ export function LeadConversationPanel({
   }
 
   async function suggest() {
+    if (!actions.suggest) return
     setSuggesting(true)
     try {
-      const suggestion = await suggestLeadReply(prospectId)
+      const suggestion = await actions.suggest(prospectId)
       setBody(suggestion.draft)
       if (suggestion.source === "template") {
         toast("Sugerencia de respaldo: revisa y edita antes de enviar", "warning")
@@ -497,7 +535,12 @@ export function LeadConversationPanel({
           </p>
         )}
 
-        {conversation && !windowOpen ? (
+        {!actions.send ? (
+          <p className="text-[11px] text-gray-500">
+            Vista de solo lectura. Para escribir, usa los botones de WhatsApp de la ficha: abren la
+            conversación con el mensaje ya redactado.
+          </p>
+        ) : conversation && !windowOpen ? (
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={templateName}
@@ -527,20 +570,22 @@ export function LeadConversationPanel({
         ) : (
           <>
             <div className="mb-2 flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                disabled={sending || suggesting}
-                onClick={() => void suggest()}
-                title="Redacta un borrador con IA a partir de la conversación. Nunca se envía solo."
-                className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2 py-1 text-[11px] font-semibold text-brand-700 hover:bg-brand-100 disabled:opacity-50"
-              >
-                {suggesting ? (
-                  <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" />
-                ) : (
-                  <Sparkles className="h-3 w-3" />
-                )}
-                Sugerir respuesta
-              </button>
+              {actions.suggest && (
+                <button
+                  type="button"
+                  disabled={sending || suggesting}
+                  onClick={() => void suggest()}
+                  title="Redacta un borrador con IA a partir de la conversación. Nunca se envía solo."
+                  className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2 py-1 text-[11px] font-semibold text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+                >
+                  {suggesting ? (
+                    <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                  Sugerir respuesta
+                </button>
+              )}
               {quickReplies.slice(0, 8).map((qr) => (
                 <button
                   key={qr.id}

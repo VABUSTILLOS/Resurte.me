@@ -61,6 +61,17 @@ import {
 import { readCrmProspects } from "@/lib/crm-prospects"
 import { CRM_PAGE_SIZE } from "@/lib/crm-filters"
 import {
+  fetchAutomationSends,
+  fetchConversationMessages,
+  fetchProfileName,
+  fetchProspectActivities,
+  loadProspectRow,
+  readLeadConversation,
+  toConversationProspect,
+  type LeadConversation as SharedLeadConversation,
+  type LeadTimelineEntry as SharedLeadTimelineEntry,
+} from "@/lib/crm-conversation"
+import {
   findMatchingProspect,
   leadToProspectDraft,
   phoneKey,
@@ -1554,21 +1565,6 @@ export async function getAdminProspectDetail(prospectId: number): Promise<{
   return { ...detail, seller, lead, tags }
 }
 
-async function fetchProfileName(
-  supabase: Awaited<ReturnType<typeof createServiceClient>>,
-  userId: string,
-): Promise<{ id: string; name: string } | null> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, full_name, email")
-    .eq("id", userId)
-    .maybeSingle()
-  if (error || !data) return null
-  return {
-    id: String(data.id),
-    name: (data.full_name as string | null)?.trim() || String(data.email ?? "Sin nombre"),
-  }
-}
 
 export interface ConvertLeadResult {
   prospectId: number
@@ -1954,8 +1950,6 @@ export async function addCrmActivity(
 // RONDA 6 — BANDEJA DE CONVERSACIONES, ETIQUETAS Y REPARTO
 // ============================================================
 
-/** Mensajes por conversación. Un hilo se lee, no se archiva. */
-const CONVERSATION_LIMIT = 200
 /** Prospectos que un reparto masivo puede mover de una sola vez. */
 const BULK_ASSIGN_LIMIT = 200
 /**
@@ -1974,189 +1968,15 @@ const ACTIVITY_SUMMARY_MAX = 280
 /** De dónde viene un evento del hilo, para no confundir un mensaje con una nota. */
 export type LeadTimelineSource = "whatsapp" | "automation" | "activity"
 
-/** Evento del hilo de un prospecto: mensaje real, automatización o actividad. */
-export interface LeadTimelineEntry extends InboxMessage {
-  source: LeadTimelineSource
-  /**
-   * Clave estable dentro del hilo. Los ids de `whatsapp_messages`,
-   * `whatsapp_automation_sends` y `crm_activities` viven en secuencias
-   * distintas, así que como clave de lista se pisarían entre sí.
-   */
-  key: string
-}
-
-export interface AdminLeadConversation {
-  prospect: ConversationProspect
-  /** Solo WhatsApp: es lo que decide la ventana de 24 h. */
-  messages: InboxMessage[]
-  /** WhatsApp + automatizaciones + actividades, para pintar el hilo completo. */
-  timeline: LeadTimelineEntry[]
-  window: WhatsAppWindowState
-  bucket: InboxBucket | null
-  needsReply: boolean
-  firstResponseMinutes: number | null
-  /** Número con el que se emparejó la conversación; `null` sin teléfono. */
-  phoneKey: string | null
-  seller: { id: string; name: string } | null
-  lead: { id: number; email: string; source: string; created_at: string } | null
-}
+/**
+ * Ronda 7: el hilo y la conversación se leen en `crm-conversation.ts`, porque la
+ * bandeja del vendedor necesita exactamente los mismos datos. Aquí solo se
+ * reexportan para no tocar a `LeadConversations.tsx`.
+ */
+export type LeadTimelineEntry = SharedLeadTimelineEntry
+export type AdminLeadConversation = SharedLeadConversation
 
 type ServiceClient = Awaited<ReturnType<typeof createServiceClient>>
-
-/**
- * Carga la ficha del prospecto. `tags` se pide aparte porque la columna llega
- * con la migración 00140: sin ella el prospecto sigue existiendo, solo sin
- * etiquetas, y la bandeja no puede dejar de abrirse por eso.
- */
-async function loadProspectRow(
-  supabase: ServiceClient,
-  prospectId: number,
-): Promise<Record<string, unknown> | null> {
-  const { data, error } = await supabase
-    .from("crm_prospects")
-    .select(CRM_PROSPECT_COLUMNS)
-    .eq("id", prospectId)
-    .maybeSingle()
-  if (!error) return (data as Record<string, unknown> | null) ?? null
-
-  if (isMissingColumnError(error)) {
-    const fallback = await supabase
-      .from("crm_prospects")
-      .select(CRM_PROSPECT_COLUMNS_WITHOUT_TAGS)
-      .eq("id", prospectId)
-      .maybeSingle()
-    if (!fallback.error) return (fallback.data as Record<string, unknown> | null) ?? null
-  }
-
-  logger.error("[ADMIN-CRM] Error fetching prospect:", error)
-  throw new Error("Error al cargar el prospecto")
-}
-
-function toConversationProspect(row: Record<string, unknown>): ConversationProspect {
-  return mapCrmProspect(row)
-}
-
-/**
- * Mensajes de WhatsApp de un número.
- *
- * Se filtra por `from_number` y no por la columna generada `from_digits`: en
- * ambos sentidos `from_number` guarda el número del cliente (el webhook al
- * recibir, el envío al mandar), así que las variantes con y sin lada cubren el
- * hilo completo sin depender de que 00140 esté aplicada.
- */
-async function fetchConversationMessages(
-  supabase: ServiceClient,
-  variants: readonly string[],
-): Promise<InboxMessage[]> {
-  const { data, error } = await supabase
-    .from("whatsapp_messages")
-    .select("id, direction, content, created_at, message_type, from_number")
-    .in("from_number", variants)
-    .order("created_at", { ascending: false })
-    .limit(CONVERSATION_LIMIT)
-
-  if (error) {
-    logger.warn("[ADMIN-CRM] No se pudo leer la conversación:", { message: error.message })
-    return []
-  }
-
-  return (data ?? []).map((row) => ({
-    id: Number(row.id),
-    direction: normalizeDirection(row.direction as string | null),
-    content: (row.content as string | null) ?? null,
-    created_at: String(row.created_at),
-    message_type: (row.message_type as string | null) ?? null,
-    from_number: (row.from_number as string | null) ?? null,
-  }))
-}
-
-/**
- * Automatizaciones enviadas a ese número. `whatsapp_automation_sends` es la
- * bitácora de envíos masivos; sin ella el hilo mostraría un hueco entre dos
- * mensajes del cliente que en realidad sí recibió algo.
- */
-async function fetchAutomationSends(
-  supabase: ServiceClient,
-  variants: readonly string[],
-): Promise<InboxMessage[]> {
-  const { data, error } = await supabase
-    .from("whatsapp_automation_sends")
-    .select("id, automation_type, status, created_at")
-    .in("recipient", variants)
-    .order("created_at", { ascending: false })
-    .limit(CONVERSATION_LIMIT)
-
-  if (error) {
-    if (!isMissingRelationError(error)) {
-      logger.warn("[ADMIN-CRM] No se pudieron leer las automatizaciones:", {
-        message: error.message,
-      })
-    }
-    return []
-  }
-
-  return (data ?? []).map((row) => ({
-    id: Number(row.id),
-    direction: "outbound" as const,
-    content: String(row.status ?? ""),
-    created_at: String(row.created_at),
-    message_type: `automation:${String(row.automation_type ?? "desconocida")}`,
-    from_number: null,
-  }))
-}
-
-/** Actividades registradas en el CRM (llamadas, visitas, notas). */
-async function fetchProspectActivities(
-  supabase: ServiceClient,
-  prospectId: number,
-): Promise<InboxMessage[]> {
-  const { data, error } = await supabase
-    .from("crm_activities")
-    .select("id, type, direction, outcome, summary, occurred_at")
-    .eq("prospect_id", prospectId)
-    .order("occurred_at", { ascending: false })
-    .limit(CONVERSATION_LIMIT)
-
-  if (error) {
-    logger.warn("[ADMIN-CRM] No se pudieron leer las actividades:", { message: error.message })
-    return []
-  }
-
-  return (data ?? []).map((row) => ({
-    id: Number(row.id),
-    direction: row.direction === "entrante" ? ("inbound" as const) : ("outbound" as const),
-    content: (row.summary as string | null) ?? (row.outcome as string | null) ?? null,
-    created_at: String(row.occurred_at),
-    message_type: `activity:${String(row.type ?? "nota")}`,
-    from_number: null,
-  }))
-}
-
-/** Lead del que nació el prospecto, para poder volver al origen. */
-async function fetchProspectLead(
-  supabase: ServiceClient,
-  prospectId: number,
-): Promise<{ id: number; email: string; source: string; created_at: string } | null> {
-  const { data, error } = await supabase
-    .from("crm_prospects")
-    .select("leads(id, email, source, created_at)")
-    .eq("id", prospectId)
-    .maybeSingle()
-
-  if (error) {
-    logger.warn("[ADMIN-CRM] No se pudo leer el lead de origen:", { message: error.message })
-    return null
-  }
-
-  const embedded = (data as { leads?: Record<string, unknown> | null } | null)?.leads
-  if (!embedded) return null
-  return {
-    id: Number(embedded.id),
-    email: String(embedded.email ?? ""),
-    source: String(embedded.source ?? ""),
-    created_at: String(embedded.created_at ?? ""),
-  }
-}
 
 /**
  * Conversación completa de un prospecto: mensajes, automatizaciones,
@@ -2171,41 +1991,12 @@ export async function getAdminLeadConversation(
   }
 
   const supabase = await createServiceClient()
-  const row = await loadProspectRow(supabase, prospectId)
-  if (!row) {
+  const conversation = await readLeadConversation(supabase, prospectId, { includeLead: true })
+  if (!conversation) {
     throw new Error("Prospecto no encontrado")
   }
 
-  const prospect = toConversationProspect(row)
-  const variants = phoneLookupVariants(prospectPhoneKey(prospect))
-
-  const [waMessages, automationSends, activities, seller, lead] = await Promise.all([
-    variants.length > 0 ? fetchConversationMessages(supabase, variants) : Promise.resolve([]),
-    variants.length > 0 ? fetchAutomationSends(supabase, variants) : Promise.resolve([]),
-    fetchProspectActivities(supabase, prospectId),
-    prospect.seller_id ? fetchProfileName(supabase, prospect.seller_id) : Promise.resolve(null),
-    fetchProspectLead(supabase, prospectId),
-  ])
-
-  const messages = mergeTimeline(waMessages)
-  const thread = buildThread(prospect, indexMessagesByPhone(messages))
-
-  return {
-    prospect,
-    messages,
-    timeline: mergeTimeline<LeadTimelineEntry>([
-      ...messages.map((m) => ({ ...m, source: "whatsapp" as const, key: `wa:${m.id}` })),
-      ...automationSends.map((m) => ({ ...m, source: "automation" as const, key: `auto:${m.id}` })),
-      ...activities.map((m) => ({ ...m, source: "activity" as const, key: `act:${m.id}` })),
-    ]),
-    window: thread.window,
-    bucket: thread.bucket,
-    needsReply: needsReply(messages),
-    firstResponseMinutes: firstResponseMinutes(messages),
-    phoneKey: thread.phoneKey,
-    seller,
-    lead,
-  }
+  return conversation
 }
 
 export interface LeadReplySuggestion {
