@@ -357,6 +357,7 @@ import { ImportProductsModal } from "../components/ImportProductsModal"
 import { ProductFormModal } from "../components/ProductFormModal"
 import { ProductsSkeleton } from "../components/ProductsSkeleton"
 import { RowActionMenu, type RowActionItem } from "../components/RowActionMenu"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 function AdminProductsContent() {
   // Lazy browser-only client: creating it during SSR would throw when
@@ -1210,7 +1211,7 @@ function AdminProductsContent() {
     // que la exportación siempre es re-importable.
     const exportRows = rows.map((p) => ({ ...p, category_slug: catSlug(p.category_id) }))
     downloadCsv(
-      `productos-${new Date().toISOString().slice(0, 10)}.csv`,
+      `productos-${dayKeyOf(DEFAULT_TIMEZONE)}.csv`,
       toCsv([...PRODUCT_CSV_HEADER], productCsvCells(exportRows))
     )
   }
@@ -1875,6 +1876,9 @@ function AdminProductsContent() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`
   })
+  // UTC a propósito: el servidor filtra el rango en UTC
+  // (`sales-report/route.ts`: `T00:00:00Z` … `T23:59:59Z`), así que `to` debe
+  // ser el día UTC. Con el día local se recortarían las ventas de la tarde.
   const [reportTo, setReportTo] = useState(() => new Date().toISOString().slice(0, 10))
   const [reportLoading, setReportLoading] = useState(false)
   const [reportInsights, setReportInsights] = useState<SalesReportInsights | null>(null)
@@ -3389,7 +3393,7 @@ function AdminProductsContent() {
             <button
               type="button"
               onClick={() => setBulkFailures(null)}
-              className="p-1 rounded-lg text-amber-600 hover:bg-amber-100"
+              className="p-1 rounded-lg text-amber-700 hover:bg-amber-100"
               aria-label="Cerrar aviso de fallos"
             >
               <X className="w-4 h-4" />
@@ -3437,7 +3441,7 @@ function AdminProductsContent() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 bg-green-600 text-white text-sm font-semibold rounded-xl shadow-lg"
+          className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 bg-green-700 text-white text-sm font-semibold rounded-xl shadow-lg"
         >
           <CheckCircle2 className="w-4 h-4" />
           {toast}
@@ -3478,7 +3482,7 @@ function AdminProductsContent() {
         id="alertas-inventario"
         label="Alertas de inventario"
         badge={stockAlertCount}
-        icon={<AlertTriangle className="w-4 h-4 text-amber-600" />}
+        icon={<AlertTriangle className="w-4 h-4 text-amber-700" />}
         open={alertsOpen}
         onToggle={() => setAlertsOpen((v) => !v)}
       >
@@ -3493,7 +3497,7 @@ function AdminProductsContent() {
             cada chip filtra la tabla. */}
         {stockAlertCount > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0" />
             <span className="text-sm font-semibold text-amber-800">Alertas de inventario:</span>
             <button
               type="button"
@@ -3501,7 +3505,7 @@ function AdminProductsContent() {
               aria-pressed={stockFilter === "low_stock"}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 stockFilter === "low_stock"
-                  ? "bg-amber-600 text-white"
+                  ? "bg-amber-700 text-white"
                   : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-100"
               }`}
             >
@@ -3640,13 +3644,13 @@ function AdminProductsContent() {
           id="salud-catalogo"
           label="Salud del catálogo"
           badge={healthIssues}
-          icon={<HeartPulse className="w-4 h-4 text-amber-600" />}
+          icon={<HeartPulse className="w-4 h-4 text-amber-700" />}
           open={healthOpen}
           onToggle={() => setHealthOpen((v) => !v)}
         >
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <div className="flex flex-wrap items-center gap-2">
-              <HeartPulse className="w-4 h-4 text-amber-600 shrink-0" />
+              <HeartPulse className="w-4 h-4 text-amber-700 shrink-0" />
               <span className="text-sm font-semibold text-amber-800">Salud del catálogo:</span>
           <button
             type="button"
@@ -3654,7 +3658,7 @@ function AdminProductsContent() {
             aria-pressed={onlyNoImage}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               onlyNoImage
-                ? "bg-amber-600 text-white"
+                ? "bg-amber-700 text-white"
                 : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
             }`}
           >
@@ -3662,7 +3666,7 @@ function AdminProductsContent() {
             Sin imagen
             <span
               className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                onlyNoImage ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+                onlyNoImage ? "bg-black/20 text-white" : "bg-amber-50 text-amber-700"
               }`}
             >
               {counts.noImage}
@@ -3684,7 +3688,7 @@ function AdminProductsContent() {
               Imagen rota
               <span
                 className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  onlyBrokenImage ? "bg-white/20 text-white" : "bg-red-50 text-red-600"
+                  onlyBrokenImage ? "bg-black/20 text-white" : "bg-red-50 text-red-700"
                 }`}
               >
                 {brokenItems.length}
@@ -3697,7 +3701,7 @@ function AdminProductsContent() {
             aria-pressed={onlyNoCities}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               onlyNoCities
-                ? "bg-amber-600 text-white"
+                ? "bg-amber-700 text-white"
                 : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
             }`}
           >
@@ -3705,7 +3709,7 @@ function AdminProductsContent() {
             Sin ciudades
             <span
               className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                onlyNoCities ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+                onlyNoCities ? "bg-black/20 text-white" : "bg-amber-50 text-amber-700"
               }`}
             >
               {counts.noCities}
@@ -3717,7 +3721,7 @@ function AdminProductsContent() {
             aria-pressed={onlyNoPrice}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               onlyNoPrice
-                ? "bg-amber-600 text-white"
+                ? "bg-amber-700 text-white"
                 : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
             }`}
           >
@@ -3725,7 +3729,7 @@ function AdminProductsContent() {
             Sin precio
             <span
               className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                onlyNoPrice ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+                onlyNoPrice ? "bg-black/20 text-white" : "bg-amber-50 text-amber-700"
               }`}
             >
               {counts.noPrice}
@@ -3746,7 +3750,7 @@ function AdminProductsContent() {
             aria-pressed={onlyNoCategory}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               onlyNoCategory
-                ? "bg-amber-600 text-white"
+                ? "bg-amber-700 text-white"
                 : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
             }`}
           >
@@ -3754,7 +3758,7 @@ function AdminProductsContent() {
             Sin categoría
             <span
               className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                onlyNoCategory ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+                onlyNoCategory ? "bg-black/20 text-white" : "bg-amber-50 text-amber-700"
               }`}
             >
               {counts.noCategory}
@@ -3775,7 +3779,7 @@ function AdminProductsContent() {
             WA sin publicar
             <span
               className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                onlyWaMismatch ? "bg-white/20 text-white" : "bg-red-50 text-red-600"
+                onlyWaMismatch ? "bg-black/20 text-white" : "bg-red-50 text-red-700"
               }`}
             >
               {counts.waMismatch}
@@ -3787,7 +3791,7 @@ function AdminProductsContent() {
             aria-pressed={onlyDupNames}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
               onlyDupNames
-                ? "bg-amber-600 text-white"
+                ? "bg-amber-700 text-white"
                 : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
             }`}
             title="Productos que comparten el mismo nombre"
@@ -3796,7 +3800,7 @@ function AdminProductsContent() {
             Nombres duplicados
             <span
               className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                onlyDupNames ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+                onlyDupNames ? "bg-black/20 text-white" : "bg-amber-50 text-amber-700"
               }`}
             >
               {counts.dupNames}
@@ -3897,7 +3901,7 @@ function AdminProductsContent() {
             {chip.label}
             <span
               className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                statusFilter === chip.value ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                statusFilter === chip.value ? "bg-black/20 text-white" : "bg-gray-100 text-gray-600"
               }`}
             >
               {chip.count}
@@ -3910,7 +3914,7 @@ function AdminProductsContent() {
           aria-pressed={onlyOnSale}
           className={`${secondaryFilterClass} items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
             onlyOnSale
-              ? "bg-green-600 text-white"
+              ? "bg-green-700 text-white"
               : "bg-white border border-green-200 text-green-700 hover:bg-green-50"
           }`}
           title="Productos con precio de oferta"
@@ -3919,7 +3923,7 @@ function AdminProductsContent() {
           En oferta
           <span
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              onlyOnSale ? "bg-white/20 text-white" : "bg-green-50 text-green-600"
+              onlyOnSale ? "bg-black/20 text-white" : "bg-green-50 text-green-700"
             }`}
           >
             {counts.onSale}
@@ -3931,7 +3935,7 @@ function AdminProductsContent() {
           aria-pressed={onlyStaleSale}
           className={`${secondaryFilterClass} items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
             onlyStaleSale
-              ? "bg-amber-600 text-white"
+              ? "bg-amber-700 text-white"
               : "bg-white border border-amber-200 text-amber-700 hover:bg-amber-50"
           }`}
           title="Ofertas con fecha de fin ya vencida (el precio de oferta sigue guardado)"
@@ -3940,7 +3944,7 @@ function AdminProductsContent() {
           Ofertas vencidas
           <span
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              onlyStaleSale ? "bg-white/20 text-white" : "bg-amber-50 text-amber-600"
+              onlyStaleSale ? "bg-black/20 text-white" : "bg-amber-50 text-amber-700"
             }`}
           >
             {counts.staleSale}
@@ -3951,7 +3955,7 @@ function AdminProductsContent() {
             type="button"
             onClick={clearExpiredSales}
             disabled={bulkSaving}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-700 text-white text-xs font-semibold hover:bg-amber-800 disabled:opacity-50"
             title="Borra precio de oferta y ventana en los productos con oferta vencida de esta página"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -3973,7 +3977,7 @@ function AdminProductsContent() {
           Bajo umbral
           <span
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              onlyUnderThreshold ? "bg-white/20 text-white" : "bg-red-50 text-red-600"
+              onlyUnderThreshold ? "bg-black/20 text-white" : "bg-red-50 text-red-700"
             }`}
           >
             {counts.underThreshold}
@@ -4013,7 +4017,7 @@ function AdminProductsContent() {
           Papelera
           <span
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-              onlyTrash ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+              onlyTrash ? "bg-black/20 text-white" : "bg-gray-100 text-gray-600"
             }`}
           >
             {counts.trash}
@@ -4080,7 +4084,7 @@ function AdminProductsContent() {
                           {v.name}
                           <span
                             className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                              active ? "bg-brand-100 text-brand-700" : "bg-gray-100 text-gray-500"
+                              active ? "bg-brand-100 text-brand-700" : "bg-gray-100 text-gray-600"
                             }`}
                           >
                             {productPresetFilterCount(v)}
@@ -4090,7 +4094,7 @@ function AdminProductsContent() {
                           type="button"
                           onClick={() => deleteView(v.name)}
                           aria-label={`Borrar vista ${v.name}`}
-                          className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 touch-target"
+                          className="p-1.5 rounded-lg text-gray-500 hover:text-red-700 hover:bg-red-50 touch-target"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -4567,7 +4571,7 @@ function AdminProductsContent() {
                             {product.name}
                             {product.admin_note && (
                               <StickyNote
-                                className="inline w-3.5 h-3.5 ml-1.5 text-amber-500 align-text-top"
+                                className="inline w-3.5 h-3.5 ml-1.5 text-amber-700 align-text-top"
                                 aria-label={`Nota interna: ${product.admin_note}`}
                               />
                             )}
@@ -4691,7 +4695,7 @@ function AdminProductsContent() {
                           <button
                             onClick={() => savePrice(product)}
                             disabled={saving.has(product.id)}
-                            className="p-1 rounded-lg text-green-600 hover:bg-green-50"
+                            className="p-1 rounded-lg text-green-700 hover:bg-green-50"
                           >
                             <Check className="w-4 h-4" />
                           </button>
@@ -5290,7 +5294,7 @@ function AdminProductsContent() {
                       {city.name} <span className="text-gray-400">· {city.state}</span>
                     </span>
                     {mixed && (
-                      <span className="ml-auto text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                      <span className="ml-auto text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
                         mixto
                       </span>
                     )}
@@ -5643,7 +5647,7 @@ function AdminProductsContent() {
                       />
                       <p
                         className={`mt-1 text-[11px] ${
-                          titleLen > SEO_TITLE_MAX ? "text-amber-600" : "text-gray-400"
+                          titleLen > SEO_TITLE_MAX ? "text-amber-700" : "text-gray-400"
                         }`}
                       >
                         {titleLen}/{SEO_TITLE_MAX} caracteres
@@ -5668,7 +5672,7 @@ function AdminProductsContent() {
                       />
                       <p
                         className={`mt-1 text-[11px] ${
-                          descLen > SEO_DESCRIPTION_MAX ? "text-amber-600" : "text-gray-400"
+                          descLen > SEO_DESCRIPTION_MAX ? "text-amber-700" : "text-gray-400"
                         }`}
                       >
                         {descLen}/{SEO_DESCRIPTION_MAX} caracteres
@@ -5774,7 +5778,7 @@ function AdminProductsContent() {
                   Cargando…
                 </div>
               ) : activityDegraded ? (
-                <p className="py-8 text-center text-sm text-amber-600">
+                <p className="py-8 text-center text-sm text-amber-700">
                   Historial no disponible en este momento.
                 </p>
               ) : activityEntries.length === 0 ? (
@@ -6366,7 +6370,7 @@ function AdminProductsContent() {
                   Cargando…
                 </div>
               ) : historyDegraded ? (
-                <p className="py-8 text-center text-sm text-amber-600">
+                <p className="py-8 text-center text-sm text-amber-700">
                   Historial no disponible en este momento.
                 </p>
               ) : historyEntries.length === 0 ? (
@@ -6433,6 +6437,7 @@ function AdminProductsContent() {
             setCategories((prev) => [...prev, cat].sort((a, b) => a.name.localeCompare(b.name, "es")))
           }
           tagSuggestions={tagList.map((t) => t.tag)}
+          confirm={confirm}
         />
       )}
 
@@ -6529,7 +6534,7 @@ function AdminProductsContent() {
                   aria-pressed={bulkPriceMode === "increase"}
                   className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
                     bulkPriceMode === "increase"
-                      ? "bg-green-600 text-white"
+                      ? "bg-green-700 text-white"
                       : "bg-green-50 text-green-700 border border-green-200 hover:bg-green-100"
                   }`}
                 >

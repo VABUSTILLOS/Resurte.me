@@ -5,6 +5,7 @@ import { Wallet, Download, Loader2 } from "lucide-react"
 import { getAdminCommissions, type CommissionsReport } from "@/lib/comercializacion/actions/commissions-admin"
 import { formatMoney } from "@/lib/comercializacion/commissions"
 import { toCsv, downloadCsv } from "@/lib/csv"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 /**
  * /admin/comisiones — reporte de comisiones por vendedor (B4).
@@ -49,7 +50,7 @@ export default function AdminComisionesPage() {
         r.monthCommission.toFixed(2),
       ])
     )
-    const stamp = new Date().toISOString().slice(0, 10)
+    const stamp = dayKeyOf(DEFAULT_TIMEZONE)
     downloadCsv(`comisiones-admin-${stamp}.csv`, csv)
   }
 

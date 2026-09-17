@@ -245,7 +245,7 @@ export function ImportProductsModal({
                   </li>
                 ))}
                 {parsed.errors.length > 20 && (
-                  <li className="text-[11px] text-red-500">…y {parsed.errors.length - 20} más</li>
+                  <li className="text-[11px] text-red-700">…y {parsed.errors.length - 20} más</li>
                 )}
               </ul>
             )}

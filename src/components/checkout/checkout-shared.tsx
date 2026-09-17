@@ -40,31 +40,11 @@ export const DELIVERY_TIMES = [
   "6:00 PM — 8:00 PM",
 ]
 
-// Generate next 7 days for Mexico
-export function getNextDays(): { value: string; label: string }[] {
-  const days: { value: string; label: string }[] = []
-  const today = new Date()
-  const formatter = new Intl.DateTimeFormat("es-MX", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  })
-
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(today)
-    date.setDate(date.getDate() + i)
-    const iso = date.toISOString().split("T")[0] ?? ""
-    const label =
-      i === 0
-        ? `Hoy — ${formatter.format(date)}`
-        : i === 1
-          ? `Mañana — ${formatter.format(date)}`
-          : formatter.format(date).replace(/^\w/, (c) => c.toUpperCase())
-    days.push({ value: iso, label })
-  }
-
-  return days
-}
+// Los próximos 7 días de entrega viven en `@/lib/delivery-days`: se calculan
+// sobre el día LOCAL del restaurante, no sobre el día UTC. Se reexportan aquí
+// para no tocar a quienes ya los importaban de este módulo.
+export { getNextDays } from "@/lib/delivery-days"
+export type { DeliveryDay } from "@/lib/delivery-days"
 
 export const PAYMENT_ICONS: Record<PaymentMethod, ReactNode> = {
   card: <CreditCard className="w-5 h-5" />,

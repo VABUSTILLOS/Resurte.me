@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { FileText, Check, X, ExternalLink, RefreshCcw, Download } from "lucide-react"
 import { toCsv, downloadCsv } from "@/lib/csv"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 interface Submission {
   id: number
@@ -74,7 +75,7 @@ export function FacturasTab() {
         new Date(s.created_at).toLocaleString("es-MX"),
       ])
     )
-    const stamp = new Date().toISOString().slice(0, 10)
+    const stamp = dayKeyOf(DEFAULT_TIMEZONE)
     downloadCsv(`facturas-${stamp}.csv`, csv)
   }
 

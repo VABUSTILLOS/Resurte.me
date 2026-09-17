@@ -18,8 +18,11 @@ import {
 
 type RangeKey = "7d" | "30d" | "month"
 
+const padDay = (n: number) => String(n).padStart(2, "0")
+
+/** Día local del navegador como `YYYY-MM-DD`; nunca el día UTC. */
 function isoDay(d: Date): string {
-  return d.toISOString().slice(0, 10)
+  return `${d.getFullYear()}-${padDay(d.getMonth() + 1)}-${padDay(d.getDate())}`
 }
 
 function rangeStart(range: RangeKey, today: string): string {

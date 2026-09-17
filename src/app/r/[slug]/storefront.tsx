@@ -13,11 +13,11 @@ import {
   buildRecommendations,
   buildWhatsAppOrderLink,
   buildWhatsAppOrderMessage,
-  cartLineKey,
   getOpenStatus,
-  unitPriceWithModifiers,
+  resolveOrderChannel,
   type OpenStatus,
 } from "@/lib/foodos"
+import { mapLinesToMenu, useFoodosCart } from "@/hooks/use-foodos-cart"
 import type {
   FoodosRestaurant,
   FoodosBranch,
@@ -26,7 +26,6 @@ import type {
   FoodosCombo,
   FoodosUpsellRule,
   FoodosOrderItem,
-  FoodosOrderItemModifier,
   FoodosItemOptionGroup,
   FoodosItemOptionValue,
   FoodosBranchHours,
@@ -63,6 +62,13 @@ interface Props {
   reviews: FoodosReview[]
   /** Hay paquetes de catering activos; sin ellos la página pública da 404. */
   hasCatering: boolean
+  /**
+   * Dónde se está mostrando el menú. `marketplace` lo sirve dentro del
+   * directorio de HoyQueComemos (`/comer/[slug]`): el pedido se marca con canal
+   * `marketplace` y el encabezado apunta de vuelta al directorio en vez de
+   * ofrecer un enlace a sí mismo.
+   */
+  origin?: "storefront" | "marketplace"
 }
 
 export function FoodosStorefront({
@@ -78,41 +84,18 @@ export function FoodosStorefront({
   overrides,
   reviews,
   hasCatering,
+  origin = "storefront",
 }: Props) {
-  const [cart, setCart] = useState<FoodosOrderItem[]>([])
   const [view, setView] = useState<View>("menu")
   // Auto-hide: el header del storefront se oculta al bajar y reaparece al
   // subir; el carrito sigue accesible por la barra inferior fija.
   const headerHidden = useScrollDirection() === "down"
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [optionsItem, setOptionsItem] = useState<FoodosMenuItem | null>(null)
 
   // Idioma del storefront (es/en), persistido por restaurante
   const [lang, setLang] = useState<StorefrontLang>(() => detectStorefrontLang(restaurant.slug))
   const changeLang = (next: StorefrontLang) => {
     setLang(next)
     try { localStorage.setItem(`foodos-lang-${restaurant.slug}`, next) } catch { /* privado */ }
-  }
-
-  // Wishlist local por restaurante (favoritos del comensal)
-  const [favorites, setFavorites] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set()
-    try {
-      return new Set(JSON.parse(localStorage.getItem(`foodos-favs-${restaurant.slug}`) ?? "[]") as string[])
-    } catch {
-      return new Set()
-    }
-  })
-  const toggleFavorite = (itemId: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev)
-      if (next.has(itemId)) next.delete(itemId)
-      else next.add(itemId)
-      try {
-        localStorage.setItem(`foodos-favs-${restaurant.slug}`, JSON.stringify([...next]))
-      } catch { /* storage lleno o privado */ }
-      return next
-    })
   }
 
   // Checkout state
@@ -130,6 +113,16 @@ export function FoodosStorefront({
     typeof window === "undefined"
       ? null
       : new URLSearchParams(window.location.search).get("reorden")
+  )
+  // Búsqueda del directorio: /comer/[slug]?platillo=<nombre> entra al menú con
+  // ese platillo resaltado. Se lee en el inicializador y no desde `searchParams`
+  // del servidor, porque leer `searchParams` volvería dinámica la ruta y se
+  // perdería el ISR de 300s (misma razón por la que `mesa` y `reorden` ya se
+  // leen aquí).
+  const [highlightDishValue] = useState(() =>
+    typeof window === "undefined"
+      ? null
+      : new URLSearchParams(window.location.search).get("platillo")
   )
   const [reorderLoaded, setReorderLoaded] = useState(false)
   const [fulfillment, setFulfillment] = useState<"pickup" | "delivery" | "dine_in">(
@@ -190,27 +183,30 @@ export function FoodosStorefront({
   const isAvailableAtBranch = (itemId: string) =>
     branchOverrides.get(itemId)?.is_available !== false
 
+  // Carrito, favoritos, categoría y modal de opciones viven en el hook
+  // compartido: el marketplace y el micrositio son la misma experiencia.
+  const cartApi = useFoodosCart({
+    slug: restaurant.slug,
+    menu: { items, combos, optionValues },
+    optionGroups,
+    priceOf: effectivePrice,
+  })
+  const cart = cartApi.lines
+  const cartCount = cartApi.count
+  const cartSubtotal = cartApi.subtotal
+  const { replaceLines } = cartApi
+
   /** Cambio de sucursal: re-precia el carrito y quita ítems no disponibles. */
   const handleSelectBranch = (id: string) => {
     setBranchId(id)
     const nextOverrides = new Map(overrides.filter((o) => o.branch_id === id).map((o) => [o.item_id, o]))
-    setCart((prev) =>
-      prev
-        .filter((line) => line.combo_id || nextOverrides.get(line.item_id)?.is_available !== false)
-        .map((line) => {
-          if (line.combo_id) return line
-          const menuItem = items.find((i) => i.id === line.item_id)
-          if (!menuItem) return line
-          const base = nextOverrides.get(line.item_id)?.price ?? menuItem.price
-          return { ...line, price: unitPriceWithModifiers(base, line.modifiers) }
-        })
+    replaceLines(
+      mapLinesToMenu(cartApi.lines, { items, combos, optionValues }, (item) => {
+        const override = nextOverrides.get(item.id)
+        return override?.price ?? item.price
+      }).filter((line) => line.combo_id || nextOverrides.get(line.item_id)?.is_available !== false)
     )
   }
-
-  const cartSubtotal = useMemo(
-    () => cart.reduce((sum, i) => sum + i.price * i.qty, 0),
-    [cart]
-  )
 
   const tipAmount = useMemo(() => {
     if (tipPct === "custom") return Math.min(Math.max(Number(customTip) || 0, 0), cartSubtotal)
@@ -237,8 +233,6 @@ export function FoodosStorefront({
     [cart, items, combos, rules]
   )
 
-  const cartCount = cart.reduce((s, i) => s + i.qty, 0)
-
   // Carga diferida del reorden: trae el pedido y mapea sus líneas al menú
   // actual (precios vigentes; se omiten ítems que ya no existen).
   useEffect(() => {
@@ -248,97 +242,23 @@ export function FoodosStorefront({
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data?.items) return
-        const lines: FoodosOrderItem[] = []
-        for (const line of data.items as FoodosOrderItem[]) {
-          if (line.combo_id) {
-            const combo = combos.find((c) => c.id === line.combo_id && c.is_active)
-            if (combo) lines.push({ item_id: combo.id, name: combo.name, price: combo.price, qty: line.qty, combo_id: combo.id })
-            continue
-          }
-          const menuItem = items.find((i) => i.id === line.item_id && i.is_available)
-          if (!menuItem) continue
-          const mods = (line.modifiers ?? []).filter((m) =>
-            optionValues.some((v) => v.id === m.value_id && v.is_available)
-          )
-          lines.push({
-            item_id: menuItem.id,
-            name: menuItem.name,
-            price: unitPriceWithModifiers(menuItem.price, mods),
-            qty: line.qty,
-            modifiers: mods.length ? mods : undefined,
-          })
-        }
-        if (lines.length) setCart(lines)
+        const lines = mapLinesToMenu(
+          data.items as FoodosOrderItem[],
+          { items, combos, optionValues },
+          (item) => item.price
+        )
+        if (lines.length) replaceLines(lines)
         setReorderLoaded(true)
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [reorderId, reorderLoaded, restaurant.slug, items, combos, optionValues])
-
-  const itemHasOptions = (itemId: string) =>
-    optionGroups.some((g) => g.item_id === itemId)
-
-  const addItem = (item: FoodosMenuItem) => {
-    if (itemHasOptions(item.id)) {
-      setOptionsItem(item)
-      return
-    }
-    pushCartLine({ item_id: item.id, name: item.name, price: effectivePrice(item), qty: 1 })
-  }
-
-  const addItemWithModifiers = (modifiers: FoodosOrderItemModifier[]) => {
-    if (!optionsItem) return
-    pushCartLine({
-      item_id: optionsItem.id,
-      name: optionsItem.name,
-      price: unitPriceWithModifiers(effectivePrice(optionsItem), modifiers),
-      qty: 1,
-      modifiers: modifiers.length ? modifiers : undefined,
-    })
-    setOptionsItem(null)
-  }
-
-  /** Agrega una línea fusionando con la existente (mismo ítem + mismos modificadores). */
-  const pushCartLine = (line: FoodosOrderItem) => {
-    setCart((prev) => {
-      const key = cartLineKey(line)
-      const existing = prev.find((i) => cartLineKey(i) === key)
-      if (existing) {
-        return prev.map((i) =>
-          cartLineKey(i) === key ? { ...i, qty: i.qty + line.qty } : i
-        )
-      }
-      return [...prev, line]
-    })
-  }
-
-  const addCombo = (combo: FoodosCombo) => {
-    pushCartLine({
-      item_id: combo.id,
-      name: combo.name,
-      price: combo.price,
-      qty: 1,
-      combo_id: combo.id,
-    })
-  }
+  }, [reorderId, reorderLoaded, restaurant.slug, items, combos, optionValues, replaceLines])
 
   const addRecommendation = (rec: (typeof recommendations)[number]) => {
-    if (rec.kind === "combo" && rec.combo) addCombo(rec.combo)
-    else if (rec.item) addItem(rec.item)
-  }
-
-  const changeQty = (index: number, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((i, idx) => (idx === index ? { ...i, qty: i.qty + delta } : i))
-        .filter((i) => i.qty > 0)
-    )
-  }
-
-  const removeItem = (index: number) => {
-    setCart((prev) => prev.filter((_, idx) => idx !== index))
+    if (rec.kind === "combo" && rec.combo) cartApi.addCombo(rec.combo)
+    else if (rec.item) cartApi.addItem(rec.item)
   }
 
   const submitOrder = async () => {
@@ -383,7 +303,7 @@ export function FoodosStorefront({
           items: cart,
           delivery_fee: deliveryFee,
           discount: 0,
-          channel: paymentMethod === "whatsapp" ? "whatsapp" : tableNumber ? "qr" : "web",
+          channel: resolveOrderChannel({ origin, paymentMethod, tableNumber }),
           fulfillment,
           payment_method:
             paymentMethod === "card" ? "card" : paymentMethod === "transfer" ? "transfer" : null,
@@ -445,7 +365,7 @@ export function FoodosStorefront({
         }
       }
 
-      setCart([])
+      cartApi.clear()
       setView("success")
       setLoading(false)
     } catch (err) {
@@ -490,7 +410,7 @@ export function FoodosStorefront({
 
   const handlePaymentSuccess = () => {
     setClientSecret(null)
-    setCart([])
+    cartApi.clear()
     setView("success")
   }
 
@@ -543,6 +463,7 @@ export function FoodosStorefront({
         restaurant={restaurant}
         orderId={orderId}
         showTransfer={paymentMethod === "transfer"}
+        directoryHref={origin === "marketplace" ? "/comer" : null}
       />
     )
   }
@@ -599,12 +520,22 @@ a.parentNode.insertBefore(o,a)};ttq.load('${restaurant.tiktok_pixel_id}');ttq.pa
             <div>
               <h1 className="font-black text-stone-900 leading-tight">{restaurant.name}</h1>
               <p className="text-xs text-stone-500">{restaurant.description ?? sf(lang, "orderOnline")}</p>
-              <Link
-                href="/comer"
-                className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-600 mt-0.5"
-              >
-                <Compass className="w-3 h-3" /> hoyquecomemos.mx
-              </Link>
+              {origin === "marketplace" ? (
+                <Link
+                  href="/comer"
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-600 mt-0.5"
+                >
+                  <Compass className="w-3 h-3" />
+                  {lang === "es" ? "Volver al directorio" : "Back to directory"}
+                </Link>
+              ) : (
+                <Link
+                  href="/comer"
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-600 mt-0.5"
+                >
+                  <Compass className="w-3 h-3" /> hoyquecomemos.mx
+                </Link>
+              )}
               <Link
                 href={`/r/${restaurant.slug}/carta`}
                 className="inline-flex items-center gap-1 text-[10px] font-semibold text-stone-500 hover:text-stone-700 mt-0.5 ml-2"
@@ -654,18 +585,19 @@ a.parentNode.insertBefore(o,a)};ttq.load('${restaurant.tiktok_pixel_id}');ttq.pa
             categories={categories}
             items={items.filter((i) => isAvailableAtBranch(i.id))}
             combos={combos}
-            selectedCategory={selectedCategory}
-            onSelectCategory={setSelectedCategory}
-            onAddItem={addItem}
-            onAddCombo={addCombo}
+            selectedCategory={cartApi.selectedCategory}
+            onSelectCategory={cartApi.setSelectedCategory}
+            onAddItem={cartApi.addItem}
+            onAddCombo={cartApi.addCombo}
             cartCount={cartCount}
             onGoToCart={() => setView("checkout")}
-            itemHasOptions={itemHasOptions}
+            itemHasOptions={cartApi.itemHasOptions}
             priceFor={effectivePrice}
             reviews={reviews}
-            favorites={favorites}
-            onToggleFavorite={toggleFavorite}
+            favorites={cartApi.favorites}
+            onToggleFavorite={cartApi.toggleFavorite}
             lang={lang}
+            highlight={highlightDishValue}
           />
         )}
 
@@ -715,8 +647,8 @@ a.parentNode.insertBefore(o,a)};ttq.load('${restaurant.tiktok_pixel_id}');ttq.pa
             scheduledTime={scheduledTime}
             setScheduledTime={setScheduledTime}
             transferAvailable={Boolean(restaurant.transfer_clabe)}
-            onChangeQty={changeQty}
-            onRemoveItem={removeItem}
+            onChangeQty={cartApi.changeQty}
+            onRemoveItem={cartApi.removeLine}
             onAddRecommendation={addRecommendation}
             onBack={() => setView("menu")}
             onSubmit={submitOrder}
@@ -727,13 +659,13 @@ a.parentNode.insertBefore(o,a)};ttq.load('${restaurant.tiktok_pixel_id}');ttq.pa
           />
         )}
 
-        {optionsItem && (
+        {cartApi.optionsItem && (
           <ItemOptionsModal
-            item={optionsItem}
+            item={cartApi.optionsItem}
             groups={optionGroups}
             values={optionValues}
-            onConfirm={addItemWithModifiers}
-            onClose={() => setOptionsItem(null)}
+            onConfirm={cartApi.addWithModifiers}
+            onClose={cartApi.closeOptions}
           />
         )}
 

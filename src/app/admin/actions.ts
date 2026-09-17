@@ -6,6 +6,7 @@ import type * as WaCatalogs from "@/lib/whatsapp-catalogs"
 import { logger } from "@/lib/logger"
 import { requireAdmin } from "@/lib/admin-auth"
 import { isMissingColumnError } from "@/lib/sale-window"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import {
   ADMIN_ORDER_OPTIONAL_COLUMNS,
   buildAdminOrdersSelect,
@@ -2810,7 +2811,7 @@ export async function broadcastWaCatalog(
   )
   if (!sections.length) throw new Error("El catálogo está vacío")
 
-  const day = new Date().toISOString().slice(0, 10)
+  const day = dayKeyOf(DEFAULT_TIMEZONE)
   let sent = 0
   let skipped = 0
   let failed = 0

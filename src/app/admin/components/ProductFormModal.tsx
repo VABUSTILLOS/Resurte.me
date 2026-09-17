@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { AlertTriangle, ImagePlus, Loader2, Plus, Search, Sparkles, Star, X } from "lucide-react"
+import type { ConfirmDialogOptions } from "@/hooks/use-confirm-dialog"
 import { cropImageToSquare } from "@/lib/crop-image"
 import { formatMoney } from "@/lib/money"
 import {
@@ -80,6 +81,10 @@ interface ProductFormModalProps {
   onCategoryCreated?: (category: Category) => void
   /** Etiquetas ya usadas en el catálogo, para autocompletar. */
   tagSuggestions?: string[]
+  /** Diálogo de confirmación accesible del padre (`useConfirmDialog`). Se pasa
+   *  desde la página para no montar un segundo diálogo: el `window.confirm`
+   *  nativo bloqueaba el hilo y escapaba del trap de foco del modal (B33). */
+  confirm: (options: ConfirmDialogOptions | string) => Promise<boolean>
 }
 
 interface SpeechRecognitionLike {
@@ -233,6 +238,7 @@ export function ProductFormModal({
   onSaved,
   onCategoryCreated,
   tagSuggestions = [],
+  confirm,
 }: ProductFormModalProps) {
   const isEdit = product !== null
   const [name, setName] = useState(product?.name ?? "")
@@ -383,16 +389,27 @@ export function ProductFormModal({
   const [gallery, setGallery] = useState<string[]>(product?.images ?? [])
   const [mainImage, setMainImage] = useState<string | null>(product?.image_url ?? null)
   const [uploadingImg, setUploadingImg] = useState(false)
+  /** Región viva del modal: la subida y el guardado no cerraban el diálogo y
+   *  no anunciaban nada (el listado sí lo hace con `role="status"`). */
+  const [liveStatus, setLiveStatus] = useState("")
   const galleryInputRef = useRef<HTMLInputElement>(null)
 
   async function uploadGalleryImage(file: File | undefined | null) {
     if (!file || uploadingImg) return
     setUploadingImg(true)
     setError(null)
+    setLiveStatus("Subiendo imagen…")
     try {
-      // Recorte 1:1 opcional (canvas, client-side) antes de subir.
+      // Recorte 1:1 opcional (canvas, client-side) antes de subir. La decisión
+      // pasa por el diálogo accesible del padre, el mismo que usa el listado.
       let upload: File | Blob = file
-      if (window.confirm("¿Recortar la imagen a formato cuadrado (1:1)?\n\nAceptar = recortar · Cancelar = usar original")) {
+      const shouldCrop = await confirm({
+        title: "¿Recortar la imagen a cuadrado (1:1)?",
+        message: "Se recorta el encuadre para que la ficha no se deforme.",
+        confirmLabel: "Recortar",
+        cancelLabel: "Usar original",
+      })
+      if (shouldCrop) {
         try {
           upload = await cropImageToSquare(file)
         } catch {
@@ -407,8 +424,11 @@ export function ProductFormModal({
       const url = data.url as string
       setGallery((prev) => [...prev, url])
       if (!mainImage) setMainImage(url)
+      setLiveStatus("Imagen agregada a la galería")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al subir la imagen")
+      // El error ya se anuncia con `role="alert"`; vaciar evita duplicarlo.
+      setLiveStatus("")
     } finally {
       setUploadingImg(false)
       if (galleryInputRef.current) galleryInputRef.current.value = ""
@@ -922,6 +942,7 @@ export function ProductFormModal({
 
     setSaving(true)
     setError(null)
+    setLiveStatus("Guardando el producto…")
     try {
       const res = isEdit
         ? await fetch("/api/admin/products/update", {
@@ -985,6 +1006,7 @@ export function ProductFormModal({
       // aviso rojo como única instrucción.
       if (options?.expectedAt !== undefined) setStaleWrite(null)
       setError(err instanceof Error ? err.message : "Error al guardar el producto")
+      setLiveStatus("")
     } finally {
       setSaving(false)
     }
@@ -1101,7 +1123,7 @@ export function ProductFormModal({
             <p className="mt-0.5 text-[11px] text-gray-500">
               {isEdit ? "Los cambios se aplican al guardar." : "Los campos con * son obligatorios."}
               {dirty && (
-                <span className="ml-2 font-semibold text-amber-600">Cambios sin guardar</span>
+                <span className="ml-2 font-semibold text-amber-700">Cambios sin guardar</span>
               )}
             </p>
             {/* Resumen de avisos: se ven desde cualquier sección del formulario,
@@ -1197,7 +1219,7 @@ export function ProductFormModal({
                     type="button"
                     onClick={saveMine}
                     disabled={saving}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-700 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-800 disabled:opacity-50"
                   >
                     {saving && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
                     Guardar lo mío
@@ -1213,6 +1235,12 @@ export function ProductFormModal({
                 </div>
               </section>
             )}
+
+            {/* Región viva: anuncia el trabajo asíncrono que no cierra el modal
+                (subida de imagen, guardado). Los errores van por `role="alert"`. */}
+            <p role="status" aria-live="polite" className="sr-only">
+              {liveStatus}
+            </p>
 
             {error && (
               <div
@@ -1603,6 +1631,7 @@ export function ProductFormModal({
                     type="button"
                     onClick={() => galleryInputRef.current?.click()}
                     disabled={uploadingImg}
+                    aria-busy={uploadingImg}
                     className="flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:underline disabled:opacity-50"
                   >
                     {uploadingImg ? (
@@ -1682,7 +1711,7 @@ export function ProductFormModal({
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element -- thumbs admin, URLs dinámicas de Storage */}
                       <img src={url} alt="" className="w-full h-full object-cover" />
-                      <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/40 px-0.5">
+                      <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/70 px-0.5">
                         <button
                           type="button"
                           onClick={() => setMainImage(url)}
@@ -1834,7 +1863,7 @@ export function ProductFormModal({
                     <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
                     <span>
                       {warning.message}{" "}
-                      <span className="text-amber-600/80">Puedes guardar así.</span>
+                      <span className="text-amber-700">Puedes guardar así.</span>
                     </span>
                   </li>
                 ))}
@@ -2009,7 +2038,7 @@ export function ProductFormModal({
                     SEO: título
                   </label>
                   <span
-                    className={`text-[10px] ${seoTitle.length > 60 ? "text-amber-600" : "text-gray-400"}`}
+                    className={`text-[10px] ${seoTitle.length > 60 ? "text-amber-700" : "text-gray-400"}`}
                   >
                     {seoTitle.length}/60
                   </span>
@@ -2029,7 +2058,7 @@ export function ProductFormModal({
                   </label>
                   <span
                     className={`text-[10px] ${
-                      seoDescription.length > 160 ? "text-amber-600" : "text-gray-400"
+                      seoDescription.length > 160 ? "text-amber-700" : "text-gray-400"
                     }`}
                   >
                     {seoDescription.length}/160
@@ -2178,6 +2207,7 @@ export function ProductFormModal({
           <button
             type="submit"
             disabled={saving || staleWrite !== null}
+            aria-busy={saving}
             title={
               staleWrite ? "Resuelve primero el conflicto de edición que aparece arriba" : undefined
             }

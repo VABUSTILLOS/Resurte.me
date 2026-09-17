@@ -12,7 +12,7 @@ import {
   ArrowRight,
 } from "lucide-react"
 import type { PublicMarketplaceEntry } from "@/lib/foodos-public"
-import { formatMoney } from "@/lib/foodos"
+import { formatMoney, normalizeSearchText } from "@/lib/foodos"
 
 interface Props {
   entries: PublicMarketplaceEntry[]
@@ -167,7 +167,11 @@ export function MarketplaceDirectory({ entries }: Props) {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map((entry) => (
-              <RestaurantCard key={entry.restaurant.id} entry={entry} />
+              <RestaurantCard
+                key={entry.restaurant.id}
+                entry={entry}
+                highlightDish={matchDish(entry, query)}
+              />
             ))}
           </div>
         )}
@@ -176,7 +180,24 @@ export function MarketplaceDirectory({ entries }: Props) {
   )
 }
 
-function RestaurantCard({ entry }: { entry: PublicMarketplaceEntry }) {
+/**
+ * Primer platillo del restaurante que coincide con lo que el comensal escribió.
+ * Alimenta el enlace "Pedir <platillo>": entra al menú del marketplace con ese
+ * platillo resaltado y desplazado a la vista.
+ */
+function matchDish(entry: PublicMarketplaceEntry, query: string): string | null {
+  const q = normalizeSearchText(query)
+  if (!q) return null
+  return entry.items.find((i) => normalizeSearchText(i.name).includes(q))?.name ?? null
+}
+
+function RestaurantCard({
+  entry,
+  highlightDish,
+}: {
+  entry: PublicMarketplaceEntry
+  highlightDish: string | null
+}) {
   const { restaurant, branches, categories } = entry
   const primary = branches[0]
   const hasDelivery = branches.some((b) => b.delivery_active)
@@ -188,7 +209,11 @@ function RestaurantCard({ entry }: { entry: PublicMarketplaceEntry }) {
 
   return (
     <Link
-      href={`/r/${restaurant.slug}`}
+      href={
+        highlightDish
+          ? `/comer/${restaurant.slug}?platillo=${encodeURIComponent(highlightDish)}`
+          : `/comer/${restaurant.slug}`
+      }
       className="group flex flex-col rounded-2xl bg-white border border-gray-200 overflow-hidden shadow-sm hover:shadow-lg hover:border-[#0E7A0E]/30 transition-all"
     >
       {/* Cover */}
@@ -254,8 +279,10 @@ function RestaurantCard({ entry }: { entry: PublicMarketplaceEntry }) {
         )}
 
         <div className="flex items-center justify-between mt-auto pt-3">
-          <span className="text-sm font-semibold text-[#0E7A0E]">Ver menú</span>
-          <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-[#0E7A0E] group-hover:translate-x-0.5 transition-all" />
+          <span className="min-w-0 truncate text-sm font-semibold text-[#0E7A0E]">
+            {highlightDish ? `Pedir ${highlightDish}` : "Ver menú"}
+          </span>
+          <ArrowRight className="w-4 h-4 shrink-0 text-gray-300 group-hover:text-[#0E7A0E] group-hover:translate-x-0.5 transition-all" />
         </div>
       </div>
     </Link>

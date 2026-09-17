@@ -40,6 +40,7 @@ import PurchaseStimulusCard from "@/components/panel/hub/PurchaseStimulusCard"
 import RestoreConfirmModal from "@/components/panel/hub/RestoreConfirmModal"
 import ServerRestoreModal from "@/components/panel/hub/ServerRestoreModal"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 export default function PanelPage() {
   const { selectedCollection, collections, setSelectedCollection } = useRestaurant()
@@ -259,7 +260,7 @@ export default function PanelPage() {
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
-      const stamp = new Date().toISOString().slice(0, 10)
+      const stamp = dayKeyOf(DEFAULT_TIMEZONE)
       a.href = url
       a.download = `resurte-panel-respaldo-${stamp}.json`
       a.click()

@@ -12,6 +12,8 @@
  *  - Webhook verification
  */
 
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
+
 // ============================================================
 // Types
 // ============================================================
@@ -247,6 +249,8 @@ export function buildCatalogBatchRequests(
   products: WhatsAppProduct[],
   method: "CREATE" | "UPDATE"
 ): CatalogBatchRequest[] {
+  // Meta espera el día local del negocio, no el día UTC.
+  const saleStartDay = dayKeyOf(DEFAULT_TIMEZONE)
   return products.map((p) => {
     const priceCents = Math.round(p.price * 100)
     const saleCents = p.sale_price ? Math.round(p.sale_price * 100) : null
@@ -260,7 +264,7 @@ export function buildCatalogBatchRequests(
       ...(saleCents && saleCents > 0 && saleCents < priceCents
         ? {
             sale_price: saleCents,
-            sale_price_start_date: new Date().toISOString().split("T")[0],
+            sale_price_start_date: saleStartDay,
           }
         : {}),
     }

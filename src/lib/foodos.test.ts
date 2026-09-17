@@ -4,6 +4,8 @@ import {
   buildWhatsAppOrderMessage,
   cartLineKey,
   modifiersSummary,
+  normalizeSearchText,
+  resolveOrderChannel,
   unitPriceWithModifiers,
   validateOptionSelection,
 } from "./foodos"
@@ -241,5 +243,40 @@ describe("signWebhookPayload", () => {
     expect(a).toBe(b)
     expect(a).toMatch(/^[0-9a-f]{64}$/)
     expect(signWebhookPayload("otro", "body")).not.toBe(a)
+  })
+})
+
+describe("normalizeSearchText", () => {
+  it("ignora acentos, mayúsculas y espacios sobrantes", () => {
+    expect(normalizeSearchText("  Camarón al Mojo  ")).toBe("camaron al mojo")
+    expect(normalizeSearchText("Camarón")).toBe(normalizeSearchText("camaron"))
+  })
+
+  it("no truena con vacío", () => {
+    expect(normalizeSearchText("")).toBe("")
+    expect(normalizeSearchText("   ")).toBe("")
+  })
+})
+
+describe("resolveOrderChannel", () => {
+  it("marca marketplace cuando el pedido viene del directorio", () => {
+    expect(resolveOrderChannel({ origin: "marketplace" })).toBe("marketplace")
+  })
+
+  it("marketplace gana aunque se pague por WhatsApp o sea para una mesa", () => {
+    expect(
+      resolveOrderChannel({ origin: "marketplace", paymentMethod: "whatsapp", tableNumber: "12" })
+    ).toBe("marketplace")
+  })
+
+  it("en el micrositio distingue whatsapp, qr y web", () => {
+    expect(resolveOrderChannel({ origin: "storefront", paymentMethod: "whatsapp" })).toBe("whatsapp")
+    expect(resolveOrderChannel({ origin: "storefront", tableNumber: "7" })).toBe("qr")
+    expect(resolveOrderChannel({ origin: "storefront", paymentMethod: "branch" })).toBe("web")
+  })
+
+  it("una mesa vacía no cuenta como qr", () => {
+    expect(resolveOrderChannel({ origin: "storefront", tableNumber: "   " })).toBe("web")
+    expect(resolveOrderChannel({})).toBe("web")
   })
 })

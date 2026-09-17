@@ -38,6 +38,7 @@ import { formatDateTime, getTodayBounds } from "@/lib/comercializacion/dates"
 import { weeklyReminderMessage, reorderSuggestionMessage, buildWhatsappLink } from "@/lib/comercializacion/whatsapp"
 import { addActivity } from "@/lib/comercializacion/actions"
 import { useToast } from "@/components/toast"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 function ReminderButtons({
   client,
@@ -242,7 +243,7 @@ export function DashboardPage({
   ).length
 
   function exportCommissionCsv() {
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = dayKeyOf(DEFAULT_TIMEZONE)
     downloadCsv(
       `comisiones-${hoy}.csv`,
       toCsv(

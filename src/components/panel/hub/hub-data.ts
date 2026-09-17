@@ -447,6 +447,18 @@ export const TOOLS: Tool[] = [
     feature: "pos_mostrador",
   },
   {
+    title: "Mesas y comandero",
+    description: "Dibuja el salón por zonas y coloca cada mesa donde está. Abre la cuenta, manda rondas a cocina, transfiere o une mesas y cóbrala al final con propina y pago combinado. Una mesa no puede tener dos cuentas abiertas.",
+    icon: UtensilsCrossed,
+    href: "/panel/foodos/mesas",
+    color: "text-emerald-700",
+    bgColor: "bg-emerald-50",
+    area: "sistema",
+    short: "Mesas",
+    standalone: true,
+    feature: "comandero",
+  },
+  {
     title: "Corte de caja y arqueo",
     description: "Abre el turno con tu fondo, registra entradas y salidas de efectivo y ciérralo contando el cajón por denominación. El esperado y el faltante los calcula el servidor, no la pantalla.",
     icon: Banknote,

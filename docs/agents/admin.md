@@ -204,7 +204,9 @@
   pegado reproduzca la vista; `clearFilters` delega en
   `clearedProductFilters()` para que añadir un filtro no lo deje fuera. Las
   confirmaciones destructivas usan el diálogo accesible con foco atrapado:
-  `window.confirm`/`window.prompt` están prohibidos en esta página.
+  `window.confirm`/`window.prompt` están prohibidos en esta página **y en sus
+  modales** — `ProductFormModal` recibe `confirm` del `useConfirmDialog()` del
+  listado (prop obligatoria) en vez de montar un diálogo propio (B33).
 - Productos ronda 8 — lotes largos (B4): toda acción masiva ofrece deshacer
   (`setUndoAction`, incluidas WhatsApp, unidad, visibilidad, ofertas, etiquetas,
   categoría, precio y disponibilidad) y los lotes muestran barra de progreso
@@ -263,6 +265,59 @@
   `submitForm()` —invertir el orden deja la barra de descarte tapando los
   errores de validación— y la acción primaria va al final de la barra. El modal
   no se cierra solo al guardar: lo cierra el padre desde `onSaved`.
+- Productos ronda 14 — diálogos y anuncios del modal (B33-B34): dos invariantes
+  nuevas de `ProductFormModal`. (1) **Sin diálogos nativos**: el recorte 1:1 de
+  una imagen de galería se pregunta con `await confirm({...})`, la función que el
+  modal **recibe** por prop desde el único `useConfirmDialog()` del listado, con
+  los mismos textos que su gemelo `handleImageFile`. El modal **no** debe montar
+  su propio `useConfirmDialog()`: el diálogo es un *hermano* del modal en el
+  árbol, así que el `Escape` del diálogo no lo ve el `onDialogKeyDown` del
+  `<form>`; anidado, un solo `Escape` dispararía `requestClose()` sobre ambos y
+  habría dos trampas de Tab compitiendo. (2) **El trabajo asíncrono se anuncia**:
+  el modal tiene una región `role="status" aria-live="polite"` (`sr-only`) que
+  anuncia el guardado y la subida, y los dos botones asíncronos llevan
+  `aria-busy`; en los `catch` el texto se limpia a propósito, porque el error ya
+  lo anuncia el banner con `role="alert"` y no se debe anunciar dos veces. El
+  contrato de ambas lo fija `src/lib/admin-product-modal-a11y.contract.test.ts`.
+- Productos ronda 15 — reabasto que no se traga el error (B35): `RestockPanel`
+  escribe con `adjustProductStock` y, al tener éxito, **elimina la fila** de la
+  lista (`prev.filter`), así que no puede quedarse callado. Dos invariantes:
+  (1) el trabajo se anuncia en una región `role="status" aria-live="polite"`
+  (`sr-only`) con el nombre del producto —"Reponiendo X…" / "Reabastecido: X"—,
+  y el botón lleva `disabled` + `aria-busy` y un `aria-label` que incluye el
+  producto, porque en una lista repetida "Reponer 12" no distingue fila;
+  (2) **el `catch` no puede quedarse vacío**: un fallo se pinta como
+  `role="alert"` ("No se pudo reabastecer X…") y limpia el `liveStatus`, y se
+  vuelve a limpiar el error al reintentar. Si no hay aviso, la fila que sigue
+  ahí parece un clic perdido y el admin reintenta a ciegas. El contrato lo fija
+  `src/lib/admin-restock-a11y.contract.test.ts`.
+- Productos ronda 16 — contraste del panel, que axe no puede ver (B36-B37): C14
+  cerró la deuda AA con `e2e/a11y.spec.ts` en 20/20, pero ese gate **solo recorre
+  rutas públicas** — `/admin/productos` exige sesión, así que axe nunca lo miró y
+  una familia entera de defectos sobrevivió al ✅. Cuatro reglas, todas medibles
+  con el fondo **compuesto** (no el token nominal): (1) **un `-600` de amber o
+  verde no vale como relleno con texto blanco** (`bg-amber-600` 3.20:1,
+  `bg-green-600` 3.22:1) ni como color de texto sobre fondos claros
+  (`amber-600`/`amber-50` 3.09:1, `green-600`/`green-50` 3.08:1): sube a `-700`
+  y a `-800` sobre `-200`; (2) **nunca aclares con alfa para un texto blanco** —
+  el chip de conteo del botón activo usaba `bg-white/20 text-white` (3.51:1);
+  `bg-black/20` oscurece y llega a 7.03:1, pero **depende** de haber subido el
+  tono del botón antes; (3) **un scrim que lleva texto se oscurece**: los
+  controles de la miniatura de galería sobre `bg-black/40` daban 2.16:1 sobre una
+  foto blanca (y 1.48:1 el hover destructivo), así que van a `bg-black/70`
+  (5.16 / 4.40) — al 60% el rojo se queda en 2.99:1 y `red-400` es **peor** que
+  `red-300`; los otros 19 `bg-black/40` son fondos de modal y no llevan texto, así
+  que no se tocan; (4) `text-gray-300`/`-400` solo valen si son decorativos
+  (`aria-hidden`, `—` de dato ausente, iconos de estado vacío, indicador de
+  orden): el dato real tiene que estar en el DOM. Ya cumplen y **no** se tocan
+  `bg-brand-600 text-white` (6.12:1, escala propia de `globals.css`), `bg-red-600
+  text-white` (4.77:1) ni los puntos de estado `bg-green-500`/`bg-amber-400` (no
+  son texto, superan el 3:1 de 1.4.11 y son redundantes con su etiqueta). Como no
+  hay credenciales de admin en CI, el **único** gate automatizado posible es
+  `src/lib/admin-productos-contrast.contract.test.ts`: su prueba central no
+  cuenta ocurrencias, enumera todo `text-white(/N)` del perímetro, camina hacia
+  atrás hasta el `bg-*` más cercano y exige que esté en una lista blanca con
+  ratio ≥4.5:1, así que se autoextiende y no se queda obsoleta.
 - Productos ronda 10 — conteos de los chips (B15-B16): la RPC
   `admin_product_filter_counts(p_include_deleted)` (00118) es la v2 de la de la
   ronda 8 y devuelve los 11 contadores + `brands` + `tagCounts` en una sola
@@ -475,6 +530,24 @@
   `marketing_consent`, tope de 200 y dedupe por día en
   `whatsapp_automation_sends`.
 
+- Productos — contraste (la superficie que axe no puede ver): `e2e/a11y.spec.ts`
+  recorre **solo rutas públicas**, así que `/admin/productos` (que exige sesión)
+  nunca pasó por axe y acumuló cuatro familias del mismo defecto. Las reglas son
+  medibles y no negociables: (1) **amber/verde `-600` no vale** ni como relleno
+  con texto blanco (`bg-amber-600` 3.20:1) ni como texto sobre `-50`
+  (`amber-600`/`amber-50` 3.09:1) — sube a `-700`, y a `-800` sobre `-200`;
+  (2) **no aclares con alfa para un texto blanco**: un chip `bg-white/20
+  text-white` dentro de un botón se compone con el botón y se queda corto
+  (3.51:1); oscurece con `bg-black/20` (7.03:1); (3) **un scrim que lleva texto
+  se oscurece a `bg-black/70`**: los controles de la miniatura de galería sobre
+  `bg-black/40` daban 2.16:1 sobre una foto blanca; los `bg-black/40` que son
+  fondos de modal no llevan texto y **no** se tocan; (4) `text-gray-300`/`-400`
+  solo si son decorativos (`aria-hidden`, `—` de dato ausente): el dato real
+  tiene que estar en el DOM. Mide siempre el fondo **compuesto**, no el token
+  nominal, y para un fondo translúcido sobre foto usa el peor caso (foto blanca).
+  El gate es `src/lib/admin-productos-contrast.contract.test.ts`: enumera todo
+  `text-white(/N)` del perímetro, busca hacia atrás el `bg-*` que lo respalda y
+  lo exige en una lista blanca ≥4.5:1, así que se autoextiende con el código.
 - Productos — móvil: la página vive en el contenedor `max-w-7xl mx-auto px-4
   sm:px-6` (como el resto del área); la barra de 7 acciones se parte en CTA
   primario + menú "Más" (`role="menu"`) por debajo de `sm`; los bloques de
@@ -903,3 +976,15 @@ Ronda 13 de `/admin/productos` (sin migraciones nuevas: se apoya en 00116 y 0011
   `tagCounts` un objeto **plano** — un `tagCounts: []` cumple `typeof ===
   "object"`, así que sin el guard el panel pintaría cero etiquetas creyendo que
   el RPC funcionó en lugar de caer al camino antiguo.
+- Contraste: `e2e/a11y.spec.ts` **no sirve** para esta superficie (recorre rutas
+  públicas; `/admin/productos` exige sesión), así que el gate es
+  `npx vitest run src/lib/admin-productos-contrast.contract.test.ts`. Si añades
+  un botón o un chip, la prueba central exige que el `bg-*` que respalde su
+  `text-white` esté en la lista blanca: añade el relleno a `PERMITIDOS` **solo**
+  después de medir el ratio sobre el fondo compuesto (≥4.5:1), y no midas el
+  token nominal — un `bg-white/20` sobre `bg-amber-700` no es `bg-white/20`. Para
+  un fondo translúcido sobre foto, mide contra el peor caso (foto blanca): los
+  controles de la miniatura de galería necesitaron `bg-black/70`, porque al 60%
+  el hover destructivo se quedaba en 2.99:1. La lista blanca también documenta
+  por qué lo demás no se toca (`bg-brand-600` 6.12:1, `bg-red-600` 4.77:1, puntos
+  de estado no textuales).

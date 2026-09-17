@@ -8,6 +8,7 @@ import type { WalletHistoryFilter } from "@/types";
 import { getWalletHistory } from "@/lib/wallet-actions";
 import { formatNumber } from "@/lib/money";
 import { toCsv, downloadCsv } from "@/lib/csv";
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date";
 
 const FILTERS: { id: WalletHistoryFilter; label: string }[] = [
   { id: "all", label: "Todos" },
@@ -91,7 +92,7 @@ export function ActivityFeed() {
           tx.amount,
         ])
       );
-      const stamp = new Date().toISOString().slice(0, 10);
+      const stamp = dayKeyOf(DEFAULT_TIMEZONE);
       downloadCsv(`mis-creditos${FILTER_FILE_SUFFIX[filter]}-${stamp}.csv`, csv);
     } catch {
       // Error de red/sesión: no interrumpir la vista por la exportación

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react"
 import Image from "next/image"
 import { ArrowRight, Heart, Plus, Star } from "lucide-react"
-import { formatMoney } from "@/lib/foodos"
+import { formatMoney, normalizeSearchText } from "@/lib/foodos"
 import { sf, type StorefrontLang } from "@/lib/foodos-i18n"
 import type { FoodosMenuCategory, FoodosMenuItem, FoodosCombo, FoodosReview } from "@/types/foodos"
 
@@ -23,6 +23,7 @@ export function MenuView({
   favorites,
   onToggleFavorite,
   lang,
+  highlight = null,
 }: {
   categories: FoodosMenuCategory[]
   items: FoodosMenuItem[]
@@ -39,12 +40,27 @@ export function MenuView({
   favorites: Set<string>
   onToggleFavorite: (itemId: string) => void
   lang: StorefrontLang
+  /** Platillo a resaltar y desplazar a la vista (búsqueda desde el directorio). */
+  highlight?: string | null
 }) {
   const featured = items.filter((i) => i.is_featured)
   const visibleCategories = selectedCategory
     ? categories.filter((c) => c.id === selectedCategory)
     : categories
   const uncategorized = selectedCategory === null ? items.filter((i) => !i.category_id) : []
+
+  // Misma normalización que usa el directorio para ofrecer la búsqueda: si aquí
+  // no coincidiera, el comensal llegaría al menú sin nada resaltado.
+  const highlightQuery = normalizeSearchText(highlight ?? "")
+  const highlightedId = highlightQuery
+    ? (items.find((i) => normalizeSearchText(i.name).includes(highlightQuery))?.id ?? null)
+    : null
+
+  useEffect(() => {
+    if (!highlightedId) return
+    const card = document.getElementById(`foodos-dish-${highlightedId}`)
+    card?.scrollIntoView({ block: "center", behavior: "smooth" })
+  }, [highlightedId])
 
   // Publica la altura de la barra "Ver pedido" al CSS cuando el carrito local
   // tiene items, para que WhatsApp/CookieConsent/Toast suban por encima (mismo
@@ -76,7 +92,7 @@ export function MenuView({
           <h2 className="text-lg font-black text-stone-900 mb-3">🔥 {sf(lang, "favoritesSection")}</h2>
           <div className="grid gap-3">
             {featured.map((item) => (
-              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} isFavorite={favorites.has(item.id)} onToggleFavorite={() => onToggleFavorite(item.id)} onAdd={() => onAddItem(item)} lang={lang} />
+              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} isFavorite={favorites.has(item.id)} onToggleFavorite={() => onToggleFavorite(item.id)} onAdd={() => onAddItem(item)} lang={lang} highlighted={item.id === highlightedId} />
             ))}
           </div>
         </section>
@@ -146,7 +162,7 @@ export function MenuView({
             {items
               .filter((i) => i.category_id === cat.id)
               .map((item) => (
-                <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} isFavorite={favorites.has(item.id)} onToggleFavorite={() => onToggleFavorite(item.id)} onAdd={() => onAddItem(item)} lang={lang} />
+                <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} isFavorite={favorites.has(item.id)} onToggleFavorite={() => onToggleFavorite(item.id)} onAdd={() => onAddItem(item)} lang={lang} highlighted={item.id === highlightedId} />
               ))}
           </div>
         </section>
@@ -157,7 +173,7 @@ export function MenuView({
           <h2 className="text-lg font-black text-stone-900 mb-3">{sf(lang, "dishes")}</h2>
           <div className="grid gap-3">
             {uncategorized.map((item) => (
-              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} isFavorite={favorites.has(item.id)} onToggleFavorite={() => onToggleFavorite(item.id)} onAdd={() => onAddItem(item)} lang={lang} />
+              <ItemCard key={item.id} item={item} hasOptions={itemHasOptions(item.id)} price={priceFor(item)} isFavorite={favorites.has(item.id)} onToggleFavorite={() => onToggleFavorite(item.id)} onAdd={() => onAddItem(item)} lang={lang} highlighted={item.id === highlightedId} />
             ))}
           </div>
         </section>
@@ -204,9 +220,14 @@ export function MenuView({
   )
 }
 
-function ItemCard({ item, hasOptions, price, isFavorite, onToggleFavorite, onAdd, lang }: { item: FoodosMenuItem; hasOptions: boolean; price: number; isFavorite: boolean; onToggleFavorite: () => void; onAdd: () => void; lang: StorefrontLang }) {
+function ItemCard({ item, hasOptions, price, isFavorite, onToggleFavorite, onAdd, lang, highlighted = false }: { item: FoodosMenuItem; hasOptions: boolean; price: number; isFavorite: boolean; onToggleFavorite: () => void; onAdd: () => void; lang: StorefrontLang; highlighted?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 bg-white border border-stone-200 rounded-2xl p-4">
+    <div
+      id={`foodos-dish-${item.id}`}
+      className={`flex items-center justify-between gap-3 bg-white border rounded-2xl p-4 ${
+        highlighted ? "border-amber-400 ring-2 ring-amber-300" : "border-stone-200"
+      }`}
+    >
       <div className="min-w-0 flex-1">
         {item.tags.length > 0 && (
           <div className="flex gap-1 mb-1">

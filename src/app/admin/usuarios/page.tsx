@@ -10,6 +10,7 @@ import {
   type ManagedUser,
   type ManagedUserRole,
 } from "./actions"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 const ROLE_META: Record<
   ManagedUserRole,
@@ -72,7 +73,7 @@ export default function AdminUsuariosPage() {
         u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString("es-MX") : "",
       ])
     )
-    const stamp = new Date().toISOString().slice(0, 10)
+    const stamp = dayKeyOf(DEFAULT_TIMEZONE)
     downloadCsv(`usuarios-${stamp}.csv`, csv)
     setNotice(`${users.length} usuario${users.length !== 1 ? "s" : ""} exportados a CSV.`)
   }

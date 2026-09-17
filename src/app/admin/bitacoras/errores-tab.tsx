@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Download, RefreshCw, Loader2 } from "lucide-react"
 import { getErrorLogs, type ErrorLogsReport } from "@/lib/admin-errors"
 import { toCsv, downloadCsv } from "@/lib/csv"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 const SEVERITY_STYLE: Record<string, string> = {
   fatal: "bg-red-100 text-red-700",
@@ -62,7 +63,7 @@ export function ErroresTab() {
         e.user_id ? e.user_id.slice(0, 8) : "",
       ])
     )
-    const stamp = new Date().toISOString().slice(0, 10)
+    const stamp = dayKeyOf(DEFAULT_TIMEZONE)
     downloadCsv(`error-logs-${stamp}.csv`, csv)
   }
 

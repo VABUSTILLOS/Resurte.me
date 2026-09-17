@@ -24,7 +24,7 @@ vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }))
 
-import { earnedTierFromOrders } from "@/lib/foodos-entitlements"
+import { earnedTierFromOrders, featuresForTier } from "@/lib/foodos-entitlements"
 import {
   getAdminFoodosAdoption,
   getAdminFoodosRestaurants,
@@ -468,9 +468,11 @@ describe("getAdminFoodosAdoption", () => {
 
     const result = await getAdminFoodosAdoption()
     expect(result.features.map((f) => f.feature)).not.toContain("app_marca")
-    // Pero sí cuenta para las capacidades abiertas del resumen: Diamante abre
-    // las 8, y el promedio es de capacidades, no un porcentaje.
-    expect(result.summary.averageUnlocked).toBe(8)
+    // Pero sí cuenta para las capacidades abiertas del resumen: el promedio es
+    // de capacidades, no un porcentaje, y Diamante las abre todas. Se deriva
+    // del catálogo en vez de fijar un número para que agregar una capacidad no
+    // rompa la prueba por una razón que no tiene que ver con `app_marca`.
+    expect(result.summary.averageUnlocked).toBe(featuresForTier("Diamante").length)
   })
 
   it("mide activación, actividad reciente y retención sobre quien tiene la capacidad abierta", async () => {

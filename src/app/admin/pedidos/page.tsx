@@ -47,6 +47,7 @@ import {
   type BulkResult,
   type Selection,
 } from "@/lib/order-bulk"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 function formatAdminAddress(a: NonNullable<AdminOrder["address"]>): string {
   const parts = [
@@ -315,7 +316,7 @@ function AdminOrdersContent() {
         new Date(o.created_at).toLocaleString("es-MX"),
       ])
     )
-    const stamp = new Date().toISOString().slice(0, 10)
+    const stamp = dayKeyOf(DEFAULT_TIMEZONE)
     downloadCsv(`pedidos-${suffix ? `${suffix}-` : ""}${stamp}.csv`, csv)
     toast(`${subset.length} pedido${subset.length !== 1 ? "s" : ""} exportados a CSV`, "success")
   }

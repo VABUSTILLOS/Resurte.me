@@ -40,6 +40,8 @@ export function RestockPanel({ onRestocked }: { onRestocked: (productId: number)
   const [showHistory, setShowHistory] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [workingId, setWorkingId] = useState<number | null>(null)
+  const [liveStatus, setLiveStatus] = useState("")
+  const [restockError, setRestockError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -75,6 +77,8 @@ export function RestockPanel({ onRestocked }: { onRestocked: (productId: number)
 
   async function restock(s: Suggestion) {
     setWorkingId(s.productId)
+    setRestockError(null)
+    setLiveStatus(`Reponiendo ${s.name}…`)
     try {
       // Reponer la cantidad sugerida deja el stock por encima del umbral y
       // el estado se deriva de la existencia (00108).
@@ -92,12 +96,17 @@ export function RestockPanel({ onRestocked }: { onRestocked: (productId: number)
       )
       setSuggestions((prev) => prev.filter((x) => x.productId !== s.productId))
       onRestocked(s.productId)
-      if (showHistory) await loadHistory()
+      setLiveStatus(`Reabastecido: ${s.name}`)
     } catch {
-      // El admin puede reintentar; el error queda en consola del servidor
+      // La fila sobrevive al fallo: el aviso explica por qué sigue ahí.
+      setLiveStatus("")
+      setRestockError(`No se pudo reabastecer ${s.name}. Vuelve a intentarlo.`)
     } finally {
       setWorkingId(null)
     }
+    // Fuera del try a propósito: el historial es decorativo y ya no puede
+    // hacer que un reabasto correcto se anuncie como fallido.
+    if (showHistory) await loadHistory()
   }
 
   if (!loaded || (suggestions.length === 0 && !showHistory)) {
@@ -115,7 +124,7 @@ export function RestockPanel({ onRestocked }: { onRestocked: (productId: number)
           <PackagePlus className="w-4 h-4" aria-hidden="true" />
           Reabasto sugerido
           {suggestions.length > 0 && (
-            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+            <span className="rounded-full bg-amber-800 px-2 py-0.5 text-[10px] font-bold text-white">
               {suggestions.length}
             </span>
           )}
@@ -132,35 +141,47 @@ export function RestockPanel({ onRestocked }: { onRestocked: (productId: number)
         </button>
       </div>
 
+      <p role="status" aria-live="polite" className="sr-only">
+        {liveStatus}
+      </p>
+      {restockError && (
+        <p role="alert" className="mt-2 text-xs font-medium text-red-700">
+          {restockError}
+        </p>
+      )}
+
       {suggestions.length === 0 ? (
-        <p className="mt-2 text-xs text-amber-800/70">
+        <p className="mt-2 text-xs text-amber-800">
           Sin sugerencias: no hay productos con stock bajo/agotado y ventas recientes.
         </p>
       ) : (
         <ul className="mt-3 divide-y divide-amber-100">
-          {suggestions.map((s) => (
-            <li key={s.productId} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
-              <span className="font-medium text-gray-900">{s.name}</span>
-              <span className="text-xs text-amber-800/80">{s.reason}</span>
-              {s.stockQuantity !== null && (
-                <span className="text-[11px] text-amber-900/60">
-                  {s.stockQuantity} en existencia · umbral {s.lowStockThreshold ?? 5}
-                </span>
-              )}
-              <button
-                type="button"
-                disabled={workingId === s.productId}
-                onClick={() => void restock(s)}
-                className="ml-auto rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50 transition-colors"
-              >
-                {workingId === s.productId
-                  ? "..."
-                  : s.suggestedQuantity > 0
-                    ? `Reponer ${s.suggestedQuantity}`
-                    : "Reabastecer"}
-              </button>
-            </li>
-          ))}
+          {suggestions.map((s) => {
+            const label =
+              s.suggestedQuantity > 0 ? `Reponer ${s.suggestedQuantity}` : "Reabastecer"
+            const busy = workingId === s.productId
+            return (
+              <li key={s.productId} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
+                <span className="font-medium text-gray-900">{s.name}</span>
+                <span className="text-xs text-amber-800">{s.reason}</span>
+                {s.stockQuantity !== null && (
+                  <span className="text-[11px] text-amber-800">
+                    {s.stockQuantity} en existencia · umbral {s.lowStockThreshold ?? 5}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  disabled={busy}
+                  aria-busy={busy}
+                  aria-label={`${label} · ${s.name}`}
+                  onClick={() => void restock(s)}
+                  className="ml-auto rounded-lg bg-amber-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-800 disabled:opacity-50 transition-colors"
+                >
+                  {busy ? "…" : label}
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
 
@@ -168,7 +189,7 @@ export function RestockPanel({ onRestocked }: { onRestocked: (productId: number)
         <div className="mt-3 border-t border-amber-200 pt-3">
           <h3 className="text-xs font-semibold text-amber-900 mb-2">Últimos ajustes de stock</h3>
           {history.length === 0 ? (
-            <p className="text-xs text-amber-800/70">Aún no hay ajustes registrados.</p>
+            <p className="text-xs text-amber-800">Aún no hay ajustes registrados.</p>
           ) : (
             <ul className="space-y-1">
               {history.map((h) => (
@@ -180,7 +201,7 @@ export function RestockPanel({ onRestocked }: { onRestocked: (productId: number)
                   {STOCK_LABEL[h.new_status] ?? h.new_status}
                   {h.note ? ` · ${h.note}` : ""}
                   <span
-                    className="ml-1 text-amber-800/60"
+                    className="ml-1 text-amber-800"
                     title={new Date(h.created_at).toLocaleString("es-MX")}
                   >
                     {formatRelativeTime(h.created_at)}

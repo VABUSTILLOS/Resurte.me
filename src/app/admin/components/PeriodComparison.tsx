@@ -8,6 +8,7 @@ import {
   metricsComparisonToCsv,
   type PeriodDays,
 } from "@/lib/analytics-periods"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 function money(value: number): string {
   return `$${value.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`
@@ -68,7 +69,7 @@ export function PeriodComparisonCard() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `comparativa-${data.days}d-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `comparativa-${data.days}d-${dayKeyOf(DEFAULT_TIMEZONE)}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

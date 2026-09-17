@@ -76,6 +76,22 @@ export function dayKeyOf(
   return `${p.year}-${pad(p.month)}-${pad(p.day)}`
 }
 
+/**
+ * Instante → valor de `<input type="datetime-local">` (`YYYY-MM-DDTHH:mm`).
+ *
+ * A diferencia del resto del módulo, aquí NO se recorta a una zona: el input
+ * solo entiende la zona de quien mira la pantalla. Es el inverso exacto de
+ * `new Date(valor).toISOString()`, así que abrir y guardar sin editar conserva
+ * el instante. Derivarlo con `toISOString()` desplazaba la hora de pared.
+ *
+ * Devuelve `""` si la fecha es inválida.
+ */
+export function toDatetimeLocalValue(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date
+  if (Number.isNaN(d.getTime())) return ""
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 /** Minutos transcurridos del día local (0..1439), para turnos de repartidor. */
 export function minutesOfDay(
   timezone: string | null | undefined,

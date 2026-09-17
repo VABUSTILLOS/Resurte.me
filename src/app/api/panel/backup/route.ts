@@ -4,6 +4,7 @@ import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 import { resolveEffectiveOwner, ownerColumn } from "@/lib/panel/owner"
 import { canUseBackup } from "@/lib/panel-roles"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 /**
  * Respaldo completo del panel (Fase 4.4 — ver plan y docs/OPS.md §7).
@@ -199,7 +200,7 @@ export async function GET(req: NextRequest) {
       dishes,
     }
 
-    const stamp = new Date().toISOString().slice(0, 10)
+    const stamp = dayKeyOf(DEFAULT_TIMEZONE)
     return new NextResponse(JSON.stringify(backup, null, 2), {
       headers: {
         "Content-Type": "application/json; charset=utf-8",

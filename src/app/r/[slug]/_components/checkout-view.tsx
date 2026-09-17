@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { buildRecommendations, formatMoney, modifiersSummary, type OpenStatus } from "@/lib/foodos"
 import { sf, type StorefrontLang } from "@/lib/foodos-i18n"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import type { FoodosBranch, FoodosOrderItem } from "@/types/foodos"
 
 export function CheckoutView({
@@ -298,7 +299,7 @@ export function CheckoutView({
                   <input
                     type="date"
                     value={scheduledDate}
-                    min={new Date().toLocaleDateString("en-CA")}
+                    min={dayKeyOf(DEFAULT_TIMEZONE)}
                     onChange={(e) => setScheduledDate(e.target.value)}
                     className="px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />

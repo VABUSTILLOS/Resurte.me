@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Modal, Button, Input, Select, TextArea, FieldLabel, Spinner } from "./ui"
 import { PROSPECT_STATUSES, PROSPECT_STATUS_LABEL, type Prospect, type ProspectStatus } from "@/lib/comercializacion/types"
+import { toDatetimeLocalValue } from "@/lib/local-date"
 import { TIER_LABEL, ZONES } from "@/lib/agente/plan"
 
 interface CityOption {
@@ -83,7 +84,7 @@ export function ProspectFormModal({
         zone: prospect?.zone ?? "",
         status: prospect?.status ?? "nuevo",
         next_follow_up_at: prospect?.next_follow_up_at
-          ? new Date(prospect.next_follow_up_at).toISOString().slice(0, 16)
+          ? toDatetimeLocalValue(prospect.next_follow_up_at)
           : "",
         notes: prospect?.notes ?? "",
       })

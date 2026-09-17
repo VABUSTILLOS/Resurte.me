@@ -131,6 +131,17 @@
   checkout; todas las listas filtran `deleted_at IS NULL`.
 - Stripe: el `clientSecret` se obtiene de `/api/payments/stripe/create-intent`;
   `/api/orders` solo registra. Webhooks verifican firma.
+- **La fecha de entrega sale del día local, no de UTC**: las 7 opciones del
+  selector y la fecha por defecto vienen de `getNextDays()`
+  (`src/lib/delivery-days.ts`, reexportado por `checkout-shared.tsx`), que ancla
+  en `dayKeyOf(DEFAULT_TIMEZONE)` y luego avanza sobre el **mediodía UTC**. El
+  servidor lee ese `value` como día local (`${date}T${time}:00-06:00` en
+  `api/orders`), así que derivarlo con `toISOString()` desplazaba toda la cena
+  un día: "Hoy — jueves 17" enviaba `2026-09-18`. El `min` del
+  `<input type="date">` de `checkout-view.tsx` usa la misma autoridad: con la
+  zona del navegador, un cliente fuera de CDMX podía elegir ayer.
+  Cubierto por `src/lib/delivery-days.test.ts` (anclado a las 19:00 locales) y
+  por la regla 8 de `docs/agents/README.md`.
 - **El paso del checkout full-page se reanuda**: `src/lib/checkout-resume.ts`
   guarda el paso en `sessionStorage` (`resurte:checkout-step`) y `/[slug]/checkout`
   lo rehidrata con un inicializador perezoso de `useState` (nunca en el render

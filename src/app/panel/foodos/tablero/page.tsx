@@ -12,6 +12,7 @@ import {
   getFoodosPanelData,
 } from "../actions"
 import { formatMoney } from "@/lib/foodos"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import type {
   FoodosRestaurant,
   FoodosBranch,
@@ -152,10 +153,12 @@ export default function TableroPage() {
 
   // Cierre diario: pedidos de hoy (no cancelados) desglosados.
   const dailyClose = useMemo(() => {
-    const today = new Date().toLocaleDateString("en-CA") // YYYY-MM-DD local
+    // El "hoy" del cierre es el día del restaurante, no el del navegador:
+    // una tablet con el reloj en UTC mostraría el cierre del día equivocado.
+    const today = dayKeyOf(DEFAULT_TIMEZONE)
     const todays = orders.filter((o) => {
       const d = new Date(o.created_at)
-      return d.toLocaleDateString("en-CA") === today && o.status !== "cancelled"
+      return dayKeyOf(DEFAULT_TIMEZONE, d) === today && o.status !== "cancelled"
     })
     const byPayment = new Map<string, { count: number; total: number }>()
     const byChannel = new Map<string, number>()
@@ -202,7 +205,7 @@ export default function TableroPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `cierre-${new Date().toLocaleDateString("en-CA")}.csv`
+    a.download = `cierre-${dayKeyOf(DEFAULT_TIMEZONE)}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

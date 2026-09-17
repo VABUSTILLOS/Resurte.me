@@ -16,6 +16,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
+import { dayKeyOf } from "@/lib/local-date"
 import { getOpenStatus } from "@/lib/foodos"
 import { createFoodosOrder } from "@/lib/foodos-order-create"
 import { getRestaurantWhatsAppConfig } from "@/lib/foodos-whatsapp"
@@ -54,25 +55,6 @@ export type MeseroHandleResult =
       orderId?: string
       state: MeseroSession["state"]
     }
-
-/** Fecha local del restaurante en formato YYYY-MM-DD. */
-export function localDay(timezone: string, now = new Date()): string {
-  try {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone || "America/Mexico_City",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(now)
-  } catch {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Mexico_City",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(now)
-  }
-}
 
 function digitsOnly(phone: string): string {
   return phone.replace(/\D/g, "")
@@ -203,7 +185,7 @@ export async function handleMeseroMessage(input: MeseroHandleInput): Promise<Mes
     }
 
     // ── Guarda 3: tope diario de respuestas ────────────────────
-    const today = localDay(ctx.timezone)
+    const today = dayKeyOf(ctx.timezone)
     const repliesToday = loaded.repliesDay === today ? loaded.repliesToday : 0
     if (repliesToday >= ctx.settings.dailyReplyCap) {
       await persistMessage(supabase, sessionId, restaurantId, "inbound", text)

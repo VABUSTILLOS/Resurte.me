@@ -15,6 +15,7 @@ import {
   Download,
 } from "lucide-react"
 import { toCsv, downloadCsv } from "@/lib/csv"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 // ============================================================
 // /admin/proveedores — Directorio de proveedores con costos de
@@ -179,7 +180,7 @@ export default function ProveedoresPage() {
       ["Proveedor", "Contacto", "Teléfono", "WhatsApp", "Email", "Ciudad", "Estado (ubicación)", "Estatus", "Producto", "Presentación", "Costo", "Principal"],
       rows
     )
-    const stamp = new Date().toISOString().slice(0, 10)
+    const stamp = dayKeyOf(DEFAULT_TIMEZONE)
     downloadCsv(`proveedores-${stamp}.csv`, csv)
   }
 

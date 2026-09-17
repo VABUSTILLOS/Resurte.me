@@ -688,6 +688,71 @@ const TOOL_GUIDES: Record<string, ToolGuideConfig> = {
     ],
   },
 
+  "/panel/foodos/mesas": {
+    tool: "Mesas y comandero",
+    icon: "🍽️",
+    intro:
+      "Dibuja tu salón una vez y trabaja el servicio sobre él: abre la cuenta de una mesa, manda rondas a cocina, mueve la cuenta si el cliente cambia de lugar y cóbrala al final con propina y pago combinado.",
+    steps: [
+      {
+        id: "salon",
+        title: "Arma el salón por zonas",
+        description:
+          "Crea una zona por área —salón, terraza, barra— y coloca cada mesa arrastrándola. El acomodo se guarda en el servidor, así que el resto de los dispositivos ven el mismo plano.",
+        example: [
+          { label: "Zona", value: "Terraza" },
+          { label: "Mesas", value: "8" },
+        ],
+      },
+      {
+        id: "abrir",
+        title: "Abre la cuenta de la mesa",
+        description:
+          "Toca una mesa libre y captura los comensales. Mientras haya una cuenta abierta la mesa se ve ocupada, y nadie más puede abrir otra ahí: el servidor rechaza la segunda.",
+        example: [{ label: "Mesa 7", value: "4 comensales" }],
+      },
+      {
+        id: "rondas",
+        title: "Manda los platillos a cocina",
+        description:
+          "Cada envío es una ronda y se imprime su comanda. Los platillos se van acumulando en la cuenta, así que puedes mandar la entrada primero y el fuerte después sin perder lo anterior.",
+        example: [
+          { label: "Ronda 1", value: "2 × Taco al pastor" },
+          { label: "Ronda 2", value: "1 × Agua de horchata" },
+        ],
+      },
+      {
+        id: "mover",
+        title: "Transfiere o une mesas",
+        description:
+          "Si el grupo se cambia de lugar, transfiere la cuenta completa. Si dos mesas se juntan, únelas: las comandas se reapuntan a la cuenta destino para que la cocina no lleve el plato a la mesa equivocada.",
+      },
+      {
+        id: "cuenta",
+        title: "Avisa que piden la cuenta",
+        description:
+          "La mesa pasa a estado «pidiendo cuenta» y queda con la hora. Sirve para que el cajero y los meseros vean quién ya está listo sin preguntar.",
+      },
+      {
+        id: "cobro",
+        title: "Cobra la cuenta",
+        description:
+          "La cuenta se cierra en una sola venta con folio, propina y —si hace falta— varias formas de pago de golpe. Necesita un turno de caja abierto: esa venta tiene que caer en tu corte del día.",
+        example: [
+          { label: "Consumo", value: "$66" },
+          { label: "Propina", value: "$10" },
+          { label: "Folio", value: "260917-0001" },
+        ],
+      },
+      {
+        id: "cancelar",
+        title: "Cancela si el cliente se va",
+        description:
+          "Cancelar marca las comandas como canceladas en vez de borrarlas: queda el rastro de qué se preparó y no se cobró.",
+      },
+    ],
+  },
+
   "/panel/foodos/caja": {
     tool: "Corte de caja",
     icon: "💵",

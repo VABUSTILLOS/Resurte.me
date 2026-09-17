@@ -11,6 +11,7 @@ import type {
   FoodosCustomerSegment,
   FoodosItemOptionGroup,
   FoodosMenuItem,
+  FoodosOrderChannel,
   FoodosOrderItem,
   FoodosOrderItemModifier,
   FoodosUpsellRule,
@@ -355,8 +356,42 @@ export function itemMargin(item: FoodosMenuItem): number | null {
   return (item.price - item.cost) / item.price
 }
 
+/**
+ * Canal con el que entró un pedido, para atribución en reportes.
+ *
+ * `marketplace` gana sobre lo demás a propósito: un pedido levantado en el
+ * directorio se cuenta como marketplace aunque se cierre por WhatsApp o sea
+ * para una mesa, porque lo que se mide es de dónde vino el comensal.
+ */
+export function resolveOrderChannel(input: {
+  origin?: "storefront" | "marketplace"
+  paymentMethod?: string | null
+  tableNumber?: string | null
+}): FoodosOrderChannel {
+  if (input.origin === "marketplace") return "marketplace"
+  if (input.paymentMethod === "whatsapp") return "whatsapp"
+  if (input.tableNumber?.trim()) return "qr"
+  return "web"
+}
+
 export function normalizePhone(phone: string): string {
   return (phone ?? "").replace(/\D/g, "")
+}
+
+/**
+ * Texto comparable para buscar platillos: minúsculas y sin acentos, así que el
+ * comensal puede escribir "camaron" y encontrar "Camarón al mojo de ajo".
+ *
+ * Vive aquí y no en cada componente porque el directorio y el menú tienen que
+ * coincidir: si uno normaliza y el otro no, la búsqueda ofrece un platillo que
+ * después no se resalta al abrir la ficha.
+ */
+export function normalizeSearchText(value: string): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
 }
 
 // --- Horarios de operación ---

@@ -11,11 +11,18 @@ export function SuccessScreen({
   orderId,
   showTransfer = false,
   lang = "es",
+  directoryHref = null,
 }: {
   restaurant: FoodosRestaurant
   orderId: string
   showTransfer?: boolean
   lang?: StorefrontLang
+  /**
+   * Cuando el pedido salió del directorio de HoyQueComemos, se ofrece volver a
+   * él: el comensal que exploraba otras opciones no tiene por qué aterrizar en
+   * el micrositio de un solo restaurante.
+   */
+  directoryHref?: string | null
 }) {
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center px-4">
@@ -67,6 +74,14 @@ export function SuccessScreen({
         >
           {sf(lang, "backToMenuBtn")}
         </button>
+        {directoryHref && (
+          <Link
+            href={directoryHref}
+            className="mt-4 inline-block text-sm font-semibold text-emerald-700 hover:underline"
+          >
+            {sf(lang, "backToDirectory")}
+          </Link>
+        )}
       </div>
     </div>
   )

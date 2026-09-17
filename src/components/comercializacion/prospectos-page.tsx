@@ -36,6 +36,7 @@ import { formatDateTime } from "@/lib/comercializacion/dates"
 import { WhatsappTemplateMenu } from "./whatsapp-templates"
 import { getProspects, deleteProspect } from "@/lib/comercializacion/actions"
 import { toCsv, downloadCsv } from "@/lib/comercializacion/csv"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 export const PAGE_SIZE = 50
 
@@ -200,7 +201,7 @@ export function ProspectosPage({
       p.notes,
     ])
     downloadCsv(
-      `prospectos-${new Date().toISOString().slice(0, 10)}.csv`,
+      `prospectos-${dayKeyOf(DEFAULT_TIMEZONE)}.csv`,
       toCsv(
         ["nombre", "restaurante", "telefono", "whatsapp", "email", "ciudad", "estado", "ultimo_contacto", "proximo_seguimiento", "notas"],
         rows

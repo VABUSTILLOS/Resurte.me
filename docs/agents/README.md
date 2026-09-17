@@ -38,6 +38,19 @@ requieren revisar todos los playbooks que dependen de esa superficie.
    perdió el esqueleto **global** de carga. Si se quiere de vuelta, va **por
    segmento o dentro de un route group**, nunca en la raíz. Excepción conocida:
    `/panel/foodos/pedidos/[id]/print` (bajo `src/app/panel/loading.tsx`).
+8. **El día local tiene una sola autoridad**: `src/lib/local-date.ts`
+   (`DEFAULT_TIMEZONE`, `dayKeyOf`, `localDateParts`, `toDatetimeLocalValue`).
+   Nunca se deriva un día de negocio con `toISOString().slice(0, 10)` ni con
+   `toLocaleDateString("en-CA")` sin `timeZone`: ambos leen la zona del
+   **runtime**, y a partir de las 18:00 de México (medianoche UTC) devuelven
+   **mañana**. Ese defecto llegó a producción en el checkout —el selector
+   ofrecía "Hoy" y agendaba la entrega para el día siguiente, toda la cena— y
+   después en 20 sitios más. Las excepciones legítimas (validación round-trip,
+   clave ISO de semana, `reportTo` del reporte de ventas, prefijo de Storage)
+   están declaradas con su motivo en `src/lib/local-date.contract.test.ts`, que
+   **falla si aparece un sitio nuevo sin justificar**. Los recortes de
+   `toISOString()` sin recorte (`created_at`, `sent_at`, `expires_at`) son
+   timestamps de auditoría y **no se tocan**.
 
 ## Sin agente asignado: cuenta y autenticación
 

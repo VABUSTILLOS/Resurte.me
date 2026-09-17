@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { logger } from "@/lib/logger"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 export const runtime = "nodejs"
 
@@ -36,7 +37,8 @@ export async function POST(request: NextRequest) {
     }
 
     const ext = file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1]
-    const path = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${ext}`
+    // La carpeta agrupa por día del negocio, igual que los nombres de los CSV.
+    const path = `${dayKeyOf(DEFAULT_TIMEZONE)}/${crypto.randomUUID()}.${ext}`
 
     const supabase = await createServiceClient()
     const { error: uploadError } = await supabase.storage

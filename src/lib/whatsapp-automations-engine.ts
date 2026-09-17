@@ -12,7 +12,7 @@ import {
   alreadySentByRestaurant,
   type RestaurantSend,
 } from "@/lib/messaging/dedupe"
-import { DEFAULT_TIMEZONE } from "@/lib/local-date"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 export interface WaAutomationConfig {
   is_active: boolean
@@ -356,7 +356,9 @@ async function runReactivation(
   const result = emptyResult(true)
   const inactiveDays = Number(cfg.config?.inactive_days) || 30
   const cutoff = new Date(Date.now() - inactiveDays * 86_400_000).toISOString()
-  const monthBucket = new Date().toISOString().slice(0, 7)
+  // Bucket mensual del restaurante (no UTC): con UTC el mes cambiaba a las
+  // 18:00 locales del último día, adelantando el reinicio del tope.
+  const monthBucket = dayKeyOf(DEFAULT_TIMEZONE).slice(0, 7)
 
   // Últimos pedidos entregados (desc); el primero por usuario es su último.
   const { data: orders, error } = await supabase

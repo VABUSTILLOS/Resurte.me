@@ -7,6 +7,7 @@ import {
   formatMxn,
 } from "./commercial-facts"
 import { PRIMARY_AUTHOR, getAuthorReference, ORGANIZATION_ID, SITE_NAME, SITE_URL } from "@/lib/author"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 /**
  * Structured data helpers for JSON-LD schema.org markup.
@@ -415,12 +416,14 @@ export interface SitemapEntry {
 }
 
 export function generateSitemapXml(entries: SitemapEntry[]): string {
+  // El `<lastmod>` por defecto es el día local del negocio, no el día UTC.
+  const fallbackDay = dayKeyOf(DEFAULT_TIMEZONE)
   const items = entries
     .map(
       (entry) =>
         `  <url>
     <loc>${entry.url}</loc>
-    <lastmod>${entry.lastModified || new Date().toISOString().split("T")[0]}</lastmod>
+    <lastmod>${entry.lastModified || fallbackDay}</lastmod>
     <changefreq>${entry.changeFrequency || "weekly"}</changefreq>
     <priority>${entry.priority || 0.8}</priority>
   </url>`
