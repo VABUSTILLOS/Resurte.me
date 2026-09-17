@@ -485,6 +485,9 @@ function AdminProductsContent() {
   const bulkCancelledRef = useRef(false)
   const [bulkCancelling, setBulkCancelling] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
+  // Scroll interno de la tabla (vista tabla). Se vuelve al principio al cambiar
+  // de página o de filtros para no aterrizar a mitad del listado.
+  const tableScrollRef = useRef<HTMLDivElement>(null)
   // Fila sticky de categorías: su alto se publica en `--admin-catbar-h` para
   // que la barra de acciones masivas se ancle justo debajo y no la tape.
   const categoryBarRef = useRef<HTMLDivElement>(null)

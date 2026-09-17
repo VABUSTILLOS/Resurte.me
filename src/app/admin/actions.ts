@@ -21,6 +21,14 @@ import {
   type AdminAlertKind,
   type AdminAlertSeverity,
 } from "@/lib/admin-alerts"
+import {
+  buildCityPerformance,
+  type CatalogAvailabilityInput,
+  type CityOrderRow,
+  type CityPerformanceResult,
+  type CityPerformanceRow,
+  type CityRow,
+} from "@/lib/admin-city-performance"
 import { format } from "date-fns"
 
 interface AdminOrderItem {
@@ -1296,6 +1304,286 @@ export async function getAdminPeriodComparison(days: number): Promise<PeriodComp
     recurringCustomers: curSplit.recurringCustomers,
     prevNewCustomers: prevSplit.newCustomers,
     prevRecurringCustomers: prevSplit.recurringCustomers,
+  }
+}
+
+// ============================================================
+// FASE 44 — DESEMPEÑO POR CIUDAD
+// ============================================================
+
+/** Tope de lectura por tabla: evita traer un histórico ilimitado al servidor. */
+const CITY_PERF_PAGE_SIZE = 1000
+const CITY_PERF_MAX_ROWS = 20000
+
+type AdminSupabase = Awaited<ReturnType<typeof createServiceClient>>
+
+/**
+ * Pedidos de una ventana, paginados. Solo se traen las columnas que alimentan
+ * las métricas: sumar en SQL obligaría a una vista nueva y aquí el volumen es
+ * de cientos de filas por periodo.
+ */
+async function fetchCityOrderRows(
+  supabase: AdminSupabase,
+  fromIso: string,
+  untilIso: string | null
+): Promise<{ rows: CityOrderRow[]; truncated: boolean }> {
+  const rows: CityOrderRow[] = []
+  for (let from = 0; from < CITY_PERF_MAX_ROWS; from += CITY_PERF_PAGE_SIZE) {
+    let query = supabase
+      .from("orders")
+      .select("city_id, total, status, payment_status, source")
+      .gte("created_at", fromIso)
+      .order("created_at", { ascending: false })
+      .range(from, from + CITY_PERF_PAGE_SIZE - 1)
+    if (untilIso) query = query.lt("created_at", untilIso)
+
+    const { data, error } = await query
+    if (error) throw error
+    const batch = data ?? []
+    rows.push(...(batch as CityOrderRow[]))
+    if (batch.length < CITY_PERF_PAGE_SIZE) break
+  }
+  return { rows, truncated: rows.length >= CITY_PERF_MAX_ROWS }
+}
+
+/**
+ * Cobertura de catálogo por ciudad respetando la semántica de
+ * `product_city_availability` (migración 00065): sin filas = global.
+ * Devuelve `null` si la disponibilidad no se pudo leer, para que el dashboard
+ * omita los tips de catálogo en lugar de mostrar una cobertura inventada.
+ */
+async function loadCityCatalogAvailability(
+  supabase: AdminSupabase
+): Promise<CatalogAvailabilityInput | null> {
+  try {
+    const visibleProducts = new Set<number>()
+    for (let from = 0; from < CITY_PERF_MAX_ROWS; from += CITY_PERF_PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id")
+        .eq("is_visible", true)
+        .order("id", { ascending: true })
+        .range(from, from + CITY_PERF_PAGE_SIZE - 1)
+      if (error) throw error
+      const batch = data ?? []
+      for (const p of batch) visibleProducts.add(Number(p.id))
+      if (batch.length < CITY_PERF_PAGE_SIZE) break
+    }
+
+    const restricted = new Set<number>()
+    const availableByCity = new Map<number, number>()
+    for (let from = 0; from < CITY_PERF_MAX_ROWS; from += CITY_PERF_PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from("product_city_availability")
+        .select("product_id, city_id, is_available")
+        .order("product_id", { ascending: true })
+        .range(from, from + CITY_PERF_PAGE_SIZE - 1)
+      if (error) throw error
+      const batch = data ?? []
+      for (const row of batch) {
+        const productId = Number(row.product_id)
+        // Productos ocultos no cuentan en la cobertura de la tienda pública.
+        if (!visibleProducts.has(productId)) continue
+        restricted.add(productId)
+        if (row.is_available === true) {
+          const cityId = Number(row.city_id)
+          availableByCity.set(cityId, (availableByCity.get(cityId) ?? 0) + 1)
+        }
+      }
+      if (batch.length < CITY_PERF_PAGE_SIZE) break
+    }
+
+    return {
+      totalProducts: visibleProducts.size,
+      restrictedProducts: restricted.size,
+      availableByCity,
+    }
+  } catch (error) {
+    logger.error("[ADMIN-CITY-PERF] Error fetching catalog availability:", error)
+    return null
+  }
+}
+
+export interface AdminCityPerformance extends CityPerformanceResult {
+  days: number
+  /** `true` si se alcanzó el tope de lectura: los totales son parciales. */
+  truncated: boolean
+}
+
+/**
+ * Desempeño por ciudad de los últimos `days` días (incluye hoy), comparado
+ * contra los `days` días anteriores. Las ventanas van alineadas a la
+ * medianoche de CDMX para que "7 días" signifique días calendario y no una
+ * rebanada arbitraria de 168 horas.
+ */
+export async function getAdminCityPerformance(days: number): Promise<AdminCityPerformance> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const { isPeriodDays } = await import("@/lib/analytics-periods")
+  if (!isPeriodDays(days)) {
+    throw new Error("Periodo inválido (7, 30 o 90 días)")
+  }
+
+  const supabase = await createServiceClient()
+  const currentStart = mxMidnightUTC(-(days - 1))
+  const previousStart = mxMidnightUTC(-(2 * days - 1))
+
+  const [current, previous, citiesRes, catalog] = await Promise.all([
+    fetchCityOrderRows(supabase, currentStart.toISOString(), null),
+    fetchCityOrderRows(
+      supabase,
+      previousStart.toISOString(),
+      currentStart.toISOString()
+    ),
+    supabase.from("cities").select("id, name, is_active").order("name", { ascending: true }),
+    loadCityCatalogAvailability(supabase),
+  ])
+
+  if (citiesRes.error) {
+    logger.error("[ADMIN-CITY-PERF] Error fetching cities:", citiesRes.error)
+    throw new Error("Error al cargar las ciudades")
+  }
+
+  const result = buildCityPerformance({
+    cities: (citiesRes.data ?? []) as CityRow[],
+    currentOrders: current.rows,
+    previousOrders: previous.rows,
+    catalog,
+  })
+
+  return {
+    ...result,
+    days,
+    truncated: current.truncated || previous.truncated,
+  }
+}
+
+export interface AdminCityTip {
+  cityId: number
+  cityName: string
+  days: number
+  tip: string
+  model: string
+  generatedAt: string
+}
+
+function buildCityTipPrompt(
+  row: CityPerformanceRow,
+  context: {
+    days: number
+    medianAov: number
+    maxCatalogCoverage: number | null
+    revenueLeader: number
+  }
+): string {
+  const lines = [
+    `Ciudad: ${row.name} (${row.isActive ? "activa" : "inactiva"})`,
+    `Ventana: últimos ${context.days} días`,
+    `Pedidos válidos: ${row.orders} (periodo anterior: ${row.previousOrders})`,
+    `Ingresos pagados: $${row.revenue} MXN (periodo anterior: $${row.previousRevenue})`,
+    `Ticket promedio: $${row.aov} MXN (mediana de la operación: $${context.medianAov} MXN)`,
+    `Tasa de cancelación: ${row.cancellationRate}%`,
+    `Pedidos por WhatsApp: ${row.whatsappShare}% (${row.whatsappOrders} de ${row.orders})`,
+    `Score de desempeño: ${row.score}/100 (nivel ${row.tier})`,
+    `Mejor ciudad por ingresos: $${context.revenueLeader} MXN`,
+  ]
+  if (row.catalogCoverage !== null && context.maxCatalogCoverage !== null) {
+    lines.push(
+      `Catálogo disponible: ${row.catalogCoverage} productos (máximo entre ciudades: ${context.maxCatalogCoverage})`
+    )
+  }
+  if (row.tips.length > 0) {
+    lines.push(
+      `Señales detectadas por reglas: ${row.tips.map((t) => t.title).join("; ")}`
+    )
+  }
+
+  return [
+    "Eres analista de operaciones de Resurte.me, una app de entregas de abarrotes y mandado a domicilio en México.",
+    "A continuación están las métricas reales de una ciudad. Propón un plan de mejora para el equipo de operaciones.",
+    "Reglas:",
+    "- Español de México, tono directo y sin relleno.",
+    "- Máximo 120 palabras.",
+    "- Exactamente 3 acciones concretas, numeradas.",
+    "- Cada acción debe indicar el responsable (catálogo, marketing, logística o soporte) y el impacto esperado.",
+    "- Usa solo los datos proporcionados; no inventes cifras ni prometas resultados.",
+    "- Si los datos no alcanzan para concluir algo, dilo en lugar de suponer.",
+    "",
+    ...lines,
+  ].join("\n")
+}
+
+/**
+ * Tip de IA bajo demanda para una ciudad. Recalcula las métricas en el
+ * servidor: el cliente nunca manda números, solo el id de la ciudad.
+ */
+export async function getAdminCityTip(input: {
+  cityId: number
+  days: number
+}): Promise<AdminCityTip> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  if (!Number.isInteger(input.cityId) || input.cityId <= 0) {
+    throw new Error("Ciudad inválida")
+  }
+
+  const performance = await getAdminCityPerformance(input.days)
+  const row =
+    performance.cities.find((c) => c.cityId === input.cityId) ??
+    performance.withoutOrders.find((c) => c.cityId === input.cityId)
+
+  if (!row) {
+    throw new Error("Ciudad no encontrada")
+  }
+
+  const { isKieAiConfigured, chatCompletion } = await import("@/lib/ai/kie-ai")
+  if (!isKieAiConfigured()) {
+    throw new Error("KIE_AI_API_KEY no está configurada. Ver docs/KIE_AI.md.")
+  }
+
+  const revenueLeader = Math.max(
+    0,
+    ...performance.cities.map((c) => c.revenue)
+  )
+  const prompt = buildCityTipPrompt(row, {
+    days: input.days,
+    medianAov: performance.medianAov,
+    maxCatalogCoverage: performance.maxCatalogCoverage,
+    revenueLeader: Math.round(revenueLeader * 100) / 100,
+  })
+
+  const result = await chatCompletion({
+    // `model: ""` usa el modelo por defecto de la API (mismo criterio que bulk-seo).
+    model: "",
+    temperature: 0.4,
+    messages: [
+      {
+        role: "system",
+        content:
+          "Eres analista de operaciones de Resurte.me. Respondes en español de México con acciones accionables y medibles.",
+      },
+      { role: "user", content: prompt },
+    ],
+  })
+
+  const tip = result.content.trim()
+  if (!tip) {
+    throw new Error("La IA no devolvió una recomendación. Intenta de nuevo.")
+  }
+
+  return {
+    cityId: row.cityId,
+    cityName: row.name,
+    days: input.days,
+    tip,
+    model: "kie-ai:default",
+    generatedAt: new Date().toISOString(),
   }
 }
 
