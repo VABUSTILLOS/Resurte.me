@@ -15,8 +15,10 @@ export type ReadJsonBodyResult<T> =
   | { ok: true; data: T }
   | { ok: false; status: 400; error: string }
 
-const INVALID_BODY = "Cuerpo de la petición inválido: se esperaba un objeto JSON"
-const MALFORMED_BODY = "Cuerpo de la petición inválido: JSON malformado o ausente"
+/** Mensajes de error del contrato; exportados para que rutas y tests compartan
+ * una sola fuente de verdad (el panel muestra `error` tal cual). */
+export const INVALID_BODY = "Cuerpo de la petición inválido: se esperaba un objeto JSON"
+export const MALFORMED_BODY = "Cuerpo de la petición inválido: JSON malformado o ausente"
 
 /**
  * Lee el cuerpo como objeto JSON. Rechaza `null`, arrays y primitivos: todas las

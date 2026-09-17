@@ -31,15 +31,15 @@ export async function POST(request: Request) {
     const { response: adminDenied } = await requireAdmin()
     if (adminDenied) return adminDenied
 
+    const parsed = await readJsonBody<{ ids?: unknown; overwrite?: unknown }>(request)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
+
     if (!isKieAiConfigured()) {
       return NextResponse.json(
         { error: "KIE_AI_API_KEY no está configurada. Ver docs/KIE_AI.md." },
         { status: 500 }
       )
     }
-
-    const parsed = await readJsonBody<{ ids?: unknown; overwrite?: unknown }>(request)
-    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
 
     const body = parsed.data
     const ids = Array.isArray(body.ids)

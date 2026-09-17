@@ -9,6 +9,7 @@ vi.mock("@/lib/audit-log", () => ({ logAdminAction: vi.fn() }))
 vi.mock("@/lib/whatsapp-sync-queue", () => ({ enqueueProductsForWaSync: vi.fn() }))
 
 import { DELETE, POST } from "./route"
+import { MALFORMED_BODY } from "@/lib/api-body"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { revalidateCatalogCache } from "@/lib/catalog-cache"
@@ -147,7 +148,7 @@ describe("/api/admin/products/delete", () => {
     expect(createServiceClient).not.toHaveBeenCalled()
   })
 
-  it("500 si el cuerpo no es JSON válido (no se valida antes de parsear)", async () => {
+  it("400 si el cuerpo no es JSON válido (B30: es fallo del cliente, no 500)", async () => {
     asAdmin()
     const res = await DELETE(
       new NextRequest("http://localhost/api/admin/products/delete", {
@@ -155,9 +156,11 @@ describe("/api/admin/products/delete", () => {
         body: "{no-es-json",
       })
     )
-    // Comportamiento actual: el parseo vive dentro del try, así que un cuerpo
-    // corrupto responde 500 en vez del 400 de validación.
-    expect(res.status).toBe(500)
+    const json = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(json.error).toBe(MALFORMED_BODY)
+    expect(createServiceClient).not.toHaveBeenCalled()
   })
 
   it("marca deleted_at, despublica y deja bitácora de la baja", async () => {

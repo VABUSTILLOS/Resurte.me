@@ -8,6 +8,7 @@
 
 import { requireAuth, getCurrentUser } from "@/lib/auth"
 import { requireFoodosFeature } from "@/lib/foodos-tier"
+import { assertOwnRestaurant } from "@/lib/foodos-owner"
 import { reportServerError } from "@/lib/error-log"
 import { dailyTokenCap } from "@/lib/ai/budget"
 import { loadAiUsage, type AiUsageSnapshot } from "@/lib/ai/usage"
@@ -2146,20 +2147,6 @@ async function canUseFlotilla(): Promise<boolean> {
 }
 
 /** Verifica propiedad antes de escribir: la RLS no da mensajes útiles. */
-async function assertOwnRestaurant(
-  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
-  userId: string,
-  restaurantId: string
-): Promise<void> {
-  const { data } = await supabase
-    .from("foodos_restaurants")
-    .select("id")
-    .eq("id", restaurantId)
-    .eq("user_id", userId)
-    .maybeSingle()
-  if (!data) throw new Error("Restaurante no encontrado")
-}
-
 export async function listFlotillaCouriers(
   restaurantId: string
 ): Promise<FlotillaCourierRow[]> {
