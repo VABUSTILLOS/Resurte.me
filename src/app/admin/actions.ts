@@ -75,6 +75,7 @@ import {
   renderQuickReply,
   quickReplyValuesFor,
   requiresTemplate,
+  nextSequenceRun,
   whatsappWindowState,
   type ConversationProspect,
   type InboxBucket,
@@ -82,6 +83,21 @@ import {
   type WhatsAppWindowState,
 } from "@/lib/crm-inbox"
 import { addTags, normalizeTags, readTags, removeTags } from "@/lib/crm-tags"
+import {
+  REPLY_DRAFT_MAX_TOKENS,
+  buildFallbackReply,
+  buildReplyPromptContext,
+  buildReplySystemPrompt,
+  sanitizeReplyDraft,
+  type ReplyEvent,
+} from "@/lib/crm-ai"
+import { chatCompletionRaw } from "@/lib/ai/llm"
+import {
+  MAX_SEQUENCE_DELAY_HOURS,
+  MAX_SEQUENCE_ENROLLMENTS_PER_BATCH,
+  MAX_SEQUENCE_STEPS,
+  type SequenceStep,
+} from "@/lib/crm-sequences-engine"
 import {
   buildSellerLoad,
   buildSlaBoard,
@@ -1411,6 +1427,13 @@ async function loadLeadBoardCounts(
 }
 
 /** Mapea una fila de `crm_prospects` al tipo del CRM. Compartido por el tablero y la bandeja. */
+/**
+ * Columnas base de un prospecto, compartidas por todas las lecturas del CRM.
+ * `lead_id` (00139) va aquí y se degrada aparte donde haga falta.
+ */
+const CRM_PROSPECT_COLUMNS =
+  "id, seller_id, lead_id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at"
+
 function toCrmProspectRow(row: Record<string, unknown>): CrmProspect {
   return {
     id: Number(row.id),
@@ -1426,8 +1449,20 @@ function toCrmProspectRow(row: Record<string, unknown>): CrmProspect {
     next_follow_up_at: (row.next_follow_up_at as string | null) ?? null,
     last_contact_at: (row.last_contact_at as string | null) ?? null,
     created_at: String(row.created_at),
+    tags: readTags(row.tags),
   }
 }
+
+/**
+ * Columnas del pipeline, de más a menos completa. Se prueban en orden y se
+ * degrada una columna a la vez: un entorno sin 00139 (sin `lead_id`) o sin
+ * 00140 (sin `tags`) debe seguir pintando el tablero, no reventar.
+ */
+const CRM_BOARD_COLUMNS = [
+  `${CRM_PROSPECT_COLUMNS}, tags`,
+  CRM_PROSPECT_COLUMNS,
+  "id, seller_id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at",
+] as const
 
 /** Conteos de la bandeja, para las pestañas de `/admin/leads`. */
 export async function getAdminLeadBoardCounts(): Promise<AdminLeadBoardCounts> {
@@ -1450,44 +1485,37 @@ export async function getAdminCrmBoard(
 
   const supabase = await createServiceClient()
   const limit = filters.limit ?? 500
-  let query = supabase
-    .from("crm_prospects")
-    .select(
-      "id, seller_id, lead_id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at",
+
+  const buildQuery = (columns: string) => {
+    let query = supabase
+      .from("crm_prospects")
+      .select(columns)
+      .order("created_at", { ascending: false })
+      .limit(limit)
+    if (filters.status && filters.status !== "todos") query = query.eq("status", filters.status)
+    if (filters.unassigned) query = query.is("seller_id", null)
+    if (filters.due) query = query.not("next_follow_up_at", "is", null).lte(
+      "next_follow_up_at",
+      new Date().toISOString(),
     )
-    .order("created_at", { ascending: false })
-    .limit(limit)
+    return query
+  }
 
-  if (filters.status && filters.status !== "todos") query = query.eq("status", filters.status)
-  if (filters.unassigned) query = query.is("seller_id", null)
-  if (filters.due) query = query.not("next_follow_up_at", "is", null).lte(
-    "next_follow_up_at",
-    new Date().toISOString(),
-  )
-
-  let rows: Record<string, unknown>[]
-  const { data, error } = await query
-  if (error) {
-    // Entorno sin 00139 (sin `lead_id` ni `seller_id` nullable): se degrada.
+  let rows: Record<string, unknown>[] = []
+  for (const columns of CRM_BOARD_COLUMNS) {
+    const { data, error } = await buildQuery(columns)
+    if (!error) {
+      rows = (data ?? []) as unknown as Record<string, unknown>[]
+      break
+    }
+    // Solo se degrada ante columnas ausentes (00139/00140 sin aplicar).
     if (!isMissingColumnError(error)) {
       logger.error("[ADMIN-CRM] Error fetching prospects:", error)
       throw new Error("Error al cargar el pipeline CRM")
     }
-    logger.warn("[ADMIN-CRM] Migración 00139 no aplicada; se omite lead_id")
-    const fallback = await supabase
-      .from("crm_prospects")
-      .select(
-        "id, seller_id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at",
-      )
-      .order("created_at", { ascending: false })
-      .limit(limit)
-    if (fallback.error) {
-      logger.error("[ADMIN-CRM] Error fetching prospects:", fallback.error)
-      throw new Error("Error al cargar el pipeline CRM")
-    }
-    rows = (fallback.data ?? []).map((row) => ({ ...row, lead_id: null }))
-  } else {
-    rows = (data ?? []) as Record<string, unknown>[]
+    logger.warn("[ADMIN-CRM] Columnas incompletas en crm_prospects; se reintenta degradado", {
+      message: error.message,
+    })
   }
 
   const prospects: CrmProspect[] = rows.map(toCrmProspectRow)
@@ -1525,6 +1553,8 @@ export async function getAdminProspectDetail(prospectId: number): Promise<{
   activities: import("@/lib/comercializacion/types").Activity[]
   seller: { id: string; name: string } | null
   lead: { id: number; email: string; source: string; created_at: string } | null
+  /** Etiquetas del prospecto (00140); `[]` si la migración no está aplicada. */
+  tags: string[]
 }> {
   const { response: adminDenied } = await requireAdmin()
   if (adminDenied) {
@@ -1541,20 +1571,26 @@ export async function getAdminProspectDetail(prospectId: number): Promise<{
     ? await fetchProfileName(supabase, detail.prospect.seller_id)
     : null
 
+  const readLeadRow = (columns: string) =>
+    supabase.from("crm_prospects").select(columns).eq("id", prospectId).maybeSingle()
+
   let lead: { id: number; email: string; source: string; created_at: string } | null = null
-  const { data: leadRow, error: leadError } = await supabase
-    .from("crm_prospects")
-    .select("leads(id, email, source, created_at)")
-    .eq("id", prospectId)
-    .maybeSingle()
-  if (leadError) {
+  let tags: string[] = []
+  const leadColumns = "leads(id, email, source, created_at)"
+  let attempt = await readLeadRow(`${leadColumns}, tags`)
+  if (attempt.error && isMissingColumnError(attempt.error)) {
+    // 00140 sin aplicar: se reintenta sin `tags` para no perder el lead de origen.
+    attempt = await readLeadRow(leadColumns)
+  }
+  if (attempt.error) {
     // 00139 ausente: el prospecto simplemente no tiene lead de origen.
-    if (!isMissingColumnError(leadError)) {
-      logger.warn("[ADMIN-CRM] No se pudo leer el lead de origen:", { message: leadError.message })
+    if (!isMissingColumnError(attempt.error)) {
+      logger.warn("[ADMIN-CRM] No se pudo leer el lead de origen:", { message: attempt.error.message })
     }
   } else {
+    const row = attempt.data as Record<string, unknown> | null
     const embedded = (
-      leadRow as { leads?: { id: number; email: string; source: string; created_at: string } | null } | null
+      row as { leads?: { id: number; email: string; source: string; created_at: string } | null } | null
     )?.leads
     if (embedded) {
       lead = {
@@ -1564,9 +1600,10 @@ export async function getAdminProspectDetail(prospectId: number): Promise<{
         created_at: String(embedded.created_at),
       }
     }
+    tags = readTags(row?.tags)
   }
 
-  return { ...detail, seller, lead }
+  return { ...detail, seller, lead, tags }
 }
 
 async function fetchProfileName(
@@ -1993,9 +2030,6 @@ const QUICK_REPLY_BODY_MAX = 1024
 /** Lo que se guarda como resumen de la actividad de WhatsApp. */
 const ACTIVITY_SUMMARY_MAX = 280
 
-const CRM_PROSPECT_COLUMNS =
-  "id, seller_id, lead_id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at"
-
 /** De dónde viene un evento del hilo, para no confundir un mensaje con una nota. */
 export type LeadTimelineSource = "whatsapp" | "automation" | "activity"
 
@@ -2230,6 +2264,124 @@ export async function getAdminLeadConversation(
     phoneKey: thread.phoneKey,
     seller,
     lead,
+  }
+}
+
+export interface LeadReplySuggestion {
+  /** Texto listo para el compositor. Nunca se envía solo. */
+  draft: string
+  /** `llm` cuando lo escribió el modelo, `template` cuando degradó. */
+  source: "llm" | "template"
+  model: string | null
+  /** Por qué degradó, cuando `source === "template"`. */
+  reason: string | null
+  /** Eventos de la conversación que entraron al contexto. */
+  events: number
+  /** Hubo recorte: la conversación es más larga que el contexto. */
+  truncated: boolean
+  /** El borrador de plantilla no respeta la compuerta de plantilla. */
+  requiresTemplate: boolean
+}
+
+/**
+ * Borrador de respuesta para un prospecto (fase C9).
+ *
+ * **Nunca envía nada.** Devuelve texto para que la persona lo revise y lo
+ * mande desde el compositor. Si no hay proveedor de IA configurado, el
+ * presupuesto del día se agotó o el proveedor falla, devuelve un borrador
+ * determinista en vez de un error: el panel tiene que seguir sirviendo.
+ *
+ * El contexto va redactado (sin teléfono ni correo completos) y acotado; ver
+ * `buildReplyPromptContext`.
+ */
+export async function suggestLeadReply(prospectId: number): Promise<LeadReplySuggestion> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const row = await loadProspectRow(supabase, prospectId)
+  if (!row) throw new Error("Prospecto no encontrado")
+
+  const prospect = toConversationProspect(row)
+  const variants = phoneLookupVariants(prospectPhoneKey(prospect))
+
+  const [waMessages, activities, seller] = await Promise.all([
+    variants.length > 0 ? fetchConversationMessages(supabase, variants) : Promise.resolve([]),
+    fetchProspectActivities(supabase, prospectId),
+    prospect.seller_id ? fetchProfileName(supabase, prospect.seller_id) : Promise.resolve(null),
+  ])
+
+  const messages = mergeTimeline(waMessages)
+  const thread = buildThread(prospect, indexMessagesByPhone(messages))
+
+  const events: ReplyEvent[] = mergeTimeline<LeadTimelineEntry>([
+    ...messages.map((m) => ({ ...m, source: "whatsapp" as const, key: `wa:${m.id}` })),
+    ...activities.map((m) => ({ ...m, source: "activity" as const, key: `act:${m.id}` })),
+  ]).map((entry) => ({
+    kind:
+      entry.source === "activity"
+        ? ("activity" as const)
+        : entry.direction === "inbound"
+          ? ("inbound" as const)
+          : ("outbound" as const),
+    at: entry.created_at,
+    text: entry.content ?? "",
+  }))
+
+  const context = buildReplyPromptContext(
+    {
+      name: prospect.name,
+      restaurantName: prospect.restaurant_name,
+      status: prospect.status,
+      tags: prospect.tags,
+      nextFollowUpAt: prospect.next_follow_up_at,
+      sellerName: seller?.name ?? null,
+      phone: prospect.whatsapp ?? prospect.phone,
+      email: prospect.email,
+    },
+    events,
+    { windowOpen: thread.window.open, bucket: thread.bucket },
+  )
+
+  const fallback = buildFallbackReply(
+    {
+      name: prospect.name,
+      restaurantName: prospect.restaurant_name,
+      status: prospect.status,
+      sellerName: seller?.name ?? null,
+    },
+    context.signals,
+  )
+
+  const answer = await chatCompletionRaw(buildReplySystemPrompt(), context.text, {
+    feature: "crm_leads_reply",
+    maxTokens: REPLY_DRAFT_MAX_TOKENS,
+    temperature: 0.4,
+  })
+
+  const draft = answer ? sanitizeReplyDraft(answer.text) : null
+  if (answer && draft) {
+    return {
+      draft,
+      source: "llm",
+      model: answer.model,
+      reason: null,
+      events: context.events,
+      truncated: context.truncated,
+      requiresTemplate: !thread.window.open,
+    }
+  }
+
+  return {
+    draft: fallback,
+    source: "template",
+    model: answer?.model ?? null,
+    reason: answer ? "empty_response" : "unavailable",
+    events: context.events,
+    truncated: context.truncated,
+    requiresTemplate: !thread.window.open,
   }
 }
 
@@ -3077,6 +3229,370 @@ function minutesSince(iso: string | null, now: Date): number | null {
   const at = Date.parse(iso)
   if (Number.isNaN(at)) return null
   return Math.max(0, Math.round((now.getTime() - at) / 60_000))
+}
+
+// ============================================================
+// C8 — SECUENCIAS DE GOTEO
+//
+// Una secuencia nace APAGADA y una inscripción solo ENCOLA: el envío real lo
+// hace `runCrmSequences()` en el cron diario, con tope por corrida y compuerta
+// de consentimiento (plantilla aprobada, o ventana de 24 h abierta).
+// ============================================================
+
+export interface AdminSequenceStep {
+  stepOrder: number
+  delayHours: number
+  templateName: string | null
+  body: string | null
+}
+
+export interface AdminSequence {
+  id: number
+  name: string
+  description: string | null
+  isActive: boolean
+  steps: AdminSequenceStep[]
+  /** Inscripciones en curso (`status = 'activa'`). */
+  activeEnrollments: number
+  createdAt: string
+}
+
+export interface AdminSequenceInput {
+  id?: number | null
+  name: string
+  description?: string | null
+  isActive?: boolean
+  steps: Array<{
+    delayHours: number
+    templateName?: string | null
+    body?: string | null
+  }>
+}
+
+/** Pasos válidos: orden consecutivo desde 1, con al menos plantilla o texto. */
+function normalizeSequenceSteps(
+  steps: AdminSequenceInput["steps"],
+): Array<{ step_order: number; delay_hours: number; template_name: string | null; body: string | null }> {
+  return steps
+    .slice(0, MAX_SEQUENCE_STEPS)
+    .map((step) => {
+      const templateName = (step.templateName ?? "").trim() || null
+      const body = (step.body ?? "").trim() || null
+      const rawDelay = Number(step.delayHours)
+      const delayHours = Number.isFinite(rawDelay)
+        ? Math.min(MAX_SEQUENCE_DELAY_HOURS, Math.max(0, Math.round(rawDelay)))
+        : 24
+      return { step_order: 0, delay_hours: delayHours, template_name: templateName, body }
+    })
+    .filter((step) => step.template_name !== null || step.body !== null)
+    .map((step, index) => ({ ...step, step_order: index + 1 }))
+}
+
+/** Secuencias con sus pasos y el número de inscripciones activas. */
+export async function listCrmSequences(): Promise<AdminSequence[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { data, error } = await supabase
+    .from("crm_sequences")
+    .select("id, name, description, is_active, created_at, crm_sequence_steps(step_order, delay_hours, template_name, body)")
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    if (isMissingRelationError(error)) return []
+    logger.error("[ADMIN-CRM] Error leyendo secuencias:", error)
+    throw new Error("Error al cargar las secuencias")
+  }
+
+  const sequences = (data ?? []) as unknown as Array<Record<string, unknown>>
+  if (sequences.length === 0) return []
+
+  const ids = sequences.map((row) => Number(row.id))
+  const { data: enrollments, error: enrollError } = await supabase
+    .from("crm_sequence_enrollments")
+    .select("sequence_id")
+    .eq("status", "activa")
+    .in("sequence_id", ids)
+
+  if (enrollError && !isMissingRelationError(enrollError)) {
+    logger.warn("[ADMIN-CRM] No se pudieron contar las inscripciones:", {
+      error: enrollError.message,
+    })
+  }
+
+  const counts = new Map<number, number>()
+  for (const row of enrollments ?? []) {
+    const id = Number(row.sequence_id)
+    counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+
+  return sequences.map((row) => {
+    const rawSteps = (row.crm_sequence_steps ?? []) as Array<Record<string, unknown>>
+    return {
+      id: Number(row.id),
+      name: String(row.name ?? ""),
+      description: (row.description as string | null) ?? null,
+      isActive: Boolean(row.is_active),
+      steps: rawSteps
+        .map((step) => ({
+          stepOrder: Number(step.step_order),
+          delayHours: Number(step.delay_hours ?? 0),
+          templateName: (step.template_name as string | null) ?? null,
+          body: (step.body as string | null) ?? null,
+        }))
+        .sort((a, b) => a.stepOrder - b.stepOrder),
+      activeEnrollments: counts.get(Number(row.id)) ?? 0,
+      createdAt: String(row.created_at ?? ""),
+    }
+  })
+}
+
+/**
+ * Crea o reemplaza una secuencia. Nace apagada salvo que el admin la active.
+ *
+ * Los pasos se reemplazan en bloque (delete + insert): editar un paso intermedio
+ * sin reescribir los siguientes dejaría huecos en `step_order`.
+ */
+export async function saveCrmSequence(input: AdminSequenceInput): Promise<number> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const name = input.name.trim()
+  if (name.length === 0) throw new Error("La secuencia necesita un nombre")
+
+  const steps = normalizeSequenceSteps(input.steps)
+  if (steps.length === 0) {
+    throw new Error("Añade al menos un paso con plantilla o texto")
+  }
+
+  const supabase = await createServiceClient()
+  const payload = {
+    name,
+    description: (input.description ?? "").trim() || null,
+    is_active: Boolean(input.isActive),
+    updated_at: new Date().toISOString(),
+  }
+
+  let sequenceId = input.id ?? null
+  if (sequenceId) {
+    const { error } = await supabase.from("crm_sequences").update(payload).eq("id", sequenceId)
+    if (error) {
+      if (isMissingRelationError(error)) {
+        throw new Error("Las secuencias todavía no están disponibles en este entorno")
+      }
+      if (error.code === "23505") throw new Error("Ya existe una secuencia con ese nombre")
+      logger.error("[ADMIN-CRM] Error actualizando secuencia:", error)
+      throw new Error("Error al guardar la secuencia")
+    }
+    const { error: clearError } = await supabase
+      .from("crm_sequence_steps")
+      .delete()
+      .eq("sequence_id", sequenceId)
+    if (clearError) {
+      logger.error("[ADMIN-CRM] Error limpiando pasos:", clearError)
+      throw new Error("Error al guardar los pasos")
+    }
+  } else {
+    const { data, error } = await supabase
+      .from("crm_sequences")
+      .insert({ ...payload, created_by: user?.id ?? null })
+      .select("id")
+      .single()
+    if (error) {
+      if (isMissingRelationError(error)) {
+        throw new Error("Las secuencias todavía no están disponibles en este entorno")
+      }
+      if (error.code === "23505") throw new Error("Ya existe una secuencia con ese nombre")
+      logger.error("[ADMIN-CRM] Error creando secuencia:", error)
+      throw new Error("Error al crear la secuencia")
+    }
+    sequenceId = Number((data as { id: number }).id)
+  }
+
+  const { error: stepsError } = await supabase
+    .from("crm_sequence_steps")
+    .insert(steps.map((step) => ({ ...step, sequence_id: sequenceId })))
+  if (stepsError) {
+    logger.error("[ADMIN-CRM] Error insertando pasos:", stepsError)
+    throw new Error("Error al guardar los pasos")
+  }
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_sequence_save",
+    entity: "crm_sequences",
+    entityId: sequenceId,
+    detail: { name, steps: steps.length, isActive: payload.is_active },
+  })
+  revalidatePath("/admin/leads")
+  return sequenceId
+}
+
+/** Enciende o apaga una secuencia. Apagarla NO cancela las inscripciones. */
+export async function toggleCrmSequence(id: number, isActive: boolean): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { error } = await supabase
+    .from("crm_sequences")
+    .update({ is_active: isActive, updated_at: new Date().toISOString() })
+    .eq("id", id)
+  if (error) {
+    if (isMissingRelationError(error)) {
+      throw new Error("Las secuencias todavía no están disponibles en este entorno")
+    }
+    logger.error("[ADMIN-CRM] Error activando la secuencia:", error)
+    throw new Error("Error al actualizar la secuencia")
+  }
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_sequence_toggle",
+    entity: "crm_sequences",
+    entityId: id,
+    detail: { isActive },
+  })
+  revalidatePath("/admin/leads")
+}
+
+export interface EnrollResult {
+  enrolled: number
+  skipped: number
+  /** Motivo del primer rechazo, para poder decirlo en la interfaz. */
+  reason: string | null
+}
+
+/**
+ * Inscribe prospectos en una secuencia. Solo ENCOLA: programa el primer paso y
+ * nada más. Un prospecto ya inscrito no se reinscribe (UNIQUE en la tabla).
+ */
+export async function enrollProspectsInSequence(
+  sequenceId: number,
+  prospectIds: readonly number[],
+): Promise<EnrollResult> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const ids = [...new Set(prospectIds.filter((id) => Number.isFinite(id)))].slice(
+    0,
+    MAX_SEQUENCE_ENROLLMENTS_PER_BATCH,
+  )
+  if (ids.length === 0) return { enrolled: 0, skipped: 0, reason: null }
+
+  const supabase = await createServiceClient()
+  const { data: stepRows, error: stepError } = await supabase
+    .from("crm_sequence_steps")
+    .select("id, sequence_id, step_order, delay_hours, template_name, body")
+    .eq("sequence_id", sequenceId)
+    .order("step_order", { ascending: true })
+
+  if (stepError) {
+    if (isMissingRelationError(stepError)) {
+      throw new Error("Las secuencias todavía no están disponibles en este entorno")
+    }
+    logger.error("[ADMIN-CRM] Error leyendo los pasos:", stepError)
+    throw new Error("Error al cargar la secuencia")
+  }
+
+  const steps = (stepRows ?? []) as SequenceStep[]
+  const first = steps[0]
+  if (!first) throw new Error("La secuencia no tiene pasos")
+
+  const { data: existing, error: existingError } = await supabase
+    .from("crm_sequence_enrollments")
+    .select("prospect_id")
+    .eq("sequence_id", sequenceId)
+    .in("prospect_id", ids)
+  if (existingError && !isMissingRelationError(existingError)) {
+    logger.warn("[ADMIN-CRM] No se pudieron leer las inscripciones previas:", {
+      error: existingError.message,
+    })
+  }
+  const alreadyIn = new Set((existing ?? []).map((row) => Number(row.prospect_id)))
+  const fresh = ids.filter((id) => !alreadyIn.has(id))
+  if (fresh.length === 0) {
+    return { enrolled: 0, skipped: ids.length, reason: "Ya estaban inscritos en esta secuencia" }
+  }
+
+  const nextRunAt = nextSequenceRun(new Date(), first.delay_hours)
+  const { error: insertError } = await supabase.from("crm_sequence_enrollments").insert(
+    fresh.map((prospectId) => ({
+      sequence_id: sequenceId,
+      prospect_id: prospectId,
+      current_step: 0,
+      next_run_at: nextRunAt,
+      status: "activa",
+      enrolled_by: user?.id ?? null,
+    })),
+  )
+  if (insertError) {
+    if (isMissingRelationError(insertError)) {
+      throw new Error("Las secuencias todavía no están disponibles en este entorno")
+    }
+    logger.error("[ADMIN-CRM] Error inscribiendo prospectos:", insertError)
+    throw new Error("Error al inscribir los prospectos")
+  }
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_sequence_enroll",
+    entity: "crm_sequence_enrollments",
+    entityId: sequenceId,
+    detail: { enrolled: fresh.length, skipped: ids.length - fresh.length },
+  })
+  revalidatePath("/admin/leads")
+  return {
+    enrolled: fresh.length,
+    skipped: ids.length - fresh.length,
+    reason: null,
+  }
+}
+
+/** Cancela la inscripción activa de un prospecto en una secuencia. */
+export async function cancelSequenceEnrollment(enrollmentId: number): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { error } = await supabase
+    .from("crm_sequence_enrollments")
+    .update({
+      status: "cancelada",
+      next_run_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", enrollmentId)
+  if (error) {
+    if (isMissingRelationError(error)) {
+      throw new Error("Las secuencias todavía no están disponibles en este entorno")
+    }
+    logger.error("[ADMIN-CRM] Error cancelando la inscripción:", error)
+    throw new Error("Error al cancelar la inscripción")
+  }
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_sequence_cancel",
+    entity: "crm_sequence_enrollments",
+    entityId: enrollmentId,
+  })
+  revalidatePath("/admin/leads")
 }
 
 // ============================================================

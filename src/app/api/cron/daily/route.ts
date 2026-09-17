@@ -116,6 +116,16 @@ export async function GET(req: NextRequest) {
         return runWhatsAppAutomations()
       },
     ],
+    // C8 — secuencias de goteo del CRM: avanza un paso por inscripción vencida.
+    // Solo encola y va con tope por corrida; sin plantilla aprobada y con la
+    // ventana de 24 h cerrada no envía, lo registra como `skipped` con motivo.
+    [
+      "crm-sequences",
+      async () => {
+        const { runCrmSequences } = await import("@/lib/crm-sequences-engine")
+        return runCrmSequences()
+      },
+    ],
     // Ronda 7 — purga de la papelera de productos: borra definitivamente los
     // que llevan más de 30 días con deleted_at (nunca los que tienen pedidos,
     // porque order_items.product_id es ON DELETE CASCADE).

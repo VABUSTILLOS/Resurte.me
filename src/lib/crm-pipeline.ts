@@ -70,6 +70,11 @@ export interface CrmProspect {
   next_follow_up_at: string | null
   last_contact_at: string | null
   created_at: string
+  /**
+   * Etiquetas del prospecto (00140). Opcional porque las filas cargadas sin la
+   * migración aplicada no traen la columna y el pipeline debe seguir pintando.
+   */
+  tags?: string[]
 }
 
 export interface CrmBoard {

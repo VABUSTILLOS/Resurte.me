@@ -92,6 +92,7 @@
 | U1-U7 | Fechas relativas, aria-labels, form accesible, badge predeterminada, scroll al editar | ✅ |
 | U8-U12 | Mostrar/ocultar contraseña, Bloq Mayús, autocomplete, hints, roles | ✅ |
 | U13 | **Passkeys / WebAuthn**: entrar sin contraseña con huella, rostro, PIN o llave física. `src/lib/supabase/client.ts` enciende el flag que auth-js exige para la API experimental (`auth: { experimental: { passkey: true } }`); sin él `signInWithPasskey`/`auth.passkey.*` lanzan **al llamarse**, no al construirse. `AuthForm` (modo login) añade "Entrar con llave de acceso" (`signInWithPasskey()`, sin correo: la credencial es descubrible), oculto si `isPasskeySupported()` es falso y detectado con `useSyncExternalStore` para que el servidor pinte `false` sin desajuste de hidratación (y sin el render extra de un `setState` en efecto). En `/recompensas?tab=profile` la `PasskeyCard` lista, crea (`registerPasskey()`), renombra (`passkey.update`) y borra (`passkey.delete`, con confirmación: es irreversible y puede dejar al usuario sin su única entrada). `src/lib/passkeys.ts` (reglas puras, 31 tests) concentra lo que no debe reimplementarse en la UI: la fecha en la zona canónica del proyecto, la etiqueta (nombre del usuario → fecha → "Llave de acceso"; **nunca un índice**, que se recorre al agregar otra), la validación del nombre (recorta antes de medir, tope 120) y el mapeo de errores a español. Dos decisiones de correctitud: (a) `ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY` se resuelve por el **nombre de la causa**, no como cancelación — auth-js lo usa tanto para `NotAllowedError` como para el caso desconocido, y tratarlo en bloque silenciaría fallos reales; (b) `NotAllowedError` **no** se suprime: el navegador no distingue "cerré la ventana" de "este dispositivo no tiene ninguna llave" (privacidad), así que `passkeyErrorMessage(err, flow)` da copy distinto al entrar (con salida por correo) y al crear. `isPasskeyCancelled` se reserva para el aborto explícito. La tarjeta se oculta entera —sin dejar hueco— si WebAuthn no existe o si el proyecto no tiene las passkeys habilitadas (`list()` falla) | ✅ |
+| U14 | **🔜 La recuperación de contraseña no tiene entrada** (hallazgo de la ronda 4, declarado). La **mitad receptora está construida y funciona**: `/auth/reset` cambia la contraseña con `supabase.auth.updateUser({ password })` (`src/app/auth/reset/page.tsx:57`) y `/auth/callback` intercambia el código por la sesión temporal. Falta la **mitad iniciadora**: `resetPasswordForEmail` aparece **solo en un comentario** (`src/app/auth/reset/page.tsx:14`) y **ningún control de la UI enlaza a esa ruta**. Consecuencia real, medida: quien olvida su contraseña **no tiene forma de entrar**; peor, el aviso de enlace caducado de la propia página (`:99`, copy **visible**) le dice que lo solicite «desde iniciar sesión con ¿Olvidaste tu contraseña?» — **un control que no existe**, así que el callejón es doble. `signInWithOtp` (enlace mágico) tampoco existe, aunque `docs/OPS.md` § 8.1 lo daba por implementado junto con la recuperación (**corregido ahí** en la ronda 4). **Por qué no se arregla aquí**: es una **decisión de producto** (¿recuperación por correo o enlace mágico? ¿dónde vive el control y con qué copy?) y **no es verificable de extremo a extremo** sin recibir el correo real, así que enviarlo sin poder probarlo violaría el invariante 5. **Boceto, una vez decidido**: en `AuthForm` (modo login) un control que pida el correo y llame a `supabase.auth.resetPasswordForEmail(email, { redirectTo: \`${SITE_URL}/auth/callback?next=/auth/reset\` })`, con guard de `isSupabaseConfigured()`, `rateLimited()` contra abuso, claves nuevas en **ambos** archivos de i18n (`es.ts` y `en.ts`, por el test de paridad) y, como **prerrequisito de dashboard**, la Redirect URL en la allow-list de Supabase (`docs/OPS.md` § 8.1 paso 4). Un test e2e puede verificar que el control existe y que la llamada se hace — **no la entrega** | 🔜 |
 
 ## 7. Panel del restaurante
 
@@ -312,21 +313,76 @@ detrás había **dos bugs reales de producto**.
 | M8 | **Documentación**: esta sección, las **reglas comunes 9 y 10** de `docs/agents/README.md` (*"todo spec e2e corre en CI, o no existe"* y *"todo flotante inferior declara su colisión"*), y la corrección del párrafo de § Verificación que daba el bug del FAB por **ajeno al plan** | ✅ |
 | M9 | **Verificación de la ronda** | ✅ |
 
-**Verificación de la ronda** (todo lo tocado en verde): `npx tsc --noEmit` → 0 ·
-`npm run lint` → 0 · `npm test` → **4099 passed / 0 failed** (incluidos los dos
-contratos nuevos) · spec móvil completo contra el server real →
-**45 passed · 29 skipped · 0 failed** · suite `@ci` completa (456 tests, ambos
-projects) → ver el párrafo de cierre de § Verificación. **Dos hallazgos que no
-se arreglan aquí y quedan declarados**: (1) **la recuperación de contraseña es
-inalcanzable** — es una decisión de producto, no un bug de test: o se enlaza
-desde el login, o se retira la ruta; (2) el **test del 404** (`smoke.spec.ts` y
-3 equivalentes) **nunca pudo pasar**: `page.goto("/ruta-que-no-existe-xyz")` no
-matchea `[slug]`, así que cae en `src/app/not-found.tsx` y conserva el título
-del root layout, mientras el test espera el que aporta `generateMetadata` de
-`src/app/[slug]/page.tsx`. Además, **el CI no sirvió como línea base**: llevaba
-**6 corridas consecutivas en rojo en `main`** por estados intermedios rotos de
-otras sesiones (un `TS2300` por identificador duplicado, Knip), así que la
-comparación válida es **local y con `--retries=2`**, como corre CI.
+**Verificación de la ronda** (todo lo tocado en verde): los dos contratos →
+**8 passed / 0 failed** · spec móvil completo contra el server real →
+**45 passed · 29 skipped · 0 failed** · suite `@ci` completa contra el server
+real y **con `--retries=2`**, como corre CI → **348 passed · 113 skipped ·
+27 flaky · 2 failed** (490 tests, ambos projects), frente a la línea base de
+antes de la ronda (**307 passed · 10 failed · 25 flaky**). Los **2 rojos son el
+mismo test** (`compartir.spec.ts:39`) y **no son una regresión**: su propia
+cabecera declara que asume el entorno CI (Supabase dummy) porque necesita que el
+catálogo **no** matchee "tomate" y "lechuga", y contra el server real sí
+matchean. Verificado verde en ambos projects contra el repo CI-equivalente.
+
+**Tres lecciones que la ronda dejó escritas, porque las tres me mordieron:**
+
+1. **El agujero de calentamiento tenía dos capas, no una.** `global-setup.ts`
+   calentaba páginas, pero **una API route que la página llama desde el cliente
+   también paga compilación en frío** y no aparece en ningún spec. Medido:
+   `/api/reviews` **13.2 s**, `/api/addresses/guest` **10.9 s**,
+   `/api/cart/bumps` **3.6 s**. El síntoma que lo delata es preciso: **el test
+   falla en el primer project y pasa en el segundo, contra el mismo server y con
+   `--workers=1`**. Añadido el array `API_ROUTES` (18 rutas; **un `GET` basta
+   para compilar el módulo, y un `405` también**) → **64 rutas** calentadas.
+   Verificado **en frío de verdad** (`.next` borrado): `compartir + calificar +
+   redeem + money-flows` → **64 passed**, `money-flows` → **20 passed**.
+2. **El test del 404 nunca midió el 404: medía la carga del server.** Mi primer
+   diagnóstico fue que la aserción era **inalcanzable** porque `page.goto()`
+   caía en `not-found.tsx` y conservaba el título del root layout. **Era falso, y
+   lo desmintió una sonda en navegador real**: tras hidratar, el `h1` es "404" y
+   el título **sí** pasa a ser el del segmento (`"Ciudad no encontrada —
+   Resurte.me"`, de `src/app/[slug]/page.tsx`). Lo que pasa es que la cáscara
+   inicial (`<html id="__next_error__">`) trae el título del root layout y solo
+   se reemplaza al hidratar el payload de flight; con el timeout por defecto de
+   5 s el test medía el arranque en frío. Arreglado con **`timeout: 15000`** en
+   los 4 tests del 404 — **sin tocar una sola aserción**, porque las aserciones
+   eran correctas.
+3. **El CI no sirvió como línea base.** Llevaba **6 corridas consecutivas en
+   rojo en `main`** por estados intermedios rotos de otras sesiones (un `TS2300`
+   por identificador duplicado, Knip), así que la comparación válida es
+   **local y con `--retries=2`**.
+
+**Dos hallazgos de producto, declarados y no arreglados aquí:**
+
+1. **La recuperación de contraseña no tiene entrada** (rastreada como **U14 🔜**
+   en § 6). La **mitad receptora funciona** (`/auth/reset` cambia la contraseña
+   con `updateUser`, y `/auth/callback` intercambia el código por la sesión
+   temporal); falta la **mitad iniciadora**: `resetPasswordForEmail` aparece
+   **únicamente en un comentario** y **nada enlaza a esa ruta**. Dos agravantes
+   que encontré al comprobar la propiedad del hallazgo: (a) el aviso de enlace
+   caducado de la propia página es **copy visible** y le dice al usuario que lo
+   solicite «desde iniciar sesión con ¿Olvidaste tu contraseña?» — **un control
+   que no existe**, así que el callejón sin salida es doble; (b) `docs/OPS.md`
+   § 8.1 **daba por implementados** este flujo y el enlace mágico
+   (`signInWithOtp`, que **no existe en `src/`**) y avisaba de que ambos consumen
+   el SMTP. **Corregido ahí**: hoy el único consumidor del SMTP es la
+   confirmación de registro. Sigue siendo una **decisión de producto** (¿correo o
+   enlace mágico? ¿copy?), y **no es verificable de extremo a extremo** sin
+   recibir el correo real — por eso se declara con el boceto exacto en vez de
+   enviarse sin poder probarlo.
+2. **El pill de la guía tapaba "Aceptar todas"** (bug #2, ya arreglado arriba en
+   M6).
+
+**Estado de los tres gates al cerrar** — `npm test`, `npx tsc --noEmit` y
+`npm run lint` quedaron **en rojo por trabajo en vuelo de otra sesión** (la
+**ronda 5**, Leads CRM: `src/app/admin/leads/page.tsx`, `src/app/admin/actions.ts`
+y `e2e/admin-leads.spec.ts`, los tres **`M` o recién commiteados**, ninguno
+tocado por esta ronda). El detalle que importa: **el contrato de la ronda 3 hizo
+su trabajo** — `local-date.contract.test.ts` cazó un recorte UTC real en el
+código nuevo (`leads/page.tsx`: el nombre del CSV se construye con
+`new Date().toISOString().slice(0, 10)`, que **desplaza la fecha un día** después
+de las 18:00 en CDMX). Es exactamente la clase de bug que la ronda 3 eliminó, y
+la guardia lo detectó en cuanto apareció.
 
 ### Ronda 5 — Leads CRM: el lead deja de morir en su bandeja
 
@@ -409,11 +465,19 @@ un fallo **real de producto** —no un flake— y quedó arreglado en la **ronda
 (`src/components/panel/guide/guide-toggle-button.tsx`, commit `61decf1`,
 `fixed` + `z-[85]`) **interceptaba el tap del banner de cookies**, así que el
 usuario móvil del panel no podía pulsar "Aceptar todas". También en la ronda 4
-se comprobó que el test del **404** (`smoke.spec.ts` y 3 equivalentes) **nunca
-pudo pasar**: la ruta de prueba no matchea `[slug]`, así que cae en
-`src/app/not-found.tsx` y conserva el título del root layout, mientras el test
-espera el que aporta `generateMetadata` de `src/app/[slug]/page.tsx`.
-`npx tsc --noEmit`, `npm test` y `npm run build` están en verde.
+se comprobó que el test del **404** (`smoke.spec.ts` y 3 equivalentes) **medía
+la carga del server, no el 404**: la cáscara inicial (`<html
+id="__next_error__">`) trae el título del root layout y solo se reemplaza al
+hidratar el payload de flight —tras hidratar, el título **sí** es el del
+segmento, el de `generateMetadata` de `src/app/[slug]/page.tsx`—, así que con el
+timeout por defecto de 5 s el test no alcanzaba a verlo en frío. Arreglado con
+`timeout: 15000` en los 4, **sin tocar ninguna aserción**: las aserciones eran
+correctas.
+`npx tsc --noEmit`, `npm test` y `npm run build` están en verde para el código
+de las rondas 1–4. **Al cerrar la ronda 4 los tres gates quedaron en rojo por
+trabajo en vuelo de otra sesión** (la ronda 5, Leads CRM: `src/app/admin/leads/page.tsx`,
+`src/app/admin/actions.ts` y `e2e/admin-leads.spec.ts`), no por esta ronda; el
+detalle está en el párrafo de cierre de la sección de la ronda 4.
 
 > Nota: `playwright.config.ts` usa `E2E_PORT` (por defecto 3000) y
 > `next dev` toma un lock **por directorio**, así que si otro dev server del

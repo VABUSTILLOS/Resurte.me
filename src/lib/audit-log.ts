@@ -34,6 +34,9 @@ export const AUDIT_ACTIONS = [
   "crm_quick_reply_save",
   "crm_quick_reply_delete",
   "crm_sequence_enroll",
+  "crm_sequence_save",
+  "crm_sequence_toggle",
+  "crm_sequence_cancel",
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -69,6 +72,9 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   crm_quick_reply_save: "Respuesta rápida guardada",
   crm_quick_reply_delete: "Respuesta rápida eliminada",
   crm_sequence_enroll: "Prospecto inscrito en secuencia",
+  crm_sequence_save: "Secuencia de goteo guardada",
+  crm_sequence_toggle: "Secuencia de goteo activada o pausada",
+  crm_sequence_cancel: "Inscripción en secuencia cancelada",
 }
 
 function isAuditAction(value: string): value is AuditAction {

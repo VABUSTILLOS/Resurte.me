@@ -144,18 +144,27 @@ test.describe("micrositio /r/[slug]", { tag: "@ci" }, () => {
   // El slug inexistente debe dar 404 real: el micrositio se comparte por
   // WhatsApp y un soft-404 (200 con la vista de 404) indexaba enlaces rotos
   // como páginas válidas. Por eso se verifica el status, no solo la vista.
+  //
+  // Los asertos del servidor se hacen sobre el CUERPO de la respuesta, no sobre
+  // el DOM: medido, la cáscara inicial (id="__next_error__") llega con el cuerpo
+  // VACÍO —h1s=[], innerText.length=0— y todo el boundary viaja en el payload de
+  // flight, así que getByText/getByRole son post-hidratación. El copy del
+  // not-found SÍ está en la respuesta y discrimina: "El restaurante que buscas
+  // no existe" aparece 1 vez en /r/* y 0 en el boundary raíz.
   test("un slug inexistente responde 404 y no renderiza un restaurante", async ({ page }) => {
     const response = await page.goto("/r/no-existe-este-restaurante", { waitUntil: "domcontentloaded" })
 
     expect(response?.status()).toBe(404)
-    // El boundary viaja en el payload de flight: la cáscara inicial
-    // (id="__next_error__") no lo trae, así que bajo carga paralela la
-    // hidratación puede tardar más que el timeout por defecto (5s) sin que el
-    // 404 esté roto. Medido aislado: pasa.
-    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible({ timeout: 15000 })
+    const body = (await response?.text()) ?? ""
+    // Boundary del micrositio, no el raíz.
+    expect(body).toContain("El restaurante que buscas no existe")
+
+    // Único aserto post-hidratación, y por eso el único con presupuesto: el h1
+    // "404" aparece a ~2.1s en caliente y a 24.4s bajo carga paralela, así que
+    // el default de 5s medía la hidratación y no el 404. Una vez hidratado, el
+    // resto resuelve al instante y no necesita margen propio.
+    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible({ timeout: 30000 })
     await expect(page.getByText("Página no encontrada")).toBeVisible()
-    // Copy del not-found del micrositio: confirma que no cae al boundary raíz.
-    await expect(page.getByText("El restaurante que buscas no existe", { exact: false })).toBeVisible()
     await expect(page.getByRole("link", { name: /Agregar/i })).toHaveCount(0)
   })
 
@@ -163,8 +172,11 @@ test.describe("micrositio /r/[slug]", { tag: "@ci" }, () => {
     const response = await page.goto("/r/no-existe-este-restaurante/carta", { waitUntil: "domcontentloaded" })
 
     expect(response?.status()).toBe(404)
+    const body = (await response?.text()) ?? ""
+    expect(body).toContain("El restaurante que buscas no existe")
+
     // Mismo margen que el test anterior: el boundary se hidrata, no viene en la cáscara.
-    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible({ timeout: 30000 })
     await expect(page.getByText("Página no encontrada")).toBeVisible()
   })
 })

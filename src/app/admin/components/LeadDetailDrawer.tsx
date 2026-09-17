@@ -19,10 +19,12 @@ import {
   getAdminProspectDetail,
   getAdminSellers,
   setCrmProspectFollowUp,
+  setCrmProspectTags,
   updateCrmProspectNotes,
   updateCrmProspectStatus,
 } from "../actions"
 import { CRM_STATUSES, CRM_STATUS_LABEL, isFollowUpDue } from "@/lib/crm-pipeline"
+import { MAX_TAGS_PER_PROSPECT, addTags, tagLabel, toggleTag } from "@/lib/crm-tags"
 import {
   ACTIVITY_OUTCOMES,
   ACTIVITY_OUTCOME_LABEL,
@@ -50,6 +52,7 @@ interface Detail {
   activities: Activity[]
   seller: { id: string; name: string } | null
   lead: LeadOrigin | null
+  tags: string[]
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -84,6 +87,8 @@ export function LeadDetailDrawer({ prospectId, onClose, onChanged }: LeadDetailD
   const [activityType, setActivityType] = useState<ActivityType>("llamada")
   const [activityOutcome, setActivityOutcome] = useState("")
   const [activitySummary, setActivitySummary] = useState("")
+  const [tagDraft, setTagDraft] = useState("")
+  const [tagBusy, setTagBusy] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -156,6 +161,33 @@ export function LeadDetailDrawer({ prospectId, onClose, onChanged }: LeadDetailD
     } finally {
       setBusy(false)
     }
+  }
+
+  /**
+   * Las etiquetas se guardan con su propio estado (`tagBusy`) en vez de `run`
+   * para que pulsar varias seguidas no bloquee el resto de la ficha.
+   */
+  async function applyTags(next: string[], success: string) {
+    setTagBusy(true)
+    try {
+      await setCrmProspectTags(prospectId, next)
+      toast(success, "success")
+      await load()
+      onChanged()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudieron guardar las etiquetas", "error")
+    } finally {
+      setTagBusy(false)
+    }
+  }
+
+  function addTagFromDraft(e: React.FormEvent) {
+    e.preventDefault()
+    if (!detail || !tagDraft.trim()) return
+    const next = addTags(detail.tags, [tagDraft])
+    setTagDraft("")
+    if (next.join("\u0000") === detail.tags.join("\u0000")) return
+    void applyTags(next, "Etiqueta añadida")
   }
 
   const prospect = detail?.prospect ?? null
@@ -261,6 +293,60 @@ export function LeadDetailDrawer({ prospectId, onClose, onChanged }: LeadDetailD
                     <ExternalLink className="h-3.5 w-3.5" /> Lead #{detail.lead.id}
                   </a>
                 )}
+              </section>
+
+              <section>
+                <span className={LABEL}>Etiquetas</span>
+                {detail.tags.length === 0 ? (
+                  <p className="text-xs text-gray-400">Sin etiquetas todavía.</p>
+                ) : (
+                  <ul className="flex flex-wrap gap-1.5">
+                    {detail.tags.map((tag) => (
+                      <li
+                        key={tag}
+                        className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-0.5 pl-2 pr-1 text-[11px] font-semibold text-brand-700"
+                      >
+                        {tagLabel(tag)}
+                        <button
+                          type="button"
+                          disabled={tagBusy}
+                          aria-label={`Quitar la etiqueta ${tagLabel(tag)}`}
+                          onClick={() => void applyTags(toggleTag(detail.tags, tag), "Etiqueta quitada")}
+                          className="rounded-full p-0.5 text-brand-600 hover:bg-brand-100 disabled:opacity-50"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <form className="mt-2 flex gap-2" onSubmit={addTagFromDraft}>
+                  <label className="sr-only" htmlFor="lead-tag-input">
+                    Nueva etiqueta
+                  </label>
+                  <input
+                    id="lead-tag-input"
+                    value={tagDraft}
+                    disabled={tagBusy || detail.tags.length >= MAX_TAGS_PER_PROSPECT}
+                    onChange={(e) => setTagDraft(e.target.value)}
+                    placeholder={
+                      detail.tags.length >= MAX_TAGS_PER_PROSPECT
+                        ? `Máximo ${MAX_TAGS_PER_PROSPECT} etiquetas`
+                        : "vip, mayoreo, sin respuesta..."
+                    }
+                    className={FIELD}
+                  />
+                  <button
+                    type="submit"
+                    disabled={tagBusy || !tagDraft.trim() || detail.tags.length >= MAX_TAGS_PER_PROSPECT}
+                    className="shrink-0 rounded-xl bg-gray-900 px-3 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    Añadir
+                  </button>
+                </form>
+                <p className="mt-1 text-[11px] text-gray-400">
+                  Se guardan en minúsculas y sin acentos: <em>Vip</em> y <em>vip</em> son la misma.
+                </p>
               </section>
 
               <section className="grid grid-cols-2 gap-3 text-xs">

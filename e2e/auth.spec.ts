@@ -8,14 +8,15 @@ import { test, expect } from "@playwright/test"
  * flujo completo de registro con confirmación se cubre con
  * scripts/verify-auth-setup.mjs contra el proyecto de Supabase.
  *
- * ⚠️ Hueco de producto conocido (backlog P0): la recuperación de contraseña
- * NO es alcanzable desde la UI. `resetPasswordForEmail` no se invoca en ningún
- * componente — solo se menciona en un comentario de /auth/reset/page.tsx — y
- * tampoco existe "enlace mágico" (`signInWithOtp`). La página /auth/reset
- * existe y funciona, pero nada enlaza a ella. Los tests que asertaban esos
- * botones se eliminaron: asertaban una UI inexistente y por eso nunca corrían
- * (0 etiquetas @ci). Cuando se implemente el flujo, añadir aquí el test del
- * disparador.
+ * ⚠️ Hueco cerrado (antes backlog P0): la recuperación de contraseña YA es
+ * alcanzable desde el login. El disparador "¿Olvidaste tu contraseña?" llama a
+ * `resetPasswordForEmail` y el enlace vuelve por /auth/callback con
+ * `next=/auth/reset`, donde el usuario elige la contraseña nueva.
+ *
+ * El envío real no se prueba aquí (necesitaría backend de correo): lo que se
+ * prueba es el disparador y el aviso de correo vacío, que es determinista y no
+ * toca la red. Antes había tests que asertaban esos botones y se eliminaron
+ * por asertar una UI inexistente; este test cubre la UI que sí existe.
  */
 test.describe("autenticación", { tag: "@ci" }, () => {
   test("la página de registro muestra el formulario completo", async ({ page }) => {
@@ -47,6 +48,33 @@ test.describe("autenticación", { tag: "@ci" }, () => {
       "aria-pressed",
       "true"
     )
+  })
+
+  test("el login ofrece la recuperación de contraseña y avisa si falta el correo", async ({
+    page,
+  }) => {
+    await page.goto("/auth/login")
+
+    const trigger = page.getByRole("button", { name: /olvidaste tu contraseña/i })
+    await expect(trigger).toBeVisible()
+
+    // Sin correo no se pide nada: el aviso lo dice en vez de mandar una
+    // petición que Supabase aceptaría sin producir un efecto visible.
+    await trigger.click()
+    // `filter` es necesario: Next inyecta `__next-route-announcer__` con
+    // role="alert" y el locator por rol a secas resuelve a 2 elementos.
+    await expect(
+      page.getByRole("alert").filter({ hasText: /escribe tu correo/i })
+    ).toBeVisible()
+
+    // El disparador es type="button": no envía el formulario de login.
+    await expect(page).toHaveURL(/\/auth\/login/)
+
+    // En registro no aplica: ahí no hay contraseña que recuperar.
+    await page.goto("/auth/register")
+    await expect(
+      page.getByRole("button", { name: /olvidaste tu contraseña/i })
+    ).toHaveCount(0)
   })
 
   test("/auth/reset sin sesión muestra aviso en lugar del formulario", async ({ page }) => {

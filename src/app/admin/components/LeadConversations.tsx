@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Search,
   Send,
+  Sparkles,
   UserRound,
 } from "lucide-react"
 import {
@@ -18,6 +19,7 @@ import {
   getAdminQuickReplies,
   listWaTemplates,
   sendLeadMessage,
+  suggestLeadReply,
   type AdminCrmInbox,
   type AdminInboxThread,
   type AdminLeadConversation,
@@ -338,6 +340,7 @@ export function LeadConversationPanel({
   const [templateName, setTemplateName] = useState("")
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [suggesting, setSuggesting] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
@@ -396,6 +399,23 @@ export function LeadConversationPanel({
       toast(e instanceof Error ? e.message : "No se pudo enviar el mensaje", "error")
     } finally {
       setSending(false)
+    }
+  }
+
+  async function suggest() {
+    setSuggesting(true)
+    try {
+      const suggestion = await suggestLeadReply(prospectId)
+      setBody(suggestion.draft)
+      if (suggestion.source === "template") {
+        toast("Sugerencia de respaldo: revisa y edita antes de enviar", "warning")
+      } else {
+        toast("Sugerencia lista: revísala antes de enviar", "success")
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo sugerir una respuesta", "error")
+    } finally {
+      setSuggesting(false)
     }
   }
 
@@ -506,22 +526,34 @@ export function LeadConversationPanel({
           </div>
         ) : (
           <>
-            {quickReplies.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {quickReplies.slice(0, 8).map((qr) => (
-                  <button
-                    key={qr.id}
-                    type="button"
-                    disabled={sending}
-                    title={qr.body}
-                    onClick={() => void send({ quickReplyId: qr.id })}
-                    className="rounded-full border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    {qr.title}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                disabled={sending || suggesting}
+                onClick={() => void suggest()}
+                title="Redacta un borrador con IA a partir de la conversación. Nunca se envía solo."
+                className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2 py-1 text-[11px] font-semibold text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+              >
+                {suggesting ? (
+                  <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                Sugerir respuesta
+              </button>
+              {quickReplies.slice(0, 8).map((qr) => (
+                <button
+                  key={qr.id}
+                  type="button"
+                  disabled={sending}
+                  title={qr.body}
+                  onClick={() => void send({ quickReplyId: qr.id })}
+                  className="rounded-full border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {qr.title}
+                </button>
+              ))}
+            </div>
             <div className="flex items-end gap-2">
               <label className="flex-1">
                 <span className="sr-only">Mensaje</span>

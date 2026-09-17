@@ -138,6 +138,43 @@ export function AuthForm({ mode }: AuthFormProps) {
   }
 
   /**
+   * Pide el enlace de restablecimiento. El enlace vuelve por `/auth/callback`
+   * con `next=/auth/reset`, que es donde el usuario elige la contraseña nueva.
+   *
+   * La respuesta es deliberadamente neutra: Supabase devuelve éxito aunque el
+   * correo no tenga cuenta, y decir "no existe" convertiría este formulario en
+   * un oráculo de qué correos están registrados.
+   */
+  async function handleForgotPassword() {
+    if (!supabase) return
+    setError(null)
+    setSuccessMessage(null)
+
+    // Sin correo no hay nada que pedir, y adivinarlo sería peor que decirlo.
+    const target = email.trim()
+    if (!target) {
+      setError("Escribe tu correo y te enviamos el enlace.")
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(target, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
+      })
+      if (error) throw error
+      setSuccessMessage(
+        `Si ${target} tiene una cuenta, te enviamos un enlace para restablecer tu contraseña. Revisa tu bandeja de entrada (y spam).`
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No pudimos enviar el enlace")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /**
    * Entrar con llave de acceso. No pide correo: la llave es "descubrible", el
    * navegador ofrece las que este dispositivo tenga para el dominio.
    */
@@ -200,7 +237,9 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       {successMessage && (
         <div role="status" className="mb-4 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700">
-          <p className="font-semibold mb-1">¡Cuenta creada!</p>
+          <p className="font-semibold mb-1">
+            {isLogin ? "Revisa tu correo" : "¡Cuenta creada!"}
+          </p>
           <p>{successMessage}</p>
         </div>
       )}
@@ -286,6 +325,18 @@ export function AuthForm({ mode }: AuthFormProps) {
             <p id="password-hint" className="mt-1 text-xs text-gray-400">
               Mínimo 6 caracteres.
             </p>
+          )}
+          {isLogin && (
+            <div className="mt-1 text-right">
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={loading}
+                className="touch-target rounded-md text-xs font-semibold text-emerald-600 hover:text-emerald-500 disabled:opacity-50 transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
           )}
         </div>
 

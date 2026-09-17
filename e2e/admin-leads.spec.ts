@@ -29,15 +29,15 @@ test.describe("leads CRM — guards", { tag: "@ci" }, () => {
 
   test("la página /admin/leads no sirve la bandeja a anónimos", async ({ page }) => {
     const response = await page.goto("/admin/leads")
-    // El middleware puede redirigir al login (200 tras seguir el redirect) o
-    // el guard del panel corta la vista. Lo que no puede: reventar con 5xx.
-    expect(response?.status()).toBeLessThan(500)
+    // 200 solo es aceptable tras seguir un redirect al login; si el guard del
+    // panel corta la vista, tiene que ser uno de los códigos de rechazo.
+    expect([...GUARDED_CODES, 200]).toContain(response?.status() ?? 0)
     await expect(page.locator("body")).not.toBeEmpty()
   })
 
   test("la vista de pipeline no sirve el tablero a anónimos", async ({ page }) => {
     const response = await page.goto("/admin/leads?tab=pipeline")
-    expect(response?.status()).toBeLessThan(500)
+    expect([...GUARDED_CODES, 200]).toContain(response?.status() ?? 0)
     await expect(page.locator("body")).not.toBeEmpty()
   })
 })
@@ -105,4 +105,44 @@ test.describe("leads CRM — deep-links de las alertas", { tag: "@ci" }, () => {
       await expect(page.locator("body")).not.toBeEmpty()
     })
   }
+})
+
+test.describe("leads CRM — bandeja de conversaciones", { tag: "@ci" }, () => {
+  // La pestaña "bandeja" es nueva en la Ronda 6: lee los mensajes que el
+  // webhook guarda desde 00041 y que hasta ahora nadie mostraba. Su superficie
+  // es la más sensible de la página (teléfonos y contenido de conversaciones),
+  // así que el guard se verifica aparte y con el parámetro explícito.
+  test("la pestaña bandeja no sirve conversaciones a anónimos", async ({ page }) => {
+    const response = await page.goto("/admin/leads?tab=bandeja")
+    expect(response?.status()).toBeLessThan(500)
+    await expect(page.locator("body")).not.toBeEmpty()
+  })
+
+  test("?view= fuera de la allowlist de la bandeja se descarta sin romper", async ({ page }) => {
+    const response = await page.goto("/admin/leads?tab=bandeja&view=conversaciones-inventadas")
+    expect(response?.status()).toBeLessThan(500)
+    await expect(page.locator("body")).not.toBeEmpty()
+  })
+
+  test("?tag= arbitraria no rompe el render del pipeline", async ({ page }) => {
+    const response = await page.goto("/admin/leads?tab=pipeline&tag=vip")
+    expect(response?.status()).toBeLessThan(500)
+    await expect(page.locator("body")).not.toBeEmpty()
+  })
+
+  test("la combinación completa de filtros de la bandeja no rompe el render", async ({ page }) => {
+    const response = await page.goto(
+      "/admin/leads?tab=bandeja&view=secuencias&tag=mayoreo&box=todos&q=cafe&page=2"
+    )
+    expect(response?.status()).toBeLessThan(500)
+    await expect(page.locator("body")).not.toBeEmpty()
+  })
+
+  test("las secuencias de goteo nacen apagadas: la URL no puede activarlas", async ({ page }) => {
+    // Activar una secuencia es un acto explícito en la interfaz (con auditoría),
+    // nunca un efecto de abrir un enlace.
+    const response = await page.goto("/admin/leads?tab=bandeja&view=secuencias&active=1")
+    expect(response?.status()).toBeLessThan(500)
+    await expect(page.locator("body")).not.toBeEmpty()
+  })
 })

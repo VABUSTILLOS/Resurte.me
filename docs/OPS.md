@@ -295,7 +295,20 @@ El servicio de correo por defecto de Supabase Auth es **solo para desarrollo** (
    - `http://localhost:3000/auth/callback` (desarrollo)
 5. Probar: registrar un usuario de prueba en `/auth/register` y confirmar que llega el correo.
 
-Flujos que dependen de este SMTP: confirmación de registro, **enlace mágico** (`signInWithOtp`) y **recuperación de contraseña** (`resetPasswordForEmail` → `/auth/reset`).
+Flujos que dependen de este SMTP: **solo la confirmación de registro** está
+implementada hoy. Los otros dos están **diseñados pero no construidos**:
+
+- **Recuperación de contraseña**: la mitad receptora existe y funciona
+  (`/auth/reset` cambia la contraseña con `updateUser`, y `/auth/callback`
+  intercambia el código por la sesión temporal), pero **no tiene entrada** —
+  `resetPasswordForEmail` aparece **únicamente en un comentario**
+  (`src/app/auth/reset/page.tsx:14`) y **ningún control de la UI enlaza a esa
+  ruta**.
+- **Enlace mágico**: `signInWithOtp` **no existe en `src/`**.
+
+No configures el SMTP esperando que estos flujos funcionen: hoy el único
+consumidor es la confirmación de registro. Detalle, consecuencias y boceto de
+implementación: `docs/PLAN-MEJORAS.md` § 6 (U14).
 
 ### 8.2 Roles del sitio y master admin
 

@@ -10,13 +10,23 @@ import { test, expect } from "@playwright/test"
  */
 
 test.describe("lista compartida — share target PWA", { tag: "@ci" }, () => {
+  /**
+   * `/compartir` es un `<Suspense>` sobre un componente CLIENTE y la página no
+   * declara `force-dynamic`, así que NADA de su contenido viaja en la cáscara
+   * del servidor: todo aserto de esta suite es post-hidratación. El default de
+   * 5s medía la hidratación y no la página — de ahí los rojos intermitentes.
+   * El presupuesto va solo en el primer aserto de cada test: una vez hidratado,
+   * el resto resuelve al instante y no necesita margen propio.
+   */
+  const HIDRATACION = { timeout: 20_000 }
+
   test("sin lista muestra el estado vacío y no ofrece agregar nada", async ({ page }) => {
     const response = await page.goto("/compartir", { waitUntil: "domcontentloaded" })
     expect(response?.status()).toBe(200)
 
     await expect(
       page.getByRole("heading", { level: 1, name: "Lista compartida" })
-    ).toBeVisible()
+    ).toBeVisible(HIDRATACION)
     await expect(page.getByRole("heading", { name: "Aún no hay lista" })).toBeVisible()
     await expect(page.getByRole("link", { name: /Ir al catálogo/ })).toBeVisible()
 
@@ -31,7 +41,7 @@ test.describe("lista compartida — share target PWA", { tag: "@ci" }, () => {
       waitUntil: "domcontentloaded",
     })
 
-    await expect(page.getByLabel("Tu lista")).toHaveValue(lista)
+    await expect(page.getByLabel("Tu lista")).toHaveValue(lista, HIDRATACION)
     // 3 renglones, 2+1+3 piezas.
     await expect(page.getByText("3 productos · 6 piezas")).toBeVisible()
   })
@@ -46,7 +56,7 @@ test.describe("lista compartida — share target PWA", { tag: "@ci" }, () => {
     // La resolución corre en el cliente contra un server action, así que el
     // primer aserto espera con holgura (el resto ya es inmediato).
     const sinCoincidencia = page.getByRole("heading", { name: /Sin coincidencia \(2\)/ })
-    await expect(sinCoincidencia).toBeVisible({ timeout: 20_000 })
+    await expect(sinCoincidencia).toBeVisible(HIDRATACION)
     await expect(page.getByRole("heading", { name: /Encontrados/ })).toHaveCount(0)
 
     // `exact` para no capturar los enlaces "Buscar en el catálogo" del header.
@@ -68,7 +78,7 @@ test.describe("lista compartida — share target PWA", { tag: "@ci" }, () => {
     await page.goto(`/compartir?titulo=${encodeURIComponent("2 kg de tomate")}`, {
       waitUntil: "domcontentloaded",
     })
-    await expect(page.getByLabel("Tu lista")).toHaveValue("2 kg de tomate")
+    await expect(page.getByLabel("Tu lista")).toHaveValue("2 kg de tomate", HIDRATACION)
   })
 
   test("el manifest declara el share target GET hacia /compartir", async ({ request }) => {

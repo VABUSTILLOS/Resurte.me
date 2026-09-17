@@ -18,6 +18,7 @@ import {
   Loader2,
   Mail,
   MessageCircle,
+  Plus,
   RotateCcw,
   Search,
   Trash2,
@@ -28,14 +29,17 @@ import {
 } from "lucide-react"
 import {
   assignCrmProspect,
+  bulkTagProspects,
   convertLeadToProspect,
   discardLead,
   getAdminCrmBoard,
+  getAdminCrmSla,
   getAdminLeadBoardCounts,
   getAdminLeads,
   getAdminSellers,
   restoreLead,
   updateCrmProspectStatus,
+  type AdminCrmSla,
   type AdminLeadBoardCounts,
   type AdminLeadRow,
 } from "../actions"
@@ -75,10 +79,14 @@ import {
   type LeadBox,
 } from "@/lib/crm-filters"
 import { downloadCsv, toCsv } from "@/lib/csv"
+import { parseTagInput, tagLabel, tagMatches } from "@/lib/crm-tags"
+import { formatMinutes } from "@/lib/crm-assignment"
 import { formatRelativeTime } from "@/lib/relative-time"
+import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import { ToastProvider, useToast } from "@/components/toast"
 import { LeadDetailDrawer } from "../components/LeadDetailDrawer"
 import { LeadConversations } from "../components/LeadConversations"
+import { LeadSequences, SequenceEnrollControl } from "../components/LeadSequences"
 
 const SOURCE_LABEL: Record<string, string> = {
   checkout_drawer: "Checkout",
@@ -160,6 +168,10 @@ function AdminLeadsContent() {
   const [workingId, setWorkingId] = useState<number | null>(null)
   const [drawerId, setDrawerId] = useState<number | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [bulkTagDraft, setBulkTagDraft] = useState("")
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [inboxSection, setInboxSection] = useState<"conversaciones" | "secuencias">("conversaciones")
 
   // Debounce: teclear no debe disparar una recarga por letra.
   useEffect(() => {
@@ -319,6 +331,44 @@ function AdminLeadsContent() {
     }
   }
 
+  function toggleSelected(id: number) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  /** Marca o desmarca los prospectos visibles del tablero (ya filtrados). */
+  function toggleSelectAllVisible() {
+    const visible = filteredProspects.map((p) => p.id)
+    setSelectedIds((prev) => (prev.length >= visible.length ? [] : visible))
+  }
+
+  async function applyBulkTags(add: readonly string[], remove: readonly string[], label: string) {
+    if (selectedIds.length === 0) return
+    setBulkBusy(true)
+    try {
+      const touched = await bulkTagProspects(selectedIds, add, remove)
+      toast(
+        touched === 0
+          ? "Ningún prospecto cambió"
+          : `${touched} prospecto${touched === 1 ? "" : "s"}: ${label}`,
+        touched === 0 ? "warning" : "success"
+      )
+      setSelectedIds([])
+      setBulkTagDraft("")
+      refresh()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudieron guardar las etiquetas", "error")
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  function bulkAddFromDraft(e: React.FormEvent) {
+    e.preventDefault()
+    const tags = parseTagInput(bulkTagDraft)
+    if (tags.length === 0) return
+    void applyBulkTags(tags, [], `+${tags.map(tagLabel).join(", ")}`)
+  }
+
   async function changeStatus(p: CrmProspect, value: string) {
     if (!isCrmStatus(value)) return
     setWorkingId(p.id)
@@ -362,7 +412,7 @@ function AdminLeadsContent() {
 
   function exportCsv() {
     if (tab === "pipeline") {
-      const rows = prospects.map((p) => [
+      const rows = filteredProspects.map((p) => [
         p.name,
         p.restaurant_name,
         p.phone,
@@ -372,6 +422,7 @@ function AdminLeadsContent() {
         p.seller_id === null
           ? "Sin asignar"
           : (sellers.find((s) => s.id === p.seller_id)?.name ?? ""),
+        (p.tags ?? []).join(" | "),
         p.next_follow_up_at,
         p.notes,
         p.created_at,
@@ -387,6 +438,7 @@ function AdminLeadsContent() {
             "Correo",
             "Estado",
             "Vendedor",
+            "Etiquetas",
             "Próximo seguimiento",
             "Notas",
             "Alta",
@@ -437,7 +489,18 @@ function AdminLeadsContent() {
       [...new Set(allLeads.map((l) => l.qualification?.segment).filter(Boolean) as string[])].sort(),
     [allLeads]
   )
-  const board = useMemo(() => groupIntoBoard(prospects), [prospects])
+  const availableTags = useMemo(() => {
+    const all = new Set<string>()
+    for (const p of prospects) for (const t of p.tags ?? []) all.add(t)
+    return [...all].sort((a, b) => a.localeCompare(b, "es"))
+  }, [prospects])
+
+  // El filtro por etiqueta se resuelve en memoria: `getAdminCrmBoard` no lo
+  // soporta y así el selector puede listar las etiquetas realmente presentes.
+  const filteredProspects = prospects.filter(
+    (p) => !tag || (p.tags ?? []).some((t) => tagMatches(t, tag))
+  )
+  const board = useMemo(() => groupIntoBoard(filteredProspects), [filteredProspects])
   const unassignedCount = useMemo(
     () => prospects.filter((p) => p.seller_id === null).length,
     [prospects]
@@ -666,6 +729,25 @@ function AdminLeadsContent() {
                   />
                   Sin asignar
                 </label>
+                <select
+                  value={tag}
+                  onChange={(e) => {
+                    setTag(e.target.value)
+                    setPage(1)
+                  }}
+                  aria-label="Filtrar por etiqueta"
+                  disabled={availableTags.length === 0}
+                  className={FILTER_FIELD}
+                >
+                  <option value="">
+                    {availableTags.length === 0 ? "Sin etiquetas" : "Cualquier etiqueta"}
+                  </option>
+                  {availableTags.map((t) => (
+                    <option key={t} value={t}>
+                      {tagLabel(t)}
+                    </option>
+                  ))}
+                </select>
               </>
             )}
 
@@ -707,6 +789,75 @@ function AdminLeadsContent() {
 
       {tab === "pipeline" && (
         <div role="tabpanel" id="crm-panel-pipeline" aria-labelledby="crm-tab-pipeline">
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-2.5">
+            <button
+              type="button"
+              onClick={toggleSelectAllVisible}
+              disabled={filteredProspects.length === 0}
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-gray-200 px-3 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <Users className="h-3.5 w-3.5" />
+              {selectedIds.length >= filteredProspects.length && filteredProspects.length > 0
+                ? "Quitar selección"
+                : `Seleccionar los ${filteredProspects.length}`}
+            </button>
+            <span className="text-[11px] text-gray-500">
+              {selectedIds.length === 0
+                ? "Selecciona prospectos para etiquetarlos en lote"
+                : `${selectedIds.length} seleccionado${selectedIds.length === 1 ? "" : "s"}`}
+            </span>
+            {selectedIds.length > 0 && (
+              <>
+                <form className="flex flex-1 flex-wrap items-center gap-2" onSubmit={bulkAddFromDraft}>
+                  <label className="sr-only" htmlFor="bulk-tag-input">
+                    Etiquetas a añadir
+                  </label>
+                  <input
+                    id="bulk-tag-input"
+                    value={bulkTagDraft}
+                    disabled={bulkBusy}
+                    onChange={(e) => setBulkTagDraft(e.target.value)}
+                    placeholder="vip, mayoreo (separa con comas)"
+                    className="min-h-[36px] min-w-[12rem] flex-1 rounded-lg border border-gray-200 px-2.5 text-[11px]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={bulkBusy || !bulkTagDraft.trim()}
+                    className="inline-flex min-h-[36px] items-center gap-1 rounded-lg bg-brand-600 px-3 text-[11px] font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Añadir
+                  </button>
+                </form>
+                <button
+                  type="button"
+                  disabled={bulkBusy || !tag}
+                  title={tag ? undefined : "Elige una etiqueta en el filtro para poder quitarla"}
+                  onClick={() => void applyBulkTags([], [tag], `−${tagLabel(tag)}`)}
+                  className="inline-flex min-h-[36px] items-center gap-1 rounded-lg border border-gray-200 px-3 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  {tag ? `Quitar «${tagLabel(tag)}»` : "Quitar etiqueta"}
+                </button>
+                <SequenceEnrollControl
+                  selectedIds={selectedIds}
+                  disabled={bulkBusy}
+                  onEnrolled={(message) => {
+                    toast(message, "success")
+                    setSelectedIds([])
+                    refresh()
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  className="inline-flex min-h-[36px] items-center rounded-lg px-3 text-[11px] font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                >
+                  Cancelar
+                </button>
+              </>
+            )}
+          </div>
+
           <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-5">
             {CRM_BOARD_COLUMNS.map((col) => {
               const cards = [...(board[col.key] ?? [])].sort(compareByUrgency)
@@ -725,20 +876,46 @@ function AdminLeadsContent() {
                       const overdue = isFollowUpDue(p.next_follow_up_at)
                       return (
                         <li key={p.id} className="rounded-lg border border-gray-200 bg-white p-2.5">
-                          <button
-                            type="button"
-                            onClick={() => setDrawerId(p.id)}
-                            className="block w-full text-left"
-                          >
-                            <span className="block text-sm font-semibold text-gray-900">
-                              {p.name}
-                            </span>
-                            {p.restaurant_name && (
-                              <span className="block text-xs text-gray-500">
-                                {p.restaurant_name}
+                          <div className="mb-1 flex items-start gap-1.5">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(p.id)}
+                              onChange={() => toggleSelected(p.id)}
+                              aria-label={`Seleccionar ${p.name}`}
+                              className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-gray-300"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setDrawerId(p.id)}
+                              className="block w-full text-left"
+                            >
+                              <span className="block text-sm font-semibold text-gray-900">
+                                {p.name}
                               </span>
-                            )}
-                          </button>
+                              {p.restaurant_name && (
+                                <span className="block text-xs text-gray-500">
+                                  {p.restaurant_name}
+                                </span>
+                              )}
+                            </button>
+                          </div>
+
+                          {p.tags && p.tags.length > 0 && (
+                            <ul className="mt-1 flex flex-wrap gap-1">
+                              {p.tags.map((t) => (
+                                <li
+                                  key={t}
+                                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                                    tagMatches(t, tag)
+                                      ? "bg-brand-600 text-white"
+                                      : "bg-brand-50 text-brand-700"
+                                  }`}
+                                >
+                                  {tagLabel(t)}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
 
                           {p.seller_id === null && (
                             <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
@@ -861,24 +1038,52 @@ function AdminLeadsContent() {
           className="space-y-4"
         >
           <FunnelView leads={allLeads} />
+          <SlaView />
         </div>
       )}
 
       {tab === "bandeja" && (
-        <div role="tabpanel" id="crm-panel-bandeja" aria-labelledby="crm-tab-bandeja">
-          <LeadConversations
-            onChanged={refresh}
-            view={view}
-            onViewChange={(next) => {
-              setView(next)
-              setPage(1)
-            }}
-            tag={tag}
-            onTagChange={(next) => {
-              setTag(next)
-              setPage(1)
-            }}
-          />
+        <div
+          role="tabpanel"
+          id="crm-panel-bandeja"
+          aria-labelledby="crm-tab-bandeja"
+          className="space-y-3"
+        >
+          <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1">
+            {(["conversaciones", "secuencias"] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={inboxSection === key}
+                onClick={() => setInboxSection(key)}
+                className={`min-h-[36px] rounded-lg px-3 text-xs font-semibold transition-colors ${
+                  inboxSection === key
+                    ? "bg-gray-900 text-white"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {key === "conversaciones" ? "Conversaciones" : "Secuencias de goteo"}
+              </button>
+            ))}
+          </div>
+
+          {inboxSection === "conversaciones" ? (
+            <LeadConversations
+              onChanged={refresh}
+              view={view}
+              onViewChange={(next) => {
+                setView(next)
+                setPage(1)
+              }}
+              tag={tag}
+              onTagChange={(next) => {
+                setTag(next)
+                setPage(1)
+              }}
+            />
+          ) : (
+            <LeadSequences onChanged={refresh} />
+          )}
         </div>
       )}
 
@@ -1255,5 +1460,234 @@ function FunnelView({ leads }: { leads: FunnelLead[] }) {
         </ul>
       </div>
     </>
+  )
+}
+
+/**
+ * SLA de conversaciones dentro del embudo: qué está sin responder, cuánto se
+ * tarda en contestar y cómo está repartida la carga entre vendedores.
+ *
+ * Los indicadores se piden al servidor ya calculados; aquí solo se pintan.
+ */
+function SlaView() {
+  const [sla, setSla] = useState<AdminCrmSla | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void getAdminCrmSla()
+      .then((data) => {
+        if (cancelled) return
+        setSla(data)
+        setError(null)
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        setError(e instanceof Error ? e.message : "Error al cargar el SLA")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (loading) {
+    return (
+      <div className={CARD}>
+        <p className="flex items-center gap-2 py-8 text-xs text-gray-400">
+          <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" /> Calculando
+          SLA de conversaciones...
+        </p>
+      </div>
+    )
+  }
+
+  if (error || !sla) {
+    return (
+      <div className={CARD}>
+        <p className="py-8 text-center text-xs text-red-600">
+          {error ?? "No se pudo calcular el SLA"}
+        </p>
+      </div>
+    )
+  }
+
+  const { board, stats, loads, pending } = sla
+  const busiest = Math.max(1, ...loads.map((l) => l.open))
+  const bucketCount = (key: "sin_responder" | "esperando" | "ventana_cerrada") =>
+    board.buckets.find((b) => b.key === key)?.count ?? 0
+
+  function exportPending() {
+    const stamp = dayKeyOf(DEFAULT_TIMEZONE)
+    downloadCsv(
+      `crm-conversaciones-pendientes-${stamp}.csv`,
+      toCsv(
+        [
+          "prospecto_id",
+          "nombre",
+          "restaurante",
+          "telefono",
+          "vendedor",
+          "minutos_esperando",
+          "ultimo_mensaje",
+          "mensajes",
+        ],
+        pending.map((row) => [
+          row.prospectId,
+          row.name,
+          row.restaurantName,
+          row.phone,
+          row.sellerName,
+          row.waitingMinutes,
+          row.lastMessageAt,
+          row.messageCount,
+        ]),
+      ),
+    )
+  }
+
+  return (
+    <>
+      <div className={CARD}>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-1.5 text-sm font-bold text-gray-900">
+            <MessageCircle className="h-3.5 w-3.5 text-gray-400" />
+            SLA de conversaciones
+          </h2>
+          <span className="text-[11px] text-gray-400">
+            {sla.considered} prospectos abiertos considerados
+          </span>
+        </div>
+
+        <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3 lg:grid-cols-6">
+          <SlaStat label="Sin responder" value={board.pendientes} tone="danger" />
+          <SlaStat label="Esperando" value={bucketCount("esperando")} />
+          <SlaStat label="Ventana cerrada" value={bucketCount("ventana_cerrada")} tone="warning" />
+          <SlaStat label="Sin conversación" value={board.sinConversacion} />
+          <SlaStat label="Mediana 1.ª respuesta" value={formatMinutes(stats.medianMinutes)} />
+          <SlaStat label="P90 1.ª respuesta" value={formatMinutes(stats.p90Minutes)} />
+        </dl>
+
+        <p className="mt-3 text-[11px] text-gray-400">
+          {stats.measured} conversaciones medidas · {stats.pending} sin respuesta todavía ·{" "}
+          {stats.unmeasured} sin mensajes entrantes
+          {stats.bestMinutes !== null && ` · mejor ${formatMinutes(stats.bestMinutes)}`}
+        </p>
+      </div>
+
+      <div className={CARD}>
+        <h2 className="mb-3 text-sm font-bold text-gray-900">Carga por vendedor</h2>
+        {loads.length === 0 ? (
+          <p className="py-4 text-center text-xs text-gray-400">Sin vendedores registrados</p>
+        ) : (
+          <ul className="space-y-2">
+            {loads.map((load) => (
+              <li key={load.sellerId} className="flex items-center gap-3">
+                <span className="w-32 shrink-0 truncate text-xs text-gray-700">{load.name}</span>
+                <span className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+                  <span
+                    className={`block h-full rounded-full ${
+                      load.overdue > 0 ? "bg-red-500" : "bg-brand-600"
+                    }`}
+                    style={{ width: `${Math.round((load.open / busiest) * 100)}%` }}
+                  />
+                </span>
+                <span className="w-28 shrink-0 text-right text-[11px] text-gray-500">
+                  {load.open} abiertos
+                  {load.overdue > 0 && (
+                    <span className="ml-1 font-semibold text-red-600">{load.overdue} vencidos</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className={CARD}>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-bold text-gray-900">Conversaciones sin responder</h2>
+          <button
+            type="button"
+            onClick={exportPending}
+            disabled={pending.length === 0}
+            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-gray-200 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+          >
+            <Download className="h-3.5 w-3.5" /> Exportar CSV
+          </button>
+        </div>
+
+        {pending.length === 0 ? (
+          <p className="py-4 text-center text-xs text-gray-400">
+            Nadie está esperando respuesta. Buen trabajo.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-xs">
+              <thead>
+                <tr className="text-left text-gray-400">
+                  <th className="pb-2">Prospecto</th>
+                  <th className="pb-2">Vendedor</th>
+                  <th className="pb-2 text-right">Esperando</th>
+                  <th className="pb-2 text-right">Último mensaje</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {pending.map((row) => (
+                  <tr key={row.prospectId}>
+                    <td className="py-2">
+                      <span className="font-semibold text-gray-800">{row.name}</span>
+                      {row.restaurantName && (
+                        <span className="block text-[11px] text-gray-500">
+                          {row.restaurantName}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 text-gray-600">{row.sellerName ?? "Sin asignar"}</td>
+                    <td className="py-2 text-right font-semibold text-red-600">
+                      {formatMinutes(row.waitingMinutes)}
+                    </td>
+                    <td className="py-2 text-right text-gray-500">
+                      {row.lastMessageAt ? formatRelativeTime(row.lastMessageAt) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {pending.length >= 200 && (
+              <p className="mt-2 text-[11px] text-gray-400">
+                Se muestran los 200 casos más antiguos; el CSV incluye los mismos.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+function SlaStat({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string
+  value: number | string
+  tone?: "neutral" | "danger" | "warning"
+}) {
+  const color =
+    tone === "danger" && Number(value) > 0
+      ? "text-red-600"
+      : tone === "warning" && Number(value) > 0
+        ? "text-amber-700"
+        : "text-gray-900"
+  return (
+    <div className="rounded-xl bg-gray-50 px-3 py-2">
+      <dt className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">{label}</dt>
+      <dd className={`mt-0.5 text-lg font-bold ${color}`}>{value}</dd>
+    </div>
   )
 }
