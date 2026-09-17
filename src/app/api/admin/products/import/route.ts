@@ -5,6 +5,7 @@ import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
+import { describeImportColumns, validateImportColumns } from "@/lib/product-import"
 import type { ProductImportRow } from "@/lib/product-import"
 
 export const runtime = "nodejs"
@@ -43,8 +44,22 @@ export async function POST(request: NextRequest) {
       rows?: ProductImportRow[]
       dryRun?: boolean
       mode?: ImportMode
+      /** Encabezado del CSV tal como lo leyó el cliente, para validarlo aquí. */
+      columns?: string[]
     }
     const rows = Array.isArray(body.rows) ? body.rows : []
+
+    // Guarda de entrada: un CSV con columnas desconocidas se importaría a medias
+    // (los datos de esas columnas se pierden en silencio). Mejor 400 explicando
+    // cuáles sobran que un resultado silenciosamente incompleto.
+    if (Array.isArray(body.columns)) {
+      const report = validateImportColumns(body.columns)
+      const problem = describeImportColumns(report)
+      if (problem) {
+        return NextResponse.json({ error: `Encabezado del CSV: ${problem}` }, { status: 400 })
+      }
+    }
+
     if (rows.length === 0) {
       return NextResponse.json({ error: "Sin filas para importar" }, { status: 400 })
     }

@@ -4,6 +4,7 @@ import { revalidateCatalogCache } from "@/lib/catalog-cache"
 import { resetCatalogCache } from "@/lib/catalog"
 import { logAdminAction } from "@/lib/audit-log"
 import { PRODUCT_AUDIT_FIELDS, validateProductPatch } from "@/lib/product-patch"
+import { conflictPayload, isStaleWrite, type ConflictCurrent } from "@/lib/product-conflict"
 import { deriveStockStatus } from "@/lib/stock"
 import { isMissingColumnError } from "@/lib/sale-window"
 import { NextResponse } from "next/server"
@@ -15,6 +16,11 @@ import { NextResponse } from "next/server"
  * sale_ends_at, stock_status, stock_quantity, low_stock_threshold,
  * is_visible, show_in_whatsapp, image_url, name, brand, category_id,
  * description, sku, barcode, tags.
+ *
+ * B19 — concurrencia optimista: con `expectedUpdatedAt` (la versión que el
+ * panel leyó) la escritura solo se aplica si nadie la ha modificado desde
+ * entonces; en caso contrario responde 409 sin tocar la fila. Sin el
+ * parámetro el endpoint mantiene el comportamiento de siempre.
  */
 export async function PATCH(request: Request) {
   try {
@@ -25,7 +31,9 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json()
-    const { productId, ...fields } = body
+    // `expectedUpdatedAt` se extrae antes del spread para que no acabe en
+    // `fields` (validateProductPatch solo conoce campos de producto).
+    const { productId, expectedUpdatedAt, ...fields } = body
 
     if (!productId) {
       return NextResponse.json(
@@ -53,7 +61,7 @@ export async function PATCH(request: Request) {
 
     // Fila actual: hace falta para derivar el stock con el umbral vigente y
     // para registrar el diff antes/después en la bitácora (Fase 15).
-    const AUDIT_COLS = [...PRODUCT_AUDIT_FIELDS, "deleted_at"]
+    const AUDIT_COLS = [...PRODUCT_AUDIT_FIELDS, "deleted_at", "updated_at"]
     let thresholdReadable = true
     let currentRes = await supabase
       .from("products")
@@ -73,6 +81,16 @@ export async function PATCH(request: Request) {
         .maybeSingle()) as unknown as typeof currentRes
     }
     const current = currentRes.data as Record<string, unknown> | null
+
+    // B19 — precondición de versión. Se comprueba antes de escribir nada: si
+    // otro usuario guardó después de que el panel leyera la fila, se devuelve
+    // la versión vigente en vez de pisar su cambio en silencio. Sin
+    // `expectedUpdatedAt` (clientes antiguos, importaciones) no bloquea.
+    if (isStaleWrite(current?.updated_at as string | null | undefined, expectedUpdatedAt)) {
+      return NextResponse.json(conflictPayload(current as ConflictCurrent | null), {
+        status: 409,
+      })
+    }
 
     // Unicidad de SKU: el índice parcial solo cubre productos no borrados.
     if (typeof updates.sku === "string") {
@@ -118,18 +136,40 @@ export async function PATCH(request: Request) {
       )
     }
 
-    let { error } = await supabase.from("products").update(updates).eq("id", productId)
+    // B19 — cada escritura mueve la versión, que es justo lo que la
+    // precondición compara. Se escribe aquí además del trigger de la
+    // migración 00119 para que funcione aunque no esté aplicada.
+    const nowIso = new Date().toISOString()
+    const writePayload = { ...updates, updated_at: nowIso }
+
+    // `.select("id")` para distinguir "actualizado" de "ya no existe": sin él
+    // PostgREST responde sin error aunque no haya tocado ninguna fila.
+    let { data: written, error } = await supabase
+      .from("products")
+      .update(writePayload)
+      .eq("id", productId)
+      .select("id")
 
     if (error && isMissingColumnError(error) && "low_stock_threshold" in updates) {
       // Migración 00108 pendiente: PostgREST rechaza el PATCH entero por una
       // sola columna inexistente. Se reintenta sin el umbral para que el
       // resto de la edición sí se guarde (mismo patrón que las lecturas).
-      const { low_stock_threshold: _omit, ...rest } = updates
-      ;({ error } = await supabase.from("products").update(rest).eq("id", productId))
+      const { low_stock_threshold: _omit, ...rest } = writePayload
+      ;({ data: written, error } = await supabase
+        .from("products")
+        .update(rest)
+        .eq("id", productId)
+        .select("id"))
     }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    if (!written || written.length === 0) {
+      return NextResponse.json(
+        { error: "El producto ya no existe", code: "not_found", field: null },
+        { status: 404 }
+      )
     }
 
     // Los cambios deben reflejarse en la tienda sin esperar el TTL de la caché.
@@ -162,7 +202,7 @@ export async function PATCH(request: Request) {
     const { enqueueProductsForWaSync } = await import("@/lib/whatsapp-sync-queue")
     await enqueueProductsForWaSync(supabase, [productId], "product_update")
 
-    return NextResponse.json({ success: true, productId, ...updates })
+    return NextResponse.json({ success: true, productId, updated_at: nowIso, ...updates })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error interno del servidor"
     return NextResponse.json({ error: message }, { status: 500 })

@@ -5,6 +5,7 @@ import { Upload, Download, X } from "lucide-react"
 import {
   parseProductImportCsv,
   generateProductImportTemplate,
+  describeImportColumns,
   type ProductImportResult,
 } from "@/lib/product-import"
 import { useEscapeKey } from "@/hooks/use-escape-key"
@@ -64,6 +65,8 @@ export function ImportProductsModal({
 
   useEscapeKey(onClose, true)
 
+  const headerProblem = parsed ? describeImportColumns(parsed.columns) : null
+
   function downloadTemplate() {
     const blob = new Blob([generateProductImportTemplate()], { type: "text/csv;charset=utf-8" })
     const url = URL.createObjectURL(blob)
@@ -95,7 +98,7 @@ export function ImportProductsModal({
       const res = await fetch("/api/admin/products/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: parsed.rows, dryRun: true, mode }),
+        body: JSON.stringify({ rows: parsed.rows, dryRun: true, mode, columns: parsed.header }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Error al previsualizar")
@@ -120,7 +123,7 @@ export function ImportProductsModal({
       const res = await fetch("/api/admin/products/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: parsed.rows, mode }),
+        body: JSON.stringify({ rows: parsed.rows, mode, columns: parsed.header }),
       })
       const data = (await res.json()) as ImportResponse
       setResult(data)
@@ -246,6 +249,15 @@ export function ImportProductsModal({
                 )}
               </ul>
             )}
+            {headerProblem && (
+              <p
+                className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800"
+                role="alert"
+              >
+                Encabezado del CSV: {headerProblem}. Descarga la plantilla y usa sus columnas
+                exactas.
+              </p>
+            )}
             {parsed.rows.length > 0 && (
               <ul className="mt-2 max-h-32 overflow-y-auto rounded-lg bg-gray-50 border border-gray-100 p-2 space-y-0.5">
                 {parsed.rows.slice(0, 10).map((r) => (
@@ -340,7 +352,7 @@ export function ImportProductsModal({
             <button
               type="button"
               onClick={() => void dryRun()}
-              disabled={!parsed || parsed.rows.length === 0 || planning}
+              disabled={!parsed || parsed.rows.length === 0 || planning || !!headerProblem}
               className="rounded-lg bg-white border border-brand-300 text-brand-700 px-4 py-2 text-sm font-semibold hover:bg-brand-50 disabled:opacity-50 transition-colors"
             >
               {planning ? "Analizando..." : "Vista previa"}

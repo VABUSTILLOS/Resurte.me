@@ -4,6 +4,8 @@ import {
   generateProductImportTemplate,
   parseImportDate,
   parseImportTags,
+  validateImportColumns,
+  describeImportColumns,
   PRODUCT_IMPORT_HEADER,
   type ProductImportColumn,
 } from "./product-import"
@@ -210,5 +212,60 @@ describe("parseProductImportCsv", () => {
       `${HEADER}\n${csvRow({ nombre: "Prod", precio: "10", cantidad: "2.5" })}`
     )
     expect(qty.errors[0]!.message).toContain("cantidad inválida")
+  })
+})
+
+describe("validateImportColumns", () => {
+  it("reconoce la plantilla completa sin problemas", () => {
+    const report = validateImportColumns(PRODUCT_IMPORT_HEADER)
+    expect(report.known).toHaveLength(PRODUCT_IMPORT_HEADER.length)
+    expect(report.unknown).toEqual([])
+    expect(report.duplicated).toEqual([])
+    expect(report.missingRequired).toEqual([])
+    expect(describeImportColumns(report)).toBeNull()
+  })
+
+  it("normaliza espacios y mayúsculas del encabezado", () => {
+    const report = validateImportColumns([" Nombre ", "PRECIO", "Marca"])
+    expect(report.known).toEqual(["nombre", "precio", "marca"])
+    expect(describeImportColumns(report)).toBeNull()
+  })
+
+  it("reporta columnas desconocidas y repetidas", () => {
+    const report = validateImportColumns(["nombre", "precio", "precio_venta", "precio"])
+    expect(report.unknown).toEqual(["precio_venta"])
+    expect(report.duplicated).toEqual(["precio"])
+    expect(report.missingRequired).toEqual([])
+    const msg = describeImportColumns(report)
+    expect(msg).toContain("columnas desconocidas")
+    expect(msg).toContain("precio_venta")
+    expect(msg).toContain("columnas repetidas")
+  })
+
+  it("marca las obligatorias ausentes", () => {
+    const report = validateImportColumns(["slug", "marca"])
+    expect(report.missingRequired).toEqual(["nombre", "precio"])
+    expect(describeImportColumns(report)).toContain("faltan columnas obligatorias")
+  })
+
+  it("ignora celdas vacías del encabezado", () => {
+    const report = validateImportColumns(["nombre", "", "precio", "  "])
+    expect(report.known).toEqual(["nombre", "precio"])
+    expect(report.unknown).toEqual([])
+    expect(report.duplicated).toEqual([])
+  })
+
+  it("parseProductImportCsv devuelve encabezado y reporte", () => {
+    const ok = parseProductImportCsv(`${HEADER}\n${csvRow({ nombre: "Prod", precio: "10" })}`)
+    expect(ok.header).toEqual([...PRODUCT_IMPORT_HEADER])
+    expect(ok.columns.unknown).toEqual([])
+
+    const bad = parseProductImportCsv("nombre;precio;precio_venta\nProd;10;12")
+    expect(bad.columns.unknown).toEqual(["precio_venta"])
+    expect(describeImportColumns(bad.columns)).toContain("precio_venta")
+
+    const empty = parseProductImportCsv("")
+    expect(empty.header).toEqual([])
+    expect(empty.columns.missingRequired).toEqual(["nombre", "precio"])
   })
 })

@@ -46,6 +46,66 @@ interface ProductImportError {
 export interface ProductImportResult {
   rows: ProductImportRow[]
   errors: ProductImportError[]
+  /** Encabezado leído del CSV, tal cual (recortado), para validarlo en servidor. */
+  header: string[]
+  columns: ProductImportColumnsReport
+}
+
+export interface ProductImportColumnsReport {
+  /** Columnas reconocidas, normalizadas (minúsculas). */
+  known: string[]
+  /** Columnas que no existen en la plantilla: sus datos se ignorarían. */
+  unknown: string[]
+  /** Columnas repetidas en el encabezado: gana la primera. */
+  duplicated: string[]
+  /** Columnas obligatorias ausentes. */
+  missingRequired: string[]
+}
+
+/** Columnas sin las cuales la fila no se puede construir. */
+const REQUIRED_IMPORT_COLUMNS = ["nombre", "precio"] as const
+
+const KNOWN_IMPORT_COLUMNS = new Set(PRODUCT_IMPORT_HEADER.map((h) => h.toLowerCase()))
+
+/**
+ * Valida el encabezado de un CSV de productos sin parsear las filas. Pura, así
+ * que sirve igual en el cliente (aviso previo) y en la API (guarda de entrada).
+ */
+export function validateImportColumns(headers: readonly string[]): ProductImportColumnsReport {
+  const seen = new Set<string>()
+  const known: string[] = []
+  const unknown: string[] = []
+  const duplicated: string[] = []
+
+  for (const raw of headers) {
+    const name = raw.trim().toLowerCase()
+    if (!name) continue
+    if (seen.has(name)) {
+      if (!duplicated.includes(name)) duplicated.push(name)
+      continue
+    }
+    seen.add(name)
+    if (KNOWN_IMPORT_COLUMNS.has(name)) known.push(name)
+    else unknown.push(name)
+  }
+
+  const missingRequired = REQUIRED_IMPORT_COLUMNS.filter((name) => !seen.has(name))
+  return { known, unknown, duplicated, missingRequired }
+}
+
+/** Mensaje de error listo para mostrar, o `null` si el encabezado es utilizable. */
+export function describeImportColumns(report: ProductImportColumnsReport): string | null {
+  const problems: string[] = []
+  if (report.missingRequired.length) {
+    problems.push(`faltan columnas obligatorias: ${report.missingRequired.join(", ")}`)
+  }
+  if (report.unknown.length) {
+    problems.push(`columnas desconocidas (se ignorarían): ${report.unknown.join(", ")}`)
+  }
+  if (report.duplicated.length) {
+    problems.push(`columnas repetidas: ${report.duplicated.join(", ")}`)
+  }
+  return problems.length ? problems.join("; ") : null
 }
 
 /** Plantilla descargable con encabezado y una fila de ejemplo. */
@@ -117,20 +177,34 @@ export function parseImportTags(raw: string): string[] {
 export function parseProductImportCsv(text: string): ProductImportResult {
   const rows: ProductImportRow[] = []
   const errors: ProductImportError[] = []
+  const emptyHeader: string[] = []
+  const emptyColumns = validateImportColumns(emptyHeader)
 
   const clean = text.replace(/^﻿/, "").trim()
   if (!clean) {
-    return { rows, errors: [{ line: 1, message: "El CSV está vacío" }] }
+    return {
+      rows,
+      errors: [{ line: 1, message: "El CSV está vacío" }],
+      header: emptyHeader,
+      columns: emptyColumns,
+    }
   }
 
   const lines = clean.split(/\r?\n/)
   const headerLine = lines[0] ?? ''
   const sep = headerLine.includes(";") ? ";" : ","
-  const header = splitCsvLine(headerLine, sep).map((h) => h.toLowerCase())
+  const rawHeader = splitCsvLine(headerLine, sep).map((h) => h.trim())
+  const header = rawHeader.map((h) => h.toLowerCase())
+  const columns = validateImportColumns(rawHeader)
 
   const col = (name: string) => header.indexOf(name)
   if (col("nombre") === -1) {
-    return { rows, errors: [{ line: 1, message: "Falta la columna obligatoria 'nombre'" }] }
+    return {
+      rows,
+      errors: [{ line: 1, message: "Falta la columna obligatoria 'nombre'" }],
+      header: rawHeader,
+      columns,
+    }
   }
 
   for (let i = 1; i < lines.length; i++) {
@@ -292,5 +366,5 @@ export function parseProductImportCsv(text: string): ProductImportResult {
     })
   }
 
-  return { rows, errors }
+  return { rows, errors, header: rawHeader, columns }
 }
