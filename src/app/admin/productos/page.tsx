@@ -19,6 +19,8 @@ import {
   PackageX,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Eye,
   EyeOff,
   ArrowUp,
@@ -921,6 +923,29 @@ function AdminProductsContent() {
   function updateFilters(next: () => void) {
     next()
     setPage(1)
+    resetListScroll()
+  }
+
+  // El scroll del listado vive dentro de la tarjeta en la vista tabla (para
+  // que el <thead> sea sticky) y en la ventana en la vista grid. Volver al
+  // inicio evita aterrizar a mitad de un listado que el admin no pidió.
+  function resetListScroll() {
+    if (tableScrollRef.current) {
+      tableScrollRef.current.scrollTo({ top: 0 })
+      return
+    }
+    if (typeof window !== "undefined") window.scrollTo({ top: 0 })
+  }
+
+  // Salto de página con acotado: la entrada libre del paginador puede llegar
+  // vacía, con decimales o fuera de rango.
+  function goToPage(next: number) {
+    const target = Number.isFinite(next)
+      ? Math.max(1, Math.min(totalPages, Math.trunc(next)))
+      : currentPage
+    setPage(target)
+    resetListScroll()
+    return target
   }
 
   // Deja el listado sin ningún filtro. `activeFilterCount` es la lista de
@@ -3070,6 +3095,116 @@ function AdminProductsContent() {
     onlyBrokenImage,
   ].filter(Boolean).length
 
+  // Chips de filtros activos: explican por qué el listado está recortado y
+  // permiten quitar UN filtro sin abrir el panel "Filtros" (que en móvil está
+  // plegado). Cada chip reutiliza el setter del control original y pasa por
+  // `updateFilters`, así que quitar un chip vuelve a la página 1 igual que
+  // cambiar el filtro a mano.
+  type ActiveFilterChip = { key: string; label: string; onRemove: () => void }
+  const activeFilterChips: ActiveFilterChip[] = []
+  const addChip = (active: boolean, chip: ActiveFilterChip) => {
+    if (active) activeFilterChips.push(chip)
+  }
+  addChip(debouncedSearch.trim() !== "", {
+    key: "q",
+    label: `Búsqueda: “${debouncedSearch.trim()}”`,
+    onRemove: () =>
+      updateFilters(() => {
+        setSearch("")
+        setDebouncedSearch("")
+      }),
+  })
+  addChip(categoryFilter !== "all", {
+    key: "category",
+    label: `Categoría: ${
+      categories.find((c) => String(c.id) === categoryFilter)?.name ?? categoryFilter
+    }`,
+    onRemove: () =>
+      updateFilters(() => {
+        setCategoryFilter("all")
+      }),
+  })
+  addChip(stockFilter !== "all", {
+    key: "stock",
+    label: STOCK_FILTERS.find((f) => f.value === stockFilter)?.label ?? stockFilter,
+    onRemove: () => updateFilters(() => setStockFilter("all")),
+  })
+  addChip(statusFilter !== "all", {
+    key: "status",
+    label: statusFilter === "published" ? "Publicados" : "Despublicados",
+    onRemove: () => updateFilters(() => setStatusFilter("all")),
+  })
+  addChip(cityFilter !== "all", {
+    key: "city",
+    label: `Ciudad: ${cities.find((c) => String(c.id) === cityFilter)?.name ?? cityFilter}`,
+    onRemove: () => updateFilters(() => setCityFilter("all")),
+  })
+  addChip(brandFilter !== "all", {
+    key: "brand",
+    label: `Marca: ${brandFilter}`,
+    onRemove: () => updateFilters(() => setBrandFilter("all")),
+  })
+  addChip(tagFilter !== "all", {
+    key: "tag",
+    label: `Etiqueta: ${tagFilter}`,
+    onRemove: () => updateFilters(() => setTagFilter("all")),
+  })
+  addChip(onlyNoImage, {
+    key: "noImage",
+    label: "Sin imagen",
+    onRemove: () => updateFilters(() => setOnlyNoImage(false)),
+  })
+  addChip(onlyNoCities, {
+    key: "noCities",
+    label: "Sin ciudades",
+    onRemove: () => updateFilters(() => setOnlyNoCities(false)),
+  })
+  addChip(onlyNoPrice, {
+    key: "noPrice",
+    label: "Sin precio",
+    onRemove: () => updateFilters(() => setOnlyNoPrice(false)),
+  })
+  addChip(onlyNoCategory, {
+    key: "noCategory",
+    label: "Sin categoría",
+    onRemove: () => updateFilters(() => setOnlyNoCategory(false)),
+  })
+  addChip(onlyWaMismatch, {
+    key: "waMismatch",
+    label: "WA sin publicar",
+    onRemove: () => updateFilters(() => setOnlyWaMismatch(false)),
+  })
+  addChip(onlyOnSale, {
+    key: "onSale",
+    label: "En oferta",
+    onRemove: () => updateFilters(() => setOnlyOnSale(false)),
+  })
+  addChip(onlyStaleSale, {
+    key: "staleSale",
+    label: "Ofertas vencidas",
+    onRemove: () => updateFilters(() => setOnlyStaleSale(false)),
+  })
+  addChip(onlyUnderThreshold, {
+    key: "underThreshold",
+    label: "Bajo umbral",
+    onRemove: () => updateFilters(() => setOnlyUnderThreshold(false)),
+  })
+  addChip(onlyDupNames, {
+    key: "dupNames",
+    label: "Nombres duplicados",
+    onRemove: () => updateFilters(() => setOnlyDupNames(false)),
+  })
+  addChip(onlyTrash, {
+    key: "trash",
+    label: "Papelera",
+    onRemove: () => updateFilters(() => setOnlyTrash(false)),
+  })
+  addChip(onlyBrokenImage, {
+    key: "brokenImage",
+    label: "Imagen rota",
+    onRemove: () => updateFilters(() => setOnlyBrokenImage(false)),
+  })
+
   // El estado vacío debe explicar POR QUÉ no hay filas: con filtros activos un
   // listado vacío no es un catálogo vacío, y sin una salida "Limpiar filtros" el
   // panel solo muestra una pantalla en blanco sin error (el síntoma reportado).
@@ -4099,6 +4234,36 @@ function AdminProductsContent() {
         </div>
       </div>
 
+      {/* Chips de filtros activos. Sustituyen a tener que recordar qué se
+          marcó: cada chip quita su filtro y "Limpiar todo" vacía la lista.
+          Scroll horizontal en móvil para no empujar el listado hacia abajo. */}
+      {activeFilterChips.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
+          <span className="text-xs font-semibold text-gray-500">
+            Filtros activos ({activeFilterChips.length})
+          </span>
+          {activeFilterChips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={chip.onRemove}
+              aria-label={`Quitar filtro: ${chip.label}`}
+              className="touch-target inline-flex max-w-full items-center gap-1 rounded-full border border-brand-200 bg-brand-50 py-1 pl-2.5 pr-1.5 text-xs font-semibold text-brand-800 hover:bg-brand-100"
+            >
+              <span className="truncate">{chip.label}</span>
+              <X className="w-3 h-3 shrink-0" aria-hidden="true" />
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="ml-auto text-xs font-semibold text-gray-500 underline hover:text-gray-700"
+          >
+            Limpiar todo
+          </button>
+        </div>
+      )}
+
       {/* Barra de acciones para la selección. Es sticky: se ancla DEBAJO del
           sub-nav de /admin (--admin-subnav-h, publicado por AdminSubNav con un
           ResizeObserver) y debajo de la fila sticky de categorías
@@ -4981,36 +5146,81 @@ function AdminProductsContent() {
 
       {/* Fase 5 — paginación (compartida por ambas vistas) */}
       {total > pageSize && (
-        <div className="mt-3 flex items-center justify-between px-5 py-3 bg-white rounded-xl border border-gray-200">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5 bg-white rounded-xl border border-gray-200">
             <p className="text-xs text-gray-400">
               Mostrando {(currentPage - 1) * pageSize + 1}–
               {Math.min(currentPage * pageSize, total)} de {total}
             </p>
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => goToPage(1)}
+                disabled={currentPage === 1}
+                aria-label="Primera página"
+                title="Primera página"
+                className="touch-target p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronsLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => goToPage(currentPage - 1)}
                 disabled={currentPage === 1}
                 aria-label="Página anterior"
-                className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Página anterior"
+                className="touch-target p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-xs font-medium text-gray-600 px-2">
-                {currentPage} / {totalPages}
-              </span>
+              {/* `key={currentPage}` remonta el input cuando la página cambia
+                  (por botón, filtro o URL) para que el valor mostrado sea
+                  siempre el real sin sincronizar estado en un efecto. */}
+              <div className="flex items-center gap-1 px-1 text-xs font-medium text-gray-600">
+                <label htmlFor="products-page-jump" className="sr-only">
+                  Ir a la página
+                </label>
+                <input
+                  key={currentPage}
+                  id="products-page-jump"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={totalPages}
+                  defaultValue={currentPage}
+                  onBlur={(e) => {
+                    e.currentTarget.value = String(goToPage(Number(e.currentTarget.value)))
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return
+                    e.preventDefault()
+                    e.currentTarget.value = String(goToPage(Number(e.currentTarget.value)))
+                  }}
+                  className="w-12 rounded-lg border border-gray-200 bg-white px-1.5 py-1 text-center text-xs tabular-nums text-gray-700 focus:outline-none focus:border-brand-500"
+                />
+                <span aria-hidden="true">/</span>
+                <span className="tabular-nums">{totalPages}</span>
+              </div>
               <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() => goToPage(currentPage + 1)}
                 disabled={currentPage === totalPages}
                 aria-label="Página siguiente"
-                className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Página siguiente"
+                className="touch-target p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ChevronRight className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => goToPage(totalPages)}
+                disabled={currentPage === totalPages}
+                aria-label="Última página"
+                title="Última página"
+                className="touch-target p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronsRight className="w-4 h-4" />
               </button>
               <select
                 value={pageSize}
                 onChange={(e) => updateFilters(() => setPageSize(Number(e.target.value)))}
                 aria-label="Productos por página"
-                className="ml-2 px-2 py-1 border border-gray-200 rounded-lg text-xs text-gray-600 bg-white focus:outline-none focus:border-brand-500"
+                className="ml-1 px-2 py-1 border border-gray-200 rounded-lg text-xs text-gray-600 bg-white focus:outline-none focus:border-brand-500"
               >
                 {PAGE_SIZE_OPTIONS.map((n) => (
                   <option key={n} value={n}>

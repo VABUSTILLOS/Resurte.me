@@ -318,6 +318,44 @@
   (`order-bulk.ts`) y `activeDrivers` (`src/lib/drivers.ts`): no duplicar
   ninguna de las dos reglas.
 
+- Desempeño por ciudad (`CityPerformance` en el dashboard, FASE 44): toda la
+  aritmética (ventana, score, tiers, tips) vive en
+  `src/lib/admin-city-performance.ts` — el componente y las actions **solo
+  consumen**, nunca recalculan. El score es relativo al mejor de la ventana
+  (0.4 ingreso + 0.25 pedidos + 0.2 tendencia + 0.15 cancelación) y una ciudad
+  **sin pedidos puntúa 0**, por diseño: no puede compensar con tendencia ni
+  calidad.
+- Disponibilidad por ciudad: la semántica de `product_city_availability` es
+  **por producto, no por ciudad** (00065): un producto **sin filas** está
+  disponible en **todas** las ciudades; en cuanto existe ≥1 fila, solo lo está
+  donde `is_available = true`. La cobertura por ciudad es
+  `(visibles - restringidos) + disponibles_por_ciudad` — restar
+  `no disponibles` invertiría el resultado y marcaría como catálogo vacío a
+  cualquier ciudad sin excepciones. Espeja `get_available_product_ids`, que
+  además exige `is_visible = true`.
+- Las ventanas son las mismas que `getAdminPeriodComparison`:
+  `mxMidnightUTC(-(days-1))` para el periodo actual y `mxMidnightUTC(-(2*days-1))`
+  para el anterior, siempre sobre `created_at` (no hay `delivered_at`). El
+  anterior se corta con `lt("created_at", currentStart)`.
+- Cancelados: cuentan en `totalOrders`/`cancellationRate` pero **no** en
+  `orders`/`revenue`; el ticket promedio es ingreso pagado / pedidos pagados.
+- `days` se valida con la allowlist `isPeriodDays` (`7|30|90`, default 30) y
+  **nunca** produce 5xx. Las rutas API usan `requireAdmin` y responden
+  `no-store`; el tip de IA devuelve **503** (no 500) cuando falta
+  `KIE_AI_API_KEY`, y el guard de admin se evalúa **antes** que la config. El
+  cliente solo manda `{ cityId, days }`: el servidor recalcula el desempeño
+  completo y busca la ciudad en `cities ∪ withoutOrders`.
+- Lectura paginada (`CITY_PERF_PAGE_SIZE`/`CITY_PERF_MAX_ROWS`, 1000/20000)
+  porque PostgREST corta en 1000 filas; al truncar, la UI avisa en vez de
+  mostrar cifras incompletas.
+- Los tips son **deterministas** (`buildCityTips`, 8 reglas con umbrales en
+  constantes) y se ordenan con `sortAlertsBySeverity`; el tip de IA es
+  **opcional y bajo demanda**, uno por ciudad, y jamás sustituye al
+  determinista. Los `href` de los tips apuntan a superficies existentes
+  (`/admin/productos?city=`, `/admin/pedidos?status=cancelled`,
+  `/admin/marketing`, `/admin/whatsapp`); el tip informativo `referencia` no
+  tiene enlace (`href: null`) y la UI no debe renderizar el "Ir" en ese caso.
+
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de
 visibilidad de un producto y confirmación de que el caché de catálogo se invalida.
@@ -389,3 +427,18 @@ confirmación), y comprobar que un pedido entregado o cancelado muestra el nombr
 fijo en lugar del selector. Probar además `?status=../etc/passwd`,
 `?from=no-es-fecha&to=2026-13-45` y `?code=NO-EXISTE`: nunca un 5xx.
 Automatizado: `npx playwright test e2e/admin-deep-links.spec.ts`.
+
+Desempeño por ciudad (requiere sesión admin + pedidos en varias ciudades): en
+`/admin` la sección "Desempeño de cada ciudad" debe mostrar el ranking ordenado
+por score con la ciudad de referencia destacada arriba y, debajo, el bloque
+"Ciudades que necesitan atención" con tips accionables. Cambiar el selector a
+7/30/90 y comprobar que las cifras cambian y que la comparativa es contra el
+periodo inmediatamente anterior. Pulsar "Ir" de un tip y verificar que aterriza
+en el recurso filtrado (p. ej. `/admin/productos?city=<id>` con el filtro de
+ciudad aplicado, o `/admin/pedidos?status=cancelled`). El tip informativo
+"Ciudad de referencia" **no** debe mostrar "Ir". Con `KIE_AI_API_KEY` ausente, el
+botón de IA debe explicar que la IA no está configurada (503), no romper la
+sección. Probar `GET /api/admin/city-performance?days=999` (debe responder 200
+con la ventana por defecto, nunca 5xx) y las dos rutas sin sesión (deben ser
+denegadas). A 375×812 el ranking pasa a tarjetas sin scroll horizontal y los
+controles mantienen 44px.

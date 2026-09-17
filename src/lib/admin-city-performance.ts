@@ -228,11 +228,11 @@ export function deltaPct(current: number, previous: number): number | null {
 /** Mediana de los tickets con venta; 0 si ninguna ciudad vendió. */
 export function medianAov(values: readonly number[]): number {
   const sorted = values.filter((v) => v > 0).sort((a, b) => a - b)
-  if (sorted.length === 0) return 0
-  const mid = Math.floor(sorted.length / 2)
-  const median =
-    sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!
-  return round2(median)
+  const count = sorted.length
+  if (count === 0) return 0
+  const mid = Math.floor(count / 2)
+  if (count % 2 === 1) return round2(sorted[mid] ?? 0)
+  return round2(((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2)
 }
 
 /**

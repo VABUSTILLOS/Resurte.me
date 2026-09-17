@@ -25,6 +25,13 @@
 - Header sticky: cualquier anchor nuevo respeta `scroll-padding-top`.
 - La regla `.touch-target:not(.hidden)` es unlayered a propósito — ver nota en
   `globals.css`; no moverla a una capa de Tailwind.
+- Header móvil: aloja 5 accesos táctiles (Todo, buscar, ciudad, carrito, cuenta)
+  más el logo, así que **no** puede llevar iconos con etiqueta de texto ni un
+  logo de tamaño fijo. El logo escala con `clamp()`, los gaps se comprimen en
+  móvil y en ≤340px el `min-width` de `.touch-target:not(.hidden)` baja a 40px
+  (la altura sigue en 44px). Si se revierte cualquiera de los tres, el header
+  vuelve a desbordar en ≤375px y rompe el test `header móvil no desborda en
+  360px`.
 - Toasts: dedupe + tope de 3 + `aria-live`; no apilar más ni auto-cerrar errores
   sin salida.
 - Todo script inline del layout debe respetar la CSP estática (sin nonce).

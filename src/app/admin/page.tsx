@@ -83,6 +83,18 @@ const PeriodComparisonCard = dynamic(
   },
 )
 
+// Fase 44 — desempeño por ciudad (sin recharts; carga diferida para no
+// bloquear el primer render del dashboard).
+const CityPerformance = dynamic(
+  () => import("./components/CityPerformance").then((m) => m.CityPerformance),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-40 animate-pulse rounded-xl bg-gray-100" />
+    ),
+  },
+)
+
 /** Fase 1 — Delta porcentual vs ayer con dirección de tendencia. */
 function buildDelta(
   today: number,
@@ -394,6 +406,11 @@ function AdminDashboardContent() {
           <AdminInsights insights={insights} />
         </div>
       )}
+
+      {/* Fase 44 — desempeño por ciudad con tips accionables */}
+      <div className="mt-8">
+        <CityPerformance />
+      </div>
 
       {/* Fase 8 — Leads y CRM */}
       {leads && <LeadsCrmWidget summary={leads} />}
