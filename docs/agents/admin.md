@@ -318,7 +318,7 @@
   (`order-bulk.ts`) y `activeDrivers` (`src/lib/drivers.ts`): no duplicar
   ninguna de las dos reglas.
 
-- Desempeño por ciudad (`CityPerformance` en el dashboard, FASE 44): toda la
+- Desempeño de cada ciudad (`CityPerformance` en el dashboard, FASE 44): toda la
   aritmética (ventana, score, tiers, tips) vive en
   `src/lib/admin-city-performance.ts` — el componente y las actions **solo
   consumen**, nunca recalculan. El score es relativo al mejor de la ventana
@@ -428,7 +428,7 @@ fijo en lugar del selector. Probar además `?status=../etc/passwd`,
 `?from=no-es-fecha&to=2026-13-45` y `?code=NO-EXISTE`: nunca un 5xx.
 Automatizado: `npx playwright test e2e/admin-deep-links.spec.ts`.
 
-Desempeño por ciudad (requiere sesión admin + pedidos en varias ciudades): en
+Desempeño de cada ciudad (requiere sesión admin + pedidos en varias ciudades): en
 `/admin` la sección "Desempeño de cada ciudad" debe mostrar el ranking ordenado
 por score con la ciudad de referencia destacada arriba y, debajo, el bloque
 "Ciudades que necesitan atención" con tips accionables. Cambiar el selector a

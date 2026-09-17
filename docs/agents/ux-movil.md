@@ -32,6 +32,24 @@
   (la altura sigue en 44px). Si se revierte cualquiera de los tres, el header
   vuelve a desbordar en ≤375px y rompe el test `header móvil no desborda en
   360px`.
+- Header en tablet (768–1023px): el trigger del mega menú **no** muestra el
+  texto "Categorías" (el `<span>` es `hidden … lg:inline`, solo icono) y el
+  contenedor del buscador lleva `min-w-0`. El texto del trigger es el que
+  desborda (78px a 768px y 26px a 820px); el `min-w-0` es defensivo, para que
+  el buscador no quede clavado en su ancho min-content.
+- `.touch-target:not(.hidden)` debe usar `max-width: 639.98px`, **nunca**
+  `640px`: 640px se solapa con el breakpoint `sm:` de Tailwind (`min-width:
+  640px`) y, al ser unlayered, pisa `sm:hidden` en ese ancho exacto; el header
+  renderiza a la vez los accesos móviles y los de escritorio y desborda 110px.
+  El `:not(.hidden)` solo neutraliza la utilidad `hidden` a secas, no
+  `sm:hidden`.
+- **Al medir desborde del header hay que medir el propio `<header>`**
+  (`header.scrollWidth - header.clientWidth`) y que ningún `a`/`button`/`input`
+  visible salga de sus bordes. `html`/`body` llevan `overflow-x: clip`, así que
+  el desborde interno no genera scroll del documento y
+  `documentElement.scrollWidth` da 0 aunque los controles estén recortados e
+  invisibles. Lo cubre `header: no desborda ni recorta controles` en
+  `e2e/mobile-chrome.spec.ts` (320 → 1280px).
 - Toasts: dedupe + tope de 3 + `aria-live`; no apilar más ni auto-cerrar errores
   sin salida.
 - Todo script inline del layout debe respetar la CSP estática (sin nonce).

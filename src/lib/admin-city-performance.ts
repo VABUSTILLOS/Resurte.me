@@ -1,5 +1,5 @@
 /**
- * Desempeño por ciudad (dashboard admin).
+ * Desempeño de cada ciudad (dashboard admin).
  *
  * `orders.city_id` existe desde el esquema inicial, pero el panel solo mostraba
  * agregados globales: no había forma de saber qué ciudades venden y cuáles no,

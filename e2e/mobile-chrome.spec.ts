@@ -115,3 +115,51 @@ test.describe("móvil: chrome de navegación", () => {
     await page.waitForURL(/\/cdmx$/, { timeout: 8000 })
   })
 })
+
+// Regresión: el header aloja logo + selector de ciudad + buscador + acciones.
+// `html`/`body` llevan `overflow-x: clip`, así que un desborde interno NO
+// genera scroll del documento: los controles se recortan y quedan invisibles
+// sin que ningún assert sobre `documentElement.scrollWidth` lo note. Por eso
+// aquí se mide el propio header y, además, se comprueba que ningún control
+// visible sobresalga de sus bordes.
+//
+// Anchos cubiertos: móviles chicos (320–412), el borde exacto del breakpoint
+// `sm` (640/641 — donde la regla unlayered `.touch-target` pisaba `sm:hidden`
+// y el header renderizaba a la vez los accesos móviles y los de escritorio),
+// la franja tablet (768/820) y desktop (900–1280).
+test.describe("header: no desborda ni recorta controles", () => {
+  test.skip(({ isMobile }) => isMobile, "el test fija sus propios viewports")
+
+  for (const width of [320, 360, 375, 412, 640, 641, 768, 820, 900, 1024, 1280]) {
+    test(`sin desborde ni recorte a ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto("/", { waitUntil: "domcontentloaded" })
+
+      const result = await page.evaluate(() => {
+        const header = document.querySelector("header")
+        if (!header) return { missing: true, overflow: 0, clipped: [] as string[] }
+        const hr = header.getBoundingClientRect()
+        const clipped: string[] = []
+        header.querySelectorAll("a, button, input").forEach((el) => {
+          const r = el.getBoundingClientRect()
+          if (r.width === 0 || r.height === 0) return
+          if (r.right > hr.right + 1 || r.left < hr.left - 1) {
+            const name = el.getAttribute("aria-label") || el.textContent?.trim().slice(0, 24)
+            clipped.push(
+              `${el.tagName.toLowerCase()} "${name}" en ${Math.round(r.left)}..${Math.round(r.right)}, ` +
+                `header ${Math.round(hr.left)}..${Math.round(hr.right)}`,
+            )
+          }
+        })
+        return { missing: false, overflow: header.scrollWidth - header.clientWidth, clipped }
+      })
+
+      expect(result.missing, "no se encontró el header").toBe(false)
+      expect(result.overflow, `el header desborda a ${width}px`).toBeLessThanOrEqual(1)
+      expect(
+        result.clipped,
+        `controles recortados a ${width}px:\n${result.clipped.join("\n")}`,
+      ).toEqual([])
+    })
+  }
+})

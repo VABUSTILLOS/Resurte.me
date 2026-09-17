@@ -192,9 +192,12 @@ export function Header() {
             <ChevronDown className="w-4 h-4 text-[var(--text-secondary)]" aria-hidden="true" />
           </button>
 
-          {/* Search Bar — hidden on mobile, shown on md+ */}
+          {/* Search Bar — hidden on mobile, shown on md+.
+              min-w-0 levanta el suelo de min-content (~292px) para que el
+              buscador pueda encoger cuando la fila se aprieta; sin él el
+              `flex-1` no baja de su ancho min-content y la fila desborda. */}
           {city && (
-            <div className="hidden md:block flex-1 max-w-lg">
+            <div className="hidden md:block flex-1 min-w-0 max-w-lg">
               <SearchBar citySlug={city.slug} compact />
             </div>
           )}

@@ -90,6 +90,127 @@ interface RelatedOption {
 /** Tope de relacionados que acepta el servidor (update/route.ts). */
 const RELATED_MAX = 12
 
+/** Secciones del formulario; el índice navega por estos anclajes. */
+const FORM_SECTIONS = [
+  { id: "pf-sec-identidad", label: "Identidad" },
+  { id: "pf-sec-catalogo", label: "Catálogo" },
+  { id: "pf-sec-imagenes", label: "Imágenes" },
+  { id: "pf-sec-precios", label: "Precios" },
+  { id: "pf-sec-inventario", label: "Inventario" },
+  { id: "pf-sec-seo", label: "SEO" },
+  { id: "pf-sec-publicacion", label: "Publicación" },
+] as const
+
+/** Campos que cuentan para la guarda de "cambios sin guardar". */
+interface FormSnapshot {
+  name: string
+  brand: string
+  categoryId: string
+  description: string
+  unit: string
+  price: string
+  salePrice: string
+  cost: string
+  stockQuantity: string
+  sku: string
+  barcode: string
+  tags: string[]
+  lowStockThreshold: string
+  seoTitle: string
+  seoDescription: string
+  relatedIds: number[]
+  stockStatus: string
+  isVisible: boolean
+  showInWhatsapp: boolean
+  publishAt: string
+  unpublishAt: string
+  saleStartsAt: string
+  saleEndsAt: string
+  adminNote: string
+  gallery: string[]
+  mainImage: string | null
+}
+
+const snapshotKey = (s: FormSnapshot) => JSON.stringify(s)
+
+/** Campo con error → control que recibe el foco al reintentar el envío. */
+const FIELD_INPUT_IDS: Record<string, string> = {
+  name: "pf-name",
+  category: "pf-category",
+  price: "pf-price",
+  salePrice: "pf-sale",
+  cost: "pf-cost",
+  stockQuantity: "pf-qty",
+  lowStockThreshold: "pf-threshold",
+  sku: "pf-sku",
+  barcode: "pf-barcode",
+  saleWindow: "pf-sale-start",
+}
+
+/** Desplaza el cuerpo del modal hasta una sección, respetando reduced motion. */
+function goToSection(id: string) {
+  const target = document.getElementById(id)
+  if (!target) return
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  target.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" })
+}
+
+/** Índice del formulario: columna fija en escritorio, chips en móvil. */
+function SectionNav({ activeId, variant }: { activeId: string; variant: "rail" | "chips" }) {
+  const items = FORM_SECTIONS.map((s) => (
+    <button
+      key={s.id}
+      type="button"
+      onClick={() => goToSection(s.id)}
+      aria-current={activeId === s.id ? "true" : undefined}
+      className={
+        variant === "rail"
+          ? `rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold ${
+              activeId === s.id
+                ? "bg-brand-50 text-brand-700"
+                : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+            }`
+          : `shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold ${
+              activeId === s.id
+                ? "bg-brand-600 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`
+      }
+    >
+      {s.label}
+    </button>
+  ))
+
+  if (variant === "chips") {
+    return (
+      <nav
+        aria-label="Secciones del formulario"
+        className="flex gap-1.5 overflow-x-auto border-b border-gray-100 px-4 py-2 lg:hidden"
+      >
+        {items}
+      </nav>
+    )
+  }
+  return (
+    <nav
+      aria-label="Secciones del formulario"
+      className="hidden w-40 shrink-0 flex-col gap-0.5 border-r border-gray-100 px-3 py-4 lg:flex"
+    >
+      {items}
+    </nav>
+  )
+}
+
+/** Error de un campo, anunciado por lectores de pantalla. */
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null
+  return (
+    <p id={id} role="alert" className="mt-1 text-[11px] font-semibold text-red-600">
+      {message}
+    </p>
+  )
+}
+
 /** Modal de alta/edición completa de producto (nombre, marca, categoría,
  *  descripción, precios, stock y flags de publicación). */
 export function ProductFormModal({
@@ -515,33 +636,144 @@ export function ProductFormModal({
     .filter((t) => !tags.includes(t))
     .slice(0, 8)
 
+  // --- Diálogo: secciones, foco y cambios sin guardar ----------------------
+
+  const dialogRef = useRef<HTMLFormElement | null>(null)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+  const [activeSection, setActiveSection] = useState<string>(FORM_SECTIONS[0].id)
+  const [confirmingClose, setConfirmingClose] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  const snapshot: FormSnapshot = {
+    name,
+    brand,
+    categoryId,
+    description,
+    unit,
+    price,
+    salePrice,
+    cost,
+    stockQuantity,
+    sku,
+    barcode,
+    tags,
+    lowStockThreshold,
+    seoTitle,
+    seoDescription,
+    relatedIds,
+    stockStatus,
+    isVisible,
+    showInWhatsapp,
+    publishAt,
+    unpublishAt,
+    saleStartsAt,
+    saleEndsAt,
+    adminNote,
+    gallery,
+    mainImage,
+  }
+  const baselineRef = useRef<string | null>(null)
+  if (baselineRef.current === null) baselineRef.current = snapshotKey(snapshot)
+  const dirty = baselineRef.current !== snapshotKey(snapshot)
+
+  // Al abrir: foco en el diálogo (no en un input, para no desplegar el teclado
+  // en móvil) y bloqueo del scroll del listado que queda detrás.
+  useEffect(() => {
+    dialogRef.current?.focus()
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [])
+
+  // Cerrar la pestaña con cambios sin guardar pide confirmación al navegador.
+  useEffect(() => {
+    if (!dirty) return
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault()
+      e.returnValue = ""
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [dirty])
+
+  // Resalta en el índice la sección visible dentro del cuerpo con scroll.
+  useEffect(() => {
+    const root = bodyRef.current
+    if (!root || typeof IntersectionObserver === "undefined") return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
+        if (visible?.target.id) setActiveSection(visible.target.id)
+      },
+      { root, rootMargin: "0px 0px -55% 0px" }
+    )
+    for (const section of FORM_SECTIONS) {
+      const el = root.querySelector(`#${section.id}`)
+      if (el) observer.observe(el)
+    }
+    return () => observer.disconnect()
+  }, [])
+
+  function requestClose() {
+    if (saving) return
+    if (dirty) {
+      setConfirmingClose(true)
+      return
+    }
+    onClose()
+  }
+
+  /** Atrapa el foco en el diálogo y resuelve Escape. */
+  function onDialogKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
+    if (e.key === "Escape") {
+      e.stopPropagation()
+      if (confirmingClose) setConfirmingClose(false)
+      else requestClose()
+      return
+    }
+    if (e.key !== "Tab") return
+    const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    if (!focusables || focusables.length === 0) return
+    const first = focusables[0]
+    const last = focusables[focusables.length - 1]
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (saving) return
-    if (!name.trim()) {
-      setError("El nombre es obligatorio")
-      return
-    }
+    // Valida todo antes de enviar y marca cada campo, en vez de detenerse en el
+    // primer problema: así se ve de una vez qué falta por corregir.
+    const nextErrors: Record<string, string> = {}
+    if (!name.trim()) nextErrors.name = "El nombre es obligatorio"
     const parsedPrice = price.trim() === "" ? null : parseFloat(price)
     if (parsedPrice !== null && (!Number.isFinite(parsedPrice) || parsedPrice < 0)) {
-      setError("Precio inválido")
-      return
+      nextErrors.price = "Precio inválido"
     }
     const parsedSale = salePrice.trim() === "" ? null : parseFloat(salePrice)
     if (parsedSale !== null && (!Number.isFinite(parsedSale) || parsedSale < 0)) {
-      setError("Precio de oferta inválido")
-      return
+      nextErrors.salePrice = "Precio de oferta inválido"
     }
     const parsedCost = cost.trim() === "" ? null : parseFloat(cost)
     if (parsedCost !== null && (!Number.isFinite(parsedCost) || parsedCost < 0)) {
-      setError("Costo inválido")
-      return
+      nextErrors.cost = "Costo inválido"
     }
     const parsedQty =
       stockQuantity.trim() === "" ? null : parseInt(stockQuantity, 10)
     if (parsedQty !== null && (!Number.isInteger(parsedQty) || parsedQty < 0)) {
-      setError("Cantidad de stock inválida")
-      return
+      nextErrors.stockQuantity = "Cantidad de stock inválida"
     }
     const parsedThreshold =
       lowStockThreshold.trim() === "" ? null : parseInt(lowStockThreshold, 10)
@@ -549,23 +781,25 @@ export function ProductFormModal({
       parsedThreshold !== null &&
       (!Number.isInteger(parsedThreshold) || parsedThreshold < 0)
     ) {
-      setError("Umbral de stock bajo inválido")
-      return
+      nextErrors.lowStockThreshold = "Umbral de stock bajo inválido"
     }
     const skuCheck = validateSku(sku)
-    if (!skuCheck.ok) {
-      setError(skuCheck.error)
-      return
-    }
+    if (!skuCheck.ok) nextErrors.sku = skuCheck.error
     const barcodeCheck = validateBarcode(barcode)
-    if (!barcodeCheck.ok) {
-      setError(barcodeCheck.error)
-      return
-    }
+    if (!barcodeCheck.ok) nextErrors.barcode = barcodeCheck.error
     if (saleStartsAt && saleEndsAt && new Date(saleStartsAt) > new Date(saleEndsAt)) {
-      setError("La oferta no puede empezar después de terminar")
+      nextErrors.saleWindow = "La oferta no puede empezar después de terminar"
+    }
+    const firstInvalid = Object.keys(nextErrors)[0]
+    if (firstInvalid) {
+      setFieldErrors(nextErrors)
+      setError("Revisa los campos marcados en rojo")
+      const target = document.getElementById(FIELD_INPUT_IDS[firstInvalid])
+      target?.scrollIntoView({ block: "center" })
+      target?.focus()
       return
     }
+    setFieldErrors({})
 
     // Espeja la regla del servidor: con unidades capturadas el estado se
     // deriva del umbral; sin unidades manda la selección manual.
@@ -638,34 +872,59 @@ export function ProductFormModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={() => !saving && onClose()}
+      onClick={requestClose}
     >
       <form
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pf-dialog-title"
+        tabIndex={-1}
         onSubmit={handleSubmit}
-        className="w-full max-w-lg rounded-2xl bg-white shadow-xl max-h-[90vh] flex flex-col"
+        onKeyDown={onDialogKeyDown}
+        className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="text-base font-bold text-gray-900">
-            {isEdit ? `Editar ${product.name}` : "Nuevo producto"}
-          </h2>
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <div className="min-w-0">
+            <h2 id="pf-dialog-title" className="truncate text-base font-bold text-gray-900">
+              {isEdit ? `Editar ${product.name}` : "Nuevo producto"}
+            </h2>
+            <p className="mt-0.5 text-[11px] text-gray-500">
+              {isEdit ? "Los cambios se aplican al guardar." : "Los campos con * son obligatorios."}
+              {dirty && (
+                <span className="ml-2 font-semibold text-amber-600">Cambios sin guardar</span>
+              )}
+            </p>
+          </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             disabled={saving}
-            className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
+            className="touch-target p-1.5 rounded-lg text-gray-400 hover:bg-gray-100"
             aria-label="Cerrar"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="overflow-y-auto px-5 py-4 space-y-4">
-          {error && (
-            <div className="px-3 py-2 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200">
-              {error}
-            </div>
-          )}
+        <SectionNav variant="chips" activeId={activeSection} />
+
+        <div className="flex min-h-0 flex-1">
+          <SectionNav variant="rail" activeId={activeSection} />
+
+          <div
+            ref={bodyRef}
+            className="min-w-0 flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-5"
+          >
+            {error && (
+              <div
+                role="alert"
+                className="px-3 py-2 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200"
+              >
+                {error}
+              </div>
+            )}
 
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-name">

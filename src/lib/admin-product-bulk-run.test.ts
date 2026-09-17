@@ -5,6 +5,7 @@ import {
   bulkPatchEach,
   postBulk,
   runPerId,
+  resolveBulkOutcome,
   summarizeBulkFailures,
 } from "./admin-product-bulk-run"
 
@@ -220,5 +221,50 @@ describe("summarizeBulkFailures", () => {
 
   it("devuelve un resumen vacío sin fallos", () => {
     expect(summarizeBulkFailures([])).toEqual({ count: 0, reasons: [] })
+  })
+})
+
+describe("resolveBulkOutcome", () => {
+  it("es 'ok' cuando todo se aplicó", () => {
+    expect(resolveBulkOutcome({ cancelled: false, failed: [], updated: [1, 2] })).toEqual({
+      kind: "ok",
+    })
+  })
+
+  it("es 'ok' sin nada que reportar", () => {
+    expect(resolveBulkOutcome({ cancelled: false, failed: [] })).toEqual({ kind: "ok" })
+  })
+
+  it("cuenta lo aplicado al cancelar (updated + ok)", () => {
+    expect(
+      resolveBulkOutcome({ cancelled: true, failed: [], updated: [1], ok: [2, 3] })
+    ).toEqual({ kind: "cancelled", applied: 3 })
+  })
+
+  it("la cancelación manda sobre los fallos: no se muestran dos avisos", () => {
+    const outcome = resolveBulkOutcome({
+      cancelled: true,
+      failed: [{ id: 1, reason: "x" }],
+    })
+    expect(outcome.kind).toBe("cancelled")
+  })
+
+  it("agrupa los fallos cuando no se canceló", () => {
+    const outcome = resolveBulkOutcome({
+      cancelled: false,
+      failed: [
+        { id: 1, reason: "Duplicado" },
+        { id: 2, reason: "Duplicado" },
+      ],
+    })
+    expect(outcome).toEqual({
+      kind: "failed",
+      failures: { count: 2, reasons: [{ reason: "Duplicado", count: 2 }] },
+    })
+  })
+
+  it("trata un lote con solo fallos como 'failed', no como 'ok'", () => {
+    const outcome = resolveBulkOutcome({ cancelled: false, failed: [{ id: 9, reason: "" }] })
+    expect(outcome.kind).toBe("failed")
   })
 })

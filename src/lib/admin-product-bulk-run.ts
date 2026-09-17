@@ -171,3 +171,29 @@ export function summarizeBulkFailures(failed: BulkFailure[]): BulkFailureSummary
     .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason))
   return { count: failed.length, reasons }
 }
+
+/** Resultado mínimo que necesita el cierre de una acción en lote. */
+export interface BulkRunResult {
+  cancelled: boolean
+  failed: BulkFailure[]
+  updated?: number[]
+  ok?: number[]
+}
+
+/** Qué debe mostrar el panel al terminar una acción en lote. */
+export type BulkOutcome =
+  | { kind: "ok" }
+  | { kind: "cancelled"; applied: number }
+  | { kind: "failed"; failures: BulkFailureSummary }
+
+/**
+ * Decide el desenlace de una acción en lote. Es la única regla que separa un
+ * toast de éxito del panel de fallos: antes cada acción mostraba "listo" aunque
+ * el lote hubiera fallado a medias, que es justo lo que no debe pasar.
+ */
+export function resolveBulkOutcome(result: BulkRunResult): BulkOutcome {
+  const applied = (result.updated?.length ?? 0) + (result.ok?.length ?? 0)
+  if (result.cancelled) return { kind: "cancelled", applied }
+  if (result.failed.length > 0) return { kind: "failed", failures: summarizeBulkFailures(result.failed) }
+  return { kind: "ok" }
+}

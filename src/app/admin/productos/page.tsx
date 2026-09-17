@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useState, useEffect, useRef, type ReactNode } from "react"
+import { Suspense, useMemo, useState, useEffect, useRef, type ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
@@ -67,12 +67,31 @@ import {
   bulkPatch,
   bulkPatchEach,
   runPerId,
-  summarizeBulkFailures,
-  type BulkOptions,
   type BulkResult,
-  type BulkFailureSummary,
 } from "@/lib/admin-product-bulk-run"
 import type { BulkFailure } from "@/lib/product-bulk"
+import {
+  activeProductFilterCount,
+  clearedProductFilters,
+  parseProductFilters,
+  productFilterApiParams,
+  productFiltersToSearchParams,
+  type ProductFilters,
+  type PublicationFilter,
+  type StockStatus,
+} from "@/lib/admin-product-filters"
+import {
+  IDS_PER_REQUEST,
+  buildMap,
+  chunkIds,
+  isNewProduct,
+  productCount,
+  timeAgo,
+  type AvailabilityMap,
+  type AvailabilityRow,
+} from "@/lib/admin-product-list"
+import { useProductSelection } from "./use-product-selection"
+import { useBulkRunner } from "./use-bulk-runner"
 import {
   DEFAULT_PRODUCT_SORT,
   PRODUCT_SORT_KEYS,
@@ -164,15 +183,6 @@ interface City {
   state: string
 }
 
-interface AvailabilityRow {
-  product_id: number
-  city_id: number
-  is_available: boolean
-}
-
-type AvailabilityMap = Map<number, Map<number, boolean>>
-type StockStatus = Product["stock_status"]
-
 const STOCK_LABELS: Record<StockStatus, string> = {
   in_stock: "En stock",
   low_stock: "Stock bajo",
@@ -191,55 +201,6 @@ const STOCK_FILTERS: { label: string; value: StockStatus | "all" }[] = [
   { label: "Stock bajo", value: "low_stock" },
   { label: "Agotados", value: "out_of_stock" },
 ]
-
-/** Tiempo relativo en español para "última edición" de la fila. */
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return "ahora"
-  if (m < 60) return `hace ${m} min`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `hace ${h} h`
-  const d = Math.floor(h / 24)
-  if (d < 30) return `hace ${d} d`
-  return new Date(iso).toLocaleDateString("es-MX")
-}
-
-/** Badge ✨ Nuevo: producto creado en los últimos 7 días. */
-function isNewProduct(p: { created_at: string | null }): boolean {
-  if (!p.created_at) return false
-  return Date.now() - new Date(p.created_at).getTime() < 7 * 24 * 60 * 60 * 1000
-}
-
-function buildMap(rows: AvailabilityRow[]): AvailabilityMap {
-  const map: AvailabilityMap = new Map()
-  for (const row of rows) {
-    const inner = map.get(row.product_id) ?? new Map<number, boolean>()
-    inner.set(row.city_id, row.is_available)
-    map.set(row.product_id, inner)
-  }
-  return map
-}
-
-/** "N productos" con la concordancia correcta en singular. */
-function productCount(n: number): string {
-  return `${n} producto${n === 1 ? "" : "s"}`
-}
-
-/**
- * Tope de ids por petición. Espejo del `MAX_IDS` de city-availability y del
- * `MAX_PAGE_SIZE` de list: por encima de esto el servidor recorta en silencio,
- * así que el panel trocea en lugar de perder parte de la selección.
- */
-const IDS_PER_REQUEST = 1000
-
-function chunkIds(ids: number[]): number[][] {
-  const chunks: number[][] = []
-  for (let i = 0; i < ids.length; i += IDS_PER_REQUEST) {
-    chunks.push(ids.slice(i, i + IDS_PER_REQUEST))
-  }
-  return chunks
-}
 
 /**
  * Valor previo de un campo para los ids dados. La selección puede abarcar
@@ -403,8 +364,12 @@ function AdminProductsContent() {
   // vuelta (vistas compartibles; las alertas del dashboard enlazan con ?stock=).
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [search, setSearch] = useState(searchParams.get("q") ?? "")
-  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get("q") ?? "")
+  // Parseo único de los filtros de la URL (`@/lib/admin-product-filters`): el
+  // mismo módulo serializa la URL, construye la query de la API y cuenta los
+  // filtros activos, así que un filtro nuevo no se puede olvidar en un lado.
+  const initialFilters = parseProductFilters(searchParams)
+  const [search, setSearch] = useState(initialFilters.search)
+  const [debouncedSearch, setDebouncedSearch] = useState(initialFilters.search)
 
   // Debounce: filtrar cientos de filas en cada tecla re-renderiza toda la tabla.
   useEffect(() => {
@@ -473,19 +438,12 @@ function AdminProductsContent() {
     }
   }
 
-  // Selección múltiple y asignación de ciudades (bulk).
-  const [selected, setSelected] = useState<Set<number>>(new Set())
+  // Selección múltiple y asignación de ciudades (bulk). El estado de la
+  // selección y el de la ejecución en lote viven en sus hooks (abajo, cuando ya
+  // se conocen la página y el total); aquí queda solo el modal de ciudades.
   const [cityModalOpen, setCityModalOpen] = useState(false)
   const [draftCities, setDraftCities] = useState<Set<number>>(new Set())
   const [bulkSaving, setBulkSaving] = useState(false)
-  // Progreso de la acción masiva en curso: `null` cuando no hay ninguna. La
-  // barra es real (bloques terminados), no un spinner indefinido.
-  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
-  // Fallos parciales de la última acción masiva, agrupados por motivo.
-  const [bulkFailures, setBulkFailures] = useState<BulkFailureSummary | null>(null)
-  // Bandera de cancelación: `postBulk`/`runPerId` la consultan entre bloques.
-  const bulkCancelledRef = useRef(false)
-  const [bulkCancelling, setBulkCancelling] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   // Scroll interno de la tabla (vista tabla). Se vuelve al principio al cambiar
   // de página o de filtros para no aterrizar a mitad del listado.
@@ -597,38 +555,24 @@ function AdminProductsContent() {
 
   // Fase 5 — filtros de categoría/stock (con deep-link ?stock= desde las
   // alertas del dashboard) y paginación.
-  const initialStock = searchParams.get("stock")
   const initialSort = parseProductSort(searchParams.get("sort"), searchParams.get("dir"))
-  const [categoryFilter, setCategoryFilter] = useState<string>(
-    // `||` (no `??`): un `?category=` vacío se trataría como filtro y dejaría el
-    // listado en blanco, sin error, hasta que el usuario limpiara la URL.
-    searchParams.get("category") || "all"
-  )
-  const [stockFilter, setStockFilter] = useState<StockStatus | "all">(
-    initialStock === "in_stock" || initialStock === "low_stock" || initialStock === "out_of_stock"
-      ? initialStock
-      : "all"
-  )
+  const [categoryFilter, setCategoryFilter] = useState<string>(initialFilters.category)
+  const [stockFilter, setStockFilter] = useState<StockStatus | "all">(initialFilters.stock)
   // Chips de estado de publicación + filtros de catálogo incompleto.
-  const initialStatus = searchParams.get("status")
-  const [statusFilter, setStatusFilter] = useState<"all" | "published" | "unpublished">(
-    initialStatus === "published" || initialStatus === "unpublished" ? initialStatus : "all"
-  )
-  const [onlyNoImage, setOnlyNoImage] = useState(searchParams.get("noImage") === "1")
-  const [onlyNoCities, setOnlyNoCities] = useState(searchParams.get("noCities") === "1")
-  const [onlyNoPrice, setOnlyNoPrice] = useState(searchParams.get("noPrice") === "1")
-  const [onlyNoCategory, setOnlyNoCategory] = useState(searchParams.get("noCategory") === "1")
-  const [onlyWaMismatch, setOnlyWaMismatch] = useState(searchParams.get("waMismatch") === "1")
-  const [onlyOnSale, setOnlyOnSale] = useState(searchParams.get("onSale") === "1")
-  const [onlyDupNames, setOnlyDupNames] = useState(searchParams.get("dupNames") === "1")
+  const [statusFilter, setStatusFilter] = useState<PublicationFilter>(initialFilters.status)
+  const [onlyNoImage, setOnlyNoImage] = useState(initialFilters.noImage)
+  const [onlyNoCities, setOnlyNoCities] = useState(initialFilters.noCities)
+  const [onlyNoPrice, setOnlyNoPrice] = useState(initialFilters.noPrice)
+  const [onlyNoCategory, setOnlyNoCategory] = useState(initialFilters.noCategory)
+  const [onlyWaMismatch, setOnlyWaMismatch] = useState(initialFilters.waMismatch)
+  const [onlyOnSale, setOnlyOnSale] = useState(initialFilters.onSale)
+  const [onlyDupNames, setOnlyDupNames] = useState(initialFilters.dupNames)
   // Papelera (soft delete, 00099).
-  const [onlyTrash, setOnlyTrash] = useState(searchParams.get("trash") === "1")
+  const [onlyTrash, setOnlyTrash] = useState(initialFilters.trash)
   // Ronda 7 — ofertas vencidas y etiqueta (colecciones de la tienda).
-  const [onlyStaleSale, setOnlyStaleSale] = useState(searchParams.get("staleSale") === "1")
-  const [onlyUnderThreshold, setOnlyUnderThreshold] = useState(
-    searchParams.get("underThreshold") === "1"
-  )
-  const [tagFilter, setTagFilter] = useState(searchParams.get("tag") || "all")
+  const [onlyStaleSale, setOnlyStaleSale] = useState(initialFilters.staleSale)
+  const [onlyUnderThreshold, setOnlyUnderThreshold] = useState(initialFilters.underThreshold)
+  const [tagFilter, setTagFilter] = useState(initialFilters.tag)
   const [tagList, setTagList] = useState<{ tag: string; count: number }[]>([])
   // Ronda 7 — imágenes rotas detectadas por el sondeo del servidor. El filtro
   // es local a la página cargada (el sondeo trabaja sobre filas concretas).
@@ -636,9 +580,7 @@ function AdminProductsContent() {
     Record<number, { url: string | null; status: number | null; reason: string }>
   >({})
   const [checkingImages, setCheckingImages] = useState(false)
-  const [onlyBrokenImage, setOnlyBrokenImage] = useState(
-    searchParams.get("brokenImage") === "1"
-  )
+  const [onlyBrokenImage, setOnlyBrokenImage] = useState(initialFilters.brokenImage)
   const [imagesModalOpen, setImagesModalOpen] = useState(false)
   // Estado de los desplegables de móvil: el encabezado no cabe a 375px, así que
   // las acciones secundarias van a un menú "Más" y los bloques de filtros y
@@ -648,8 +590,8 @@ function AdminProductsContent() {
   const [healthOpen, setHealthOpen] = useState(false)
   const [alertsOpen, setAlertsOpen] = useState(false)
   // Filtros por ciudad y marca (server-side).
-  const [cityFilter, setCityFilter] = useState(searchParams.get("city") || "all")
-  const [brandFilter, setBrandFilter] = useState(searchParams.get("brand") || "all")
+  const [cityFilter, setCityFilter] = useState(initialFilters.city)
+  const [brandFilter, setBrandFilter] = useState(initialFilters.brand)
   const [brands, setBrands] = useState<string[]>([])
   // Vista tabla/grid (también viaja en la URL).
   // La vista efectiva se deriva en render: `useMediaQuery` devuelve `false` en
@@ -674,29 +616,57 @@ function AdminProductsContent() {
     PAGE_SIZE_OPTIONS.includes(initialPageSize) ? initialPageSize : DEFAULT_PAGE_SIZE
   )
 
+  // Vista única de los filtros. El parseo, la serialización a URL, la query de
+  // la API y el conteo de filtros activos leen todos de este objeto
+  // (`@/lib/admin-product-filters`), así que añadir un filtro no puede dejarlo
+  // fuera de uno de los tres sitios.
+  const filters = useMemo<ProductFilters>(
+    () => ({
+      search: debouncedSearch,
+      category: categoryFilter,
+      stock: stockFilter,
+      status: statusFilter,
+      tag: tagFilter,
+      city: cityFilter,
+      brand: brandFilter,
+      noImage: onlyNoImage,
+      noCities: onlyNoCities,
+      noPrice: onlyNoPrice,
+      noCategory: onlyNoCategory,
+      waMismatch: onlyWaMismatch,
+      onSale: onlyOnSale,
+      dupNames: onlyDupNames,
+      trash: onlyTrash,
+      staleSale: onlyStaleSale,
+      underThreshold: onlyUnderThreshold,
+      brokenImage: onlyBrokenImage,
+    }),
+    [
+      debouncedSearch,
+      categoryFilter,
+      stockFilter,
+      statusFilter,
+      tagFilter,
+      cityFilter,
+      brandFilter,
+      onlyNoImage,
+      onlyNoCities,
+      onlyNoPrice,
+      onlyNoCategory,
+      onlyWaMismatch,
+      onlyOnSale,
+      onlyDupNames,
+      onlyTrash,
+      onlyStaleSale,
+      onlyUnderThreshold,
+      onlyBrokenImage,
+    ]
+  )
+
   // Sincroniza los filtros activos a la URL (sin recargar ni scroll).
   useEffect(() => {
     const sp = new URLSearchParams()
-    if (debouncedSearch) sp.set("q", debouncedSearch)
-    if (categoryFilter !== "all") sp.set("category", categoryFilter)
-    if (stockFilter !== "all") sp.set("stock", stockFilter)
-    if (statusFilter !== "all") sp.set("status", statusFilter)
-    if (onlyNoImage) sp.set("noImage", "1")
-    if (onlyNoCities) sp.set("noCities", "1")
-    if (onlyNoPrice) sp.set("noPrice", "1")
-    if (onlyNoCategory) sp.set("noCategory", "1")
-    if (onlyWaMismatch) sp.set("waMismatch", "1")
-    if (onlyOnSale) sp.set("onSale", "1")
-    if (onlyDupNames) sp.set("dupNames", "1")
-    if (onlyTrash) sp.set("trash", "1")
-    if (onlyStaleSale) sp.set("staleSale", "1")
-    if (onlyUnderThreshold) sp.set("underThreshold", "1")
-    // Filtro cliente (la sonda de imágenes rotas solo cubre la página visible),
-    // pero viaja en la URL para que el enlace reproduzca la vista.
-    if (onlyBrokenImage) sp.set("brokenImage", "1")
-    if (tagFilter !== "all") sp.set("tag", tagFilter)
-    if (cityFilter !== "all") sp.set("city", cityFilter)
-    if (brandFilter !== "all") sp.set("brand", brandFilter)
+    productFiltersToSearchParams(filters, sp)
     // Solo se persiste una vista elegida (o un `?view=` ya presente): el
     // default de móvil (tarjetas) no contamina la URL.
     if ((viewOverride ?? viewParam) === "grid") sp.set("view", "grid")
@@ -705,33 +675,7 @@ function AdminProductsContent() {
     if (pageSize !== DEFAULT_PAGE_SIZE) sp.set("pageSize", String(pageSize))
     const qs = sp.toString()
     router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false })
-  }, [
-    debouncedSearch,
-    categoryFilter,
-    stockFilter,
-    statusFilter,
-    onlyNoImage,
-    onlyNoCities,
-    onlyNoPrice,
-    onlyNoCategory,
-    onlyWaMismatch,
-    onlyOnSale,
-    onlyDupNames,
-    onlyTrash,
-    onlyStaleSale,
-    onlyUnderThreshold,
-    onlyBrokenImage,
-    tagFilter,
-    cityFilter,
-    brandFilter,
-    view,
-    viewOverride,
-    viewParam,
-    sort,
-    page,
-    pageSize,
-    router,
-  ])
+  }, [filters, viewOverride, viewParam, sort, page, pageSize, router])
 
   // Paginación server-side: total + conteos de chips vienen del API.
   const [total, setTotal] = useState(0)
@@ -768,23 +712,7 @@ function AdminProductsContent() {
   /** Query string compartida por la tabla, select-all y export. */
   const listParams = (extra: Record<string, string>) => {
     const sp = new URLSearchParams({
-      q: debouncedSearch,
-      category: categoryFilter,
-      stock: stockFilter,
-      status: statusFilter,
-      noImage: onlyNoImage ? "1" : "0",
-      noCities: onlyNoCities ? "1" : "0",
-      noPrice: onlyNoPrice ? "1" : "0",
-      noCategory: onlyNoCategory ? "1" : "0",
-      waMismatch: onlyWaMismatch ? "1" : "0",
-      onSale: onlyOnSale ? "1" : "0",
-      dupNames: onlyDupNames ? "1" : "0",
-      trash: onlyTrash ? "1" : "0",
-      staleSale: onlyStaleSale ? "1" : "0",
-      underThreshold: onlyUnderThreshold ? "1" : "0",
-      tag: tagFilter,
-      city: cityFilter,
-      brand: brandFilter,
+      ...productFilterApiParams(filters),
       sort: sort.key,
       dir: sort.dir,
       ...extra,
@@ -874,29 +802,7 @@ function AdminProductsContent() {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    reloadKey,
-    debouncedSearch,
-    categoryFilter,
-    stockFilter,
-    statusFilter,
-    onlyNoImage,
-    onlyNoCities,
-    onlyNoPrice,
-    onlyNoCategory,
-    onlyWaMismatch,
-    onlyOnSale,
-    onlyDupNames,
-    onlyTrash,
-    onlyStaleSale,
-    onlyUnderThreshold,
-    tagFilter,
-    cityFilter,
-    brandFilter,
-    sort,
-    page,
-    pageSize,
-  ])
+  }, [reloadKey, filters, sort, page, pageSize])
 
   const categoryName = (id: number | null) =>
     categories.find((c) => c.id === id)?.name ?? "Sin categoría"
@@ -916,6 +822,33 @@ function AdminProductsContent() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pageItems = products
+  // Selección de filas y ejecución de acciones en lote: se instancian aquí
+  // porque necesitan la página visible y el total que reporta la API.
+  const {
+    selected,
+    setSelected,
+    toggleSelect,
+    toggleSelectAllFiltered,
+    allFilteredSelected,
+    clearSelection,
+  } = useProductSelection({
+    pageIds: pageItems.map((p) => p.id),
+    total,
+    buildListQuery: listParams,
+    idsPerRequest: IDS_PER_REQUEST,
+  })
+  const {
+    bulkProgress,
+    setBulkProgress,
+    bulkFailures,
+    setBulkFailures,
+    bulkCancelling,
+    beginBulk,
+    cancelBulk,
+    bulkRunOptions,
+    finishBulk,
+    isCancelled,
+  } = useBulkRunner({ notify: setToast })
   // Incidencias de imagen de la página cargada (el sondeo es bajo demanda).
   const brokenItems = pageItems.filter((p) => imageIssues[p.id])
   const filterBroken = onlyBrokenImage && brokenItems.length > 0
@@ -948,30 +881,31 @@ function AdminProductsContent() {
     return target
   }
 
-  // Deja el listado sin ningún filtro. `activeFilterCount` es la lista de
-  // filtros que ocultan filas: si se agrega uno nuevo, hay que limpiarlo aquí
-  // (y contarlo allí), o el estado vacío volvería a ser un callejón sin salida.
+  // Deja el listado sin ningún filtro. La lista de filtros a limpiar sale del
+  // módulo compartido, el mismo que los cuenta: si se agrega uno nuevo, el
+  // estado vacío no puede volverse un callejón sin salida.
   function clearFilters() {
+    const cleared = clearedProductFilters()
     updateFilters(() => {
-      setSearch("")
-      setDebouncedSearch("")
-      setCategoryFilter("all")
-      setStockFilter("all")
-      setStatusFilter("all")
-      setOnlyNoImage(false)
-      setOnlyNoCities(false)
-      setOnlyNoPrice(false)
-      setOnlyNoCategory(false)
-      setOnlyWaMismatch(false)
-      setOnlyOnSale(false)
-      setOnlyStaleSale(false)
-      setOnlyUnderThreshold(false)
-      setOnlyDupNames(false)
-      setOnlyTrash(false)
-      setOnlyBrokenImage(false)
-      setTagFilter("all")
-      setCityFilter("all")
-      setBrandFilter("all")
+      setSearch(cleared.search)
+      setDebouncedSearch(cleared.search)
+      setCategoryFilter(cleared.category)
+      setStockFilter(cleared.stock)
+      setStatusFilter(cleared.status)
+      setOnlyNoImage(cleared.noImage)
+      setOnlyNoCities(cleared.noCities)
+      setOnlyNoPrice(cleared.noPrice)
+      setOnlyNoCategory(cleared.noCategory)
+      setOnlyWaMismatch(cleared.waMismatch)
+      setOnlyOnSale(cleared.onSale)
+      setOnlyStaleSale(cleared.staleSale)
+      setOnlyUnderThreshold(cleared.underThreshold)
+      setOnlyDupNames(cleared.dupNames)
+      setOnlyTrash(cleared.trash)
+      setOnlyBrokenImage(cleared.brokenImage)
+      setTagFilter(cleared.tag)
+      setCityFilter(cleared.city)
+      setBrandFilter(cleared.brand)
       setSort(DEFAULT_PRODUCT_SORT)
     })
   }
@@ -983,60 +917,6 @@ function AdminProductsContent() {
 
   const citiesAvailableCount = (productId: number): number =>
     availability[productId] ?? cities.length
-
-  // ---------- Selección ----------
-  const lastSelectedRef = useRef<number | null>(null)
-  const toggleSelect = (id: number, shift: boolean) => {
-    // Shift+clic: selecciona el rango entre el último clic y este (orden de página).
-    if (shift && lastSelectedRef.current != null) {
-      const ids = pageItems.map((p) => p.id)
-      const a = ids.indexOf(lastSelectedRef.current)
-      const b = ids.indexOf(id)
-      if (a !== -1 && b !== -1) {
-        const [from, to] = a < b ? [a, b] : [b, a]
-        setSelected((prev) => {
-          const next = new Set(prev)
-          for (let i = from; i <= to; i++) {
-            const pid = ids[i]
-            if (pid !== undefined) next.add(pid)
-          }
-          return next
-        })
-        return
-      }
-    }
-    lastSelectedRef.current = id
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  // "Seleccionar todo" abarca TODOS los resultados del filtro (todas las
-  // páginas): los ids se piden al servidor.
-  const allFilteredSelected = total > 0 && selected.size >= total
-
-  const toggleSelectAllFiltered = async () => {
-    if (allFilteredSelected) {
-      setSelected(new Set())
-      return
-    }
-    const ids: number[] = []
-    let pageIdx = 1
-    for (;;) {
-      const res = await fetch(
-        `/api/admin/products/list?${listParams({ idsOnly: "1", page: String(pageIdx), pageSize: "1000" })}`
-      )
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) break
-      ids.push(...(data.ids ?? []))
-      if (ids.length >= (data.total ?? 0) || (data.ids ?? []).length === 0) break
-      pageIdx++
-    }
-    setSelected(new Set(ids))
-  }
 
   // ---------- Modal de ciudades ----------
   // La selección puede abarcar todas las páginas, así que la disponibilidad de
@@ -1083,62 +963,6 @@ function AdminProductsContent() {
   }
 
   // ---------- Acciones bulk ----------
-  /**
-   * Arranca una acción masiva: progreso a cero, sin cancelar y sin fallos
-   * heredados de la acción anterior.
-   */
-  function beginBulk() {
-    bulkCancelledRef.current = false
-    setBulkCancelling(false)
-    setBulkProgress({ done: 0, total: 0 })
-    setBulkFailures(null)
-  }
-
-  /**
-   * Pide cancelar la acción en curso. No aborta la petición ya enviada (deja
-   * el servidor terminar ese bloque, que es la unidad atómica); corta antes de
-   * enviar el siguiente.
-   */
-  function cancelBulk() {
-    bulkCancelledRef.current = true
-    setBulkCancelling(true)
-  }
-
-  /** Opciones que conectan `bulkPatch*`/`runPerId` con la barra de progreso. */
-  function bulkRunOptions(): BulkOptions {
-    return {
-      onProgress: (done, total) => setBulkProgress({ done, total }),
-      isCancelled: () => bulkCancelledRef.current,
-    }
-  }
-
-  /**
-   * Cierra una acción masiva y decide si hay algo que reportar.
-   *
-   * Devuelve `true` cuando terminó entera y sin fallos: solo entonces el
-   * llamador muestra su mensaje de éxito. Si se canceló o hubo fallos, el
-   * detalle va al panel de fallos y no a un toast genérico.
-   */
-  function finishBulk(result: {
-    cancelled: boolean
-    failed: BulkFailure[]
-    updated?: number[]
-    ok?: number[]
-  }): boolean {
-    setBulkProgress(null)
-    setBulkCancelling(false)
-    const applied = (result.updated?.length ?? 0) + (result.ok?.length ?? 0)
-    if (result.cancelled) {
-      setToast(`Cancelado · ${productCount(applied)} ya se habían actualizado`)
-      return false
-    }
-    if (result.failed.length > 0) {
-      setBulkFailures(summarizeBulkFailures(result.failed))
-      return false
-    }
-    return true
-  }
-
   const applyBulk = async (body: Record<string, unknown>) => {
     if (selected.size === 0) return
     const ids = [...selected]
@@ -1246,7 +1070,7 @@ function AdminProductsContent() {
           })
         }
       }
-      setSelected(new Set())
+      clearSelection()
     } catch {
       setBulkProgress(null)
       setError("Error al actualizar WhatsApp en lote")
@@ -1264,7 +1088,7 @@ function AdminProductsContent() {
     try {
       const result = await applyVisibilityToIds([...selected], isVisible)
       const succeededIds = result.updated
-      setSelected(new Set())
+      clearSelection()
       if (finishBulk(result) && succeededIds.length > 0) {
         setToast(
           `${succeededIds.length} producto${succeededIds.length === 1 ? "" : "s"} ${
@@ -1746,7 +1570,7 @@ function AdminProductsContent() {
       const failures: BulkFailure[] = []
       let cancelled = false
       for (const p of missing) {
-        if (bulkCancelledRef.current) {
+        if (isCancelled()) {
           cancelled = true
           break
         }
@@ -1788,7 +1612,7 @@ function AdminProductsContent() {
         }
       }
       setReloadKey((k) => k + 1)
-      setSelected(new Set())
+      clearSelection()
       if (finishBulk({ cancelled, failed: failures, ok: doneIds })) {
         setToast(`Imágenes IA: ${doneIds.length} generada${doneIds.length === 1 ? "" : "s"}`)
       }
@@ -2173,7 +1997,7 @@ function AdminProductsContent() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? "Error al fusionar")
       setToast(`Productos fusionados (#${b} → #${a})`)
-      setSelected(new Set())
+      clearSelection()
       setReloadKey((k) => k + 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al fusionar")
@@ -2209,7 +2033,7 @@ function AdminProductsContent() {
           }),
         bulkRunOptions()
       )
-      setSelected(new Set())
+      clearSelection()
       setReloadKey((k) => k + 1)
       if (finishBulk(result)) {
         setToast(`${result.ok.length} movido${result.ok.length === 1 ? "" : "s"} a la papelera`)
@@ -2239,7 +2063,7 @@ function AdminProductsContent() {
           }),
         bulkRunOptions()
       )
-      setSelected(new Set())
+      clearSelection()
       setReloadKey((k) => k + 1)
       if (finishBulk(result)) {
         setToast(
@@ -2351,7 +2175,7 @@ function AdminProductsContent() {
       setSeoProposals([])
       setSeoSkipped([])
       setSeoFailed([])
-      setSelected(new Set())
+      clearSelection()
       setReloadKey((k) => k + 1)
     } catch {
       setError("Error al aplicar el SEO en lote")
@@ -2462,7 +2286,7 @@ function AdminProductsContent() {
         })
       }
       setBulkSaleOpen(false)
-      setSelected(new Set())
+      clearSelection()
     } catch {
       setBulkProgress(null)
       setError("Error al actualizar ofertas en lote")
@@ -2689,7 +2513,7 @@ function AdminProductsContent() {
         )
       }
       setBulkMarginOpen(false)
-      setSelected(new Set())
+      clearSelection()
     } catch {
       setBulkProgress(null)
       setError("Error al aplicar oferta por margen")
@@ -2731,7 +2555,7 @@ function AdminProductsContent() {
         }
       }
       setBulkUnitOpen(false)
-      setSelected(new Set())
+      clearSelection()
     } catch {
       setBulkProgress(null)
       setError("Error al asignar la unidad en lote")
@@ -2778,7 +2602,7 @@ function AdminProductsContent() {
         }
       }
       setBulkCategoryOpen(false)
-      setSelected(new Set())
+      clearSelection()
     } catch {
       setBulkProgress(null)
       setError("Error al cambiar la categoría en lote")
@@ -2849,7 +2673,7 @@ function AdminProductsContent() {
         })
       }
       setBulkPriceOpen(false)
-      setSelected(new Set())
+      clearSelection()
     } catch {
       setBulkProgress(null)
       setError("Error al ajustar precios en lote")
@@ -3074,26 +2898,7 @@ function AdminProductsContent() {
   // Filtros secundarios plegados en móvil: se revelan con el mismo botón
   // "Filtros" que los selects. En escritorio (sm+) quedan siempre visibles.
   const secondaryFilterClass = filtersOpen ? "inline-flex" : "hidden sm:inline-flex"
-  const activeFilterCount = [
-    debouncedSearch.trim() !== "",
-    categoryFilter !== "all",
-    stockFilter !== "all",
-    statusFilter !== "all",
-    cityFilter !== "all",
-    brandFilter !== "all",
-    tagFilter !== "all",
-    onlyNoImage,
-    onlyNoCities,
-    onlyNoPrice,
-    onlyNoCategory,
-    onlyWaMismatch,
-    onlyOnSale,
-    onlyStaleSale,
-    onlyUnderThreshold,
-    onlyDupNames,
-    onlyTrash,
-    onlyBrokenImage,
-  ].filter(Boolean).length
+  const activeFilterCount = activeProductFilterCount(filters)
 
   // Chips de filtros activos: explican por qué el listado está recortado y
   // permiten quitar UN filtro sin abrir el panel "Filtros" (que en móvil está
@@ -4461,7 +4266,7 @@ function AdminProductsContent() {
               Eliminar
             </button>
             <button
-              onClick={() => setSelected(new Set())}
+              onClick={() => clearSelection()}
               disabled={bulkSaving}
               className="touch-target whitespace-nowrap px-2 py-1.5 text-xs font-semibold text-gray-500 hover:underline disabled:opacity-50"
             >

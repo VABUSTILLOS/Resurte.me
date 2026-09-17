@@ -106,7 +106,7 @@ export function SearchBar({
           aria-label={placeholder ?? "Buscar productos"}
           enterKeyHint="search"
           autoComplete="off"
-          className="flex-1 bg-transparent px-3 text-[#1a1a1a] placeholder:text-[var(--text-secondary)] focus:outline-none text-sm"
+          className="flex-1 min-w-0 bg-transparent px-3 text-[#1a1a1a] placeholder:text-[var(--text-secondary)] focus:outline-none text-sm"
           minLength={2}
         />
         {query && (

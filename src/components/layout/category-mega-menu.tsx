@@ -112,10 +112,11 @@ export function CategoryMegaMenu({
         onClick={handleTriggerClick}
         aria-expanded={open}
         aria-controls="category-mega-menu"
-        className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] hover:bg-[#F7F5F0] transition-colors text-sm shrink-0 touch-target"
+        aria-label="Categorías"
+        className="hidden sm:inline-flex min-w-[44px] items-center justify-center gap-1.5 px-3 py-1.5 rounded-[10px] hover:bg-[#F7F5F0] transition-colors text-sm shrink-0 touch-target"
       >
         <LayoutGrid className="w-4 h-4 text-[#0E7A0E]" aria-hidden="true" />
-        <span className="font-medium text-[#343538]">Categorías</span>
+        <span className="hidden font-medium text-[#343538] lg:inline">Categorías</span>
         <ChevronDown
           className={`w-4 h-4 text-[var(--text-secondary)] transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
           aria-hidden="true"

@@ -76,7 +76,7 @@ interface TipState {
 }
 
 /**
- * Fase 44 — Desempeño por ciudad. Rankea las ciudades por un score compuesto,
+ * Fase 44 — Desempeño de cada ciudad. Rankea las ciudades por un score compuesto,
  * separa las que no vendieron y traduce cada debilidad en tips accionables
  * (reglas deterministas + un tip de IA opcional bajo demanda).
  */
@@ -138,10 +138,10 @@ export function CityPerformance() {
   const worst = data?.needsAttention[0]
 
   return (
-    <section aria-label="Desempeño por ciudad" className="rounded-xl border border-gray-200 bg-white p-5">
+    <section aria-label="Desempeño de cada ciudad" className="rounded-xl border border-gray-200 bg-white p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="font-semibold text-gray-900">Desempeño por ciudad</h2>
+          <h2 className="font-semibold text-gray-900">Desempeño de cada ciudad</h2>
           <p className="text-[11px] text-gray-400">
             Ranking por ingresos, pedidos, tendencia y calidad · comparado con los {days} días anteriores
           </p>
@@ -204,7 +204,7 @@ export function CityPerformance() {
               <div className="hidden overflow-x-auto sm:block">
                 <table className="w-full text-sm">
                   <caption className="sr-only">
-                    Desempeño por ciudad en los últimos {days} días, ordenado por score
+                    Desempeño de cada ciudad en los últimos {days} días, ordenado por score
                   </caption>
                   <thead>
                     <tr className="border-b border-gray-100 text-left text-[11px] uppercase tracking-wide text-gray-400">

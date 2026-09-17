@@ -612,8 +612,14 @@ textarea:focus-visible,
    has both `hidden` and `touch-target` (e.g. desktop-only header buttons),
    which pushed the mobile cart button off-screen. The :not(.hidden)
    selector keeps the 44px touch target on visible buttons while letting
-   `.hidden` win for hidden ones. */
-@media (max-width: 640px) {
+   `.hidden` win for hidden ones.
+   El límite superior es 639.98px (= justo por debajo del breakpoint `sm` de
+   Tailwind) y NO 640px: con 640px la media query y `sm:` se solapaban en ese
+   ancho exacto, así que el display:inline-flex unlayered pisaba también a
+   `sm:hidden` y el header renderizaba a la vez los accesos móviles y los de
+   escritorio (110px de desborde recortado a 640px). El `:not(.hidden)` solo
+   cubre la utilidad `hidden` a secas, no sus variantes responsive. */
+@media (max-width: 639.98px) {
   .touch-target:not(.hidden) {
     min-width: 44px;
     min-height: 44px;

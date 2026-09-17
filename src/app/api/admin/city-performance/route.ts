@@ -7,7 +7,7 @@ export const runtime = "nodejs"
 
 const DEFAULT_DAYS = 30
 
-/** Desempeño por ciudad del dashboard admin (ventana 7/30/90 días). */
+/** Desempeño de cada ciudad del dashboard admin (ventana 7/30/90 días). */
 export async function GET(request: Request) {
   try {
     const { response: adminDenied } = await requireAdmin()

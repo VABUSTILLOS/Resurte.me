@@ -1411,7 +1411,7 @@ export interface AdminCityPerformance extends CityPerformanceResult {
 }
 
 /**
- * Desempeño por ciudad de los últimos `days` días (incluye hoy), comparado
+ * Desempeño de cada ciudad de los últimos `days` días (incluye hoy), comparado
  * contra los `days` días anteriores. Las ventanas van alineadas a la
  * medianoche de CDMX para que "7 días" signifique días calendario y no una
  * rebanada arbitraria de 168 horas.
