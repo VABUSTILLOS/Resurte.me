@@ -471,23 +471,36 @@ En el SQL Editor de Supabase, en este orden:
 2. `00083_foodos_order_notifications.sql` — sin ella los avisos se envían pero sin dedupe.
 3. `00084_foodos_orders_updated_at.sql` — sin ella nada se rompe, pero el timestamp queda congelado.
 4. `00085_stripe_connect.sql` — sin ella el panel de cobros falla al leer `stripe_*`.
-5. `00112_bump_affinity.sql` — sin ella el ranking de bumps cae al motor por
-   tags y el panel *Afinidad entre productos* (`/admin/marketing`) devuelve
-   error al leer `bump_affinity`. Idempotente (`BEGIN` + `IF NOT EXISTS` +
-   `CREATE OR REPLACE` + `ON CONFLICT`).
-6. `00113_user_carts_bumps.sql` — sin ella `PUT /api/cart/bumps/selection` y
-   `POST /api/cart/bumps/hydrate` devuelven 500 y la selección de bumps solo
-   sobrevive en `localStorage` (el cliente degrada en silencio, no rompe la
-   app). Aditiva e idempotente.
 
-Verificación rápida de que `00112` y `00113` están aplicadas, contra el REST de
-producción con la clave publicable:
+### Migraciones recientes ya aplicadas a producción
+
+`00112_bump_affinity.sql` y `00113_user_carts_bumps.sql` se aplicaron a
+producción el **16-sep-2026**. Quedan documentadas por el síntoma que provocan
+si faltan en un entorno nuevo:
+
+- `00112_bump_affinity.sql` — sin ella el ranking de bumps cae al motor por
+  tags y el panel *Afinidad entre productos* (`/admin/marketing`) devuelve
+  error al leer `bump_affinity`. Idempotente (`BEGIN` + `IF NOT EXISTS` +
+  `CREATE OR REPLACE` + `ON CONFLICT`). Termina con
+  `SELECT public.seed_bump_affinity();`, que resuelve los pares canónicos
+  contra el catálogo por slug (los slugs ausentes se omiten en silencio), así
+  que en un entorno nuevo hay que ejecutar esa función después del catálogo.
+- `00113_user_carts_bumps.sql` — sin ella `PUT /api/cart/bumps/selection` y
+  `POST /api/cart/bumps/hydrate` devuelven 500 y la selección de bumps solo
+  sobrevive en `localStorage` (el cliente degrada en silencio, no rompe la
+  app). Aditiva e idempotente.
+
+Verificación contra el REST de producción con la clave publicable (basta el
+`apikey`; un `200` confirma que la tabla o la columna existe, **no** que tenga
+filas: el rol anónimo no las ve):
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' \
-  -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
-  "https://<ref>.supabase.co/rest/v1/bump_affinity?select=id&limit=1"   # 200 = aplicada, 404 = pendiente
+curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
+  "https://<ref>.supabase.co/rest/v1/bump_affinity?select=id&limit=1"    # 200 aplicada · 404 pendiente
+curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
+  "https://<ref>.supabase.co/rest/v1/user_carts?select=bumps&limit=1"   # 200 aplicada · 400 pendiente
 ```
+
 
 ---
 
