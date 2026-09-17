@@ -12,7 +12,7 @@ import {
 } from "lucide-react"
 
 const TOOL_KEYS = Object.keys(TOOL_ACCESS) as PanelToolKey[]
-const ALL_ROLES: PanelRole[] = ["dueno", "gerente", "cocina", "mesero"]
+const ALL_ROLES: PanelRole[] = ["dueno", "gerente", "cajero", "cocina", "mesero"]
 
 export default function PersonalPage() {
   const [members, setMembers] = useState<PanelMember[]>([])

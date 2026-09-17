@@ -40,7 +40,14 @@ export async function resolveEffectiveOwner(req: NextRequest): Promise<Effective
       .limit(1)
     const m = Array.isArray(membership) ? membership[0] : membership
     if (m && typeof m.owner_user_id === "string") {
-      const role = m.role === "cocina" || m.role === "mesero" || m.role === "gerente" ? m.role : "gerente"
+      // Fail-closed a propósito: un rol desconocido NO puede escalar a
+      // "gerente" (que abriría menú, precios y configuración). Si el CHECK de
+      // panel_members crece y aquí se olvida, el rol cae a "mesero", que solo
+      // ve mesas y cocina, en vez de al más permisivo.
+      const role =
+        m.role === "gerente" || m.role === "cajero" || m.role === "cocina" || m.role === "mesero"
+          ? m.role
+          : "mesero"
       return { userId: m.owner_user_id, guestToken: null, role, viaMember: true }
     }
     return { userId: user.id, guestToken: null, role: "dueno", viaMember: false }

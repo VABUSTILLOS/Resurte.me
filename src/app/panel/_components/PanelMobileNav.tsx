@@ -7,6 +7,8 @@ import { LayoutGrid, Lock, X } from "lucide-react"
 import { motion, useDragControls } from "framer-motion"
 import { TOOLS, TOOL_AREAS } from "@/components/panel/hub/hub-data"
 import { useEscapeKey } from "@/hooks/use-escape-key"
+import { usePanelRole } from "@/hooks/use-panel-role"
+import { canAccessPanelHref } from "@/lib/panel-roles"
 import type { RestaurantCollection } from "@/types"
 import { t } from "@/lib/i18n/es"
 
@@ -20,6 +22,10 @@ export function PanelMobileNav({ open, onClose, selectedCollection }: PanelMobil
   const pathname = usePathname()
   const dragControls = useDragControls()
   const closeBtnRef = useRef<HTMLButtonElement>(null)
+  // Mismo predicado que el guard del layout y el grid del hub: si el drawer
+  // usara otro criterio, un mesero vería la caja en la lista y se toparía con
+  // la pantalla de acceso denegado al tocarla.
+  const { role } = usePanelRole()
 
   useEscapeKey(onClose, open)
 
@@ -110,7 +116,9 @@ export function PanelMobileNav({ open, onClose, selectedCollection }: PanelMobil
           </Link>
 
           {TOOL_AREAS.map((area) => {
-            const areaTools = TOOLS.filter((tool) => tool.area === area.key)
+            const areaTools = TOOLS.filter(
+              (tool) => tool.area === area.key && canAccessPanelHref(role, tool.href),
+            )
             if (areaTools.length === 0) return null
             return (
               <Fragment key={area.key}>

@@ -26,7 +26,7 @@ import AppOrdersCard from "@/components/panel/ventas/app-orders-card"
 import { useHubAlerts } from "@/components/panel/hub/use-hub-alerts"
 import { useAlertHistory } from "@/components/panel/hub/use-alert-history"
 import { usePanelRole } from "@/hooks/use-panel-role"
-import { canAccessTool, toolKeyForPath } from "@/lib/panel-roles"
+import { canAccessPanelHref, canAccessTool } from "@/lib/panel-roles"
 import { ensureGuestToken } from "@/lib/guest-address"
 import HeroSection from "@/components/panel/hub/HeroSection"
 import LiveStats from "@/components/panel/hub/LiveStats"
@@ -404,12 +404,12 @@ export default function PanelPage() {
   useAlertHistory(alerts, slug)
 
   // Fase 4.6: las herramientas visibles dependen del rol del operador.
+  // Fase 6: `canAccessPanelHref` además oculta las superficies de FoodOS que
+  // el rol no puede abrir (caja para el mesero, menú para el cajero), que la
+  // sola clave `foodos` no distingue.
   const { role } = usePanelRole()
   const visibleTools = useMemo(
-    () => TOOLS.filter((tool) => {
-      const key = toolKeyForPath(tool.href)
-      return !key || canAccessTool(role, key)
-    }),
+    () => TOOLS.filter((tool) => canAccessPanelHref(role, tool.href)),
     [role],
   )
 

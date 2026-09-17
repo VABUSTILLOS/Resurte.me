@@ -82,6 +82,30 @@ export function isNoOpenShiftError(error: unknown): error is NoOpenShiftError {
 }
 
 /**
+ * Cortes de **todas** las sucursales, del más reciente al más viejo.
+ *
+ * Existe porque el tablero necesita poblar un selector de turnos que cruce
+ * sucursales: `listShifts` con `branchId` nulo filtra `branch_id is null`, que
+ * es la sucursal "sin sucursal", no "todas". Confundir las dos cosas dejaría el
+ * selector vacío en un restaurante con sucursales.
+ */
+export async function listRestaurantShifts(
+  supabase: SupabaseClient,
+  restaurantId: string,
+  limit = 60
+): Promise<ShiftRow[]> {
+  const { data, error } = await supabase
+    .from("foodos_pos_shifts")
+    .select(SHIFT_COLUMNS)
+    .eq("restaurant_id", restaurantId)
+    .order("opened_at", { ascending: false })
+    .limit(limit)
+
+  if (error) throw new Error(error.message)
+  return (data as unknown as ShiftRow[] | null) ?? []
+}
+
+/**
  * Cortes del alcance pedido, del más reciente al más viejo. Misma semántica de
  * sucursal que `findOpenShift`.
  */

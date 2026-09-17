@@ -2,23 +2,30 @@
 
 // ============================================================
 // Tablero FoodTech — métricas del sistema de pedidos:
-// pedidos por día, por canal y sucursal, ticket promedio,
-// top platillos, ingresos y efectividad de combos/reglas.
+// pedidos por día, por canal, por sucursal y por turno de caja,
+// ticket promedio, top platillos y cierre diario exportable.
+//
+// Toda la aritmética vive en `@/lib/foodos-reportes` (módulo puro y probado).
+// Aquí solo se pinta: la regla que más se equivoca en un POS —los ingresos se
+// cuentan por `payment_status = "paid"`, nunca por número de filas— tiene que
+// estar en un solo lugar, no repartida entre componentes.
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import {
-  getAiUsage,
-  getFoodosPanelData,
-} from "../actions"
+import { getAiUsage, getFoodosPanelData } from "../actions"
+import { getFoodosReportData, type FoodosReportData } from "./actions"
 import { formatMoney } from "@/lib/foodos"
-import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
-import type {
-  FoodosRestaurant,
-  FoodosBranch,
-  FoodosOrder,
-  FoodosCustomer,
-} from "@/types/foodos"
+import {
+  FULFILLMENT_LABELS,
+  NO_SHIFT,
+  computeDailyClose,
+  computeReport,
+  dailyCloseCsv,
+  paymentMethodLabel,
+  shiftOptions,
+  type ShiftCloseRow,
+} from "@/lib/foodos-reportes"
+import type { FoodosRestaurant, FoodosBranch, FoodosCustomer } from "@/types/foodos"
 import type { AiUsageSnapshot } from "@/lib/ai/usage"
 import {
   Loader2,
@@ -30,30 +37,35 @@ import {
   Sparkles,
   Download,
   TriangleAlert,
+  Clock,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
 
-const DAY_MS = 86_400_000
-const CANAL_LABEL: Record<string, string> = { web: "Web", qr: "QR", whatsapp: "WhatsApp" }
-
 export default function TableroPage() {
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
-  const [orders, setOrders] = useState<FoodosOrder[]>([])
   const [branches, setBranches] = useState<FoodosBranch[]>([])
   const [customers, setCustomers] = useState<FoodosCustomer[]>([])
   const [aiUsage, setAiUsage] = useState<AiUsageSnapshot | null>(null)
+  const [data, setData] = useState<FoodosReportData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [reportLoading, setReportLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState(30)
-  const [now] = useState(() => Date.now())
+  const [branchId, setBranchId] = useState("")
+  const [shiftId, setShiftId] = useState("")
+  // El instante del reporte se fija al cargar: el corte en SQL y el agrupado
+  // por día tienen que usar el mismo reloj, o el pedido de la medianoche del
+  // límite entra por un lado y desaparece por el otro.
+  const [now, setNow] = useState(() => Date.now())
 
-  const load = useCallback(async () => {
+  const loadStatic = useCallback(async () => {
     try {
-      const [{ restaurant: r, orders: os, branches: bs, customers: cs }, usage] =
-        await Promise.all([getFoodosPanelData(), getAiUsage()])
+      const [{ restaurant: r, branches: bs, customers: cs }, usage] = await Promise.all([
+        getFoodosPanelData(),
+        getAiUsage(),
+      ])
       setRestaurant(r)
-      setOrders(os)
       setBranches(bs)
       setCustomers(cs)
       setAiUsage(usage)
@@ -65,147 +77,90 @@ export default function TableroPage() {
   }, [])
 
   useEffect(() => {
-    const run = async () => { await load() }
+    const run = async () => {
+      await loadStatic()
+    }
     run()
-  }, [load])
+  }, [loadStatic])
 
-  const metrics = useMemo(() => {
-    const cutoff = now - days * DAY_MS
-    const recent = orders.filter((o) => {
-      const t = new Date(o.created_at).getTime()
-      return t >= cutoff && o.status !== "cancelled"
-    })
-
-    const paid = recent.filter((o) => o.payment_status !== "failed")
-    const revenue = paid.reduce((s, o) => s + o.total, 0)
-    const avgTicket = recent.length ? revenue / recent.length : 0
-    const deliveryCount = recent.filter((o) => o.fulfillment === "delivery").length
-    const pickupCount = recent.filter((o) => o.fulfillment === "pickup").length
-
-    // por día (últimos 7 días)
-    const byDay: { label: string; count: number }[] = []
-    for (let i = days - 1; i >= 0; i--) {
-      const start = now - i * DAY_MS
-      const end = start + DAY_MS
-      const count = recent.filter((o) => {
-        const t = new Date(o.created_at).getTime()
-        return t >= start && t < end
-      }).length
-      byDay.push({
-        label: new Date(start).toLocaleDateString("es-MX", { weekday: "short" }),
-        count,
+  const loadReport = useCallback(async () => {
+    const stamp = Date.now()
+    try {
+      const next = await getFoodosReportData({
+        days,
+        branchId: branchId || null,
+        now: stamp,
       })
+      setData(next)
+      setNow(stamp)
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("foodos.tablero.loadError"))
+    } finally {
+      setReportLoading(false)
     }
+  }, [days, branchId])
 
-    // por canal
-    const byChannel = new Map<string, number>()
-    for (const o of recent) byChannel.set(o.channel, (byChannel.get(o.channel) ?? 0) + 1)
-
-    // por sucursal
-    const byBranch = new Map<string, number>()
-    for (const o of recent) {
-      const key = o.branch_id ?? "sin_sucursal"
-      byBranch.set(key, (byBranch.get(key) ?? 0) + 1)
+  useEffect(() => {
+    const run = async () => {
+      await loadReport()
     }
+    run()
+  }, [loadReport])
 
-    // top platillos
-    const itemCount = new Map<string, { name: string; qty: number; revenue: number }>()
-    for (const o of recent) {
-      for (const i of o.items) {
-        const cur = itemCount.get(i.item_id) ?? { name: i.name, qty: 0, revenue: 0 }
-        cur.qty += i.qty
-        cur.revenue += i.price * i.qty
-        itemCount.set(i.item_id, cur)
-      }
-    }
-    const topItems = [...itemCount.values()].sort((a, b) => b.qty - a.qty).slice(0, 5)
+  const orders = data?.orders ?? []
+  const shifts = data?.shifts ?? []
 
-    // combos / cross-sell
-    const comboRevenue = recent.reduce((s, o) => {
-      return s + o.items.filter((i) => i.combo_id).reduce((c, i) => c + i.price * i.qty, 0)
-    }, 0)
-    const comboShare = revenue ? (comboRevenue / revenue) * 100 : 0
-
-    const repeatCustomers = customers.filter((c) => c.total_orders >= 2).length
-    const repeatRate = customers.length ? (repeatCustomers / customers.length) * 100 : 0
-
-    return {
-      count: recent.length,
-      revenue,
-      avgTicket,
-      deliveryCount,
-      pickupCount,
-      byDay,
-      byChannel,
-      byBranch,
-      topItems,
-      comboRevenue,
-      comboShare,
-      repeatRate,
-      customers: customers.length,
-    }
-  }, [orders, customers, days, now])
-
-  const maxDay = useMemo(
-    () => Math.max(...metrics.byDay.map((d) => d.count), 1),
-    [metrics.byDay]
+  const report = useMemo(
+    () =>
+      computeReport(
+        orders,
+        { days, branchId: branchId || null, shiftId: shiftId || null },
+        now
+      ),
+    [orders, days, branchId, shiftId, now]
   )
 
-  // Cierre diario: pedidos de hoy (no cancelados) desglosados.
-  const dailyClose = useMemo(() => {
-    // El "hoy" del cierre es el día del restaurante, no el del navegador:
-    // una tablet con el reloj en UTC mostraría el cierre del día equivocado.
-    const today = dayKeyOf(DEFAULT_TIMEZONE)
-    const todays = orders.filter((o) => {
-      const d = new Date(o.created_at)
-      return dayKeyOf(DEFAULT_TIMEZONE, d) === today && o.status !== "cancelled"
-    })
-    const byPayment = new Map<string, { count: number; total: number }>()
-    const byChannel = new Map<string, number>()
-    const byFulfillment = new Map<string, number>()
-    let revenue = 0
-    let tips = 0
-    let discounts = 0
-    let pending = 0
-    for (const o of todays) {
-      revenue += o.total
-      tips += o.tip ?? 0
-      discounts += o.discount ?? 0
-      if (o.payment_status !== "paid") pending += o.total
-      const pm = o.payment_method ?? "sucursal"
-      const cur = byPayment.get(pm) ?? { count: 0, total: 0 }
-      cur.count += 1
-      cur.total += o.total
-      byPayment.set(pm, cur)
-      byChannel.set(o.channel, (byChannel.get(o.channel) ?? 0) + 1)
-      byFulfillment.set(o.fulfillment, (byFulfillment.get(o.fulfillment) ?? 0) + 1)
+  const close = useMemo(
+    () =>
+      computeDailyClose(orders, shifts, {
+        now,
+        shiftId: shiftId || null,
+      }),
+    [orders, shifts, now, shiftId]
+  )
+
+  const branchNames = useMemo(
+    () => new Map(branches.map((b) => [b.id, b.name])),
+    [branches]
+  )
+
+  const shiftLabels = useMemo(() => {
+    const map = new Map(shiftOptions(shifts, branchNames).map((o) => [o.id, o.label]))
+    map.set(NO_SHIFT, t("foodos.tablero.shiftNone"))
+    return map
+  }, [shifts, branchNames])
+
+  const repeat = useMemo(() => {
+    const repeatCustomers = customers.filter((c) => c.total_orders >= 2).length
+    return {
+      count: customers.length,
+      rate: customers.length ? (repeatCustomers / customers.length) * 100 : 0,
     }
-    return { count: todays.length, revenue, tips, discounts, pending, byPayment, byChannel, byFulfillment, todays }
-  }, [orders])
+  }, [customers])
+
+  const maxDay = useMemo(
+    () => Math.max(...report.byDay.map((d) => d.count), 1),
+    [report.byDay]
+  )
 
   const exportDailyClose = () => {
-    const header = "pedido,hora,canal,cumplimiento,metodo_pago,estado_pago,subtotal,descuento,envio,propina,total"
-    const rows = dailyClose.todays.map((o) =>
-      [
-        o.id.slice(0, 8),
-        new Date(o.created_at).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
-        o.channel,
-        o.fulfillment,
-        o.payment_method ?? "sucursal",
-        o.payment_status,
-        o.subtotal,
-        o.discount,
-        o.delivery_fee,
-        o.tip ?? 0,
-        o.total,
-      ].join(",")
-    )
-    const csv = [header, ...rows].join("\n")
+    const csv = dailyCloseCsv(close, shiftLabels)
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `cierre-${dayKeyOf(DEFAULT_TIMEZONE)}.csv`
+    a.download = `cierre-${close.dayKey}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -226,9 +181,11 @@ export default function TableroPage() {
     )
   }
 
+  const busy = reportLoading || data === null
+
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="text-2xl font-black text-stone-900">{t("foodos.tablero.title")}</h1>
           <p className="text-sm text-stone-500">{t("foodos.tablero.subtitle")}</p>
@@ -237,7 +194,11 @@ export default function TableroPage() {
           {[7, 30, 90].map((d) => (
             <button
               key={d}
-              onClick={() => setDays(d)}
+              onClick={() => {
+                setReportLoading(true)
+                setDays(d)
+              }}
+              aria-pressed={days === d}
               className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
                 days === d ? "bg-stone-900 text-white" : "bg-white border border-stone-200 text-stone-600"
               }`}
@@ -248,16 +209,64 @@ export default function TableroPage() {
         </div>
       </div>
 
+      {/* Filtros: el tablero de un restaurante con sucursales no puede sumar
+          todas juntas y dejar que el dueño adivine qué local va mal. */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        <select
+          value={branchId}
+          onChange={(e) => {
+            setReportLoading(true)
+            setBranchId(e.target.value)
+          }}
+          aria-label={t("foodos.tablero.branchFilter")}
+          className="h-11 rounded-xl border border-stone-200 bg-white px-3 text-sm font-semibold text-stone-700"
+        >
+          <option value="">{t("foodos.tablero.branchAll")}</option>
+          {branches.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+        {shifts.length > 0 && (
+          <select
+            value={shiftId}
+            onChange={(e) => {
+              setReportLoading(true)
+              setShiftId(e.target.value)
+            }}
+            aria-label={t("foodos.tablero.shiftFilter")}
+            className="h-11 rounded-xl border border-stone-200 bg-white px-3 text-sm font-semibold text-stone-700"
+          >
+            <option value="">{t("foodos.tablero.shiftAll")}</option>
+            {shiftOptions(shifts, branchNames).map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+            <option value={NO_SHIFT}>{t("foodos.tablero.shiftNone")}</option>
+          </select>
+        )}
+        {busy && <Loader2 className="w-4 h-4 animate-spin text-stone-400" aria-hidden="true" />}
+      </div>
+
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>
       )}
 
+      {data?.truncated && (
+        <p className="mb-4 flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+          {t("foodos.tablero.truncated")}
+        </p>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Kpi icon={<ShoppingBag className="w-5 h-5" />} label={t("foodos.tablero.kpiOrders")} value={String(metrics.count)} accent="bg-emerald-100 text-emerald-600" />
-        <Kpi icon={<TrendingUp className="w-5 h-5" />} label={t("foodos.tablero.kpiRevenue")} value={formatMoney(metrics.revenue)} accent="bg-blue-100 text-blue-600" />
-        <Kpi icon={<Percent className="w-5 h-5" />} label={t("foodos.tablero.kpiAvgTicket")} value={formatMoney(metrics.avgTicket)} accent="bg-purple-100 text-purple-600" />
-        <Kpi icon={<Repeat className="w-5 h-5" />} label={t("foodos.tablero.kpiRepeat")} value={`${metrics.repeatRate.toFixed(0)}%`} accent="bg-amber-100 text-amber-600" />
+        <Kpi icon={<ShoppingBag className="w-5 h-5" />} label={t("foodos.tablero.kpiOrders")} value={String(report.orderCount)} accent="bg-emerald-100 text-emerald-600" />
+        <Kpi icon={<TrendingUp className="w-5 h-5" />} label={t("foodos.tablero.kpiRevenue")} value={formatMoney(report.revenue)} accent="bg-blue-100 text-blue-600" />
+        <Kpi icon={<Percent className="w-5 h-5" />} label={t("foodos.tablero.kpiAvgTicket")} value={formatMoney(report.avgTicket)} accent="bg-purple-100 text-purple-600" />
+        <Kpi icon={<Repeat className="w-5 h-5" />} label={t("foodos.tablero.kpiRepeat")} value={`${repeat.rate.toFixed(0)}%`} accent="bg-amber-100 text-amber-600" />
       </div>
 
       {aiUsage && <AiUsageCard usage={aiUsage} />}
@@ -266,57 +275,51 @@ export default function TableroPage() {
         {/* Pedidos por día */}
         <Card title={t("foodos.tablero.byDay")}>
           <div className="flex items-end gap-1 h-40">
-            {metrics.byDay.map((d, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+            {report.byDay.map((d) => (
+              <div key={d.key} className="flex-1 flex flex-col items-center gap-1 min-w-0">
                 <span className="text-[10px] text-stone-400 font-semibold">{d.count || ""}</span>
                 <div
+                  title={`${d.key} · ${d.count} · ${formatMoney(d.revenue)}`}
                   className="w-full rounded-t-lg bg-emerald-500/80 hover:bg-emerald-500 transition-colors"
                   style={{ height: `${Math.max((d.count / maxDay) * 100, d.count ? 8 : 2)}%` }}
                 />
-                <span className="text-[10px] text-stone-500 capitalize">{d.label}</span>
+                <span className="text-[10px] text-stone-500 capitalize truncate">{d.label}</span>
               </div>
             ))}
           </div>
         </Card>
 
-        {/* Canales y cumplimiento */}
+        {/* Canales */}
         <Card title={t("foodos.tablero.channelsCard")}>
           <div className="space-y-3">
-            {["web", "qr", "whatsapp"].map((ch) => {
-              const count = metrics.byChannel.get(ch) ?? 0
-              const pct = metrics.count ? (count / metrics.count) * 100 : 0
-              return (
-                <div key={ch}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-stone-600">{CANAL_LABEL[ch] ?? ch}</span>
-                    <span className="font-bold text-stone-900">{count}</span>
-                  </div>
-                  <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
-                  </div>
+            {report.byChannel.map((row) => (
+              <div key={row.channel}>
+                <div className="flex justify-between text-sm mb-1 gap-3">
+                  <span className="text-stone-600 truncate">{row.label}</span>
+                  <span className="font-bold text-stone-900 shrink-0">
+                    {row.count}
+                    <span className="text-stone-400 font-normal"> · {formatMoney(row.revenue)}</span>
+                  </span>
                 </div>
-              )
-            })}
-            <div className="pt-2 border-t border-stone-100 flex justify-between text-sm">
-              <span className="text-stone-600">{t("foodos.common.fulfillmentDelivery")}</span>
-              <span className="font-bold text-stone-900">{metrics.deliveryCount}</span>
-              <span className="text-stone-600 ml-6">{t("foodos.common.fulfillmentPickup")}</span>
-              <span className="font-bold text-stone-900">{metrics.pickupCount}</span>
-            </div>
+                <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${row.share}%` }} />
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
 
         {/* Top platillos */}
         <Card title={t("foodos.tablero.topItems")}>
-          {metrics.topItems.length === 0 ? (
+          {report.topItems.length === 0 ? (
             <p className="text-sm text-stone-400 py-6 text-center">{t("foodos.tablero.emptyPeriod")}</p>
           ) : (
             <div className="space-y-3">
-              {metrics.topItems.map((item, idx) => (
-                <div key={item.name} className="flex items-center justify-between gap-3">
+              {report.topItems.map((item, idx) => (
+                <div key={item.itemId} className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
-                      idx === 0 ? "bg-amber-100 text-amber-700" : "bg-stone-100 text-stone-500"
+                      idx === 0 ? "bg-amber-100 text-amber-700" : "bg-stone-100 text-stone-600"
                     }`}>
                       {idx + 1}
                     </span>
@@ -335,96 +338,149 @@ export default function TableroPage() {
         {/* Combos / cross-sell */}
         <Card title={t("foodos.tablero.combosCard")}>
           <div className="flex items-center gap-4">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-100 to-amber-100 flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-100 to-amber-100 flex items-center justify-center shrink-0">
               <div className="text-center">
-                <Sparkles className="w-5 h-5 text-emerald-600 mx-auto" />
-                <p className="text-lg font-black text-stone-900">{metrics.comboShare.toFixed(0)}%</p>
+                <Sparkles className="w-5 h-5 text-emerald-600 mx-auto" aria-hidden="true" />
+                <p className="text-lg font-black text-stone-900">{report.comboShare.toFixed(0)}%</p>
               </div>
             </div>
             <div>
               <p className="text-sm text-stone-600">
-                <strong className="text-stone-900">{formatMoney(metrics.comboRevenue)}</strong> {t("foodos.tablero.comboSales")}
+                <strong className="text-stone-900">{formatMoney(report.comboRevenue)}</strong> {t("foodos.tablero.comboSales")}
               </p>
-              <p className="text-xs text-stone-500 mt-1">{t("foodos.tablero.ofTotal", { total: formatMoney(metrics.revenue) })}</p>
+              <p className="text-xs text-stone-500 mt-1">{t("foodos.tablero.ofTotal", { total: formatMoney(report.revenue) })}</p>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-stone-100 flex items-center gap-2 text-sm text-stone-600">
-            <Users className="w-4 h-4 text-stone-400" />
-            {t("foodos.tablero.customersRepeat", { count: metrics.customers, rate: metrics.repeatRate.toFixed(0) })}
+            <Users className="w-4 h-4 text-stone-400" aria-hidden="true" />
+            {t("foodos.tablero.customersRepeat", { count: repeat.count, rate: repeat.rate.toFixed(0) })}
           </div>
         </Card>
       </div>
 
       {/* Por sucursal */}
-      {branches.length > 1 && (
+      {report.byBranch.length > 0 && (
         <Card title={t("foodos.tablero.byBranch")} className="mt-6">
           <div className="grid gap-3 md:grid-cols-3">
-            {branches.map((b) => {
-              const count = metrics.byBranch.get(b.id) ?? 0
-              return (
-                <div key={b.id} className="bg-stone-50 rounded-xl p-4">
-                  <p className="text-sm font-bold text-stone-900">{b.name}</p>
-                  <p className="text-2xl font-black text-stone-900 mt-1">{count}</p>
-                  <p className="text-xs text-stone-500">{t("foodos.tablero.orders")}</p>
-                </div>
-              )
-            })}
+            {report.byBranch.map((row) => (
+              <div key={row.branchId} className="bg-stone-50 rounded-xl p-4">
+                <p className="text-sm font-bold text-stone-900 truncate">
+                  {branchNames.get(row.branchId) ?? t("foodos.tablero.noBranch")}
+                </p>
+                <p className="text-2xl font-black text-stone-900 mt-1">{formatMoney(row.revenue)}</p>
+                <p className="text-xs text-stone-500">
+                  {row.count} {t("foodos.tablero.orders")}
+                </p>
+              </div>
+            ))}
           </div>
         </Card>
       )}
+
+      {/* Por turno de caja */}
+      {report.byShift.length > 0 && (
+        <Card title={t("foodos.tablero.byShift")} className="mt-6">
+          <div className="space-y-3">
+            {report.byShift.map((row) => (
+              <div key={row.shiftId} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Clock className="w-4 h-4 text-stone-400 shrink-0" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-stone-900 truncate">
+                      {shiftLabels.get(row.shiftId) ?? row.shiftId}
+                    </p>
+                    <p className="text-xs text-stone-500">
+                      {row.count} {t("foodos.tablero.orders")} · {t("foodos.tablero.shiftCash", { amount: formatMoney(row.cash) })}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-sm font-bold text-stone-900 shrink-0">{formatMoney(row.revenue)}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* Cierre diario */}
-      <Card title="Cierre del día" className="mt-6">
-        {dailyClose.count === 0 ? (
-          <p className="text-sm text-stone-400 py-6 text-center">Sin pedidos hoy todavía.</p>
+      <Card title={t("foodos.tablero.closeTitle")} className="mt-6">
+        {close.orderCount === 0 ? (
+          <p className="text-sm text-stone-400 py-6 text-center">{t("foodos.tablero.closeEmpty")}</p>
         ) : (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <CloseStat label="Pedidos" value={String(dailyClose.count)} />
-              <CloseStat label="Ventas" value={formatMoney(dailyClose.revenue)} />
-              <CloseStat label="Propinas" value={formatMoney(dailyClose.tips)} />
-              <CloseStat label="Descuentos" value={formatMoney(dailyClose.discounts)} />
-              <CloseStat label="Por cobrar" value={formatMoney(dailyClose.pending)} accent={dailyClose.pending > 0} />
+              <CloseStat label={t("foodos.tablero.closeOrders")} value={String(close.orderCount)} />
+              <CloseStat label={t("foodos.tablero.closeRevenue")} value={formatMoney(close.revenue)} />
+              <CloseStat label={t("foodos.tablero.closeTips")} value={formatMoney(close.tips)} />
+              <CloseStat label={t("foodos.tablero.closeDiscounts")} value={formatMoney(close.discounts)} />
+              <CloseStat label={t("foodos.tablero.closePending")} value={formatMoney(close.pending)} accent={close.pending > 0} />
             </div>
+
             <div className="grid md:grid-cols-3 gap-4">
               <div>
-                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">Por método de pago</p>
+                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                  {t("foodos.tablero.closeByPayment")}
+                </p>
                 <div className="space-y-1.5">
-                  {[...dailyClose.byPayment.entries()].map(([pm, v]) => (
-                    <div key={pm} className="flex justify-between text-sm">
-                      <span className="text-stone-600 capitalize">{pm === "card" ? "Tarjeta" : pm === "transfer" ? "Transferencia" : "En sucursal"}</span>
-                      <span className="font-semibold text-stone-900">{v.count} · {formatMoney(v.total)}</span>
+                  {close.byPayment.map((row) => (
+                    <div key={row.method} className="flex justify-between gap-3 text-sm">
+                      <span className="text-stone-600 truncate">{paymentMethodLabel(row.method)}</span>
+                      <span className="font-semibold text-stone-900 shrink-0">
+                        {row.count} · {formatMoney(row.total)}
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
               <div>
-                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">Por canal</p>
+                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                  {t("foodos.tablero.closeByChannel")}
+                </p>
                 <div className="space-y-1.5">
-                  {[...dailyClose.byChannel.entries()].map(([ch, count]) => (
-                    <div key={ch} className="flex justify-between text-sm">
-                      <span className="text-stone-600">{CANAL_LABEL[ch] ?? ch}</span>
-                      <span className="font-semibold text-stone-900">{count}</span>
+                  {close.byChannel.map((row) => (
+                    <div key={row.channel} className="flex justify-between gap-3 text-sm">
+                      <span className="text-stone-600 truncate">{row.label}</span>
+                      <span className="font-semibold text-stone-900 shrink-0">
+                        {row.count} · {formatMoney(row.revenue)}
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
               <div>
-                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">Por servicio</p>
+                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                  {t("foodos.tablero.closeByService")}
+                </p>
                 <div className="space-y-1.5">
-                  {[...dailyClose.byFulfillment.entries()].map(([f, count]) => (
-                    <div key={f} className="flex justify-between text-sm">
-                      <span className="text-stone-600">{f === "delivery" ? "A domicilio" : f === "dine_in" ? "En el local" : "Para llevar"}</span>
-                      <span className="font-semibold text-stone-900">{count}</span>
+                  {close.byFulfillment.map((row) => (
+                    <div key={row.fulfillment} className="flex justify-between gap-3 text-sm">
+                      <span className="text-stone-600 truncate">
+                        {FULFILLMENT_LABELS[row.fulfillment] ?? row.fulfillment}
+                      </span>
+                      <span className="font-semibold text-stone-900 shrink-0">{row.count}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
+
+            {close.shifts.length > 0 && (
+              <div className="pt-3 border-t border-stone-100">
+                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+                  {t("foodos.tablero.closeShifts")}
+                </p>
+                <div className="space-y-2">
+                  {close.shifts.map((row) => (
+                    <ShiftCloseLine key={row.id} row={row} />
+                  ))}
+                </div>
+              </div>
+            )}
+
             <button
               onClick={exportDailyClose}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-stone-900 text-white text-sm font-semibold hover:bg-stone-700"
             >
-              <Download className="w-4 h-4" /> Exportar cierre (CSV)
+              <Download className="w-4 h-4" aria-hidden="true" /> {t("foodos.tablero.closeExport")}
             </button>
           </div>
         )}
@@ -450,6 +506,52 @@ function Kpi({
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 ${accent}`}>{icon}</div>
       <p className="text-xl font-black text-stone-900 truncate">{value}</p>
       <p className="text-xs text-stone-500">{label}</p>
+    </div>
+  )
+}
+
+const ARQUEO_TONE: Record<string, string> = {
+  ok: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  short: "bg-red-50 text-red-700 border-red-200",
+  over: "bg-amber-50 text-amber-700 border-amber-200",
+}
+
+function arqueoLabel(arqueo: ShiftCloseRow["arqueo"]): string {
+  if (arqueo === "ok") return t("foodos.tablero.arqueoOk")
+  if (arqueo === "short") return t("foodos.tablero.arqueoShort")
+  if (arqueo === "over") return t("foodos.tablero.arqueoOver")
+  return t("foodos.tablero.arqueoOpen")
+}
+
+/**
+ * Un turno del cierre. Mientras siga abierto no hay faltante ni sobrante que
+ * mostrar: el corte todavía no cuadra porque no ha terminado.
+ */
+function ShiftCloseLine({ row }: { row: ShiftCloseRow }) {
+  const tone = ARQUEO_TONE[row.arqueo ?? ""] ?? "bg-stone-100 text-stone-600 border-stone-200"
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <div className="min-w-0">
+        <p className="font-semibold text-stone-900 truncate">{row.label}</p>
+        <p className="text-xs text-stone-500">
+          {row.orderCount} · {formatMoney(row.revenue)} · {formatMoney(row.cashSales)}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {row.expectedCash !== null && (
+          <span className="text-xs text-stone-500">
+            {t("foodos.tablero.expectedCash")} {formatMoney(row.expectedCash)}
+          </span>
+        )}
+        {row.declaredCash !== null && (
+          <span className="text-xs text-stone-500">
+            {t("foodos.tablero.declaredCash")} {formatMoney(row.declaredCash)}
+          </span>
+        )}
+        <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${tone}`}>
+          {arqueoLabel(row.arqueo)}
+        </span>
+      </div>
     </div>
   )
 }

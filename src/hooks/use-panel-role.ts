@@ -26,7 +26,9 @@ function fetchRole(): Promise<RoleState> {
         if (!res.ok) return { role: "dueno", viaMember: false, loading: false }
         const json = (await res.json()) as { role?: string; viaMember?: boolean }
         const role: PanelRole =
-          json.role === "gerente" || json.role === "cocina" || json.role === "mesero" ? json.role : "dueno"
+          json.role === "gerente" || json.role === "cajero" || json.role === "cocina" || json.role === "mesero"
+            ? json.role
+            : "dueno"
         return { role, viaMember: json.viaMember === true && role !== "dueno", loading: false }
       })
       .catch((): RoleState => ({ role: "dueno", viaMember: false, loading: false }))

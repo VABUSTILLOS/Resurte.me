@@ -7,12 +7,12 @@
  * las API routes (403 cuando el rol no puede escribir esa clave).
  */
 
-export type PanelRole = "dueno" | "gerente" | "cocina" | "mesero"
+export type PanelRole = "dueno" | "gerente" | "cajero" | "cocina" | "mesero"
 
 /** Roles asignables a miembros (el dueño no es un miembro). */
 export type MemberRole = Exclude<PanelRole, "dueno">
 
-export const MEMBER_ROLES: MemberRole[] = ["gerente", "cocina", "mesero"]
+export const MEMBER_ROLES: MemberRole[] = ["gerente", "cajero", "cocina", "mesero"]
 
 /** Clave de herramienta = segmento de ruta bajo /panel. */
 export type PanelToolKey =
@@ -31,8 +31,85 @@ export const TOOL_ACCESS: Record<PanelToolKey, PanelRole[]> = {
   comanda: ["dueno", "gerente", "cocina", "mesero"],
   inventario: ["dueno", "gerente", "cocina"],
   ventas: ["dueno", "gerente", "mesero"],
-  foodos: ["dueno", "gerente"],
+  foodos: ["dueno", "gerente", "cajero", "mesero"],
   personal: ["dueno"],
+}
+
+/**
+ * Superficies de FoodOS (`/panel/foodos/<superficie>`).
+ *
+ * `foodos` es una herramienta paraguas: quien entra ve el panel completo del
+ * restaurante, con menú, precios y configuración. Un cajero o un mesero no
+ * deben poder tocar nada de eso, así que la matriz de arriba sólo abre la
+ * puerta y esta segunda matriz decide **qué pantallas** hay detrás.
+ *
+ * Las superficies no listadas aquí quedan cerradas para todo rol que no sea
+ * dueño o gerente (fail-closed): una pantalla nueva no se filtra por olvido.
+ */
+export type FoodosSurfaceKey =
+  | "tablero" | "pedidos" | "mostrador" | "mesas" | "cocina" | "caja"
+  | "menu" | "combos" | "clientes" | "restaurante" | "pos" | "catering"
+  | "cupones" | "whatsapp" | "inbox" | "wallet" | "sitio-ia" | "flotilla"
+  | "mesero-ia"
+
+export const FOODOS_SURFACE_ACCESS: Record<FoodosSurfaceKey, PanelRole[]> = {
+  // Operación de caja y piso: vender, cobrar y cerrar el día.
+  tablero: ["dueno", "gerente", "cajero"],
+  pedidos: ["dueno", "gerente", "cajero"],
+  mostrador: ["dueno", "gerente", "cajero"],
+  caja: ["dueno", "gerente", "cajero"],
+  mesas: ["dueno", "gerente", "cajero", "mesero"],
+  // El mesero mira la cocina para saber qué está listo sin cruzar el salón.
+  cocina: ["dueno", "gerente", "cajero", "mesero"],
+  // Menú, precios, marketing y configuración: sólo dueño y gerente.
+  menu: ["dueno", "gerente"],
+  combos: ["dueno", "gerente"],
+  clientes: ["dueno", "gerente"],
+  restaurante: ["dueno", "gerente"],
+  pos: ["dueno", "gerente"],
+  catering: ["dueno", "gerente"],
+  cupones: ["dueno", "gerente"],
+  whatsapp: ["dueno", "gerente"],
+  inbox: ["dueno", "gerente"],
+  wallet: ["dueno", "gerente"],
+  "sitio-ia": ["dueno", "gerente"],
+  flotilla: ["dueno", "gerente"],
+  "mesero-ia": ["dueno", "gerente"],
+}
+
+/**
+ * Superficie de FoodOS de una ruta. `null` cuando la ruta no es de FoodOS o es
+ * la raíz `/panel/foodos`.
+ */
+export function foodosSurfaceForPath(pathname: string): string | null {
+  if (toolKeyForPath(pathname) !== "foodos") return null
+  const seg = pathname.split("/")[3] ?? ""
+  return seg || null
+}
+
+/**
+ * ¿Puede este rol abrir esta ruta de FoodOS? Cierra las superficies no
+ * declaradas, para que una pantalla nueva no herede acceso por accidente.
+ */
+export function canAccessFoodosSurface(role: PanelRole, pathname: string): boolean {
+  if (!canAccessTool(role, "foodos")) return false
+  if (role === "dueno" || role === "gerente") return true
+  const surface = foodosSurfaceForPath(pathname)
+  if (surface === null) return true
+  const allowed = FOODOS_SURFACE_ACCESS[surface as FoodosSurfaceKey]
+  return allowed ? allowed.includes(role) : false
+}
+
+/**
+ * Predicado único de navegación: lo usan el guard del layout, el grid del hub
+ * y el drawer móvil, para que los tres no puedan discrepar.
+ */
+export function canAccessPanelHref(role: PanelRole, href: string): boolean {
+  const key = toolKeyForPath(href)
+  if (!key) return true
+  if (!canAccessTool(role, key)) return false
+  if (key !== "foodos") return true
+  return canAccessFoodosSurface(role, href)
 }
 
 export function canAccessTool(role: PanelRole, tool: PanelToolKey): boolean {

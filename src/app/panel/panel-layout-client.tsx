@@ -12,7 +12,7 @@ import { useLocale } from "@/lib/i18n/use-locale"
 import { usePanelRealtimeSync } from "@/hooks/use-panel-realtime-sync"
 import { usePanelRole } from "@/hooks/use-panel-role"
 import { useEscapeKey } from "@/hooks/use-escape-key"
-import { canAccessTool, toolKeyForPath } from "@/lib/panel-roles"
+import { canAccessPanelHref, toolKeyForPath } from "@/lib/panel-roles"
 import { FoodosEntitlementsProvider } from "@/components/panel/foodos/entitlements-context"
 import type { FoodosEntitlementState } from "@/lib/foodos-entitlements"
 import { PanelMobileNav } from "./_components/PanelMobileNav"
@@ -62,10 +62,13 @@ function PanelContent({ children }: { children: React.ReactNode }) {
   usePanelRealtimeSync()
 
   // Fase 4.6: gate por rol — un miembro solo abre las herramientas de su rol.
+  // Fase 6: dentro de FoodOS el cajero y el mesero solo ven sus superficies,
+  // por eso el guard usa el predicado completo y no solo la clave de la
+  // herramienta (que para todo `/panel/foodos/*` es `foodos`).
   const pathname = usePathname()
   const { role, viaMember, loading: roleLoading } = usePanelRole()
   const gatedTool = toolKeyForPath(pathname ?? "")
-  const denied = !roleLoading && gatedTool !== null && !canAccessTool(role, gatedTool)
+  const denied = !roleLoading && gatedTool !== null && !canAccessPanelHref(role, pathname ?? "")
 
   useEffect(() => {
     async function load() {

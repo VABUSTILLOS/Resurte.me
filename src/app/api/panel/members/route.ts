@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Correo inválido" }, { status: 400 })
     }
     if (!isMemberRole(body.role)) {
-      return NextResponse.json({ error: "Rol inválido (gerente, cocina o mesero)" }, { status: 400 })
+      return NextResponse.json({ error: "Rol inválido (gerente, cajero, cocina o mesero)" }, { status: 400 })
     }
     if (user.email && email === user.email.toLowerCase()) {
       return NextResponse.json({ error: "No puedes invitarte a ti mismo" }, { status: 400 })
@@ -185,7 +185,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "id inválido" }, { status: 400 })
     }
     if (!isMemberRole(body.role)) {
-      return NextResponse.json({ error: "Rol inválido (gerente, cocina o mesero)" }, { status: 400 })
+      return NextResponse.json({ error: "Rol inválido (gerente, cajero, cocina o mesero)" }, { status: 400 })
     }
 
     const { error } = await service
