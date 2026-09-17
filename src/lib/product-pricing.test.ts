@@ -6,6 +6,7 @@ import {
   marginBand,
   marginPct,
   markupPct,
+  pricingWarningId,
 } from "./product-pricing"
 
 /** Fechas fijas y lejanas: la vigencia de la oferta se prueba sin depender de `now`. */
@@ -175,5 +176,22 @@ describe("analyzePricing", () => {
     expect(analysis.marginPct).toBeNull()
     expect(analysis.markupPct).toBeNull()
     expect(analysis.warnings).toEqual([])
+  })
+})
+
+describe("pricingWarningId", () => {
+  it("produce ids en kebab, sin guiones bajos", () => {
+    // Los playbooks y los e2e citan estos ids por nombre: cambiarlos es cambiar
+    // el contrato, así que el formato queda fijado aquí.
+    expect(pricingWarningId("below_cost")).toBe("pf-warn-below-cost")
+    expect(pricingWarningId("sale_not_a_discount")).toBe("pf-warn-sale-not-a-discount")
+  })
+
+  it("cada aviso de `analyzePricing` tiene su id y no se repite", () => {
+    const { warnings } = analyzePricing({ price: 100, salePrice: 120, cost: 130 })
+    expect(warnings.length).toBeGreaterThan(1)
+    const ids = warnings.map((w) => pricingWarningId(w.key))
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const id of ids) expect(id).not.toContain("_")
   })
 })

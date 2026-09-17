@@ -1,20 +1,34 @@
-import { logger } from "@/lib/logger"
 // ============================================================
 // Motor de ejecución de campañas FoodOS (solo servidor).
 //
-// Convierte una campaña "scheduled" en envíos reales por
-// WhatsApp: selecciona los clientes objetivo de la
-// automatización, renderiza el mensaje con placeholders y
-// registra cada envío como una campaña hija (sent | failed).
+// Convierte una campaña "scheduled" en envíos reales: selecciona los
+// clientes objetivo, elige canal (WhatsApp o SMS), resuelve la variante
+// A/B, renderiza el mensaje con placeholders y registra cada envío como
+// una campaña hija (sent | failed).
 //
 // Lo usan:
 //  - /api/foodos/campaigns/run (cron diario de Vercel)
 //  - El botón "Ejecutar campaña" del panel (server action)
 // ============================================================
 
+import { logger } from "@/lib/logger"
 import { createServiceClient } from "@/lib/supabase/service"
 import { normalizePhone } from "@/lib/foodos"
-import { sendTextMessage } from "@/lib/whatsapp"
+import {
+  audienceMembers,
+  filterAbandonedCarts,
+  isAudienceKey,
+  isBirthdayToday,
+  localDateParts,
+  SEGMENT_TO_AUDIENCE,
+} from "@/lib/foodos-rfm"
+import { pickVariant } from "@/lib/messaging/channel"
+import { loadMessagingCapabilities, sendMarketingMessage } from "@/lib/messaging/send"
+import {
+  alreadySentByPlatform,
+  platformTypeForRestaurantType,
+  type PlatformSend,
+} from "@/lib/messaging/dedupe"
 import type {
   FoodosAutomation,
   FoodosCampaign,
@@ -44,6 +58,8 @@ export interface CampaignRunResult {
   sent: number
   failed: number
   skipped: number
+  /** Omitidos porque la plataforma ya contactó a esa persona hoy (Fase 9). */
+  skippedByPlatform?: number
 }
 
 // Mensajes por defecto cuando la automatización no define uno.
@@ -60,6 +76,12 @@ const DEFAULT_MESSAGES: Record<FoodosAutomation["type"], string> = {
     "Antojo de {restaurante}? Pide ahora sin filas en {link} 😋",
   new_product:
     "¡Nuevo platillo en {restaurante}! Descúbrelo en {link} ✨",
+  birthday:
+    "¡Feliz cumpleaños, {nombre}! 🎂 Todo el equipo de {restaurante} te desea un gran día. Consiéntete hoy: {link}",
+  abandoned_cart:
+    "{nombre}, tu pedido de {restaurante} se quedó a medias 😅 ¿Lo terminamos? {link}",
+  review_request:
+    "¡Gracias por tu pedido, {nombre}! ¿Nos regalas una reseña de {restaurante}? Nos toma 30 segundos: {link}",
 }
 
 function siteOrigin(): string {
@@ -97,12 +119,162 @@ export function renderMessage(
 // Los filtros se empujan a la BD para no cargar toda la base.
 // ------------------------------------------------------------
 
-export async function fetchTargetCustomers(
-  supabase: Awaited<ReturnType<typeof createServiceClient>>,
+type ServiceClient = Awaited<ReturnType<typeof createServiceClient>>
+
+export interface TargetOptions {
+  /** Zona del restaurante; determina "hoy" para cumpleaños. */
+  timezone?: string | null
+  now?: Date
+}
+
+async function customersByIds(
+  supabase: ServiceClient,
+  restaurantId: string,
+  ids: readonly string[]
+): Promise<FoodosCustomer[]> {
+  if (ids.length === 0) return []
+  const { data } = await supabase
+    .from("foodos_customers")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .in("id", [...ids])
+  return (data as FoodosCustomer[]) ?? []
+}
+
+/**
+ * Cumpleaños de hoy: no se puede expresar `EXTRACT(MONTH FROM birthday)`
+ * con el query builder, así que se traen solo los que tienen fecha y se
+ * filtra en JS con el mes/día local del restaurante.
+ */
+async function fetchBirthdayTargets(
+  supabase: ServiceClient,
+  restaurantId: string,
+  opts: TargetOptions
+): Promise<FoodosCustomer[]> {
+  const { data } = await supabase
+    .from("foodos_customers")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .not("birthday", "is", null)
+  const parts = localDateParts(opts.timezone, opts.now)
+  return ((data as FoodosCustomer[]) ?? []).filter((c) =>
+    isBirthdayToday(c.birthday, parts)
+  )
+}
+
+/**
+ * Carrito abandonado: un pedido creado que sigue sin pagarse ES un
+ * checkout iniciado y no terminado. No hace falta instrumentar el
+ * storefront ni añadir tablas de carrito.
+ */
+async function fetchAbandonedCartTargets(
+  supabase: ServiceClient,
   automation: FoodosAutomation,
-  restaurantId: string
+  restaurantId: string,
+  opts: TargetOptions
+): Promise<FoodosCustomer[]> {
+  const now = opts.now ?? new Date()
+  const cfg = automation.trigger_config ?? {}
+  const hoursAfter = Number(cfg.hours_after) || 2
+  const maxAgeDays = 7
+  const since = new Date(now.getTime() - maxAgeDays * 86_400_000).toISOString()
+
+  const { data: orders } = await supabase
+    .from("foodos_orders")
+    .select("customer_id, created_at, total")
+    .eq("restaurant_id", restaurantId)
+    .eq("payment_status", "pending")
+    .neq("status", "cancelled")
+    .not("customer_id", "is", null)
+    .gte("created_at", since)
+
+  const rows = (orders ?? []) as {
+    customer_id: string
+    created_at: string
+    total: number
+  }[]
+  const ids = [...new Set(rows.map((o) => o.customer_id))]
+  const customers = await customersByIds(supabase, restaurantId, ids)
+
+  const candidates = filterAbandonedCarts(rows, customers, {
+    hoursAfter,
+    maxAgeDays,
+    now,
+  })
+  const keep = new Set(candidates.map((c) => c.customer_id))
+  return customers.filter((c) => keep.has(c.id))
+}
+
+/**
+ * Petición de reseña: pedidos entregados hace poco que todavía no tienen
+ * reseña. Se excluye a quien ya reseñó para no pedir dos veces.
+ */
+async function fetchReviewRequestTargets(
+  supabase: ServiceClient,
+  automation: FoodosAutomation,
+  restaurantId: string,
+  opts: TargetOptions
+): Promise<FoodosCustomer[]> {
+  const now = opts.now ?? new Date()
+  const hoursAfter = Number(automation.trigger_config?.hours_after) || 24
+  const since = new Date(now.getTime() - hoursAfter * 3_600_000).toISOString()
+
+  const { data: orders } = await supabase
+    .from("foodos_orders")
+    .select("id, customer_id")
+    .eq("restaurant_id", restaurantId)
+    .eq("status", "delivered")
+    .not("customer_id", "is", null)
+    .gte("created_at", since)
+
+  const rows = (orders ?? []) as { id: string; customer_id: string }[]
+  if (rows.length === 0) return []
+
+  const { data: reviews } = await supabase
+    .from("foodos_reviews")
+    .select("order_id")
+    .eq("restaurant_id", restaurantId)
+    .in("order_id", rows.map((o) => o.id))
+  const reviewed = new Set(
+    ((reviews ?? []) as { order_id: string | null }[])
+      .map((r) => r.order_id)
+      .filter((id): id is string => !!id)
+  )
+
+  const ids = [
+    ...new Set(rows.filter((o) => !reviewed.has(o.id)).map((o) => o.customer_id)),
+  ]
+  return customersByIds(supabase, restaurantId, ids)
+}
+
+export async function fetchTargetCustomers(
+  supabase: ServiceClient,
+  automation: FoodosAutomation,
+  restaurantId: string,
+  opts: TargetOptions = {}
 ): Promise<FoodosCustomer[]> {
   const cfg = automation.trigger_config ?? {}
+
+  // La audiencia RFM manda sobre el segmento simple: si el dueño eligió
+  // "en riesgo", no queremos que un `target_segment` viejo lo sobreescriba.
+  if (automation.audience && isAudienceKey(automation.audience)) {
+    const { data } = await supabase
+      .from("foodos_customers")
+      .select("*")
+      .eq("restaurant_id", restaurantId)
+    const all = (data as FoodosCustomer[]) ?? []
+    return audienceMembers(all, automation.audience, opts.now)
+  }
+
+  if (automation.type === "birthday") {
+    return fetchBirthdayTargets(supabase, restaurantId, opts)
+  }
+  if (automation.type === "abandoned_cart") {
+    return fetchAbandonedCartTargets(supabase, automation, restaurantId, opts)
+  }
+  if (automation.type === "review_request") {
+    return fetchReviewRequestTargets(supabase, automation, restaurantId, opts)
+  }
 
   let query = supabase
     .from("foodos_customers")
@@ -124,6 +296,21 @@ export async function fetchTargetCustomers(
   return (data as FoodosCustomer[]) ?? []
 }
 
+/**
+ * Audiencia efectiva de una automatización, para auditar por qué se envió.
+ * Se guarda en `foodos_campaigns.audience` para poder reproducir un envío
+ * aunque después se cambie la configuración de la automatización.
+ */
+export function effectiveAudience(
+  automation: FoodosAutomation
+): string | null {
+  if (automation.audience && isAudienceKey(automation.audience)) {
+    return automation.audience
+  }
+  const segment = automation.trigger_config?.target_segment
+  return segment ? (SEGMENT_TO_AUDIENCE[segment] ?? null) : null
+}
+
 // ------------------------------------------------------------
 // Ejecución de una campaña
 // ------------------------------------------------------------
@@ -139,6 +326,9 @@ export async function runFoodosCampaign(
   campaignId: string
 ): Promise<CampaignRunResult> {
   const supabase = await createServiceClient()
+  // Un solo reloj para toda la corrida: si se recalculara por cliente, una
+  // campaña que cruza medianoche podría saltarse a alguien dos veces.
+  const runNow = new Date()
 
   const { data: campaign } = await supabase
     .from("foodos_campaigns")
@@ -147,7 +337,7 @@ export async function runFoodosCampaign(
     .maybeSingle()
   if (!campaign) throw new Error("Campaña no encontrada")
   if (campaign.status !== "scheduled") {
-    return { campaignId, sent: 0, failed: 0, skipped: 0 }
+    return { campaignId, sent: 0, failed: 0, skipped: 0, skippedByPlatform: 0 }
   }
 
   const { data: restaurant } = await supabase
@@ -166,7 +356,7 @@ export async function runFoodosCampaign(
         error: `Restaurante inactivo (${restaurant.status})`,
       })
       .eq("id", campaignId)
-    return { campaignId, sent: 0, failed: 0, skipped: 1 }
+    return { campaignId, sent: 0, failed: 0, skipped: 1, skippedByPlatform: 0 }
   }
 
   const { data: automation } = campaign.automation_id
@@ -181,7 +371,7 @@ export async function runFoodosCampaign(
       .from("foodos_campaigns")
       .update({ status: "failed", error: "Automatización no encontrada" })
       .eq("id", campaignId)
-    return { campaignId, sent: 0, failed: 0, skipped: 1 }
+    return { campaignId, sent: 0, failed: 0, skipped: 1, skippedByPlatform: 0 }
   }
   // Automatizaciones inactivas no deben enviar.
   if (!automation.is_active) {
@@ -189,22 +379,41 @@ export async function runFoodosCampaign(
       .from("foodos_campaigns")
       .update({ status: "failed", error: "Automatización inactiva" })
       .eq("id", campaignId)
-    return { campaignId, sent: 0, failed: 0, skipped: 1 }
+    return { campaignId, sent: 0, failed: 0, skipped: 1, skippedByPlatform: 0 }
   }
 
-  let targets = await fetchTargetCustomers(
-    supabase,
-    automation as FoodosAutomation,
-    campaign.restaurant_id
-  )
+  const auto = automation as FoodosAutomation
+  let targets = await fetchTargetCustomers(supabase, auto, campaign.restaurant_id, {
+    timezone: (restaurant as FoodosRestaurant).timezone,
+  })
   if (campaign.customer_id) {
     targets = targets.filter((c) => c.id === campaign.customer_id)
   }
+
+  // Capacidades resueltas una vez por corrida: descifrar el token por
+  // cliente sería un desperdicio y un riesgo de rate limit.
+  const caps = await loadMessagingCapabilities(supabase, campaign.restaurant_id)
+
+  // Guardia entre motores (Fase 9): los envíos que la plataforma ya hizo hoy de
+  // esta misma intención. Se lee una vez, no por cliente.
+  const platformSends = await loadPlatformSendsForToday(
+    supabase,
+    auto.type,
+    (restaurant as FoodosRestaurant).timezone,
+    runNow
+  )
+
+  const preferredChannel = auto.channel ?? "whatsapp"
+  const useAbTest = !!auto.ab_test && !!auto.message_b?.trim()
+  const audience = effectiveAudience(auto)
+  const templateA = auto.message?.trim() || DEFAULT_MESSAGES[auto.type]
+  const templateB = auto.message_b?.trim() || templateA
 
   const isParent = !campaign.customer_id
   let sent = 0
   let failed = 0
   let skipped = 0
+  let skippedByPlatform = 0
   const childRows: {
     restaurant_id: string
     automation_id: string | null
@@ -214,6 +423,9 @@ export async function runFoodosCampaign(
     error: string | null
     sent_at: string | null
     channel: string
+    variant: string | null
+    audience: string | null
+    provider: string | null
   }[] = []
 
   for (const customer of targets) {
@@ -223,24 +435,50 @@ export async function runFoodosCampaign(
       continue
     }
 
-    const message = renderMessage(
-      automation.message?.trim() ||
-        DEFAULT_MESSAGES[automation.type as FoodosAutomation["type"]],
-      {
-        customer,
-        restaurant: restaurant as FoodosRestaurant,
-        automation: automation as FoodosAutomation,
-      }
-    )
+    // No repetir el mensaje que la plataforma ya mandó hoy a esta persona.
+    // Es el único punto donde los dos motores comparten estado.
+    if (
+      alreadySentByPlatform({
+        sends: platformSends,
+        restaurantType: auto.type,
+        recipient: phone,
+        timezone: (restaurant as FoodosRestaurant).timezone,
+        now: runNow,
+      })
+    ) {
+      skipped++
+      skippedByPlatform++
+      continue
+    }
+
+    const variant = pickVariant(customer.id, useAbTest)
+    const template = variant === "b" ? templateB : templateA
+    const message = renderMessage(template, {
+      customer,
+      restaurant: restaurant as FoodosRestaurant,
+      automation: auto,
+    })
+
+    const result = await sendMarketingMessage({
+      caps,
+      to: phone,
+      text: message,
+      preferred: preferredChannel,
+      smsOptIn: !!customer.sms_opt_in,
+    })
 
     let status: FoodosCampaign["status"] = "sent"
     let error: string | null = null
-    try {
-      await sendTextMessage({ to: phone, text: message })
+    if (result.ok) {
       sent++
-    } catch (err) {
+    } else if (result.channel === null) {
+      // Sin canal disponible no es un fallo del proveedor: se cuenta como
+      // omitido para no ensuciar la tasa de error de la campaña.
+      skipped++
+      continue
+    } else {
       status = "failed"
-      error = err instanceof Error ? err.message : "Error desconocido"
+      error = result.error
       failed++
     }
 
@@ -255,7 +493,10 @@ export async function runFoodosCampaign(
         status,
         error,
         sent_at: status === "sent" ? new Date().toISOString() : null,
-        channel: campaign.channel ?? "whatsapp",
+        channel: result.channel ?? preferredChannel,
+        variant,
+        audience,
+        provider: result.provider,
       })
     } else {
       await supabase
@@ -264,6 +505,10 @@ export async function runFoodosCampaign(
           status,
           error,
           sent_at: status === "sent" ? new Date().toISOString() : null,
+          variant,
+          audience,
+          provider: result.provider,
+          channel: result.channel ?? preferredChannel,
         })
         .eq("id", campaignId)
     }
@@ -281,16 +526,65 @@ export async function runFoodosCampaign(
         // Sin destinatarios no es un envío exitoso: se marca fallida
         status: noRecipients || (failed > 0 && sent === 0) ? "failed" : "sent",
         error: noRecipients
-          ? "Sin clientes objetivo para esta automatización"
+          ? skippedByPlatform > 0 && skippedByPlatform === skipped
+            ? "La plataforma ya contactó a estos clientes hoy"
+            : skipped > 0
+              ? "Sin canal disponible para los clientes objetivo"
+              : "Sin clientes objetivo para esta automatización"
           : failed > 0
             ? `${failed} envío(s) fallidos de ${sent + failed}`
             : null,
         sent_at: new Date().toISOString(),
+        audience,
       })
       .eq("id", campaignId)
   }
 
-  return { campaignId, sent, failed, skipped }
+  return { campaignId, sent, failed, skipped, skippedByPlatform }
+}
+
+/**
+ * Envíos de la plataforma de la misma intención en las últimas 48 h.
+ *
+ * La ventana es de 48 h y no de "hoy" para que el filtro de día local lo haga
+ * `alreadySentByPlatform`, que conoce la zona del restaurante. Pedirle a
+ * Postgres el día local obligaría a codificar el offset en la consulta.
+ *
+ * Nunca lanza: si la tabla no responde, el dedupe entre motores se degrada a
+ * "sin datos" en vez de impedir que la campaña salga.
+ */
+async function loadPlatformSendsForToday(
+  supabase: ServiceClient,
+  restaurantType: string,
+  timezone: string | null | undefined,
+  now: Date
+): Promise<PlatformSend[]> {
+  const platformType = platformTypeForRestaurantType(restaurantType)
+  if (!platformType) return []
+
+  const since = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString()
+  try {
+    const { data, error } = await supabase
+      .from("whatsapp_automation_sends")
+      .select("automation_type, recipient, created_at")
+      .eq("automation_type", platformType)
+      .gte("created_at", since)
+    if (error) {
+      logger.warn("No se pudo leer el dedupe entre motores", {
+        error: error.message,
+        platformType,
+        timezone: timezone ?? null,
+      })
+      return []
+    }
+    return (data ?? []) as PlatformSend[]
+  } catch (err) {
+    logger.warn("Dedupe entre motores inalcanzable", {
+      error: err instanceof Error ? err.message : String(err),
+      platformType,
+    })
+    return []
+  }
 }
 
 /**

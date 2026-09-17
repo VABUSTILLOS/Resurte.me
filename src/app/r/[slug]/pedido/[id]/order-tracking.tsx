@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
-  Bike, CheckCircle2, ChefHat, Clock, Loader2, PackageCheck, Star, Store, UtensilsCrossed, XCircle,
+  Bike, CheckCircle2, ChefHat, Clock, Loader2, MapPin, PackageCheck, Star, Store, UtensilsCrossed, XCircle,
 } from "lucide-react"
 import { formatMoney, modifiersSummary } from "@/lib/foodos"
 import { detectStorefrontLang } from "@/lib/foodos-i18n"
@@ -26,6 +26,26 @@ interface TrackData {
   branch_name: string | null
   total: number
   items: FoodosOrderItem[]
+  delivery: {
+    status: string
+    zone_name: string | null
+    courier_name: string | null
+    eta_minutes: number | null
+    tracking_url: string | null
+    provider: string
+    proof_pin: string | null
+    proof_verified: boolean
+  } | null
+}
+
+/** Etiquetas del estado de la entrega de la Flotilla (no confundir con el estado del pedido). */
+const DELIVERY_STATUS_LABEL: Record<string, string> = {
+  pending: "Por asignar",
+  assigned: "Repartidor asignado",
+  picked_up: "En camino",
+  delivered: "Entregada",
+  failed: "No se pudo entregar",
+  cancelled: "Cancelada",
 }
 
 const STEPS: { status: FoodosOrderStatus; label: string; icon: React.ReactNode }[] = [
@@ -172,6 +192,63 @@ export function OrderTracking({ slug, orderId, restaurantName }: { slug: string;
                 )
               })}
             </div>
+          </div>
+        )}
+
+        {isDelivery && data.delivery && (
+          <div className="bg-white border border-stone-200 rounded-3xl p-6">
+            <h2 className="font-bold text-stone-900 mb-3 flex items-center gap-2">
+              <Bike className="w-4 h-4 text-emerald-600" /> Tu entrega
+            </h2>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-stone-500">Estado</span>
+                <span className="font-bold text-stone-900">
+                  {DELIVERY_STATUS_LABEL[data.delivery.status] ?? data.delivery.status}
+                </span>
+              </div>
+              {data.delivery.courier_name && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-stone-500">Repartidor</span>
+                  <span className="font-bold text-stone-900">{data.delivery.courier_name}</span>
+                </div>
+              )}
+              {data.delivery.eta_minutes != null && data.delivery.status !== "delivered" && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-stone-500">Tiempo estimado</span>
+                  <span className="font-bold text-stone-900">{data.delivery.eta_minutes} min</span>
+                </div>
+              )}
+              {data.delivery.zone_name && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-stone-500">Zona</span>
+                  <span className="font-semibold text-stone-700">{data.delivery.zone_name}</span>
+                </div>
+              )}
+            </div>
+            {data.delivery.proof_pin && (
+              <div className="mt-4 rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-center">
+                <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wide">
+                  Código de entrega
+                </p>
+                <p className="mt-1 text-3xl font-black tracking-[0.3em] text-emerald-900 tabular-nums">
+                  {data.delivery.proof_pin}
+                </p>
+                <p className="mt-1 text-xs text-emerald-800">
+                  Díselo al repartidor cuando recibas tu pedido.
+                </p>
+              </div>
+            )}
+            {data.delivery.tracking_url && (
+              <a
+                href={data.delivery.tracking_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 flex items-center justify-center gap-2 w-full min-h-11 rounded-xl bg-emerald-600 text-white text-sm font-bold"
+              >
+                <MapPin className="w-4 h-4" /> Seguir al repartidor
+              </a>
+            )}
           </div>
         )}
 

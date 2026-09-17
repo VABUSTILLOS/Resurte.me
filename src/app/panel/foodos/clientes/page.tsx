@@ -21,10 +21,21 @@ import {
   insertCampaign,
   runCampaignNow,
   deleteCampaign,
+  getCampaignAbStats,
+  generateCampaignCopy,
+  updateCustomerProfile,
+  type CampaignAbStats,
 } from "../actions"
 import { formatMoney, SEGMENT_META, segmentCustomer } from "@/lib/foodos"
+import {
+  AUDIENCE_PLAYBOOK,
+  FOODOS_AUDIENCE_KEYS,
+  buildAudiences,
+  isAudienceKey,
+} from "@/lib/foodos-rfm"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import StatCard from "@/components/panel/StatCard"
+import type { FoodosMarketingChannel } from "@/types/foodos"
 import type {
   FoodosLoyaltyProgram,
   FoodosReview,
@@ -45,8 +56,14 @@ import {
   Percent,
   CalendarClock,
   Star,
+  Sparkles,
+  Cake,
+  FlaskConical,
+  Target,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
+import NivelGate from "@/components/panel/foodos/nivel-gate"
+import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
 import { t } from "@/lib/i18n/es"
 
 const AUTOMATION_TYPES: { id: FoodosAutomationType; label: string; hint: string }[] = [
@@ -56,6 +73,33 @@ const AUTOMATION_TYPES: { id: FoodosAutomationType; label: string; hint: string 
   { id: "season_promo", label: t("foodos.clientes.autoSeasonPromo"), hint: t("foodos.clientes.autoSeasonPromoHint") },
   { id: "off_hours", label: t("foodos.clientes.autoOffHours"), hint: t("foodos.clientes.autoOffHoursHint") },
   { id: "new_product", label: t("foodos.clientes.autoNewProduct"), hint: t("foodos.clientes.autoNewProductHint") },
+  { id: "birthday", label: t("foodos.marketing.autoBirthday"), hint: t("foodos.marketing.autoBirthdayHint") },
+  { id: "abandoned_cart", label: t("foodos.marketing.autoAbandonedCart"), hint: t("foodos.marketing.autoAbandonedCartHint") },
+  { id: "review_request", label: t("foodos.marketing.autoReviewRequest"), hint: t("foodos.marketing.autoReviewRequestHint") },
+]
+
+/** Espejo local del tono que acepta la server action (evita importar el módulo de IA al bundle). */
+type CampaignTone = "cercano" | "formal" | "urgente" | "festivo"
+
+const CHANNEL_OPTIONS: { id: FoodosMarketingChannel; label: string }[] = [
+  { id: "whatsapp", label: t("foodos.marketing.channelWhatsapp") },
+  { id: "sms", label: t("foodos.marketing.channelSms") },
+  { id: "both", label: t("foodos.marketing.channelBoth") },
+]
+
+function channelLabel(channel: FoodosMarketingChannel): string {
+  return CHANNEL_OPTIONS.find((c) => c.id === channel)?.label ?? channel
+}
+
+function audienceLabelOf(value: string | null): string | null {
+  return isAudienceKey(value) ? t(AUDIENCE_PLAYBOOK[value].labelKey) : null
+}
+
+const AI_TONES: { id: CampaignTone; label: string }[] = [
+  { id: "cercano", label: t("foodos.marketing.toneCercano") },
+  { id: "formal", label: t("foodos.marketing.toneFormal") },
+  { id: "urgente", label: t("foodos.marketing.toneUrgente") },
+  { id: "festivo", label: t("foodos.marketing.toneFestivo") },
 ]
 
 interface AutomationForm {
@@ -63,6 +107,10 @@ interface AutomationForm {
   type: FoodosAutomationType
   name: string
   message: string
+  message_b: string
+  ab_test: boolean
+  audience: string
+  channel: FoodosMarketingChannel
   days_without_order: string
   discount_pct: string
 }
@@ -71,8 +119,19 @@ const EMPTY_AUTO: AutomationForm = {
   type: "thank_you",
   name: "",
   message: "",
+  message_b: "",
+  ab_test: false,
+  audience: "",
+  channel: "whatsapp",
   days_without_order: "30",
   discount_pct: "10",
+}
+
+/** Editor de los datos que solo usa el marketing (cumpleaños y opt-in de SMS). */
+interface ProfileDraft {
+  id: string
+  birthday: string
+  sms_opt_in: boolean
 }
 
 const SEGMENT_FILTERS: { id: FoodosCustomerSegment | "all"; label: string }[] = [
@@ -84,6 +143,11 @@ const SEGMENT_FILTERS: { id: FoodosCustomerSegment | "all"; label: string }[] = 
 ]
 
 export default function ClientesPage() {
+  // El CRM es base; las automatizaciones y campañas son la capacidad premium
+  // "marketing_ia" (Plata). El servidor las bloquea y aquí se explica por qué.
+  const { can } = useEntitlements()
+  const canMarketingIa = can("marketing_ia")
+
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
   const [customers, setCustomers] = useState<FoodosCustomer[]>([])
   const [automations, setAutomations] = useState<FoodosAutomation[]>([])
@@ -97,6 +161,12 @@ export default function ClientesPage() {
   const [autoForm, setAutoForm] = useState<AutomationForm>(EMPTY_AUTO)
   const [saving, setSaving] = useState(false)
   const [sendingCampaign, setSendingCampaign] = useState<string | null>(null)
+  const [abStats, setAbStats] = useState<CampaignAbStats[]>([])
+  const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null)
+  const [aiBrief, setAiBrief] = useState("")
+  const [aiTone, setAiTone] = useState<CampaignTone>("cercano")
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiSource, setAiSource] = useState<"llm" | "template" | null>(null)
 
   // Lealtad y reseñas
   const [loyalty, setLoyalty] = useState<FoodosLoyaltyProgram | null>(null)
@@ -113,7 +183,12 @@ export default function ClientesPage() {
       setAutomations(as)
       setCampaigns(cps)
       if (r) {
-        const [prog, revs] = await Promise.all([getLoyaltyProgram(r.id), listReviews(r.id)])
+        const [prog, revs, ab] = await Promise.all([
+          getLoyaltyProgram(r.id),
+          listReviews(r.id),
+          getCampaignAbStats(r.id),
+        ])
+        setAbStats(ab)
         setLoyalty(prog)
         if (prog) {
           setLoyaltyForm({
@@ -155,6 +230,9 @@ export default function ClientesPage() {
       )
     })
   }, [customers, computedSegments, segmentFilter, search])
+
+  // Audiencias RFM en vivo: mismas reglas que el motor del servidor.
+  const audiences = useMemo(() => buildAudiences(customers), [customers])
 
   const stats = useMemo(() => {
     const seg = computedSegments
@@ -220,11 +298,17 @@ export default function ClientesPage() {
         name: autoForm.name.trim(),
         trigger_config: triggerConfig,
         message: autoForm.message.trim() || null,
+        message_b: autoForm.message_b.trim() || null,
+        ab_test: autoForm.ab_test,
+        audience: autoForm.audience || null,
+        channel: autoForm.channel,
         incentive_config: autoForm.discount_pct ? { discount_pct: Number(autoForm.discount_pct) } : {},
         is_active: true,
       })
       setShowAutoForm(false)
       setAutoForm(EMPTY_AUTO)
+      setAiBrief("")
+      setAiSource(null)
       setAutomations(await listAutomations(restaurant.id))
     } catch (e) {
       setError(e instanceof Error ? e.message : t("foodos.clientes.saveAutoError"))
@@ -243,7 +327,8 @@ export default function ClientesPage() {
         restaurant_id: restaurant.id,
         automation_id: auto.id,
         status: "scheduled",
-        channel: "whatsapp",
+        // El canal por cliente lo resuelve el motor; aquí solo dejamos registrado el preferido.
+        channel: auto.channel === "sms" ? "sms" : "whatsapp",
       })
       const result = await runCampaignNow(campaign.id)
       if (result.failed > 0) {
@@ -265,6 +350,63 @@ export default function ClientesPage() {
     if (!restaurant) return
     await deleteCampaign(id)
     setCampaigns(await listCampaigns(restaurant.id))
+  }
+
+  function openAutomationForm(overrides: Partial<AutomationForm> = {}) {
+    setAutoForm({ ...EMPTY_AUTO, ...overrides })
+    setAiBrief("")
+    setAiSource(null)
+    setShowAutoForm(true)
+  }
+
+  async function handleGenerateCopy() {
+    if (!restaurant) return
+    if (!aiBrief.trim()) return
+    setAiBusy(true)
+    setError(null)
+    try {
+      const audience = isAudienceKey(autoForm.audience)
+        ? t(AUDIENCE_PLAYBOOK[autoForm.audience].labelKey)
+        : null
+      const result = await generateCampaignCopy({
+        restaurant_id: restaurant.id,
+        brief: aiBrief.trim(),
+        offer: autoForm.discount_pct ? `${autoForm.discount_pct}% de descuento` : null,
+        audienceLabel: audience,
+        tone: aiTone,
+      })
+      setAutoForm((f) => ({ ...f, message: result.text }))
+      setAiSource(result.source)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("foodos.marketing.aiError"))
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
+  async function handleSaveProfile() {
+    if (!profileDraft) return
+    setSaving(true)
+    setError(null)
+    try {
+      await updateCustomerProfile({
+        id: profileDraft.id,
+        birthday: profileDraft.birthday || null,
+        sms_opt_in: profileDraft.sms_opt_in,
+      })
+      setCustomers((prev) =>
+        prev.map((c) =>
+          c.id === profileDraft.id
+            ? { ...c, birthday: profileDraft.birthday || null, sms_opt_in: profileDraft.sms_opt_in }
+            : c
+        )
+      )
+      setProfileDraft(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("foodos.clientes.loadError"))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function toggleAuto(a: FoodosAutomation) {
@@ -304,8 +446,9 @@ export default function ClientesPage() {
           <p className="text-sm text-stone-500">{t("foodos.clientes.subtitle")}</p>
         </div>
         <button
-          onClick={() => { setAutoForm(EMPTY_AUTO); setShowAutoForm(true) }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700"
+          onClick={() => openAutomationForm()}
+          disabled={!canMarketingIa}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-600"
         >
           <Plus className="w-4 h-4" /> {t("foodos.clientes.newAutomation")}
         </button>
@@ -363,7 +506,8 @@ export default function ClientesPage() {
                   const seg = computedSegments.get(c.id) ?? c.segment
                   const meta = SEGMENT_META[seg]
                   return (
-                    <div key={c.id} className="py-3 flex items-center justify-between gap-3">
+                    <div key={c.id} className="py-3">
+                      <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-semibold text-stone-900 truncate">
                           {c.name ?? t("foodos.clientes.noName")}
@@ -401,7 +545,76 @@ export default function ClientesPage() {
                             Ajustar crédito
                           </button>
                         )}
+                        {canMarketingIa && profileDraft?.id !== c.id && (
+                          <button
+                            onClick={() =>
+                              setProfileDraft({
+                                id: c.id,
+                                birthday: c.birthday ?? "",
+                                sms_opt_in: c.sms_opt_in,
+                              })
+                            }
+                            className="flex items-center gap-1 text-[11px] font-semibold text-stone-400 hover:text-emerald-700 mt-0.5 ml-auto"
+                          >
+                            <Cake className="w-3 h-3" aria-hidden="true" /> {t("foodos.marketing.customerMarketing")}
+                          </button>
+                        )}
                       </div>
+                      </div>
+
+                      {profileDraft?.id === c.id && (
+                        <div className="mt-2 bg-stone-50 rounded-xl p-3 space-y-3">
+                          <label className="block text-xs">
+                            <span className="font-semibold text-stone-600 block mb-1">
+                              {t("foodos.marketing.customerBirthday")}
+                            </span>
+                            <input
+                              type="date"
+                              value={profileDraft.birthday}
+                              onChange={(e) =>
+                                setProfileDraft((d) => (d ? { ...d, birthday: e.target.value } : d))
+                              }
+                              className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white"
+                            />
+                            <span className="text-[11px] text-stone-400 mt-1 block">
+                              {t("foodos.marketing.customerBirthdayHint")}
+                            </span>
+                          </label>
+                          <label className="flex items-start gap-2 text-xs text-stone-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={profileDraft.sms_opt_in}
+                              onChange={(e) =>
+                                setProfileDraft((d) => (d ? { ...d, sms_opt_in: e.target.checked } : d))
+                              }
+                              className="accent-emerald-600 mt-0.5"
+                            />
+                            <span>
+                              <span className="font-semibold block">
+                                {t("foodos.marketing.customerSmsOptIn")}
+                              </span>
+                              <span className="text-[11px] text-stone-400">
+                                {t("foodos.marketing.customerSmsOptInHint")}
+                              </span>
+                            </span>
+                          </label>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleSaveProfile}
+                              disabled={saving}
+                              className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              {t("foodos.marketing.customerSave")}
+                            </button>
+                            <button
+                              onClick={() => setProfileDraft(null)}
+                              className="px-4 py-2 rounded-xl bg-stone-200 text-stone-700 text-xs font-bold hover:bg-stone-300"
+                            >
+                              {t("common.cancel")}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -412,13 +625,54 @@ export default function ClientesPage() {
 
         {/* Automatizaciones + campañas */}
         <div className="space-y-6">
+          {/* Audiencias RFM */}
+          <div className="bg-white border border-stone-200 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Target className="w-5 h-5 text-stone-500" />
+              <h2 className="font-bold text-stone-900">{t("foodos.marketing.audiencesTitle")}</h2>
+            </div>
+            <p className="text-xs text-stone-500 mb-4">{t("foodos.marketing.audiencesSubtitle")}</p>
+
+            {audiences.length === 0 ? (
+              <p className="text-sm text-stone-400 py-2">{t("foodos.marketing.audiencesEmpty")}</p>
+            ) : (
+              <div className="space-y-2">
+                {audiences.map((a) => (
+                  <button
+                    key={a.key}
+                    type="button"
+                    disabled={!canMarketingIa}
+                    onClick={() => openAutomationForm({ audience: a.key, type: "season_promo" })}
+                    className="w-full text-left bg-stone-50 hover:bg-emerald-50 disabled:hover:bg-stone-50 rounded-xl p-3 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-stone-900">
+                        {t(a.playbook.labelKey)}
+                      </span>
+                      <span className="text-xs font-semibold text-stone-500">
+                        {t("foodos.marketing.audienceMembers", { count: a.count })}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-stone-500 mt-0.5">{t(a.playbook.actionKey)}</p>
+                    <p className="text-[11px] text-stone-400 mt-1">
+                      {t("foodos.marketing.audienceReachable", { count: a.reachable })} ·{" "}
+                      {t("foodos.marketing.audienceRevenue", { amount: formatMoney(a.revenue) })}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="bg-white border border-stone-200 rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-4">
               <MessageSquare className="w-5 h-5 text-stone-500" />
               <h2 className="font-bold text-stone-900">{t("foodos.clientes.automationsTitle")}</h2>
             </div>
 
-            {automations.length === 0 ? (
+            {!canMarketingIa ? (
+              <NivelGate feature="marketing_ia" variant="inline" />
+            ) : automations.length === 0 ? (
               <p className="text-sm text-stone-400 py-4">
                 {t("foodos.clientes.emptyAutomations")}
               </p>
@@ -435,6 +689,11 @@ export default function ClientesPage() {
                         </span>
                       </div>
                       <p className="text-xs text-stone-500 mt-0.5">{typeMeta?.label ?? a.type}</p>
+                      <p className="text-[11px] text-stone-400 mt-0.5">
+                        {channelLabel(a.channel)}
+                        {a.ab_test && ` · ${t("foodos.marketing.abTitle")}`}
+                        {audienceLabelOf(a.audience) && ` · ${audienceLabelOf(a.audience)}`}
+                      </p>
                       {a.incentive_config?.discount_pct && (
                         <p className="flex items-center gap-1 text-xs text-emerald-600 font-semibold mt-1">
                           <Percent className="w-3 h-3" /> {t("foodos.clientes.incentive", { pct: a.incentive_config.discount_pct })}
@@ -470,7 +729,9 @@ export default function ClientesPage() {
               <CalendarClock className="w-5 h-5 text-stone-500" />
               <h2 className="font-bold text-stone-900">{t("foodos.clientes.campaignsTitle")}</h2>
             </div>
-            {campaigns.length === 0 ? (
+            {!canMarketingIa ? (
+              <NivelGate feature="marketing_ia" variant="inline" />
+            ) : campaigns.length === 0 ? (
               <p className="text-sm text-stone-400 py-4">{t("foodos.clientes.emptyCampaigns")}</p>
             ) : (
               <div className="space-y-2">
@@ -494,6 +755,43 @@ export default function ClientesPage() {
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Resultados del experimento A/B */}
+          <div className="bg-white border border-stone-200 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <FlaskConical className="w-5 h-5 text-stone-500" />
+              <h2 className="font-bold text-stone-900">{t("foodos.marketing.abResultsTitle")}</h2>
+            </div>
+            {!canMarketingIa ? (
+              <NivelGate feature="marketing_ia" variant="inline" />
+            ) : abStats.every((v) => v.total === 0) ? (
+              <p className="text-sm text-stone-400 py-4">{t("foodos.marketing.abResultsEmpty")}</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {abStats.map((v) => (
+                  <div key={v.variant} className="bg-stone-50 rounded-xl p-3">
+                    <p className="text-xs font-bold text-stone-900">
+                      {v.variant === "a"
+                        ? t("foodos.marketing.abVariantA")
+                        : t("foodos.marketing.abVariantB")}
+                    </p>
+                    <p className="text-lg font-black text-emerald-700 mt-1">{v.sent}</p>
+                    <p className="text-[11px] text-stone-500">
+                      {t("foodos.marketing.abSent", { count: v.sent })}
+                    </p>
+                    {v.failed > 0 && (
+                      <p className="text-[11px] text-red-600">
+                        {t("foodos.marketing.abFailed", { count: v.failed })}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-stone-400">
+                      {t("foodos.marketing.abTotal", { count: v.total })}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -582,7 +880,7 @@ export default function ClientesPage() {
 
       {/* Modal nueva automatización */}
       <BottomSheet
-        open={showAutoForm}
+        open={showAutoForm && canMarketingIa}
         onClose={() => setShowAutoForm(false)}
         ariaLabelledby="auto-form-title"
         maxWidthClass="max-w-lg"
@@ -639,6 +937,101 @@ export default function ClientesPage() {
               )}
 
               <div>
+                <label className="text-xs font-semibold text-stone-600 block mb-1">{t("foodos.marketing.audienceLabel")}</label>
+                <select
+                  value={autoForm.audience}
+                  onChange={(e) => setAutoForm((f) => ({ ...f, audience: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">{t("foodos.marketing.audienceNone")}</option>
+                  {FOODOS_AUDIENCE_KEYS.map((key) => (
+                    <option key={key} value={key}>
+                      {t(AUDIENCE_PLAYBOOK[key].labelKey)}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[11px] text-stone-400 mt-1 block">{t("foodos.marketing.audienceHint")}</span>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-stone-600 block mb-1">{t("foodos.marketing.channelLabel")}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {CHANNEL_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setAutoForm((f) => ({ ...f, channel: opt.id }))}
+                      aria-pressed={autoForm.channel === opt.id}
+                      className={`px-2 py-2 rounded-xl text-[11px] font-bold transition-colors ${
+                        autoForm.channel === opt.id
+                          ? "bg-emerald-600 text-white"
+                          : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[11px] text-stone-400 mt-1 block">{t("foodos.marketing.channelHint")}</span>
+              </div>
+
+              {/* Generador de copy con IA */}
+              <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-600" aria-hidden="true" />
+                  <span className="text-xs font-bold text-emerald-900">{t("foodos.marketing.aiTitle")}</span>
+                </div>
+                <label className="block text-[11px] font-semibold text-stone-600">
+                  {t("foodos.marketing.aiBriefLabel")}
+                  <input
+                    value={aiBrief}
+                    onChange={(e) => setAiBrief(e.target.value)}
+                    placeholder={t("foodos.marketing.aiBriefPlaceholder")}
+                    className="mt-1 w-full px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-semibold text-stone-600">{t("foodos.marketing.aiToneLabel")}</span>
+                  {AI_TONES.map((tone) => (
+                    <button
+                      key={tone.id}
+                      type="button"
+                      onClick={() => setAiTone(tone.id)}
+                      aria-pressed={aiTone === tone.id}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                        aiTone === tone.id
+                          ? "bg-emerald-600 text-white"
+                          : "bg-white text-stone-600 border border-stone-200"
+                      }`}
+                    >
+                      {tone.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerateCopy}
+                  disabled={aiBusy || !aiBrief.trim()}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {aiBusy ? (
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" aria-hidden="true" />
+                  )}
+                  {aiBusy ? t("foodos.marketing.aiGenerating") : t("foodos.marketing.aiGenerate")}
+                </button>
+                {aiSource && (
+                  <p className="text-[11px] text-emerald-800" aria-live="polite">
+                    {aiSource === "llm"
+                      ? t("foodos.marketing.aiSourceLlm")
+                      : t("foodos.marketing.aiSourceTemplate")}
+                  </p>
+                )}
+                <p className="text-[11px] text-stone-500">{t("foodos.marketing.aiHint")}</p>
+              </div>
+
+              <div>
                 <label className="text-xs font-semibold text-stone-600 block mb-1">{t("foodos.clientes.messageLabel")}</label>
                 <textarea
                   value={autoForm.message}
@@ -647,6 +1040,40 @@ export default function ClientesPage() {
                   placeholder={t("foodos.clientes.messagePlaceholder")}
                   className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
+              </div>
+
+              {/* Experimento A/B */}
+              <div className="bg-stone-50 rounded-xl p-3 space-y-2">
+                <label className="flex items-center gap-2 text-xs font-semibold text-stone-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoForm.ab_test}
+                    onChange={(e) =>
+                      setAutoForm((f) => ({
+                        ...f,
+                        ab_test: e.target.checked,
+                        message_b: e.target.checked ? f.message_b : "",
+                      }))
+                    }
+                    className="accent-emerald-600"
+                  />
+                  {t("foodos.marketing.abLabel")}
+                </label>
+                <p className="text-[11px] text-stone-400">{t("foodos.marketing.abHint")}</p>
+                {autoForm.ab_test && (
+                  <div>
+                    <label className="text-xs font-semibold text-stone-600 block mb-1">
+                      {t("foodos.marketing.messageBLabel")}
+                    </label>
+                    <textarea
+                      value={autoForm.message_b}
+                      onChange={(e) => setAutoForm((f) => ({ ...f, message_b: e.target.value }))}
+                      rows={3}
+                      placeholder={t("foodos.marketing.messageBPlaceholder")}
+                      className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>

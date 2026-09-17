@@ -30,6 +30,25 @@ import {
   type CityRow,
 } from "@/lib/admin-city-performance"
 import { format } from "date-fns"
+import {
+  earnedTierFromOrders,
+  effectiveTier,
+  featuresForTier,
+  isCashbackTier,
+  type FoodosFeature,
+} from "@/lib/foodos-entitlements"
+import {
+  ADOPTION_WINDOW_DAYS,
+  bucketUsage,
+  computeFeatureAdoption,
+  summarizeAdoption,
+  type AdoptionSummary,
+  type FeatureActivity,
+  type FeatureAdoption,
+  type RestaurantFeatureState,
+} from "@/lib/foodos-adoption"
+import type { RewardsOrder } from "@/lib/wallet-progress"
+import type { CashbackTier } from "@/types"
 
 interface AdminOrderItem {
   id: number
@@ -1130,6 +1149,22 @@ export async function getRestockSuggestions(limit = 10): Promise<
 // FASE 13 — CRM OPERATIVO (/admin/leads)
 // ============================================================
 
+/** Diagnóstico del calificador B2B, tal como lo guardó el servidor. */
+export interface AdminLeadQualification {
+  score: number
+  segment: string
+  recommended_tier: string
+  recommended_features: string[]
+  reasons: string[]
+  answers: {
+    weeklyOrders: number
+    averageTicket: number
+    channels: string[]
+    biggestPain: string
+    usesDeliveryApp: boolean
+  }
+}
+
 export interface AdminLeadRow {
   id: number
   email: string
@@ -1137,9 +1172,12 @@ export interface AdminLeadRow {
   source: string
   coupon_code: string | null
   created_at: string
+  /** Solo en leads de /restaurantes. */
+  restaurant_name: string | null
+  qualification: AdminLeadQualification | null
 }
 
-/** Leads web capturados (checkout drawer / exit intent), más recientes primero. */
+/** Leads web capturados (checkout drawer / exit intent / landing B2B), más recientes primero. */
 export async function getAdminLeads(limit = 100): Promise<AdminLeadRow[]> {
   const { response: adminDenied } = await requireAdmin()
   if (adminDenied) {
@@ -1149,7 +1187,9 @@ export async function getAdminLeads(limit = 100): Promise<AdminLeadRow[]> {
   const supabase = await createServiceClient()
   const { data, error } = await supabase
     .from("leads")
-    .select("id, email, phone, source, coupon_code, created_at")
+    .select(
+      "id, email, phone, source, coupon_code, created_at, restaurant_name, qualification"
+    )
     .order("created_at", { ascending: false })
     .limit(limit)
   if (error) {
@@ -3070,4 +3110,444 @@ export async function sendWaCatalogToPhone(
     },
     config
   )
+}
+
+// ============================================================
+// FoodOS — administración de restaurantes y niveles
+// ============================================================
+
+/** Fila del listado de restaurantes FoodOS con su nivel y uso real. */
+export interface AdminFoodosRestaurantRow {
+  id: string
+  name: string
+  slug: string
+  status: string
+  ownerId: string | null
+  ownerEmail: string | null
+  createdAt: string
+  /** Nivel ganado por compras calificadas del dueño. */
+  earnedTier: CashbackTier
+  /** Nivel efectivo (ganado + override vigente). */
+  tier: CashbackTier
+  overridden: boolean
+  overrideReason: string | null
+  overrideExpiresAt: string | null
+  /** Semanas calificadas del mes en curso. */
+  qualifyingWeeksThisMonth: number
+  /** Gasto del dueño en la semana ISO en curso (MXN). */
+  weekSpend: number
+  /** Capacidades premium abiertas por el nivel efectivo. */
+  features: FoodosFeature[]
+  aiSessions: number
+  aiMessages: number
+  deliveries: number
+}
+
+/** Ventana de órdenes a leer: cubre la semana ISO en curso aunque cruce mes. */
+const FOODOS_TIER_LOOKBACK_DAYS = 45
+
+/** Tope de restaurantes listados de una sola vez. */
+const FOODOS_ADMIN_LIST_LIMIT = 200
+
+interface AdminTierOverride {
+  tier: string
+  reason: string | null
+  expires_at: string | null
+}
+
+/**
+ * Listado de restaurantes FoodOS con nivel ganado, nivel efectivo, override
+ * y uso real de las capacidades premium.
+ *
+ * El nivel NO se recalcula por restaurante (sería N consultas): se leen todas
+ * las órdenes pagadas de la ventana y todos los overrides en dos consultas, y
+ * el cálculo puro (`earnedTierFromOrders`) se aplica en memoria.
+ */
+export async function getAdminFoodosRestaurants(): Promise<AdminFoodosRestaurantRow[]> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { data: restaurants, error } = await supabase
+    .from("foodos_restaurants")
+    .select("id, name, slug, status, user_id, created_at")
+    .order("created_at", { ascending: false })
+    .limit(FOODOS_ADMIN_LIST_LIMIT)
+
+  if (error) {
+    logger.error("admin.foodosRestaurants.restaurants", error)
+    throw new Error("No se pudieron cargar los restaurantes")
+  }
+
+  const rows = restaurants ?? []
+  if (rows.length === 0) return []
+
+  const ownerIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))]
+  const restaurantIds = rows.map((r) => r.id)
+  const since = new Date(
+    Date.now() - FOODOS_TIER_LOOKBACK_DAYS * 86400000
+  ).toISOString()
+
+  const [ordersRes, overridesRes, usersRes, sessionsRes, messagesRes, deliveriesRes] =
+    await Promise.all([
+      ownerIds.length
+        ? supabase
+            .from("orders")
+            .select("user_id, created_at, total")
+            .in("user_id", ownerIds)
+            .eq("payment_status", "paid")
+            .neq("status", "cancelled")
+            .gte("created_at", since)
+        : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from("foodos_entitlement_overrides")
+        .select("restaurant_id, tier, reason, expires_at")
+        .in("restaurant_id", restaurantIds),
+      // El correo vive en `auth.users`, no en `profiles`.
+      ownerIds.length
+        ? supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
+        : Promise.resolve({ data: { users: [] }, error: null }),
+      supabase.from("foodos_ai_sessions").select("restaurant_id").in("restaurant_id", restaurantIds),
+      supabase.from("foodos_ai_messages").select("restaurant_id").in("restaurant_id", restaurantIds),
+      supabase.from("foodos_deliveries").select("restaurant_id").in("restaurant_id", restaurantIds),
+    ])
+
+  for (const [label, res] of [
+    ["orders", ordersRes],
+    ["overrides", overridesRes],
+    ["users", usersRes],
+    ["aiSessions", sessionsRes],
+    ["aiMessages", messagesRes],
+    ["deliveries", deliveriesRes],
+  ] as const) {
+    if (res.error) logger.warn("admin.foodosRestaurants.query", { label, error: res.error.message })
+  }
+
+  // Órdenes agrupadas por dueño: el nivel es del dueño, no del restaurante.
+  const ordersByOwner = new Map<string, RewardsOrder[]>()
+  for (const order of ordersRes.data ?? []) {
+    const owner = order.user_id
+    if (!owner) continue
+    const list = ordersByOwner.get(owner) ?? []
+    list.push({ created_at: order.created_at, total: order.total })
+    ordersByOwner.set(owner, list)
+  }
+
+  const overrideByRestaurant = new Map<string, AdminTierOverride>()
+  for (const row of overridesRes.data ?? []) {
+    overrideByRestaurant.set(row.restaurant_id, {
+      tier: row.tier,
+      reason: row.reason,
+      expires_at: row.expires_at,
+    })
+  }
+
+  const emailByOwner = new Map<string, string>()
+  const wantedOwners = new Set(ownerIds)
+  for (const authUser of usersRes.data?.users ?? []) {
+    if (authUser.email && wantedOwners.has(authUser.id)) {
+      emailByOwner.set(authUser.id, authUser.email)
+    }
+  }
+
+  const countByRestaurant = (data: { restaurant_id: string }[] | null) => {
+    const counts = new Map<string, number>()
+    for (const row of data ?? []) {
+      counts.set(row.restaurant_id, (counts.get(row.restaurant_id) ?? 0) + 1)
+    }
+    return counts
+  }
+
+  const sessions = countByRestaurant(sessionsRes.data)
+  const messages = countByRestaurant(messagesRes.data)
+  const deliveries = countByRestaurant(deliveriesRes.data)
+
+  const now = new Date()
+
+  return rows.map((r) => {
+    const { tier: earned, progress } = earnedTierFromOrders(ordersByOwner.get(r.user_id) ?? [], now)
+    const override = overrideByRestaurant.get(r.id) ?? null
+    const { tier, overridden } = effectiveTier(earned, override, now)
+    return {
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      status: r.status,
+      ownerId: r.user_id ?? null,
+      ownerEmail: emailByOwner.get(r.user_id) ?? null,
+      createdAt: r.created_at,
+      earnedTier: earned,
+      tier,
+      overridden,
+      overrideReason: overridden ? (override?.reason ?? null) : null,
+      overrideExpiresAt: overridden ? (override?.expires_at ?? null) : null,
+      qualifyingWeeksThisMonth: progress.qualifyingWeeksThisMonth,
+      weekSpend: progress.weekSpend,
+      features: featuresForTier(tier),
+      aiSessions: sessions.get(r.id) ?? 0,
+      aiMessages: messages.get(r.id) ?? 0,
+      deliveries: deliveries.get(r.id) ?? 0,
+    }
+  })
+}
+
+/**
+ * Concede, cambia o revoca el nivel de un restaurante.
+ *
+ * Conceder `Verde` equivale a revocar: el override se borra y vuelve a mandar
+ * el nivel ganado por compras (misma regla que `effectiveTier`).
+ */
+export async function setFoodosTierOverride(
+  restaurantId: string,
+  tier: string,
+  reason?: string | null,
+  expiresAt?: string | null
+): Promise<void> {
+  const { user, response: adminDenied } = await requireAdmin()
+  if (adminDenied || !user) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  if (!isCashbackTier(tier)) {
+    throw new Error("Nivel inválido")
+  }
+
+  const supabase = await createServiceClient()
+
+  if (tier === "Verde") {
+    const { error } = await supabase
+      .from("foodos_entitlement_overrides")
+      .delete()
+      .eq("restaurant_id", restaurantId)
+    if (error) {
+      logger.error("admin.foodosTierOverride.delete", error, { restaurantId })
+      throw new Error("No se pudo revocar el nivel")
+    }
+    revalidatePath("/admin/restaurantes")
+    return
+  }
+
+  const { error } = await supabase.from("foodos_entitlement_overrides").upsert(
+    {
+      restaurant_id: restaurantId,
+      tier,
+      reason: reason?.trim().slice(0, 500) || null,
+      granted_by: user.id,
+      expires_at: expiresAt || null,
+    },
+    { onConflict: "restaurant_id" }
+  )
+
+  if (error) {
+    logger.error("admin.foodosTierOverride.upsert", error, { restaurantId })
+    throw new Error("No se pudo guardar el nivel")
+  }
+
+  revalidatePath("/admin/restaurantes")
+}
+
+// ============================================================
+// FoodOS — KPIs de adopción por capacidad (Fase 9)
+// ============================================================
+
+/**
+ * Fuentes de actividad de cada capacidad.
+ *
+ * `app_marca` no aparece: el manifest PWA y el icono se sirven derivados de la
+ * configuración del restaurante y no dejan rastro en la base, así que no hay
+ * nada honesto que medir. Se reporta aparte en `untracked` en vez de fingir un
+ * 0%, que se leería como "nadie la usa".
+ */
+const ADOPTION_SOURCES: Record<
+  Exclude<FoodosFeature, "app_marca">,
+  { table: string; column: string; onlyOk?: boolean; notNull?: boolean }
+> = {
+  marketing_ia: { table: "foodos_campaigns", column: "sent_at" },
+  flotilla: { table: "foodos_deliveries", column: "created_at" },
+  mesero_ia: { table: "foodos_ai_sessions", column: "created_at" },
+  wallet_passes: { table: "foodos_wallet_passes", column: "created_at" },
+  // Solo las aprobadas: un borrador que la IA generó y el dueño nunca revisó
+  // no es adopción del sitio. El filtro de no-nulos no es cosmético: en un
+  // `ORDER BY ... DESC` Postgres pone los NULL primero, así que sin él los
+  // borradores desplazarían a las páginas aprobadas del tope de lectura.
+  sitio_ia: {
+    table: "foodos_seo_pages",
+    column: "approved_at",
+    notNull: true,
+  },
+  pos_integraciones: { table: "foodos_pos_sync_log", column: "created_at", onlyOk: true },
+  catering: { table: "foodos_catering_requests", column: "created_at" },
+}
+
+/** Tope de filas leídas por fuente. */
+const ADOPTION_ACTIVITY_LIMIT = 5000
+
+export interface AdminFoodosAdoption {
+  windowDays: number
+  features: FeatureAdoption[]
+  summary: AdoptionSummary
+  /** Capacidades abiertas por nivel que la base no puede medir. */
+  untracked: FoodosFeature[]
+}
+
+interface AdoptionActivityRow {
+  restaurant_id: string
+  [column: string]: unknown
+}
+
+/**
+ * KPIs de adopción de las capacidades premium.
+ *
+ * Tres consultas fijas (restaurantes, overrides, órdenes del dueño) más una por
+ * capacidad. Igual que `getAdminFoodosRestaurants`, el nivel no se recalcula
+ * por restaurante: se lee todo de golpe y el cálculo puro se aplica en memoria.
+ *
+ * Cada lectura de actividad es best-effort: si una fuente falla, esa capacidad
+ * queda en cero y se registra el aviso, pero el panel sigue cargando.
+ */
+export async function getAdminFoodosAdoption(): Promise<AdminFoodosAdoption> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const { data: restaurants, error } = await supabase
+    .from("foodos_restaurants")
+    .select("id, name, user_id")
+    .order("created_at", { ascending: false })
+    .limit(FOODOS_ADMIN_LIST_LIMIT)
+
+  if (error) {
+    logger.error("admin.foodosAdoption.restaurants", error)
+    throw new Error("No se pudieron cargar los restaurantes")
+  }
+
+  const rows = restaurants ?? []
+  if (rows.length === 0) {
+    return {
+      windowDays: ADOPTION_WINDOW_DAYS,
+      features: [],
+      summary: {
+        restaurants: 0,
+        activeRestaurants: 0,
+        dormantRestaurants: 0,
+        averageUnlocked: 0,
+      },
+      untracked: ["app_marca"],
+    }
+  }
+
+  const ownerIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))]
+  const restaurantIds = rows.map((r) => r.id)
+  const since = new Date(Date.now() - FOODOS_TIER_LOOKBACK_DAYS * 86400000).toISOString()
+
+  const featureKeys = Object.keys(ADOPTION_SOURCES) as (keyof typeof ADOPTION_SOURCES)[]
+
+  const [ordersRes, overridesRes, ...activityRes] = await Promise.all([
+    ownerIds.length
+      ? supabase
+          .from("orders")
+          .select("user_id, created_at, total")
+          .in("user_id", ownerIds)
+          .eq("payment_status", "paid")
+          .neq("status", "cancelled")
+          .gte("created_at", since)
+      : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from("foodos_entitlement_overrides")
+      .select("restaurant_id, tier, expires_at")
+      .in("restaurant_id", restaurantIds),
+    ...featureKeys.map((feature) => {
+      const src = ADOPTION_SOURCES[feature]
+      let query = supabase
+        .from(src.table)
+        .select(`restaurant_id, ${src.column}`)
+        .in("restaurant_id", restaurantIds)
+        .order(src.column, { ascending: false })
+        .limit(ADOPTION_ACTIVITY_LIMIT)
+      if (src.onlyOk) query = query.eq("status", "ok")
+      if (src.notNull) query = query.not(src.column, "is", null)
+      return query
+    }),
+  ])
+
+  for (const [label, res] of [
+    ["orders", ordersRes],
+    ["overrides", overridesRes],
+    ...activityRes.map((res, i) => [`activity:${featureKeys[i]}`, res] as const),
+  ] as const) {
+    if (res.error) logger.warn("admin.foodosAdoption.query", { label, error: res.error.message })
+  }
+
+  const ordersByOwner = new Map<string, RewardsOrder[]>()
+  for (const order of ordersRes.data ?? []) {
+    const owner = order.user_id
+    if (!owner) continue
+    const list = ordersByOwner.get(owner) ?? []
+    list.push({ created_at: order.created_at, total: order.total })
+    ordersByOwner.set(owner, list)
+  }
+
+  const overrideByRestaurant = new Map<
+    string,
+    { tier: string; expires_at: string | null }
+  >()
+  for (const row of overridesRes.data ?? []) {
+    overrideByRestaurant.set(row.restaurant_id, { tier: row.tier, expires_at: row.expires_at })
+  }
+
+  const now = new Date()
+
+  const states: RestaurantFeatureState[] = rows.map((r) => {
+    const { tier: earned } = earnedTierFromOrders(ordersByOwner.get(r.user_id) ?? [], now)
+    const { tier } = effectiveTier(earned, overrideByRestaurant.get(r.id) ?? null, now)
+    return { restaurantId: r.id, name: r.name, unlocked: featuresForTier(tier) }
+  })
+
+  const activity: FeatureActivity[] = []
+
+  featureKeys.forEach((feature, index) => {
+    const src = ADOPTION_SOURCES[feature]
+    const res = activityRes[index]
+    const data = (res?.data ?? []) as unknown as AdoptionActivityRow[]
+    if (data.length >= ADOPTION_ACTIVITY_LIMIT) {
+      logger.warn("admin.foodosAdoption.truncated", {
+        feature,
+        table: src.table,
+        limit: ADOPTION_ACTIVITY_LIMIT,
+      })
+    }
+
+    const stampsByRestaurant = new Map<string, (string | null)[]>()
+    for (const row of data) {
+      const stamp = row[src.column]
+      const list = stampsByRestaurant.get(row.restaurant_id) ?? []
+      list.push(typeof stamp === "string" ? stamp : null)
+      stampsByRestaurant.set(row.restaurant_id, list)
+    }
+
+    for (const [restaurantId, stamps] of stampsByRestaurant) {
+      activity.push({
+        restaurantId,
+        feature,
+        ...bucketUsage(stamps, now),
+      })
+    }
+  })
+
+  // `app_marca` no se mide: se devuelve fuera de `features` para que nadie lea
+  // su 0% como "nadie la usa" cuando en realidad es "no hay nada que medir".
+  const untracked: FoodosFeature[] = ["app_marca"]
+
+  return {
+    windowDays: ADOPTION_WINDOW_DAYS,
+    features: computeFeatureAdoption(states, activity).filter(
+      (row) => !untracked.includes(row.feature)
+    ),
+    summary: summarizeAdoption(states, activity),
+    untracked,
+  }
 }

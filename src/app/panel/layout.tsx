@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { getUserRole } from "@/lib/roles"
+import { getMyEntitlements } from "@/lib/foodos-tier"
 import { PanelLayoutClient } from "./panel-layout-client"
 
 export const metadata: Metadata = {
@@ -26,5 +27,11 @@ export default async function PanelLayout({
   if (role === "vendedor") {
     redirect("/comercializacion")
   }
-  return <PanelLayoutClient>{children}</PanelLayoutClient>
+
+  // Nivel de compras del restaurante dueño. Se resuelve una sola vez aquí y
+  // baja a todo el panel por contexto: el hub y las herramientas premium
+  // comparten el mismo dato sin volver a consultar la base.
+  const entitlements = await getMyEntitlements()
+
+  return <PanelLayoutClient entitlements={entitlements}>{children}</PanelLayoutClient>
 }

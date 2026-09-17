@@ -25,6 +25,16 @@
   en `/admin/whatsapp/automations`. Las rutas viejas se mantienen como
   `redirects()` permanentes (308) en `next.config.ts`; al mover una superficie,
   agrega el redirect correspondiente en vez de dejar un 404.
+- Restaurantes FoodOS (`/admin/restaurantes`, grupo *Clientes*): nivel de lealtad
+  **computado en vivo** por restaurante (`getAdminFoodosRestaurants`), override
+  manual (`setFoodosTierOverride`) y KPIs de adopción por capacidad
+  (`getAdminFoodosAdoption`). Dos reglas que no se pueden romper: un override con
+  `tier: "Verde"` **revoca** (borra la fila, no la escribe), y una capacidad sin
+  tabla de telemetría se declara como **no medida** (`untracked`) en vez de
+  contarse como cero. Los KPIs tienen tope de 5 000 filas por fuente; al
+  alcanzarlo se emite `logger.warn("admin.foodosAdoption.truncated")` y el número
+  queda subestimado a propósito. Todo el texto de admin va **hardcodeado en
+  español** (no pasa por `t()`), a diferencia del panel del restaurante.
 - Errores con reintento (`error.tsx` del área + botón Reintentar en página).
   El boundary de `/admin` además **reporta a `error_logs`** con
   `reportClientError()` (`src/lib/report-client-error.ts`): antes solo escribía
@@ -307,6 +317,44 @@
   decidirlo: `delete` con JSON inválido o sin `deleted_at`, `audit` si falta
   `admin_audit_log` (devuelve 500, no lista vacía) y `bulk-seo`, que responde 200
   con los fallos por producto en `failed[]`.
+- Productos ronda 11 — el modal de producto no puede mentir (B22-B24). Tres
+  reglas, todas con su lógica pura fuera del componente:
+  `resolveSubmittedStockStatus(quantity, threshold, manual)` (`src/lib/stock.ts`)
+  devuelve `{ status, derived }` y es **la única** derivación del estado de
+  stock: `submitForm` la usa para enviar y el `<select id="pf-stock">` la usa
+  para pintar. Antes el select mostraba `stockStatus` (la selección manual)
+  mientras se enviaba el derivado, así que el admin elegía "Agotado", el
+  guardado escribía "En stock" y la pantalla nunca lo contaba. Con la
+  derivación mandando el select va **deshabilitado** y con
+  `aria-describedby="pf-stock-hint"`; las unidades no enteras o negativas
+  (texto a medio escribir) **no** cuentan como control de inventario, para no
+  congelar el select mientras se teclea. `analyzePricing(...)`
+  (`src/lib/product-pricing.ts`) devuelve margen, markup, precio efectivo,
+  estado de la oferta y los avisos; los cortes del margen (30 / 10, en
+  `MARGIN_GOOD_PCT`/`MARGIN_WARN_PCT`) son los **mismos** que la columna "Margen"
+  del catálogo: si se cambian allí, se cambian aquí. Los dos avisos
+  (`below_cost`, `sale_not_a_discount`) son **no bloqueantes** —el admin puede
+  guardar igual— y `sale_not_a_discount` distingue `>` (la tienda cobraría el
+  precio "de oferta", más caro) de `==` (igual al normal): una `sale_price` ≥
+  `price` sí se aplica en la tienda, y ese es justo el error que hay que evitar.
+  El `id` de cada aviso lo resuelve `pricingWarningId(key)`, no el componente:
+  las claves van en snake_case (`below_cost`) y un `id` de HTML no debe llevarlo,
+  y los playbooks y los e2e citan `pf-warn-below-cost` por nombre — si el id se
+  armara a mano en el JSX, documentación y pantalla se separarían en silencio.
+  `fieldA11y(key, ...hints)` concatena el id del error con los de las pistas
+  estáticas (`pf-stock-hint`, `pf-qty-hint`, `pf-threshold-hint`, `pf-margin`,
+  `pf-warn-*`): al añadir una pista, pasarla por ahí — publicar
+  `aria-describedby` a mano tapa el `pf-err-<campo>` y el error deja de
+  anunciarse. Al cerrar la ronda se encontró que el servidor ya devolvía
+  `field: "stock_status"` (400 de `src/lib/product-patch.ts`) pero
+  `SERVER_FIELD_TO_FORM_KEY` no lo traducía: el error caía en el aviso general
+  sin marcar el select. Ahora está mapeado **y** con `id` en
+  `PRODUCT_FIELD_INPUT_IDS`, y hay una prueba que exige que toda columna
+  traducida tenga control: si añades una al mapa, añádela también al de ids.
+  **Traspaso pendiente (no hecho aquí)**: mandar `expectedUpdatedAt` en el
+  PATCH desde `ProductFormModal`. Requiere `updated_at` en `ProductFormProduct`
+  y en la fila que le pasa `page.tsx` (archivo de otra sesión), así que se dejó
+  fuera de esta ronda a propósito para no pisar ese trabajo.
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
@@ -513,6 +561,12 @@
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de
 visibilidad de un producto y confirmación de que el caché de catálogo se invalida.
 
+Los KPIs de adopción y el override de nivel se prueban en
+`src/app/admin/restaurantes.test.ts` (23 tests). `e2e/foodos.spec.ts` comprueba
+además que `/admin/restaurantes` no renderice el error boundary ("Algo salió
+mal") — el boundary de Next responde **200**, así que un status no sirve de
+guard.
+
 Ronda 7 (requiere 00106-00111 aplicadas): en `/admin/productos` buscar por SKU,
 editar etiquetas, programar una oferta y ver que la ficha de tienda solo la
 muestra dentro de la ventana, elegir relacionados, correr "Revisar imágenes",
@@ -583,6 +637,25 @@ repetir con ellas ausentes para comprobar la degradación):
   `pageSize`, sin `page`) y la píldora activa debe marcarse; pasar de 8 vistas y
   comprobar que cae la más antigua.
 Automatizado: `npx playwright test e2e/admin-productos.spec.ts --grep @ci`.
+
+Ronda 11 del modal de producto (B22-B24; requiere sesión admin):
+- Stock honesto: abrir "Nuevo producto", elegir "Stock bajo" a mano y luego
+  capturar **0** unidades → el select debe mostrar "Agotado" y quedar
+  deshabilitado; con 2 unidades → "Stock bajo"; al vaciar las unidades vuelve a
+  estar habilitado y conserva la última selección manual. Guardar con 0
+  unidades y reabrir: el estado guardado debe ser el que mostraba el select.
+- Margen en vivo: con precio 100 y costo 50 → `#pf-margin` dice 50% en verde;
+  con costo 95 → 5% en rojo (mismo corte que la columna "Margen" del catálogo);
+  con costo 120 → aparece `#pf-warn-below-cost` y el resumen de la cabecera
+  ("1 aviso de precio"); corregir el costo lo hace desaparecer sin recargar.
+- Oferta que no es descuento: precio 100 y oferta 120 → `#pf-warn-sale-not-a-discount`
+  debe decir que la tienda cobraría 120, y **guardar debe funcionar igual**
+  (los avisos no bloquean).
+- Pistas anunciadas: con un campo en error **y** una pista (`#pf-price` con
+  aviso, `#pf-stock` derivado), el `aria-describedby` del control debe listar el
+  `pf-err-*` **y** el `pf-*-hint`; ninguno debe tapar al otro.
+Automatizado: `npx playwright test e2e/admin-productos-modal.spec.ts --grep @ci`
+(los dos casos nuevos se saltan solos sin `E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD`).
 
 Acciones masivas de pedidos (requiere sesión admin + datos): en `/admin/pedidos`
 marcar un subconjunto y comprobar que el checkbox del encabezado queda

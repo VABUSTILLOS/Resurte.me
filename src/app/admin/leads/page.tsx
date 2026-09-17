@@ -26,6 +26,7 @@ import { ToastProvider, useToast } from "@/components/toast"
 const SOURCE_LABEL: Record<string, string> = {
   checkout_drawer: "Checkout",
   exit_intent: "Exit intent",
+  restaurantes_landing: "Landing /restaurantes",
 }
 
 export default function AdminLeadsPage() {
@@ -282,6 +283,7 @@ function AdminLeadsContent() {
                 <th className="px-5 py-3">Email</th>
                 <th className="px-5 py-3">Teléfono</th>
                 <th className="px-5 py-3">Fuente</th>
+                <th className="px-5 py-3">Restaurante / diagnóstico</th>
                 <th className="px-5 py-3">Cupón</th>
                 <th className="px-5 py-3">Fecha</th>
               </tr>
@@ -294,6 +296,22 @@ function AdminLeadsContent() {
                   <td className="px-5 py-3 text-xs text-gray-500">
                     {SOURCE_LABEL[l.source] ?? l.source}
                   </td>
+                  <td className="px-5 py-3 text-xs text-gray-600">
+                    {l.restaurant_name && (
+                      <span className="block font-medium text-gray-800">{l.restaurant_name}</span>
+                    )}
+                    {l.qualification ? (
+                      <span
+                        className="block text-gray-500"
+                        title={l.qualification.reasons.join(" ")}
+                      >
+                        Segmento {l.qualification.segment} ({l.qualification.score}/100) · nivel{" "}
+                        {l.qualification.recommended_tier}
+                      </span>
+                    ) : (
+                      !l.restaurant_name && <span className="text-gray-300">—</span>
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-xs font-mono text-gray-500">{l.coupon_code ?? "—"}</td>
                   <td
                     className="px-5 py-3 text-xs text-gray-400"
@@ -305,7 +323,7 @@ function AdminLeadsContent() {
               ))}
               {leads.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-400">
+                  <td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-400">
                     <Users className="w-5 h-5 mx-auto mb-2 text-gray-300" />
                     Sin leads capturados todavía
                   </td>

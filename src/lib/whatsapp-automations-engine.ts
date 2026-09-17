@@ -8,6 +8,11 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { createServiceClient } from "@/lib/supabase/service"
 import { sendTemplate, sendTextMessage } from "@/lib/whatsapp"
+import {
+  alreadySentByRestaurant,
+  type RestaurantSend,
+} from "@/lib/messaging/dedupe"
+import { DEFAULT_TIMEZONE } from "@/lib/local-date"
 
 export interface WaAutomationConfig {
   is_active: boolean
@@ -227,15 +232,31 @@ async function sendAutomationWhatsApp(
     userId?: string | null
     orderId?: number | null
     templateId?: number | null
+    /** Envíos recientes del motor del restaurante, para el dedupe cruzado. */
+    restaurantSends?: readonly RestaurantSend[]
   }
 ): Promise<"sent" | "skipped" | "failed"> {
-  const { type, recipient, dedupeKey, text, userId = null, orderId = null, templateId = null } = params
+  const { type, recipient, dedupeKey, text, userId = null, orderId = null, templateId = null, restaurantSends = [] } = params
 
   const { count } = await supabase
     .from("whatsapp_automation_sends")
     .select("id", { count: "exact", head: true })
     .eq("dedupe_key", dedupeKey)
   if ((count ?? 0) > 0) return "skipped"
+
+  // Dedupe cruzado: si el restaurante ya le mandó la misma intención hoy, no
+  // repetimos el mensaje. Misma zona horaria que usan los crons de la
+  // plataforma para que ambos lados cuenten el mismo día.
+  if (
+    alreadySentByRestaurant({
+      sends: restaurantSends,
+      platformType: type,
+      recipient,
+      timezone: DEFAULT_TIMEZONE,
+    })
+  ) {
+    return "skipped"
+  }
 
   let status: "sent" | "failed" = "sent"
   let detail: string | null = null
@@ -285,7 +306,8 @@ async function sendAutomationWhatsApp(
 
 async function runCartAbandonment(
   supabase: SupabaseClient,
-  cfg: WaAutomationConfig
+  cfg: WaAutomationConfig,
+  restaurantSends: readonly RestaurantSend[] = []
 ): Promise<AutomationSendResult> {
   const result = emptyResult(true)
   const delay = Math.max(1, cfg.trigger_delay_hours || 2)
@@ -310,6 +332,7 @@ async function runCartAbandonment(
 
   for (const order of orders ?? []) {
     const sendStatus = await sendAutomationWhatsApp(supabase, {
+    restaurantSends,
       type: "cart_abandonment",
       recipient: order.customer_phone as string,
       dedupeKey: `cart_abandonment:order:${order.id}`,
@@ -327,7 +350,8 @@ async function runCartAbandonment(
 
 async function runReactivation(
   supabase: SupabaseClient,
-  cfg: WaAutomationConfig
+  cfg: WaAutomationConfig,
+  restaurantSends: readonly RestaurantSend[] = []
 ): Promise<AutomationSendResult> {
   const result = emptyResult(true)
   const inactiveDays = Number(cfg.config?.inactive_days) || 30
@@ -372,6 +396,7 @@ async function runReactivation(
     }
     const phone = profile.phone as string
     const sendStatus = await sendAutomationWhatsApp(supabase, {
+    restaurantSends,
       type: "reactivation",
       recipient: phone,
       dedupeKey: `reactivation:${phone}:${monthBucket}`,
@@ -388,7 +413,8 @@ async function runReactivation(
 
 async function runPostDeliveryRating(
   supabase: SupabaseClient,
-  cfg: WaAutomationConfig
+  cfg: WaAutomationConfig,
+  restaurantSends: readonly RestaurantSend[] = []
 ): Promise<AutomationSendResult> {
   const result = emptyResult(true)
   const delay = Math.max(1, cfg.trigger_delay_hours || 24)
@@ -412,6 +438,7 @@ async function runPostDeliveryRating(
   const link = String(cfg.config?.rating_link ?? "https://resurte.me/calificar")
   for (const order of orders ?? []) {
     const sendStatus = await sendAutomationWhatsApp(supabase, {
+    restaurantSends,
       type: "post_delivery_rating",
       recipient: order.customer_phone as string,
       dedupeKey: `post_delivery_rating:order:${order.id}`,
@@ -429,7 +456,8 @@ async function runPostDeliveryRating(
 
 async function runOnboarding(
   supabase: SupabaseClient,
-  cfg: WaAutomationConfig
+  cfg: WaAutomationConfig,
+  restaurantSends: readonly RestaurantSend[] = []
 ): Promise<AutomationSendResult> {
   const result = emptyResult(true)
   const since = new Date(Date.now() - 24 * 3_600_000).toISOString()
@@ -458,6 +486,7 @@ async function runOnboarding(
     if ((count ?? 0) !== 1) continue
 
     const sendStatus = await sendAutomationWhatsApp(supabase, {
+    restaurantSends,
       type: "onboarding",
       recipient: order.customer_phone as string,
       dedupeKey: `onboarding:user:${order.user_id}`,
@@ -475,7 +504,8 @@ async function runOnboarding(
 
 async function runBirthday(
   supabase: SupabaseClient,
-  cfg: WaAutomationConfig
+  cfg: WaAutomationConfig,
+  restaurantSends: readonly RestaurantSend[] = []
 ): Promise<AutomationSendResult> {
   const result = emptyResult(true)
   const parts = cdmxDateParts()
@@ -502,6 +532,7 @@ async function runBirthday(
     }
     const phone = profile.phone as string
     const sendStatus = await sendAutomationWhatsApp(supabase, {
+    restaurantSends,
       type: "birthday",
       recipient: phone,
       dedupeKey: automationDedupeKey("birthday", phone, day),
@@ -524,7 +555,11 @@ async function runBirthday(
 
 const ENGINE_JOBS: Record<
   string,
-  (supabase: SupabaseClient, cfg: WaAutomationConfig) => Promise<AutomationSendResult>
+  (
+    supabase: SupabaseClient,
+    cfg: WaAutomationConfig,
+    restaurantSends: readonly RestaurantSend[]
+  ) => Promise<AutomationSendResult>
 > = {
   cart_abandonment: runCartAbandonment,
   reactivation: runReactivation,
@@ -540,6 +575,7 @@ const ENGINE_JOBS: Record<
 export async function runWhatsAppAutomations(): Promise<Record<string, AutomationSendResult>> {
   const supabase = await createServiceClient()
   const results: Record<string, AutomationSendResult> = {}
+  const restaurantSends = await loadRestaurantSends(supabase, new Date())
 
   for (const [type, run] of Object.entries(ENGINE_JOBS)) {
     try {
@@ -548,7 +584,7 @@ export async function runWhatsAppAutomations(): Promise<Record<string, Automatio
         results[type] = emptyResult(false)
         continue
       }
-      results[type] = await run(supabase, cfg)
+      results[type] = await run(supabase, cfg, restaurantSends)
     } catch (err) {
       logger.error("runWhatsAppAutomations: falló una automatización", {
         type,
@@ -563,4 +599,49 @@ export async function runWhatsAppAutomations(): Promise<Record<string, Automatio
   }
 
   return results
+}
+
+/**
+ * Envíos recientes del motor del restaurante (`foodos_campaigns` en estado
+ * `sent`), con el teléfono del cliente resuelto por el embed de PostgREST.
+ *
+ * Ventana de 48 h: el filtro fino de "mismo día local" lo hace
+ * `alreadySentByRestaurant`, que sí conoce la zona del restaurante.
+ *
+ * Nunca lanza: si la lectura falla, devuelve `[]` y la plataforma sigue
+ * enviando (mejor un mensaje de más que un cron caído).
+ */
+async function loadRestaurantSends(
+  supabase: SupabaseClient,
+  now: Date
+): Promise<RestaurantSend[]> {
+  const since = new Date(now.getTime() - 48 * 3_600_000).toISOString()
+  try {
+    const { data, error } = await supabase
+      .from("foodos_campaigns")
+      .select("sent_at, foodos_automations(type), foodos_customers(phone)")
+      .eq("status", "sent")
+      .gte("sent_at", since)
+    if (error) {
+      logger.warn("No se pudo leer las campañas del restaurante para el dedupe", {
+        error: error.message,
+      })
+      return []
+    }
+    type Embedded = {
+      sent_at: string | null
+      foodos_automations: { type: string | null } | null
+      foodos_customers: { phone: string | null } | null
+    }
+    return ((data ?? []) as unknown as Embedded[]).map((row) => ({
+      automation_type: row.foodos_automations?.type ?? null,
+      recipient: row.foodos_customers?.phone ?? null,
+      sent_at: row.sent_at,
+    }))
+  } catch (err) {
+    logger.warn("Excepción leyendo campañas del restaurante para el dedupe", {
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return []
+  }
 }

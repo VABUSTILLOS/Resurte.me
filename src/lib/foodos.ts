@@ -143,6 +143,7 @@ export function buildWhatsAppOrderMessage(input: {
   total: number
   fulfillment: string
   tableNumber?: string | null
+  deliveryAddress?: string | null
   customerName: string
   customerPhone: string
   note?: string | null
@@ -173,6 +174,9 @@ export function buildWhatsAppOrderMessage(input: {
         ? `En el local${input.tableNumber ? ` · Mesa ${input.tableNumber}` : ""}`
         : "Para llevar"
   lines.push(`Servicio: ${fulfillmentLabel}`)
+  if (input.fulfillment === "delivery" && input.deliveryAddress) {
+    lines.push(`Domicilio: ${input.deliveryAddress}`)
+  }
   lines.push(`Cliente: ${input.customerName} · ${input.customerPhone}`)
   if (input.note) lines.push(`Nota: ${input.note}`)
   return lines.join("\n")

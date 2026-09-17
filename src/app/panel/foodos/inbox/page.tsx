@@ -13,11 +13,22 @@ import {
   markWaConversationRead,
   sendWaReply,
   sendCatalogToCustomer,
+  listMeseroSessions,
+  takeOverMeseroSession,
+  resumeMeseroSession,
+  type MeseroSessionRow,
 } from "../actions"
 import { createClient } from "@/lib/supabase/client"
 import type { FoodosRestaurant, FoodosWhatsAppMessage } from "@/types/foodos"
-import { Inbox, Loader2, Send, Store } from "lucide-react"
+import { Bot, Inbox, Loader2, Send, Store, UserRound } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
+import { t } from "@/lib/i18n/es"
+import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
+
+/** Normaliza un teléfono para casar sesiones del Mesero IA con el hilo. */
+function digits(phone: string): string {
+  return phone.replace(/\D/g, "")
+}
 
 interface Conversation {
   phone: string
@@ -34,13 +45,20 @@ export default function WaInboxPage() {
   const [reply, setReply] = useState("")
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [aiSessions, setAiSessions] = useState<MeseroSessionRow[]>([])
+  const [aiBusy, setAiBusy] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const { can } = useEntitlements()
+  const canMeseroIa = can("mesero_ia")
 
   const load = useCallback(async () => {
     try {
       const { restaurant: r } = await getFoodosPanelData()
       setRestaurant(r)
-      if (r) setMessages(await listWaMessages(r.id))
+      if (r) {
+        setMessages(await listWaMessages(r.id))
+        setAiSessions(await listMeseroSessions(r.id))
+      }
     } finally {
       setLoading(false)
     }
@@ -90,6 +108,29 @@ export default function WaInboxPage() {
   }, [messages])
 
   const active = conversations.find((c) => c.phone === selected) ?? null
+
+  // Sesión del Mesero IA que corresponde al hilo abierto (los teléfonos
+  // pueden llegar con o sin prefijo, así que se comparan solo los dígitos).
+  const activeAi = useMemo(() => {
+    if (!active) return null
+    const phone = digits(active.phone)
+    return aiSessions.find((s) => digits(s.customer_phone) === phone) ?? null
+  }, [active, aiSessions])
+
+  async function toggleAi(takeOver: boolean) {
+    if (!activeAi) return
+    setAiBusy(true)
+    setError(null)
+    try {
+      if (takeOver) await takeOverMeseroSession(activeAi.id)
+      else await resumeMeseroSession(activeAi.id)
+      if (restaurant) setAiSessions(await listMeseroSessions(restaurant.id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cambiar el control de la conversación")
+    } finally {
+      setAiBusy(false)
+    }
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -190,21 +231,56 @@ export default function WaInboxPage() {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                <p className="font-semibold text-gray-900 font-mono text-sm">{active.phone}</p>
-                <button
-                  onClick={async () => {
-                    if (!restaurant) return
-                    try {
-                      await sendCatalogToCustomer(restaurant.id, active.phone)
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : "Error al enviar catálogo")
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#25D366] text-white text-xs font-bold hover:bg-[#1fb857]"
-                >
-                  <Store className="w-3.5 h-3.5" /> Enviar catálogo
-                </button>
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 flex-wrap">
+                <div className="flex items-center gap-2 min-w-0">
+                  <p className="font-semibold text-gray-900 font-mono text-sm">{active.phone}</p>
+                  {activeAi && (
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                        activeAi.handoff_at
+                          ? "bg-amber-50 text-amber-700"
+                          : "bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      {activeAi.handoff_at
+                        ? t("foodos.mesero.humanBadge")
+                        : t("foodos.mesero.aiBadge")}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {canMeseroIa && activeAi && (
+                    <button
+                      onClick={() => void toggleAi(!activeAi.handoff_at)}
+                      disabled={aiBusy}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {aiBusy ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : activeAi.handoff_at ? (
+                        <Bot className="w-3.5 h-3.5" />
+                      ) : (
+                        <UserRound className="w-3.5 h-3.5" />
+                      )}
+                      {activeAi.handoff_at
+                        ? t("foodos.mesero.resume")
+                        : t("foodos.mesero.takeOver")}
+                    </button>
+                  )}
+                  <button
+                    onClick={async () => {
+                      if (!restaurant) return
+                      try {
+                        await sendCatalogToCustomer(restaurant.id, active.phone)
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Error al enviar catálogo")
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#25D366] text-white text-xs font-bold hover:bg-[#1fb857]"
+                  >
+                    <Store className="w-3.5 h-3.5" /> Enviar catálogo
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-2">

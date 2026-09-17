@@ -110,6 +110,52 @@ export async function GET() {
   // Marketplace hoyquecomemos
   entries.push({ url: `${BASE_URL}/comer`, changeFrequency: "daily", priority: 0.9 })
 
+  // Micrositios de restaurantes y su sitio IA (Fase 6). Se listan el micrositio
+  // de pedidos y la carta indexable de cada restaurante activo, más las páginas
+  // de contenido que el dueño publicó. Solo lo publicado: la RLS anónima
+  // filtra los borradores y el sitemap no debe anunciar lo que da 404.
+  try {
+    const [{ getPublicMarketplace }, { createPublicClient }, { listPublishedSeoPages }, { menuPath, restaurantPath, seoPagePath }] =
+      await Promise.all([
+        import("@/lib/foodos-public"),
+        import("@/lib/supabase/public"),
+        import("@/lib/foodos-seo-pages"),
+        import("@/lib/foodos-seo"),
+      ])
+
+    const marketplace = await getPublicMarketplace()
+    const supabase = createPublicClient()
+
+    for (const entry of marketplace) {
+      const slug = entry.restaurant.slug
+      if (!slug) continue
+      entries.push({
+        url: `${BASE_URL}${restaurantPath(slug)}`,
+        changeFrequency: "daily",
+        priority: 0.9,
+      })
+      entries.push({
+        url: `${BASE_URL}${menuPath(slug)}`,
+        changeFrequency: "weekly",
+        priority: 0.8,
+      })
+
+      if (!supabase) continue
+      const pages = await listPublishedSeoPages(supabase, entry.restaurant.id, 50)
+      for (const page of pages) {
+        if (!page.slug) continue
+        entries.push({
+          url: `${BASE_URL}${seoPagePath(slug, page.slug)}`,
+          changeFrequency: "monthly",
+          priority: 0.6,
+          lastModified: page.updated_at,
+        })
+      }
+    }
+  } catch {
+    // Supabase not configured — se queda el directorio /comer
+  }
+
   // Índice de precios (Fase 6): el hub, una página por insumo publicado y una
   // por ciudad. Los slugs salen de `getPriceIndexUrlSlugs`, congelado por
   // despliegue, porque las páginas usan `dynamicParams = false`: el sitemap no

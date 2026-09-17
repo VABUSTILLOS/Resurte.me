@@ -12,8 +12,13 @@ import { QUALIFYING_WEEK_MIN } from "@/lib/utils"
 
 const MEXICO_TZ = "America/Mexico_City"
 
-/** Escalones de nivel por semanas calificadas del mes (igual que el trigger). */
-const TIER_LADDER = [
+/**
+ * Escalones de nivel por semanas calificadas del mes (igual que el trigger).
+ *
+ * Exportado porque es la fuente única del escalón: la landing de /restaurantes
+ * lo publica tal cual en vez de repetir los umbrales.
+ */
+export const TIER_LADDER = [
   { tier: "Verde", pct: 5, weeks: 0 },
   { tier: "Plata", pct: 10, weeks: 2 },
   { tier: "Oro", pct: 15, weeks: 3 },

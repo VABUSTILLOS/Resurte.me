@@ -180,3 +180,25 @@ emails separada por coma) → tabla `admin_users` (opcional, requiere migración
 > ⚠️ Sin `ADMIN_EMAILS` (o fila en `admin_users`) ningún usuario es admin: las
 > rutas devuelven 401/403 y el panel no carga datos. Definirla en Vercel y en
 > `.env.local`.
+
+## Tablas de FoodOS (paridad FluxSales, fases 0–9)
+
+Tablas que el programa de paridad con FluxSales añadió o de las que depende.
+`foodos_restaurants`, `foodos_menu_*`, `foodos_orders`, `foodos_customers`,
+`foodos_automations`, `foodos_branches` y `foodos_campaigns` vienen de
+`00023_foodos.sql`; el resto son de las migraciones de cada fase. Detalle
+funcional, invariantes y decisiones en `docs/foodos-paridad-fluxsales.md`.
+
+| Tabla | Migración | Para qué |
+| --- | --- | --- |
+| `foodos_entitlement_overrides` | `00120` | Override manual del nivel (Plata/Oro/Diamante) por restaurante. El nivel normal se **computa en vivo**, no se persiste. |
+| `foodos_ai_usage` | `00121` | Contador diario de tokens por restaurante/capacidad. Lo escribe la capa de IA; el tope se aplica en `src/lib/ai/budget.ts`. |
+| `foodos_ai_sessions` | `00122` | Sesiones del Mesero IA (una conversación de WhatsApp por cliente). |
+| `foodos_deliveries` / `foodos_delivery_events` | `00124` | Flotilla: entregas, asignación a repartidor y bitácora de estados. `provider_delivery_id` enlaza con el reparto externo. |
+| `foodos_wallet_passes` | `00126` | Tarjeta de lealtad (Apple/Google Wallet) por cliente. |
+| `foodos_seo_pages` | `00128` | Sitio IA: páginas generadas. Nacen en `draft` y el dueño las aprueba (`approved_at`). |
+| `foodos_pos_connections` / `foodos_pos_sync_log` | `00129` | Integraciones de punto de venta y su bitácora de sincronización (`kind`, `status`). |
+| `foodos_catering_packages` / `foodos_catering_requests` | `00130` | Catering por volumen: paquetes y solicitudes. El total lo decide el servidor. |
+| `whatsapp_automation_sends` | `00097` | Bitácora de las automatizaciones de WhatsApp de la plataforma. Tiene `UNIQUE (dedupe_key)`; es la mitad "plataforma" del dedupe cruzado. |
+| `leads` (`restaurant_name`, `qualification`) | `00131` | Landing B2B `/restaurantes`: amplía el `CHECK` de `source` y guarda el diagnóstico. |
+| `error_logs` | `00054` | Bitácora de errores de cliente y servidor. La ingesta de servidor es `reportServerError()` (`src/lib/error-log.ts`); la lectura admin, `getErrorLogs()` (`src/lib/admin-errors.ts`). |

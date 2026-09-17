@@ -35,6 +35,16 @@ export interface PricingWarning {
   message: string
 }
 
+/**
+ * `id` del aviso en el DOM. Las claves van en snake_case (`below_cost`) pero un
+ * `id` de HTML no debería llevarlo, así que la traducción vive aquí y no en el
+ * componente: es la única forma de que el id que documentan los playbooks y el
+ * que se pinta no se separen.
+ */
+export function pricingWarningId(key: PricingWarningKey): string {
+  return `pf-warn-${key.replace(/_/g, "-")}`
+}
+
 export interface PricingInput {
   price: number | null
   salePrice?: number | null

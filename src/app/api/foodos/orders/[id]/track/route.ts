@@ -62,6 +62,51 @@ export async function GET(
       branchName = branch?.name ?? null
     }
 
+    // Estado de la entrega (Flotilla). Solo se expone si el pedido es a
+    // domicilio: es información operativa del restaurante, no del cliente.
+    let delivery: {
+      status: string
+      zone_name: string | null
+      courier_name: string | null
+      eta_minutes: number | null
+      tracking_url: string | null
+      provider: string
+      proof_pin: string | null
+      proof_verified: boolean
+    } | null = null
+    if (order.fulfillment === "delivery") {
+      const { data: row } = await supabase
+        .from("foodos_deliveries")
+        .select(
+          "status, zone_name, eta_minutes, provider, provider_tracking_url, courier_id, proof_pin, proof_verified"
+        )
+        .eq("order_id", order.id)
+        .maybeSingle()
+      if (row) {
+        let courierName: string | null = null
+        if (row.courier_id) {
+          const { data: courier } = await supabase
+            .from("foodos_couriers")
+            .select("name")
+            .eq("id", row.courier_id)
+            .maybeSingle()
+          courierName = courier?.name ?? null
+        }
+        delivery = {
+          status: row.status,
+          zone_name: row.zone_name,
+          courier_name: courierName,
+          eta_minutes: row.eta_minutes,
+          tracking_url: row.provider_tracking_url,
+          provider: row.provider,
+          // El PIN es del comensal: lo muestra al repartidor al recibir.
+          // Deja de exponerse cuando la entrega ya se cerró.
+          proof_pin: row.proof_verified ? null : (row.proof_pin ?? null),
+          proof_verified: row.proof_verified === true,
+        }
+      }
+    }
+
     return NextResponse.json({
       id: order.id,
       status: order.status,
@@ -73,6 +118,7 @@ export async function GET(
       branch_name: branchName,
       total: order.total,
       items: order.items,
+      delivery,
     })
   } catch (error) {
     logger.error("FoodOS track error:", error)

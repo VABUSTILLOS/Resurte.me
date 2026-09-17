@@ -9,7 +9,12 @@ import {
   formKeyForServerField,
   validateProductForm,
 } from "@/lib/product-form"
-import { analyzePricing, marginBand, type MarginBand } from "@/lib/product-pricing"
+import {
+  analyzePricing,
+  marginBand,
+  pricingWarningId,
+  type MarginBand,
+} from "@/lib/product-pricing"
 import {
   DEFAULT_LOW_STOCK_THRESHOLD,
   resolveLowStockThreshold,
@@ -1514,7 +1519,7 @@ export function ProductFormModal({
                   {...fieldA11y(
                     "price",
                     "pf-margin",
-                    ...pricing.warnings.map((w) => `pf-warn-${w.key}`)
+                    ...pricing.warnings.map((w) => pricingWarningId(w.key))
                   )}
                 />
                 <FieldError id="pf-err-price" message={fieldErrors.price} />
@@ -1536,7 +1541,7 @@ export function ProductFormModal({
                   className={fieldCls("salePrice")}
                   {...fieldA11y(
                     "salePrice",
-                    ...pricing.warnings.map((w) => `pf-warn-${w.key}`)
+                    ...pricing.warnings.map((w) => pricingWarningId(w.key))
                   )}
                 />
                 <FieldError id="pf-err-salePrice" message={fieldErrors.salePrice} />
@@ -1608,7 +1613,7 @@ export function ProductFormModal({
                 {pricing.warnings.map((warning) => (
                   <li
                     key={warning.key}
-                    id={`pf-warn-${warning.key}`}
+                    id={pricingWarningId(warning.key)}
                     className="flex items-start gap-1.5 text-[11px] text-amber-700"
                   >
                     <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />

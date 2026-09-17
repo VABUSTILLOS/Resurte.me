@@ -49,6 +49,7 @@ export const PRODUCT_FIELD_INPUT_IDS: Record<string, string> = {
   cost: "pf-cost",
   stockQuantity: "pf-qty",
   lowStockThreshold: "pf-threshold",
+  stockStatus: "pf-stock",
   sku: "pf-sku",
   barcode: "pf-barcode",
   saleWindow: "pf-sale-start",
@@ -70,6 +71,7 @@ const SERVER_FIELD_TO_FORM_KEY: Record<string, string> = {
   cost: "cost",
   stock_quantity: "stockQuantity",
   low_stock_threshold: "lowStockThreshold",
+  stock_status: "stockStatus",
   sku: "sku",
   barcode: "barcode",
 }

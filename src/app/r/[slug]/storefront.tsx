@@ -5,7 +5,7 @@ import Image from "next/image"
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import Script from "next/script"
-import { Compass, ShoppingBag } from "lucide-react"
+import { BookOpen, Compass, PartyPopper, ShoppingBag } from "lucide-react"
 import { detectStorefrontLang, sf, type StorefrontLang } from "@/lib/foodos-i18n"
 import { useScrollDirection } from "@/hooks/use-scroll-direction"
 import {
@@ -61,6 +61,8 @@ interface Props {
   branchHours: FoodosBranchHours[]
   overrides: FoodosBranchMenuOverride[]
   reviews: FoodosReview[]
+  /** Hay paquetes de catering activos; sin ellos la página pública da 404. */
+  hasCatering: boolean
 }
 
 export function FoodosStorefront({
@@ -75,6 +77,7 @@ export function FoodosStorefront({
   branchHours,
   overrides,
   reviews,
+  hasCatering,
 }: Props) {
   const [cart, setCart] = useState<FoodosOrderItem[]>([])
   const [view, setView] = useState<View>("menu")
@@ -133,6 +136,8 @@ export function FoodosStorefront({
     mesaParam ? "dine_in" : "pickup"
   )
   const [tableNumber, setTableNumber] = useState(mesaParam ?? "")
+  const [deliveryAddress, setDeliveryAddress] = useState("")
+  const [deliveryNotes, setDeliveryNotes] = useState("")
   const [branchId, setBranchId] = useState<string | null>(branches[0]?.id ?? null)
   const [paymentMethod, setPaymentMethod] = useState<"card" | "branch" | "whatsapp" | "transfer">("branch")
   const [note, setNote] = useState("")
@@ -350,6 +355,10 @@ export function FoodosStorefront({
       setError("Indica tu número de mesa.")
       return
     }
+    if (fulfillment === "delivery" && deliveryAddress.trim().length < 5) {
+      setError(sf(lang, "deliveryAddressRequired"))
+      return
+    }
     if (!openStatus.isOpen) {
       setError(openStatus.nextOpenLabel ?? "Esta sucursal está cerrada por ahora.")
       return
@@ -382,6 +391,8 @@ export function FoodosStorefront({
           customer_phone: customerPhone.trim(),
           note: note.trim() || null,
           table_number: fulfillment === "dine_in" ? tableNumber.trim() : null,
+          delivery_address: fulfillment === "delivery" ? deliveryAddress.trim() : null,
+          delivery_notes: fulfillment === "delivery" ? deliveryNotes.trim() || null : null,
           coupon_code: appliedCoupon?.code ?? null,
           tip: tipAmount,
           redeem_points: redeemPoints,
@@ -425,6 +436,7 @@ export function FoodosStorefront({
             total: data.total,
             fulfillment,
             tableNumber: fulfillment === "dine_in" ? tableNumber.trim() : null,
+            deliveryAddress: fulfillment === "delivery" ? deliveryAddress.trim() || null : null,
             customerName: customerName.trim(),
             customerPhone: customerPhone.trim(),
             note: note.trim() || null,
@@ -593,6 +605,20 @@ a.parentNode.insertBefore(o,a)};ttq.load('${restaurant.tiktok_pixel_id}');ttq.pa
               >
                 <Compass className="w-3 h-3" /> hoyquecomemos.mx
               </Link>
+              <Link
+                href={`/r/${restaurant.slug}/carta`}
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-stone-500 hover:text-stone-700 mt-0.5 ml-2"
+              >
+                <BookOpen className="w-3 h-3" /> {sf(lang, "fullMenu")}
+              </Link>
+              {hasCatering && (
+                <Link
+                  href={`/r/${restaurant.slug}/catering`}
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 hover:text-amber-600 mt-0.5 ml-2"
+                >
+                  <PartyPopper className="w-3 h-3" /> {sf(lang, "cateringViewPackages")}
+                </Link>
+              )}
             </div>
           </div>
           <button
@@ -658,6 +684,10 @@ a.parentNode.insertBefore(o,a)};ttq.load('${restaurant.tiktok_pixel_id}');ttq.pa
             setFulfillment={setFulfillment}
             tableNumber={tableNumber}
             setTableNumber={setTableNumber}
+            deliveryAddress={deliveryAddress}
+            setDeliveryAddress={setDeliveryAddress}
+            deliveryNotes={deliveryNotes}
+            setDeliveryNotes={setDeliveryNotes}
             branchId={branchId}
             setBranchId={handleSelectBranch}
             paymentMethod={paymentMethod}

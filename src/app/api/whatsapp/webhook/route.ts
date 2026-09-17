@@ -199,6 +199,28 @@ async function handleFoodosIncoming(
     logger.error("FoodOS webhook: failed to persist message:", error)
   }
 
+  // ── Mesero IA ───────────────────────────────────────────────
+  // Se intenta ANTES del catálogo: quien activó el Mesero IA quiere que la IA
+  // atienda, no que se le dispare una lista de productos. Solo aplica a texto;
+  // las respuestas del catálogo interactivo no pasan por la IA.
+  if (messageType === "text" && content) {
+    try {
+      const { handleMeseroMessage } = await import("@/lib/foodos-ai-wa/orchestrator")
+      const result = await handleMeseroMessage({
+        supabase,
+        restaurantId: conn.restaurant_id,
+        from,
+        text: content,
+        messageId,
+      })
+      if (result.handled) return true
+    } catch (e) {
+      // Si la IA falla, se cae al catálogo en vez de dejar al cliente sin
+      // respuesta.
+      logger.error("FoodOS Mesero IA error:", e)
+    }
+  }
+
   if (conn.auto_reply_catalog) {
     try {
       // Evitar loop de auto-respuestas: solo si no se respondió ya en 24h.

@@ -22,6 +22,10 @@ export function CheckoutView({
   setFulfillment,
   tableNumber,
   setTableNumber,
+  deliveryAddress,
+  setDeliveryAddress,
+  deliveryNotes,
+  setDeliveryNotes,
   branchId,
   setBranchId,
   paymentMethod,
@@ -72,6 +76,10 @@ export function CheckoutView({
   setFulfillment: (v: "pickup" | "delivery" | "dine_in") => void
   tableNumber: string
   setTableNumber: (v: string) => void
+  deliveryAddress: string
+  setDeliveryAddress: (v: string) => void
+  deliveryNotes: string
+  setDeliveryNotes: (v: string) => void
   branchId: string | null
   setBranchId: (v: string) => void
   paymentMethod: "card" | "branch" | "whatsapp" | "transfer"
@@ -251,6 +259,33 @@ export function CheckoutView({
                 inputMode="numeric"
                 className="w-full px-4 py-3 mb-4 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
+            )}
+
+            {fulfillment === "delivery" && (
+              <div className="mb-4 space-y-2">
+                <label className="block">
+                  <span className="text-xs font-semibold text-stone-500">
+                    {sf(lang, "deliveryAddress")}
+                  </span>
+                  <textarea
+                    value={deliveryAddress}
+                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                    placeholder={sf(lang, "deliveryAddressPlaceholder")}
+                    rows={2}
+                    className="mt-1 w-full px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-stone-500">
+                    {sf(lang, "deliveryNotes")}
+                  </span>
+                  <input
+                    value={deliveryNotes}
+                    onChange={(e) => setDeliveryNotes(e.target.value)}
+                    className="mt-1 w-full px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </label>
+              </div>
             )}
 
             {/* Pedido programado */}

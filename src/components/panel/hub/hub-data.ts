@@ -1,9 +1,11 @@
 import type { LucideIcon } from "lucide-react"
 import type { RestaurantCollection } from "@/types"
+import type { FoodosFeature } from "@/lib/foodos-entitlements"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp, Calendar, ClipboardCheck,
   Package, Receipt, Flame, QrCode, UtensilsCrossed, Gift, Megaphone,
-  BarChart3, Compass, Users, Ticket, MessageCircle, Inbox,
+  BarChart3, Compass, Users, Ticket, MessageCircle, Inbox, Bot, Truck,
+  Wallet, Globe, Server, CalendarHeart,
 } from "lucide-react"
 
 export type HubCollection = RestaurantCollection
@@ -135,6 +137,12 @@ export interface Tool {
   short?: string
   collectionDesc?: (name: string) => string
   standalone?: boolean
+  /**
+   * Capacidad premium que abre esta herramienta. Si se declara, la tarjeta
+   * muestra el nivel requerido y se bloquea hasta alcanzarlo
+   * (`src/lib/foodos-entitlements.ts`). Sin este campo la herramienta es base.
+   */
+  feature?: FoodosFeature
 }
 
 export const TOOL_AREAS: { key: ToolArea; label: string; icon: LucideIcon }[] = [
@@ -305,6 +313,79 @@ export const TOOLS: Tool[] = [
     area: "sistema",
     short: "Clientes",
     standalone: true,
+    feature: "marketing_ia",
+  },
+  {
+    title: "Mesero IA",
+    description: "Un mesero que atiende WhatsApp 24/7: entiende el pedido, arma el carrito, cobra con las mismas reglas de tu tienda y lo manda a cocina. Nunca inventa precios.",
+    icon: Bot,
+    href: "/panel/foodos/mesero-ia",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50",
+    area: "sistema",
+    short: "Mesero IA",
+    standalone: true,
+    feature: "mesero_ia",
+  },
+  {
+    title: "Flotilla",
+    description: "Repartidores propios, zonas por radio con tarifa y mínimo, asignación de entregas y seguimiento del estado. La tarifa siempre la calcula el servidor.",
+    icon: Truck,
+    href: "/panel/foodos/flotilla",
+    color: "text-orange-600",
+    bgColor: "bg-orange-50",
+    area: "sistema",
+    short: "Flotilla",
+    standalone: true,
+    feature: "flotilla",
+  },
+  {
+    title: "Tarjeta de lealtad",
+    description: "El pase que tu cliente guarda en el teléfono: saldo, valor y recompensa. Se actualiza solo al acreditar puntos y se puede revocar.",
+    icon: Wallet,
+    href: "/panel/foodos/wallet",
+    color: "text-indigo-600",
+    bgColor: "bg-indigo-50",
+    area: "sistema",
+    short: "Tarjeta",
+    standalone: true,
+    feature: "wallet_passes",
+  },
+  {
+    title: "Sitio web y app",
+    description: "Tu carta indexable en Google, páginas de contenido que la IA redacta y tú apruebas, y tu micrositio instalable como app en el teléfono.",
+    icon: Globe,
+    href: "/panel/foodos/sitio-ia",
+    color: "text-teal-600",
+    bgColor: "bg-teal-50",
+    area: "sistema",
+    short: "Sitio web",
+    standalone: true,
+    feature: "sitio_ia",
+  },
+  {
+    title: "Punto de venta",
+    description: "Conecta tu caja para no capturar el menú dos veces. Mientras el adaptador de tu proveedor no exista, el panel te lo dice en la cara y la importación CSV de tu menú sigue funcionando.",
+    icon: Server,
+    href: "/panel/foodos/pos",
+    color: "text-slate-600",
+    bgColor: "bg-slate-50",
+    area: "sistema",
+    short: "Punto de venta",
+    standalone: true,
+    feature: "pos_integraciones",
+  },
+  {
+    title: "Catering",
+    description: "Paquetes por persona para eventos: el comensal ve el total antes de enviar y tú decides si lo tomas. El total siempre lo calcula el servidor.",
+    icon: CalendarHeart,
+    href: "/panel/foodos/catering",
+    color: "text-rose-600",
+    bgColor: "bg-rose-50",
+    area: "sistema",
+    short: "Catering",
+    standalone: true,
+    feature: "catering",
   },
   {
     title: "Cupones",

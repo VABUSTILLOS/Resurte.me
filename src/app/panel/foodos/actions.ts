@@ -7,12 +7,52 @@
 // ============================================================
 
 import { requireAuth, getCurrentUser } from "@/lib/auth"
+import { requireFoodosFeature } from "@/lib/foodos-tier"
+import { reportServerError } from "@/lib/error-log"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
-import { slugify } from "@/lib/foodos"
+import { formatMoney, slugify } from "@/lib/foodos"
+import { tallyAbTest } from "@/lib/messaging/channel"
+import type { CampaignCopyOutput, CampaignTone } from "@/lib/foodos-ai/copy"
 import { notifyFoodosCustomer } from "@/lib/foodos-notifications"
-import { revalidatePath } from "next/cache"
+import {
+  EMPTY_WALLET_STATS,
+  ensureWalletPass,
+  getWalletStats,
+  listWalletPasses,
+  refreshWalletPass,
+  setWalletPassActive,
+  type WalletPassRow,
+  type WalletStats,
+} from "@/lib/foodos-wallet/passes"
+import {
+  deleteSeoPage,
+  listSeoPages,
+  loadSeoProfile,
+  saveSeoProfile,
+  setSeoPageStatus,
+  upsertSeoPage,
+  type SeoPageKind,
+  type SeoPageRow,
+} from "@/lib/foodos-seo-pages"
+import { generateAboutText, generateDishCopy, generateFaq } from "@/lib/foodos-ai/seo"
+import {
+  googleBusinessChecklist,
+  googleBusinessProgress,
+  menuPath,
+  manifestPath,
+  restaurantPath,
+  slugifySeo,
+  type GoogleBusinessProgress,
+  type GoogleBusinessStep,
+} from "@/lib/foodos-seo"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { after } from "next/server"
+import type { LocalMenuItem } from "@/lib/pos/reconcile"
+import type { PosMenuSnapshotItem } from "@/lib/pos/adapter"
+import type { PosConnectionView, PosKpis, PosSyncEntry } from "@/lib/pos/registry"
+import type { CateringKpis, CateringPackage } from "@/lib/foodos-catering"
+import type { CateringRequestRow } from "@/lib/foodos-catering-data"
 import type {
   FoodosRestaurant,
   FoodosRestaurantStatus,
@@ -29,6 +69,8 @@ import type {
   FoodosCustomerSegment,
   FoodosCampaign,
   FoodosCampaignStatus,
+  FoodosMarketingChannel,
+  FoodosCampaignVariant,
   FoodosItemOptionGroup,
   FoodosItemOptionValue,
   FoodosBranchHours,
@@ -792,12 +834,31 @@ export async function updateOrderStatus(
 }
 
 // ------------------------------------------------------------
+// Gate de nivel (FoodOS entitlements)
+//
+// Las escrituras son la frontera real de seguridad y siempre lanzan. Las
+// lecturas degradan a vacío para que la pantalla pueda mostrar su propio
+// estado bloqueado en lugar de romperse con un error de servidor.
+// ------------------------------------------------------------
+
+/** `true` si el restaurante tiene la capacidad; usado por las lecturas. */
+async function canUseMarketingIa(): Promise<boolean> {
+  try {
+    await requireFoodosFeature("marketing_ia")
+    return true
+  } catch {
+    return false
+  }
+}
+
+// ------------------------------------------------------------
 // Automatizaciones (recurrencia WhatsApp)
 // ------------------------------------------------------------
 
 export async function listAutomations(
   restaurantId: string
 ): Promise<FoodosAutomation[]> {
+  if (!(await canUseMarketingIa())) return []
   const { supabase } = await requireAuth()
   const { data, error } = await supabase
     .from("foodos_automations")
@@ -815,16 +876,29 @@ export async function upsertAutomation(input: {
   name: string
   trigger_config?: FoodosAutomation["trigger_config"]
   message?: string | null
+  /** Segundo mensaje del experimento A/B. Sin él, `ab_test` no tiene efecto. */
+  message_b?: string | null
+  ab_test?: boolean
+  /** Audiencia RFM o segmento simple; ver `effectiveAudience()`. */
+  audience?: string | null
+  channel?: FoodosMarketingChannel
   incentive_config?: FoodosAutomation["incentive_config"]
   is_active?: boolean
 }): Promise<void> {
+  await requireFoodosFeature("marketing_ia")
   const { supabase } = await requireAuth()
+  const messageB = input.message_b?.trim() || null
   const payload = {
     restaurant_id: input.restaurant_id,
     type: input.type,
     name: input.name,
     trigger_config: input.trigger_config ?? {},
     message: input.message || null,
+    message_b: messageB,
+    // Un A/B sin segundo mensaje no es un experimento: se normaliza a false.
+    ab_test: Boolean(input.ab_test && messageB),
+    audience: input.audience?.trim() || null,
+    channel: input.channel ?? "whatsapp",
     incentive_config: input.incentive_config ?? {},
     is_active: input.is_active ?? true,
   }
@@ -839,6 +913,7 @@ export async function toggleAutomation(
   id: string,
   isActive: boolean
 ): Promise<void> {
+  await requireFoodosFeature("marketing_ia")
   const { supabase } = await requireAuth()
   const { error } = await supabase
     .from("foodos_automations")
@@ -852,7 +927,45 @@ export async function toggleAutomation(
 // Clientes (CRM)
 // ------------------------------------------------------------
 
+export async function updateCustomerProfile(input: {
+  id: string
+  /** `YYYY-MM-DD`; `null` borra la fecha. */
+  birthday?: string | null
+  sms_opt_in?: boolean
+}): Promise<void> {
+  await requireFoodosFeature("marketing_ia")
+  const { supabase, user } = await requireAuth()
+  // Defensa en profundidad: el RLS ya protege, pero verificamos la
+  // propiedad del restaurante antes de escribir.
+  const { data: owned } = await supabase
+    .from("foodos_customers")
+    .select("id, foodos_restaurants!inner(user_id)")
+    .eq("id", input.id)
+    .eq("foodos_restaurants.user_id", user.id)
+    .maybeSingle()
+  if (!owned) throw new Error("Cliente no encontrado")
+
+  const patch: { birthday?: string | null; sms_opt_in?: boolean } = {}
+  if (input.birthday !== undefined) {
+    const birthday = input.birthday?.trim() || null
+    if (birthday && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
+      throw new Error("Fecha de cumpleaños inválida")
+    }
+    patch.birthday = birthday
+  }
+  if (input.sms_opt_in !== undefined) patch.sms_opt_in = Boolean(input.sms_opt_in)
+  if (Object.keys(patch).length === 0) return
+
+  const { error } = await supabase
+    .from("foodos_customers")
+    .update(patch)
+    .eq("id", input.id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/clientes")
+}
+
 export async function listCampaigns(restaurantId: string) {
+  if (!(await canUseMarketingIa())) return []
   const { supabase } = await requireAuth()
   const { data, error } = await supabase
     .from("foodos_campaigns")
@@ -872,6 +985,7 @@ export async function insertCampaign(input: {
   status?: string
   channel?: string
 }): Promise<{ data: FoodosCampaign }> {
+  await requireFoodosFeature("marketing_ia")
   const { supabase, user } = await requireAuth()
   // Defensa en profundidad: el RLS ya protege, pero verificamos la
   // propiedad del restaurante explícitamente antes de insertar.
@@ -903,6 +1017,7 @@ export async function insertCampaign(input: {
 export async function runCampaignNow(
   campaignId: string
 ): Promise<{ sent: number; failed: number; skipped: number }> {
+  await requireFoodosFeature("marketing_ia")
   // Verifica sesión y propiedad antes de delegar al motor (service client)
   const { supabase, user } = await requireAuth()
   const { data: campaign } = await supabase
@@ -934,6 +1049,7 @@ export async function runCampaignNow(
 }
 
 export async function deleteCampaign(id: string): Promise<void> {
+  await requireFoodosFeature("marketing_ia")
   const { supabase, user } = await requireAuth()
   // Defensa en profundidad: el RLS ya protege, pero verificamos la
   // propiedad antes de borrar (mismo patrón que runCampaignNow).
@@ -948,6 +1064,85 @@ export async function deleteCampaign(id: string): Promise<void> {
   const { error } = await supabase.from("foodos_campaigns").delete().eq("id", id)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/clientes")
+}
+
+// ------------------------------------------------------------
+// Marketing IA (nivel Plata)
+//
+// Mismo contrato que el resto: las lecturas degradan, las escrituras lanzan.
+// La IA solo redacta la plantilla; nunca fija precios, audiencias ni enlaces.
+// ------------------------------------------------------------
+
+export interface CampaignAbStats {
+  variant: FoodosCampaignVariant
+  sent: number
+  failed: number
+  total: number
+}
+
+export async function getCampaignAbStats(
+  restaurantId: string,
+  days = 30
+): Promise<CampaignAbStats[]> {
+  if (!(await canUseMarketingIa())) return []
+  const { supabase } = await requireAuth()
+  const window = Math.min(Math.max(Math.trunc(days) || 30, 1), 365)
+  const since = new Date(Date.now() - window * 86_400_000).toISOString()
+
+  const { data, error } = await supabase
+    .from("foodos_campaigns")
+    .select("variant, status")
+    .eq("restaurant_id", restaurantId)
+    .not("variant", "is", null)
+    .gte("created_at", since)
+    .limit(5000)
+  if (error) throw new Error(error.message)
+
+  const tally = tallyAbTest(
+    (data ?? []) as { variant: FoodosCampaignVariant | null; status: string }[]
+  )
+  return (["a", "b"] as const).map((variant) => ({
+    variant,
+    sent: tally[variant].sent,
+    failed: tally[variant].failed,
+    total: tally[variant].sent + tally[variant].failed,
+  }))
+}
+
+/**
+ * Redacta una plantilla de campaña con IA a partir de una instrucción breve.
+ * `source: "template"` significa que la IA no estaba disponible y el resultado
+ * es la plantilla determinista: en ambos casos el texto es usable.
+ */
+export async function generateCampaignCopy(input: {
+  restaurant_id: string
+  brief: string
+  offer?: string | null
+  audienceLabel?: string | null
+  tone?: CampaignTone
+}): Promise<CampaignCopyOutput> {
+  await requireFoodosFeature("marketing_ia")
+  const { supabase, user } = await requireAuth()
+  const { data: owned } = await supabase
+    .from("foodos_restaurants")
+    .select("id, name")
+    .eq("id", input.restaurant_id)
+    .eq("user_id", user.id)
+    .maybeSingle()
+  if (!owned) throw new Error("Restaurante no encontrado")
+
+  const brief = input.brief.trim()
+  if (!brief) throw new Error("Describe qué quieres comunicar")
+
+  const { generateCampaignCopy: generate } = await import("@/lib/foodos-ai/copy")
+  return generate({
+    restaurantName: String(owned.name ?? ""),
+    brief: brief.slice(0, 600),
+    offer: input.offer?.trim() || null,
+    audienceLabel: input.audienceLabel?.trim() || null,
+    tone: input.tone,
+    restaurantId: input.restaurant_id,
+  })
 }
 
 // ------------------------------------------------------------
@@ -1598,4 +1793,1797 @@ export async function sendWaReply(
     content: trimmed.slice(0, 4000),
     status: "sent",
   })
+}
+
+// ------------------------------------------------------------
+// Mesero IA (nivel Diamante)
+//
+// Mismo contrato que Marketing IA: las escrituras lanzan
+// (`requireFoodosFeature`), las lecturas degradan a vacío para que la
+// pantalla muestre su estado bloqueado en lugar de un error de servidor.
+// ------------------------------------------------------------
+
+export interface MeseroSettings {
+  restaurant_id: string
+  is_enabled: boolean
+  tone: "amable" | "formal" | "rapido" | "divertido"
+  greeting: string | null
+  handoff_enabled: boolean
+  max_items: number
+  daily_reply_cap: number
+  business_hours_only: boolean
+}
+
+export interface MeseroSessionRow {
+  id: string
+  customer_phone: string
+  state: string
+  pending_question: string | null
+  order_id: string | null
+  handoff_at: string | null
+  message_count: number
+  replies_today: number
+  last_message_at: string | null
+  created_at: string
+}
+
+export interface MeseroMessageRow {
+  id: string
+  session_id: string
+  direction: "inbound" | "outbound" | "human"
+  content: string
+  source: "llm" | "template" | null
+  created_at: string
+}
+
+export interface MeseroStats {
+  conversations: number
+  handoffs: number
+  orders: number
+  conversion: number
+  avgTicket: number
+}
+
+/** `true` si el restaurante tiene la capacidad; usado por las lecturas. */
+async function canUseMeseroIa(): Promise<boolean> {
+  try {
+    await requireFoodosFeature("mesero_ia")
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function getMeseroSettings(
+  restaurantId: string
+): Promise<MeseroSettings | null> {
+  if (!(await canUseMeseroIa())) return null
+  const { supabase } = await requireAuth()
+  const { data } = await supabase
+    .from("foodos_ai_settings")
+    .select("*")
+    .eq("restaurant_id", restaurantId)
+    .maybeSingle()
+  return (data as MeseroSettings | null) ?? null
+}
+
+export async function upsertMeseroSettings(input: {
+  restaurant_id: string
+  is_enabled: boolean
+  tone: "amable" | "formal" | "rapido" | "divertido"
+  greeting: string | null
+  handoff_enabled: boolean
+  max_items: number
+  daily_reply_cap: number
+  business_hours_only: boolean
+}): Promise<void> {
+  await requireFoodosFeature("mesero_ia")
+  const { supabase } = await requireAuth()
+
+  const maxItems = Math.min(Math.max(Math.round(Number(input.max_items) || 20), 1), 50)
+  const dailyCap = Math.min(Math.max(Math.round(Number(input.daily_reply_cap) || 0), 0), 2000)
+
+  const { error } = await supabase.from("foodos_ai_settings").upsert(
+    {
+      restaurant_id: input.restaurant_id,
+      is_enabled: Boolean(input.is_enabled),
+      tone: input.tone,
+      greeting: input.greeting?.trim() ? input.greeting.trim().slice(0, 500) : null,
+      handoff_enabled: Boolean(input.handoff_enabled),
+      max_items: maxItems,
+      daily_reply_cap: dailyCap,
+      business_hours_only: Boolean(input.business_hours_only),
+    },
+    { onConflict: "restaurant_id" }
+  )
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/mesero-ia")
+}
+
+/** Sesiones ordenadas por actividad reciente. */
+export async function listMeseroSessions(
+  restaurantId: string,
+  limit = 50
+): Promise<MeseroSessionRow[]> {
+  if (!(await canUseMeseroIa())) return []
+  const { supabase } = await requireAuth()
+  const { data } = await supabase
+    .from("foodos_ai_sessions")
+    .select(
+      "id, customer_phone, state, pending_question, order_id, handoff_at, message_count, replies_today, last_message_at, created_at"
+    )
+    .eq("restaurant_id", restaurantId)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .limit(Math.min(Math.max(limit, 1), 200))
+  return (data ?? []) as MeseroSessionRow[]
+}
+
+export async function listMeseroMessages(
+  sessionId: string,
+  limit = 100
+): Promise<MeseroMessageRow[]> {
+  if (!(await canUseMeseroIa())) return []
+  const { supabase } = await requireAuth()
+  const { data } = await supabase
+    .from("foodos_ai_messages")
+    .select("id, session_id, direction, content, source, created_at")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: true })
+    .limit(Math.min(Math.max(limit, 1), 300))
+  return (data ?? []) as MeseroMessageRow[]
+}
+
+/** El humano toma la conversación: la IA deja de responder. */
+export async function takeOverMeseroSession(sessionId: string): Promise<void> {
+  await requireFoodosFeature("mesero_ia")
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_ai_sessions")
+    .update({ handoff_at: new Date().toISOString(), state: "handoff", pending_question: null })
+    .eq("id", sessionId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/mesero-ia")
+}
+
+/** La IA retoma la conversación desde cero (borrador limpio). */
+export async function resumeMeseroSession(sessionId: string): Promise<void> {
+  await requireFoodosFeature("mesero_ia")
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_ai_sessions")
+    .update({
+      handoff_at: null,
+      state: "browsing",
+      pending_question: null,
+      draft: {},
+    })
+    .eq("id", sessionId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/mesero-ia")
+}
+
+/** Métricas de las últimas N horas de conversación. */
+export async function getMeseroStats(
+  restaurantId: string,
+  days = 30
+): Promise<MeseroStats> {
+  const empty: MeseroStats = {
+    conversations: 0,
+    handoffs: 0,
+    orders: 0,
+    conversion: 0,
+    avgTicket: 0,
+  }
+  if (!(await canUseMeseroIa())) return empty
+  const { supabase } = await requireAuth()
+
+  const since = new Date(Date.now() - Math.min(Math.max(days, 1), 365) * 86_400_000).toISOString()
+  const { data: sessions } = await supabase
+    .from("foodos_ai_sessions")
+    .select("id, order_id, handoff_at")
+    .eq("restaurant_id", restaurantId)
+    .gte("last_message_at", since)
+
+  const rows = sessions ?? []
+  const orderIds = rows.map((r) => r.order_id).filter((id): id is string => Boolean(id))
+
+  let avgTicket = 0
+  if (orderIds.length) {
+    const { data: orders } = await supabase
+      .from("foodos_orders")
+      .select("total")
+      .in("id", orderIds)
+    const totals = (orders ?? []).map((o) => Number(o.total) || 0)
+    if (totals.length) {
+      avgTicket = totals.reduce((s, t) => s + t, 0) / totals.length
+    }
+  }
+
+  const conversations = rows.length
+  const orders = orderIds.length
+  return {
+    conversations,
+    handoffs: rows.filter((r) => r.handoff_at).length,
+    orders,
+    conversion: conversations ? orders / conversations : 0,
+    avgTicket,
+  }
+}
+
+// ============================================================
+// Flotilla (nivel Oro)
+// ============================================================
+// Mismo contrato que el resto del panel: las ESCRITURAS exigen el nivel y
+// lanzan si falta; las LECTURAS degradan a un valor vacío para que la página
+// pueda pintar el candado en vez de reventar.
+// ============================================================
+
+export interface FlotillaCourierRow {
+  id: string
+  name: string
+  phone: string | null
+  vehicle: "moto" | "bici" | "auto" | "a_pie"
+  capacity: number
+  shift_start: string | null
+  shift_end: string | null
+  is_active: boolean
+  notes: string | null
+  load: number
+  /** El enlace móvil del repartidor está activo (tiene token). */
+  has_link: boolean
+}
+
+export interface FlotillaZoneRow {
+  id: string
+  name: string
+  branch_id: string | null
+  center_lat: number | null
+  center_lng: number | null
+  radius_km: number | null
+  fee: number
+  min_order: number
+  eta_minutes: number
+  payout_mode: "fixed" | "per_km" | "percent"
+  payout_value: number
+  color: string | null
+  sort_order: number
+  is_active: boolean
+}
+
+export interface FlotillaDeliveryRow {
+  id: string
+  order_id: string
+  courier_id: string | null
+  courier_name: string | null
+  status: "pending" | "assigned" | "picked_up" | "delivered" | "failed" | "cancelled"
+  provider: "in_house" | "uber_direct"
+  provider_tracking_url: string | null
+  zone_name: string | null
+  dropoff_address: string
+  dropoff_notes: string | null
+  customer_name: string | null
+  order_total: number
+  fee: number
+  courier_payout: number
+  distance_km: number | null
+  eta_minutes: number | null
+  created_at: string
+  assigned_at: string | null
+  picked_up_at: string | null
+}
+
+export interface FlotillaStats {
+  active: number
+  unassigned: number
+  deliveredToday: number
+  failedToday: number
+  avgDeliveryMinutes: number | null
+  feesToday: number
+  payoutsToday: number
+  couriers: number
+  zones: number
+}
+
+/** URL pública del sitio; se usa para armar los enlaces que comparte el panel. */
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://resurte.me").replace(/\/$/, "")
+
+const EMPTY_FLOTILLA_STATS: FlotillaStats = {
+  active: 0,
+  unassigned: 0,
+  deliveredToday: 0,
+  failedToday: 0,
+  avgDeliveryMinutes: null,
+  feesToday: 0,
+  payoutsToday: 0,
+  couriers: 0,
+  zones: 0,
+}
+
+/** `true` si el restaurante tiene la capacidad; usado por las lecturas. */
+async function canUseFlotilla(): Promise<boolean> {
+  try {
+    await requireFoodosFeature("flotilla")
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Verifica propiedad antes de escribir: la RLS no da mensajes útiles. */
+async function assertOwnRestaurant(
+  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  userId: string,
+  restaurantId: string
+): Promise<void> {
+  const { data } = await supabase
+    .from("foodos_restaurants")
+    .select("id")
+    .eq("id", restaurantId)
+    .eq("user_id", userId)
+    .maybeSingle()
+  if (!data) throw new Error("Restaurante no encontrado")
+}
+
+export async function listFlotillaCouriers(
+  restaurantId: string
+): Promise<FlotillaCourierRow[]> {
+  if (!(await canUseFlotilla())) return []
+  const { supabase } = await requireAuth()
+  const { listCouriersWithLoad } = await import("@/lib/flotilla/deliveries")
+  return listCouriersWithLoad(supabase, restaurantId)
+}
+
+export async function listFlotillaZones(
+  restaurantId: string
+): Promise<FlotillaZoneRow[]> {
+  if (!(await canUseFlotilla())) return []
+  const { supabase } = await requireAuth()
+  const { data } = await supabase
+    .from("foodos_delivery_zones")
+    .select(
+      "id, name, branch_id, center_lat, center_lng, radius_km, fee, min_order, eta_minutes, payout_mode, payout_value, color, sort_order, is_active"
+    )
+    .eq("restaurant_id", restaurantId)
+    .order("sort_order", { ascending: true })
+  return (data ?? []) as FlotillaZoneRow[]
+}
+
+export async function listFlotillaDeliveries(
+  restaurantId: string,
+  limit = 50
+): Promise<FlotillaDeliveryRow[]> {
+  if (!(await canUseFlotilla())) return []
+  const { supabase } = await requireAuth()
+  const { listActiveDeliveries } = await import("@/lib/flotilla/deliveries")
+  const rows = await listActiveDeliveries(supabase, restaurantId, limit)
+  if (!rows.length) return []
+
+  const courierIds = [
+    ...new Set(rows.map((r) => r.courier_id).filter((id): id is string => typeof id === "string")),
+  ]
+  const orderIds = rows.map((r) => String(r.order_id ?? "")).filter(Boolean)
+
+  const [couriersRes, ordersRes] = await Promise.all([
+    courierIds.length
+      ? supabase.from("foodos_couriers").select("id, name").in("id", courierIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    orderIds.length
+      ? supabase.from("foodos_orders").select("id, customer_name, total").in("id", orderIds)
+      : Promise.resolve({ data: [] as { id: string; customer_name: string | null; total: number }[] }),
+  ])
+
+  const courierNames = new Map(
+    (couriersRes.data ?? []).map((c) => [String(c.id), String(c.name ?? "")])
+  )
+  const orders = new Map(
+    (ordersRes.data ?? []).map((o) => [
+      String(o.id),
+      { name: (o.customer_name as string | null) ?? null, total: Number(o.total) || 0 },
+    ])
+  )
+
+  return rows.map((row) => {
+    const courierId = typeof row.courier_id === "string" ? row.courier_id : null
+    const orderId = String(row.order_id ?? "")
+    const order = orders.get(orderId)
+    return {
+      id: String(row.id ?? ""),
+      order_id: orderId,
+      courier_id: courierId,
+      courier_name: courierId ? courierNames.get(courierId) ?? null : null,
+      status: String(row.status ?? "pending") as FlotillaDeliveryRow["status"],
+      provider: String(row.provider ?? "in_house") as FlotillaDeliveryRow["provider"],
+      provider_tracking_url:
+        typeof row.provider_tracking_url === "string" ? row.provider_tracking_url : null,
+      zone_name: typeof row.zone_name === "string" ? row.zone_name : null,
+      dropoff_address: String(row.dropoff_address ?? ""),
+      dropoff_notes: typeof row.dropoff_notes === "string" ? row.dropoff_notes : null,
+      customer_name: order?.name ?? null,
+      order_total: order?.total ?? 0,
+      fee: Number(row.fee) || 0,
+      courier_payout: Number(row.courier_payout) || 0,
+      distance_km: row.distance_km === null || row.distance_km === undefined ? null : Number(row.distance_km),
+      eta_minutes: row.eta_minutes === null || row.eta_minutes === undefined ? null : Number(row.eta_minutes),
+      created_at: String(row.created_at ?? ""),
+      assigned_at: typeof row.assigned_at === "string" ? row.assigned_at : null,
+      picked_up_at: typeof row.picked_up_at === "string" ? row.picked_up_at : null,
+    }
+  })
+}
+
+export async function getFlotillaStats(restaurantId: string): Promise<FlotillaStats> {
+  if (!(await canUseFlotilla())) return EMPTY_FLOTILLA_STATS
+  const { supabase } = await requireAuth()
+
+  const [{ getFlotillaSummary }, { count: couriers }, { count: zones }, restaurantRes] =
+    await Promise.all([
+      import("@/lib/flotilla/deliveries"),
+      supabase
+        .from("foodos_couriers")
+        .select("id", { count: "exact", head: true })
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true),
+      supabase
+        .from("foodos_delivery_zones")
+        .select("id", { count: "exact", head: true })
+        .eq("restaurant_id", restaurantId)
+        .eq("is_active", true),
+      supabase
+        .from("foodos_restaurants")
+        .select("timezone")
+        .eq("id", restaurantId)
+        .maybeSingle(),
+    ])
+
+  const timezone =
+    typeof restaurantRes.data?.timezone === "string" ? restaurantRes.data.timezone : null
+  const summary = await getFlotillaSummary(supabase, restaurantId, { timezone })
+  if (!summary) return EMPTY_FLOTILLA_STATS
+
+  return {
+    ...summary,
+    couriers: couriers ?? 0,
+    zones: zones ?? 0,
+  }
+}
+
+export async function upsertFlotillaCourier(input: {
+  id?: string | null
+  restaurant_id: string
+  name: string
+  phone?: string | null
+  vehicle?: "moto" | "bici" | "auto" | "a_pie"
+  capacity?: number
+  shift_start?: string | null
+  shift_end?: string | null
+  is_active?: boolean
+  notes?: string | null
+}): Promise<void> {
+  await requireFoodosFeature("flotilla")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const name = input.name?.trim()
+  if (!name) throw new Error("El repartidor necesita un nombre")
+
+  const payload = {
+    restaurant_id: input.restaurant_id,
+    name,
+    phone: input.phone?.trim() || null,
+    vehicle: input.vehicle ?? "moto",
+    capacity: Math.min(Math.max(Number(input.capacity) || 1, 1), 10),
+    shift_start: input.shift_start || null,
+    shift_end: input.shift_end || null,
+    is_active: input.is_active ?? true,
+    notes: input.notes?.trim() || null,
+  }
+
+  const { error } = input.id
+    ? await supabase.from("foodos_couriers").update(payload).eq("id", input.id)
+    : await supabase.from("foodos_couriers").insert(payload)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/flotilla")
+}
+
+export async function toggleFlotillaCourier(id: string, isActive: boolean): Promise<void> {
+  await requireFoodosFeature("flotilla")
+  const { supabase } = await requireAuth()
+  const { error } = await supabase
+    .from("foodos_couriers")
+    .update({ is_active: isActive })
+    .eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/flotilla")
+}
+
+export async function deleteFlotillaCourier(id: string): Promise<void> {
+  await requireFoodosFeature("flotilla")
+  const { supabase } = await requireAuth()
+  // Las entregas históricas conservan `courier_id` a NULL (FK ON DELETE SET NULL):
+  // borrar a un repartidor no debe borrar su historial.
+  const { error } = await supabase.from("foodos_couriers").delete().eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/flotilla")
+}
+
+export async function upsertFlotillaZone(input: {
+  id?: string | null
+  restaurant_id: string
+  name: string
+  branch_id?: string | null
+  center_lat?: number | null
+  center_lng?: number | null
+  radius_km?: number | null
+  fee: number
+  min_order?: number
+  eta_minutes?: number
+  payout_mode?: "fixed" | "per_km" | "percent"
+  payout_value?: number
+  color?: string | null
+  sort_order?: number
+  is_active?: boolean
+}): Promise<void> {
+  await requireFoodosFeature("flotilla")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const name = input.name?.trim()
+  if (!name) throw new Error("La zona necesita un nombre")
+
+  const radius = Number(input.radius_km)
+  if (!Number.isFinite(radius) || radius <= 0) {
+    throw new Error("El radio de la zona debe ser mayor a cero")
+  }
+  const lat = Number(input.center_lat)
+  const lng = Number(input.center_lng)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error("La zona necesita coordenadas válidas")
+  }
+
+  const payload = {
+    restaurant_id: input.restaurant_id,
+    name,
+    branch_id: input.branch_id || null,
+    center_lat: lat,
+    center_lng: lng,
+    radius_km: radius,
+    fee: Math.max(0, Number(input.fee) || 0),
+    min_order: Math.max(0, Number(input.min_order) || 0),
+    eta_minutes: Math.min(Math.max(Number(input.eta_minutes) || 35, 5), 240),
+    payout_mode: input.payout_mode ?? "fixed",
+    payout_value: Math.max(0, Number(input.payout_value) || 0),
+    color: input.color?.trim() || null,
+    sort_order: Number(input.sort_order) || 0,
+    is_active: input.is_active ?? true,
+  }
+
+  const { error } = input.id
+    ? await supabase.from("foodos_delivery_zones").update(payload).eq("id", input.id)
+    : await supabase.from("foodos_delivery_zones").insert(payload)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/flotilla")
+}
+
+export async function deleteFlotillaZone(id: string): Promise<void> {
+  await requireFoodosFeature("flotilla")
+  const { supabase } = await requireAuth()
+  const { error } = await supabase.from("foodos_delivery_zones").delete().eq("id", id)
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/flotilla")
+}
+
+export async function assignFlotillaCourier(input: {
+  restaurant_id: string
+  delivery_id: string
+  courier_id: string
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("flotilla")
+  const { supabase } = await requireAuth()
+  const { assignCourier } = await import("@/lib/flotilla/deliveries")
+  const result = await assignCourier(supabase, {
+    deliveryId: input.delivery_id,
+    restaurantId: input.restaurant_id,
+    courierId: input.courier_id,
+  })
+  revalidatePath("/panel/foodos/flotilla")
+  return result.ok ? { ok: true } : { ok: false, error: result.error }
+}
+
+export async function advanceFlotillaDelivery(input: {
+  restaurant_id: string
+  delivery_id: string
+  status: "assigned" | "picked_up" | "delivered" | "failed" | "cancelled"
+  note?: string | null
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("flotilla")
+  const { supabase } = await requireAuth()
+  const { advanceDelivery } = await import("@/lib/flotilla/deliveries")
+  const result = await advanceDelivery(supabase, {
+    deliveryId: input.delivery_id,
+    restaurantId: input.restaurant_id,
+    status: input.status,
+    note: input.note ?? null,
+  })
+  revalidatePath("/panel/foodos/flotilla")
+  return result.ok ? { ok: true } : { ok: false, error: result.error }
+}
+
+/**
+ * Despacha la entrega a un proveedor externo (Uber Direct).
+ *
+ * Es una acción EXPLÍCITA y nunca automática: cuesta dinero por entrega. Sin
+ * credenciales configuradas devuelve un error legible y la Flotilla sigue
+ * operando con repartidores propios.
+ */
+export async function dispatchFlotillaToProvider(input: {
+  restaurant_id: string
+  delivery_id: string
+}): Promise<{ ok: boolean; error?: string; trackingUrl?: string | null }> {
+  await requireFoodosFeature("flotilla")
+  const { supabase } = await requireAuth()
+
+  const { resolveDeliveryProvider } = await import("@/lib/flotilla/provider")
+  const provider = resolveDeliveryProvider()
+  if (!provider) {
+    return { ok: false, error: "No hay proveedor de reparto configurado" }
+  }
+
+  const { data: delivery } = await supabase
+    .from("foodos_deliveries")
+    .select(
+      "id, order_id, branch_id, status, dropoff_address, dropoff_notes, dropoff_lat, dropoff_lng, provider_delivery_id"
+    )
+    .eq("id", input.delivery_id)
+    .eq("restaurant_id", input.restaurant_id)
+    .maybeSingle()
+  if (!delivery) return { ok: false, error: "Entrega no encontrada" }
+  if (delivery.provider_delivery_id) {
+    return { ok: false, error: "La entrega ya se despachó al proveedor" }
+  }
+  if (delivery.status === "delivered" || delivery.status === "cancelled") {
+    return { ok: false, error: "La entrega ya está cerrada" }
+  }
+
+  const { data: order } = await supabase
+    .from("foodos_orders")
+    .select("id, customer_name, customer_phone")
+    .eq("id", delivery.order_id)
+    .maybeSingle()
+
+  let pickupName = "Sucursal"
+  let pickupAddress = ""
+  let pickupPhone: string | null = null
+  if (delivery.branch_id) {
+    const { data: branch } = await supabase
+      .from("foodos_branches")
+      .select("name, address, phone")
+      .eq("id", delivery.branch_id)
+      .maybeSingle()
+    if (branch) {
+      pickupName = String(branch.name ?? pickupName)
+      pickupAddress = String(branch.address ?? "")
+      pickupPhone = typeof branch.phone === "string" ? branch.phone : null
+    }
+  }
+  if (!pickupAddress) {
+    return { ok: false, error: "La sucursal necesita una dirección de recolección" }
+  }
+
+  const result = await provider.dispatch({
+    pickupName,
+    pickupAddress,
+    pickupPhone: pickupPhone ?? "",
+    dropoffName: String(order?.customer_name ?? "Cliente"),
+    dropoffAddress: String(delivery.dropoff_address ?? ""),
+    dropoffPhone: String(order?.customer_phone ?? ""),
+    dropoffNotes: typeof delivery.dropoff_notes === "string" ? delivery.dropoff_notes : undefined,
+    externalRef: String(delivery.order_id),
+  })
+  if (!result.ok) {
+    // Traza durable: el proveedor rechazó el despacho y la entrega se queda
+    // sin repartidor. `logger.warn` se pierde en la consola del proceso.
+    // El try/catch protege el error legible: la observabilidad nunca debe
+    // convertir "no se pudo despachar" en una excepción.
+    try {
+      await reportServerError({
+        message: "La Flotilla no pudo despachar la entrega al proveedor",
+        severity: "warn",
+        context: {
+          restaurantId: input.restaurant_id,
+          deliveryId: input.delivery_id,
+          provider: "uber_direct",
+        },
+        url: "foodos:flotilla",
+        error: result.error,
+      })
+    } catch {
+      // Sin traza, pero con mensaje para el restaurante.
+    }
+    return { ok: false, error: result.error }
+  }
+
+  const { error } = await supabase
+    .from("foodos_deliveries")
+    .update({
+      provider: "uber_direct",
+      provider_delivery_id: result.providerDeliveryId,
+      provider_tracking_url: result.trackingUrl,
+      eta_minutes: result.etaMinutes ?? undefined,
+    })
+    .eq("id", input.delivery_id)
+  if (error) throw new Error(error.message)
+
+  await supabase.from("foodos_delivery_events").insert({
+    delivery_id: input.delivery_id,
+    restaurant_id: input.restaurant_id,
+    status: String(delivery.status ?? "pending"),
+    actor: "provider",
+    note: "Despachado a proveedor externo",
+  })
+
+  revalidatePath("/panel/foodos/flotilla")
+  return { ok: true, trackingUrl: result.trackingUrl }
+}
+
+/**
+ * Asigna la entrega al repartidor que le toca (turno, cupo y menos carga).
+ *
+ * Si nadie está disponible devuelve un error legible en vez de dejar la
+ * entrega muda: el restaurante asigna a mano o despacha al proveedor.
+ */
+export async function autoAssignFlotillaDelivery(input: {
+  restaurant_id: string
+  delivery_id: string
+}): Promise<{ ok: boolean; courierName?: string | null; error?: string }> {
+  await requireFoodosFeature("flotilla")
+  const { supabase } = await requireAuth()
+  const { autoAssignDelivery } = await import("@/lib/flotilla/deliveries")
+  const result = await autoAssignDelivery(supabase, {
+    deliveryId: input.delivery_id,
+    restaurantId: input.restaurant_id,
+  })
+  revalidatePath("/panel/foodos/flotilla")
+  return result.ok
+    ? { ok: true, courierName: result.courierName }
+    : { ok: false, error: result.error }
+}
+
+/**
+ * Devuelve el enlace móvil del repartidor, generándolo si aún no existe.
+ *
+ * El token es una capacidad: quien lo tenga ve las entregas asignadas a
+ * ese repartidor. Por eso se muestra solo en el panel y se puede revocar.
+ */
+export async function ensureFlotillaCourierLink(input: {
+  restaurant_id: string
+  courier_id: string
+}): Promise<{ ok: boolean; url?: string; error?: string }> {
+  await requireFoodosFeature("flotilla")
+  const { supabase } = await requireAuth()
+  const { ensureCourierToken } = await import("@/lib/flotilla/deliveries")
+  const result = await ensureCourierToken(supabase, {
+    courierId: input.courier_id,
+    restaurantId: input.restaurant_id,
+  })
+  if (!result.ok) return { ok: false, error: result.error }
+  revalidatePath("/panel/foodos/flotilla")
+  return { ok: true, url: `${SITE_URL}/reparto/${result.token}` }
+}
+
+/** Rota el enlace del repartidor: el anterior deja de funcionar al instante. */
+export async function revokeFlotillaCourierLink(input: {
+  restaurant_id: string
+  courier_id: string
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("flotilla")
+  const { supabase } = await requireAuth()
+  const { revokeCourierToken } = await import("@/lib/flotilla/deliveries")
+  const result = await revokeCourierToken(supabase, {
+    courierId: input.courier_id,
+    restaurantId: input.restaurant_id,
+  })
+  revalidatePath("/panel/foodos/flotilla")
+  return result.ok ? { ok: true } : { ok: false, error: result.error }
+}
+
+// ============================================================
+// Tarjeta de lealtad (nivel Diamante)
+// ============================================================
+// El saldo de la tarjeta es una FOTOGRAFÍA del CRM, no una consulta viva: se
+// copia al pase para que el comensal lo vea sin sesión. La copia la mantiene
+// al día el trigger `foodos_sync_wallet_passes` (migración 00126) cada vez que
+// se acreditan puntos.
+//
+// Mismo contrato que el resto del panel: las ESCRITURAS exigen el nivel y
+// lanzan; las LECTURAS degradan.
+//
+// La emisión escribe con service role: la RLS de `foodos_wallet_passes` solo
+// deja insertar a admin. El permiso real lo da el gate de nivel más la
+// verificación de propiedad, ambos ANTES de tocar la base.
+// ============================================================
+
+export interface WalletSettings {
+  wallet_enabled: boolean
+  reward_points: number | null
+  reward_label: string | null
+  points_per_100: number
+  point_value: number
+  is_active: boolean
+}
+
+/** `true` si el restaurante tiene la capacidad; usado por las lecturas. */
+async function canUseWallet(): Promise<boolean> {
+  try {
+    await requireFoodosFeature("wallet_passes")
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function getWalletSettings(
+  restaurantId: string
+): Promise<WalletSettings | null> {
+  if (!(await canUseWallet())) return null
+  const { supabase } = await requireAuth()
+  const { data, error } = await supabase
+    .from("foodos_loyalty_programs")
+    .select(
+      "wallet_enabled, reward_points, reward_label, points_per_100, point_value, is_active"
+    )
+    .eq("restaurant_id", restaurantId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as WalletSettings | null) ?? null
+}
+
+export async function listWalletPassRows(
+  restaurantId: string
+): Promise<WalletPassRow[]> {
+  if (!(await canUseWallet())) return []
+  const { supabase } = await requireAuth()
+  return listWalletPasses(supabase, restaurantId)
+}
+
+export async function getWalletKpis(restaurantId: string): Promise<WalletStats> {
+  if (!(await canUseWallet())) return { ...EMPTY_WALLET_STATS }
+  const { supabase } = await requireAuth()
+  return getWalletStats(supabase, restaurantId)
+}
+
+/**
+ * Guarda el aspecto comercial de la tarjeta: si está encendida, qué
+ * recompensa anuncia y a cuántos puntos.
+ *
+ * La recompensa es opcional: sin ella la tarjeta solo muestra el saldo. Un
+ * umbral en cero se guarda como NULL para no anunciar una meta imposible, y
+ * una recompensa sin nombre se rechaza porque el comensal vería un hueco.
+ */
+export async function upsertWalletSettings(input: {
+  restaurant_id: string
+  wallet_enabled: boolean
+  reward_points?: number | null
+  reward_label?: string | null
+}): Promise<void> {
+  await requireFoodosFeature("wallet_passes")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const raw = input.reward_points
+  const threshold =
+    raw === null || raw === undefined || !Number.isFinite(Number(raw)) || Number(raw) <= 0
+      ? null
+      : Math.floor(Number(raw))
+  const label = input.reward_label?.trim() || null
+  if (threshold !== null && !label) {
+    throw new Error("La recompensa necesita un nombre")
+  }
+
+  const { error } = await supabase.from("foodos_loyalty_programs").upsert(
+    {
+      restaurant_id: input.restaurant_id,
+      wallet_enabled: input.wallet_enabled,
+      reward_points: threshold,
+      reward_label: threshold === null ? null : label,
+    },
+    { onConflict: "restaurant_id" }
+  )
+  if (error) throw new Error(error.message)
+  revalidatePath("/panel/foodos/wallet")
+}
+
+/**
+ * Emite la tarjeta de un comensal.
+ *
+ * Idempotente: si ya existía, devuelve el MISMO token, para no invalidar el QR
+ * que el comensal ya tiene guardado. Devuelve el token y no la URL porque el
+ * slug del restaurante ya lo tiene la página que llama.
+ */
+export async function issueWalletPass(input: {
+  restaurant_id: string
+  customer_id: string
+}): Promise<{ ok: boolean; token?: string; error?: string }> {
+  await requireFoodosFeature("wallet_passes")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  let service: Awaited<ReturnType<typeof createServiceClient>>
+  try {
+    service = await createServiceClient()
+  } catch {
+    return { ok: false, error: "No se pudo emitir la tarjeta" }
+  }
+
+  const result = await ensureWalletPass(service, {
+    restaurantId: input.restaurant_id,
+    customerId: input.customer_id,
+    platform: "web",
+  })
+  if (!result.ok) return { ok: false, error: result.error }
+
+  revalidatePath("/panel/foodos/wallet")
+  return { ok: true, token: result.pass.token }
+}
+
+/** Recalcula la fotografía del pase con el saldo actual del CRM. */
+export async function refreshWalletPassRow(input: {
+  restaurant_id: string
+  pass_id: string
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("wallet_passes")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const updated = await refreshWalletPass(supabase, input.restaurant_id, input.pass_id)
+  if (!updated) return { ok: false, error: "No se pudo actualizar la tarjeta" }
+  revalidatePath("/panel/foodos/wallet")
+  return { ok: true }
+}
+
+/**
+ * Revoca o reactiva una tarjeta. Revocar invalida el enlace al instante: el
+ * comensal deja de poder abrir su saldo.
+ */
+export async function setWalletPassEnabled(input: {
+  restaurant_id: string
+  pass_id: string
+  is_active: boolean
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("wallet_passes")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const ok = await setWalletPassActive(
+    supabase,
+    input.restaurant_id,
+    input.pass_id,
+    input.is_active
+  )
+  if (!ok) return { ok: false, error: "No se pudo cambiar la tarjeta" }
+  revalidatePath("/panel/foodos/wallet")
+  return { ok: true }
+}
+
+// ============================================================
+// Sitio web y SEO local (nivel Diamante)
+//
+// El "app de marca" y el sitio IA son la misma cosa vista desde dos lados: el
+// manifest PWA por restaurante (instalar el micrositio como app) y las páginas
+// públicas indexables (`/r/[slug]/carta` y `/r/[slug]/p/[slug]`).
+//
+// Invariante de la fase: **la IA nunca publica sola**. Todo lo generado nace en
+// `draft` (`upsertSeoPage` fuerza el estado) y el dueño lo aprueba. Y la IA no
+// inventa cifras ni enlaces: si el modelo alucina un precio o una sucursal, el
+// generador lo descarta y cae a la plantilla determinista.
+//
+// El manifest y las páginas ya publicadas son públicos a propósito: el dueño
+// aprobó ese contenido y gatearlos solo rompería la instalación de la app. Lo
+// que está gateado es generar, editar y publicar.
+// ============================================================
+
+export interface SeoProfileFields {
+  id: string
+  name: string
+  slug: string
+  tagline: string | null
+  about: string | null
+  description: string | null
+  seo_keywords: string[]
+  google_business_url: string | null
+  theme_color: string | null
+  logo_url: string | null
+  currency: string | null
+}
+
+export interface SeoDishOption {
+  id: string
+  name: string
+  description: string | null
+  tags: string[]
+}
+
+export interface SeoSiteData {
+  profile: SeoProfileFields
+  pages: SeoPageRow[]
+  dishes: SeoDishOption[]
+  checklist: GoogleBusinessStep[]
+  progress: GoogleBusinessProgress
+  /** URLs absolutas que el dueño puede copiar y compartir. */
+  urls: { site: string; menu: string; manifest: string }
+}
+
+export interface SeoKpis {
+  total: number
+  published: number
+  drafts: number
+  progressRatio: number
+  pendingSteps: number
+}
+
+/** `true` si el restaurante tiene la capacidad; usado por las lecturas. */
+async function canUseSitioIa(): Promise<boolean> {
+  try {
+    await requireFoodosFeature("sitio_ia")
+    return true
+  } catch {
+    return false
+  }
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.map((entry) => String(entry)).filter((entry) => entry.trim() !== "")
+}
+
+export async function getSitioData(restaurantId: string): Promise<SeoSiteData | null> {
+  if (!(await canUseSitioIa())) return null
+  const { supabase } = await requireAuth()
+
+  const context = await loadSeoProfile(supabase, restaurantId)
+  if (!context) return null
+
+  const [pages, dishRows] = await Promise.all([
+    listSeoPages(supabase, restaurantId),
+    supabase
+      .from("foodos_menu_items")
+      .select("id, name, description, tags")
+      .eq("restaurant_id", restaurantId)
+      .eq("is_available", true)
+      .order("sort_order")
+      .limit(200),
+  ])
+
+  const dishes: SeoDishOption[] = ((dishRows.data as unknown[]) ?? [])
+    .map((entry) => {
+      const row = entry as Record<string, unknown>
+      const name = typeof row.name === "string" ? row.name.trim() : ""
+      return {
+        id: String(row.id ?? ""),
+        name,
+        description: typeof row.description === "string" ? row.description : null,
+        tags: asStringArray(row.tags),
+      }
+    })
+    .filter((dish) => dish.id !== "" && dish.name !== "")
+
+  const checklist = googleBusinessChecklist({
+    profile: context.restaurant,
+    branches: context.branches,
+    hours: context.hours,
+    reviewCount: context.rating?.count ?? 0,
+  })
+
+  const slug = context.restaurant.slug
+  return {
+    profile: {
+      id: context.restaurant.id,
+      name: context.restaurant.name,
+      slug,
+      tagline: context.restaurant.tagline ?? null,
+      about: context.restaurant.about ?? null,
+      description: context.restaurant.description ?? null,
+      seo_keywords: context.restaurant.seo_keywords ?? [],
+      google_business_url: context.restaurant.google_business_url ?? null,
+      theme_color: context.restaurant.theme_color ?? null,
+      logo_url: context.restaurant.logo_url ?? null,
+      currency: context.restaurant.currency ?? null,
+    },
+    pages,
+    dishes,
+    checklist,
+    progress: googleBusinessProgress(checklist),
+    urls: {
+      site: `${SITE_URL}${restaurantPath(slug)}`,
+      menu: `${SITE_URL}${menuPath(slug)}`,
+      manifest: `${SITE_URL}${manifestPath(slug)}`,
+    },
+  }
+}
+
+export async function getSeoKpis(restaurantId: string): Promise<SeoKpis> {
+  const empty: SeoKpis = {
+    total: 0,
+    published: 0,
+    drafts: 0,
+    progressRatio: 0,
+    pendingSteps: 0,
+  }
+  if (!(await canUseSitioIa())) return empty
+  const { supabase } = await requireAuth()
+
+  const [pages, context] = await Promise.all([
+    listSeoPages(supabase, restaurantId),
+    loadSeoProfile(supabase, restaurantId),
+  ])
+  if (!context) return empty
+
+  const steps = googleBusinessChecklist({
+    profile: context.restaurant,
+    branches: context.branches,
+    hours: context.hours,
+    reviewCount: context.rating?.count ?? 0,
+  })
+  const progress = googleBusinessProgress(steps)
+
+  return {
+    total: pages.length,
+    published: pages.filter((page) => page.status === "published").length,
+    drafts: pages.filter((page) => page.status === "draft").length,
+    progressRatio: progress.ratio,
+    pendingSteps: progress.pending.length,
+  }
+}
+
+/**
+ * Guarda el perfil público: la frase corta que aparece bajo el nombre, la
+ * descripción larga y las palabras clave que alimentan los datos estructurados.
+ */
+export async function saveSeoProfileAction(input: {
+  restaurant_id: string
+  tagline?: string | null
+  about?: string | null
+  seo_keywords?: string[] | null
+  google_business_url?: string | null
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("sitio_ia")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const result = await saveSeoProfile(supabase, {
+    restaurantId: input.restaurant_id,
+    tagline: input.tagline,
+    about: input.about,
+    seoKeywords: input.seo_keywords,
+    googleBusinessUrl: input.google_business_url,
+  })
+  if (!result.ok) return { ok: false, error: result.error }
+
+  revalidatePath("/panel/foodos/sitio-ia")
+  revalidateTag("foodos-seo", "max")
+  return { ok: true }
+}
+
+/**
+ * Genera una página y la deja en borrador.
+ *
+ * `about` y `dish` pasan por el modelo (que solo reescribe lo que le damos);
+ * `faq` se arma siempre con datos reales del restaurante y sin modelo, porque
+ * una respuesta inventada sobre envíos o pagos se convierte en un cliente
+ * reclamando en el mostrador.
+ */
+export async function generateSeoPage(input: {
+  restaurant_id: string
+  kind: SeoPageKind
+  notes?: string | null
+  menu_item_id?: string | null
+}): Promise<{ ok: boolean; error?: string; page?: SeoPageRow; source?: "llm" | "template" }> {
+  await requireFoodosFeature("sitio_ia")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const context = await loadSeoProfile(supabase, input.restaurant_id)
+  if (!context) return { ok: false, error: "Restaurante no encontrado" }
+
+  const restaurantName = context.restaurant.name
+  const city = context.branches.find((branch) => branch.city)?.city ?? null
+  const notes = input.notes?.trim() ? input.notes.trim() : null
+
+  if (input.kind === "about") {
+    const output = await generateAboutText({
+      restaurantName,
+      notes: notes ?? context.restaurant.about,
+      keywords: context.restaurant.seo_keywords,
+      city,
+      restaurantId: input.restaurant_id,
+    })
+    const saved = await upsertSeoPage(supabase, {
+      restaurantId: input.restaurant_id,
+      kind: "about",
+      title: `Sobre ${restaurantName}`,
+      summary: city ? `Quiénes somos en ${city}` : "Quiénes somos",
+      body: output.text,
+      source: output.source,
+    })
+    if (!saved.ok) return { ok: false, error: saved.error }
+    revalidatePath("/panel/foodos/sitio-ia")
+    return { ok: true, page: saved.page, source: output.source }
+  }
+
+  if (input.kind === "faq") {
+    const output = generateFaq({ restaurantName, branches: context.branches, city })
+    const saved = await upsertSeoPage(supabase, {
+      restaurantId: input.restaurant_id,
+      kind: "faq",
+      title: "Preguntas frecuentes",
+      summary: `Envíos, pagos y horarios de ${restaurantName}`,
+      body: "",
+      faq: output.items,
+      source: output.source,
+    })
+    if (!saved.ok) return { ok: false, error: saved.error }
+    revalidatePath("/panel/foodos/sitio-ia")
+    return { ok: true, page: saved.page, source: output.source }
+  }
+
+  if (input.kind === "dish") {
+    if (!input.menu_item_id) return { ok: false, error: "Elige un platillo del menú" }
+    const { data: itemRow } = await supabase
+      .from("foodos_menu_items")
+      .select("id, name, description, price, tags")
+      .eq("id", input.menu_item_id)
+      .eq("restaurant_id", input.restaurant_id)
+      .maybeSingle()
+    if (!itemRow) return { ok: false, error: "Ese platillo ya no está en el menú" }
+
+    const item = itemRow as Record<string, unknown>
+    const dishName = typeof item.name === "string" ? item.name.trim() : ""
+    if (!dishName) return { ok: false, error: "Ese platillo no tiene nombre" }
+
+    const output = await generateDishCopy({
+      restaurantName,
+      dishName,
+      notes: notes ?? (typeof item.description === "string" ? item.description : null),
+      tags: asStringArray(item.tags),
+      restaurantId: input.restaurant_id,
+    })
+
+    // El precio y la ciudad los pone el servidor con datos reales, no el
+    // modelo: la IA nunca fija precios. Sin esto la página sería una sola
+    // frase, que Google castiga como contenido pobre.
+    const price = Number(item.price)
+    const facts: string[] = []
+    if (Number.isFinite(price) && price > 0) {
+      facts.push(`Precio: ${formatMoney(price)}.`)
+    }
+    const delivery = context.branches.some((branch) => branch.delivery_active)
+    const pickup = context.branches.some((branch) => branch.pickup_active)
+    const ways = [delivery ? "a domicilio" : null, pickup ? "para recoger" : null].filter(Boolean)
+    if (ways.length > 0) {
+      facts.push(
+        `Pídelo en línea ${ways.join(" o ")}${city ? ` en ${city}` : ""}, directo con ${restaurantName}.`
+      )
+    }
+
+    const saved = await upsertSeoPage(supabase, {
+      restaurantId: input.restaurant_id,
+      kind: "dish",
+      title: dishName,
+      slug: slugifySeo(dishName),
+      summary: output.text.slice(0, 155),
+      body: [output.text, facts.join(" ")].filter(Boolean).join("\n\n"),
+      source: output.source,
+    })
+    if (!saved.ok) return { ok: false, error: saved.error }
+    revalidatePath("/panel/foodos/sitio-ia")
+    return { ok: true, page: saved.page, source: output.source }
+  }
+
+  return { ok: false, error: "Tipo de página no soportado" }
+}
+
+/** Publica un borrador: es el acto de aprobación explícita del dueño. */
+export async function publishSeoPage(input: {
+  restaurant_id: string
+  page_id: string
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("sitio_ia")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const ok = await setSeoPageStatus(supabase, input.restaurant_id, input.page_id, "published")
+  if (!ok) return { ok: false, error: "No se pudo publicar la página" }
+
+  revalidatePath("/panel/foodos/sitio-ia")
+  // El sitio público lee de un caché por tag: sin esto la página recién
+  // publicada tardaría hasta 5 minutos en existir para el comensal.
+  revalidateTag("foodos-seo", "max")
+  revalidatePath("/r/[slug]/p/[pageSlug]", "page")
+  revalidatePath("/sitemap.xml")
+  return { ok: true }
+}
+
+export async function unpublishSeoPage(input: {
+  restaurant_id: string
+  page_id: string
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("sitio_ia")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const ok = await setSeoPageStatus(supabase, input.restaurant_id, input.page_id, "draft")
+  if (!ok) return { ok: false, error: "No se pudo ocultar la página" }
+
+  revalidatePath("/panel/foodos/sitio-ia")
+  revalidateTag("foodos-seo", "max")
+  revalidatePath("/r/[slug]/p/[pageSlug]", "page")
+  revalidatePath("/sitemap.xml")
+  return { ok: true }
+}
+
+export async function deleteSeoPageRow(input: {
+  restaurant_id: string
+  page_id: string
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("sitio_ia")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const ok = await deleteSeoPage(supabase, input.restaurant_id, input.page_id)
+  if (!ok) return { ok: false, error: "No se pudo borrar la página" }
+
+  revalidatePath("/panel/foodos/sitio-ia")
+  revalidateTag("foodos-seo", "max")
+  revalidatePath("/r/[slug]/p/[pageSlug]", "page")
+  revalidatePath("/sitemap.xml")
+  return { ok: true }
+}
+
+// ============================================================
+// Punto de venta (nivel Diamante)
+//
+// Seis proveedores declarados, **ninguno implementado todavía**. El panel lo
+// dice tal cual: cada conexión aparece como "pendiente" con la nota de qué
+// falta. Fingir una sincronización produciría un menú desincronizado en
+// silencio, que es peor que no tener integración.
+//
+// Mientras tanto el camino sin credenciales sigue siendo la importación CSV de
+// `/panel/foodos/menu`, que ya existe y no depende de nadie.
+//
+// Los webhooks entrantes se verifican con `safeSecretEqual` contra el secreto
+// de la conexión, y `getPosWebhookSecret` es fail-closed: si la conexión no está
+// `connected` o la lectura falla, no hay secreto y el webhook se rechaza.
+// ============================================================
+
+export interface PosData {
+  connections: PosConnectionView[]
+  log: PosSyncEntry[]
+  kpis: PosKpis
+}
+
+export interface PosSyncSummary {
+  ok: boolean
+  error?: string
+  created: number
+  updated: number
+  unchanged: number
+  /** Platillos que solo existen en FoodOS. Nunca se borran solos. */
+  onlyLocally: number
+  /** Se rellenó con la nota del adaptador cuando no está implementado. */
+  skipped: boolean
+}
+
+/** `true` si el restaurante tiene la capacidad; usado por las lecturas. */
+async function canUsePos(): Promise<boolean> {
+  try {
+    await requireFoodosFeature("pos_integraciones")
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function getPosData(restaurantId: string): Promise<PosData | null> {
+  if (!(await canUsePos())) return null
+  const { supabase } = await requireAuth()
+  const { loadPosContext } = await import("@/lib/pos/connections")
+  const context = await loadPosContext(supabase, restaurantId, {
+    origin: SITE_URL,
+    restaurantId,
+  })
+  return { connections: context.views, log: context.log, kpis: context.kpis }
+}
+
+export async function savePosConnectionAction(input: {
+  restaurant_id: string
+  provider: string
+  credentials: Record<string, string>
+}): Promise<{ ok: boolean; error?: string; missing?: string[] }> {
+  await requireFoodosFeature("pos_integraciones")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const { isPosProvider } = await import("@/lib/pos/registry")
+  if (!isPosProvider(input.provider)) return { ok: false, error: "Proveedor no reconocido" }
+
+  const { upsertPosConnection } = await import("@/lib/pos/connections")
+  const result = await upsertPosConnection(
+    supabase,
+    input.restaurant_id,
+    input.provider,
+    input.credentials
+  )
+  if (!result.ok) return { ok: false, error: result.error, missing: result.missing }
+
+  revalidatePath("/panel/foodos/pos")
+  return { ok: true }
+}
+
+export async function testPosConnectionAction(input: {
+  restaurant_id: string
+  provider: string
+}): Promise<{ ok: boolean; status: string; message: string }> {
+  await requireFoodosFeature("pos_integraciones")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const { checkPosCredentials, isPosProvider } = await import("@/lib/pos/registry")
+  if (!isPosProvider(input.provider)) {
+    return { ok: false, status: "pending", message: "Proveedor no reconocido" }
+  }
+
+  const { resolvePosAdapter } = await import("@/lib/pos/adapter")
+  const { getPosConnection, logPosSync } = await import("@/lib/pos/connections")
+  const adapter = resolvePosAdapter(input.provider)
+
+  // Las credenciales guardadas en claro solo se leen aquí, en el servidor: el
+  // panel siempre recibe la versión enmascarada.
+  const facts = await getPosConnection(supabase, input.restaurant_id, input.provider)
+  const credentials = facts?.credentials ?? {}
+  const health = await adapter.health(credentials)
+  const check = checkPosCredentials(input.provider, credentials)
+
+  // Se registra aunque no esté implementado: si el dueño probó, la bitácora
+  // debe decirlo. `pending` no es un fallo, es una carencia conocida.
+  await logPosSync(supabase, input.restaurant_id, {
+    provider: input.provider,
+    kind: "health",
+    status: health.status === "ready" ? "ok" : "skipped",
+    detail: health.message,
+  })
+
+  revalidatePath("/panel/foodos/pos")
+  return {
+    ok: health.status === "ready",
+    status: check.ok ? health.status : "needs_credentials",
+    message: health.message,
+  }
+}
+
+export async function runPosMenuSyncAction(input: {
+  restaurant_id: string
+  provider: string
+}): Promise<PosSyncSummary> {
+  await requireFoodosFeature("pos_integraciones")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const empty: PosSyncSummary = {
+    ok: false,
+    created: 0,
+    updated: 0,
+    unchanged: 0,
+    onlyLocally: 0,
+    skipped: false,
+  }
+
+  const { isPosProvider } = await import("@/lib/pos/registry")
+  if (!isPosProvider(input.provider)) return { ...empty, error: "Proveedor no reconocido" }
+
+  const { normalizeMenuSnapshot, resolvePosAdapter } = await import("@/lib/pos/adapter")
+  const { getPosConnection, logPosSync } = await import("@/lib/pos/connections")
+  const { planMenuSync } = await import("@/lib/pos/reconcile")
+
+  const facts = await getPosConnection(supabase, input.restaurant_id, input.provider)
+  const adapter = resolvePosAdapter(input.provider)
+  const pulled = await adapter.pullMenu(facts?.credentials ?? {})
+  if (!pulled.ok) {
+    await logPosSync(supabase, input.restaurant_id, {
+      provider: input.provider,
+      kind: "menu",
+      status: pulled.code === "not_implemented" ? "skipped" : "failed",
+      detail: pulled.error,
+    })
+    revalidatePath("/panel/foodos/pos")
+    return { ...empty, error: pulled.error, skipped: pulled.code === "not_implemented" }
+  }
+
+  const snapshot = normalizeMenuSnapshot(pulled.items)
+  const { data: localRows } = await supabase
+    .from("foodos_menu_items")
+    .select("id, name, price, description")
+    .eq("restaurant_id", input.restaurant_id)
+    .limit(500)
+
+  const local: LocalMenuItem[] = ((localRows as unknown[]) ?? []).map((entry) => {
+    const row = entry as Record<string, unknown>
+    return {
+      id: String(row.id),
+      name: String(row.name ?? ""),
+      price: Number(row.price) || 0,
+      description: typeof row.description === "string" ? row.description : null,
+    }
+  })
+
+  const plan = planMenuSync(local, snapshot)
+
+  // Se emparejan categorías por nombre, igual que la importación CSV: el
+  // proveedor manda un nombre, no un id de FoodOS.
+  const categoryNames = [
+    ...new Set(snapshot.map((item) => item.category?.trim()).filter(Boolean)),
+  ] as string[]
+  const categoryIds = new Map<string, string>()
+  if (categoryNames.length > 0) {
+    const { data: existingCats } = await supabase
+      .from("foodos_menu_categories")
+      .select("id, name")
+      .eq("restaurant_id", input.restaurant_id)
+    for (const entry of (existingCats as unknown[]) ?? []) {
+      const row = entry as Record<string, unknown>
+      categoryIds.set(String(row.name ?? "").trim().toLowerCase(), String(row.id))
+    }
+    let nextOrder = categoryIds.size
+    for (const name of categoryNames) {
+      const key = name.toLowerCase()
+      if (categoryIds.has(key)) continue
+      const { data: created } = await supabase
+        .from("foodos_menu_categories")
+        .insert({ restaurant_id: input.restaurant_id, name, sort_order: nextOrder++ })
+        .select("id")
+        .maybeSingle()
+      const id = (created as Record<string, unknown> | null)?.id
+      if (id) categoryIds.set(key, String(id))
+    }
+  }
+
+  const categoryIdFor = (item: PosMenuSnapshotItem): string | null => {
+    const key = item.category?.trim().toLowerCase()
+    return key ? categoryIds.get(key) ?? null : null
+  }
+
+  let created = 0
+  if (plan.created.length > 0) {
+    const rows = plan.created.map((item) => ({
+      restaurant_id: input.restaurant_id,
+      category_id: categoryIdFor(item),
+      name: item.name,
+      description: item.description,
+      price: item.price,
+      cost: 0,
+      tags: item.tags,
+      is_available: true,
+    }))
+    const { error } = await supabase.from("foodos_menu_items").insert(rows)
+    if (error) {
+      await logPosSync(supabase, input.restaurant_id, {
+        provider: input.provider,
+        kind: "menu",
+        status: "failed",
+        detail: "No se pudieron crear los platillos nuevos",
+      })
+      revalidatePath("/panel/foodos/pos")
+      return { ...empty, error: "No se pudieron crear los platillos nuevos" }
+    }
+    created = rows.length
+  }
+
+  let updated = 0
+  for (const change of plan.updated) {
+    const { error } = await supabase
+      .from("foodos_menu_items")
+      .update({
+        name: change.item.name,
+        description: change.item.description,
+        price: change.item.price,
+        category_id: categoryIdFor(change.item),
+        tags: change.item.tags,
+      })
+      .eq("id", change.id)
+      .eq("restaurant_id", input.restaurant_id)
+    if (!error) updated++
+  }
+
+  await logPosSync(supabase, input.restaurant_id, {
+    provider: input.provider,
+    kind: "menu",
+    status: "ok",
+    itemsCount: created + updated,
+    detail: `${created} nuevos, ${updated} actualizados, ${plan.onlyLocally.length} solo en FoodOS`,
+  })
+
+  revalidatePath("/panel/foodos/pos")
+  revalidatePath("/panel/foodos/menu")
+  return {
+    ok: true,
+    created,
+    updated,
+    unchanged: plan.unchanged.length,
+    onlyLocally: plan.onlyLocally.length,
+    skipped: false,
+  }
+}
+
+export async function disconnectPosConnectionAction(input: {
+  restaurant_id: string
+  provider: string
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("pos_integraciones")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const { isPosProvider } = await import("@/lib/pos/registry")
+  if (!isPosProvider(input.provider)) return { ok: false, error: "Proveedor no reconocido" }
+
+  const { disconnectPosConnection } = await import("@/lib/pos/connections")
+  const result = await disconnectPosConnection(supabase, input.restaurant_id, input.provider)
+  if (!result.ok) return result
+
+  revalidatePath("/panel/foodos/pos")
+  return { ok: true }
+}
+
+export async function rotatePosWebhookSecretAction(input: {
+  restaurant_id: string
+  provider: string
+}): Promise<{ ok: boolean; error?: string; secret?: string }> {
+  await requireFoodosFeature("pos_integraciones")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const { isPosProvider } = await import("@/lib/pos/registry")
+  if (!isPosProvider(input.provider)) return { ok: false, error: "Proveedor no reconocido" }
+
+  const { rotatePosWebhookSecret } = await import("@/lib/pos/connections")
+  const result = await rotatePosWebhookSecret(supabase, input.restaurant_id, input.provider)
+  if (!result.ok) return result
+
+  revalidatePath("/panel/foodos/pos")
+  return { ok: true, secret: result.secret }
+}
+
+// ============================================================
+// Catering por volumen (nivel Diamante)
+//
+// El total siempre lo calcula `quoteCatering` en el servidor a partir del
+// paquete y el número de personas. El navegador manda cuántas personas van;
+// nunca cuánto cuesta.
+//
+// Cotizar y confirmar son actos separados: la solicitud nace cotizada (el
+// precio por persona es público) y el restaurante decide. Un evento confirmado
+// no se declina — para eso está cancelar, que deja claro que hubo acuerdo.
+// ============================================================
+
+export interface CateringData {
+  packages: CateringPackage[]
+  requests: CateringRequestRow[]
+  kpis: CateringKpis
+}
+
+/** `true` si el restaurante tiene la capacidad; usado por las lecturas. */
+async function canUseCatering(): Promise<boolean> {
+  try {
+    await requireFoodosFeature("catering")
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function getCateringData(restaurantId: string): Promise<CateringData | null> {
+  if (!(await canUseCatering())) return null
+  const { supabase } = await requireAuth()
+  const { loadCateringContext } = await import("@/lib/foodos-catering-data")
+  const context = await loadCateringContext(supabase, restaurantId)
+  return { packages: context.packages, requests: context.requests, kpis: context.kpis }
+}
+
+export async function saveCateringPackageAction(input: {
+  restaurant_id: string
+  package_id?: string | null
+  name: string
+  description?: string | null
+  price_per_person: number
+  min_people: number
+  max_people?: number | null
+  lead_time_hours?: number | null
+  includes?: string[]
+  is_active?: boolean
+  sort_order?: number | null
+}): Promise<{ ok: boolean; error?: string; id?: string }> {
+  await requireFoodosFeature("catering")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const { saveCateringPackage } = await import("@/lib/foodos-catering-data")
+  const result = await saveCateringPackage(
+    supabase,
+    input.restaurant_id,
+    input.package_id ?? null,
+    {
+      name: input.name,
+      description: input.description,
+      pricePerPerson: input.price_per_person,
+      minPeople: input.min_people,
+      maxPeople: input.max_people,
+      leadTimeHours: input.lead_time_hours,
+      includes: input.includes,
+      isActive: input.is_active,
+      sortOrder: input.sort_order,
+    }
+  )
+  if (!result.ok) return { ok: false, error: result.error }
+
+  revalidatePath("/panel/foodos/catering")
+  revalidatePath("/r/[slug]/catering")
+  return { ok: true, id: result.id }
+}
+
+export async function deleteCateringPackageAction(input: {
+  restaurant_id: string
+  package_id: string
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("catering")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const { deleteCateringPackage } = await import("@/lib/foodos-catering-data")
+  const result = await deleteCateringPackage(supabase, input.restaurant_id, input.package_id)
+  if (!result.ok) return result
+
+  revalidatePath("/panel/foodos/catering")
+  revalidatePath("/r/[slug]/catering")
+  return { ok: true }
+}
+
+export async function setCateringRequestStatusAction(input: {
+  restaurant_id: string
+  request_id: string
+  status: string
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("catering")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const { setCateringRequestStatus } = await import("@/lib/foodos-catering-data")
+  const result = await setCateringRequestStatus(
+    supabase,
+    input.restaurant_id,
+    input.request_id,
+    input.status
+  )
+  if (!result.ok) return result
+
+  revalidatePath("/panel/foodos/catering")
+  return { ok: true }
+}
+
+export async function overrideCateringTotalAction(input: {
+  restaurant_id: string
+  request_id: string
+  total: number
+  deposit?: number | null
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("catering")
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const { overrideCateringTotal } = await import("@/lib/foodos-catering-data")
+  const result = await overrideCateringTotal(
+    supabase,
+    input.restaurant_id,
+    input.request_id,
+    input.total,
+    input.deposit ?? null
+  )
+  if (!result.ok) return result
+
+  revalidatePath("/panel/foodos/catering")
+  return { ok: true }
 }

@@ -4,6 +4,8 @@ import {
   getPublicMarketplace,
   getPublicRestaurantBySlug,
 } from "@/lib/foodos-public"
+import { getPublicCateringBySlug } from "@/lib/foodos-catering-public"
+import { restaurantPath, siteOrigin } from "@/lib/foodos-seo"
 import { FoodosStorefront } from "./storefront"
 
 // ISR: catálogo revalidado cada 5 min (alineado con src/lib/catalog-cache.ts).
@@ -34,9 +36,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${data.restaurant.name} · Pide en línea`,
     description: data.restaurant.description ?? undefined,
+    alternates: { canonical: `${siteOrigin()}${restaurantPath(slug)}` },
     openGraph: data.restaurant.logo_url
       ? { images: [data.restaurant.logo_url] }
       : undefined,
+    // Manifest por restaurante: instalarlo abre directo en su menú. Se enlaza
+    // desde el micrositio porque es donde el comensal decide instalar.
+    manifest: `/r/${slug}/manifest.webmanifest`,
   }
 }
 
@@ -47,6 +53,10 @@ export default async function StorefrontPage({ params }: PageProps) {
 
   const itemsAvailable = data.items.filter((i) => i.is_available)
   const combosActive = data.combos.filter((c) => c.is_active)
+  // El enlace a catering solo aparece si hay paquetes activos: la página
+  // pública devuelve 404 cuando no los hay, así que enlazarla siempre llevaría
+  // al comensal a un callejón sin salida. Misma caché (300s) que el catálogo.
+  const catering = await getPublicCateringBySlug(slug)
 
   return (
     <FoodosStorefront
@@ -61,6 +71,7 @@ export default async function StorefrontPage({ params }: PageProps) {
       branchHours={data.branchHours}
       overrides={data.overrides}
       reviews={data.reviews}
+      hasCatering={Boolean(catering)}
     />
   )
 }

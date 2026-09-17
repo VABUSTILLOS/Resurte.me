@@ -241,6 +241,10 @@ export interface FoodosCustomer {
   total_spend: number
   last_order_at: string | null
   segment: FoodosCustomerSegment
+  /** Fecha de nacimiento (solo se usan mes y día). */
+  birthday: string | null
+  /** Consentimiento explícito para SMS. Sin esto no se envía SMS. */
+  sms_opt_in: boolean
   loyalty_points: number
   store_credit: number
   created_at: string
@@ -253,7 +257,38 @@ export interface FoodosLoyaltyProgram {
   points_per_100: number
   point_value: number
   is_active: boolean
+  /** Si el restaurante ofrece la tarjeta instalable (Apple/Google/web). */
+  wallet_enabled: boolean
+  /** Puntos que desbloquean la recompensa anunciada. `null` = sin recompensa. */
+  reward_points: number | null
+  /** Qué se lleva el comensal al juntar `reward_points`. */
+  reward_label: string | null
   created_at: string
+}
+
+/** Plataformas de la tarjeta de lealtad. `web` es la de respaldo. */
+export type FoodosWalletPlatform = "apple" | "google" | "web"
+
+export interface FoodosWalletPass {
+  id: string
+  restaurant_id: string
+  customer_id: string
+  platform: FoodosWalletPlatform
+  /** Identificador del pase ante Apple/Google. Determinista por cliente. */
+  serial: string
+  /** Capability token de la tarjeta web / QR. */
+  token: string
+  /** Fotografía del saldo, no una consulta viva. */
+  points: number
+  points_value: number
+  reward_label: string | null
+  reward_threshold: number | null
+  is_active: boolean
+  snapshot_at: string
+  pushed_at: string | null
+  push_count: number
+  created_at: string
+  updated_at: string
 }
 
 export interface FoodosReview {
@@ -337,6 +372,11 @@ export interface FoodosOrder {
   loyalty_points_redeemed: number
   loyalty_points_earned: number
   scheduled_for: string | null
+  /** Dirección de entrega tal como la escribió el comensal. */
+  delivery_address: string | null
+  delivery_lat: number | null
+  delivery_lng: number | null
+  delivery_notes: string | null
   created_at: string
 }
 
@@ -368,6 +408,15 @@ export type FoodosAutomationType =
   | "season_promo"
   | "off_hours"
   | "new_product"
+  | "birthday"
+  | "abandoned_cart"
+  | "review_request"
+
+/** Canales de marketing. `both` intenta SMS solo con opt-in explícito. */
+export type FoodosMarketingChannel = "whatsapp" | "sms" | "both"
+
+/** Variante de una prueba A/B. */
+export type FoodosCampaignVariant = "a" | "b"
 
 export interface FoodosAutomation {
   id: string
@@ -381,6 +430,12 @@ export interface FoodosAutomation {
     target_segment?: FoodosCustomerSegment
   }
   message: string | null
+  /** Mensaje alternativo de la prueba A/B. NULL = sin experimento. */
+  message_b: string | null
+  ab_test: boolean
+  /** Audiencia RFM objetivo. NULL = se usa `trigger_config.target_segment`. */
+  audience: string | null
+  channel: FoodosMarketingChannel
   incentive_config: { discount_pct?: number; promo_code?: string }
   is_active: boolean
   created_at: string
@@ -396,7 +451,123 @@ export interface FoodosCampaign {
   scheduled_for: string | null
   status: FoodosCampaignStatus
   channel: string
+  /** Variante enviada en la prueba A/B. NULL = sin experimento. */
+  variant: FoodosCampaignVariant | null
+  /** Audiencia a la que se apuntó esta ejecución (auditoría). */
+  audience: string | null
+  /** Proveedor que envió ('meta' | 'twilio'). NULL = aún sin enviar. */
+  provider: string | null
   error: string | null
   sent_at: string | null
+  created_at: string
+}
+
+// ============================================================
+// Flotilla (nivel Oro)
+// ============================================================
+
+export type FoodosCourierVehicle = "moto" | "bici" | "auto" | "a_pie"
+
+export interface FoodosCourier {
+  id: string
+  restaurant_id: string
+  name: string
+  phone: string | null
+  vehicle: FoodosCourierVehicle
+  /** Pedidos simultáneos que puede llevar. */
+  capacity: number
+  /** Turno declarado en formato "HH:MM". NULL = siempre disponible. */
+  shift_start: string | null
+  shift_end: string | null
+  is_active: boolean
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type FoodosPayoutMode = "fixed" | "per_km" | "percent"
+
+export interface FoodosDeliveryZone {
+  id: string
+  restaurant_id: string
+  /** NULL = aplica a todas las sucursales. */
+  branch_id: string | null
+  name: string
+  center_lat: number | null
+  center_lng: number | null
+  radius_km: number | null
+  fee: number
+  min_order: number
+  eta_minutes: number
+  payout_mode: FoodosPayoutMode
+  payout_value: number
+  color: string | null
+  sort_order: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type FoodosDeliveryStatus =
+  | "pending"
+  | "assigned"
+  | "picked_up"
+  | "delivered"
+  | "failed"
+  | "cancelled"
+
+export type FoodosDeliveryProvider = "in_house" | "uber_direct"
+
+export interface FoodosDelivery {
+  id: string
+  restaurant_id: string
+  order_id: string
+  branch_id: string | null
+  zone_id: string | null
+  courier_id: string | null
+  provider: FoodosDeliveryProvider
+  provider_delivery_id: string | null
+  provider_tracking_url: string | null
+  status: FoodosDeliveryStatus
+  pickup_address: string | null
+  dropoff_address: string
+  dropoff_lat: number | null
+  dropoff_lng: number | null
+  dropoff_notes: string | null
+  /** Nombre de la zona al momento del pedido (la zona pudo cambiar después). */
+  zone_name: string | null
+  /** Tarifa COPIADA al crear la entrega; el precio de un pedido no se recalcula. */
+  fee: number
+  courier_payout: number
+  distance_km: number | null
+  eta_minutes: number | null
+  assigned_at: string | null
+  picked_up_at: string | null
+  delivered_at: string | null
+  failed_reason: string | null
+  /** Última posición conocida del repartidor (mejor esfuerzo). */
+  last_lat: number | null
+  last_lng: number | null
+  last_ping_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type FoodosDeliveryActor =
+  | "system"
+  | "courier"
+  | "restaurant"
+  | "customer"
+  | "provider"
+
+export interface FoodosDeliveryEvent {
+  id: number
+  delivery_id: string
+  restaurant_id: string
+  status: string
+  note: string | null
+  actor: FoodosDeliveryActor
+  lat: number | null
+  lng: number | null
   created_at: string
 }

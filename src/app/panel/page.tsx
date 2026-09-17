@@ -33,6 +33,7 @@ import KitchenMonitor from "@/components/panel/hub/KitchenMonitor"
 import AlertsPanel from "@/components/panel/hub/AlertsPanel"
 import BackupStrip from "@/components/panel/hub/BackupStrip"
 import ToolGrid from "@/components/panel/hub/ToolGrid"
+import NivelCard from "@/components/panel/foodos/nivel-card"
 import PurchaseStimulusCard from "@/components/panel/hub/PurchaseStimulusCard"
 import RestoreConfirmModal from "@/components/panel/hub/RestoreConfirmModal"
 import ServerRestoreModal from "@/components/panel/hub/ServerRestoreModal"
@@ -456,6 +457,7 @@ export default function PanelPage() {
       )}
 
       <div className="mb-4 sm:mb-6">
+        {canAccessTool(role, "foodos") && <NivelCard />}
         <ToolGrid tools={visibleTools} selectedCollection={selectedCollection} />
       </div>
 

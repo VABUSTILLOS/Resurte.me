@@ -54,6 +54,7 @@ const ADMIN_NAV_GROUPS = [
     items: [
       { href: "/admin/usuarios", label: "Usuarios", exact: false },
       { href: "/admin/recompensas", label: "Recompensas", exact: false },
+      { href: "/admin/restaurantes", label: "Restaurantes", exact: false },
     ],
   },
   {

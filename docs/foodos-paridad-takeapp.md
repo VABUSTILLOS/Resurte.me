@@ -89,10 +89,39 @@ Auditoría de funcionalidades de take.app y estado de cobertura en FoodOS
 - **Broadcast** a segmentos del CRM con plantillas de la WABA del restaurante
 - **Inbox** `/panel/foodos/inbox` con conversaciones realtime y respuesta 24h
 
+## Añadido en el programa de paridad con FluxSales (fases 0–9)
+
+Iniciativa posterior y más amplia: ver `docs/foodos-paridad-fluxsales.md` para
+el detalle, las invariantes y las decisiones. Resumen de lo que aporta sobre
+esta base:
+
+- **Entitlements por nivel** (fases 0–1): las capacidades premium se desbloquean
+  con el nivel de lealtad (Plata/Oro/Diamante), **no con una suscripción**. Fuente
+  única en `src/lib/foodos-entitlements.ts`; el nivel se computa en vivo.
+- **Capa de IA compartida** (fase 1): adaptadores con degradación garantizada a
+  plantilla — el producto funciona sin ninguna credencial de IA.
+- **Mesero IA** (fase 2): toma pedidos por WhatsApp con máquina de estados, sobre
+  el productor único de pedidos que ya usaba el storefront.
+- **Marketing IA** (fase 3): segmentación RFM y campañas con copy generado.
+- **Flotilla** (fase 4): entregas con asignación por turno/cupo/carga **y despacho
+  a un reparto externo** (adaptador de Uber Direct).
+- **Tarjeta de lealtad Wallet** (fase 5): pases Apple/Google por cliente.
+- **Sitio IA, app de marca y SEO local** (fase 6): páginas generadas (en `draft`
+  hasta que el dueño aprueba), PWA por restaurante y manifiesto propio.
+- **Punto de venta y catering** (fase 7): registro de adaptadores de POS con
+  reconciliación, y paquetes/solicitudes de catering con el total decidido en el
+  servidor.
+- **Landing B2B `/restaurantes`** (fase 8): calculadora de comisión perdida y
+  calificador de leads con el diagnóstico derivado en el servidor.
+- **Transversal** (fase 9): KPIs de adopción en el admin, dedupe cruzado entre los
+  dos motores de mensajería, trazas durables de IA y de reparto, y e2e.
+
 ## Brechas conscientes (fuera de alcance)
 
-- App POS nativa, impresoras térmicas/Bluetooth, TV menu board
-- Integraciones de couriers (Lalamove/Uber Direct), catálogo nativo de WhatsApp
-- Dominio propio por restaurante, multi-idioma del panel (solo storefront)
+- App POS nativa: FoodOS **se integra** con los POS existentes (registro de
+  adaptadores), no los reemplaza. Siguen fuera: impresoras térmicas/Bluetooth y
+  TV menu board.
+- Dominio propio por restaurante (el sitio IA y la PWA viven bajo `/r/[slug]`),
+  multi-idioma del panel (solo storefront)
 - API pública/webhooks/MCP para comercios, white label/resellers
 - Suscripciones/pedidos recurrentes, pedidos grupales

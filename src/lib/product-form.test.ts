@@ -163,8 +163,19 @@ describe("formKeyForServerField", () => {
     expect(formKeyForServerField("sale_price")).toBe("salePrice")
     expect(formKeyForServerField("low_stock_threshold")).toBe("lowStockThreshold")
     expect(formKeyForServerField("stock_quantity")).toBe("stockQuantity")
+    expect(formKeyForServerField("stock_status")).toBe("stockStatus")
     expect(formKeyForServerField("sku")).toBe("sku")
     expect(formKeyForServerField("barcode")).toBe("barcode")
+  })
+
+  it("cada clave traducida tiene control al que llevar el foco", () => {
+    // Un 400 de campo que no se puede pintar acaba en el aviso general, así que
+    // el mapa de ids y el de columnas tienen que ir juntos.
+    for (const field of ["stock_status", "stock_quantity", "sale_price", "cost"]) {
+      const key = formKeyForServerField(field)
+      expect(key).not.toBeNull()
+      expect(PRODUCT_FIELD_INPUT_IDS[key as string]).toBeTruthy()
+    }
   })
 
   it("manda las dos fechas de la oferta al mismo campo", () => {

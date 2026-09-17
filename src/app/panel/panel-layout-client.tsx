@@ -13,6 +13,8 @@ import { usePanelRealtimeSync } from "@/hooks/use-panel-realtime-sync"
 import { usePanelRole } from "@/hooks/use-panel-role"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import { canAccessTool, toolKeyForPath } from "@/lib/panel-roles"
+import { FoodosEntitlementsProvider } from "@/components/panel/foodos/entitlements-context"
+import type { FoodosEntitlementState } from "@/lib/foodos-entitlements"
 import { PanelMobileNav } from "./_components/PanelMobileNav"
 import { PanelFab } from "./_components/PanelFab"
 import { PanelCompactFooter } from "@/components/panel/PanelCompactFooter"
@@ -265,10 +267,18 @@ function PanelContent({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function PanelLayoutClient({ children }: { children: React.ReactNode }) {
+export function PanelLayoutClient({
+  entitlements,
+  children,
+}: {
+  entitlements: FoodosEntitlementState
+  children: React.ReactNode
+}) {
   return (
-    <RestaurantProvider>
-      <PanelContent>{children}</PanelContent>
-    </RestaurantProvider>
+    <FoodosEntitlementsProvider value={entitlements}>
+      <RestaurantProvider>
+        <PanelContent>{children}</PanelContent>
+      </RestaurantProvider>
+    </FoodosEntitlementsProvider>
   )
 }
