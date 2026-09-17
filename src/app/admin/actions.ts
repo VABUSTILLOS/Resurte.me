@@ -84,13 +84,17 @@ import {
 import { addTags, normalizeTags, readTags, removeTags } from "@/lib/crm-tags"
 import {
   buildSellerLoad,
+  buildSlaBoard,
   distributeProspects,
+  firstResponseStats,
   isAssignmentStrategy,
   type Assignment,
   type AssignmentStrategy,
   type AssignableProspect,
+  type FirstResponseStats,
   type SellerLoad,
   type SellerRef,
+  type SlaBoard,
 } from "@/lib/crm-assignment"
 import type { SendTemplateParams } from "@/lib/whatsapp"
 
@@ -2982,6 +2986,97 @@ async function loadRecentMessages(supabase: ServiceClient): Promise<Record<strin
     return []
   }
   return (data ?? []) as Record<string, unknown>[]
+}
+
+/** Cuántos hilos pendientes se listan en el tablero de SLA. */
+const SLA_PENDING_LIMIT = 200
+
+export interface AdminSlaPendingThread {
+  prospectId: number
+  name: string
+  restaurantName: string | null
+  phone: string | null
+  sellerName: string | null
+  /** Minutos desde el último mensaje del cliente sin respuesta nuestra. */
+  waitingMinutes: number | null
+  lastMessageAt: string | null
+  messageCount: number
+}
+
+export interface AdminCrmSla {
+  board: SlaBoard
+  stats: FirstResponseStats
+  loads: SellerLoad[]
+  pending: AdminSlaPendingThread[]
+  /** Prospectos abiertos considerados en el cálculo. */
+  considered: number
+}
+
+/**
+ * Tablero de SLA de la bandeja para el embudo.
+ *
+ * Se calcula en el servidor y no en el cliente a propósito: `firstResponseStats`
+ * necesita los mensajes de cada hilo, y mandar 2.000 mensajes al navegador para
+ * pintar cuatro números sería desperdiciar la mitad del payload del embudo.
+ */
+export async function getAdminCrmSla(): Promise<AdminCrmSla> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const [prospectRows, messageRows, sellers] = await Promise.all([
+    loadInboxProspects(supabase),
+    loadRecentMessages(supabase),
+    loadSellerRefs(supabase).catch(() => [] as SellerRef[]),
+  ])
+
+  const prospects = prospectRows.map(toConversationProspect)
+  const messages: InboxMessage[] = messageRows.map((row) => ({
+    id: Number(row.id),
+    direction: normalizeDirection(row.direction as string | null),
+    content: (row.content as string | null) ?? null,
+    created_at: String(row.created_at),
+    message_type: (row.message_type as string | null) ?? null,
+    from_number: (row.from_number as string | null) ?? null,
+  }))
+
+  const now = new Date()
+  const threads = buildThreads(prospects, messages, now)
+  const sellerNames = new Map(sellers.map((s) => [s.id, s.name]))
+
+  const pending: AdminSlaPendingThread[] = threads
+    .filter((thread) => needsReply(thread.messages))
+    .map((thread) => ({
+      prospectId: thread.prospect.id,
+      name: thread.prospect.name,
+      restaurantName: thread.prospect.restaurant_name,
+      phone: thread.prospect.whatsapp ?? thread.prospect.phone,
+      sellerName: thread.prospect.seller_id
+        ? (sellerNames.get(thread.prospect.seller_id) ?? "Sin nombre")
+        : null,
+      waitingMinutes: minutesSince(thread.last?.created_at ?? null, now),
+      lastMessageAt: thread.last?.created_at ?? null,
+      messageCount: thread.messages.length,
+    }))
+    .sort((a, b) => (b.waitingMinutes ?? -1) - (a.waitingMinutes ?? -1))
+
+  return {
+    board: buildSlaBoard(threads),
+    stats: firstResponseStats(threads),
+    loads: buildSellerLoad(sellers, prospects, now),
+    pending: pending.slice(0, SLA_PENDING_LIMIT),
+    considered: threads.length,
+  }
+}
+
+/** Minutos transcurridos desde una fecha ISO. `null` si no hay fecha válida. */
+function minutesSince(iso: string | null, now: Date): number | null {
+  if (!iso) return null
+  const at = Date.parse(iso)
+  if (Number.isNaN(at)) return null
+  return Math.max(0, Math.round((now.getTime() - at) / 60_000))
 }
 
 // ============================================================

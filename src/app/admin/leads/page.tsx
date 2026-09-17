@@ -89,7 +89,7 @@ const SOURCE_LABEL: Record<string, string> = {
 }
 
 const TAB_LABEL: Record<CrmTab, string> = {
-  leads: "Bandeja de leads",
+  leads: "Leads",
   pipeline: "Pipeline CRM",
   embudo: "Embudo",
   bandeja: "Bandeja",
