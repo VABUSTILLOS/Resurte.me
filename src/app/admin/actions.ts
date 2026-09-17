@@ -63,6 +63,7 @@ import {
 } from "@/lib/crm-pipeline"
 import {
   buildThread,
+  buildThreads,
   indexMessagesByPhone,
   mergeTimeline,
   needsReply,
@@ -80,12 +81,7 @@ import {
   type InboxMessage,
   type WhatsAppWindowState,
 } from "@/lib/crm-inbox"
-import {
-  addTags,
-  normalizeTags,
-  readTags,
-  removeTags,
-} from "@/lib/crm-tags"
+import { addTags, normalizeTags, readTags, removeTags } from "@/lib/crm-tags"
 import {
   buildSellerLoad,
   distributeProspects,
@@ -2813,6 +2809,179 @@ export async function getAdminSellerLoads(): Promise<SellerLoad[]> {
   return buildSellerLoad(sellers, prospects).sort(
     (a, b) => b.open - a.open || a.name.localeCompare(b.name, "es"),
   )
+}
+
+/** Prospectos que la bandeja mira de una sola vez. */
+const INBOX_PROSPECT_LIMIT = 500
+/** Mensajes recientes con los que se arma la lista de conversaciones. */
+const INBOX_MESSAGE_SCAN_LIMIT = 2000
+
+export interface AdminInboxThread {
+  prospect: ConversationProspect
+  phoneKey: string | null
+  bucket: InboxBucket | null
+  window: WhatsAppWindowState
+  /** Último mensaje del hilo; `null` si nunca hubo conversación. */
+  last: InboxMessage | null
+  lastMessageAt: string | null
+  /** Recorte del último mensaje para la vista de lista. */
+  preview: string | null
+  messageCount: number
+  needsReply: boolean
+  firstResponseMinutes: number | null
+  seller: { id: string; name: string } | null
+}
+
+export interface AdminCrmInbox {
+  threads: AdminInboxThread[]
+  /** Cuántos prospectos hay en cada bandeja, contando los que no se listan. */
+  counts: Record<InboxBucket, number>
+  /** Prospectos abiertos sin ningún mensaje: no son una conversación. */
+  sinConversacion: number
+  /** Prospectos con teléfono pero sin mensajes que emparejen. */
+  sinMensajes: number
+}
+
+function inboxPreview(message: InboxMessage | null): string | null {
+  if (!message) return null
+  const text = (message.content ?? "").replace(/\s+/g, " ").trim()
+  return text.length > 120 ? `${text.slice(0, 117)}...` : text || null
+}
+
+/**
+ * Bandeja completa: los prospectos abiertos con su conversación ya armada.
+ *
+ * Se traen los mensajes recientes una sola vez y se indexan en memoria por
+ * teléfono. Hacer una consulta por prospecto serían 500 viajes a la base para
+ * pintar una lista, y el índice de `from_number` no ayuda cuando se piden todos.
+ */
+export async function getAdminCrmInbox(): Promise<AdminCrmInbox> {
+  const { response: adminDenied } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  const [prospectRows, messageRows, sellers] = await Promise.all([
+    loadInboxProspects(supabase),
+    loadRecentMessages(supabase),
+    loadSellerRefs(supabase).catch(() => [] as SellerRef[]),
+  ])
+
+  const prospects = prospectRows.map(toConversationProspect)
+  const messages: InboxMessage[] = messageRows.map((row) => ({
+    id: Number(row.id),
+    direction: normalizeDirection(row.direction as string | null),
+    content: (row.content as string | null) ?? null,
+    created_at: String(row.created_at),
+    message_type: (row.message_type as string | null) ?? null,
+    from_number: (row.from_number as string | null) ?? null,
+  }))
+
+  const now = new Date()
+  const sellerNames = new Map(sellers.map((s) => [s.id, s.name]))
+  const counts: Record<InboxBucket, number> = {
+    sin_responder: 0,
+    esperando: 0,
+    ventana_cerrada: 0,
+  }
+  let sinConversacion = 0
+  let sinMensajes = 0
+
+  const threads: AdminInboxThread[] = []
+  for (const thread of buildThreads(prospects, messages, now)) {
+    if (thread.bucket) counts[thread.bucket] += 1
+    if (thread.messages.length === 0) {
+      if (thread.phoneKey) sinMensajes += 1
+      else sinConversacion += 1
+    }
+    threads.push({
+      prospect: thread.prospect,
+      phoneKey: thread.phoneKey,
+      bucket: thread.bucket,
+      window: thread.window,
+      last: thread.last,
+      lastMessageAt: thread.last?.created_at ?? null,
+      preview: inboxPreview(thread.last),
+      messageCount: thread.messages.length,
+      needsReply: needsReply(thread.messages),
+      firstResponseMinutes: firstResponseMinutes(thread.messages),
+      seller: thread.prospect.seller_id
+        ? {
+            id: thread.prospect.seller_id,
+            name: sellerNames.get(thread.prospect.seller_id) ?? "Sin nombre",
+          }
+        : null,
+    })
+  }
+
+  // Lo que necesita respuesta primero, y dentro de eso lo más reciente. Los
+  // prospectos sin conversación no son urgencia: van al final.
+  const order: Record<InboxBucket, number> = {
+    sin_responder: 0,
+    ventana_cerrada: 1,
+    esperando: 2,
+  }
+  threads.sort((a, b) => {
+    const rankA = a.bucket ? order[a.bucket] : 3
+    const rankB = b.bucket ? order[b.bucket] : 3
+    if (rankA !== rankB) return rankA - rankB
+    const at = a.lastMessageAt ? Date.parse(a.lastMessageAt) : 0
+    const bt = b.lastMessageAt ? Date.parse(b.lastMessageAt) : 0
+    if (at !== bt) return bt - at
+    return b.prospect.id - a.prospect.id
+  })
+
+  return { threads, counts, sinConversacion, sinMensajes }
+}
+
+/**
+ * Prospectos de la bandeja con etiquetas. `tags` llega con 00140: sin esa
+ * columna la bandeja sigue abriendo, solo sin chips.
+ */
+async function loadInboxProspects(supabase: ServiceClient): Promise<Record<string, unknown>[]> {
+  const { data, error } = await supabase
+    .from("crm_prospects")
+    .select(`${CRM_PROSPECT_COLUMNS}, tags`)
+    .order("created_at", { ascending: false })
+    .limit(INBOX_PROSPECT_LIMIT)
+
+  if (!error) return (data ?? []) as Record<string, unknown>[]
+
+  if (!isMissingColumnError(error)) {
+    logger.error("[ADMIN-CRM] Error cargando la bandeja:", error)
+    throw new Error("Error al cargar la bandeja")
+  }
+
+  logger.warn("[ADMIN-CRM] Migración 00140 no aplicada; se omite tags")
+  const fallback = await supabase
+    .from("crm_prospects")
+    .select(CRM_PROSPECT_COLUMNS)
+    .order("created_at", { ascending: false })
+    .limit(INBOX_PROSPECT_LIMIT)
+  if (fallback.error) {
+    logger.error("[ADMIN-CRM] Error cargando la bandeja:", fallback.error)
+    throw new Error("Error al cargar la bandeja")
+  }
+  return (fallback.data ?? []) as Record<string, unknown>[]
+}
+
+/** Mensajes recientes de todos los números, para indexarlos en un solo paso. */
+async function loadRecentMessages(supabase: ServiceClient): Promise<Record<string, unknown>[]> {
+  const { data, error } = await supabase
+    .from("whatsapp_messages")
+    .select("id, direction, content, created_at, message_type, from_number")
+    .not("from_number", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(INBOX_MESSAGE_SCAN_LIMIT)
+
+  if (error) {
+    logger.warn("[ADMIN-CRM] No se pudieron leer los mensajes de la bandeja:", {
+      message: error.message,
+    })
+    return []
+  }
+  return (data ?? []) as Record<string, unknown>[]
 }
 
 // ============================================================

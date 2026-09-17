@@ -34,6 +34,7 @@ import {
   type Prospect,
 } from "@/lib/comercializacion/types"
 import { formatRelativeTime } from "@/lib/relative-time"
+import { LeadConversationPanel } from "./LeadConversations"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 import { useToast } from "@/components/toast"
 
@@ -469,6 +470,18 @@ export function LeadDetailDrawer({ prospectId, onClose, onChanged }: LeadDetailD
                     ))}
                   </ul>
                 )}
+              </section>
+
+              <section>
+                <h3 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-gray-500">
+                  <MessageCircle className="h-3.5 w-3.5" /> Conversación de WhatsApp
+                </h3>
+                <LeadConversationPanel
+                  key={prospectId}
+                  prospectId={prospectId}
+                  onSent={onChanged}
+                  className="h-[420px]"
+                />
               </section>
 
               <section className="border-t border-gray-100 pt-3 text-[11px] text-gray-400">

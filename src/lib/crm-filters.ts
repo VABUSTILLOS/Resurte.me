@@ -13,7 +13,7 @@
 
 import { CRM_STATUSES, LEAD_STATUSES, type CrmStatus, type LeadStatus } from "@/lib/crm-pipeline"
 
-export const CRM_TABS = ["leads", "pipeline", "embudo"] as const
+export const CRM_TABS = ["leads", "pipeline", "embudo", "bandeja"] as const
 export type CrmTab = (typeof CRM_TABS)[number]
 
 /** Bandeja de entrada de leads web. */
@@ -30,6 +30,20 @@ export const LEAD_BOX_LABEL: Record<LeadBox, string> = {
 /** Filas por página. Bajo a propósito: la bandeja se revisa en el celular. */
 export const CRM_PAGE_SIZE = 50
 
+/**
+ * Bandejas de la pestaña "Bandeja". No se validan contra una lista permitida
+ * porque el valor por defecto es "todas": una bandeja desconocida en la URL cae
+ * al conjunto completo, que es lo que el admin espera ver.
+ */
+export const INBOX_VIEWS = ["sin_responder", "esperando", "ventana_cerrada"] as const
+export type InboxView = (typeof INBOX_VIEWS)[number]
+
+export const INBOX_VIEW_LABEL: Record<InboxView, string> = {
+  sin_responder: "Sin responder",
+  esperando: "Esperando respuesta",
+  ventana_cerrada: "Ventana cerrada",
+}
+
 export interface CrmUrlState {
   tab: CrmTab
   q: string
@@ -44,6 +58,10 @@ export interface CrmUrlState {
   due: boolean
   /** Solo prospectos sin vendedor. */
   unassigned: boolean
+  /** Bandeja de conversaciones: vacío = todas. */
+  view: string
+  /** Etiqueta normalizada por la que filtrar. */
+  tag: string
   page: number
 }
 
@@ -56,6 +74,8 @@ export const DEFAULT_CRM_URL_STATE: CrmUrlState = {
   box: "pendientes",
   due: false,
   unassigned: false,
+  view: "",
+  tag: "",
   page: 1,
 }
 
@@ -81,6 +101,10 @@ export function isLeadBox(value: string): value is LeadBox {
   return isOneOf(value, LEAD_BOXES)
 }
 
+export function isInboxView(value: string): value is InboxView {
+  return isOneOf(value, INBOX_VIEWS)
+}
+
 /**
  * Normaliza los parámetros de la URL. Nunca lanza: un valor inválido cae al
  * default, porque una URL mal escrita no debe tumbar el panel.
@@ -91,6 +115,7 @@ export function parseCrmSearchParams(raw: RawSearchParams | URLSearchParams): Cr
 
   const tab = firstValue(params, "tab")
   const box = firstValue(params, "box")
+  const view = firstValue(params, "view")
   const page = Number.parseInt(firstValue(params, "page"), 10)
 
   return {
@@ -102,6 +127,8 @@ export function parseCrmSearchParams(raw: RawSearchParams | URLSearchParams): Cr
     box: isLeadBox(box) ? box : DEFAULT_CRM_URL_STATE.box,
     due: firstValue(params, "due") === "1",
     unassigned: firstValue(params, "unassigned") === "1",
+    view: isInboxView(view) ? view : DEFAULT_CRM_URL_STATE.view,
+    tag: firstValue(params, "tag").slice(0, 40),
     page: Number.isFinite(page) && page >= 1 ? Math.min(page, MAX_CRM_PAGE) : 1,
   }
 }
@@ -118,6 +145,8 @@ export function buildCrmQuery(state: Partial<CrmUrlState>): string {
   if (merged.box !== DEFAULT_CRM_URL_STATE.box) params.set("box", merged.box)
   if (merged.due) params.set("due", "1")
   if (merged.unassigned) params.set("unassigned", "1")
+  if (merged.view) params.set("view", merged.view)
+  if (merged.tag) params.set("tag", merged.tag)
   if (merged.page > 1) params.set("page", String(merged.page))
   return params.toString()
 }
@@ -137,6 +166,8 @@ export function hasActiveCrmFilters(state: CrmUrlState): boolean {
       state.status ||
       state.due ||
       state.unassigned ||
+      state.view ||
+      state.tag ||
       state.box !== DEFAULT_CRM_URL_STATE.box,
   )
 }

@@ -78,6 +78,7 @@ import { downloadCsv, toCsv } from "@/lib/csv"
 import { formatRelativeTime } from "@/lib/relative-time"
 import { ToastProvider, useToast } from "@/components/toast"
 import { LeadDetailDrawer } from "../components/LeadDetailDrawer"
+import { LeadConversations } from "../components/LeadConversations"
 
 const SOURCE_LABEL: Record<string, string> = {
   checkout_drawer: "Checkout",
@@ -91,9 +92,10 @@ const TAB_LABEL: Record<CrmTab, string> = {
   leads: "Bandeja de leads",
   pipeline: "Pipeline CRM",
   embudo: "Embudo",
+  bandeja: "Bandeja",
 }
 
-const TAB_ORDER: CrmTab[] = ["leads", "pipeline", "embudo"]
+const TAB_ORDER: CrmTab[] = ["leads", "pipeline", "embudo", "bandeja"]
 
 const SEGMENT_LABEL: Record<string, string> = {
   A: "A · Alto",
@@ -142,6 +144,8 @@ function AdminLeadsContent() {
   const [box, setBox] = useState<LeadBox>(initial.box)
   const [due, setDue] = useState(initial.due)
   const [unassigned, setUnassigned] = useState(initial.unassigned)
+  const [view, setView] = useState(initial.view)
+  const [tag, setTag] = useState(initial.tag)
   const [page, setPage] = useState(initial.page)
 
   const [leads, setLeads] = useState<AdminLeadRow[]>([])
@@ -173,10 +177,26 @@ function AdminLeadsContent() {
       box,
       due,
       unassigned,
+      view,
+      tag,
       page,
     })
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }, [tab, debouncedQ, source, segment, status, box, due, unassigned, page, router, pathname])
+  }, [
+    tab,
+    debouncedQ,
+    source,
+    segment,
+    status,
+    box,
+    due,
+    unassigned,
+    view,
+    tag,
+    page,
+    router,
+    pathname,
+  ])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -335,6 +355,8 @@ function AdminLeadsContent() {
     setBox("pendientes")
     setDue(false)
     setUnassigned(false)
+    setView("")
+    setTag("")
     setPage(1)
   }
 
@@ -429,6 +451,8 @@ function AdminLeadsContent() {
     box,
     due,
     unassigned,
+    view,
+    tag,
     page,
   })
 
@@ -436,6 +460,7 @@ function AdminLeadsContent() {
     leads: null,
     pipeline: null,
     embudo: null,
+    bandeja: null,
   })
 
   function onTabKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
@@ -528,7 +553,7 @@ function AdminLeadsContent() {
         ))}
       </div>
 
-      {tab !== "embudo" && (
+      {tab !== "embudo" && tab !== "bandeja" && (
         <div className={`${CARD} mb-4`}>
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative min-w-[200px] flex-1">
@@ -836,6 +861,24 @@ function AdminLeadsContent() {
           className="space-y-4"
         >
           <FunnelView leads={allLeads} />
+        </div>
+      )}
+
+      {tab === "bandeja" && (
+        <div role="tabpanel" id="crm-panel-bandeja" aria-labelledby="crm-tab-bandeja">
+          <LeadConversations
+            onChanged={refresh}
+            view={view}
+            onViewChange={(next) => {
+              setView(next)
+              setPage(1)
+            }}
+            tag={tag}
+            onTagChange={(next) => {
+              setTag(next)
+              setPage(1)
+            }}
+          />
         </div>
       )}
 
