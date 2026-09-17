@@ -13,6 +13,7 @@ requieren revisar todos los playbooks que dependen de esa superficie.
 | Panel | [panel.md](panel.md) | `src/app/panel`, `src/components/panel`, `src/hooks/use-*`, `src/lib/panel-*` |
 | Admin | [admin.md](admin.md) | `src/app/admin`, `src/app/api/admin`, `src/lib/admin-*` |
 | UX móvil global | [ux-movil.md](ux-movil.md) | `src/app/globals.css`, `src/app/layout.tsx`, `src/components/layout`, `src/components/toast.tsx`, `src/components/pwa`, `public/sw.js` |
+| Punto de venta y comandero | [pos-mesas.md](pos-mesas.md) | `src/app/panel/foodos/{mostrador,mesas,caja,tablero,pedidos}`, `src/lib/foodos-{order-create,cash,tables,payments,reportes,shift,owner,printing}`, `src/lib/panel-roles.ts` |
 
 ## Reglas comunes a todos los agentes
 
@@ -55,10 +56,10 @@ requieren revisar todos los playbooks que dependen de esa superficie.
 ## Sin agente asignado: cuenta y autenticación
 
 `src/app/auth/**`, `src/components/auth/**`, `src/lib/supabase/**` y
-`src/lib/passkeys.ts` (fase U del plan) no pertenecen a ninguno de los seis
+`src/lib/passkeys.ts` (fase U del plan) no pertenecen a ninguno de los siete
 perímetros. **Todos** los agentes dependen de ellos, porque todos asumen una
 sesión: `createClient()` devuelve `null` sin configuración y los consumidores
-hacen `if (!supabase) return`. Antes de tocarlos, revisar los seis playbooks.
+hacen `if (!supabase) return`. Antes de tocarlos, revisar los siete playbooks.
 Reglas propias de esta superficie:
 
 1. `src/lib/supabase/client.ts` enciende `auth: { experimental: { passkey: true } }`.

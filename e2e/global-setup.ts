@@ -30,6 +30,15 @@ const ROUTES = [
   "/admin",
   "/admin/restaurantes",
   "/admin/bitacoras",
+  // Punto de venta (Fase 1–3 de la paridad con Maspedidos). Sin sesión
+  // redirigen a login; lo que se paga en frío es la compilación del segmento.
+  "/panel/foodos/tablero",
+  "/panel/foodos/mostrador",
+  "/panel/foodos/mesas",
+  "/panel/foodos/caja",
+  "/panel/foodos/pedidos",
+  // Marketplace: el 404 real de una ficha inexistente (ver foodos-pos.spec.ts).
+  "/comer/no-existe-este-restaurante",
   // Micrositio de restaurante: el 404 real y su carta. Estas rutas devuelven
   // 404 a propósito (guard del layout); el calentamiento es de compilación, no
   // de datos, así que el status es indiferente.

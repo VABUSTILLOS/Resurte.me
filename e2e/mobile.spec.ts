@@ -1,5 +1,59 @@
 import { test, expect, type Locator, type Page } from "@playwright/test"
 
+// ---------------------------------------------------------------------------
+// Helpers compartidos del hub del panel
+// ---------------------------------------------------------------------------
+
+/**
+ * Colección de prueba. `selectedCollection` se hidrata de
+ * `localStorage["resurte-restaurant-type"]` (ver `restaurant-context.tsx`), así
+ * que sembrarla activa el hub — FAB, banner "personalizadas para", ToolGrid,
+ * LiveStats y BackupStrip — sin depender de las colecciones de Supabase, que en
+ * CI no existen (credenciales dummy). El slug debe ser uno real: las
+ * herramientas lo usan para elegir icono y sugerencias.
+ */
+const TEST_COLLECTION = {
+  id: 1,
+  name: "Hamburguesas y hot dogs",
+  slug: "hamburguesas-hot-dogs",
+  description: null,
+  image_url: null,
+  tags: [],
+  display_order: 1,
+  is_active: true,
+}
+
+/**
+ * Siembra la colección para TODAS las navegaciones del test.
+ * Debe llamarse antes del `page.goto` del panel: `addInitScript` solo afecta a
+ * las navegaciones posteriores.
+ */
+async function seedPanelCollection(page: Page): Promise<void> {
+  await page.addInitScript((collection) => {
+    try {
+      window.localStorage.setItem("resurte-restaurant-type", JSON.stringify(collection))
+    } catch {
+      // Storage no disponible: el test correrá sin colección.
+    }
+  }, TEST_COLLECTION)
+}
+
+/**
+ * La guía paso a paso se auto-abre la primera vez (`useToolGuide` arranca en
+ * `useState(() => !seen)` y `seen` vive en localStorage, que está vacío en cada
+ * contexto de test nuevo). En móvil su drawer (`z-[90]`, ancho
+ * `100vw - 3rem`) tapa el panel y su backdrop `z-[85]` intercepta los taps.
+ */
+async function dismissToolGuide(page: Page): Promise<void> {
+  const close = page.getByRole("button", { name: "Cerrar guía" })
+  try {
+    await close.waitFor({ state: "visible", timeout: 3000 })
+    await close.tap().catch(() => {})
+  } catch {
+    // La guía ya estaba vista o no aplica a esta ruta.
+  }
+}
+
 // Solo se ejecuta en el project "mobile-chromium" (Pixel 7: 412×915, touch).
 test.describe("móvil: render, touch-target y sin overflow", () => {
   // 1) Las páginas públicas renderizan en viewport móvil sin scroll horizontal.
@@ -146,9 +200,13 @@ test.describe("móvil: producto — barra sticky add-to-cart", () => {
 // Abre el bottom sheet del panel de forma robusta: el onClick se adjunta al
 // hidratar React, así que reintenta el tap hasta que el dialog aparezca.
 async function openPanelSheet(page: Page): Promise<ReturnType<Page["getByRole"]>> {
+  await seedPanelCollection(page)
   await page.goto("/panel", { waitUntil: "domcontentloaded" })
+  await dismissToolGuide(page)
   const hamburger = page.getByRole("button", { name: "Abrir menú de herramientas" })
-  const sheet = page.getByRole("dialog", { name: "Panel de Herramientas" })
+  // El sheet se anuncia con `aria-label={t("panel.title")}` = "Mi Restaurante"
+  // (ver `PanelMobileNav.tsx`), no con el literal "Panel de Herramientas".
+  const sheet = page.getByRole("dialog", { name: "Mi Restaurante" })
   await expect(hamburger).toBeVisible()
   for (let attempt = 0; attempt < 5; attempt++) {
     await hamburger.tap()
@@ -1610,14 +1668,11 @@ test.describe("Fase 14 móvil: footer compacto, landings de negocio y hub del pa
 
   // 14C: el hub del panel — ToolGrid compacto y BackupStrip con scroll horizontal.
   test("el hub del panel: primera card <110px y BackupStrip con scroll sin overflow", async ({ page }) => {
+    // El hub (ToolGrid + BackupStrip) solo se monta con colección seleccionada.
+    await seedPanelCollection(page)
     await page.goto("/panel", { waitUntil: "domcontentloaded" })
+    await dismissToolGuide(page)
     await page.waitForTimeout(1500)
-
-    // Seleccionar un tipo de restaurante para activar el hub (BackupStrip solo aparece con colección).
-    const pickerBtn = page.getByRole("button", { name: /Hamburguesas y Hot Dogs/ }).first()
-    await expect(pickerBtn).toBeVisible({ timeout: 5000 })
-    await pickerBtn.tap()
-    await page.waitForTimeout(800)
 
     // ToolGrid: primera card (Link horizontal) mide <110px en móvil.
     const firstTool = page.locator("div.flex.flex-col.gap-2").first().locator("a").first()
@@ -1684,7 +1739,9 @@ test.describe("Fase 16 — Hub del panel des-saturado en móvil y barra de acces
   test.skip(({ isMobile }) => !isMobile, "solo móvil")
 
   test.beforeEach(async ({ page }) => {
+    await seedPanelCollection(page)
     await page.goto("/panel", { waitUntil: "domcontentloaded" })
+    await dismissToolGuide(page)
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
   })
 
@@ -1703,13 +1760,10 @@ test.describe("Fase 16 — Hub del panel des-saturado en móvil y barra de acces
     return last!
   }
 
+  // La colección se siembra en `beforeEach`, así que el hub ya está activo;
+  // solo hay que garantizar que la guía paso a paso no lo tape.
   async function selectCollection(page: import("@playwright/test").Page) {
-    // Si el hub ya tiene colección seleccionada (persistida), no hace falta el picker.
-    const nav = page.getByRole("navigation", { name: "Accesos rápidos del panel" })
-    if (await nav.isVisible().catch(() => false)) return
-    const pickerBtn = page.locator("button", { hasText: /Hamburguesas y Hot Dogs/ }).first()
-    await pickerBtn.tap().catch(() => {})
-    await page.waitForTimeout(800)
+    await dismissToolGuide(page)
   }
 
   test("LiveStats es una tira horizontal swipeable en móvil", async ({ page }) => {
@@ -1824,14 +1878,13 @@ test.describe("Fase 16 — FAB del panel solo en móvil", () => {
   test.use({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false })
 
   test("en desktop el FAB de herramientas no se renderiza", async ({ page }) => {
+    await seedPanelCollection(page)
     await page.goto("/panel", { waitUntil: "domcontentloaded" })
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
 
-    const pickerBtn = page.locator("button", { hasText: /Hamburguesas y Hot Dogs/ }).first()
-    await pickerBtn.tap().catch(() => {})
-    await page.waitForTimeout(800)
-
-    await expect(page.getByRole("button", { name: "Abrir herramientas" })).toHaveCount(0)
+    // Con colección el FAB sí se monta, pero `lg:hidden` lo oculta en desktop:
+    // lo que se comprueba es que no está visible, no que falte del DOM.
+    await expect(page.getByRole("button", { name: "Abrir herramientas" })).toBeHidden()
   })
 })
 
@@ -1839,16 +1892,16 @@ test.describe("Fase 17 — Panel: banner oculto, ThemeToggle con feedback, foote
   test.skip(({ isMobile }) => !isMobile, "solo móvil")
 
   test.beforeEach(async ({ page }) => {
+    await seedPanelCollection(page)
     await page.goto("/panel", { waitUntil: "domcontentloaded" })
+    await dismissToolGuide(page)
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
   })
 
+  // La colección se siembra en `beforeEach`, así que el hub (FAB, banner,
+  // ToolGrid) ya está activo; solo hay que garantizar que la guía no lo tape.
   async function selectCollection(page: import("@playwright/test").Page) {
-    const fab = page.getByRole("button", { name: "Abrir herramientas" })
-    if (await fab.isVisible().catch(() => false)) return
-    const pickerBtn = page.locator("button", { hasText: /Hamburguesas y Hot Dogs/ }).first()
-    await pickerBtn.tap().catch(() => {})
-    await page.waitForTimeout(800)
+    await dismissToolGuide(page)
   }
 
   test("el banner 'personalizadas para' está oculto en móvil", async ({ page }) => {
@@ -1930,13 +1983,9 @@ test.describe("Fase 17 — Banner 'personalizadas para' visible en desktop", () 
   test.use({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false })
 
   test("en desktop el banner sí se muestra tras elegir colección", async ({ page }) => {
+    await seedPanelCollection(page)
     await page.goto("/panel", { waitUntil: "domcontentloaded" })
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
-
-    const pickerBtn = page.locator("button", { hasText: /Hamburguesas y Hot Dogs/ }).first()
-    // Desktop sin hasTouch → tap() lanza y el catch lo traga; usar click().
-    await pickerBtn.click().catch(() => {})
-    await page.waitForTimeout(800)
 
     await expect(page.getByText("Todas las herramientas están personalizadas para")).toBeVisible()
   })
@@ -1946,14 +1995,10 @@ test.describe("Fase 18 — Semáforo de rentabilidad: el simulador ajusta el pre
   test.skip(({ isMobile }) => !isMobile, "solo móvil")
 
   test.beforeEach(async ({ page }) => {
+    await seedPanelCollection(page)
     await page.goto("/panel", { waitUntil: "domcontentloaded" })
+    await dismissToolGuide(page)
     await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {})
-    const nav = page.getByRole("navigation", { name: "Accesos rápidos del panel" })
-    if (!(await nav.isVisible().catch(() => false))) {
-      const pickerBtn = page.locator("button", { hasText: /Hamburguesas y Hot Dogs/ }).first()
-      await pickerBtn.tap().catch(() => {})
-      await page.waitForTimeout(800)
-    }
   })
 
   test("subir el simulador aumenta el precio de venta y deja el costo intacto", async ({ page }) => {
