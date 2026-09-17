@@ -374,6 +374,18 @@ dashboard. Eso fue la causa del drift histórico (ver `supabase/ESQUEMA.md`).
 commiteada, pero **no aplicada** al proyecto vinculado (`isogthougrpctnfzcdes`).
 Es la única pieza que falta del arreglo del panel de pedidos.
 
+**Estado verificado (16-sep-2026):** se reportó haber ejecutado el script en el
+SQL Editor del dashboard, pero la verificación contra el REST de producción
+**no lo confirma**: `orders?select=id,coupon_code` sigue devolviendo
+`400 42703`. No es caché obsoleta de PostgREST — la sonda diferencial de más
+abajo lo descarta, porque la misma caché sí ve `user_carts.bumps` (00113). El
+script hay que volver a ejecutarlo y confirmar con la sonda REST. Nota: hacerlo
+desde el SQL Editor es la excepción documentada a la regla de §9 (*prohibido*
+editar el esquema de producción a mano); se usa aquí solo porque el entorno
+donde se escribió el arreglo tiene las credenciales enmascaradas. Un
+`npx supabase db push` desde una máquina con sesión válida sigue siendo la vía
+preferida.
+
 Qué pasó: la columna `orders.coupon_code` se escribía desde el checkout pero
 **nunca se versionó en una migración** (00049 la añadió a `leads` y 00080 a
 `foodos_restaurants`, pero no a `orders`). En el esquema desplegado la consulta
@@ -406,6 +418,46 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
   "https://isogthougrpctnfzcdes.supabase.co/rest/v1/orders?select=id,coupon_code&limit=1"
 # 200 = la columna existe · 400 42703 = sigue sin aplicarse
 ```
+
+### Cómo distinguir "caché de esquema obsoleta" de "no se aplicó"
+
+PostgREST valida los `select` contra una **caché de esquema** propia, así que un
+`42703` puede significar dos cosas muy distintas: el objeto no existe, o existe
+pero la caché todavía no se refrescó. Se distinguen comparando contra un objeto
+de una migración reciente que **sí** está aplicada (00113, 16-sep-2026):
+
+| Sonda (`GET /rest/v1/…`, rol anónimo) | 00113 aplicada, 00114 ausente |
+| --- | --- |
+| `user_carts?select=user_id,bumps,bumps_updated_at` | `200` — la caché ve DDL reciente |
+| `orders?select=id,coupon_code` | `400 42703` |
+
+Si la primera da `200` y la segunda `42703`, la caché está fresca y la migración
+**realmente no se aplicó**. Si **ambas** dieran `42703`, sospechar de la caché
+(`NOTIFY pgrst, 'reload schema';`) antes que del script. Ojo: el rol anónimo no
+ve filas por RLS, así que un `200` prueba que la tabla o columna **existe**, no
+que tenga datos.
+
+### Script con comprobación incluida
+
+El SQL Editor puede responder `Failed to fetch (api.supabase.com)` y dejar el
+script sin aplicar sin que se note (§ más abajo). Para que el resultado sea
+inequívoco, pegar el `ALTER` y la consulta de comprobación **en el mismo
+script**:
+
+```sql
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS coupon_code TEXT;
+COMMENT ON COLUMN public.orders.coupon_code IS
+  'Código del cupón aplicado al pedido (referencia lógica a coupons.code, sin FK: el histórico del descuento sobrevive al borrado del cupón).';
+
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'coupon_code';
+```
+
+Resultado esperado: una fila `coupon_code | text`. Si no aparece ninguna fila, el
+`ALTER` no corrió. Que aparezca prueba que la sentencia se ejecutó sin error en
+esa sesión, **no** que haya commiteado: la confirmación definitiva es la sonda
+REST de arriba.
 
 **Por qué quedó pendiente:** el entorno donde se hizo el arreglo enmascara
 `POSTGRES_PASSWORD` y `POSTGRES_URL*` (se leen como la cadena literal
@@ -659,7 +711,10 @@ En el SQL Editor de Supabase, en este orden:
 4. `00085_stripe_connect.sql` — sin ella el panel de cobros falla al leer `stripe_*`.
 5. `00114_orders_coupon_code.sql` — sin ella el panel de pedidos carga (el código
    reintenta sin la columna) pero **un pago rechazado consume el cupón del
-   cliente sin devolverlo**. Detalle en §9.
+   cliente sin devolverlo**. Detalle en §9. Ojo: el 16-sep-2026 se reportó
+   haberla corrido en el SQL Editor y la sonda REST demostró que **no
+   commiteó**; usar el script con comprobación incluida de §9 y confirmar con
+   `orders?select=id,coupon_code` → `200`.
 
 ### Migraciones recientes ya aplicadas a producción
 

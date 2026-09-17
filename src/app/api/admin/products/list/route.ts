@@ -80,8 +80,83 @@ function parseParams(req: NextRequest): ListParams {
   }
 }
 
+/** Conteos derivados que alimentan los chips y los filtros "calculados". */
+interface FilterCounts {
+  noCitiesIds: number[]
+  dupNameIds: number[]
+  underThresholdIds: number[]
+  categoryCounts: Record<string, number>
+}
+
+function toIdList(value: unknown): number[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((v): v is number => typeof v === "number" && Number.isInteger(v) && v > 0)
+}
+
+function toCategoryCounts(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {}
+  const out: Record<string, number> = {}
+  for (const [key, count] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof count === "number" && Number.isFinite(count)) out[key] = count
+  }
+  return out
+}
+
+/**
+ * Conteos derivados vía `admin_product_filter_counts` (00115): una sola
+ * consulta agregada, sin topes de paginación.
+ *
+ * Devuelve `null` si la migración aún no está aplicada (o el cliente no expone
+ * `rpc`), y el llamador cae a los helpers en JS. Antes de 00115 estos conteos
+ * paginaban el catálogo desde Node con un tope de 1000 filas, así que en
+ * catálogos grandes subcontaban y el filtro "sin ciudades" excluía productos.
+ */
+async function filterCountsViaRpc(
+  supabase: ServiceClient,
+  withDeletedAt: boolean
+): Promise<FilterCounts | null> {
+  if (typeof supabase.rpc !== "function") return null
+  try {
+    // `withDeletedAt` significa "la BD tiene la columna": el panel cuenta
+    // siempre sobre el catálogo vivo, así que el flag del RPC es su inverso.
+    const { data, error } = await supabase.rpc("admin_product_filter_counts", {
+      p_include_deleted: !withDeletedAt,
+    })
+    if (error || !data || typeof data !== "object") return null
+    const payload = data as Record<string, unknown>
+    return {
+      noCitiesIds: toIdList(payload.noCitiesIds),
+      dupNameIds: toIdList(payload.dupNameIds),
+      underThresholdIds: toIdList(payload.underThresholdIds),
+      categoryCounts: toCategoryCounts(payload.categoryCounts),
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Conteos derivados con degradación: RPC si está disponible, si no los
+ *  helpers en JS (mismo resultado, más lento y con tope de 1000 filas). */
+async function filterCounts(
+  supabase: ServiceClient,
+  withDeletedAt: boolean
+): Promise<FilterCounts> {
+  const viaRpc = await filterCountsViaRpc(supabase, withDeletedAt)
+  if (viaRpc) return viaRpc
+  const [noCitiesIds, dupNameIds, underThresholdIds, categoryCounts] = await Promise.all([
+    noCitiesProductIds(supabase, withDeletedAt),
+    duplicateNameProductIds(supabase, withDeletedAt),
+    underThresholdProductIds(supabase, withDeletedAt),
+    categoryTally(supabase, withDeletedAt),
+  ])
+  return { noCitiesIds, dupNameIds, underThresholdIds, categoryCounts }
+}
+
 /** Ids de productos con filas de disponibilidad pero sin ninguna ciudad
- *  activa ("sin ciudades"). null = filtro no aplica. */
+ *  activa ("sin ciudades"). null = filtro no aplica.
+ *
+ *  Fallback de `admin_product_filter_counts` (00115): descarga toda la tabla
+ *  de disponibilidad, así que en catálogos grandes conviene el RPC. */
 async function noCitiesProductIds(
   supabase: ServiceClient,
   withDeletedAt: boolean
@@ -174,7 +249,8 @@ async function applyFilters(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- builder de PostgREST no exporta un tipo reusable
   query: any,
   p: ListParams,
-  withDeletedAt: boolean
+  withDeletedAt: boolean,
+  derived: FilterCounts
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<{ query: any }> {
   // Papelera (00099): por defecto solo productos vivos; trash=1 lista borrados.
@@ -248,12 +324,13 @@ async function applyFilters(
   // Etiqueta (JSONB): coincidencia exacta dentro del arreglo.
   if (p.tag !== "all") query = query.contains("tags", JSON.stringify([p.tag]))
   if (p.underThreshold) {
-    const ids = await underThresholdProductIds(supabase, withDeletedAt)
-    query = query.in("id", ids.length > 0 ? ids : [-1])
+    query = query.in(
+      "id",
+      derived.underThresholdIds.length > 0 ? derived.underThresholdIds : [-1]
+    )
   }
   if (p.dupNames) {
-    const ids = await duplicateNameProductIds(supabase, withDeletedAt)
-    query = query.in("id", ids.length > 0 ? ids : [-1])
+    query = query.in("id", derived.dupNameIds.length > 0 ? derived.dupNameIds : [-1])
   }
   if (p.city !== "all") {
     // Disponible en la ciudad = no tiene fila is_available=false para ella
@@ -269,11 +346,10 @@ async function applyFilters(
     }
   }
   if (p.noCities) {
-    const ids = await noCitiesProductIds(supabase, withDeletedAt)
-    if (ids.length === 0) {
+    if (derived.noCitiesIds.length === 0) {
       query = query.in("id", [-1]) // sin matches
     } else {
-      query = query.in("id", ids)
+      query = query.in("id", derived.noCitiesIds)
     }
   }
   return { query }
@@ -362,11 +438,16 @@ export async function GET(request: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const alive = (q: any) => (withDeletedAt ? q.is("deleted_at", null) : q)
 
+      // Una sola consulta agregada alimenta los filtros derivados y los chips
+      // (00115). Se calcula antes del listado para reutilizarla en ambos.
+      const derived = await filterCounts(supabase, withDeletedAt)
+
       let { query } = await applyFilters(
         supabase,
         supabase.from("products").select(p.idsOnly ? "id" : cols, { count: "exact" }),
         p,
-        withDeletedAt
+        withDeletedAt,
+        derived
       )
 
       // Orden: stock se ordena por severidad (in_stock < low_stock < out_of_stock).
