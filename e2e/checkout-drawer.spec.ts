@@ -733,4 +733,54 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
       bumpGroupAfter.locator("button").filter({ hasText: "Guacamole preparado" })
     ).toHaveCount(0)
   })
+
+  /**
+   * El aviso "… agregado al carrito" (toast.tsx) se anclaba abajo-derecha en
+   * desktop y tapaba el CTA "Hacer Checkout" de la barra de carrito (162×29px).
+   * Ahora vive abajo-izquierda y en sm+ sube --toast-bottom-gap por encima del
+   * pill flotante "Ver todos los productos".
+   *
+   * El contenedor de toasts existe siempre (ToastProvider en layout.tsx) pero su
+   * caja mide 0 sin avisos, así que validamos su posición computada contra las
+   * cajas reales del carril (el carrito sembrado monta la barra sin depender de
+   * la BD ni del catálogo local).
+   */
+  test("el aviso no tapa los CTAs del carril inferior", async ({ page, isMobile }) => {
+    seedCart(page, [aguacate])
+    await page.goto("/chihuahua", { waitUntil: "domcontentloaded" })
+
+    const checkout = page.getByRole("button", { name: "Hacer Checkout" })
+    await expect(checkout).toBeVisible()
+    const checkoutBox = await checkout.boundingBox()
+    const viewport = page.viewportSize()
+    expect(checkoutBox).not.toBeNull()
+    expect(viewport).not.toBeNull()
+
+    const anchor = await page.evaluate(() => {
+      const el = document.querySelector<HTMLElement>('div[aria-live="polite"].fixed')
+      if (!el) return null
+      const cs = getComputedStyle(el)
+      return {
+        left: el.getBoundingClientRect().left,
+        bottom: parseFloat(cs.bottom),
+        maxWidth: parseFloat(cs.maxWidth),
+      }
+    })
+    expect(anchor).not.toBeNull()
+    if (!anchor || !checkoutBox || !viewport) return
+
+    // 1) Nunca alcanza el CTA: su borde derecho máximo (left + max-w-sm) queda a
+    //    la izquierda del botón de checkout.
+    expect(anchor.left + anchor.maxWidth).toBeLessThanOrEqual(checkoutBox.x)
+
+    // 2) Arranca por encima de la barra de carrito (no la pisa).
+    const toastBottomY = viewport.height - anchor.bottom
+    expect(toastBottomY).toBeLessThanOrEqual(checkoutBox.y)
+
+    // 3) En desktop libra además el pill "Ver todos los productos".
+    const stickyBox = await page.locator(".sticky-catalog-button").boundingBox()
+    if (!isMobile && stickyBox) {
+      expect(toastBottomY).toBeLessThanOrEqual(stickyBox.y)
+    }
+  })
 })
