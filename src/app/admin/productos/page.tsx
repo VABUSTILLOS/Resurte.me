@@ -3628,17 +3628,25 @@ function AdminProductsContent() {
         </div>
       </div>
 
-      {/* Barra de acciones para la selección */}
+      {/* Barra de acciones para la selección. Es sticky: se ancla DEBAJO del
+          sub-nav de /admin (--admin-subnav-h, publicado por AdminSubNav con un
+          ResizeObserver) para poder aplicar acciones sin volver a subir. En
+          móvil es una sola fila con scroll horizontal (sin wrap) para no
+          comerse la pantalla; en sm+ se conserva el wrap. */}
       {selected.size > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
-          <span className="text-sm font-semibold text-brand-900">
+        <div
+          role="region"
+          aria-label="Acciones masivas"
+          className="sticky z-30 top-[calc(var(--header-top-offset)+var(--admin-subnav-h))] mb-4 flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-1.5 shadow-sm sm:px-4 sm:py-3"
+        >
+          <span className="shrink-0 text-sm font-semibold text-brand-900">
             {selected.size} seleccionado{selected.size === 1 ? "" : "s"}
           </span>
-          <div className="flex flex-wrap items-center gap-2 ml-auto">
+          <div className="ml-auto flex items-center gap-2 overflow-x-auto sm:flex-wrap sm:overflow-visible">
             <button
               onClick={() => openCityModal()}
               disabled={bulkSaving || cityModalLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50"
             >
               <MapPin className="w-3.5 h-3.5" />
               {cityModalLoading ? "Cargando…" : "Elegir ciudades…"}
@@ -3646,7 +3654,7 @@ function AdminProductsContent() {
             <button
               onClick={() => applyAllCities(true)}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold hover:bg-blue-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold hover:bg-blue-100 disabled:opacity-50"
               title="Disponibles en todas las ciudades (Global)"
             >
               <Globe className="w-3.5 h-3.5" />
@@ -3655,7 +3663,7 @@ function AdminProductsContent() {
             <button
               onClick={() => applyAllCities(false)}
               disabled={bulkSaving}
-              className="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-semibold hover:bg-red-100 disabled:opacity-50"
+              className="touch-target px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-semibold hover:bg-red-100 disabled:opacity-50"
               title="No disponibles en ninguna ciudad"
             >
               Ninguna
@@ -3664,7 +3672,7 @@ function AdminProductsContent() {
             <button
               onClick={() => bulkSetVisibility(true)}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 text-xs font-semibold hover:bg-green-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 text-xs font-semibold hover:bg-green-100 disabled:opacity-50"
             >
               <Eye className="w-3.5 h-3.5" />
               Mostrar en tienda
@@ -3672,7 +3680,7 @@ function AdminProductsContent() {
             <button
               onClick={() => bulkSetVisibility(false)}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200 text-xs font-semibold hover:bg-gray-200 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200 text-xs font-semibold hover:bg-gray-200 disabled:opacity-50"
             >
               <EyeOff className="w-3.5 h-3.5" />
               Ocultar de tienda
@@ -3680,7 +3688,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setBulkCategoryOpen(true)}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold hover:bg-purple-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold hover:bg-purple-100 disabled:opacity-50"
               title="Cambiar la categoría de la selección"
             >
               <Tag className="w-3.5 h-3.5" />
@@ -3689,7 +3697,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setBulkUnitOpen(true)}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold hover:bg-teal-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 text-xs font-semibold hover:bg-teal-100 disabled:opacity-50"
               title="Asignar unidad (kg, pieza…) a la selección"
             >
               <Package className="w-3.5 h-3.5" />
@@ -3698,7 +3706,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setBulkPriceOpen(true)}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-xs font-semibold hover:bg-orange-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 text-xs font-semibold hover:bg-orange-100 disabled:opacity-50"
               title="Ajustar precios de la selección en ±%"
             >
               <Percent className="w-3.5 h-3.5" />
@@ -3707,7 +3715,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setBulkSaleOpen(true)}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-50 text-pink-700 border border-pink-200 text-xs font-semibold hover:bg-pink-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-pink-50 text-pink-700 border border-pink-200 text-xs font-semibold hover:bg-pink-100 disabled:opacity-50"
               title="Aplicar o quitar ofertas en la selección"
             >
               <Tag className="w-3.5 h-3.5" />
@@ -3716,7 +3724,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setBulkTagOpen(true)}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold hover:bg-indigo-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold hover:bg-indigo-100 disabled:opacity-50"
               title="Agregar o quitar una etiqueta en la selección"
             >
               <Tag className="w-3.5 h-3.5" />
@@ -3725,7 +3733,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setBulkMarginOpen(true)}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-lime-50 text-lime-700 border border-lime-200 text-xs font-semibold hover:bg-lime-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-lime-50 text-lime-700 border border-lime-200 text-xs font-semibold hover:bg-lime-100 disabled:opacity-50"
               title="Oferta calculada para conservar un margen mínimo (requiere costo)"
             >
               <Percent className="w-3.5 h-3.5" />
@@ -3734,7 +3742,7 @@ function AdminProductsContent() {
             <button
               onClick={generateSeoBatch}
               disabled={bulkSaving || seoGenerating}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-xs font-semibold hover:bg-violet-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 border border-violet-200 text-xs font-semibold hover:bg-violet-100 disabled:opacity-50"
               title="Generar título y descripción SEO con IA (solo productos sin SEO)"
             >
               {seoGenerating ? (
@@ -3747,7 +3755,7 @@ function AdminProductsContent() {
             <button
               onClick={() => bulkSetWhatsApp(true)}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
               title="Mostrar la selección en el catálogo de WhatsApp"
             >
               <Eye className="w-3.5 h-3.5" />
@@ -3756,7 +3764,7 @@ function AdminProductsContent() {
             <button
               onClick={() => bulkSetWhatsApp(false)}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50"
               title="Ocultar la selección del catálogo de WhatsApp"
             >
               <EyeOff className="w-3.5 h-3.5" />
@@ -3765,7 +3773,7 @@ function AdminProductsContent() {
             <button
               onClick={copySelection}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold hover:bg-indigo-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold hover:bg-indigo-100 disabled:opacity-50"
               title="Copiar la selección como lista Nombre — $precio"
             >
               <ClipboardList className="w-3.5 h-3.5" />
@@ -3774,7 +3782,7 @@ function AdminProductsContent() {
             <button
               onClick={bulkGenerateImages}
               disabled={bulkAiBusy}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold hover:bg-purple-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-xs font-semibold hover:bg-purple-100 disabled:opacity-50"
               title="Generar imagen con IA para los seleccionados sin imagen (máx 10)"
             >
               {bulkAiBusy ? (
@@ -3788,7 +3796,7 @@ function AdminProductsContent() {
               <button
                 onClick={mergeSelected}
                 disabled={bulkSaving}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200 text-xs font-semibold hover:bg-fuchsia-100 disabled:opacity-50"
+                className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200 text-xs font-semibold hover:bg-fuchsia-100 disabled:opacity-50"
                 title="Fusionar: conserva el de menor id, el otro va a la papelera"
               >
                 <Copy className="w-3.5 h-3.5" />
@@ -3798,7 +3806,7 @@ function AdminProductsContent() {
             <button
               onClick={bulkDuplicate}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-xs font-semibold hover:bg-sky-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-xs font-semibold hover:bg-sky-100 disabled:opacity-50"
               title="Duplicar la selección (las copias nacen despublicadas)"
             >
               <Copy className="w-3.5 h-3.5" />
@@ -3807,7 +3815,7 @@ function AdminProductsContent() {
             <button
               onClick={bulkDelete}
               disabled={bulkSaving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-semibold hover:bg-red-100 disabled:opacity-50"
+              className="touch-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-semibold hover:bg-red-100 disabled:opacity-50"
               title="Eliminar la selección (los que tengan pedidos se omiten)"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -3816,7 +3824,7 @@ function AdminProductsContent() {
             <button
               onClick={() => setSelected(new Set())}
               disabled={bulkSaving}
-              className="px-2 py-1.5 text-xs font-semibold text-gray-500 hover:underline disabled:opacity-50"
+              className="touch-target px-2 py-1.5 text-xs font-semibold text-gray-500 hover:underline disabled:opacity-50"
             >
               Limpiar
             </button>
