@@ -4312,12 +4312,18 @@ function AdminProductsContent() {
       {view === "table" ? (
       <div
         aria-busy={refreshing}
-        className="bg-white rounded-xl border border-gray-200 overflow-hidden"
+        /* La tabla scrollea dentro de la tarjeta para que el encabezado pueda
+           quedarse pegado: `overflow-x-auto` convierte el eje Y en `auto` y un
+           `th` sticky quedaría anclado a un scrollport que no scrollea. El
+           alto se calcula con las mismas variables que el sub-nav y la fila de
+           categorías (nunca con offsets a mano), con un mínimo para que en
+           pantallas bajas la tarjeta siga siendo usable. */
+        className="flex max-h-[max(24rem,calc(100dvh-var(--header-top-offset)-var(--admin-subnav-h)-var(--admin-catbar-h)-1.5rem))] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white"
       >
-        <div className="overflow-x-auto">
+        <div ref={tableScrollRef} className="min-h-0 flex-1 overflow-auto">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-left text-xs text-gray-400 font-medium">
+            <thead className="sticky top-0 z-10 border-b border-gray-100 bg-gray-50">
+              <tr className="text-left text-xs text-gray-400 font-medium">
                 <th className="pl-4 pr-1 py-3 w-10">
                   <input
                     type="checkbox"
