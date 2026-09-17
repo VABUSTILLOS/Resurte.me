@@ -89,10 +89,20 @@ export interface FoodosOrderBody {
  * registre en otro lado.
  */
 export interface FoodosPosContext {
-  /** Folio consecutivo ya reservado con `foodos_next_folio`. */
-  folio: string
+  /**
+   * Folio consecutivo ya reservado con `foodos_next_folio`. Nulo en una comanda
+   * de mesa: mandar platillos a cocina no es una venta, y el folio se reserva
+   * una sola vez, al cerrar la cuenta. Un folio vacío en lugar de nulo chocaría
+   * con el índice único de folios al segundo envío.
+   */
+  folio: string | null
   cashierUserId: string
-  shiftId: string
+  /**
+   * Turno de caja al que se carga el movimiento. Nulo en una comanda cuando la
+   * caja todavía no abre: bloquear la cocina porque el cajero llega tarde
+   * dejaría al salón sin poder pedir. El cierre de la cuenta sí exige turno.
+   */
+  shiftId: string | null
   tableTicketId?: string | null
   /**
    * Si el cobro ya se cerró con el cliente. Por omisión `true` en el mostrador
@@ -100,6 +110,13 @@ export interface FoodosPosContext {
    * `false` y quedan pendientes hasta el cierre.
    */
   settled?: boolean
+  /**
+   * `false` cuando el pedido sólo documenta un cobro y **no** es trabajo nuevo
+   * de cocina: es el caso de la cuenta que cierra una mesa, cuyos platillos ya
+   * se mandaron en sus comandas. Nace en estado terminal para no aparecer en el
+   * KDS como una comanda fantasma. Por omisión `true`.
+   */
+  sendToKitchen?: boolean
 }
 
 export interface FoodosOrderOptions {
@@ -460,7 +477,17 @@ export async function createFoodosOrder(
     total,
     channel,
     fulfillment,
-    status: "pending",
+    // Un pedido capturado por el personal (caja o mesero) nace confirmado: nadie
+    // lo teclea si no lo va a preparar, así que no tiene sentido dejarlo en la
+    // bandeja de "por confirmar". La cuenta que cierra una mesa nace en estado
+    // terminal porque su comida ya se mandó en las comandas. Los pedidos en
+    // línea sí siguen naciendo `pending`: el dueño los confirma al verificar el
+    // pago.
+    status: options.pos
+      ? options.pos.sendToKitchen === false
+        ? "delivered"
+        : "confirmed"
+      : "pending",
     payment_method: serverPaymentMethod,
     payment_breakdown: paymentBreakdown,
     payment_status: derivePaymentStatus(serverPaymentMethod, settled),

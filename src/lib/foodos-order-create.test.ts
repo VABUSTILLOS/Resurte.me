@@ -621,6 +621,64 @@ describe("contexto de punto de venta", () => {
   })
 })
 
+// Una comanda de mesa no puede nacer "pending": caería en la bandeja de "por
+// confirmar" y nunca llegaría a la cocina. El personal que la captura ya sabe
+// que la va a preparar, así que nace confirmada. Lo que sí llega "pending" es
+// un pedido en línea, que el dueño confirma desde el panel.
+describe("estado de un pedido capturado por el personal", () => {
+  const POS = {
+    folio: "260917-0001",
+    cashierUserId: "user-caja",
+    shiftId: "shift-1",
+  }
+
+  it("un pedido de mostrador nace confirmado, listo para cocina", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(client, body({ channel: "mostrador" }), { pos: POS })
+
+    expect(calls.inserts[0]?.payload.status).toBe("confirmed")
+  })
+
+  it("un envío a cocina de una mesa nace confirmado", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(
+      client,
+      body({ channel: "mesero", fulfillment: "dine_in", table_number: "Mesa 3" }),
+      { pos: { ...POS, folio: "", tableTicketId: "ticket-1", settled: false, sendToKitchen: true } }
+    )
+
+    expect(calls.inserts[0]?.payload).toMatchObject({
+      channel: "mesero",
+      fulfillment: "dine_in",
+      table_number: "Mesa 3",
+      table_ticket_id: "ticket-1",
+      status: "confirmed",
+      payment_status: "pending",
+    })
+  })
+
+  it("la cuenta del cierre nace entregada: la comida ya salió", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(
+      client,
+      body({ channel: "mesero", fulfillment: "dine_in", table_number: "Mesa 3" }),
+      { pos: { ...POS, tableTicketId: "ticket-1", settled: true, sendToKitchen: false } }
+    )
+
+    expect(calls.inserts[0]?.payload).toMatchObject({
+      status: "delivered",
+      payment_status: "paid",
+    })
+  })
+
+  it("un pedido en línea sigue naciendo pendiente de confirmar", async () => {
+    const { client, calls } = fakeClient(baseConfig())
+    await createFoodosOrder(client, body())
+
+    expect(calls.inserts[0]?.payload.status).toBe("pending")
+  })
+})
+
 describe("cobro combinado", () => {
   const POS = {
     folio: "260917-0001",

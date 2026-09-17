@@ -186,6 +186,15 @@ body.has-panel-bottom-nav {
   --floating-bottom-offset: calc(4.5rem + var(--inset-bottom));
 }
 
+/* Mostrador FoodOS: la barra del ticket ocupa toda la franja inferior mientras
+   hay partidas. Flota por encima del carril para no chocar con el FAB de
+   herramientas, así que el FAB de WhatsApp —que vive en esa misma franja y
+   tiene z mayor— taparía el total. Se oculta mientras la barra está visible. */
+body.has-mostrador-ticket-bar .whatsapp-floating,
+body.has-mostrador-ticket-bar .back-to-top {
+  display: none;
+}
+
 /* Header auto-hide: al ocultarse el header global, las barras sticky
    secundarias (top bar del panel, sidebar del dashboard) suben al top. */
 body.header-hidden {

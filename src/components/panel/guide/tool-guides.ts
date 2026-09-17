@@ -638,6 +638,56 @@ const TOOL_GUIDES: Record<string, ToolGuideConfig> = {
     ],
   },
 
+  "/panel/foodos/mostrador": {
+    tool: "Punto de venta",
+    icon: "🧾",
+    intro:
+      "Cobra de pie, con el cliente enfrente: busca el platillo, elige el tipo de servicio, captura el pago y entrega el ticket con folio. La venta queda en el turno abierto, así que aparece en tu corte del día.",
+    steps: [
+      {
+        id: "turno",
+        title: "Abre la caja antes de la primera venta",
+        description:
+          "Sin turno abierto la pantalla no deja cobrar. No es un candado decorativo: una venta sin turno no tiene a dónde imputarse y desaparecería del corte.",
+        example: [
+          { label: "Turno", value: "Abierto · fondo $500" },
+          { label: "Siguiente folio", value: "260917-0001" },
+        ],
+      },
+      {
+        id: "platillos",
+        title: "Arma el ticket con el buscador o las categorías",
+        description:
+          "Toca un platillo para sumarlo y vuélvelo a tocar para subir la cantidad. Si tiene tamaños o extras se abre la ventana de opciones; los combos entran como una sola partida.",
+        example: [
+          { label: "Taco al pastor", value: "$22 × 3" },
+          { label: "Agua de horchata", value: "$35 × 1" },
+        ],
+      },
+      {
+        id: "servicio",
+        title: "Elige si es para llevar, a domicilio o en mesa",
+        description:
+          "En mesa se pide el número. A domicilio se captura la dirección y se cotiza la tarifa contra el servidor antes de cobrar: si está fuera de zona o no llega al mínimo, se ve aquí y no después de tomar el dinero.",
+        example: [
+          { label: "Servicio", value: "A domicilio" },
+          { label: "Tarifa cotizada", value: "$45 · 35 min" },
+        ],
+      },
+      {
+        id: "cobro",
+        title: "Captura el pago y entrega el ticket",
+        description:
+          "Un solo método, o varios con el cobro combinado cuando pagan parte en efectivo y parte con tarjeta. Con efectivo de por medio captura lo recibido y el cambio se calcula solo. Al cobrar aparecen el folio y los botones de impresión de ticket y de comanda.",
+        example: [
+          { label: "Total", value: "$101" },
+          { label: "Recibido", value: "$150" },
+          { label: "Cambio", value: "$49" },
+        ],
+      },
+    ],
+  },
+
   "/panel/foodos/caja": {
     tool: "Corte de caja",
     icon: "💵",

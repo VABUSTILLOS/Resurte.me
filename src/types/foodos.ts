@@ -313,11 +313,17 @@ export type FoodosOrderStatus =
   | "cancelled"
 
 /**
- * De dónde entró el pedido. `mostrador` es la venta en caja del POS nativo y
- * `marketplace` el pedido que llega desde HoyQueComemos; en ambos el
- * restaurante es quien cobra y entrega, no Resurte.me.
+ * De dónde entró el pedido. `mostrador` es la venta en caja del POS nativo,
+ * `mesero` el servicio en mesa del comandero y `marketplace` el pedido que
+ * llega desde HoyQueComemos; en los tres el restaurante es quien cobra y
+ * entrega, no Resurte.me.
+ *
+ * Ojo con `mesero`: una cuenta de mesa deja una fila por cada envío a cocina
+ * (comanda operativa, `payment_status = "pending"`, nunca se cobra) y una fila
+ * final al cerrar (la cuenta, `payment_status = "paid"`). Los ingresos se
+ * cuentan **por `payment_status = "paid"`**, nunca por el número de filas.
  */
-export type FoodosOrderChannel = "web" | "qr" | "whatsapp" | "mostrador" | "marketplace"
+export type FoodosOrderChannel = "web" | "qr" | "whatsapp" | "mostrador" | "mesero" | "marketplace"
 export type FoodosFulfillment = "delivery" | "pickup" | "dine_in"
 /**
  * `processing` = el cliente ya recibió las instrucciones de un método

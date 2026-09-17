@@ -435,6 +435,18 @@ export const TOOLS: Tool[] = [
     standalone: true,
   },
   {
+    title: "Punto de venta",
+    description: "Cobra de pie: busca el platillo, elige si es para llevar, a domicilio o en mesa, captura el pago —efectivo, tarjeta, transferencia o combinado— y entrega el ticket con folio. Sin turno abierto no deja vender, porque esa venta no aparecería en el corte del día.",
+    icon: Ticket,
+    href: "/panel/foodos/mostrador",
+    color: "text-emerald-700",
+    bgColor: "bg-emerald-50",
+    area: "sistema",
+    short: "Mostrador",
+    standalone: true,
+    feature: "pos_mostrador",
+  },
+  {
     title: "Corte de caja y arqueo",
     description: "Abre el turno con tu fondo, registra entradas y salidas de efectivo y ciérralo contando el cajón por denominación. El esperado y el faltante los calcula el servidor, no la pantalla.",
     icon: Banknote,
