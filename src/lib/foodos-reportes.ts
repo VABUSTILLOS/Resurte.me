@@ -14,8 +14,6 @@ import type { FoodosOrder, FoodosOrderChannel } from "@/types/foodos"
 import { cashPartOfSale, fromCents, toCents } from "./foodos-cash"
 import { channelLabel, FOODOS_ORDER_CHANNELS } from "./foodos"
 
-export { CHANNEL_LABELS, channelLabel } from "./foodos"
-
 const DAY_MS = 86_400_000
 
 /** Bucket de las ventas que no pasaron por caja (web, QR, marketplace). */
