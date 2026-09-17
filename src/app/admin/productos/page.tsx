@@ -119,6 +119,22 @@ import {
 } from "@/lib/admin-products-view"
 import { downloadCsv, toCsv } from "@/lib/csv"
 import { PRODUCT_CSV_HEADER, productCsvCells } from "@/lib/product-csv"
+import { conflictFromResponse } from "@/lib/product-conflict"
+import {
+  describeProductPreset,
+  isActiveProductPreset,
+  makeProductPreset,
+  MAX_PRODUCT_PRESETS,
+  parseLegacyProductPresets,
+  parseProductPresets,
+  productPresetFilterCount,
+  PRODUCT_PRESETS_LEGACY_KEY,
+  PRODUCT_PRESETS_STORAGE_KEY,
+  removeProductPreset,
+  serializeProductPresets,
+  upsertProductPreset,
+  type ProductPreset,
+} from "@/lib/product-filter-presets"
 
 interface Product {
   id: number
@@ -151,6 +167,10 @@ interface Product {
   seo_title: string | null
   seo_description: string | null
   created_at: string | null
+  /** Versión de la fila (B19). La envía cada escritura y la devuelve el
+   *  listado; el panel la manda como precondición para no pisar cambios
+   *  ajenos. Opcional para no romper la asignabilidad con otros tipos. */
+  updated_at?: string | null
   /** Solo presente en la papelera (00099). Opcional para no romper la
    *  asignabilidad con `ProductFormProduct` del modal. */
   deleted_at?: string | null
@@ -423,9 +443,14 @@ function AdminProductsContent() {
       const res = await fetch("/api/admin/products/update", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, image_url: upData.url }),
+        body: JSON.stringify({
+          productId,
+          expectedUpdatedAt: products.find((p) => p.id === productId)?.updated_at ?? undefined,
+          image_url: upData.url,
+        }),
       })
       const data = await res.json()
+      if (handleStaleWrite(productId, res, data)) return
       if (!res.ok) throw new Error(data.error ?? "Error al guardar la imagen")
       setProducts((prev) =>
         prev.map((p) => (p.id === productId ? { ...p, image_url: upData.url } : p))
@@ -456,6 +481,8 @@ function AdminProductsContent() {
   // Fase 16 — importación masiva vía CSV
   const [importOpen, setImportOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  /** B19 — aviso de conflicto de versión (409) con botón para recargar. */
+  const [staleNotice, setStaleNotice] = useState<{ message: string } | null>(null)
   // Alta/edición completa de producto y duplicado.
   const [productForm, setProductForm] = useState<"new" | Product | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
@@ -1451,11 +1478,13 @@ function AdminProductsContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           productId: p.id,
+          expectedUpdatedAt: p.updated_at ?? undefined,
           image_url: url,
           images: url ? [...gallery, url] : gallery,
         }),
       })
       const data = await res.json().catch(() => ({}))
+      if (handleStaleWrite(p.id, res, data)) return
       if (!res.ok) throw new Error(data.error ?? "Error al guardar la imagen")
       // La incidencia ya no aplica: el sondeo vuelve a decidir en la próxima revisión.
       setImageIssues((prev) => {
@@ -1576,9 +1605,19 @@ function AdminProductsContent() {
           const patch = await fetch("/api/admin/products/update", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId: p.id, image_url: url, images: [url] }),
+            body: JSON.stringify({
+              productId: p.id,
+              expectedUpdatedAt: p.updated_at ?? undefined,
+              image_url: url,
+              images: [url],
+            }),
           })
-          if (!patch.ok) throw new Error("error al guardar la imagen")
+          if (!patch.ok) {
+            // Incluye el 409 de versión (B19): el motivo queda por id en el
+            // resumen de fallos en vez de perderse.
+            const patchData = await patch.json().catch(() => ({}))
+            throw new Error(patchData.error ?? "error al guardar la imagen")
+          }
           doneIds.push(p.id)
           setBulkProgress({ done: doneIds.length, total: missing.length })
         } catch (err) {
@@ -1854,53 +1893,42 @@ function AdminProductsContent() {
     }
   }
 
-  // Vistas guardadas de filtros (localStorage).
-  interface SavedView {
-    name: string
-    params: Record<string, string>
-  }
-  const [savedViews, setSavedViews] = useState<SavedView[]>(() => {
+  // Vistas guardadas de filtros: la query canónica del listado (filtros + orden
+  // + vista + tamaño de página) en `localStorage`. La lógica vive en
+  // `@/lib/product-filter-presets`, la misma fuente que la URL.
+  const [savedViews, setSavedViews] = useState<ProductPreset[]>(() => {
     if (typeof window === "undefined") return []
     try {
-      return JSON.parse(localStorage.getItem("resurte-admin-product-views") ?? "[]")
+      const stored = parseProductPresets(localStorage.getItem(PRODUCT_PRESETS_STORAGE_KEY))
+      if (stored.length > 0) return stored
+      // Vistas del formato anterior del panel: se migran al leerlas y se
+      // reescriben en la clave nueva en el primer guardado.
+      return parseLegacyProductPresets(localStorage.getItem(PRODUCT_PRESETS_LEGACY_KEY))
     } catch {
       return []
     }
   })
   const [viewsOpen, setViewsOpen] = useState(false)
 
-  function persistViews(views: SavedView[]) {
-    setSavedViews(views)
+  function persistViews(views: ProductPreset[]) {
+    const next = views.slice(0, MAX_PRODUCT_PRESETS)
+    setSavedViews(next)
     try {
-      localStorage.setItem("resurte-admin-product-views", JSON.stringify(views))
+      localStorage.setItem(PRODUCT_PRESETS_STORAGE_KEY, serializeProductPresets(next))
+      localStorage.removeItem(PRODUCT_PRESETS_LEGACY_KEY)
     } catch {
       // sin espacio / modo privado: la vista vive solo en memoria
     }
   }
 
-  function currentFilterParams(): Record<string, string> {
-    const params: Record<string, string> = {}
-    if (debouncedSearch) params.q = debouncedSearch
-    if (categoryFilter !== "all") params.category = categoryFilter
-    if (stockFilter !== "all") params.stock = stockFilter
-    if (statusFilter !== "all") params.status = statusFilter
-    if (onlyNoImage) params.noImage = "1"
-    if (onlyNoCities) params.noCities = "1"
-    if (onlyNoPrice) params.noPrice = "1"
-    if (onlyNoCategory) params.noCategory = "1"
-    if (onlyWaMismatch) params.waMismatch = "1"
-    if (onlyOnSale) params.onSale = "1"
-    if (onlyDupNames) params.dupNames = "1"
-    if (onlyTrash) params.trash = "1"
-    if (onlyStaleSale) params.staleSale = "1"
-    if (onlyUnderThreshold) params.underThreshold = "1"
-    if (onlyBrokenImage) params.brokenImage = "1"
-    if (tagFilter !== "all") params.tag = tagFilter
-    if (cityFilter !== "all") params.city = cityFilter
-    if (brandFilter !== "all") params.brand = brandFilter
-    if (view === "grid") params.view = "grid"
-    Object.assign(params, productSortSearchParams(sort))
-    return params
+  /** Query canónica de lo que se está viendo, idéntica a la que escribe la URL. */
+  function currentPresetQuery(): string {
+    const sp = new URLSearchParams()
+    productFiltersToSearchParams(filters, sp)
+    if (view === "grid") sp.set("view", "grid")
+    for (const [key, value] of Object.entries(productSortSearchParams(sort))) sp.set(key, value)
+    if (pageSize !== DEFAULT_PAGE_SIZE) sp.set("pageSize", String(pageSize))
+    return sp.toString()
   }
 
   async function saveCurrentView() {
@@ -1910,41 +1938,48 @@ function AdminProductsContent() {
       confirmLabel: "Guardar vista",
     })
     if (!name?.trim()) return
-    const params = currentFilterParams()
-    if (Object.keys(params).length === 0) {
-      setError("No hay filtros activos para guardar")
-      return
-    }
-    persistViews([...savedViews.filter((v) => v.name !== name.trim()), { name: name.trim(), params }])
-    setToast(`Vista "${name.trim()}" guardada`)
+    // La vista sin filtros también se guarda: "Catálogo completo" es un atajo
+    // legítimo para volver al estado inicial.
+    const preset = makeProductPreset(name, currentPresetQuery())
+    if (!preset) return
+    persistViews(upsertProductPreset(savedViews, preset))
+    setToast(`Vista "${preset.name}" guardada`)
   }
 
-  function applyView(v: SavedView) {
+  function deleteView(name: string) {
+    persistViews(removeProductPreset(savedViews, name))
+  }
+
+  function applyView(preset: ProductPreset) {
+    const sp = new URLSearchParams(preset.query)
+    const next = parseProductFilters(sp)
     updateFilters(() => {
-      setSearch(v.params.q ?? "")
-      setDebouncedSearch(v.params.q ?? "")
-      setCategoryFilter(v.params.category ?? "all")
-      setStockFilter((v.params.stock as StockStatus | "all") ?? "all")
-      setStatusFilter((v.params.status as "all" | "published" | "unpublished") ?? "all")
-      setOnlyNoImage(v.params.noImage === "1")
-      setOnlyNoCities(v.params.noCities === "1")
-      setOnlyNoPrice(v.params.noPrice === "1")
-      setOnlyNoCategory(v.params.noCategory === "1")
-      setOnlyWaMismatch(v.params.waMismatch === "1")
-      setOnlyOnSale(v.params.onSale === "1")
-      setOnlyDupNames(v.params.dupNames === "1")
-      setOnlyTrash(v.params.trash === "1")
-      setOnlyStaleSale(v.params.staleSale === "1")
-      setOnlyUnderThreshold(v.params.underThreshold === "1")
-      setOnlyBrokenImage(v.params.brokenImage === "1")
-      setTagFilter(v.params.tag ?? "all")
-      setCityFilter(v.params.city ?? "all")
-      setBrandFilter(v.params.brand ?? "all")
-      setView(v.params.view === "grid" ? "grid" : "table")
-      setSort(parseProductSort(v.params.sort, v.params.dir))
+      setSearch(next.search)
+      setDebouncedSearch(next.search)
+      setCategoryFilter(next.category)
+      setStockFilter(next.stock)
+      setStatusFilter(next.status)
+      setTagFilter(next.tag)
+      setCityFilter(next.city)
+      setBrandFilter(next.brand)
+      setOnlyNoImage(next.noImage)
+      setOnlyNoCities(next.noCities)
+      setOnlyNoPrice(next.noPrice)
+      setOnlyNoCategory(next.noCategory)
+      setOnlyWaMismatch(next.waMismatch)
+      setOnlyOnSale(next.onSale)
+      setOnlyDupNames(next.dupNames)
+      setOnlyTrash(next.trash)
+      setOnlyStaleSale(next.staleSale)
+      setOnlyUnderThreshold(next.underThreshold)
+      setOnlyBrokenImage(next.brokenImage)
     })
+    setView(sp.get("view") === "grid" ? "grid" : "table")
+    setSort(parseProductSort(sp.get("sort"), sp.get("dir")))
+    const size = Number(sp.get("pageSize"))
+    setPageSize(PAGE_SIZE_OPTIONS.includes(size) ? size : DEFAULT_PAGE_SIZE)
     setViewsOpen(false)
-    setToast(`Vista "${v.name}" aplicada`)
+    setToast(`Vista "${preset.name}" aplicada`)
   }
   async function mergeSelected() {
     if (selected.size !== 2 || bulkSaving) return
@@ -2117,6 +2152,7 @@ function AdminProductsContent() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               productId: draft.id,
+              expectedUpdatedAt: products.find((p) => p.id === draft.id)?.updated_at ?? undefined,
               seo_title: draft.seo_title.trim() || null,
               seo_description: draft.seo_description.trim() || null,
             }),
@@ -2657,22 +2693,54 @@ function AdminProductsContent() {
   }
 
   // ---------- Edición por producto (precio, stock, WhatsApp) ----------
+  /**
+   * B19 — concurrencia optimista. El servidor responde 409 `stale_write`
+   * cuando la fila cambió desde que el panel la leyó. Se adopta la versión
+   * vigente (así un reintento no vuelve a chocar consigo mismo) y se avisa con
+   * un botón para recargar el listado. Devuelve `true` si era ese conflicto.
+   */
+  const handleStaleWrite = (productId: number, res: Response, body: unknown) => {
+    if (res.status !== 409) return false
+    if ((body as { code?: unknown } | null)?.code !== "stale_write") return false
+    const conflict = conflictFromResponse(body)
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === productId ? { ...p, updated_at: conflict?.currentUpdatedAt ?? null } : p
+      )
+    )
+    setStaleNotice({
+      message:
+        (body as { error?: string }).error ?? "Otro usuario modificó este producto mientras lo editabas",
+    })
+    return true
+  }
+
   const patchProduct = async (productId: number, fields: Record<string, unknown>) => {
     setSaving((prev) => new Set(prev).add(productId))
     setError(null)
+    setStaleNotice(null)
+    // La versión que el panel leyó viaja como precondición: el servidor la
+    // compara y rechaza la escritura si la fila ya cambió.
+    const expectedUpdatedAt = products.find((p) => p.id === productId)?.updated_at ?? undefined
     try {
       const res = await fetch("/api/admin/products/update", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, ...fields }),
+        body: JSON.stringify({ productId, expectedUpdatedAt, ...fields }),
       })
+      const data = await res.json().catch(() => ({}))
+      if (handleStaleWrite(productId, res, data)) return
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
         throw new Error(data.error ?? "Error al actualizar")
       }
+      // El servidor devuelve la versión nueva: sin ella la siguiente edición
+      // del mismo producto chocaría con su propia escritura anterior.
+      const updatedAt = typeof data.updated_at === "string" ? data.updated_at : null
       // Aplica el cambio localmente
       setProducts((prev) =>
-        prev.map((p) => (p.id === productId ? { ...p, ...fields } : p))
+        prev.map((p) =>
+          p.id === productId ? { ...p, ...fields, ...(updatedAt ? { updated_at: updatedAt } : {}) } : p
+        )
       )
       setToast("Cambio guardado")
     } catch (err) {
@@ -2873,6 +2941,8 @@ function AdminProductsContent() {
   // "Filtros" que los selects. En escritorio (sm+) quedan siempre visibles.
   const secondaryFilterClass = filtersOpen ? "inline-flex" : "hidden sm:inline-flex"
   const activeFilterCount = activeProductFilterCount(filters)
+  // Query de lo que se ve ahora, para marcar la vista guardada activa.
+  const activePresetQuery = currentPresetQuery()
 
   // Chips de filtros activos: explican por qué el listado está recortado y
   // permiten quitar UN filtro sin abrir el panel "Filtros" (que en móvil está
@@ -3184,6 +3254,32 @@ function AdminProductsContent() {
           className="mb-4 px-4 py-3 bg-red-50 text-red-700 text-sm rounded-xl border border-red-200"
         >
           {error}
+        </div>
+      )}
+
+      {/* B19 — la fila cambió mientras se editaba: se explica y se ofrece
+          recargar en vez de reintentar en silencio (lo que pisaría el cambio
+          del otro usuario). */}
+      {staleNotice && (
+        <div
+          role="alert"
+          className="mb-4 flex items-start gap-3 px-4 py-3 bg-amber-50 text-amber-900 text-sm rounded-xl border border-amber-200"
+        >
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold">El producto cambió mientras lo editabas</p>
+            <p className="mt-0.5 break-words">{staleNotice.message}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setStaleNotice(null)
+              setReloadKey((k) => k + 1)
+            }}
+            className="touch-target shrink-0 px-3 py-2 text-sm font-semibold text-amber-900 bg-white border border-amber-300 rounded-xl hover:bg-amber-100"
+          >
+            Recargar
+          </button>
         </div>
       )}
 
@@ -3891,7 +3987,7 @@ function AdminProductsContent() {
             Vistas
           </button>
           {viewsOpen && (
-            <div className="absolute z-30 mt-1 w-56 rounded-xl border border-gray-200 bg-white shadow-lg p-2">
+            <div className="absolute z-30 mt-1 w-64 rounded-xl border border-gray-200 bg-white shadow-lg p-2">
               <button
                 type="button"
                 onClick={() => {
@@ -3903,30 +3999,54 @@ function AdminProductsContent() {
                 ＋ Guardar vista actual
               </button>
               {savedViews.length === 0 ? (
-                <p className="px-3 py-2 text-[11px] text-gray-400">Sin vistas guardadas.</p>
+                <p className="px-3 py-2 text-[11px] text-gray-400">
+                  Sin vistas guardadas. Guarda la combinación de filtros, orden y vista para
+                  recuperarla con un clic.
+                </p>
               ) : (
                 <ul className="mt-1 divide-y divide-gray-50">
-                  {savedViews.map((v) => (
-                    <li key={v.name} className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => applyView(v)}
-                        className="flex-1 text-left px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-gray-50 truncate"
-                        title={`Aplicar vista ${v.name}`}
-                      >
-                        {v.name}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => persistViews(savedViews.filter((s) => s.name !== v.name))}
-                        aria-label={`Borrar vista ${v.name}`}
-                        className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </li>
-                  ))}
+                  {savedViews.map((v) => {
+                    const active = isActiveProductPreset(v, activePresetQuery)
+                    return (
+                      <li key={v.name} className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => applyView(v)}
+                          aria-current={active ? "true" : undefined}
+                          className={`flex-1 min-w-0 text-left px-3 py-2 min-h-11 rounded-lg text-xs truncate ${
+                            active
+                              ? "bg-brand-50 text-brand-700 font-semibold"
+                              : "text-gray-700 hover:bg-gray-50"
+                          }`}
+                          title={`Aplicar vista ${v.name} — ${describeProductPreset(v)}`}
+                        >
+                          {v.name}
+                          <span
+                            className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                              active ? "bg-brand-100 text-brand-700" : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            {productPresetFilterCount(v)}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteView(v.name)}
+                          aria-label={`Borrar vista ${v.name}`}
+                          className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 touch-target"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
+              )}
+              {savedViews.length > 0 && (
+                <p className="px-3 pt-2 pb-1 text-[10px] text-gray-400">
+                  {savedViews.length} de {MAX_PRODUCT_PRESETS} vistas · las más antiguas se
+                  descartan al superar el tope
+                </p>
               )}
             </div>
           )}

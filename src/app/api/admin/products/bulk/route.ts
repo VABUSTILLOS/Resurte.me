@@ -126,7 +126,13 @@ export async function POST(request: Request) {
     const { response: adminDenied, user: adminUser } = await requireAdmin()
     if (adminDenied) return adminDenied
 
-    const body = (await request.json()) as { ids?: unknown; patch?: unknown; patches?: unknown }
+    const body = (await request.json()) as {
+      ids?: unknown
+      patch?: unknown
+      patches?: unknown
+      expected?: unknown
+      force?: unknown
+    }
 
     const idsResult = normalizeBulkIds(body.ids)
     if (!idsResult.ok) {
@@ -141,6 +147,34 @@ export async function POST(request: Request) {
     const patchById = parsed.patchById
 
     const supabase = await createServiceClient()
+
+    // B19 — precondiciones de versión. Los ids cuya fila ya cambió se sacan del
+    // lote antes de escribir: en vez de pisar el cambio ajeno en silencio se
+    // reportan por id (mismo resumen de fallos parciales de B4). `force: true`
+    // ignora las precondiciones a conciencia.
+    const batch = new Set(ids)
+    const expected =
+      body.force === true
+        ? new Map<number, string>()
+        : new Map([...parseExpectedMap(body.expected)].filter(([id]) => batch.has(id)))
+    const stale: number[] = []
+    if (expected.size > 0) {
+      const currentRows: Array<{ id: number; updated_at: string | null }> = []
+      for (const idsChunk of chunkList([...expected.keys()], BULK_CHUNK)) {
+        // Si el esquema aún no expone `updated_at` la lectura falla: sin filas
+        // no hay conflicto que detectar y el lote sigue su curso normal.
+        const read = await supabase.from("products").select("id, updated_at").in("id", idsChunk)
+        if (read.error) continue
+        for (const row of (read.data ?? []) as Array<Record<string, unknown>>) {
+          currentRows.push({
+            id: row.id as number,
+            updated_at: (row.updated_at as string | null) ?? null,
+          })
+        }
+      }
+      stale.push(...staleIds(expected, currentRows))
+      for (const id of stale) patchById.delete(id)
+    }
 
     // `stock_quantity` obliga a derivar `stock_status` con el umbral **de cada**
     // producto (misma regla que create/update), así que hay que leerlos antes
@@ -179,6 +213,7 @@ export async function POST(request: Request) {
 
     const updated: number[] = []
     const failed: BulkFailure[] = []
+    for (const id of stale) failed.push({ id, reason: STALE_WRITE_REASON })
 
     for (const { patch, ids: groupIds } of groupByPatch(ids, patchById).values()) {
       for (const idsChunk of chunkList(groupIds, BULK_CHUNK)) {
@@ -223,6 +258,7 @@ export async function POST(request: Request) {
         ids,
         count: updated.length,
         failed,
+        ...(stale.length > 0 ? { stale } : {}),
         ...(uniformPatch
           ? { patch: uniformPatch }
           : {
@@ -238,7 +274,7 @@ export async function POST(request: Request) {
       await enqueueProductsForWaSync(supabase, updated, "product_bulk_update")
     }
 
-    return NextResponse.json({ updated, failed })
+    return NextResponse.json({ updated, failed, stale })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error interno del servidor"
     return NextResponse.json({ error: message }, { status: 500 })

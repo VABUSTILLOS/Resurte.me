@@ -10,6 +10,7 @@ vi.mock("@/lib/whatsapp-sync-queue", () => ({ enqueueProductsForWaSync: vi.fn() 
 
 import { POST } from "./route"
 import { MAX_BULK_IDS } from "@/lib/product-bulk"
+import { STALE_WRITE_REASON } from "@/lib/product-conflict"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
 import { logAdminAction } from "@/lib/audit-log"
@@ -26,6 +27,10 @@ const WRITE_MISSING_COLUMN = {
 }
 
 type WriteResult = { data?: unknown; error: unknown }
+
+// B19 — versiones de la fila para las pruebas de concurrencia optimista.
+const V1 = "2026-01-01T00:00:00.000Z"
+const V2 = "2026-01-02T00:00:00.000Z"
 
 function asAdmin() {
   vi.mocked(requireAdmin).mockResolvedValue({ user: { id: "admin-1" }, response: null } as never)
@@ -161,7 +166,7 @@ describe("/api/admin/products/bulk", () => {
       })
     )
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ updated: [1, 2, 3], failed: [] })
+    expect(await res.json()).toEqual({ updated: [1, 2, 3], failed: [], stale: [] })
     // Dos valores distintos ⇒ dos sentencias, no tres.
     expect(writePayloads).toEqual(expect.arrayContaining([{ price: 10 }, { price: 25 }]))
     expect(writePayloads).toHaveLength(2)
@@ -210,7 +215,7 @@ describe("/api/admin/products/bulk", () => {
     const { writePayloads, writeChunks } = serviceWith({})
     const res = await POST(bulkRequest({ ids: [1, 2, 3], patch: { is_visible: false } }))
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ updated: [1, 2, 3], failed: [] })
+    expect(await res.json()).toEqual({ updated: [1, 2, 3], failed: [], stale: [] })
 
     expect(writePayloads).toHaveLength(1)
     // Publicar/despublicar manual cancela la programación pendiente.
@@ -241,6 +246,7 @@ describe("/api/admin/products/bulk", () => {
     expect(await res.json()).toEqual({
       updated: [1, 3],
       failed: [{ id: 2, reason: "El producto no existe" }],
+      stale: [],
     })
     const entry = vi.mocked(logAdminAction).mock.calls[0]![1]
     expect(entry.detail).toMatchObject({ count: 2 })
@@ -256,6 +262,7 @@ describe("/api/admin/products/bulk", () => {
         { id: 1, reason: "denied" },
         { id: 2, reason: "denied" },
       ],
+      stale: [],
     })
   })
 
@@ -274,7 +281,7 @@ describe("/api/admin/products/bulk", () => {
     })
     const res = await POST(bulkRequest({ ids: [1, 2], patch: { stock_quantity: 5 } }))
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ updated: [1, 2], failed: [] })
+    expect(await res.json()).toEqual({ updated: [1, 2], failed: [], stale: [] })
 
     // Los umbrales se leen antes de escribir.
     expect(readCols[0]).toContain("low_stock_threshold")
@@ -302,5 +309,107 @@ describe("/api/admin/products/bulk", () => {
     expect(writePayloads[0]).toMatchObject({ low_stock_threshold: 2, is_visible: false })
     expect(writePayloads[1]).not.toHaveProperty("low_stock_threshold")
     expect(writePayloads[1]).toMatchObject({ is_visible: false })
+  })
+
+  // ---------- B19: concurrencia optimista ----------
+
+  it("marca como `stale` los ids que cambiaron y escribe solo el resto", async () => {
+    asAdmin()
+    const { writePayloads, readCols } = serviceWith({
+      // Precondición: el id 2 ya no está en la versión que el panel leyó.
+      reads: [
+        {
+          data: [
+            { id: 1, updated_at: V1 },
+            { id: 2, updated_at: V2 },
+          ],
+          error: null,
+        },
+      ],
+    })
+    const res = await POST(
+      bulkRequest({
+        ids: [1, 2],
+        patch: { is_visible: true },
+        expected: { "1": V1, "2": V1 },
+      })
+    )
+    expect(res.status).toBe(200)
+
+    const body = await res.json()
+    expect(body.updated).toEqual([1])
+    expect(body.stale).toEqual([2])
+    expect(body.failed).toEqual([{ id: 2, reason: STALE_WRITE_REASON }])
+
+    // La lectura de versiones pide `id, updated_at`.
+    expect(readCols[0]).toBe("id, updated_at")
+    // Y el id en conflicto nunca llega a la escritura.
+    expect(writePayloads).toHaveLength(1)
+  })
+
+  it("deja constancia del conflicto en la bitácora", async () => {
+    asAdmin()
+    serviceWith({
+      reads: [{ data: [{ id: 1, updated_at: V2 }], error: null }],
+    })
+    await POST(bulkRequest({ ids: [1], patch: { is_visible: true }, expected: { "1": V1 } }))
+    const entry = vi.mocked(logAdminAction).mock.calls[0]![1]
+    expect(entry.detail).toMatchObject({ stale: [1], count: 0 })
+  })
+
+  it("`force: true` omite la precondición por completo", async () => {
+    asAdmin()
+    const { readCols, writePayloads } = serviceWith({})
+    const res = await POST(
+      bulkRequest({
+        ids: [1],
+        patch: { is_visible: true },
+        expected: { "1": V1 },
+        force: true,
+      })
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ updated: [1], failed: [], stale: [] })
+    // Sin lectura de versiones: solo la escritura.
+    expect(readCols).toHaveLength(0)
+    expect(writePayloads).toHaveLength(1)
+  })
+
+  it("ignora versiones de ids que no están en el lote", async () => {
+    asAdmin()
+    const { writePayloads } = serviceWith({})
+    const res = await POST(
+      bulkRequest({
+        ids: [1],
+        patch: { is_visible: true },
+        expected: { "1": V1, "99": V1 },
+      })
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ updated: [1], failed: [], stale: [] })
+    // El id ajeno no se lee ni bloquea la escritura del lote.
+    expect(writePayloads).toHaveLength(1)
+  })
+
+  it("no bloquea el lote si la lectura de versiones falla", async () => {
+    asAdmin()
+    const { writePayloads } = serviceWith({
+      reads: [{ data: null, error: { code: "42703", message: "column updated_at does not exist" } }],
+    })
+    const res = await POST(
+      bulkRequest({ ids: [1], patch: { is_visible: true }, expected: { "1": V1 } })
+    )
+    // Un esquema sin `updated_at` no puede probar el conflicto: se escribe igual.
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ updated: [1], failed: [], stale: [] })
+    expect(writePayloads).toHaveLength(1)
+  })
+
+  it("sin `expected` no lee versiones ni reporta conflictos", async () => {
+    asAdmin()
+    const { readCols } = serviceWith({})
+    const res = await POST(bulkRequest({ ids: [1], patch: { is_visible: true } }))
+    expect(await res.json()).toEqual({ updated: [1], failed: [], stale: [] })
+    expect(readCols).toHaveLength(0)
   })
 })

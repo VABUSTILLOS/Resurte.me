@@ -253,6 +253,60 @@
   `submitForm()` —invertir el orden deja la barra de descarte tapando los
   errores de validación— y la acción primaria va al final de la barra. El modal
   no se cierra solo al guardar: lo cierra el padre desde `onSaved`.
+- Productos ronda 10 — conteos de los chips (B15-B16): la RPC
+  `admin_product_filter_counts(p_include_deleted)` (00118) es la v2 de la de la
+  ronda 8 y devuelve los 11 contadores + `brands` + `tagCounts` en una sola
+  llamada. Ojo con dos trampas: `p_include_deleted` es el INVERSO de
+  `withDeletedAt` (esa variable significa "la tabla tiene la columna
+  `deleted_at`", no "incluir borrados") y el descarte de una RPC v1 lo decide
+  `parseProductCountsPayload` (`src/lib/admin-product-counts.ts`) exigiendo
+  `brands` array **y** `tagCounts` objeto — sin esa comprobación, un proyecto con
+  00115 aplicada y 00118 no daría conteos vacíos en silencio. La migración trae
+  además `idx_admin_audit_log_entity` para el historial por producto. Sigue
+  valiendo la regla de la ronda 8: al añadir un filtro con contador se tocan la
+  RPC **y** el fallback en JS.
+- Productos ronda 10 — CSV con una sola cabecera (B17): `src/lib/product-csv.ts`
+  es la fuente única de la cabecera y las celdas del CSV de productos, y el
+  import valida contra ella (`PRODUCT_IMPORT_HEADER`, `validateImportColumns`,
+  `describeImportColumns` en `src/lib/product-import.ts`). Un CSV sin `nombre` o
+  `precio` responde 400 ANTES de tocar la base y el modal lo avisa en ámbar
+  bloqueando la vista previa: el problema no se puede descubrir a mitad de la
+  importación. Al agregar una columna, va en el lib y en su `.test.ts` (hay una
+  prueba de ida y vuelta export → import).
+- Productos ronda 10 — escritura optimista (B19): la versión de una fila es
+  `products.updated_at`, con el trigger `products_touch_updated_at` (00119) para
+  que cualquier escritura —no solo la del panel— la mueva; el PATCH además la
+  sella explícitamente para funcionar antes de aplicar la migración. `PATCH
+  /update` acepta `expectedUpdatedAt` y responde **409 `stale_write`** con
+  `conflict.current` (la fila actual) en vez de sobreescribir; `POST /bulk`
+  acepta `expected` (mapa id → versión) y `force: true`, y **excluye** los ids
+  stale antes de agrupar los parches, devolviéndolos en `stale` y en `failed`.
+  Regla del módulo `src/lib/product-conflict.ts`: solo `actual > esperada` es
+  conflicto — fecha ausente o inválida, o `expected` no enviado, NUNCA bloquean
+  (compatibilidad con cualquier cliente viejo). El panel adopta la versión que
+  devuelve el servidor y, ante un 409, muestra un banner ámbar con "Recargar" en
+  vez de perder el trabajo.
+  **Traspaso pendiente**: enviar `expectedUpdatedAt` desde `ProductFormModal`
+  (ronda 9, otra sesión). Al tocarlo: mandar la versión de la fila cargada como
+  `expectedUpdatedAt` y pintar el 409 con el `conflict.current` que ya resuelve
+  `conflictFromResponse`.
+- Productos ronda 10 — vistas guardadas (B20): una vista es la **query canónica
+  del listado** (filtros + orden + tabla/tarjetas + tamaño de página), no un
+  formato paralelo. `src/lib/product-filter-presets.ts` la normaliza (sin `page`,
+  sin valores vacíos, parámetros ordenados), así que dos URLs equivalentes se
+  reconocen como la misma vista; tope de 8 (cae la más antigua), reemplazo por
+  nombre sin distinguir mayúsculas y migración del formato anterior
+  (`resurte-admin-product-views` → `admin-productos-vistas`) para no borrar lo
+  que el admin ya tenía guardado. La vista sin filtros es válida ("Catálogo
+  completo"). En `page.tsx` la query actual se arma con `filters` + `view` +
+  `sort` + `pageSize` y los mismos helpers que la URL: no volver a enumerar los
+  18 filtros a mano, que era justo la duplicación que este frente eliminó.
+- Productos ronda 10 — cobertura de rutas (B18): cada ruta de
+  `/api/admin/products` tiene su `route.test.ts` (11 nuevos). Fijan el contrato
+  ACTUAL, incluidas las degradaciones que hoy son un 500 y no deben cambiarse sin
+  decidirlo: `delete` con JSON inválido o sin `deleted_at`, `audit` si falta
+  `admin_audit_log` (devuelve 500, no lista vacía) y `bulk-seo`, que responde 200
+  con los fallos por producto en `failed[]`.
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
@@ -508,6 +562,27 @@ Repetir con el header global oculto (scroll hacia abajo): las tres filas
 (header/sub-nav/categorías) deben seguir pegadas entre sí. Con cero categorías
 la fila desaparece y la barra masiva se ancla como antes (no debe quedar un
 hueco).
+
+Ronda 10 de `/admin/productos` (requiere 00118 y 00119 aplicadas; conviene
+repetir con ellas ausentes para comprobar la degradación):
+- Contadores: con la RPC v2 aplicada, los chips (estado, categoría, sin ciudad,
+  papelera, marcas, etiquetas) cuadran con lo que devuelve cada filtro y el
+  listado hace **una** llamada; sin 00118 (o con la 00115 sola) siguen
+  apareciendo, calculados en JS, y el listado no da 5xx.
+- CSV: descargar el CSV y volver a importarlo sin tocar nada (la vista previa
+  debe decir 0 cambios); quitarle la columna `nombre` y comprobar que el import
+  responde 400 y el modal lo avisa en ámbar sin dejar aplicar.
+- Escritura optimista: en el panel, guardar una edición rápida (imagen, SEO o
+  campo rápido) de un producto que cambió por detrás → banner ámbar con
+  "Recargar" en vez de pisar la fila. El contrato del lote (`expected`, `force`)
+  se prueba por API, porque el panel todavía no lo manda:
+  `POST /api/admin/products/bulk` con `expected` apuntando a una versión vieja
+  devuelve el id en `stale` y en `failed`, y con `force: true` lo escribe igual.
+- Vistas guardadas: filtrar por categoría + ordenar por ventas, guardar la
+  vista, limpiar filtros y aplicarla: la URL debe reproducir la vista (con
+  `pageSize`, sin `page`) y la píldora activa debe marcarse; pasar de 8 vistas y
+  comprobar que cae la más antigua.
+Automatizado: `npx playwright test e2e/admin-productos.spec.ts --grep @ci`.
 
 Acciones masivas de pedidos (requiere sesión admin + datos): en `/admin/pedidos`
 marcar un subconjunto y comprobar que el checkbox del encabezado queda

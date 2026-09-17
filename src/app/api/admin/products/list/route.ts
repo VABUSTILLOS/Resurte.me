@@ -12,19 +12,19 @@ import {
 import { NextResponse, type NextRequest } from "next/server"
 
 const COLS =
-  "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,created_at,sku,barcode,tags,sale_starts_at,sale_ends_at,low_stock_threshold,related_product_ids,deleted_at"
+  "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,created_at,sku,barcode,tags,sale_starts_at,sale_ends_at,low_stock_threshold,related_product_ids,updated_at,deleted_at"
 
 /** Set de la ronda 6 (00096-00105) sin las columnas de la ronda 7
  *  (00106-00109): permite degradar solo esas funciones si aún no se
  *  aplicaron las migraciones nuevas. */
 const COLS_BASE =
-  "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,created_at,deleted_at"
+  "id,name,slug,brand,category_id,description,unit,price,sale_price,cost,stock_quantity,sort_order,stock_status,is_visible,show_in_whatsapp,image_url,images,publish_at,unpublish_at,admin_note,seo_title,seo_description,created_at,updated_at,deleted_at"
 
 /** Columnas que existen desde antes de la migración 00096: si las
  *  migraciones 00096-00104 aún no se aplican, el panel degrada a este set
  *  (sin programación, nota interna ni papelera) en vez de fallar. */
 const COLS_LEGACY =
-  "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,images"
+  "id,name,slug,brand,category_id,description,unit,price,sale_price,stock_status,is_visible,show_in_whatsapp,image_url,images,updated_at"
 
 const MAX_PAGE_SIZE = 1000
 

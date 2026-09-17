@@ -34,7 +34,7 @@ function asAdmin() {
  */
 function serviceWith(opts: {
   reads: { data: unknown; error: unknown }[]
-  writes: { error: unknown }[]
+  writes: { error: unknown; data?: unknown }[]
 }) {
   let readCalls = 0
   let writeCalls = 0
@@ -50,9 +50,15 @@ function serviceWith(opts: {
     }),
     update: vi.fn((payload: unknown) => {
       writePayloads.push(payload)
-      const result = opts.writes[Math.min(writeCalls, opts.writes.length - 1)]
+      const result = opts.writes[Math.min(writeCalls, opts.writes.length - 1)] ?? { error: null }
       writeCalls++
-      return { eq: vi.fn(() => Promise.resolve(result)) }
+      // El PATCH encadena `.select("id")` para distinguir "actualizado" de
+      // "ya no existe"; el fake imita esa forma.
+      const terminal = {
+        error: result.error,
+        data: result.error ? null : (result.data ?? [{ id: 1 }]),
+      }
+      return { eq: vi.fn(() => ({ select: vi.fn(() => Promise.resolve(terminal)) })) }
     }),
   }
   vi.mocked(createServiceClient).mockResolvedValue({ from: vi.fn(() => builder) } as never)
@@ -73,7 +79,12 @@ const CURRENT_ROW = {
   low_stock_threshold: 3,
   stock_status: "low_stock",
   deleted_at: null,
+  updated_at: "2026-01-01T00:00:00.000Z",
 }
+
+// B19 — versiones de la fila para las pruebas de concurrencia optimista.
+const V1 = "2026-01-01T00:00:00.000Z"
+const V2 = "2026-01-02T00:00:00.000Z"
 
 describe("/api/admin/products/update", () => {
   beforeEach(() => vi.clearAllMocks())
@@ -165,5 +176,87 @@ describe("/api/admin/products/update", () => {
     asAdmin()
     const res = await PATCH(patchRequest({ price: 30 }))
     expect(res.status).toBe(400)
+  })
+
+  // ---------- B19: concurrencia optimista ----------
+
+  it("409 sin escribir cuando la fila cambió desde que el panel la leyó", async () => {
+    asAdmin()
+    const { writePayloads, readCols } = serviceWith({
+      reads: [{ data: { ...CURRENT_ROW, updated_at: V2 }, error: null }],
+      writes: [{ error: null }],
+    })
+    const res = await PATCH(patchRequest({ productId: 1, price: 30, expectedUpdatedAt: V1 }))
+    expect(res.status).toBe(409)
+
+    const body = await res.json()
+    expect(body.code).toBe("stale_write")
+    expect(body.field).toBeNull()
+    expect(body.conflict.currentUpdatedAt).toBe(V2)
+    // La fila vigente viaja para que el panel se resincronice sin otra lectura.
+    expect(body.conflict.current).toMatchObject({ name: "Taco", price: 20 })
+    expect(body.error).toContain("Recarga")
+
+    // Lo importante: el cambio ajeno no se pisa.
+    expect(writePayloads).toHaveLength(0)
+    // Y la lectura pide `updated_at` para poder comparar.
+    expect(readCols[0]).toContain("updated_at")
+  })
+
+  it("200 y sella `updated_at` cuando la versión enviada es la vigente", async () => {
+    asAdmin()
+    const { writePayloads } = serviceWith({
+      reads: [{ data: { ...CURRENT_ROW, updated_at: V1 }, error: null }],
+      writes: [{ error: null }],
+    })
+    const res = await PATCH(patchRequest({ productId: 1, price: 30, expectedUpdatedAt: V1 }))
+    expect(res.status).toBe(200)
+
+    // Cada escritura mueve la versión, que es justo lo que compara el guard.
+    const stamped = writePayloads[0] as Record<string, unknown>
+    expect(typeof stamped.updated_at).toBe("string")
+    expect(Number.isFinite(Date.parse(stamped.updated_at as string))).toBe(true)
+
+    // Y la versión nueva vuelve al panel: sin ella, su siguiente edición
+    // chocaría con su propia escritura anterior.
+    const body = await res.json()
+    expect(body.updated_at).toBe(stamped.updated_at)
+    expect(body.success).toBe(true)
+  })
+
+  it("no bloquea si el `updated_at` vigente es anterior al esperado", async () => {
+    asAdmin()
+    const { writePayloads } = serviceWith({
+      // Reloj desfasado o una importación que reescribió la fecha hacia atrás.
+      reads: [{ data: { ...CURRENT_ROW, updated_at: V1 }, error: null }],
+      writes: [{ error: null }],
+    })
+    const res = await PATCH(patchRequest({ productId: 1, price: 30, expectedUpdatedAt: V2 }))
+    expect(res.status).toBe(200)
+    expect(writePayloads).toHaveLength(1)
+  })
+
+  it("sin `expectedUpdatedAt` mantiene el comportamiento anterior", async () => {
+    asAdmin()
+    const { writePayloads } = serviceWith({
+      reads: [{ data: { ...CURRENT_ROW, updated_at: V2 }, error: null }],
+      writes: [{ error: null }],
+    })
+    const res = await PATCH(patchRequest({ productId: 1, price: 30 }))
+    expect(res.status).toBe(200)
+    expect(writePayloads).toHaveLength(1)
+  })
+
+  it("404 si el producto desapareció entre la lectura y la escritura", async () => {
+    asAdmin()
+    // Sin `.select("id")` PostgREST no devuelve error al no tocar ninguna fila:
+    // el panel mostraba "guardado" sobre un producto que ya no existía.
+    serviceWith({
+      reads: [{ data: CURRENT_ROW, error: null }],
+      writes: [{ error: null, data: [] }],
+    })
+    const res = await PATCH(patchRequest({ productId: 1, price: 30 }))
+    expect(res.status).toBe(404)
+    expect((await res.json()).error).toContain("ya no existe")
   })
 })
