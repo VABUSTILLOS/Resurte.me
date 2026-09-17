@@ -66,6 +66,7 @@ import {
   PRODUCT_SORT_KEYS,
   PRODUCT_SORT_LABEL,
   ariaSortFor,
+  defaultProductSortDir,
   nextProductSort,
   parseProductSort,
   productSortDirLabel,
@@ -3677,9 +3678,12 @@ function AdminProductsContent() {
           <select
             id="product-sort-key"
             value={sort.key}
-            onChange={(e) =>
-              setSort({ key: e.target.value as ProductSortKey, dir: sort.dir })
-            }
+            onChange={(e) => {
+              const key = e.target.value as ProductSortKey
+              // La dirección la fija la clave (ventas arranca en descendente),
+              // no la que traía la clave anterior.
+              setSort({ key, dir: defaultProductSortDir(key) })
+            }}
             title="Ordenar el listado por"
             className="max-w-[9rem] bg-transparent text-xs font-semibold text-gray-600 focus:outline-none"
           >
@@ -3981,8 +3985,16 @@ function AdminProductsContent() {
                 <th className="px-5 py-3 hidden md:table-cell">Estado</th>
                 <th className="px-5 py-3 hidden md:table-cell">WhatsApp</th>
                 <th className="px-5 py-3 hidden md:table-cell">Ciudades</th>
-                <th className="px-5 py-3 hidden md:table-cell" title="Unidades vendidas (histórico)">
-                  Ventas
+                <th className="px-5 py-3 hidden md:table-cell" aria-sort={ariaSortFor("sales", sort)}>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("sales")}
+                    className="inline-flex items-center gap-1 hover:text-gray-600"
+                    aria-label="Ordenar por más vendidos"
+                    title="Unidades vendidas (histórico)"
+                  >
+                    Ventas {sortIcon("sales")}
+                  </button>
                 </th>
                 <th className="px-5 py-3">Acciones</th>
               </tr>

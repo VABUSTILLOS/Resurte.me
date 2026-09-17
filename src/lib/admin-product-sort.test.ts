@@ -136,3 +136,68 @@ describe("admin-product-sort", () => {
     ).toEqual({ key: "created_at", dir: "desc" })
   })
 })
+
+describe("orden por más vendidos", () => {
+  it("sales es una clave de primera clase con etiqueta y cabecera", () => {
+    expect(isProductSortKey("sales")).toBe(true)
+    expect(PRODUCT_SORT_LABEL.sales).toBe("Más vendidos")
+    expect(PRODUCT_TABLE_SORT_KEYS).toContain("sales")
+  })
+
+  it("arranca en descendente para no mostrar los menos vendidos primero", () => {
+    // Sin `dir` explícito manda la dirección de la clave, no el asc por defecto.
+    expect(parseProductSort("sales", null)).toEqual({ key: "sales", dir: "desc" })
+    expect(parseProductSort("sales", "")).toEqual({ key: "sales", dir: "desc" })
+    expect(parseProductSort("sales", "asc")).toEqual({ key: "sales", dir: "asc" })
+    expect(parseProductSort("sales", "desc")).toEqual({ key: "sales", dir: "desc" })
+    // El resto de claves conserva el asc histórico.
+    expect(parseProductSort("cost", null)).toEqual({ key: "cost", dir: "asc" })
+    // Un deep-link sin `dir` sigue mostrando los más vendidos primero.
+    expect(productSortSearchParams({ key: "sales", dir: "desc" })).toEqual({ sort: "sales" })
+    expect(productSortSearchParams({ key: "sales", dir: "asc" })).toEqual({
+      sort: "sales",
+      dir: "asc",
+    })
+  })
+
+  it("nextProductSort estrena sales en descendente y luego alterna", () => {
+    expect(nextProductSort({ key: "name", dir: "asc" }, "sales")).toEqual({
+      key: "sales",
+      dir: "desc",
+    })
+    expect(nextProductSort({ key: "sales", dir: "desc" }, "sales")).toEqual({
+      key: "sales",
+      dir: "asc",
+    })
+  })
+
+  it("ordena por la columna de la vista y desempata por nombre", () => {
+    // `nullsFirst: false` con desc manda los productos sin ventas (NULL) al
+    // final, que es justo lo que se espera de "más vendidos".
+    expect(productSortOrderClauses({ key: "sales", dir: "desc" })).toEqual([
+      { column: "sales_units", ascending: false, nullsFirst: false },
+      { column: "name", ascending: true },
+    ])
+    expect(productSortOrderClauses({ key: "sales", dir: "asc" })).toEqual([
+      { column: "sales_units", ascending: true, nullsFirst: true },
+      { column: "name", ascending: true },
+    ])
+  })
+
+  it("degrada a nombre si la vista de ventas no está disponible", () => {
+    const full = "id,name,price,cost,stock_quantity,stock_status,created_at"
+    expect(clampProductSortToColumns({ key: "sales", dir: "desc" }, full)).toEqual(
+      DEFAULT_PRODUCT_SORT
+    )
+    expect(clampProductSortToColumns({ key: "sales", dir: "desc" }, full, { hasSales: false })).toEqual(
+      DEFAULT_PRODUCT_SORT
+    )
+    expect(clampProductSortToColumns({ key: "sales", dir: "desc" }, full, { hasSales: true })).toEqual(
+      { key: "sales", dir: "desc" }
+    )
+    // El resto de claves ignora el flag.
+    expect(clampProductSortToColumns({ key: "name", dir: "desc" }, full, { hasSales: true })).toEqual(
+      { key: "name", dir: "desc" }
+    )
+  })
+})

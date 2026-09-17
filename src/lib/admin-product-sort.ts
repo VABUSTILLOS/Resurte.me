@@ -120,11 +120,12 @@ export function productSortOrderClauses(sort: ProductSort): ProductSortOrderClau
   const ascending = sort.dir === "asc"
   if (sort.key === "sales") {
     // `sales_units` vive en la vista `products_with_sales` y es NULL (no 0)
-    // cuando el producto no vendió: `nullsFirst: !ascending` lo trata como 0,
-    // así que "más vendidos" (desc) deja los no vendidos al final. `name`
-    // desempata de forma estable entre productos con las mismas ventas.
+    // cuando el producto no vendió: `nullsFirst: ascending` lo trata como 0,
+    // así que "más vendidos" (desc) deja los no vendidos al final y el orden
+    // inverso los pone al principio. `name` desempata de forma estable entre
+    // productos con las mismas ventas.
     return [
-      { column: "sales_units", ascending, nullsFirst: !ascending },
+      { column: "sales_units", ascending, nullsFirst: ascending },
       { column: "name", ascending: true },
     ]
   }
@@ -154,7 +155,9 @@ export function productSortOrderClauses(sort: ProductSort): ProductSortOrderClau
 export function productSortSearchParams(sort: ProductSort): Record<string, string> {
   const params: Record<string, string> = {}
   if (sort.key !== DEFAULT_PRODUCT_SORT.key) params.sort = sort.key
-  if (sort.dir !== DEFAULT_PRODUCT_SORT.dir) params.dir = sort.dir
+  // Se compara con el default de la PROPIA clave: `?sort=sales` ya implica
+  // descendente, así que añadir `dir=desc` sería ruido.
+  if (sort.dir !== defaultProductSortDir(sort.key)) params.dir = sort.dir
   return params
 }
 
