@@ -17,7 +17,7 @@
 | insumos para restaurantes / proveeduría para restaurantes | `/blog/guia-proveeduria-restaurantes` | ✅ Creada (fase 3, PR #9) |
 | desechables para restaurantes mayoreo | `/{ciudad}/categoria/desechables` | ✅ × 20 |
 | insumos para taquería / pizzería / sushi… | `/{ciudad}/coleccion/*` | ✅ × 14 colecciones |
-| precios de central de abastos | post + página de precios | ⬜ Crear (ver Índice de precios) |
+| precios de central de abastos | post + página de precios | ✅ Página publicada (`/precios`, 2026-09-17) |
 | comprar por mayoreo en línea México | `/blog/como-funciona-compra-mayoreo-en-linea` | ✅ Creada (fase 5) |
 
 ### Keywords informacionales (las que atraen y construyen autoridad)
@@ -27,7 +27,7 @@ Ya cubiertas por los 108 posts: food cost, merma, inventario, NOM-251, CFDI, cos
 2. **"lista de insumos para abrir un restaurante"** — captura negocios nuevos = clientes nuevos de Resurte. ✅ Creada en fase 3: `lista-insumos-abrir-restaurante`.
 3. **"central de abastos vs proveedor digital"** — comparativa directa (ver §3). ✅ Creada en fase 2: `central-de-abastos-vs-comprar-en-linea`.
 4. **"cómo funciona la compra por mayoreo en línea"** — educación de categoría. ✅ Creada en fase 5: `como-funciona-compra-mayoreo-en-linea`.
-5. **"precio del kilo de [insumo] hoy"** — la keyword de mayor volumen del segmento; se ataca con el Índice de precios (§5). ⬜ Pendiente (requiere exponer datos del catálogo).
+5. **"precio del kilo de [insumo] hoy"** — la keyword de mayor volumen del segmento; se ataca con el Índice de precios (§5). ✅ Los datos del catálogo ya se exponen (2026-09-17): `/precios/[insumo]`, `/precios/ciudad/[ciudad]`, `/api/feed/precios.json` y `indice-precios.csv`.
 6. **"proveedores de [insumo específico] en [ciudad]"** — aguacate, tortilla, carne de cerdo… posts programáticos por insumo top. ✅ Serie por categoría COMPLETA (fases 5-6): `proveedores-frutas-verduras-restaurantes`, `proveedores-carne-mayoreo-restaurantes`, `proveedores-lacteos-huevo-restaurantes`, `proveedores-bebidas-mayoreo-restaurantes`, `abarrotes-mayoreo-restaurantes`, `desechables-mayoreo-restaurantes`. Siguiente nivel (opcional): posts por insumo específico (aguacate, tortilla) si el volumen lo justifica.
 
 ---

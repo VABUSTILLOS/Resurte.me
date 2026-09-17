@@ -2,7 +2,9 @@
 
 > Programa de mejora continua por feature. **Oleadas 1 y 2 implementadas**
 > (fases 1-10 por feature + fases 11+ de compra fácil priorizando móvil).
-> El backlog restante queda al final de cada sección.
+> **Backlog cerrado**: no queda ninguna fila 🔜, así que las rondas siguientes no
+> salen de un inventario pendiente sino de **deuda medida con herramientas**
+> (ver la Ronda 3). Si aparece backlog nuevo, se declara al final de su sección.
 >
 > Convenciones: ✅ implementada · 🔜 backlog priorizado.
 
@@ -52,7 +54,7 @@
 | C11 | **Stepper − N + en la card cuando el producto ya está en el carrito** | ✅ |
 | C12 | **Rail "Vistos recientemente"** en la página de producto | ✅ |
 | C13 | **Comparador de precios por unidad**: `unit-price.ts` normaliza la presentación (`por kilo`, `500 g`, `1 l`, `por pieza`…) a un precio por kg/l/pieza; la ficha de producto muestra el `$/kg` real y una sección "Comparar presentaciones" con la más barata y el sobreprecio (`+N%`) de las demás, y las cards y la búsqueda global muestran el `$/kg` como insignia | ✅ |
-| C14 | **Contraste AA de la insignia `$/kg`** (deuda detectada al cerrar W9/U13, no es de esas rondas): el `<p>` de precio por unidad de la card usaba `text-[#0E7A0E]/70` con `sm:text-[11px]` → **3.13:1** sobre blanco (`#56a256`), y el contador `.opacity-70` de los chips → **3.52:1** (`#b7d7b7` sobre `#0e7a0e`); axe los marca `color-contrast` serio, así que `npm run test:e2e` fallaba **de forma determinista** en `a11y.spec.ts › busqueda` (ambos proyectos) y **de forma intermitente** en `home`/`ciudad`/storefront según qué renderizara la rejilla. Regresión del commit `19cd8e0` (comparador por unidad), ajena a W9/U13. El `<p>` de `perUnit` se reconoce porque es el único que lleva `sm:text-[11px]`. Arreglo: quitar la opacidad en los 6 sitios con el mismo patrón — `product-card.tsx` (precio por unidad y pista de mayoreo), `header.tsx` (etiqueta *recompensas*), `recipe-slider.tsx` (*Recetario*), `collection-story-section.tsx` (*Nuestra Historia*) y los contadores de chip de `search-page-client.tsx` / `user-shop-view.tsx` (que también incumplían **en estado inactivo**: `#5C6068` al 70 % = 3.21:1). En el mismo barrido apareció `menu-view.tsx` L214 (`text-stone-500` sobre `bg-stone-100`, 10 px = **4.38:1**) bloqueando el storefront `/r/mr-fresh`: subido a `text-stone-600` (**≈7:1**). `e2e/a11y.spec.ts` queda **20/20 verde** en ambos proyectos | ✅ |
+| C14 | **Contraste AA de la insignia `$/kg`** (deuda detectada al cerrar W9/U13, no es de esas rondas): el `<p>` de precio por unidad de la card usaba `text-[#0E7A0E]/70` con `sm:text-[11px]` → **3.13:1** sobre blanco (`#56a256`), y el contador `.opacity-70` de los chips → **3.52:1** (`#b7d7b7` sobre `#0e7a0e`); axe los marca `color-contrast` serio, así que `npm run test:e2e` fallaba **de forma determinista** en `a11y.spec.ts › busqueda` (ambos proyectos) y **de forma intermitente** en `home`/`ciudad`/storefront según qué renderizara la rejilla. Regresión del commit `19cd8e0` (comparador por unidad), ajena a W9/U13. El `<p>` de `perUnit` se reconoce porque es el único que lleva `sm:text-[11px]`. Arreglo: quitar la opacidad en los 6 sitios con el mismo patrón — `product-card.tsx` (precio por unidad y pista de mayoreo), `header.tsx` (etiqueta *recompensas*), `recipe-slider.tsx` (*Recetario*), `collection-story-section.tsx` (*Nuestra Historia*) y los contadores de chip de `search-page-client.tsx` / `user-shop-view.tsx` (que también incumplían **en estado inactivo**: `#5C6068` al 70 % = 3.21:1). En el mismo barrido apareció `menu-view.tsx` L214 (`text-stone-500` sobre `bg-stone-100`, 10 px = **4.38:1**) bloqueando el storefront `/r/mr-fresh`: subido a `text-stone-600` (**≈7:1**). `e2e/a11y.spec.ts` queda **20/20 verde** en ambos proyectos. Ojo con el alcance: esto cierra la deuda de las **rutas públicas**, que son las únicas que ese spec recorre; el contraste del panel de admin (que exige sesión y axe nunca miró) es **B36/B37** en § 8 | ✅ |
 
 ## 4. Carrito y checkout
 
@@ -311,8 +313,15 @@ de riesgo — imports, tipos estrictos, componentes nuevos — fueron verificado
 uno a uno).
 
 **Estado de `test:e2e`:** `e2e/a11y.spec.ts` está **20/20 verde** en
-`chromium` y `mobile-chromium` — la deuda de contraste quedó cerrada (fila
-**C14** en § 3). Quedan dos rojos **intermitentes** que pasan aislados bajo
+`chromium` y `mobile-chromium`. Ojo con leer eso como "no hay deuda de
+contraste": ese gate recorre **solo rutas públicas**, así que las superficies
+que exigen sesión (el panel de admin) **no pasan por axe**. La deuda AA de las
+rutas públicas quedó cerrada (fila **C14** en § 3), pero `/admin/productos`
+acumuló cuatro familias del mismo defecto hasta que se midieron a mano y se
+fijaron con `src/lib/admin-productos-contrast.contract.test.ts` (filas
+**B36**/**B37** en § 8) — mientras no haya credenciales de admin en CI, ese
+contrato es el único gate posible para esa superficie.
+Quedan dos rojos **intermitentes** que pasan aislados bajo
 carga paralela (`e2e/compartir.spec.ts`, `e2e/mobile-chrome.spec.ts`), y
 `e2e/mobile-chrome.spec.ts:28` es un fallo **real y preexistente** ajeno a este
 plan: el FAB de `src/components/panel/guide/guide-toggle-button.tsx` (commit

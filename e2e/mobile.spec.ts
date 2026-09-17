@@ -63,8 +63,14 @@ async function dismissToolGuide(page: Page): Promise<void> {
   }
 }
 
-// Solo se ejecuta en el project "mobile-chromium" (Pixel 7: 412×915, touch).
-test.describe("móvil: render, touch-target y sin overflow", () => {
+// Todo describe del archivo lleva `{ tag: "@ci" }`: sin la etiqueta estos tests
+// existen pero `npm run test:e2e` (= `playwright test --grep @ci`) nunca los
+// ejecuta, que es como los 68 tests de este archivo quedaron huérfanos durante
+// varias rondas. Los que solo tienen sentido con dedo se auto-excluyen con
+// `test.skip(({ isMobile }) => !isMobile)`: en el project `chromium` quedan
+// skipped, no rojos. `src/lib/e2e-specs.contract.test.ts` impide que un spec
+// nuevo vuelva a nacer sin `@ci`.
+test.describe("móvil: render, touch-target y sin overflow", { tag: "@ci" }, () => {
   // 1) Las páginas públicas renderizan en viewport móvil sin scroll horizontal.
   const pages: Array<[string, string]> = [
     ["home", "/"],
@@ -143,7 +149,7 @@ async function discoverProductHref(page: Page): Promise<string | null> {
   return null
 }
 
-test.describe("móvil: producto — barra sticky add-to-cart", () => {
+test.describe("móvil: producto — barra sticky add-to-cart", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   // El banner de cookies (fixed bottom, z-60) cubre la sticky ATC (z-40) en
@@ -230,7 +236,7 @@ async function openPanelSheet(page: Page): Promise<ReturnType<Page["getByRole"]>
   throw new Error("no se pudo abrir el sheet del panel tras 5 intentos")
 }
 
-test.describe("móvil: panel — menú hamburguesa", () => {
+test.describe("móvil: panel — menú hamburguesa", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
   test("el botón de menú abre el bottom sheet con los módulos", async ({ page }) => {
     const sheet = await openPanelSheet(page)
@@ -255,7 +261,7 @@ test.describe("móvil: panel — menú hamburguesa", () => {
 // --- Fase 2: página de producto (accordions), carrito (drawer/trash/toast) y
 //     grid (altura uniforme de quick-add) ---
 
-test.describe("móvil: producto — accordion defaults Fase 2", () => {
+test.describe("móvil: producto — accordion defaults Fase 2", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
   test("en móvil Descripción va cerrado y Calidad y Origen abierto", async ({ page }) => {
     const productHref = await discoverProductHref(page)
@@ -274,7 +280,7 @@ test.describe("móvil: producto — accordion defaults Fase 2", () => {
   })
 })
 
-test.describe("móvil: carrito — drawer, trash y toast Fase 2", () => {
+test.describe("móvil: carrito — drawer, trash y toast Fase 2", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   // Agrega el primer producto con quick-add y abre el drawer desde la barra flotante.
@@ -331,7 +337,7 @@ test.describe("móvil: carrito — drawer, trash y toast Fase 2", () => {
   })
 })
 
-test.describe("móvil: grid — altura uniforme del quick-add Fase 2", () => {
+test.describe("móvil: grid — altura uniforme del quick-add Fase 2", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
   test("las cards de una misma fila tienen la misma altura (agotadas y en stock)", async ({ page }) => {
     await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
@@ -416,7 +422,7 @@ async function boundingBoxSettled(locator: Locator): Promise<{ x: number; y: num
   return null
 }
 
-test.describe("móvil: carrito — touch-targets de conversión Fase 3", () => {
+test.describe("móvil: carrito — touch-targets de conversión Fase 3", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   test("steppers y trash de /cart miden al menos 44px", async ({ page }) => {
@@ -481,7 +487,7 @@ test.describe("móvil: carrito — touch-targets de conversión Fase 3", () => {
   })
 })
 
-test.describe("móvil: checkout drawer — ancho consistente Fase 3", () => {
+test.describe("móvil: checkout drawer — ancho consistente Fase 3", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   test("el checkout drawer alcanza un ancho generoso en tablets (sm:max-w-2xl)", async ({ page }) => {
@@ -508,7 +514,7 @@ test.describe("móvil: checkout drawer — ancho consistente Fase 3", () => {
   })
 })
 
-test.describe("móvil: búsqueda en contexto — overlay Fase 3", () => {
+test.describe("móvil: búsqueda en contexto — overlay Fase 3", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   async function openSearchOverlay(page: Page): Promise<boolean> {
@@ -573,7 +579,7 @@ test.describe("móvil: búsqueda en contexto — overlay Fase 3", () => {
 
 // --- Fase 4: touch targets de micro-conversión y modales de pago ---
 
-test.describe("móvil: micro-conversión — touch targets Fase 4", () => {
+test.describe("móvil: micro-conversión — touch targets Fase 4", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   test("el stepper principal del producto mide al menos 44px", async ({ page }) => {
@@ -769,7 +775,7 @@ test.describe("móvil: micro-conversión — touch targets Fase 4", () => {
 
 // --- Fase 6: storefront /r/[slug] y SearchBar de colecciones ---
 
-test.describe("móvil: storefront — touch targets Fase 6", () => {
+test.describe("móvil: storefront — touch targets Fase 6", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   // Descubre el primer storefront `/r/[slug]` disponible desde el directorio
@@ -902,7 +908,7 @@ test.describe("móvil: storefront — touch targets Fase 6", () => {
   })
 })
 
-test.describe("móvil: colecciones — SearchBar abre overlay Fase 6", () => {
+test.describe("móvil: colecciones — SearchBar abre overlay Fase 6", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   // La búsqueda de una colección en móvil debe abrir el overlay en vivo (patrón
@@ -945,7 +951,7 @@ test.describe("móvil: colecciones — SearchBar abre overlay Fase 6", () => {
 
 // --- Fase 7: quick-add a la misma altura + cero solapes en sticky bottom ---
 
-test.describe("móvil: Fase 7 — quick-add uniforme y sin solapes", () => {
+test.describe("móvil: Fase 7 — quick-add uniforme y sin solapes", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   // El banner de cookies (fixed bottom, z-60) cubre el cart bar del storefront
@@ -1119,7 +1125,7 @@ test.describe("móvil: Fase 7 — quick-add uniforme y sin solapes", () => {
 
 // --- Fase 8: homepage móvil — h2 en una línea, cart bar apilada y jerarquía ---
 
-test.describe("móvil: Fase 8 — h2 sin saltos de línea y cart bar sin empalmes", () => {
+test.describe("móvil: Fase 8 — h2 sin saltos de línea y cart bar sin empalmes", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   // El banner de cookies (fixed bottom) cubre el cart bar en contextos nuevos;
@@ -1209,7 +1215,13 @@ test.describe("móvil: Fase 8 — h2 sin saltos de línea y cart bar sin empalme
 // ===== Fase 9 — placeholder de búsqueda animado (marquee) =====
 // El hint "Buscar frutas, verduras, carnes, abarrotes..." se anima en móvil
 // para alcanzar a leerse completo. Solo visible con input vacío y sin foco.
-test.describe("Fase 9: placeholder animado de búsqueda", () => {
+test.describe("Fase 9: placeholder animado de búsqueda", { tag: "@ci" }, () => {
+  // La animación es móvil-only por diseño: globals.css desactiva
+  // `.marquee-placeholder` con `@media (min-width: 640px) { animation: none }`.
+  // Sin este guard el describe corría también en el project `chromium` (desktop)
+  // y fallaba asertando comportamiento de móvil.
+  test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
+
   test("el marquee del catálogo está visible y animado con input vacío", async ({ page }) => {
     await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
     await page.waitForTimeout(1200) // reveal + hidratación
@@ -1247,7 +1259,7 @@ test.describe("Fase 9: placeholder animado de búsqueda", () => {
 
 // ===== Fase 10 — quick-add despegado/compacto, cards a misma altura y
 // "Hecho para ti" en 2 columnas =====
-test.describe("Fase 10 móvil: botones Agregar y grid de catálogo", () => {
+test.describe("Fase 10 móvil: botones Agregar y grid de catálogo", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   test("en /buscar las cards y los botones Agregar quedan a la misma altura por fila", async ({ page }) => {
@@ -1330,7 +1342,7 @@ test.describe("Fase 10 móvil: botones Agregar y grid de catálogo", () => {
 })
 
 // ===== Fase 11 — footer en 2 columnas (como tablet) y lectura móvil =====
-test.describe("Fase 11 móvil: footer 2 columnas y tamaños de texto", () => {
+test.describe("Fase 11 móvil: footer 2 columnas y tamaños de texto", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   test("el footer muestra el bloque de marca arriba y los links en 2 filas de 2", async ({ page }) => {
@@ -1398,7 +1410,7 @@ test.describe("Fase 11 móvil: footer 2 columnas y tamaños de texto", () => {
   })
 })
 
-test.describe("Fase 12 móvil: tamaños de texto de lectura (13px)", () => {
+test.describe("Fase 12 móvil: tamaños de texto de lectura (13px)", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   // Helper: comprueba que el computed font-size de un locator visible es ≥13px.
@@ -1514,7 +1526,7 @@ test.describe("Fase 12 móvil: tamaños de texto de lectura (13px)", () => {
 })
 
 // ===== Fase 13 — tipografía unificada, swipe en testimonios y sección "3 pasos" =====
-test.describe("móvil: Fase 13 — testimonios (tamaño + swipe) y sección de 3 pasos", () => {
+test.describe("móvil: Fase 13 — testimonios (tamaño + swipe) y sección de 3 pasos", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   // El banner de cookies (fixed bottom) puede cubrir la parte baja de la sección;
@@ -1543,6 +1555,10 @@ test.describe("móvil: Fase 13 — testimonios (tamaño + swipe) y sección de 3
 
     const section = await testimonialSection(page)
     const quote = section.locator("blockquote p")
+    // El carrusel es `dynamic(..., { ssr: false })`: no está en el HTML
+    // inicial, aparece cuando baja el chunk. Un waitForTimeout fijo es una
+    // carrera y dejaba `sizes` vacío.
+    await expect(quote.first()).toBeVisible({ timeout: 10000 })
     const sizes = await quote.evaluateAll((els) =>
       els.map((el) => parseFloat(getComputedStyle(el).fontSize))
     )
@@ -1626,7 +1642,7 @@ test.describe("móvil: Fase 13 — testimonios (tamaño + swipe) y sección de 3
   })
 })
 
-test.describe("Fase 14 móvil: footer compacto, landings de negocio y hub del panel", () => {
+test.describe("Fase 14 móvil: footer compacto, landings de negocio y hub del panel", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   async function boundingBoxSettled(
@@ -1709,7 +1725,7 @@ test.describe("Fase 14 móvil: footer compacto, landings de negocio y hub del pa
 // Fase 15 — Bug del logo móvil: el tap-target era solo el texto (~26px), por eso
 // los taps que caían en el header (pero fuera de las letras) no navegaban. El fix
 // estira el <Link> a la altura completa del header (self-stretch, 64px) + px-2.
-test.describe("Fase 15 — logo móvil: tap-target amplio y navegación al home", () => {
+test.describe("Fase 15 — logo móvil: tap-target amplio y navegación al home", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo project mobile-chromium")
 
   test("el logo mide ≥44px y un tap en el borde del header navega al home", async ({ page }) => {
@@ -1746,7 +1762,7 @@ test.describe("Fase 15 — logo móvil: tap-target amplio y navegación al home"
   })
 })
 
-test.describe("Fase 16 — Hub del panel des-saturado en móvil y barra de accesos rápidos", () => {
+test.describe("Fase 16 — Hub del panel des-saturado en móvil y barra de accesos rápidos", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo móvil")
 
   test.beforeEach(async ({ page }) => {
@@ -1887,7 +1903,7 @@ test.describe("Fase 16 — Hub del panel des-saturado en móvil y barra de acces
   })
 })
 
-test.describe("Fase 16 — FAB del panel solo en móvil", () => {
+test.describe("Fase 16 — FAB del panel solo en móvil", { tag: "@ci" }, () => {
   test.use({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false })
 
   test("en desktop el FAB de herramientas no se renderiza", async ({ page }) => {
@@ -1901,7 +1917,7 @@ test.describe("Fase 16 — FAB del panel solo en móvil", () => {
   })
 })
 
-test.describe("Fase 17 — Panel: banner oculto, ThemeToggle con feedback, footer compacto, intuitividad", () => {
+test.describe("Fase 17 — Panel: banner oculto, ThemeToggle con feedback, footer compacto, intuitividad", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo móvil")
 
   test.beforeEach(async ({ page }) => {
@@ -1993,7 +2009,7 @@ test.describe("Fase 17 — Panel: banner oculto, ThemeToggle con feedback, foote
   })
 })
 
-test.describe("Fase 17 — Banner 'personalizadas para' visible en desktop", () => {
+test.describe("Fase 17 — Banner 'personalizadas para' visible en desktop", { tag: "@ci" }, () => {
   test.use({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false })
 
   test("en desktop el banner sí se muestra tras elegir colección", async ({ page }) => {
@@ -2005,7 +2021,7 @@ test.describe("Fase 17 — Banner 'personalizadas para' visible en desktop", () 
   })
 })
 
-test.describe("Fase 18 — Semáforo de rentabilidad: el simulador ajusta el precio (no el costo)", () => {
+test.describe("Fase 18 — Semáforo de rentabilidad: el simulador ajusta el precio (no el costo)", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => !isMobile, "solo móvil")
 
   test.beforeEach(async ({ page }) => {

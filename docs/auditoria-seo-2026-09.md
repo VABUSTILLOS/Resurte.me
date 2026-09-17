@@ -167,15 +167,26 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 
 ## 6. Plan de acción priorizado
 
+> **Reconciliación 2026-09-17.** Esta lista se escribió antes de que varios ítems se
+> implementaran y nunca se volvió a marcar, así que leída hoy exagera lo que falta.
+> Se corrigieron los que tienen evidencia en el repo (autor, `/about#equipo`, índice
+> de precios, saneador de GA). Lo que sigue en ⬜ es **externo al repo** —consolas de
+> Google/Vercel y marketing off-page—, no deuda de código.
+
 ### Crítico (esta semana)
 1. ✅ Merge del PR #9 → deploy.
-2. ⬜ Corregir `NEXT_PUBLIC_GA_MEASUREMENT_ID` en Vercel (valor: `G-YKJ9ECF267`).
+2. ✅ **Síntoma cerrado en código** (2026-09-17): `sanitizeEnvId` (`src/lib/analytics.tsx`
+   L22-30) recorta el prefijo `NOMBRE_VAR=` y las comillas, que era justo lo que rompía
+   el tag de gtag; el valor local ya es `G-YKJ9ECF267`. Confirmar el valor en el
+   dashboard de Vercel queda como higiene, ya no como bloqueo.
 3. ⬜ Reenviar `sitemap.xml` en Google Search Console; verificar en Cobertura que carritos/checkouts salen del índice (usar "Eliminaciones" si alguna ya está indexada).
 
 ### Alto (semanas 2–4)
 4. ✅ Metadatos del blog: 44/44 aplicados (13 graves en fase 1 + 31 menores en fase 2, Anexo A).
 5. ⬜ PageSpeed Insights en home, /cdmx y /blog tras el deploy; si LCP móvil > 2.5 s, atacar payload RSC y bundles.
-6. ⬜ Páginas de autor reales + `/about#equipo`.
+6. ✅ Páginas de autor reales + `/about#equipo` (2026-09-17): `src/app/autor/[slug]/page.tsx`
+   (205 líneas) sobre `src/lib/author.ts` (3 autores), y la sección `id="equipo"` en
+   `src/app/about/page.tsx` L176.
 7. ✅ 5 páginas de comparación/alternativas/decisión creadas (3 en fase 2 + alternativas Sysco en fase 3 + 5 formas de surtir en fase 6); adicional: `lista-insumos-abrir-restaurante` (brecha de apertura).
 
 ### Medio (meses 2–3)
@@ -184,7 +195,10 @@ HTTPS con HSTS `preload`, CSP (report-only), `x-frame-options: DENY`, `x-content
 10. ⬜ Google Business Profile para Resurte.me (aunque sea B2B sin tienda: perfil de servicio).
 
 ### Largo plazo
-11. ⬜ Datos propios publicados ("Índice Resurte.me de precios de insumos") — imán de enlaces y citas de IA.
+11. ✅ Publicado (2026-09-17): `/precios`, `/precios/[insumo]`, `/precios/ciudad/[ciudad]`,
+    `indice-precios.csv`, el feed `/api/feed/precios.json`, el cron `precios` y
+    `src/lib/price-index.ts`; la migración `00091_price_index` está **aplicada** en el
+    proyecto. Lo que falta de este ítem es el empujón de outreach (ítem 9), no el dato.
 12. ⬜ Programa de reseñas de clientes B2B (testimonios con nombre y negocio en home).
 
 ---

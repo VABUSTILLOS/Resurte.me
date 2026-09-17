@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test"
 
 // Valida la navegación por teclado en rutas públicas: skip-link,
 // orden de tabulación y foco visible (más allá del contraste).
-test.describe("accesibilidad navegación por teclado", () => {
+test.describe("accesibilidad navegación por teclado", { tag: "@ci" }, () => {
   const pages: Array<[string, string]> = [
     ["home", "/"],
     ["marketplace", "/comer"],
@@ -38,12 +38,30 @@ test.describe("accesibilidad navegación por teclado", () => {
 
       // Presiona Tab repetidamente y verifica que el foco siempre está en
       // un elemento interactivo y avanza (no queda atrapado en un bucle).
+      // La identidad del nodo se marca con un WeakMap: usar `className` como
+      // identidad da falsos positivos porque dos botones hermanos con las
+      // mismas clases Tailwind (p. ej. "Buscar productos" y "Seleccionar
+      // ciudad" en el header móvil) son nodos distintos.
       let lastTarget = ""
       for (let i = 0; i < 8; i++) {
         await page.keyboard.press("Tab")
         const target = await page.evaluate(() => {
-          const el = document.activeElement
-          return el ? `${el.tagName.toLowerCase()}[${(el as HTMLElement).className}]` : "body"
+          const el = document.activeElement as HTMLElement | null
+          if (!el) return "body"
+          const w = window as unknown as {
+            __focusIds?: WeakMap<Element, number>
+            __focusSeq?: number
+          }
+          if (!w.__focusIds) {
+            w.__focusIds = new WeakMap()
+            w.__focusSeq = 0
+          }
+          if (!w.__focusIds.has(el)) w.__focusIds.set(el, ++w.__focusSeq!)
+          const label =
+            el.getAttribute("aria-label") ||
+            el.textContent?.trim().slice(0, 30) ||
+            el.tagName.toLowerCase()
+          return `#${w.__focusIds.get(el)} ${el.tagName.toLowerCase()}(${label})`
         })
         expect(target, `Tab ${i} no debe caer fuera de un elemento interactivo`).not.toBe("body")
         if (target === lastTarget) {

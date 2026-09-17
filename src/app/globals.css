@@ -156,10 +156,17 @@ body.has-toast .sticky-catalog-button {
    StickyCatalogButton, el botón de detección de ciudad y el sticky ATC;
    mientras está visible se ocultan para que el usuario no pueda tocar
    accidentalmente un botón que queda bajo el banner. Al aceptar/desechar el
-   banner, la clase se quita y reaparecen. */
+   banner, la clase se quita y reaparecen.
+
+   El toggle de la guía del panel entra en la misma lista por una razón más
+   fuerte: usa el MISMO offset inferior que el banner
+   (`--floating-bottom-offset` = `--inset-bottom + 4.5rem`), pero con z-[85]
+   frente al z-[60] del banner. Sin ocultarlo, el pill queda encima del CTA
+   "Aceptar todas" e intercepta el tap: el usuario no puede consentir. */
 body.cookie-consent-visible .whatsapp-floating,
 body.cookie-consent-visible .sticky-catalog-button,
-body.cookie-consent-visible .city-detector {
+body.cookie-consent-visible .city-detector,
+body.cookie-consent-visible .guide-toggle-floating {
   display: none;
 }
 

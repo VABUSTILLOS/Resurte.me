@@ -339,6 +339,27 @@ Credenciales que necesitan los comandos: la URL del proyecto
 > el panel de Supabase (*Project Settings → API* → *Project URL* y clave
 > `service_role`) y pegarlas en `.env.local`.
 
+> ✅ **Estado local reparado (17-sep-2026).** `.env.local` tenía literalmente
+> `[SENSITIVE]` en `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+> así que `isSupabaseConfigured()` devolvía `false` y todo el marketplace caía a
+> 404 (`/r/[slug]`) o a estado vacío (`/comer`). Se rellenaron copiando los valores
+> reales que **ya estaban en el mismo archivo** (`SUPABASE_URL` y
+> `SUPABASE_ANON_KEY`); no hizo falta sacar nada de Vercel.
+>
+> Dos detalles útiles para la próxima vez: **Next 16 recarga `.env.local` en
+> caliente** (`Reload env: .env.local` en el log), así que no hay que reiniciar
+> `next dev`; y las entradas **negativas** que se cachearon mientras la variable
+> estaba rota (`unstable_cache` / ISR, `revalidate = 300` en `/r/[slug]`) siguen
+> sirviendo 404 hasta que expira esa ventana. Si tras arreglar el env un slug
+> sigue dando 404, espera ~5 min antes de sospechar del código.
+>
+> Siguen pendientes, y **solo se pueden pegar a mano** (marcadas *Sensitive* en
+> Vercel ⇒ la CLI no las descifra): `SUPABASE_SERVICE_ROLE_KEY` —su ausencia deja
+> `service.ts` sin cliente, lo que rompe los paneles del restaurantero y hace que
+> el rate-limit server-side falle *fail-open*—, `STRIPE_SECRET_KEY`,
+> `STRIPE_WEBHOOK_SECRET` y `POSTGRES_PASSWORD`/`POSTGRES_URL*` (ver la rotación
+> pendiente de arriba).
+
 **Alternativa sin credenciales locales**: crea el usuario en el Dashboard de
 Supabase (*Authentication → Users → Add user*, con *Auto Confirm User*) y concédele
 el rol con `update profiles set role = 'admin' where id = '<uuid>';` o añadiendo su

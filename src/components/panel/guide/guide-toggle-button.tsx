@@ -16,7 +16,7 @@ export default function GuideToggleButton({ onClick, label = "Guía" }: GuideTog
   return (
     <button
       onClick={onClick}
-      className="fixed bottom-[calc(var(--inset-bottom)+4.5rem)] lg:bottom-5 right-4 z-[85] flex items-center gap-1.5 rounded-full bg-gray-900 text-white pl-2.5 pr-3 py-2 shadow-lg hover:bg-gray-700 transition-colors touch-target"
+      className="guide-toggle-floating fixed bottom-[calc(var(--inset-bottom)+4.5rem)] lg:bottom-5 right-4 z-[85] flex items-center gap-1.5 rounded-full bg-gray-900 text-white pl-2.5 pr-3 py-2 shadow-lg hover:bg-gray-700 transition-colors touch-target"
       aria-label={`Abrir guía paso a paso (${label})`}
       title="Ver guía paso a paso"
     >

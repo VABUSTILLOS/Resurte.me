@@ -126,11 +126,13 @@ Resurte.me como fuente.
 
 ## 4. Condiciones previas para que la medición arranque
 
-- [ ] `NEXT_PUBLIC_GA_MEASUREMENT_ID` correcto en Vercel (sin prefijo espurio). Sin esto
-      el evento `ai_referral` no se emite y no habrá datos de clics desde IA.
-- [ ] Migración `supabase/migrations/00091_price_index.sql` aplicada a producción, y el
-      cron `price-index` ejecutado, para que `/precios` publique cifras reales. Una cifra
-      desactualizada citada por la IA es peor que no ser citado.
+- [x] `NEXT_PUBLIC_GA_MEASUREMENT_ID` correcto (2026-09-17). El valor local es
+      `G-YKJ9ECF267` y, sobre todo, `sanitizeEnvId` (`src/lib/analytics.tsx` L22-30) sanea
+      el prefijo `NOMBRE_VAR=` y las comillas, que era el fallo real: `ai_referral` se
+      emite aunque el valor del dashboard siga sucio.
+- [x] Migración `supabase/migrations/00091_price_index.sql` **aplicada** (verificado
+      2026-09-17: el proyecto lista sus 138 migraciones, `00091` entre ellas). Lo único que
+      no se puede comprobar desde el repo es que el cron ya haya corrido, porque es runtime.
 - [ ] Acceso a Google Search Console para el dominio.
 - [ ] Acceso a los logs de Vercel.
 - [ ] Ejecutar el paquete off-page de `docs/estrategia-contenidos-seo.md` §8 (ítem de

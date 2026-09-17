@@ -235,3 +235,8 @@ historial a mano, o corregir la `version` después. `db push` sólo compara
 
 `db push` además exige sesión: `npx supabase login` (o `SUPABASE_ACCESS_TOKEN`)
 y, sin enlace previo, la contraseña de la base.
+
+**Estado verificado.** El historial está en sincronía: `npx supabase db push`
+responde *"Remote database is up to date."* y `npx supabase migration list
+--linked` lista las 138 migraciones con `local` == `remote` en todas, sin huecos
+ni filas huérfanas. Ese es el comando para re-comprobar tras cualquier migración.
