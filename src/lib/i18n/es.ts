@@ -804,6 +804,18 @@ export const es = {
       lockedCta: "Cómo subir de nivel",
       overriddenNote: "Nivel otorgado por Resurte.me",
       seeLevels: "Ver todos los niveles",
+      previewTitle: "{tool}: vista previa",
+      previewBody:
+        "Estás viendo la herramienta completa con datos de ejemplo. Puedes recorrerla y abrir la demo; para guardar o ejecutar necesitas nivel {tier}.",
+      previewDemoCta: "Ver demo",
+      previewOpenTool: "Ver en vista previa",
+      previewUpgradeCta: "Cómo subir a {tier}",
+      upsellTitle: "Esta acción necesita nivel {tier}",
+      upsellBody:
+        "Lo que ves es una vista previa: guardar y ejecutar se activan con el nivel {tier}. Compra en Resurte.me esta semana y sube solo, sin costo extra.",
+      upsellConfirm: "Cómo subir de nivel",
+      upsellCancel: "Seguir explorando",
+      adminUnlockedNote: "Vista de administrador: nivel desbloqueado.",
       featureMarketingIa: "Marketing IA",
       featureMarketingIaDesc:
         "Campañas por WhatsApp, correo y SMS con textos escritos para tu tono local, segmentación por hábito de consumo y pruebas A/B de asuntos.",

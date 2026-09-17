@@ -799,6 +799,18 @@ const en: Dictionary = {
       lockedCta: "How to move up a tier",
       overriddenNote: "Tier granted by Resurte.me",
       seeLevels: "See all tiers",
+      previewTitle: "{tool}: preview",
+      previewBody:
+        "You're seeing the full tool with sample data. Browse it and open the demo; saving or running requires {tier} tier.",
+      previewDemoCta: "See demo",
+      previewOpenTool: "See preview",
+      previewUpgradeCta: "How to reach {tier}",
+      upsellTitle: "This action needs {tier} tier",
+      upsellBody:
+        "What you're seeing is a preview: saving and running turn on at {tier} tier. Shop on Resurte.me this week and it activates on its own, at no extra cost.",
+      upsellConfirm: "How to move up a tier",
+      upsellCancel: "Keep exploring",
+      adminUnlockedNote: "Admin view: tier unlocked.",
       featureMarketingIa: "AI marketing",
       featureMarketingIaDesc:
         "WhatsApp, email and SMS campaigns with copy written for your local voice, segmentation by purchase habit and subject-line A/B tests.",

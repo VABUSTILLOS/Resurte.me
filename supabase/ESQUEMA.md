@@ -63,6 +63,31 @@ borrado del cupón). Es aditiva e idempotente, sin backfill.
 simplemente no aparece en el panel ni en el ticket, y el checkout no audita el
 descuento.
 
+## ⚠️ `orders.user_id` es nullable (migración 00009) — trampa de render
+
+`00001_initial_schema.sql` declara `user_id UUID NOT NULL REFERENCES
+profiles(id)`, pero **`00009_nullable_order_user.sql` hace
+`ALTER TABLE orders ALTER COLUMN user_id DROP NOT NULL`** para soportar
+checkout de invitado. `POST /api/orders` inserta `user_id: userId` donde
+`userId = user?.id ?? null`, así que un pedido de invitado **no tiene perfil**.
+
+Consecuencias que no son obvias:
+
+- El embed `profiles` (con hint `orders_user_id_fkey`) llega `null`, y
+  `customer_name` también. Cualquier `order.user_id.slice(...)` sin guarda es un
+  `null.slice()` que, dentro del `.map` de la tabla, tumba la sección entera de
+  `/admin/pedidos` con el error boundary. El nombre visible se resuelve siempre
+  con `orderCustomerLabel()` (`src/lib/admin/order-selects.ts`), que cae a
+  `"Invitado"`.
+- La política RLS de `orders` es `auth.uid() = user_id`. Para un pedido de
+  invitado eso evalúa a `NULL`, que **no** es verdadero: la fila es invisible
+  desde una sonda con anon key. Los pedidos de invitado solo se ven con
+  `service_role`, es decir, únicamente en el panel admin. Una sonda
+  `orders?user_id=is.null` que devuelve `[]` **no** prueba que no existan.
+- `00071_reconcile_prod_drift.sql` reafirma defaults y `NOT NULL` de otras
+  columnas derivadas, pero **nunca toca `user_id`**: la nulabilidad es
+  intencional y debe conservarse.
+
 ## 🔴 Drift histórico (ya versionado): `products` vs `product_stores`
 
 Las migraciones originales (00001–00027) definían precio/stock **por tienda** en

@@ -92,12 +92,13 @@ export async function GET(request: Request) {
     }
 
     // ── Emails de recuperación por toque ─────────────────────────
+    // email_logs no tiene created_at: la hora de envío vive en sent_at.
     const { data: recoveryLogs, error: logsErr } = await supabase
       .from("email_logs")
       .select("email_type")
       .in("email_type", ["abandoned_cart", "abandoned_cart_24h", "abandoned_cart_48h"])
       .eq("status", "sent")
-      .gte("created_at", since)
+      .gte("sent_at", since)
     if (logsErr) throw logsErr
 
     const recoveryByTouch: Record<string, number> = {}

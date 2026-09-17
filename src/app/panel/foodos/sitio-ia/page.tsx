@@ -29,8 +29,8 @@ import {
   type SeoSiteData,
 } from "../actions"
 import StatCard from "@/components/panel/StatCard"
-import NivelGate from "@/components/panel/foodos/nivel-gate"
-import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
+import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
+import { useTierGuard } from "@/hooks/use-tier-guard"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
 import type { FoodosRestaurant } from "@/types/foodos"
@@ -79,8 +79,7 @@ function kindLabel(kind: SeoPageRow["kind"]): string {
 }
 
 export default function SitioIaPage() {
-  const { can } = useEntitlements()
-  const canSitio = can("sitio_ia")
+  const { run, upsellDialog } = useTierGuard("sitio_ia")
 
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
   const [site, setSite] = useState<SeoSiteData | null>(null)
@@ -158,16 +157,20 @@ export default function SitioIaPage() {
     setSaving(true)
     setNotice(null)
     try {
-      const result = await saveSeoProfileAction({
-        restaurant_id: restaurant.id,
-        tagline,
-        about,
-        seo_keywords: keywords
-          .split(",")
-          .map((entry) => entry.trim())
-          .filter(Boolean),
-        google_business_url: googleBusiness.trim() || null,
-      })
+      const attempt = await run(() =>
+        saveSeoProfileAction({
+          restaurant_id: restaurant.id,
+          tagline,
+          about,
+          seo_keywords: keywords
+            .split(",")
+            .map((entry) => entry.trim())
+            .filter(Boolean),
+          google_business_url: googleBusiness.trim() || null,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.sitio.actionError"))
       setNotice({ ok: true, text: t("foodos.sitio.saved") })
       await load()
@@ -190,12 +193,16 @@ export default function SitioIaPage() {
     setBusy(kind)
     setNotice(null)
     try {
-      const result = await generateSeoPage({
-        restaurant_id: restaurant.id,
-        kind,
-        notes: notes.trim() || null,
-        menu_item_id: kind === "dish" ? dishId : null,
-      })
+      const attempt = await run(() =>
+        generateSeoPage({
+          restaurant_id: restaurant.id,
+          kind,
+          notes: notes.trim() || null,
+          menu_item_id: kind === "dish" ? dishId : null,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.sitio.generateError"))
       setNotice({
         ok: true,
@@ -220,9 +227,13 @@ export default function SitioIaPage() {
     setBusy(page.id)
     setNotice(null)
     try {
-      const result = publish
-        ? await publishSeoPage({ restaurant_id: restaurant.id, page_id: page.id })
-        : await unpublishSeoPage({ restaurant_id: restaurant.id, page_id: page.id })
+      const attempt = await run(() =>
+        publish
+          ? publishSeoPage({ restaurant_id: restaurant.id, page_id: page.id })
+          : unpublishSeoPage({ restaurant_id: restaurant.id, page_id: page.id })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.sitio.actionError"))
       await load()
     } catch (err) {
@@ -241,10 +252,14 @@ export default function SitioIaPage() {
     setBusy(page.id)
     setNotice(null)
     try {
-      const result = await deleteSeoPageRow({
-        restaurant_id: restaurant.id,
-        page_id: page.id,
-      })
+      const attempt = await run(() =>
+        deleteSeoPageRow({
+          restaurant_id: restaurant.id,
+          page_id: page.id,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.sitio.actionError"))
       await load()
     } catch (err) {
@@ -261,15 +276,6 @@ export default function SitioIaPage() {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="w-6 h-6 animate-spin text-[#0E7A0E]" />
-      </div>
-    )
-  }
-
-  if (!canSitio) {
-    return (
-      <div className="space-y-6">
-        <Header />
-        <NivelGate feature="sitio_ia" />
       </div>
     )
   }
@@ -308,6 +314,8 @@ export default function SitioIaPage() {
           {t("foodos.common.retry")}
         </button>
       </div>
+
+      <ToolPreviewNotice feature="sitio_ia" />
 
       {notice && (
         <div
@@ -660,6 +668,8 @@ export default function SitioIaPage() {
         title={t("foodos.sitio.title")}
         subtitle={t("foodos.sitio.guideSubtitle")}
       />
+
+      {upsellDialog}
     </div>
   )
 }

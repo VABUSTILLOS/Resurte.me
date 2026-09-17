@@ -43,6 +43,17 @@
   técnico (sección, mensaje, digest) con botón de copiar. El helper nunca lanza
   y deduplica por mensaje+digest, porque el endpoint tiene rate limit de 30/min
   y un boundary que re-monta en bucle agotaría la cuota.
+- Pedidos (`/admin/pedidos`): **`orders.user_id` es nullable** desde la
+  migración `00009_nullable_order_user.sql` (checkout de invitado: el API
+  inserta `user_id: null`). El embed `profiles` viene nulo en esos pedidos y
+  `customer_name` también, así que nunca encadenar `order.user_id.slice(...)`
+  sobre el valor crudo: un `null.slice()` dentro del `.map` de la tabla tumba
+  la sección entera con el error boundary (pasó en producción). El nombre
+  visible se resuelve siempre con `orderCustomerLabel()` de
+  `src/lib/admin/order-selects.ts`, que cae a `"Invitado"`. Como la política
+  RLS de `orders` es `auth.uid() = user_id`, los pedidos de invitado solo son
+  visibles con `service_role` — es decir, únicamente en el panel admin, nunca
+  desde una sonda con anon key.
 - Productos (`/admin/productos`): la tabla es server-side
   (`GET /api/admin/products/list` con búsqueda/filtros/orden/paginación y
   conteos para los chips); "seleccionar todo" abarca todas las páginas vía

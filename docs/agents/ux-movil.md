@@ -13,6 +13,20 @@
 - `--floating-bottom-offset` es la fuente única del rail inferior; sus cambios de
   estado son clases en `body` (ver regla 3 del README de agentes). Nuevo flotante
   ⇒ registrar su regla de colisión (InstallPrompt y BackToTop ya tienen la suya).
+- **Ningún flotante del rail con `z >= 60` sin decidir su colisión con el banner
+  de cookies** (regla 10 del README de agentes). El banner vive en ese mismo
+  carril con `z-[60]` y su franja de botones es la parte baja de su caja: un `z`
+  estrictamente mayor **intercepta el tap de "Aceptar todas"** y el usuario se
+  queda sin poder consentir. Un `z` **igual** no intercepta —el banner se
+  renderiza al final de `layout.tsx` y gana el empate por orden de DOM— pero
+  también hay que declararlo. El barrido medido de `src/` da **5 flotantes** en
+  ese carril (banner, guía del panel, 2 pills del dashboard, toast) y solo el de
+  la guía interceptaba. `src/lib/floats.contract.test.ts` lo bloquea.
+- El pill de la guía del panel escribe su offset **a mano** a propósito
+  (`bottom-[calc(var(--inset-bottom)+4.5rem)]`): la clase `has-panel-bottom-nav`
+  que define ese mismo valor llega en un efecto que espera a que la colección
+  cargue, así que leer la variable lo haría arrancar 3.5rem abajo y saltar. La
+  coincidencia de valores es intencionada; el acoplamiento a la clase, no.
 - El contenedor de toasts se ancla abajo-izquierda en `sm+` (nunca sobre los CTAs
   del carril: "Hacer Checkout" vive abajo-derecha) y a la MISMA altura que el
   WhatsApp FAB (`.whatsapp-floating`), en la esquina opuesta. Su separación del
@@ -132,6 +146,16 @@
 Recorrido a 320px/375px/768px: header, drawer de carrito, WhatsApp FAB, cookie
 banner, BackToTop, InstallPrompt, BottomTabBar de recompensas y PanelQuickNav sin
 solapes. Modo offline: el catálogo visitado abre desde el SW.
+
+Colisiones del rail: `npx vitest run src/lib/floats.contract.test.ts` — 4 pruebas.
+Barre `src/**/*.tsx`, localiza los flotantes anclados al rail con `z >= 60` y
+exige que cada uno tenga decisión escrita (clase oculta presente en `globals.css`
+o exención con motivo). Es la red que faltaba cuando el pill de la guía
+interceptaba el tap de "Aceptar todas" en el panel: el fallo estaba **medido y
+descartado** en la documentación, no detectado. Verificación manual del caso
+completo: abrir `/panel` en móvil sin consentimiento previo
+(`localStorage.removeItem("resurte_cookie_consent")`) y comprobar que el tap en
+"Aceptar todas" cierra el banner.
 
 Share target: `npx playwright test e2e/compartir.spec.ts --grep "share target"`
 (ambos proyectos: `chromium` y `mobile-chromium`). Cubre estado vacío, precarga

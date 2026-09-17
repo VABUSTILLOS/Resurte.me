@@ -287,6 +287,45 @@ inventario final de recortes UTC en `src/` (no test): **4 sitios, los 4
 justificados**. La regla queda como **regla común 8** de `docs/agents/README.md`
 y como invariante del playbook de checkout.
 
+### Ronda 4 — la capa móvil recupera su red de seguridad
+
+El backlog declarado volvió a estar cerrado (186 ✅, cero 🔜), así que la ronda
+sale otra vez de **deuda medida con herramientas**. La medición encontró algo
+peor que deuda: `npm run test:e2e` es `playwright test --grep @ci`, y **cuatro
+specs completos no tenían ni una sola etiqueta `@ci`** — **84 tests** que
+existían en el repo y que **nadie ejecutaba jamás** (`mobile.spec.ts` 68,
+`keyboard` 7, `auth` 6, `redeem` 3). La suite decía "todo verde" mientras un
+tercio de la evidencia móvil estaba apagada. Al encenderlos: **16 en rojo**, y
+detrás había **dos bugs reales de producto**.
+
+| # | Fase | Estado |
+|---|---|---|
+| M1 | **Triaje de los 16 rojos** (sin tocar código). Corrida real contra el dev server vivo (`E2E_PORT=3100`): **30 ✅ · 16 ❌ · 28 skip en 2.1 min**. Tres causas raíz, ninguna "flake": (a) **ancla muerta** — `mobile.spec.ts` buscaba `getByRole("navigation", { name: "Accesos rápidos del panel" })`, un label que **existe solo en el test** (`grep -rn "Accesos rápidos" src/` → 0 coincidencias) y cuyo fallback pulsaba "Hamburguesas y Hot Dogs", texto que solo aparece **como comentario** en `src/lib/recipes.ts` → `tap()` agotaba los **30 s** y reventaba el `beforeEach` entero; el FAB real (`aria-label="Abrir herramientas"`) ya se usaba en Fase 17, así que la migración estaba **a medias**; (b) **regresión real de UI** — el footer de `/cdmx` en móvil medía **618.875 px** contra un presupuesto de 560; (c) **contención** bajo `fullyParallel`. Entregable: tabla de triaje | ✅ |
+| M2 | **El arnés de colección del panel**: un solo helper (`seedPanelCollection`), ancla real (`Abrir herramientas`), diálogo correcto, rótulos reales del sheet, `toBeHidden()` donde el FAB es `lg:hidden`, y **timeouts acotados** para que un fallo sea rápido y claro. La secuencia de corridas cuenta la historia: **16 → 4 → 15 → 1**. El pico a 15 lo **introduje yo**: un bucle de 3 iteraciones con `close.tap()` sin timeout durante la animación de salida de `AnimatePresence`; acotarlo (2 iteraciones, `timeout: 2000` y `state: "detached"`) devolvió el verde. Lección repetida: **el arnés nuevo también puede ser la regresión** | ✅ |
+| M3 | **La regresión real del footer**: medida en vivo con Playwright a 412 px antes de tocar nada — **618.875 px** = `padding-top` 32 + grid 473.875 (marca 134 + fila 2 141 + fila 3 158.875 + dos gaps de 20) + bloque inferior 57 (texto a **2 líneas**). El exceso era **ritmo vertical**, no un link de más (los 2 links SEO de `258072f7` se conservan). 5 ediciones **solo móviles** en `footer.tsx` → **545 px < 560** con las 4 columnas igualadas (139 px) y sin encoger ningún target táctil. Spec móvil: **45 passed · 29 skipped · 0 failed en 31.1 s** | ✅ |
+| M4 | **Los 16 verdes**: cada rojo cerrado según su triaje — test reparado si el ancla estaba muerta, UI reparada si la aserción seguía siendo válida | ✅ |
+| M5 | **Los huérfanos, encendidos** — y el alcance cambió por completo al medir. Los 84 no eran "CI-safe pendientes de cablear": **cuatro specs obsoletos y rotos**, y dos de ellos no probaban nada. `redeem.spec.ts` creía mockearse con `page.route`, pero su petición salía por `page.request.post()`, **que no pasa por ese interceptor** → el spec nunca ejerció su propio mock. `auth.spec.ts`: 3 de 6 rompían por `getByLabel(/contraseña/i)` (**strict mode violation**: el botón `aria-label="Mostrar contraseña"` también matchea) y otros 2 asertaban un "enlace mágico" y un "¿olvidaste tu contraseña?" **que no existen**. `keyboard.spec.ts`: 2 falsos positivos por usar `className` como identidad de nodo (dos nodos distintos comparten clases Tailwind) → sustituido por un `WeakMap` de ids. Para separar "spec roto" de "falta de datos" monté un **repo CI-equivalente** (Supabase dummy, webpack) y corrí los mismos specs contra él y contra el server real: **resultado idéntico** → no era cuestión de datos. Reescritos `auth` (5 tests) y `redeem`, reparados `keyboard` y `mobile`, y **etiquetados**: `mobile.spec.ts` **26/26 describes** y `mobile-chrome.spec.ts` sus **2** — lo que recuperó **11 tests que no tenían ninguna etiqueta** porque los genera un bucle `for` sobre anchos. **Bug de producto #1**: `resetPasswordForEmail` aparece **únicamente en un comentario** (`src/app/auth/reset/page.tsx`) y `signInWithOtp` no existe → **la recuperación de contraseña es inalcanzable**: la página funciona y nada enlaza a ella | ✅ |
+| M6 | **El tap que no llegaba**: el pill de la guía del panel (`guide-toggle-button.tsx`, `z-[85]`) **interceptaba el tap de "Aceptar todas"** del banner de cookies (`z-[60]`). No era una sospecha: el log de Playwright lo nombraba —`… guide-toggle-button.tsx … intercepts pointer events`— y `--workers=1` reproducía el mismo fallo, así que **no era contención**. La causa es de una línea: en el panel `body.has-panel-bottom-nav` fija `--floating-bottom-offset: calc(4.5rem + var(--inset-bottom))` — el **mismo offset exacto** que el pill escribe a mano — así que ambos ocupan la misma franja y la guía gana por z-index. El mecanismo de resolución **ya existía** (`body.cookie-consent-visible` ocultaba `.whatsapp-floating`, `.sticky-catalog-button`, `.city-detector`): al pill le faltaba **solo su clase semántica**. Añadida `guide-toggle-floating` + una línea de CSS → **Fase 16: 4 passed · 4 skipped · 0 failed**. El **barrido** del resto de la franja (26 `fixed` con `z >= 60` en `src/`, de los que **solo 5 están anclados al rail**) cerró el asunto con una medición, no con una sospecha: los 2 pills del dashboard (`z-[60]`) **empatan** con el banner pero **no interceptan** (el banner se renderiza después en `layout.tsx` y gana el empate por orden de DOM), el `PanelFab` (`z-40`) es el **ancla** de la que deriva el offset —no un bug— y el `toast` (`z-[100]`) es efímero. **El pill escribía su offset a mano a propósito**: leer `var(--floating-bottom-offset)` lo haría arrancar 3.5rem abajo en el primer frame, porque `has-panel-bottom-nav` la añade un efecto que espera a que la colección cargue (documentado en el CSS para que nadie lo "arregle") | ✅ |
+| M7 | **Los dos contratos anti-regresión** (modelo `local-date.contract.test.ts`). `src/lib/e2e-specs.contract.test.ts`: todo `e2e/*.spec.ts` tiene algún `@ci`, todo `describe`/`test` de nivel superior lleva la etiqueta en **su propio** header, y `test:e2e` sigue filtrando por ella. Ya en su primera corrida **encontró 2 bloques reales sin etiqueta** (los dos describes de `mobile-chrome.spec.ts`). `src/lib/floats.contract.test.ts`: barre `src/**/*.tsx`, encuentra los flotantes del rail con `z >= 60` y exige que **cada uno tenga decisión** — oculto (y entonces su clase tiene que estar de verdad en el CSS) o exento **con motivo escrito**. Los dos verificados por **prueba de mutación**: quitar la clase del CSS o romper el prefijo la detecta; reintroducir un bloque sin `@ci` la detecta | ✅ |
+| M8 | **Documentación**: esta sección, las **reglas comunes 9 y 10** de `docs/agents/README.md` (*"todo spec e2e corre en CI, o no existe"* y *"todo flotante inferior declara su colisión"*), y la corrección del párrafo de § Verificación que daba el bug del FAB por **ajeno al plan** | ✅ |
+| M9 | **Verificación de la ronda** | ✅ |
+
+**Verificación de la ronda** (todo lo tocado en verde): `npx tsc --noEmit` → 0 ·
+`npm run lint` → 0 · `npm test` → **4099 passed / 0 failed** (incluidos los dos
+contratos nuevos) · spec móvil completo contra el server real →
+**45 passed · 29 skipped · 0 failed** · suite `@ci` completa (456 tests, ambos
+projects) → ver el párrafo de cierre de § Verificación. **Dos hallazgos que no
+se arreglan aquí y quedan declarados**: (1) **la recuperación de contraseña es
+inalcanzable** — es una decisión de producto, no un bug de test: o se enlaza
+desde el login, o se retira la ruta; (2) el **test del 404** (`smoke.spec.ts` y
+3 equivalentes) **nunca pudo pasar**: `page.goto("/ruta-que-no-existe-xyz")` no
+matchea `[slug]`, así que cae en `src/app/not-found.tsx` y conserva el título
+del root layout, mientras el test espera el que aporta `generateMetadata` de
+`src/app/[slug]/page.tsx`. Además, **el CI no sirvió como línea base**: llevaba
+**6 corridas consecutivas en rojo en `main`** por estados intermedios rotos de
+otras sesiones (un `TS2300` por identificador duplicado, Knip), así que la
+comparación válida es **local y con `--retries=2`**, como corre CI.
+
 ## 9. Blog
 
 | # | Fase | Estado |
@@ -321,11 +360,17 @@ acumuló cuatro familias del mismo defecto hasta que se midieron a mano y se
 fijaron con `src/lib/admin-productos-contrast.contract.test.ts` (filas
 **B36**/**B37** en § 8) — mientras no haya credenciales de admin en CI, ese
 contrato es el único gate posible para esa superficie.
-Quedan dos rojos **intermitentes** que pasan aislados bajo
-carga paralela (`e2e/compartir.spec.ts`, `e2e/mobile-chrome.spec.ts`), y
-`e2e/mobile-chrome.spec.ts:28` es un fallo **real y preexistente** ajeno a este
-plan: el FAB de `src/components/panel/guide/guide-toggle-button.tsx` (commit
-`61decf1`, `fixed` + `z-[85]`) intercepta el tap del banner de cookies.
+Queda un rojo **intermitente** que pasa aislado bajo carga paralela
+(`e2e/compartir.spec.ts`). El otro, `e2e/mobile-chrome.spec.ts:28`, resultó ser
+un fallo **real de producto** —no un flake— y quedó arreglado en la **ronda 4**
+(ver esa sección): el pill de la guía del panel
+(`src/components/panel/guide/guide-toggle-button.tsx`, commit `61decf1`,
+`fixed` + `z-[85]`) **interceptaba el tap del banner de cookies**, así que el
+usuario móvil del panel no podía pulsar "Aceptar todas". También en la ronda 4
+se comprobó que el test del **404** (`smoke.spec.ts` y 3 equivalentes) **nunca
+pudo pasar**: la ruta de prueba no matchea `[slug]`, así que cae en
+`src/app/not-found.tsx` y conserva el título del root layout, mientras el test
+espera el que aporta `generateMetadata` de `src/app/[slug]/page.tsx`.
 `npx tsc --noEmit`, `npm test` y `npm run build` están en verde.
 
 > Nota: `playwright.config.ts` usa `E2E_PORT` (por defecto 3000) y

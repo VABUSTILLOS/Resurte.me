@@ -15,6 +15,7 @@ import { cache } from "react"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { getUserRole } from "@/lib/roles"
 import { logger } from "@/lib/logger"
 import {
   effectiveTier,
@@ -169,17 +170,38 @@ export class FoodosFeatureLockedError extends Error {
 }
 
 /**
+ * ¿El usuario actual es administrador de plataforma?
+ *
+ * El admin no tiene restaurante propio, así que su nivel real siempre es
+ * Verde: sin este bypass no podría probar ni dar soporte a las herramientas
+ * premium. Delega en `getUserRole()` (ADMIN_EMAILS / profiles.role /
+ * admin_users) y `cache()` deduplica la verificación dentro de la request.
+ */
+export const isCurrentUserAdmin = cache(async (): Promise<boolean> => {
+  try {
+    return (await getUserRole()) === "admin"
+  } catch (err) {
+    logger.warn("foodos.entitlements.adminCheck", { error: String(err) })
+    return false
+  }
+})
+
+/**
  * Puerta de entrada de las server actions premium: devuelve los entitlements
  * del usuario o lanza `FoodosFeatureLockedError`.
  *
  * Toda acción que toque una capacidad premium debe empezar por aquí: la UI
- * puede ocultar la herramienta, pero el permiso real se verifica en servidor.
+ * puede mostrar la herramienta en vista previa, pero el permiso real se
+ * verifica en servidor.
  */
 export async function requireFoodosFeature(
   feature: FoodosFeature
 ): Promise<FoodosEntitlementState> {
   const entitlements = await getMyEntitlements()
   if (!hasFeature(entitlements.tier, feature)) {
+    // El bypass del admin se consulta solo cuando el nivel no alcanza, para
+    // no pagar la verificación extra en el camino normal de un restaurantero.
+    if (await isCurrentUserAdmin()) return entitlements
     throw new FoodosFeatureLockedError(
       feature,
       FEATURE_MIN_TIER[feature],

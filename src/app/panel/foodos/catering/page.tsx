@@ -29,8 +29,8 @@ import {
   type CateringData,
 } from "../actions"
 import StatCard from "@/components/panel/StatCard"
-import NivelGate from "@/components/panel/foodos/nivel-gate"
-import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
+import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
+import { useTierGuard } from "@/hooks/use-tier-guard"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
 import { formatMoney } from "@/lib/foodos"
@@ -172,8 +172,8 @@ function optionalNumber(value: string): number | null {
 }
 
 export default function CateringPage() {
-  const { can } = useEntitlements()
-  const canCatering = can("catering")
+  // `guard` y no `run`: esta página ya tiene un `run(key, task)` de estado de carga.
+  const { run: guard, upsellDialog } = useTierGuard("catering")
 
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
   const [data, setData] = useState<CateringData>(EMPTY_DATA)
@@ -251,18 +251,22 @@ export default function CateringPage() {
       .filter((line) => line !== "")
 
     return run("save-package", async () => {
-      const result = await saveCateringPackageAction({
-        restaurant_id: restaurant.id,
-        package_id: draft.id,
-        name: draft.name.trim(),
-        description: draft.description.trim() === "" ? null : draft.description.trim(),
-        price_per_person: pricePerPerson,
-        min_people: minPeople,
-        max_people: optionalNumber(draft.maxPeople),
-        lead_time_hours: optionalNumber(draft.leadTimeHours),
-        includes,
-        is_active: draft.isActive,
-      })
+      const attempt = await guard(() =>
+        saveCateringPackageAction({
+          restaurant_id: restaurant.id,
+          package_id: draft.id,
+          name: draft.name.trim(),
+          description: draft.description.trim() === "" ? null : draft.description.trim(),
+          price_per_person: pricePerPerson,
+          min_people: minPeople,
+          max_people: optionalNumber(draft.maxPeople),
+          lead_time_hours: optionalNumber(draft.leadTimeHours),
+          includes,
+          is_active: draft.isActive,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.catering.formError"))
       setNotice({ ok: true, text: t("foodos.catering.packageSaved") })
       setDraft(null)
@@ -274,10 +278,14 @@ export default function CateringPage() {
     if (!restaurant) return
     if (!window.confirm(t("foodos.catering.deleteConfirm"))) return
     return run(`delete:${pkg.id}`, async () => {
-      const result = await deleteCateringPackageAction({
-        restaurant_id: restaurant.id,
-        package_id: pkg.id,
-      })
+      const attempt = await guard(() =>
+        deleteCateringPackageAction({
+          restaurant_id: restaurant.id,
+          package_id: pkg.id,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.catering.actionError"))
       setNotice({ ok: true, text: t("foodos.catering.packageDeleted") })
       await load()
@@ -287,11 +295,15 @@ export default function CateringPage() {
   function moveStatus(request: RequestRow, next: CateringStatus) {
     if (!restaurant) return
     return run(`status:${request.id}:${next}`, async () => {
-      const result = await setCateringRequestStatusAction({
-        restaurant_id: restaurant.id,
-        request_id: request.id,
-        status: next,
-      })
+      const attempt = await guard(() =>
+        setCateringRequestStatusAction({
+          restaurant_id: restaurant.id,
+          request_id: request.id,
+          status: next,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.catering.actionError"))
       setNotice({ ok: true, text: t("foodos.catering.requestCancelled") })
       await load()
@@ -306,12 +318,16 @@ export default function CateringPage() {
       return
     }
     return run(`override:${request.id}`, async () => {
-      const result = await overrideCateringTotalAction({
-        restaurant_id: restaurant.id,
-        request_id: request.id,
-        total,
-        deposit: optionalNumber(override.deposit),
-      })
+      const attempt = await guard(() =>
+        overrideCateringTotalAction({
+          restaurant_id: restaurant.id,
+          request_id: request.id,
+          total,
+          deposit: optionalNumber(override.deposit),
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.catering.actionError"))
       setNotice({ ok: true, text: t("foodos.catering.overrideSaved") })
       setOverride(null)
@@ -323,15 +339,6 @@ export default function CateringPage() {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="w-6 h-6 animate-spin text-[#0E7A0E]" />
-      </div>
-    )
-  }
-
-  if (!canCatering) {
-    return (
-      <div className="space-y-6">
-        <Header />
-        <NivelGate feature="catering" />
       </div>
     )
   }
@@ -370,6 +377,8 @@ export default function CateringPage() {
           {t("foodos.common.retry")}
         </button>
       </div>
+
+      <ToolPreviewNotice feature="catering" />
 
       {notice && (
         <div
@@ -856,6 +865,8 @@ export default function CateringPage() {
         title={t("foodos.catering.title")}
         subtitle={t("foodos.catering.guideSubtitle")}
       />
+
+      {upsellDialog}
     </div>
   )
 }

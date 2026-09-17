@@ -26,8 +26,8 @@ import {
   upsertWalletSettings,
 } from "../actions"
 import StatCard from "@/components/panel/StatCard"
-import NivelGate from "@/components/panel/foodos/nivel-gate"
-import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
+import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
+import { useTierGuard } from "@/hooks/use-tier-guard"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
 import { formatMoney } from "@/lib/foodos"
@@ -77,8 +77,7 @@ function shortDate(value: string): string {
 }
 
 export default function WalletPage() {
-  const { can } = useEntitlements()
-  const canWallet = can("wallet_passes")
+  const { run, upsellDialog } = useTierGuard("wallet_passes")
 
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
   const [customers, setCustomers] = useState<FoodosCustomer[]>([])
@@ -168,12 +167,15 @@ export default function WalletPage() {
     setSaving(true)
     setNotice(null)
     try {
-      await upsertWalletSettings({
-        restaurant_id: restaurant.id,
-        wallet_enabled: enabled,
-        reward_points: points,
-        reward_label: rewardLabel,
-      })
+      const attempt = await run(() =>
+        upsertWalletSettings({
+          restaurant_id: restaurant.id,
+          wallet_enabled: enabled,
+          reward_points: points,
+          reward_label: rewardLabel,
+        })
+      )
+      if (!attempt.ran) return
       setNotice({ ok: true, text: t("foodos.wallet.saved") })
       await load()
     } catch (err) {
@@ -191,10 +193,14 @@ export default function WalletPage() {
     setBusyId(customerId)
     setNotice(null)
     try {
-      const result = await issueWalletPass({
-        restaurant_id: restaurant.id,
-        customer_id: customerId,
-      })
+      const attempt = await run(() =>
+        issueWalletPass({
+          restaurant_id: restaurant.id,
+          customer_id: customerId,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       setNotice({
         ok: result.ok,
         text: result.ok
@@ -218,11 +224,15 @@ export default function WalletPage() {
     setBusyId(pass.id)
     setNotice(null)
     try {
-      const result = await setWalletPassEnabled({
-        restaurant_id: restaurant.id,
-        pass_id: pass.id,
-        is_active: !pass.is_active,
-      })
+      const attempt = await run(() =>
+        setWalletPassEnabled({
+          restaurant_id: restaurant.id,
+          pass_id: pass.id,
+          is_active: !pass.is_active,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.wallet.actionError"))
       await load()
     } catch (err) {
@@ -240,10 +250,14 @@ export default function WalletPage() {
     setBusyId(pass.id)
     setNotice(null)
     try {
-      const result = await refreshWalletPassRow({
-        restaurant_id: restaurant.id,
-        pass_id: pass.id,
-      })
+      const attempt = await run(() =>
+        refreshWalletPassRow({
+          restaurant_id: restaurant.id,
+          pass_id: pass.id,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.wallet.actionError"))
       await load()
     } catch (err) {
@@ -273,15 +287,6 @@ export default function WalletPage() {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="w-6 h-6 animate-spin text-[#0E7A0E]" />
-      </div>
-    )
-  }
-
-  if (!canWallet) {
-    return (
-      <div className="space-y-6">
-        <Header />
-        <NivelGate feature="wallet_passes" />
       </div>
     )
   }
@@ -318,6 +323,8 @@ export default function WalletPage() {
           {t("foodos.common.retry")}
         </button>
       </div>
+
+      <ToolPreviewNotice feature="wallet_passes" />
 
       {notice && (
         <div
@@ -627,6 +634,8 @@ export default function WalletPage() {
         title={t("foodos.wallet.title")}
         subtitle={t("foodos.wallet.guideSubtitle")}
       />
+
+      {upsellDialog}
     </div>
   )
 }

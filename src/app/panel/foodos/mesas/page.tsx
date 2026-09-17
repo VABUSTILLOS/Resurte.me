@@ -47,7 +47,7 @@ import {
 import { getFoodosPanelData } from "../actions"
 import { createClient } from "@/lib/supabase/client"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
-import NivelGate from "@/components/panel/foodos/nivel-gate"
+import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
 import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { ItemOptionsModal } from "@/app/r/[slug]/_components/item-options-modal"
@@ -996,15 +996,6 @@ export default function MesasPage() {
     )
   }
 
-  if (!canMesas) {
-    return (
-      <div className="space-y-6">
-        <Header />
-        <NivelGate feature={FEATURE} />
-      </div>
-    )
-  }
-
   if (!restaurant) {
     return (
       <div className="space-y-6">
@@ -1040,6 +1031,8 @@ export default function MesasPage() {
   return (
     <div className="space-y-4 pb-[calc(var(--floating-bottom-offset)+1rem)]">
       <Header />
+
+      <ToolPreviewNotice feature={FEATURE} />
 
       {/* La sucursal decide el salón: mezclar dos no tiene sentido. */}
       <div className="flex flex-wrap items-center gap-2">

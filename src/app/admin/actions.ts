@@ -63,7 +63,8 @@ interface AdminOrderItem {
 
 export interface AdminOrder {
   id: number
-  user_id: string
+  /** Nullable desde 00009: los pedidos de invitado no tienen usuario. */
+  user_id: string | null
   customer_name: string | null
   status: string
   subtotal: number

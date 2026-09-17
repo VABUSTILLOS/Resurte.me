@@ -2,13 +2,30 @@
 
 import { Fragment } from "react"
 import Link from "next/link"
-import { ArrowRight, Lock } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 import { t } from "@/lib/i18n/es"
 import { minTierFor } from "@/lib/foodos-entitlements"
 import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
 import { TierIcon, tierLabel } from "@/components/panel/foodos/nivel-badge"
 import { TOOL_AREAS } from "./hub-data"
 import type { HubCollection, Tool } from "./hub-data"
+import type { CashbackTier } from "@/types"
+
+/**
+ * Píldora informativa del nivel que hace falta para USAR la herramienta.
+ * Es informativa: no dims ni bloquea la tarjeta, que sigue abriendo la
+ * herramienta en vista previa.
+ */
+function TierChip({ tier, className = "" }: { tier: CashbackTier; className?: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-semibold text-gray-500 whitespace-nowrap ${className}`}
+    >
+      <TierIcon tier={tier} className="w-3 h-3 opacity-60" />
+      {tierLabel(tier)}
+    </span>
+  )
+}
 
 interface ToolGridProps {
   tools: Tool[]
@@ -16,11 +33,15 @@ interface ToolGridProps {
 }
 
 export default function ToolGrid({ tools, selectedCollection }: ToolGridProps) {
-  const { can } = useEntitlements()
+  const { canUse } = useEntitlements()
   const isLocked = (tool: Tool) => !tool.standalone && !selectedCollection
-  /** Nivel requerido si la capacidad premium todavía no se desbloquea. */
+  /**
+   * Nivel que hace falta para USAR la capacidad premium. No bloquea la
+   * tarjeta: la herramienta se abre en vista previa (se ve completa, con
+   * demo) y el nivel solo se pide al guardar.
+   */
   const levelLockOf = (tool: Tool) =>
-    tool.feature && !can(tool.feature) ? minTierFor(tool.feature) : null
+    tool.feature && !canUse(tool.feature) ? minTierFor(tool.feature) : null
 
   return (
     <div id="panel-tools" className="flex flex-col gap-2 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
@@ -44,7 +65,7 @@ export default function ToolGrid({ tools, selectedCollection }: ToolGridProps) {
             {areaTools.map((tool) => {
               const locked = isLocked(tool)
               const requiredTier = levelLockOf(tool)
-              const blocked = locked || requiredTier !== null
+              const blocked = locked
               return (
                 <Link
                   key={tool.href}
@@ -68,6 +89,9 @@ export default function ToolGrid({ tools, selectedCollection }: ToolGridProps) {
                         </span>
                       )}
                       <span className="truncate sm:whitespace-normal">{tool.title}</span>
+                      {!locked && requiredTier && (
+                        <TierChip tier={requiredTier} className="shrink-0 sm:hidden" />
+                      )}
                     </h3>
                     <p className="hidden sm:block text-sm text-gray-500 leading-relaxed sm:mb-3">
                       {selectedCollection && tool.collectionDesc
@@ -80,27 +104,24 @@ export default function ToolGrid({ tools, selectedCollection }: ToolGridProps) {
                         : tool.description}
                     </p>
                   </div>
-                  <div className="hidden sm:flex items-center gap-1 text-sm font-semibold text-[#0E7A0E] group-hover:gap-2 transition-all">
-                    {locked
-                      ? t("panel.selectKitchen")
-                      : requiredTier
-                        ? t("foodos.entitlements.lockedTitle", { tier: tierLabel(requiredTier) })
-                        : t("panel.openTool")}
+                  <div className="hidden sm:flex items-center gap-1.5 text-sm font-semibold text-[#0E7A0E] group-hover:gap-2 transition-all">
+                    {locked ? (
+                      t("panel.selectKitchen")
+                    ) : requiredTier ? (
+                      <>
+                        {t("foodos.entitlements.previewOpenTool")}
+                        <TierChip tier={requiredTier} />
+                      </>
+                    ) : (
+                      t("panel.openTool")
+                    )}
                     <ArrowRight className="w-4 h-4" />
                   </div>
                   <ArrowRight className="sm:hidden w-5 h-5 text-gray-300 shrink-0" />
-                  {blocked && (
+                  {locked && (
                     <div className="absolute inset-0 bg-white/40 rounded-xl sm:rounded-2xl flex items-center justify-center">
                       <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 bg-white px-3 py-1.5 rounded-full border border-gray-200 shadow-sm">
-                        {requiredTier ? (
-                          <>
-                            <TierIcon tier={requiredTier} className="w-3.5 h-3.5 opacity-50" />
-                            <Lock aria-hidden className="w-3 h-3" />
-                            {tierLabel(requiredTier)}
-                          </>
-                        ) : (
-                          <>🔒 {t("panel.locked")}</>
-                        )}
+                        🔒 {t("panel.locked")}
                       </span>
                     </div>
                   )}

@@ -52,6 +52,33 @@ requieren revisar todos los playbooks que dependen de esa superficie.
    **falla si aparece un sitio nuevo sin justificar**. Los recortes de
    `toISOString()` sin recorte (`created_at`, `sent_at`, `expires_at`) son
    timestamps de auditoría y **no se tocan**.
+9. **Todo spec e2e corre en CI, o no existe**: `npm run test:e2e` es
+   `playwright test --grep @ci`, así que un spec sin la etiqueta **existe en el
+   repo y nunca se ejecuta**. Ese agujero escondió cuatro archivos completos
+   —84 tests, un tercio de la evidencia móvil— que al encenderlos estaban
+   obsoletos y en rojo: asertaban UI que ya no existía, y uno de ellos
+   (`redeem.spec.ts`) creía mockearse con `page.route` cuando su propia
+   petición salía por `page.request.post()`, que **no pasa por ese interceptor**.
+   La etiqueta va en el header del `describe` (los `test` hijos la heredan); un
+   spec que solo aplica a un project se auto-excluye con
+   `test.skip(({ isMobile }) => !isMobile)`, no dejándolo sin etiqueta.
+   `src/lib/e2e-specs.contract.test.ts` **falla** si aparece un spec o un
+   `describe` de nivel superior sin `@ci`, o si el script deja de filtrar.
+   Corolario: **un `@ci` que pasa porque se saltó no es cobertura** — los tests
+   que dependen de sesión o de datos reales se saltan solos, y en CI no hay
+   ninguno de los dos.
+10. **Todo flotante inferior declara su colisión**: un elemento `fixed` anclado
+   al rail (`bottom-[var(--floating-bottom-offset)]` y compañía) con
+   **`z >= 60`** se pinta por encima del banner de cookies (`z-[60]`) y puede
+   interceptar el tap de "Aceptar todas". El pill de la guía del panel
+   (`z-[85]`) lo hacía: el usuario móvil del panel **no podía consentir**, y el
+   fallo llevaba documentado como "ajeno al plan" desde hacía varias rondas.
+   Todo flotante de esa franja o bien lleva una clase semántica **y** aparece en
+   una regla `body.cookie-consent-visible .<clase>` de `globals.css`, o bien
+   declara su exención **con motivo escrito** (un `z` igual no intercepta: el
+   banner se renderiza al final de `layout.tsx` y gana el empate por orden de
+   DOM). `src/lib/floats.contract.test.ts` **falla** si aparece un flotante sin
+   decidir o si una clase declarada como oculta no está en el CSS.
 
 ## Sin agente asignado: cuenta y autenticación
 

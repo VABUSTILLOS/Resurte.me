@@ -2,8 +2,8 @@ import { test, expect } from "@playwright/test"
 
 // UX móvil: header con auto-hide y navegación del panel vía FAB + bottom sheet.
 // Corre en todos los projects; los asserts de FAB/panel aplican en viewport móvil.
-test.describe("móvil: chrome de navegación", () => {
-  test("header global se oculta al bajar y reaparece al subir @ci", async ({ page, isMobile }) => {
+test.describe("móvil: chrome de navegación", { tag: "@ci" }, () => {
+  test("header global se oculta al bajar y reaparece al subir", async ({ page, isMobile }) => {
     test.skip(!isMobile, "auto-hide validado en viewport móvil")
     await page.goto("/", { waitUntil: "domcontentloaded" })
     const header = page.locator("header").first()
@@ -25,7 +25,7 @@ test.describe("móvil: chrome de navegación", () => {
     })
   })
 
-  test("panel en móvil: sin barras fijas apiladas y FAB abre el sheet @ci", async ({ page, isMobile }) => {
+  test("panel en móvil: sin barras fijas apiladas y FAB abre el sheet", async ({ page, isMobile }) => {
     test.skip(!isMobile, "solo viewport móvil")
     // Pre-selecciona una colección para activar el chrome completo del panel.
     await page.addInitScript(() => {
@@ -76,7 +76,7 @@ test.describe("móvil: chrome de navegación", () => {
     await expect(sheet).not.toBeVisible()
   })
 
-  test("header móvil: botón 'Ver todos los productos' navega al catálogo @ci", async ({ page, isMobile }) => {
+  test("header móvil: botón 'Ver todos los productos' navega al catálogo", async ({ page, isMobile }) => {
     test.skip(!isMobile, "solo viewport móvil")
     await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
 
@@ -91,7 +91,7 @@ test.describe("móvil: chrome de navegación", () => {
     await expect(page.getByRole("heading", { name: "Todos los productos" })).toBeVisible({ timeout: 8000 })
   })
 
-  test("producto en móvil: breadcrumb con Atrás y ruta visible @ci", async ({ page, isMobile }) => {
+  test("producto en móvil: breadcrumb con Atrás y ruta visible", async ({ page, isMobile }) => {
     test.skip(!isMobile, "solo viewport móvil")
     await page.goto("/cdmx", { waitUntil: "domcontentloaded" })
 
@@ -127,7 +127,7 @@ test.describe("móvil: chrome de navegación", () => {
 // `sm` (640/641 — donde la regla unlayered `.touch-target` pisaba `sm:hidden`
 // y el header renderizaba a la vez los accesos móviles y los de escritorio),
 // la franja tablet (768/820) y desktop (900–1280).
-test.describe("header: no desborda ni recorta controles", () => {
+test.describe("header: no desborda ni recorta controles", { tag: "@ci" }, () => {
   test.skip(({ isMobile }) => isMobile, "el test fija sus propios viewports")
 
   for (const width of [320, 360, 375, 412, 640, 641, 768, 820, 900, 1024, 1280]) {

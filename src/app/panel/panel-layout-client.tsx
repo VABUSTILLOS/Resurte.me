@@ -272,13 +272,16 @@ function PanelContent({ children }: { children: React.ReactNode }) {
 
 export function PanelLayoutClient({
   entitlements,
+  isAdmin = false,
   children,
 }: {
   entitlements: FoodosEntitlementState
+  /** Vista de administrador de plataforma: todo desbloqueado. */
+  isAdmin?: boolean
   children: React.ReactNode
 }) {
   return (
-    <FoodosEntitlementsProvider value={entitlements}>
+    <FoodosEntitlementsProvider value={entitlements} isAdmin={isAdmin}>
       <RestaurantProvider>
         <PanelContent>{children}</PanelContent>
       </RestaurantProvider>

@@ -38,7 +38,7 @@ import {
 } from "../actions"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import StatCard from "@/components/panel/StatCard"
-import NivelGate from "@/components/panel/foodos/nivel-gate"
+import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
 import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
@@ -454,15 +454,6 @@ export default function FlotillaPage() {
     )
   }
 
-  if (!canFlotilla) {
-    return (
-      <div className="space-y-6">
-        <Header />
-        <NivelGate feature="flotilla" />
-      </div>
-    )
-  }
-
   if (!restaurant) {
     return (
       <div className="space-y-6">
@@ -495,6 +486,8 @@ export default function FlotillaPage() {
           {t("foodos.common.retry")}
         </button>
       </div>
+
+      <ToolPreviewNotice feature="flotilla" />
 
       {notice && (
         <div

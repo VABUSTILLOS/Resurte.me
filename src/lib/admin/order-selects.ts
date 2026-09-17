@@ -154,7 +154,8 @@ export interface AdminOrderAddressRow {
 /** Fila cruda de `orders` tal como la devuelve `buildAdminOrdersSelect`. */
 export interface AdminOrderRow {
   id: number
-  user_id: string
+  /** Nullable desde 00009: el checkout de invitado crea pedidos sin usuario. */
+  user_id: string | null
   status: string
   subtotal: number | string
   delivery_fee: number | string
@@ -202,4 +203,20 @@ export interface AdminOrderPrintRow {
 export interface OrderQueryResult<Row> {
   data: Row | null
   error: PostgrestErrorLike | null
+}
+
+/**
+ * Nombre visible del cliente de un pedido.
+ *
+ * `orders.user_id` es nullable desde la migración 00009 (checkout de invitado
+ * sin perfil), así que el embed `profiles` puede venir nulo y `customer_name`
+ * quedar vacío. Sin esta guarda el panel hacía `null.slice(0, 8)` dentro del
+ * `.map` de la tabla y el TypeError tumbaba toda la sección `/admin/pedidos`.
+ */
+export function orderCustomerLabel(order: {
+  customer_name: string | null
+  user_id: string | null
+}): string {
+  if (order.customer_name) return order.customer_name
+  return order.user_id ? `Usuario #${order.user_id.slice(0, 8)}` : "Invitado"
 }

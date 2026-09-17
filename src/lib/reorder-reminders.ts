@@ -70,15 +70,18 @@ export async function checkReorderReminders(): Promise<CronResult> {
 
   // Dedupe por ciclo: si ya se envió un recordatorio DESPUÉS de su último
   // pedido, no repetir hasta que vuelva a comprar.
-  const { data: alreadySent } = await supabase
+  // email_logs no tiene created_at: la hora de envío vive en sent_at.
+  const { data: alreadySent, error: sentErr } = await supabase
     .from("email_logs")
-    .select("user_id, created_at")
+    .select("user_id, sent_at")
     .eq("email_type", "reorder_reminder")
     .in("user_id", candidates.map((c) => c.userId))
+  // Sin log, un fallo aquí pasa inadvertido y el dedupe deja de filtrar.
+  if (sentErr) logger.error("[REORDER-REMINDER] Error reading email_logs:", sentErr)
 
   const lastReminderAt = new Map<string, number>()
   for (const log of alreadySent ?? []) {
-    const t = new Date(log.created_at as string).getTime()
+    const t = new Date(log.sent_at as string).getTime()
     const prev = lastReminderAt.get(log.user_id as string)
     if (prev === undefined || t > prev) lastReminderAt.set(log.user_id as string, t)
   }

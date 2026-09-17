@@ -48,6 +48,7 @@ import {
   type Selection,
 } from "@/lib/order-bulk"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
+import { orderCustomerLabel } from "@/lib/admin/order-selects"
 
 function formatAdminAddress(a: NonNullable<AdminOrder["address"]>): string {
   const parts = [
@@ -301,7 +302,7 @@ function AdminOrdersContent() {
       ["Pedido", "Cliente", "Dirección", "Subtotal", "Envío", "Descuento", "Cupón", "Total", "Método de pago", "Estado de pago", "Estado", "Origen", "Repartidor", "Fecha"],
       subset.map((o) => [
         o.id,
-        o.customer_name ?? `Usuario #${o.user_id.slice(0, 8)}`,
+        orderCustomerLabel(o),
         o.address ? formatAdminAddress(o.address) : "",
         o.subtotal.toFixed(2),
         o.delivery_fee.toFixed(2),
@@ -776,7 +777,7 @@ function AdminOrdersContent() {
                   </td>
                   <td className="px-5 py-3 font-mono text-xs font-semibold text-gray-500">#{order.id}</td>
                   <td className="px-5 py-3 text-xs text-gray-500">
-                    {order.customer_name || `Usuario #${order.user_id.slice(0, 8)}`}
+                    {orderCustomerLabel(order)}
                   </td>
                   <td className="px-5 py-3 text-xs text-gray-500 max-w-[180px]">
                     {order.address ? (
@@ -901,7 +902,7 @@ function AdminOrdersContent() {
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Pedido #{selectedOrder.id}</h2>
                 <p className="text-xs text-gray-400">
-                  {selectedOrder.customer_name || `Usuario #${selectedOrder.user_id.slice(0, 8)}`} ·{" "}
+                  {orderCustomerLabel(selectedOrder)} ·{" "}
                   {new Date(selectedOrder.created_at).toLocaleString("es-MX", {
                     day: "numeric",
                     month: "long",

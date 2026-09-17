@@ -12,10 +12,12 @@ import { createContext, useContext, useMemo } from "react"
 import {
   featuresForTier,
   hasFeature,
+  minTierFor,
   summarizeEntitlements,
   type FoodosEntitlementState,
   type FoodosFeature,
 } from "@/lib/foodos-entitlements"
+import type { CashbackTier } from "@/types"
 
 /** Estado de un visitante sin restaurante: todo bloqueado, nada roto. */
 export const EMPTY_ENTITLEMENTS: FoodosEntitlementState = {
@@ -31,29 +33,55 @@ export const EMPTY_ENTITLEMENTS: FoodosEntitlementState = {
 
 interface EntitlementsContextValue {
   entitlements: FoodosEntitlementState
-  /** ¿El nivel alcanza para esta capacidad? */
+  /**
+   * ¿Se puede USAR la capacidad (guardar, ejecutar, cobrar)?
+   *
+   * Es el único predicado que debe decidir si una escritura se permite. El
+   * nivel ya no decide si la herramienta se VE: el contenido completo se
+   * renderiza siempre y solo la acción final pide el nivel.
+   */
+  canUse: (feature: FoodosFeature) => boolean
+  /**
+   * Alias histórico de `canUse`.
+   *
+   * @deprecated Preferir `canUse` para escrituras y `isPreview` para
+   * presentación. Se conserva para no romper los llamadores existentes.
+   */
   can: (feature: FoodosFeature) => boolean
+  /** Nivel que falta para usar la capacidad, o `null` si ya se puede. */
+  lockedTier: (feature: FoodosFeature) => CashbackTier | null
+  /** ¿La capacidad se muestra en vista previa (solo lectura + demo)? */
+  isPreview: (feature: FoodosFeature) => boolean
   /** Capacidades disponibles en el nivel actual. */
   available: FoodosFeature[]
+  /** Vista de administrador de plataforma: todo desbloqueado. */
+  isAdmin: boolean
 }
 
 const EntitlementsContext = createContext<EntitlementsContextValue | null>(null)
 
 export function FoodosEntitlementsProvider({
   value,
+  isAdmin = false,
   children,
 }: {
   value: FoodosEntitlementState
+  /** El layout del panel lo resuelve con `getUserRole()`. */
+  isAdmin?: boolean
   children: React.ReactNode
 }) {
-  const ctx = useMemo<EntitlementsContextValue>(
-    () => ({
+  const ctx = useMemo<EntitlementsContextValue>(() => {
+    const canUse = (feature: FoodosFeature) => isAdmin || hasFeature(value.tier, feature)
+    return {
       entitlements: value,
-      can: (feature) => hasFeature(value.tier, feature),
+      canUse,
+      can: canUse,
+      lockedTier: (feature) => (canUse(feature) ? null : minTierFor(feature)),
+      isPreview: (feature) => !canUse(feature),
       available: featuresForTier(value.tier),
-    }),
-    [value]
-  )
+      isAdmin,
+    }
+  }, [value, isAdmin])
   return <EntitlementsContext.Provider value={ctx}>{children}</EntitlementsContext.Provider>
 }
 
@@ -67,7 +95,11 @@ export function useEntitlements(): EntitlementsContextValue {
   if (ctx) return ctx
   return {
     entitlements: EMPTY_ENTITLEMENTS,
+    canUse: () => false,
     can: () => false,
+    lockedTier: (feature) => minTierFor(feature),
+    isPreview: () => true,
     available: [],
+    isAdmin: false,
   }
 }

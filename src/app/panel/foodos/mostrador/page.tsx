@@ -33,7 +33,7 @@ import {
 } from "../mostrador-actions"
 import { getFoodosPanelData } from "../actions"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
-import NivelGate from "@/components/panel/foodos/nivel-gate"
+import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
 import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { ItemOptionsModal } from "@/app/r/[slug]/_components/item-options-modal"
@@ -553,15 +553,6 @@ export default function MostradorPage() {
     )
   }
 
-  if (!canMostrador) {
-    return (
-      <div className="space-y-6">
-        <Header />
-        <NivelGate feature={FEATURE} />
-      </div>
-    )
-  }
-
   if (!restaurant) {
     return (
       <div className="space-y-6">
@@ -585,6 +576,8 @@ export default function MostradorPage() {
   return (
     <div className="space-y-4 pb-[calc(var(--floating-bottom-offset)+5rem)]">
       <Header />
+
+      <ToolPreviewNotice feature={FEATURE} />
 
       {/* El turno y los precios dependen de la sucursal, así que se elige primero. */}
       <div className="flex flex-wrap items-center gap-2">

@@ -33,5 +33,14 @@ export default async function PanelLayout({
   // comparten el mismo dato sin volver a consultar la base.
   const entitlements = await getMyEntitlements()
 
-  return <PanelLayoutClient entitlements={entitlements}>{children}</PanelLayoutClient>
+  // El admin de plataforma no tiene restaurante propio (su nivel real es
+  // Verde), pero necesita ver y probar todo para dar soporte. El desbloqueo
+  // se resuelve en el contexto, no falseando el nivel.
+  const isAdmin = role === "admin"
+
+  return (
+    <PanelLayoutClient entitlements={entitlements} isAdmin={isAdmin}>
+      {children}
+    </PanelLayoutClient>
+  )
 }

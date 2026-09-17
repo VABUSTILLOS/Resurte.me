@@ -290,6 +290,186 @@ const TOOL_DEMOS: Record<string, ToolDemoConfig> = {
       { id: "pd3", emoji: "🥤", title: "Pedido #1044 · 3 refrescos", detail: "Web · Para llevar · $75 · Pagado en línea", tone: "positive" },
     ],
   },
+
+  // ---- Herramientas premium (nivel Diamante) ------------------------------
+  // Mismo formato que las demás: se ven completas en modo demo aunque el
+  // nivel del restaurante todavía no alcance para usarlas.
+
+  "/panel/foodos/mostrador": {
+    form: [
+      { label: "Cliente", value: "Público general" },
+      { label: "Producto", value: "Tacos de pastor (orden)" },
+      { label: "Cantidad", value: "2" },
+      { label: "Forma de pago", value: "Efectivo" },
+      { label: "Efectivo recibido", value: "200" },
+    ],
+    stats: [
+      { label: "Ventas de hoy", value: "$3,480.00", tone: "positive" },
+      { label: "Tickets", value: "27" },
+      { label: "Ticket promedio", value: "$128.89" },
+      { label: "Efectivo en caja", value: "$1,240.00" },
+    ],
+    list: [
+      { id: "mo1", emoji: "🧾", title: "Ticket #A-027 · $178.00", detail: "2 tacos + 2 refrescos · Efectivo · Cambio $22.00", tone: "positive" },
+      { id: "mo2", emoji: "💳", title: "Ticket #A-028 · $96.00", detail: "Orden de pastor · Tarjeta (Clip)", tone: "positive" },
+      { id: "mo3", emoji: "🔀", title: "Ticket #A-029 · $210.00", detail: "Pago combinado: $100 efectivo + $110 transferencia", tone: "warning" },
+    ],
+  },
+
+  "/panel/foodos/mesas": {
+    form: [
+      { label: "Zona", value: "Terraza" },
+      { label: "Mesa", value: "Mesa 4" },
+      { label: "Comensales", value: "3" },
+      { label: "Mesero", value: "Ana" },
+    ],
+    stats: [
+      { label: "Mesas ocupadas", value: "6 de 14", tone: "warning" },
+      { label: "Cuentas abiertas", value: "6" },
+      { label: "Consumo abierto", value: "$2,140.00" },
+      { label: "Tiempo promedio", value: "38 min" },
+    ],
+    list: [
+      { id: "me1", emoji: "🪑", title: "Mesa 3 · Terraza", detail: "Abierta 42 min · $486.00 · 4 comensales", tone: "warning" },
+      { id: "me2", emoji: "🍽️", title: "Mesa 7 · Salón", detail: "Cuenta pedida · $312.00 · lista para cobrar", tone: "positive" },
+      { id: "me3", emoji: "🔗", title: "Mesas 5 + 6 unidas", detail: "Grupo de 8 · $1,342.00 · enviado a cocina", tone: "default" },
+    ],
+  },
+
+  "/panel/foodos/caja": {
+    form: [
+      { label: "Fondo inicial", value: "1500" },
+      { label: "Concepto del movimiento", value: "Compra de tortillas" },
+      { label: "Monto", value: "240" },
+    ],
+    stats: [
+      { label: "Turno", value: "Abierto · Ana", tone: "positive" },
+      { label: "Efectivo esperado", value: "$1,984.00" },
+      { label: "Tarjeta", value: "$2,415.00" },
+      { label: "Diferencia", value: "$0.00", tone: "positive" },
+    ],
+    list: [
+      { id: "ca1", emoji: "🟢", title: "Apertura de turno · 08:00", detail: "Fondo inicial $1,500.00 · Ana", tone: "positive" },
+      { id: "ca2", emoji: "💸", title: "Retiro · 13:20", detail: "Compra de tortillas · −$240.00", tone: "warning" },
+      { id: "ca3", emoji: "📊", title: "Corte parcial · 16:00", detail: "Sistema $3,480.00 vs contado $3,480.00", tone: "positive" },
+    ],
+  },
+
+  "/panel/foodos/pos": {
+    form: [
+      { label: "Punto de venta", value: "Soft Restaurant" },
+      { label: "Sucursal", value: "Matriz Centro" },
+      { label: "Sincronización de menú", value: "Cada 30 min" },
+    ],
+    stats: [
+      { label: "Conexiones activas", value: "1 de 1", tone: "positive" },
+      { label: "Última sincronización", value: "hace 12 min", tone: "positive" },
+      { label: "Platillos sincronizados", value: "146" },
+      { label: "Webhooks 24 h", value: "38", tone: "default" },
+    ],
+    list: [
+      { id: "po1", emoji: "✅", title: "Soft Restaurant · Matriz Centro", detail: "Menú al día · 146 platillos · sin errores", tone: "positive" },
+      { id: "po2", emoji: "🔄", title: "Sync de menú · 14:30", detail: "+3 platillos, 2 precios actualizados", tone: "positive" },
+      { id: "po3", emoji: "⚠️", title: "Webhook con reintento", detail: "Pedido #1041 · entregado en el 2º intento", tone: "warning" },
+    ],
+  },
+
+  "/panel/foodos/wallet": {
+    form: [
+      { label: "Nombre del programa", value: "Club La Esquina" },
+      { label: "Puntos por peso", value: "1" },
+      { label: "Meta de recompensa", value: "150 puntos = postre gratis" },
+    ],
+    stats: [
+      { label: "Tarjetas emitidas", value: "312" },
+      { label: "Tarjetas activas", value: "248", tone: "positive" },
+      { label: "Puntos en circulación", value: "18,420" },
+      { label: "Canjes del mes", value: "37", tone: "positive" },
+    ],
+    list: [
+      { id: "wa1", emoji: "🍎", title: "Apple Wallet · 171 tarjetas", detail: "68% de las emisiones", tone: "positive" },
+      { id: "wa2", emoji: "🤖", title: "Google Wallet · 141 tarjetas", detail: "32% de las emisiones", tone: "positive" },
+      { id: "wa3", emoji: "🎂", title: "Cumpleaños del mes", detail: "12 comensales · mensaje automático listo", tone: "warning" },
+    ],
+  },
+
+  "/panel/foodos/catering": {
+    form: [
+      { label: "Nombre del paquete", value: "Comida corrida para 50" },
+      { label: "Personas mínimas", value: "30" },
+      { label: "Precio por persona", value: "185" },
+      { label: "Anticipación", value: "72 horas" },
+    ],
+    stats: [
+      { label: "Solicitudes del mes", value: "8" },
+      { label: "Cotizado", value: "$148,500.00", tone: "positive" },
+      { label: "Ganadas", value: "5", tone: "positive" },
+      { label: "Paquetes activos", value: "4" },
+    ],
+    list: [
+      { id: "ct1", emoji: "🏢", title: "Oficinas Torre Norte · 80 personas", detail: "Solicitud nueva · $14,800.00 · 12 de marzo", tone: "warning" },
+      { id: "ct2", emoji: "🎉", title: "XV años · 120 personas", detail: "Confirmado · $22,200.00 · anticipo recibido", tone: "positive" },
+      { id: "ct3", emoji: "📝", title: "Escuela primaria · 60 personas", detail: "Cotización enviada · esperando respuesta", tone: "default" },
+    ],
+  },
+
+  "/panel/foodos/sitio-ia": {
+    form: [
+      { label: "Ciudad objetivo", value: "Guadalajara" },
+      { label: "Platillo destacado", value: "Tacos de pastor" },
+      { label: "Tono de la descripción", value: "Cercano y local" },
+    ],
+    stats: [
+      { label: "Páginas publicadas", value: "12", tone: "positive" },
+      { label: "Borradores", value: "3" },
+      { label: "Impresiones (28 d)", value: "9,480", tone: "positive" },
+      { label: "Clics (28 d)", value: "612", tone: "positive" },
+    ],
+    list: [
+      { id: "si1", emoji: "✅", title: "Mejores tacos de pastor en Guadalajara", detail: "Publicada · 2,140 impresiones · posición 4.2", tone: "positive" },
+      { id: "si2", emoji: "✍️", title: "Menú para eventos en Zapopan", detail: "Borrador generado · listo para revisar", tone: "warning" },
+      { id: "si3", emoji: "🔍", title: "Preguntas frecuentes del negocio", detail: "8 preguntas generadas desde tu menú", tone: "positive" },
+    ],
+  },
+
+  "/panel/foodos/mesero-ia": {
+    form: [
+      { label: "Saludo inicial", value: "¡Hola! ¿Qué se te antoja hoy? 🌮" },
+      { label: "Tono", value: "Amable" },
+      { label: "Horario de atención", value: "13:00 – 23:00" },
+    ],
+    stats: [
+      { label: "Conversaciones hoy", value: "34" },
+      { label: "Pedidos armados", value: "19", tone: "positive" },
+      { label: "Tomados por IA", value: "16 de 19", tone: "positive" },
+      { label: "Respuesta promedio", value: "4 s" },
+    ],
+    list: [
+      { id: "mi1", emoji: "💬", title: "+52 33 1234 5678 · 19:42", detail: "Pidió 2 órdenes de pastor · comanda enviada a cocina", tone: "positive" },
+      { id: "mi2", emoji: "🙋", title: "+52 33 8765 4321 · 19:58", detail: "Preguntó por entrega a domicilio · atendido por IA", tone: "positive" },
+      { id: "mi3", emoji: "🧑‍🍳", title: "+52 33 5555 1111 · 20:14", detail: "Caso especial (alergias) · tomado por una persona", tone: "warning" },
+    ],
+  },
+
+  "/panel/foodos/flotilla": {
+    form: [
+      { label: "Nombre del repartidor", value: "Luis Ramírez" },
+      { label: "Teléfono", value: "33 1234 5678" },
+      { label: "Zona", value: "Centro" },
+      { label: "Tarifa base", value: "35" },
+    ],
+    stats: [
+      { label: "Repartidores activos", value: "5 de 6", tone: "positive" },
+      { label: "Entregas en curso", value: "4", tone: "warning" },
+      { label: "Entregas hoy", value: "38", tone: "positive" },
+      { label: "Tiempo promedio", value: "24 min", tone: "positive" },
+    ],
+    list: [
+      { id: "fl1", emoji: "🛵", title: "Luis Ramírez · Centro", detail: "3 entregas activas · 1.2 km de la más cercana", tone: "warning" },
+      { id: "fl2", emoji: "✅", title: "Ana Torres · Chapultepec", detail: "2 entregas completadas · 12:40 y 13:15", tone: "positive" },
+      { id: "fl3", emoji: "📦", title: "Sin asignar · 2 pedidos", detail: "Colonia Americana · asignación automática en curso", tone: "default" },
+    ],
+  },
 }
 
 export const DEMO_BANNER_TEXT =

@@ -85,9 +85,15 @@ test.describe("smoke: páginas públicas", { tag: "@ci" }, () => {
   test("404 para rutas inexistentes", async ({ page }) => {
     const response = await page.goto("/ruta-que-no-existe-xyz", { waitUntil: "domcontentloaded" })
     // 404 real (antes el streaming del shell devolvía 200 y el enlace roto se
-    // indexaba como página válida). El título lo aporta el generateMetadata
-    // del segmento, que sigue resolviéndose aunque la página llame a notFound.
+    // indexaba como página válida). La garantía SEO es el **status**, no el
+    // título: `not-found.js` se renderiza dentro del root layout, así que el
+    // <title> es el del layout aunque el segmento haya resuelto uno propio en
+    // generateMetadata — Next descarta el del segmento cuando el boundary lo
+    // reemplaza. Medido: /ruta-que-no-existe-xyz responde 404 con el título de
+    // la home. No hay vía soportada para cambiarlo (`global-not-found.js` solo
+    // cubre rutas que no matchean ninguna, y esta sí matchea [slug]).
     expect(response?.status()).toBe(404)
-    await expect(page).toHaveTitle(/Ciudad no encontrada/i)
+    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible()
+    await expect(page.getByText("Página no encontrada")).toBeVisible()
   })
 })

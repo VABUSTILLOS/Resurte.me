@@ -29,8 +29,8 @@ import {
   type PosData,
 } from "../actions"
 import StatCard from "@/components/panel/StatCard"
-import NivelGate from "@/components/panel/foodos/nivel-gate"
-import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
+import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
+import { useTierGuard } from "@/hooks/use-tier-guard"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
 import type { FoodosRestaurant } from "@/types/foodos"
@@ -141,8 +141,8 @@ function when(value: string | null): string {
 }
 
 export default function PosPage() {
-  const { can } = useEntitlements()
-  const canPos = can("pos_integraciones")
+  // `guard` y no `run`: esta página ya tiene un `run(key, task)` de estado de carga.
+  const { run: guard, upsellDialog } = useTierGuard("pos_integraciones")
 
   const [restaurant, setRestaurant] = useState<FoodosRestaurant | null>(null)
   const [data, setData] = useState<PosData>(EMPTY_DATA)
@@ -226,11 +226,15 @@ export default function PosPage() {
       if (value) credentials[field.key] = value
     }
     return run(`save:${view.descriptor.provider}`, async () => {
-      const result = await savePosConnectionAction({
-        restaurant_id: restaurant.id,
-        provider: view.descriptor.provider,
-        credentials,
-      })
+      const attempt = await guard(() =>
+        savePosConnectionAction({
+          restaurant_id: restaurant.id,
+          provider: view.descriptor.provider,
+          credentials,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.pos.actionError"))
       setNotice({ ok: true, text: t("foodos.pos.saved") })
       setDrafts((current) => ({ ...current, [view.descriptor.provider]: {} }))
@@ -241,10 +245,14 @@ export default function PosPage() {
   function test(view: PosConnectionView) {
     if (!restaurant) return
     return run(`test:${view.descriptor.provider}`, async () => {
-      const result = await testPosConnectionAction({
-        restaurant_id: restaurant.id,
-        provider: view.descriptor.provider,
-      })
+      const attempt = await guard(() =>
+        testPosConnectionAction({
+          restaurant_id: restaurant.id,
+          provider: view.descriptor.provider,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       setNotice({ ok: result.ok, text: result.message })
       await load()
     })
@@ -253,10 +261,14 @@ export default function PosPage() {
   function sync(view: PosConnectionView) {
     if (!restaurant) return
     return run(`sync:${view.descriptor.provider}`, async () => {
-      const result = await runPosMenuSyncAction({
-        restaurant_id: restaurant.id,
-        provider: view.descriptor.provider,
-      })
+      const attempt = await guard(() =>
+        runPosMenuSyncAction({
+          restaurant_id: restaurant.id,
+          provider: view.descriptor.provider,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (result.skipped) {
         setNotice({ ok: false, text: t("foodos.pos.syncSkipped") })
       } else if (!result.ok) {
@@ -280,10 +292,14 @@ export default function PosPage() {
     if (!restaurant) return
     if (!window.confirm(t("foodos.pos.disconnectConfirm"))) return
     return run(`disconnect:${view.descriptor.provider}`, async () => {
-      const result = await disconnectPosConnectionAction({
-        restaurant_id: restaurant.id,
-        provider: view.descriptor.provider,
-      })
+      const attempt = await guard(() =>
+        disconnectPosConnectionAction({
+          restaurant_id: restaurant.id,
+          provider: view.descriptor.provider,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.pos.actionError"))
       await load()
     })
@@ -293,10 +309,14 @@ export default function PosPage() {
     if (!restaurant) return
     if (!window.confirm(t("foodos.pos.rotateConfirm"))) return
     return run(`rotate:${view.descriptor.provider}`, async () => {
-      const result = await rotatePosWebhookSecretAction({
-        restaurant_id: restaurant.id,
-        provider: view.descriptor.provider,
-      })
+      const attempt = await guard(() =>
+        rotatePosWebhookSecretAction({
+          restaurant_id: restaurant.id,
+          provider: view.descriptor.provider,
+        })
+      )
+      if (!attempt.ran) return
+      const result = attempt.value
       if (!result.ok) throw new Error(result.error ?? t("foodos.pos.actionError"))
       if (result.secret) {
         setSecret({ provider: view.descriptor.provider, value: result.secret })
@@ -309,15 +329,6 @@ export default function PosPage() {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="w-6 h-6 animate-spin text-[#0E7A0E]" />
-      </div>
-    )
-  }
-
-  if (!canPos) {
-    return (
-      <div className="space-y-6">
-        <Header />
-        <NivelGate feature="pos_integraciones" />
       </div>
     )
   }
@@ -356,6 +367,8 @@ export default function PosPage() {
           {t("foodos.common.retry")}
         </button>
       </div>
+
+      <ToolPreviewNotice feature="pos_integraciones" />
 
       {notice && (
         <div
@@ -736,6 +749,8 @@ export default function PosPage() {
         title={t("foodos.pos.title")}
         subtitle={t("foodos.pos.guideSubtitle")}
       />
+
+      {upsellDialog}
     </div>
   )
 }

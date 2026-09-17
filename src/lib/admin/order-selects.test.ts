@@ -7,6 +7,7 @@ import {
   isAdminOrderOptionalColumn,
   missingColumnName,
   missingOptionalOrderColumn,
+  orderCustomerLabel,
 } from "./order-selects"
 
 /**
@@ -153,5 +154,37 @@ describe("missingOptionalOrderColumn", () => {
       missingOptionalOrderColumn({ code: "PGRST201", message: "more than one relationship" })
     ).toBeNull()
     expect(missingOptionalOrderColumn(null)).toBeNull()
+  })
+})
+
+/**
+ * Regresión del crash de /admin/pedidos: la migración 00009 hizo nullable
+ * `orders.user_id` (checkout de invitado), así que el perfil embebido puede
+ * venir nulo y `customer_name` quedar vacío. La etiqueta se calculaba con
+ * `order.user_id.slice(0, 8)` sin guarda y el TypeError tumbaba toda la
+ * sección con el error boundary.
+ */
+describe("orderCustomerLabel", () => {
+  it("prefiere el nombre del perfil", () => {
+    expect(orderCustomerLabel({ customer_name: "Ana Pérez", user_id: "abc12345-6789" })).toBe(
+      "Ana Pérez"
+    )
+  })
+
+  it("cae al id corto cuando el pedido tiene usuario pero no nombre", () => {
+    expect(orderCustomerLabel({ customer_name: null, user_id: "abc12345-6789" })).toBe(
+      "Usuario #abc12345"
+    )
+  })
+
+  it("no revienta con pedidos de invitado (user_id nulo)", () => {
+    expect(orderCustomerLabel({ customer_name: null, user_id: null })).toBe("Invitado")
+  })
+
+  it("ignora nombres vacíos en lugar de renderizar una celda en blanco", () => {
+    expect(orderCustomerLabel({ customer_name: "", user_id: null })).toBe("Invitado")
+    expect(orderCustomerLabel({ customer_name: "", user_id: "abc12345-6789" })).toBe(
+      "Usuario #abc12345"
+    )
   })
 })

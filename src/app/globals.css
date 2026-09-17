@@ -162,7 +162,14 @@ body.has-toast .sticky-catalog-button {
    fuerte: usa el MISMO offset inferior que el banner
    (`--floating-bottom-offset` = `--inset-bottom + 4.5rem`), pero con z-[85]
    frente al z-[60] del banner. Sin ocultarlo, el pill queda encima del CTA
-   "Aceptar todas" e intercepta el tap: el usuario no puede consentir. */
+   "Aceptar todas" e intercepta el tap: el usuario no puede consentir.
+
+   El pill escribe ese offset a mano a propósito, en vez de leer
+   `var(--floating-bottom-offset)`: `has-panel-bottom-nav` la añade
+   `panel-layout-client.tsx` en un efecto que espera a que la colección esté
+   cargada, así que en el primer frame la variable todavía vale el offset base
+   (`1rem`) y el pill arrancaría 3.5rem más abajo para saltar después. La
+   coincidencia de valores es intencionada; el acoplamiento a la clase, no. */
 body.cookie-consent-visible .whatsapp-floating,
 body.cookie-consent-visible .sticky-catalog-button,
 body.cookie-consent-visible .city-detector,

@@ -32,7 +32,7 @@ import {
 import { getFoodosPanelData } from "../actions"
 import { BottomSheet } from "@/components/ui/bottom-sheet"
 import StatCard from "@/components/panel/StatCard"
-import NivelGate from "@/components/panel/foodos/nivel-gate"
+import ToolPreviewNotice from "@/components/panel/foodos/tool-preview-notice"
 import { useEntitlements } from "@/components/panel/foodos/entitlements-context"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
@@ -252,15 +252,6 @@ export default function CajaPage() {
     )
   }
 
-  if (!canCaja) {
-    return (
-      <div className="space-y-6">
-        <Header />
-        <NivelGate feature="pos_mostrador" />
-      </div>
-    )
-  }
-
   if (!restaurant) {
     return (
       <div className="space-y-6">
@@ -319,6 +310,8 @@ export default function CajaPage() {
           </button>
         </div>
       </div>
+
+      <ToolPreviewNotice feature="pos_mostrador" />
 
       {notice && (
         <p
