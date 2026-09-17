@@ -8,6 +8,7 @@ import {
   getCatalogProducts,
   mergeWithCatalog,
   resetCatalogCache,
+  countExampleIngredients,
 } from "@/lib/catalog"
 
 interface ProductShape {
@@ -28,8 +29,26 @@ const catalogProducts: ProductShape[] = [
 ]
 
 describe("mergeWithCatalog", () => {
-  it("catálogo vacío devuelve los mocks", () => {
-    expect(mergeWithCatalog(mockProducts, [])).toEqual(mockProducts)
+  it("catálogo vacío devuelve los mocks marcados como ejemplo", () => {
+    expect(mergeWithCatalog(mockProducts, [])).toEqual(
+      mockProducts.map((m) => ({ ...m, source: "example" })),
+    )
+  })
+
+  it("los productos del catálogo se marcan como catálogo", () => {
+    const merged = mergeWithCatalog(mockProducts, catalogProducts)
+    expect(merged.find((p) => p.name === "Pollo")?.source).toBe("catalog")
+    expect(merged.find((p) => p.name === "Cebolla")?.source).toBe("example")
+  })
+
+  it("countExampleIngredients cuenta solo los que no vienen del catálogo", () => {
+    const merged = mergeWithCatalog(mockProducts, catalogProducts)
+    expect(countExampleIngredients(merged)).toBe(2)
+    expect(countExampleIngredients([])).toBe(0)
+  })
+
+  it("sin catálogo todos son ejemplo", () => {
+    expect(countExampleIngredients(mergeWithCatalog(mockProducts, []))).toBe(3)
   })
 
   it("los productos del catálogo ganan sobre los mocks (precio autoritativo)", () => {

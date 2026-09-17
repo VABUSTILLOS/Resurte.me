@@ -440,7 +440,7 @@ dashboard. Eso fue la causa del drift histórico (ver `supabase/ESQUEMA.md`).
 3. **Prohibido `supabase db reset --linked`** desde una máquina local, y
    prohibido editar el esquema de producción a mano en el SQL Editor (párrafo
    anterior). Aplicar a mano deja el ledger sin fila y `db push` **no** la
-   re-aplica después: ver §«Migraciones históricas de aplicación manual».
+   re-aplica después: ver §«Migraciones de aplicación manual histórica».
 4. Ante drift sospechado: documentar en `supabase/ESQUEMA.md`, versionar el
    cambio real como migración nueva y reconciliar — no repetir ediciones
    manuales.
@@ -528,10 +528,9 @@ resultado esperado aquí. Un `404 PGRST205` (*"Could not find the table
 `GET /api/admin/products/list?sort=sales` interpreta como "vista ausente", y es
 lo que sí hay que ver en un entorno nuevo sin la migración.
 
-Esta migración **no tiene fila en el ledger** (se aplicó pegando el SQL en el
-editor, que no registra migraciones). Como `db push` solo empuja versiones
-locales mayores que la máxima remota, no se re-aplica: en un entorno nuevo hay
-que aplicarla a mano o por CLI.
+Esta migración **sí tiene fila en el ledger** (`00116` · `product_sales_view`,
+verificado contra `supabase_migrations.schema_migrations` el 17-sep-2026), así
+que `db push` la aplica sola en un entorno nuevo: no hay paso manual.
 
 Sin ella el panel **no se rompe**: el listado reintenta sin el orden por
 ventas, cae al orden por nombre y marca `schemaDrift` (aviso ámbar de
@@ -572,8 +571,9 @@ privilegios por defecto a esos roles en cada objeto nuevo de `public`.
   invitado recurrente desaparecía cada 30 días y rompía el historial.
 
 **Estado verificado (17-sep-2026):** **aplicada**. No es "la última migración del
-repo" —el repositorio va por `00154`— sino una de las que se aplicaron a mano y
-quedaron sin fila en el ledger. Sonda con la clave publicable:
+repo" —el repositorio va por `00157`— y **sí tiene fila en el ledger** (`00117` ·
+`address_book`), así que `db push` la aplica sola en un entorno nuevo. Sonda con
+la clave publicable:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
@@ -867,15 +867,13 @@ operativa: con Hobby, 538 páginas ISR a `revalidate = 300` bastan para agotar
 las 4 h/mes de Active CPU; en Pro el recurso se cobra por uso, pero conviene
 subir el `revalidate` igual para no pagar regeneraciones que nadie mira.
 
-### Migraciones históricas de aplicación manual (hoy aplicadas)
+### Migraciones de aplicación manual histórica (objetos vivos en producción)
 
-Se aplicaron pegando el SQL en el editor, así que **no tienen fila en
-`supabase_migrations.schema_migrations`** (el editor no registra migraciones).
-Sus objetos están vivos en producción —verificado por sonda REST y por
-`npx supabase inspect db`—, pero el hueco del ledger importa: como `db push`
-solo empuja versiones locales **mayores** que la máxima remota, y la remota
-máxima ya es `00153`, estas migraciones **no se re-aplican solas**. En un
-entorno nuevo hay que aplicarlas a mano o por CLI. Se documentan por el síntoma
+Se aplicaron a mano en su día, pegando el SQL en el editor. Sus objetos están
+vivos en producción —verificado por sonda REST y por `npx supabase inspect db`—
+y **todas tienen fila en el ledger**: el rango `00001`…`00153` está completo
+(verificado contra `supabase_migrations.schema_migrations` el 17-sep-2026), así
+que `db push` las aplica solo en un entorno nuevo. Se documentan por el síntoma
 que provocan si faltan:
 
 1. `00082_foodos_payment_proofs.sql` — sin ella subir un comprobante falla.
@@ -895,22 +893,21 @@ que provocan si faltan:
    (§2). Sonda: `addresses?select=id,last_used_at,deleted_at&limit=1` →
    `400`/`42703` pendiente · `200` aplicada.
 
-Las filas ausentes del ledger son nueve: `00043`, `00082`, `00083`, `00084`,
-`00085`, `00116`, `00117`, `00143` y `00144`.
-
 **Para saber si te falta algo, no adivines ni pegues SQL "por si acaso": corre
 `npm run db:status`.** Read-only, y compara el ledger en las dos direcciones.
 
-Estado medido el **17-sep-2026**: los objetos de las seis están vivos, pero el
-ledger **no está limpio**. Tiene una versión remota huérfana, `20260917190303`,
-que es `00154_marketplace_delivery_proof.sql` aplicada por **MCP**:
-`apply_migration` registra un timestamp generado en vez del número del archivo.
-No es cosmético — la CLI exige que el historial remoto sea un prefijo de la lista
-local, así que esa fila deja `db push` **bloqueado por completo** con
-`LegacyDbPushMissingLocalError`: no se puede aplicar ninguna migración nueva
-hasta repararla. `npm run db:status` lo detecta y te da el comando exacto. La
-regla y el historial de incidentes están en «Regla: las migraciones numeradas se
-aplican por CLI, nunca por MCP».
+Estado medido el **17-sep-2026**: los objetos están vivos, pero el ledger **no
+está limpio**. Las cuatro migraciones más recientes (`00154`…`00157`) se
+aplicaron por **MCP**, que registra un **timestamp generado** en vez del número
+del archivo: `20260917190303` (`marketplace_delivery_proof`), `20260917215802`
+(`commission_ledger`), `20260917220238` (`commission_periods_period_index`) y
+`20260917230345` (`foodos_payouts`). Su DDL **está aplicado y coincide** con los
+archivos. No es cosmético — la CLI exige que el historial remoto sea un prefijo
+de la lista local, así que esas filas dejan `db push` **bloqueado por completo**
+con `LegacyDbPushMissingLocalError`: no se puede aplicar ninguna migración nueva
+hasta repararlas. `npm run db:status` lo detecta y te da los comandos exactos.
+La regla y el historial de incidentes están en «Regla: las migraciones numeradas
+se aplican por CLI, nunca por MCP».
 
 ### Migraciones recientes ya aplicadas a producción
 
@@ -1002,21 +999,29 @@ FROM PUBLIC, anon, authenticated;`, ya estaba byte a byte en
 la reparación el ledger tenía 152 filas y 13 versiones sin cinco dígitos;
 después, 152 filas con `00001`…`00152` y cero.
 
-**Recaída el mismo 17-sep-2026.** Horas después de esa reparación apareció una
-fila nueva con timestamp, `20260917190303`, correspondiente a
-`00154_marketplace_delivery_proof.sql`: el MCP se volvió a usar. No es un
-arrastre histórico, es la regla de arriba incumpliéndose otra vez — por eso la
-detección tiene que ser un comando y no una revisión a ojo. El DDL de `00154` **sí
-está aplicado** (sus tres columnas `orders.delivery_proof_*` responden en
-producción), así que la reparación es solo de ledger:
+**Recaída el mismo 17-sep-2026.** Horas después de esa reparación aparecieron
+cuatro filas nuevas con timestamp —`20260917190303`, `20260917215802`,
+`20260917220238` y `20260917230345`— correspondientes a `00154`…`00157`: el MCP
+se volvió a usar, una vez por migración. No es un arrastre histórico, es la
+regla de arriba incumpliéndose otra vez — por eso la detección tiene que ser un
+comando y no una revisión a ojo. El DDL de las cuatro **sí está aplicado** y su
+texto **coincide** con los archivos (columnas `orders.delivery_proof_*`, tablas
+`commission_periods` y `foodos_payouts`, índice `idx_commission_periods_period`),
+así que la reparación es solo de ledger:
 
 ```bash
 npx supabase migration repair --status reverted 20260917190303
+npx supabase migration repair --status reverted 20260917215802
+npx supabase migration repair --status reverted 20260917220238
+npx supabase migration repair --status reverted 20260917230345
 npx supabase migration repair --status applied 00154
+npx supabase migration repair --status applied 00155
+npx supabase migration repair --status applied 00156
+npx supabase migration repair --status applied 00157
 ```
 
 `migration repair` escribe **solo** `supabase_migrations.schema_migrations`; no
-ejecuta el SQL de la migración. Mientras esa fila siga ahí, `db push` falla
+ejecuta el SQL de la migración. Mientras esas filas sigan ahí, `db push` falla
 entero y **ninguna** migración nueva se puede aplicar.
 
 **Cinco divergencias de contenido que NO son drift de ledger.** Las filas

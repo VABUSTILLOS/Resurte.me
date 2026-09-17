@@ -34,6 +34,12 @@ export interface FoodosRestaurant {
   tiktok_pixel_id: string | null
   created_at: string
   updated_at: string
+  // "App de tu marca" (00159). NULL = el manifest deriva el valor: el nombre
+  // recortado a 12 caracteres y el fondo beige por defecto. De sólo lectura
+  // para el dueño — 00160 quitó el UPDATE de columna, así que se escriben
+  // únicamente por `saveAppBrand` con service role.
+  app_short_name: string | null
+  app_background_color: string | null
 }
 
 // --- Webhooks salientes (paridad take.app) ---

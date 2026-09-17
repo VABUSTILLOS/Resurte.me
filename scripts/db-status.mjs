@@ -106,7 +106,13 @@ const orphanRemote = rows.filter((row) => row.remote && !row.local)
 const applied = rows.filter((row) => row.local && row.remote)
 
 if (verbose) {
-  console.log(`Ledger: ${applied.length} aplicadas · ${pending.length} pendientes · ${orphanRemote.length} remotas sin archivo local`)
+  // "sin fila en el ledger", no "pendientes": una migración puede estar aplicada
+  // en la base y aun así no tener fila con su número (ver el caso MCP más abajo).
+  console.log(`Ledger: ${applied.length} aplicadas · ${pending.length} sin fila numérica · ${orphanRemote.length} remotas sin archivo local`)
+  if (orphanRemote.length > 0 && orphanRemote.length === pending.length) {
+    console.log(`  ↳ las ${pending.length} sin fila y las ${orphanRemote.length} huérfanas cuadran 1:1:`)
+    console.log("    son las MISMAS migraciones, aplicadas por MCP. No están pendientes.")
+  }
   for (const row of rows.slice(-10)) {
     const local = row.local || "—"
     const remote = row.remote || "—"
@@ -133,7 +139,8 @@ if (orphanRemote.length > 0) {
   }
   const missing = pending.map((row) => row.local)
   if (missing.length > 0) {
-    console.error("    Y después, la fila correcta de lo que ya está aplicado:")
+    console.error("    Y después, la fila con el número del archivo. Confirma ANTES que el DDL")
+    console.error("    está aplicado (sonda REST, o compara el esquema): `repair` no ejecuta SQL.")
     for (const version of missing) {
       console.error(`      npx supabase migration repair --status applied ${version}`)
     }

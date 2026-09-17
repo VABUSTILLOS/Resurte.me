@@ -88,7 +88,14 @@ export function useLocalStorage<T>(
 export interface SharedDish {
   id: string
   name: string
-  ingredients: { ingredientName: string; quantity: number; unit: string; unitPrice: number }[]
+  ingredients: {
+    ingredientName: string
+    quantity: number
+    unit: string
+    unitPrice: number
+    /** Precio de ejemplo (no del catálogo ni capturado por el dueño). */
+    example?: boolean
+  }[]
   foodCostPercent: number
   sellingPrice: number
   modificadores?: { id: string; nombre: string; precio: number }[]

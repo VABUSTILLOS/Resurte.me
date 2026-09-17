@@ -1,10 +1,15 @@
 /**
- * Cálculo de comisión estimada del vendedor.
+ * Tasa de comisión del vendedor y formato de dinero de la pantalla.
  *
- * Regla de negocio: comisión = Σ(pedidos PAGADOS de clientes vinculados
- * al vendedor) × tasa global. La tasa se configura vía la env var
- * SELLER_COMMISSION_RATE (ej: "0.05" = 5%). Solo es una cifra estimada
- * de visualización: no hay ledger de pagos de comisiones.
+ * La tasa se configura vía la env var SELLER_COMMISSION_RATE (ej: "0.05" =
+ * 5%). Aquí solo se lee: el cálculo y el pago viven en el ledger de 00155
+ * (`commission_periods` + `accrue_commission_period`), que congela la tasa en
+ * el primer devengo y guarda el estado de cada periodo.
+ *
+ * Por eso esta constante es la tasa *vigente*, no la de un periodo ya
+ * devengado: para saber cuánto se pagó hay que leer el periodo, no
+ * recalcularlo. La única excepción es la estimación de «pendientes de
+ * devengar» en /admin/comisiones, que es explícitamente una previsión.
  */
 import { formatMoney as sharedFormatMoney } from "@/lib/money"
 

@@ -30,6 +30,8 @@ export interface HubStats {
   aperturaCount: number
   avgFoodCost: number
   avgMargin: number
+  /** Platillos cuyo food cost depende de al menos un precio de ejemplo. */
+  exampleDishesCount: number
   monthLoss: number
   mermaVsGoal: number
   seasonalSavings: number

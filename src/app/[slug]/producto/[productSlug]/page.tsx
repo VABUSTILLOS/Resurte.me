@@ -8,6 +8,7 @@ import {
   getCachedProductsByCategory,
   getCachedVisibleProducts,
   getCityAvailabilityForSlug,
+  getProductReviewIndex,
 } from "@/lib/catalog-cache"
 import { ProductDetailClient } from "./product-detail-client"
 import { RecentlyViewed } from "@/components/product/recently-viewed"
@@ -131,6 +132,15 @@ export default async function ProductPage({ params }: Props) {
       .map((p) => ({ ...p, price: p.sale_price ?? p.price }))
   )
 
+  // Reseñas del producto (00158): agregado ya cacheado, resuelto en O(1).
+  // `undefined` cuando no hay ninguna, y entonces no se pinta el bloque.
+  //
+  // No se emite `aggregateRating` en el JSON-LD a propósito: la calificación es
+  // del pedido completo (incluye entrega y atención), así que declararla como
+  // nota del producto en datos estructurados sería una afirmación falsa —y el
+  // tipo de marcado que Google penaliza.
+  const reviewStats = (await getProductReviewIndex()).get(product.id)
+
   const url = `https://resurte.me/${slug}/producto/${productSlug}`
   const jsonLd = [
     getProductSchema(
@@ -161,6 +171,7 @@ export default async function ProductPage({ params }: Props) {
         presentations={presentations}
         citySlug={slug}
         cityName={city.name}
+        reviewStats={reviewStats}
       />
       {/* Rail de vistos recientemente (cliente, localStorage) */}
       <RecentlyViewed

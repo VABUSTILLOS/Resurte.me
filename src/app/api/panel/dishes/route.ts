@@ -19,7 +19,14 @@ const MAX_DISHES = 200
 interface DishInput {
   id: string
   name: string
-  ingredients?: { ingredientName: string; quantity: number; unit: string; unitPrice: number }[]
+  ingredients?: {
+    ingredientName: string
+    quantity: number
+    unit: string
+    unitPrice: number
+    /** Precio de ejemplo; viaja en el JSONB y lo consume Rentabilidad. */
+    example?: boolean
+  }[]
   foodCostPercent: number
   sellingPrice: number
   modificadores?: { id: string; nombre: string; precio: number }[]

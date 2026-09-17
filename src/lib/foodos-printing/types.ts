@@ -1,11 +1,17 @@
 // ============================================================
 // Contrato de impresión de FoodOS.
 //
-// El dominio (un pedido) no sabe nada del dispositivo. Primero se arma un
-// `TicketDocument` puro —el mismo objeto sirve para el diálogo del navegador
-// o para una térmica ESC/POS— y después un `TicketPrinter` lo manda al fierro.
-// Separar las dos cosas es lo que permite probar el contenido del ticket sin
-// una impresora y agregar Bluetooth/USB después sin tocar el dominio.
+// El dominio (un pedido) no sabe nada del dispositivo: aquí sólo se arma un
+// `TicketDocument` puro, que se prueba sin impresora. Hoy el único destino es
+// el diálogo del navegador (ver `src/app/panel/foodos/pedidos/[id]/print/`).
+//
+// Hubo un registro de impresoras (`printers.ts`) que declaraba un adaptador
+// ESC/POS "no implementado" para que la UI lo mostrara como próximamente. La
+// UI nunca lo mostró: `getPrinter`, `availablePrinters`, `printerOptions` y
+// `printTicket` no tenían un solo consumidor en la app, y el módulo se
+// sostenía únicamente de su propio test. Se eliminó en vez de dejar una
+// promesa que nadie ve. Cuando exista la térmica real, el contrato se
+// reintroduce junto con la pantalla que lo usa — no antes.
 // ============================================================
 
 import type { FoodosOrder } from "@/types/foodos"
@@ -118,25 +124,4 @@ export interface TicketContext {
   trackingUrl?: string | null
   /** Desglose de pago del mostrador. Sin él se usa `payment_method` del pedido. */
   payment?: TicketPayment | null
-}
-
-export type TicketPrinterId = "browser" | "escpos"
-
-export type PrintOutcome =
-  | { ok: true; printer: TicketPrinterId; via: "browser-dialog" | "escpos" }
-  | { ok: false; printer: TicketPrinterId; reason: string }
-
-export interface TicketPrinter {
-  id: TicketPrinterId
-  label: string
-  /**
-   * `false` = adaptador declarado pero todavía no implementado. `print`
-   * responde que no en vez de fingir que mandó algo a una impresora.
-   */
-  implemented: boolean
-  /** `true` si necesita un navegador con DOM (el diálogo del sistema). */
-  requiresBrowser: boolean
-  /** Ruta que el cliente debe abrir para imprimir. `null` si no aplica. */
-  printPath(doc: TicketDocument, orderId: string): string | null
-  print(doc: TicketDocument, orderId: string): Promise<PrintOutcome>
 }

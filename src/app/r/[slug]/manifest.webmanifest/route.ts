@@ -37,6 +37,8 @@ export async function GET(_request: Request, { params }: RouteProps) {
     logo_url: data.restaurant.logo_url,
     theme_color: data.restaurant.theme_color,
     currency: data.restaurant.currency,
+    app_short_name: data.restaurant.app_short_name,
+    app_background_color: data.restaurant.app_background_color,
   })
 
   return new Response(JSON.stringify(manifest), {

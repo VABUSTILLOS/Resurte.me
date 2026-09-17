@@ -115,7 +115,8 @@ export default function PanelPage() {
       const cost = d.ingredients.reduce((si, i) => si + (i.quantity * i.unitPrice), 0)
       return d.sellingPrice > 0 && foodCostStatus((cost / d.sellingPrice) * 100, panelCfg) === "red"
     }).length
-    return { totalCosteo, totalMerma, green, red, dishesCount: sharedDishes.length, mermaCount: mermaEntries.length, aperturaCount: aperturaChecked.length, avgFoodCost, avgMargin, monthLoss, mermaVsGoal, seasonalSavings, totalPrice, monthlyGoal }
+    const exampleDishesCount = sharedDishes.filter((d) => d.ingredients.some((i) => i.example)).length
+    return { totalCosteo, totalMerma, green, red, exampleDishesCount, dishesCount: sharedDishes.length, mermaCount: mermaEntries.length, aperturaCount: aperturaChecked.length, avgFoodCost, avgMargin, monthLoss, mermaVsGoal, seasonalSavings, totalPrice, monthlyGoal }
   }, [sharedDishes, mermaEntries, aperturaChecked, selectedCollection, monthlyGoal, shoppingList, panelCfg])
 
   // Mostrador de hoy: mismo cálculo y mismo "hoy" (local) que /panel/ventas.

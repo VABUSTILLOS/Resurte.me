@@ -65,6 +65,7 @@ export const AUDIT_ACTIONS = [
   "commission_pay",
   "commission_cancel",
   "commission_adjust",
+  "foodos_payout_record",
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -131,6 +132,7 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   commission_pay: "Comisión pagada al vendedor",
   commission_cancel: "Periodo de comisión cancelado",
   commission_adjust: "Ajuste a comisión",
+  foodos_payout_record: "Dispersión registrada al restaurante",
 }
 
 function isAuditAction(value: string): value is AuditAction {

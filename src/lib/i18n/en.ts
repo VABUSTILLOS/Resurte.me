@@ -153,6 +153,11 @@ const en: Dictionary = {
     categoryLabel: "Category:",
     categoryAll: "All ({count})",
     categoryFilterLabel: "Filter by category",
+    originLabel: "Source:",
+    originAll: "All ({count})",
+    originReal: "Mine only ({count})",
+    originExample: "Examples only ({count})",
+    originFilterLabel: "Filter by data source",
     simulatorLabel: "Price simulator:",
     simulatorAria: "Adjust sale price",
     reset: "Reset",
@@ -184,7 +189,9 @@ const en: Dictionary = {
     tipTitle: "How to use it?",
     tipDescription:
       "Dishes from “My menu” use real prices from the Resurte.me catalog via Costing my menu; reference dishes are estimates for your cuisine type. Use the price simulator to explore how your sale price impacts your margin and food cost. A food cost above 38% puts your business at risk.",
-    csvHeader: "Dish,Category,Cost,Sale Price,Margin,Food Cost %,Status",
+    csvHeader: "Dish,Category,Cost,Sale Price,Margin,Food Cost %,Status,Source",
+    csvOriginReal: "mine",
+    csvOriginExample: "example",
   },
   analitica: {
     pageTitle: "Restaurant analytics",

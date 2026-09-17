@@ -158,6 +158,11 @@ export const es = {
     categoryLabel: "Categoría:",
     categoryAll: "Todas ({count})",
     categoryFilterLabel: "Filtrar por categoría",
+    originLabel: "Origen:",
+    originAll: "Todos ({count})",
+    originReal: "Solo míos ({count})",
+    originExample: "Solo ejemplos ({count})",
+    originFilterLabel: "Filtrar por origen del dato",
     simulatorLabel: "Simulador de precio:",
     simulatorAria: "Ajustar precio de venta",
     reset: "Restablecer",
@@ -189,7 +194,9 @@ export const es = {
     tipTitle: "¿Cómo usarlo?",
     tipDescription:
       "Los platillos de “Mi menú” usan los precios reales del catálogo de Resurte.me vía Costeando mi menú; los platillos de referencia son estimados para tu tipo de cocina. Usa el simulador de precio para explorar cómo tu precio de venta impacta tu margen y el food cost. Un food cost arriba del 38% pone en riesgo tu negocio.",
-    csvHeader: "Platillo,Categoría,Costo,Precio Venta,Margen,Food Cost %,Estado",
+    csvHeader: "Platillo,Categoría,Costo,Precio Venta,Margen,Food Cost %,Estado,Origen",
+    csvOriginReal: "propio",
+    csvOriginExample: "ejemplo",
   },
   analitica: {
     pageTitle: "Analítica del restaurante",

@@ -4,8 +4,12 @@ import { NextRequest } from "next/server"
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }))
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }))
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
+// La ruta invalida el caché del catálogo al publicar una reseña (00158);
+// fuera de un request real `revalidateTag` no tiene scope de Next.
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }))
 
 import { GET, POST } from "./route"
+import { revalidateTag } from "next/cache"
 import { createServiceClient } from "@/lib/supabase/service"
 import { createClient } from "@/lib/supabase/server"
 
@@ -291,6 +295,16 @@ describe("POST /api/reviews", () => {
     // La tabla no tiene trigger: la ruta fija updated_at explícitamente
     const updatedAt = String(payload.updated_at)
     expect(new Date(updatedAt).toISOString()).toBe(updatedAt)
+  })
+
+  it("invalida el caché del catálogo para que la reseña se vea al instante", async () => {
+    // Sin esto la ficha del producto mostraría el agregado viejo hasta 5 min,
+    // que es justo la ventana en la que el cliente vuelve a mirar.
+    setup({ order: { data: ORDER, error: null } })
+
+    await POST(post({ order_id: ORDER_ID, rating: 5, token: TOKEN }))
+
+    expect(vi.mocked(revalidateTag)).toHaveBeenCalledWith("reviews", "max")
   })
 
   it("200 guarda el user_id cuando la sesión es la dueña del pedido", async () => {

@@ -3,6 +3,7 @@
 import { PieChart, Percent, DollarSign, BarChart3, TrendingUp, ShoppingCart, UtensilsCrossed } from "lucide-react"
 import type { PanelConfig } from "@/lib/panel-config"
 import type { HubMesa, HubMesasInfo, HubStats } from "./hub-data"
+import { EXAMPLE_BADGE_HELP } from "@/lib/example-data"
 
 interface LiveStatsProps {
   stats: HubStats
@@ -32,6 +33,14 @@ export default function LiveStats({ stats, panelCfg, mesasInfo, mesas }: LiveSta
           {stats.dishesCount > 0 ? `${stats.avgFoodCost.toFixed(1)}%` : "—"}
         </p>
         <p className="text-[11px] text-gray-400">Food cost promedio</p>
+        {stats.exampleDishesCount > 0 && (
+          <p
+            className="text-[10px] text-amber-600 font-medium mt-1"
+            title={EXAMPLE_BADGE_HELP}
+          >
+            {stats.exampleDishesCount} de {stats.dishesCount} con precios de ejemplo
+          </p>
+        )}
         {stats.dishesCount > 0 && (
           <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
             <div

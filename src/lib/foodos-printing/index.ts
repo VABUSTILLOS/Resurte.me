@@ -11,6 +11,9 @@
  * Si necesitas un símbolo nuevo, impórtalo del submódulo correspondiente; no
  * lo añadas aquí "por comodidad": eso fue justo lo que convirtió este archivo
  * en una API sobredimensionada.
+ *
+ * No hay barrel de impresoras: el único destino implementado es el diálogo del
+ * navegador y no hay nada que elegir. Ver la nota de `./types`.
  */
 export type { TicketDocument, TicketKind, TicketPayment } from "./types"
 

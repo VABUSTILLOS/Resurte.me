@@ -49,6 +49,14 @@ import {
 } from "@/lib/foodos-seo-pages"
 import { generateAboutText, generateDishCopy, generateFaq } from "@/lib/foodos-ai/seo"
 import {
+  appBrandChecklist,
+  appBrandProgress,
+  normalizeAppBackgroundColor,
+  normalizeAppShortName,
+  type AppBrandProgress,
+  type AppBrandStep,
+} from "@/lib/foodos-app-brand"
+import {
   googleBusinessChecklist,
   googleBusinessProgress,
   menuPath,
@@ -2982,6 +2990,159 @@ export async function saveSeoProfileAction(input: {
   if (!result.ok) return { ok: false, error: result.error }
 
   revalidatePath("/panel/foodos/sitio-ia")
+  revalidateTag("foodos-seo", "max")
+  return { ok: true }
+}
+
+// ------------------------------------------------------------
+// App de tu marca (Fase 6, nivel Diamante)
+//
+// El manifest ya existía; lo que faltaba era poder arreglar los dos campos que
+// el dueño ve y el servidor no podía adivinar: el nombre bajo el icono (se
+// recortaba el nombre a 12 caracteres) y el fondo de arranque (era el beige de
+// Resurte.me). 00159 los añadió y 00160 los dejó fuera del UPDATE del dueño:
+// `saveAppBrand` es el único camino de escritura, y por eso valida.
+// ------------------------------------------------------------
+
+export interface AppBrandData {
+  restaurant_id: string
+  slug: string
+  name: string
+  status: string
+  logo_url: string | null
+  theme_color: string | null
+  description: string | null
+  app_short_name: string | null
+  app_background_color: string | null
+  menu_item_count: number
+  steps: AppBrandStep[]
+  progress: AppBrandProgress
+  urls: {
+    install: string
+    manifest: string
+    menu: string
+  }
+}
+
+/** `true` si el restaurante tiene la capacidad; usado por las lecturas. */
+async function canUseAppMarca(): Promise<boolean> {
+  try {
+    await requireFoodosFeature("app_marca")
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Lo que necesita la pantalla para previsualizar la app **sin** llamar al
+ * bundle público: `getPublicRestaurantBySlug` dispara doce consultas y cachea
+ * para los comensales, no para el dueño. Aquí basta la fila propia.
+ */
+export async function getAppBrandData(restaurantId: string): Promise<AppBrandData | null> {
+  if (!(await canUseAppMarca())) return null
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, restaurantId)
+
+  const [restaurant, menuItems] = await Promise.all([
+    supabase
+      .from("foodos_restaurants")
+      .select(
+        "id, name, slug, status, logo_url, theme_color, description, app_short_name, app_background_color"
+      )
+      .eq("id", restaurantId)
+      .eq("user_id", ownerUserId)
+      .maybeSingle(),
+    supabase
+      .from("foodos_menu_items")
+      .select("id", { count: "exact", head: true })
+      .eq("restaurant_id", restaurantId)
+      .eq("is_available", true),
+  ])
+
+  if (restaurant.error) throw new Error(restaurant.error.message)
+  const row = restaurant.data
+  if (!row) return null
+
+  const menuItemCount = menuItems.count ?? 0
+  const steps = appBrandChecklist({
+    logo_url: row.logo_url,
+    theme_color: row.theme_color,
+    app_short_name: row.app_short_name,
+    app_background_color: row.app_background_color,
+    status: row.status,
+    menuItemCount,
+  })
+
+  const slug = String(row.slug ?? "")
+  return {
+    restaurant_id: String(row.id),
+    slug,
+    name: String(row.name ?? ""),
+    status: String(row.status ?? ""),
+    logo_url: row.logo_url,
+    theme_color: row.theme_color,
+    description: row.description,
+    app_short_name: row.app_short_name,
+    app_background_color: row.app_background_color,
+    menu_item_count: menuItemCount,
+    steps,
+    progress: appBrandProgress(steps),
+    urls: {
+      install: `${SITE_URL}${restaurantPath(slug)}`,
+      manifest: `${SITE_URL}${manifestPath(slug)}`,
+      menu: `${SITE_URL}${menuPath(slug)}`,
+    },
+  }
+}
+
+/**
+ * Guarda el nombre bajo el icono y el fondo de arranque.
+ *
+ * Escribe con **service role** porque 00160 le quitó al dueño el UPDATE de esas
+ * dos columnas: así el valor que llega al manifest pasó necesariamente por
+ * `normalizeApp*`. El `eq` por `ownerUserId` reafirma la propiedad, igual que en
+ * `startConnectOnboarding`.
+ *
+ * Un campo vacío guarda `null`, que significa "vuelve al valor derivado" — no es
+ * un error, es la forma de deshacer la personalización.
+ */
+export async function saveAppBrand(input: {
+  restaurant_id: string
+  short_name?: string | null
+  background_color?: string | null
+}): Promise<{ ok: boolean; error?: string }> {
+  await requireFoodosFeature("app_marca")
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
+
+  const shortName = normalizeAppShortName(input.short_name)
+  if (shortName.error) return { ok: false, error: shortName.error }
+  const background = normalizeAppBackgroundColor(input.background_color)
+  if (background.error) return { ok: false, error: background.error }
+
+  const service = await createServiceClient()
+  const { error } = await service
+    .from("foodos_restaurants")
+    .update({
+      app_short_name: shortName.value,
+      app_background_color: background.value,
+    })
+    .eq("id", input.restaurant_id)
+    .eq("user_id", ownerUserId)
+
+  if (error) {
+    logger.error("foodos.app_brand.save_failed", {
+      restaurant: input.restaurant_id,
+      error: error.message,
+    })
+    return { ok: false, error: "No se pudo guardar la app. Intenta de nuevo." }
+  }
+
+  revalidatePath("/panel/foodos/app-marca")
+  // El manifest y la página pública salen del bundle cacheado por slug; sin
+  // esto el comensal vería el nombre viejo hasta cinco minutos.
+  revalidateTag("foodos-public", "max")
   revalidateTag("foodos-seo", "max")
   return { ok: true }
 }

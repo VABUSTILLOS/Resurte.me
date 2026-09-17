@@ -12,6 +12,17 @@
 export const DEFAULT_SEO_THEME_COLOR = "#0E7A0E"
 export const DEFAULT_SEO_ORIGIN = "https://resurte.me"
 
+/**
+ * Android y iOS recortan `short_name` alrededor de los 12 caracteres debajo
+ * del icono. Es el mismo límite que impone la CHECK de `app_short_name` (00159).
+ */
+export const MANIFEST_SHORT_NAME_MAX = 12
+/**
+ * Fondo de la pantalla de arranque. Era el beige de Resurte.me escrito a mano:
+ * un restaurante con marca oscura veía un destello claro al abrir su app.
+ */
+export const DEFAULT_MANIFEST_BACKGROUND_COLOR = "#F7F5F0"
+
 /** Google corta la descripción alrededor de los 155 caracteres. */
 export const META_DESCRIPTION_MAX = 155
 /** El título indexable se corta cerca de los 60 caracteres. */
@@ -28,6 +39,10 @@ export interface SeoRestaurantProfile {
   currency?: string | null
   seo_keywords?: string[] | null
   google_business_url?: string | null
+  /** Nombre corto bajo el icono (00159). NULL = derivarlo del nombre. */
+  app_short_name?: string | null
+  /** Fondo de la pantalla de arranque (00159). NULL = el beige por defecto. */
+  app_background_color?: string | null
 }
 
 export interface SeoBranchFacts {
@@ -190,6 +205,30 @@ export function imageMimeType(url: string): string {
 }
 
 /**
+ * Nombre bajo el icono. El dueño manda; si no lo definió se deriva del nombre,
+ * que es exactamente lo que se hacía antes de 00159 — y por eso "Restaurante
+ * La Parrilla" se instalaba como "Restaurante " (el recorte dejaba el espacio
+ * colgando y Android mostraba un nombre a medias sin forma de arreglarlo).
+ */
+export function manifestShortName(profile: SeoRestaurantProfile): string {
+  const own = profile.app_short_name?.trim()
+  if (own) return own.slice(0, MANIFEST_SHORT_NAME_MAX)
+  const name = profile.name.trim()
+  if (name.length <= MANIFEST_SHORT_NAME_MAX) return name
+  return name.slice(0, MANIFEST_SHORT_NAME_MAX).trim()
+}
+
+/**
+ * Fondo de la pantalla de arranque. La CHECK de 00159 ya garantiza el formato
+ * en la base, pero el panel previsualiza valores en vuelo: un color inválido
+ * haría que el navegador rechace el manifest entero, así que aquí se valida.
+ */
+export function manifestBackgroundColor(profile: SeoRestaurantProfile): string {
+  const raw = profile.app_background_color?.trim() ?? ""
+  return /^#[0-9a-f]{6}$/i.test(raw) ? raw : DEFAULT_MANIFEST_BACKGROUND_COLOR
+}
+
+/**
  * Iconos del manifest.
  *
  * El logo del restaurante se declara `sizes: "any"`: no conocemos sus
@@ -215,13 +254,10 @@ export function manifestIcons(logoUrl?: string | null): ManifestIcon[] {
 
 export function buildRestaurantManifest(profile: SeoRestaurantProfile): RestaurantManifest {
   const path = restaurantPath(profile.slug)
-  const shortName = profile.name.trim().length > 12
-    ? profile.name.trim().slice(0, 12).trim()
-    : profile.name.trim()
 
   return {
     name: profile.name.trim(),
-    short_name: shortName || profile.name.trim(),
+    short_name: manifestShortName(profile) || profile.name.trim(),
     description: seoDescription(profile),
     id: path,
     start_url: path,
@@ -230,7 +266,7 @@ export function buildRestaurantManifest(profile: SeoRestaurantProfile): Restaura
     // reusar una app que no es la suya.
     scope: path,
     display: "standalone",
-    background_color: "#F7F5F0",
+    background_color: manifestBackgroundColor(profile),
     theme_color: safeThemeColor(profile.theme_color),
     orientation: "portrait-primary",
     lang: "es-MX",

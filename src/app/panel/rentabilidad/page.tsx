@@ -9,6 +9,8 @@ import { useToast } from "@/components/toast"
 import { t } from "@/lib/i18n/es"
 import { foodCostStatus, usePanelConfig } from "@/lib/panel-config"
 import { normalizeName } from "@/lib/normalize"
+import { EXAMPLE_BADGE_HELP, EXAMPLE_BADGE_LABEL, exampleRowsNotice, splitByOrigin } from "@/lib/example-data"
+import ExampleDataBanner from "@/components/panel/ExampleDataBanner"
 import { isCurrentMonth } from "@/lib/panel-utils"
 import EmptyState from "@/components/panel/EmptyState"
 import Link from "next/link"
@@ -21,7 +23,19 @@ import { entryTotal } from "@/components/panel/ventas/ventas-shared"
 import type { SaleEntry } from "@/components/panel/ventas/ventas-shared"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 
-interface DishData { name: string; cost: number; price: number; category: string; alert?: string }
+interface DishData {
+  name: string
+  cost: number
+  price: number
+  category: string
+  alert?: string
+  /**
+   * `true` = costo y precio de ejemplo (no capturados por el dueño). Los
+   * veredictos y alertas derivados de estas filas no son hallazgos sobre su
+   * negocio, así que no entran en los semáforos ni en el buzón de alertas.
+   */
+  example?: boolean
+}
 
 // Mock dishes per collection with profitability data
 const DISH_DATA: Record<string, DishData[]> = {
@@ -167,6 +181,7 @@ export default function RentabilidadPage() {
   const [sortBy, setSortBy] = useLocalStorage<string>("rentabilidad-sort", "name", slug)
   const [priceMultiplier, setPriceMultiplier] = useLocalStorage<number>("rentabilidad-sim-price", 0, slug)
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
+  const [originFilter, setOriginFilter] = useState<"all" | "real" | "example">("all")
 
   // Merma factor: integrates "Merma del mes" into real cost/margin calculations
   const mermaStats = useMemo(() => {
@@ -179,9 +194,10 @@ export default function RentabilidadPage() {
   const mermaFactor = mermaStats.hasMerma && mermaStats.monthLoss > 0 ? 1 + mermaStats.mermaPct / 100 : 1
 
   // Merge: base mock data + dishes from costeo tool
-  const mockDishes = selectedCollection
+  const mockDishes = (selectedCollection
     ? (DISH_DATA[selectedCollection.slug] || DEFAULT_DISHES)
     : DEFAULT_DISHES
+  ).map((d) => ({ ...d, example: true }))
 
   const costeoDishes: DishData[] = useMemo(() =>
     sharedDishes.map((d) => {
@@ -191,6 +207,7 @@ export default function RentabilidadPage() {
         cost: Math.round(totalCost * 100) / 100,
         price: d.sellingPrice,
         category: "Mi menú",
+        example: d.ingredients.some((i) => i.example),
         alert: foodCostStatus((totalCost / d.sellingPrice) * 100, panelCfg) === "red"
           ? t("rentabilidad.highCostAlert")
           : undefined,
@@ -237,10 +254,11 @@ export default function RentabilidadPage() {
 
   // Category analysis: counts, avg food cost, avg margin, semaphore per category
   const categoryAnalysis = useMemo(() => {
-    const groups = new Map<string, { count: number; cost: number; price: number }>()
+    const groups = new Map<string, { count: number; exampleCount: number; cost: number; price: number }>()
     dishes.forEach((d) => {
-      const g = groups.get(d.category) || { count: 0, cost: 0, price: 0 }
+      const g = groups.get(d.category) || { count: 0, exampleCount: 0, cost: 0, price: 0 }
       g.count += 1
+      if (d.example === true) g.exampleCount += 1
       g.cost += d.cost
       g.price += d.price
       groups.set(d.category, g)
@@ -251,7 +269,7 @@ export default function RentabilidadPage() {
         const avgMargin = (g.price - g.cost) / g.count
         const st = foodCostStatus(avgFc, panelCfg)
         const status = st === "green" ? "ok" : st === "amber" ? "justo" : "mal"
-        return { category, count: g.count, avgFc, avgMargin, status }
+        return { category, count: g.count, exampleCount: g.exampleCount, avgFc, avgMargin, status }
       })
       .sort((a, b) => a.avgFc - b.avgFc)
   }, [dishes, panelCfg])
@@ -264,9 +282,12 @@ export default function RentabilidadPage() {
   }, [categoryAnalysis, panelCfg])
 
   const filteredDishes = useMemo(() => {
-    if (categoryFilter === "all") return dishes
-    return dishes.filter((d) => d.category === categoryFilter)
-  }, [dishes, categoryFilter])
+    let rows = dishes
+    if (originFilter === "real") rows = rows.filter((d) => d.example !== true)
+    else if (originFilter === "example") rows = rows.filter((d) => d.example === true)
+    if (categoryFilter !== "all") rows = rows.filter((d) => d.category === categoryFilter)
+    return rows
+  }, [dishes, categoryFilter, originFilter])
 
   // Ventas reales del mes cruzadas con el costo del costeo (o el unitCost registrado)
   const realSales = useMemo(() => {
@@ -300,7 +321,8 @@ export default function RentabilidadPage() {
       const fc = ((d.cost / d.price) * 100).toFixed(1)
       const st = foodCostStatus(parseFloat(fc), panelCfg)
       const status = st === "green" ? t("rentabilidad.statusExcellent") : st === "amber" ? t("rentabilidad.statusAcceptable") : t("rentabilidad.statusReview")
-      return `"${d.name}","${d.category}",${d.cost.toFixed(2)},${d.price.toFixed(2)},${(d.price - d.cost).toFixed(2)},${fc}%,${status}`
+      const origin = d.example === true ? t("rentabilidad.csvOriginExample") : t("rentabilidad.csvOriginReal")
+      return `"${d.name}","${d.category}",${d.cost.toFixed(2)},${d.price.toFixed(2)},${(d.price - d.cost).toFixed(2)},${fc}%,${status},${origin}`
     })
     const csv = [header, ...rows].join("\n")
     const blob = new Blob([csv], { type: "text/csv" })
@@ -314,13 +336,13 @@ export default function RentabilidadPage() {
   }
 
   function printSummary() {
-    const greens = dishes.filter((d) => foodCostStatus((d.cost / d.price) * 100, panelCfg) === "green").length
-    const ambers = dishes.filter((d) => foodCostStatus((d.cost / d.price) * 100, panelCfg) === "amber").length
-    const reds = dishes.filter((d) => foodCostStatus((d.cost / d.price) * 100, panelCfg) === "red").length
+    const greens = countedDishes.filter((d) => foodCostStatus((d.cost / d.price) * 100, panelCfg) === "green").length
+    const ambers = countedDishes.filter((d) => foodCostStatus((d.cost / d.price) * 100, panelCfg) === "amber").length
+    const reds = countedDishes.filter((d) => foodCostStatus((d.cost / d.price) * 100, panelCfg) === "red").length
     const statusLabel = (st: string) => st === "ok" ? t("rentabilidad.statusExcellent") : st === "justo" ? t("rentabilidad.statusAcceptable") : t("rentabilidad.statusReview")
     const monthName = new Date().toLocaleDateString("es-MX", { month: "long", year: "numeric" })
     const catRows = categoryAnalysis
-      .map((c) => `<tr><td>${c.category}</td><td>${c.count}</td><td>${c.avgFc.toFixed(1)}%</td><td>$${c.avgMargin.toFixed(2)}</td><td>${statusLabel(c.status)}</td></tr>`)
+      .map((c) => `<tr><td>${c.category}</td><td>${c.count}</td><td>${c.avgFc.toFixed(1)}%</td><td>$${c.avgMargin.toFixed(2)}</td><td>${statusLabel(c.status)}</td><td>${c.exampleCount === c.count ? EXAMPLE_BADGE_LABEL : `${c.exampleCount}/${c.count}`}</td></tr>`)
       .join("")
     const realSalesHtml = realSales
       ? `<h2>Ventas reales del mes (${realSales.entries} ventas)</h2>
@@ -338,9 +360,10 @@ export default function RentabilidadPage() {
       @media print{button{display:none}}</style></head><body>
       <h1>Resumen de rentabilidad — ${selectedCollection?.name ?? "Menú"}</h1>
       <p>${monthName} · ${dishes.length} platillos analizados</p>
+      ${exampleDishes.length > 0 ? `<p style="background:#fef3c7;border:1px solid #fcd34d;padding:8px 12px;border-radius:8px;font-size:13px">${exampleRowsMsg}</p>` : ""}
       <p class="semaforo"><span class="g">🟢 ${greens}</span><span class="a">🟡 ${ambers}</span><span class="r">🔴 ${reds}</span></p>
       <h2>Análisis por categoría</h2>
-      <table><tr><th>Categoría</th><th>Platillos</th><th>Food cost prom.</th><th>Margen prom.</th><th>Estado</th></tr>${catRows}</table>
+      <table><tr><th>Categoría</th><th>Platillos</th><th>Food cost prom.</th><th>Margen prom.</th><th>Estado</th><th>Origen</th></tr>${catRows}</table>
       ${realSalesHtml}
       <script>window.onload=()=>window.print()</script></body></html>`
     const win = window.open("", "_blank")
@@ -372,10 +395,19 @@ export default function RentabilidadPage() {
   }
 
   const fcStatus = (pct: number) => foodCostStatus(pct, panelCfg)
-  const greenCount = dishes.filter((d) => fcStatus((d.cost / d.price) * 100) === "green").length
-  const amberCount = dishes.filter((d) => fcStatus((d.cost / d.price) * 100) === "amber").length
-  const redCount = dishes.filter((d) => fcStatus((d.cost / d.price) * 100) === "red").length
-  const alerts = dishes.filter((d) => d.alert)
+  const { real: realDishes, example: exampleDishes } = splitByOrigin(dishes)
+  const exampleRowsMsg = exampleRowsNotice(exampleDishes.length, realDishes.length, "platillos")
+  // El semáforo es un veredicto sobre el menú del dueño: solo cuenta lo suyo.
+  // Si todavía no tiene platillos propios, se cuenta lo de ejemplo para que la
+  // pantalla no quede en cero, y el aviso de arriba dice que son de ejemplo.
+  const countedDishes = realDishes.length > 0 ? realDishes : dishes
+  const greenCount = countedDishes.filter((d) => fcStatus((d.cost / d.price) * 100) === "green").length
+  const amberCount = countedDishes.filter((d) => fcStatus((d.cost / d.price) * 100) === "amber").length
+  const redCount = countedDishes.filter((d) => fcStatus((d.cost / d.price) * 100) === "red").length
+  // Una alerta escrita sobre un costo inventado no es un hallazgo. Solo se
+  // muestran las de platillos propios; las de ejemplo quedan etiquetadas en la
+  // lista de abajo.
+  const alerts = realDishes.filter((d) => d.alert)
 
 
   return (
@@ -539,6 +571,14 @@ export default function RentabilidadPage() {
                 <div className="flex items-center gap-1.5 mb-1">
                   <span>{c.status === "ok" ? "🟢" : c.status === "justo" ? "🟡" : "🔴"}</span>
                   <span className="font-semibold text-gray-800 truncate">{c.category}</span>
+                  {c.exampleCount === c.count && (
+                    <span
+                      className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium"
+                      title={EXAMPLE_BADGE_HELP}
+                    >
+                      {EXAMPLE_BADGE_LABEL}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center justify-between text-gray-500 mt-1">
                   <span>{c.count !== 1 ? t("rentabilidad.dishCountMany", { count: c.count }) : t("rentabilidad.dishCountOne", { count: c.count })}</span>
@@ -558,6 +598,8 @@ export default function RentabilidadPage() {
 
       {tab === "platillos" && (
         <>
+      <ExampleDataBanner message={exampleRowsMsg} />
+
       {/* Alert box */}
       {alerts.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
@@ -605,6 +647,19 @@ export default function RentabilidadPage() {
                 {c.category} ({c.count})
               </option>
             ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 px-3 py-2">
+          <span className="text-xs text-gray-400 shrink-0">{t("rentabilidad.originLabel")}</span>
+          <select
+            value={originFilter}
+            onChange={(e) => setOriginFilter(e.target.value as "all" | "real" | "example")}
+            className="text-xs font-semibold text-gray-700 bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            aria-label={t("rentabilidad.originFilterLabel")}
+          >
+            <option value="all">{t("rentabilidad.originAll", { count: dishes.length })}</option>
+            <option value="real">{t("rentabilidad.originReal", { count: realDishes.length })}</option>
+            <option value="example">{t("rentabilidad.originExample", { count: exampleDishes.length })}</option>
           </select>
         </div>
         <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-100 px-3 py-2">
@@ -686,6 +741,14 @@ export default function RentabilidadPage() {
                       <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">
                         {dish.category}
                       </span>
+                      {dish.example && (
+                        <span
+                          className="text-[10px] bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium"
+                          title={EXAMPLE_BADGE_HELP}
+                        >
+                          {EXAMPLE_BADGE_LABEL}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

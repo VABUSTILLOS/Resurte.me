@@ -140,7 +140,7 @@ function rowToSeoPage(data: unknown): SeoPageRow | null {
 // ------------------------------------------------------------
 
 const RESTAURANT_COLUMNS =
-  "id, name, slug, logo_url, description, theme_color, currency, tagline, about, seo_keywords, google_business_url"
+  "id, name, slug, logo_url, description, theme_color, currency, tagline, about, seo_keywords, google_business_url, app_short_name, app_background_color"
 
 /**
  * Todo lo que necesitan el manifest, los datos estructurados y el checklist de
@@ -178,6 +178,8 @@ export async function loadSeoProfile(
         ? (row.seo_keywords as unknown[]).map((k) => String(k)).filter(Boolean)
         : [],
       google_business_url: text(row.google_business_url),
+      app_short_name: text(row.app_short_name),
+      app_background_color: text(row.app_background_color),
     }
 
     const { data: branchRows } = await supabase

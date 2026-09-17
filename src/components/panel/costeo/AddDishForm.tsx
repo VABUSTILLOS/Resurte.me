@@ -1,7 +1,9 @@
 import { Plus, Trash2, Save } from "lucide-react"
 import NumberInput from "@/components/panel/NumberInput"
-import { DISH_CATEGORIES, type DishIngredient, type IngredientOption, type InventarioItem } from "./costeo-shared"
+import { DISH_CATEGORIES, type DishIngredient, type InventarioItem } from "./costeo-shared"
+import type { MergedIngredient } from "@/lib/catalog"
 import { t } from "@/lib/i18n/es"
+import { EXAMPLE_BADGE_HELP, EXAMPLE_BADGE_LABEL } from "@/lib/example-data"
 
 export default function AddDishForm({
   showForm,
@@ -72,7 +74,7 @@ export default function AddDishForm({
   saveCurrentAsRecipe: () => void
   resetForm: () => void
   setShowForm: (v: boolean) => void
-  ingredients: IngredientOption[]
+  ingredients: MergedIngredient[]
   inventarioItems: InventarioItem[]
   normalizeName: (s: string) => string
 }) {
@@ -147,7 +149,7 @@ export default function AddDishForm({
                   <option value="">Seleccionar ingrediente</option>
                   {ingredients.map((opt) => (
                     <option key={opt.name} value={opt.name}>
-                      {opt.name} — ${opt.price}/{opt.unit}
+                      {opt.name} — ${opt.price}/{opt.unit}{opt.source === "example" ? " (precio de ejemplo)" : ""}
                     </option>
                   ))}
                 </select>
@@ -171,6 +173,14 @@ export default function AddDishForm({
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
+              {ing.example && (
+                <p
+                  className="ml-0.5 -mt-1 mb-1 text-[10px] text-amber-700"
+                  title={EXAMPLE_BADGE_HELP}
+                >
+                  ⚠ Precio de {EXAMPLE_BADGE_LABEL} (no está en el catálogo): el food cost de este platillo no será real.
+                </p>
+              )}
               {invMatch && (
                 <div className="flex items-center gap-1 ml-0.5 -mt-1 mb-1">
                   <button

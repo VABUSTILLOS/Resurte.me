@@ -18,6 +18,8 @@ import { formatUnitPrice, unitPrice } from "@/lib/unit-price"
 import { getCategoryIcon } from "@/lib/utils"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { FREE_SHIPPING_MXN, formatMxn } from "@/lib/commercial-facts"
+import { ProductReviews } from "@/components/product/product-reviews"
+import type { ProductReviewStats } from "@/lib/product-reviews"
 
 interface ProductDetailClientProps {
   product: Product
@@ -27,9 +29,11 @@ interface ProductDetailClientProps {
   presentations?: PresentationCandidate<Product>[]
   citySlug: string
   cityName: string
+  /** Reseñas agregadas del producto. `undefined` = no tiene ninguna. */
+  reviewStats?: ProductReviewStats
 }
 
-export function ProductDetailClient({ product, category, relatedProducts, presentations = [], citySlug, cityName }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, category, relatedProducts, presentations = [], citySlug, cityName, reviewStats }: ProductDetailClientProps) {
   const { addItem } = useCart()
   const { toast } = useToast()
   const [added, setAdded] = useState(false)
@@ -407,6 +411,8 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
             </div>
           </div>
         </div>
+
+        <ProductReviews stats={reviewStats} />
 
         {/* También te puede interesar — Erewhon-style */}
         {relatedProducts.length > 0 && (

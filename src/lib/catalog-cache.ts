@@ -1,4 +1,5 @@
 import { revalidateTag, unstable_cache } from "next/cache"
+import { buildProductReviewIndex, type ProductReviewStats } from "@/lib/product-reviews"
 import type { Category, City, Product, RestaurantCollection } from "@/types"
 import {
   getAvailableProductIds,
@@ -10,6 +11,7 @@ import {
   getProductBySlug,
   getProducts,
   getProductsByCollection,
+  getProductReviewFeed,
   getProductsPaginated,
   getRestaurantCollectionBySlug,
   getRestaurantCollections,
@@ -159,6 +161,33 @@ export const getCachedProductsPaginated = unstable_cache(
   ["catalog-products-paginated"],
   { revalidate: 300, tags: ["catalog", "products"] }
 )
+
+/**
+ * Reseñas de pedido agregadas por producto (migración 00158). TTL alineado con
+ * el resto del catálogo; el tag "reviews" permite invalidarlo en el momento en
+ * que se publica una reseña nueva (lo hace POST /api/reviews), para que no
+ * tarde hasta 5 minutos en aparecer.
+ *
+ * Se cachea el ARREGLO de filas, no el Map: `unstable_cache` serializa su
+ * resultado y un Map no sobrevive a esa serialización. Construir el índice a
+ * partir del arreglo es O(filas), y solo hay filas de productos con reseñas.
+ */
+export const getCachedProductReviewRows = unstable_cache(
+  async () => getProductReviewFeed(),
+  ["catalog-product-reviews"],
+  { revalidate: 300, tags: ["catalog", "reviews"] }
+)
+
+/**
+ * Índice producto → agregado de reseñas, listo para resolver en O(1) desde una
+ * página de producto. Vacío cuando no hay reseñas: el consumidor debe no pintar
+ * nada en ese caso.
+ */
+export async function getProductReviewIndex(): Promise<
+  Map<number, ProductReviewStats>
+> {
+  return buildProductReviewIndex(await getCachedProductReviewRows())
+}
 
 /**
  * Invalida el caché del catálogo completo (productos, categorías y

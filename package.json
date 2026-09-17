@@ -67,7 +67,6 @@
   "knip": {
     "ignore": [
       "scripts/**",
-      "src/lib/ai/kie-ai-admin.ts",
       "public/sw.js"
     ],
     "ignoreExportsUsedInFile": true,

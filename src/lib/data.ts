@@ -3,6 +3,11 @@ import type { City, Category, Product, RestaurantCollection } from "@/types"
 import { logger } from "@/lib/logger"
 import { expandSearchTerms, escapeIlike } from "@/lib/search-terms"
 import { normalizeSale, withResolvedSale } from "@/lib/sale-window"
+import {
+  REVIEW_FEED_LIMIT_PER_PRODUCT,
+  type ProductReviewFeedRow,
+  normalizeFeedRow,
+} from "@/lib/product-reviews"
 
 type SupabasePublicClient = NonNullable<ReturnType<typeof createPublicClient>>
 
@@ -272,6 +277,49 @@ export async function getAvailableProductIds(
     return null
   }
   return (data ?? []) as number[]
+}
+
+// ============================================================
+// RESEÑAS DE PEDIDO PROYECTADAS AL CATÁLOGO
+// ============================================================
+
+/**
+ * Reseñas agregadas por producto (RPC `product_review_feed`, migración 00158).
+ *
+ * Devuelve [] cuando el RPC no está disponible (migración sin aplicar, caché de
+ * esquema de PostgREST desactualizada, entorno sin secrets) o cuando todavía no
+ * hay ninguna reseña. Los dos casos son el mismo estado para el consumidor: "no
+ * hay nada que mostrar", y la página simplemente no pinta el bloque. Nunca se
+ * inventan reseñas para llenar el hueco.
+ *
+ * Las filas se normalizan aquí para que lo que se guarde en el caché sea ya
+ * válido: una fila corrupta no llega a la capa de presentación.
+ */
+export async function getProductReviewFeed(
+  limitPerProduct: number = REVIEW_FEED_LIMIT_PER_PRODUCT
+): Promise<ProductReviewFeedRow[]> {
+  const supabase = await tryCreateClient()
+  if (!supabase) return []
+
+  const { data, error } = await supabase.rpc("product_review_feed", {
+    p_limit_per_product: limitPerProduct,
+  })
+
+  if (error) {
+    logger.warn(
+      "getProductReviewFeed: RPC no disponible, catálogo sin reseñas",
+      { message: error.message }
+    )
+    return []
+  }
+
+  const rows = (data ?? []) as unknown[]
+  const normalized: ProductReviewFeedRow[] = []
+  for (const raw of rows) {
+    const row = normalizeFeedRow(raw)
+    if (row) normalized.push(row)
+  }
+  return normalized
 }
 
 // ============================================================

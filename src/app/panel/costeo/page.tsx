@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { getCatalogProducts, mergeWithCatalog, type CatalogProduct } from "@/lib/catalog"
+import { getCatalogProducts, mergeWithCatalog, countExampleIngredients, type CatalogProduct } from "@/lib/catalog"
 import { usePanelConfig } from "@/lib/panel-config"
 import { useRestaurant } from "@/contexts/restaurant-context"
 import { useLocalStorage, useSharedDishes } from "@/hooks/use-local-storage"
 import { useSyncedStorage } from "@/hooks/use-synced-storage"
 import { useToast } from "@/components/toast"
 import { normalizeName } from "@/lib/normalize"
+import { EXAMPLE_BADGE_LABEL, exampleIngredientsNotice, exampleRowsNotice } from "@/lib/example-data"
 import { toNonNegativeNumber } from "@/lib/panel-utils"
 import { uid } from "@/lib/ids"
 import { Calculator } from "lucide-react"
@@ -36,6 +37,7 @@ import RecipePickerModal from "@/components/panel/costeo/RecipePickerModal"
 import DeleteModals from "@/components/panel/costeo/DeleteModals"
 import ShortcutsOverlay from "@/components/panel/costeo/ShortcutsOverlay"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
+import ExampleDataBanner from "@/components/panel/ExampleDataBanner"
 
 let dishCounter = 0
 function nextId() { dishCounter++; return `dish-${Date.now()}-${dishCounter}` }
@@ -74,7 +76,13 @@ export default function CosteoPage() {
   const [editingDishId, setEditingDishId] = useState<string | null>(null)
   const [newDishName, setNewDishName] = useState("")
   const [newDishIngredients, setNewDishIngredients] = useState<DishIngredient[]>([
-    { ingredientName: ingredients[0]?.name || "", quantity: 0, unit: ingredients[0]?.unit || "", unitPrice: ingredients[0]?.price || 0 },
+    {
+      ingredientName: ingredients[0]?.name || "",
+      quantity: 0,
+      unit: ingredients[0]?.unit || "",
+      unitPrice: ingredients[0]?.price || 0,
+      example: ingredients[0]?.source === "example",
+    },
   ])
   const [targetFoodCost, setTargetFoodCost] = useSyncedStorage<number>("costeo-target-fc", 30, slug)
   // Custom ingredient mode
@@ -260,14 +268,16 @@ export default function CosteoPage() {
   function exportCSV() {
     const dishesToExport = filteredDishes
     if (dishesToExport.length === 0) return
-    const header = "Nombre,Categoría,Porciones,Costo por porción,Precio por porción,Ingredientes,Costo Total,Precio Venta,Margen,Food Cost %"
+    const header = "Nombre,Categoría,Porciones,Costo por porción,Precio por porción,Ingredientes,Costo Total,Precio Venta,Margen,Food Cost %,Origen"
     const rows = dishesToExport.map((d) => {
       const cost = d.ingredients.reduce((s, i) => s + (i.quantity * i.unitPrice), 0)
       const margin = d.sellingPrice - cost
       const fc = d.sellingPrice > 0 ? ((cost / d.sellingPrice) * 100).toFixed(1) : "0"
       const portions = d.portions || 4
       const ingList = d.ingredients.map((i) => `${i.ingredientName} (${i.quantity}${i.unit})`).join("; ")
-      return `"${d.name}","${d.category}",${portions},${(cost / portions).toFixed(2)},${(d.sellingPrice / portions).toFixed(2)},"${ingList}",${cost.toFixed(2)},${d.sellingPrice.toFixed(2)},${margin.toFixed(2)},${fc}%`
+      // El food cost % de este renglón no es real si algún insumo trae precio de ejemplo.
+      const origin = d.ingredients.some((i) => i.example) ? EXAMPLE_BADGE_LABEL : "propio"
+      return `"${d.name}","${d.category}",${portions},${(cost / portions).toFixed(2)},${(d.sellingPrice / portions).toFixed(2)},"${ingList}",${cost.toFixed(2)},${d.sellingPrice.toFixed(2)},${margin.toFixed(2)},${fc}%,${origin}`
     })
     const csv = [header, ...rows].join("\n")
     const blob = new Blob([csv], { type: "text/csv" })
@@ -345,6 +355,7 @@ export default function CosteoPage() {
       quantity: 0,
       unit: ingredients[0]?.unit || "",
       unitPrice: ingredients[0]?.price || 0,
+      example: ingredients[0]?.source === "example",
     }])
     setEditingDishId(null)
     setShowForm(false)
@@ -402,6 +413,7 @@ export default function CosteoPage() {
         ingredientName: value,
         unit: found?.unit || current.unit,
         unitPrice: found?.price || current.unitPrice,
+        example: found ? found.source === "example" : false,
       }
     } else {
       updated[idx] = { ...current, [field]: value }
@@ -418,6 +430,7 @@ export default function CosteoPage() {
       quantity: 1,
       unit: customUnit,
       unitPrice: price,
+      example: false,
     }])
     setCustomName("")
     setCustomPrice("")
@@ -468,6 +481,7 @@ export default function CosteoPage() {
         quantity: ing.quantity,
         unit: found?.unit || ing.unit,
         unitPrice: found?.price || 0,
+        example: found ? found.source === "example" : false,
       }
     })
     setEditingDishId(null)
@@ -531,6 +545,17 @@ export default function CosteoPage() {
     }
   }
 
+  // Ingredientes sin producto real en el catálogo: su precio es de ejemplo y
+  // cualquier food cost calculado con ellos no es una medición del negocio.
+  const exampleIngredientCount = countExampleIngredients(ingredients)
+  const exampleIngredientsMsg = exampleIngredientsNotice(exampleIngredientCount, ingredients.length)
+  const exampleDishCount = dishes.filter((d) => d.ingredients.some((i) => i.example)).length
+  const exampleDishesMsg = exampleRowsNotice(
+    exampleDishCount,
+    dishes.length - exampleDishCount,
+    "platillos de tu menú",
+  )
+
   if (!selectedCollection) {
     return (
       <div className="text-center py-16">
@@ -577,6 +602,9 @@ export default function CosteoPage() {
 
     {tab === "platillos" && (
       <>
+    <ExampleDataBanner message={exampleIngredientsMsg} />
+    <ExampleDataBanner message={exampleDishesMsg} />
+
     <FoodCostTarget
       targetFoodCost={targetFoodCost}
       onDecrease={() => setTargetFoodCost(Math.max(panelCfg.costeoTargetFcMin, targetFoodCost - 5))}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidateTag } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
@@ -154,6 +155,11 @@ export async function POST(request: NextRequest) {
       logger.error("[REVIEWS] upsert error:", upsertError)
       return NextResponse.json({ error: "No se pudo guardar tu reseña" }, { status: 500 })
     }
+
+    // El catálogo cachea el agregado de reseñas por producto (00158). Sin esto
+    // la reseña recién publicada tardaría hasta 5 minutos en verse en la ficha
+    // del producto, que es justo el momento en que el cliente va a mirar.
+    revalidateTag("reviews", "max")
 
     return NextResponse.json({ ok: true })
   } catch (err) {

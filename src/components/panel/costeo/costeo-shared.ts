@@ -19,6 +19,13 @@ export interface DishIngredient {
   quantity: number
   unit: string
   unitPrice: number
+  /**
+   * `true` cuando el `unitPrice` es un precio de ejemplo (el ingrediente no
+   * está en el catálogo y se tomó de la lista de arranque), no un precio
+   * capturado por el usuario. El food cost de un platillo con ingredientes de
+   * ejemplo no es una medición de su negocio y la UI lo etiqueta.
+   */
+  example?: boolean
 }
 
 interface DishModifier {
@@ -65,7 +72,9 @@ export interface InventarioItem {
   pricePerUnit: number
 }
 
-// Mock ingredients per collection type — in production this comes from Resurte.me catalog
+// Mock ingredients per collection type — en producción el catálogo real los
+// sustituye; los que sobreviven quedan marcados con `source: "example"` por
+// `mergeWithCatalog` y la UI avisa cuando un food cost depende de ellos.
 export const MOCK_INGREDIENTS: Record<string, IngredientOption[]> = {
   "hamburguesas-hot-dogs": [
     { name: "Carne molida sirloin 80/20", unit: "kg", price: 189 },

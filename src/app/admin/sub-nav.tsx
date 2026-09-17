@@ -55,6 +55,11 @@ const ADMIN_NAV_GROUPS = [
       { href: "/admin/usuarios", label: "Usuarios", exact: false },
       { href: "/admin/recompensas", label: "Recompensas", exact: false },
       { href: "/admin/restaurantes", label: "Restaurantes", exact: false },
+      // C.2 — dinero de FoodOS en custodia de la plataforma. Va junto a
+      // Restaurantes porque es la misma audiencia, pero es una obligación de
+      // pago, no un listado más: mientras Stripe Connect esté apagado, el
+      // 100 % del dinero con tarjeta de los micrositios pasa por aquí.
+      { href: "/admin/foodos/dispersiones", label: "Dispersiones FoodOS", exact: false },
       // P14: puerta de entrada a la sesión de soporte. Va junto a Restaurantes
       // porque es la misma audiencia, pero es una acción sobre el restaurante,
       // no un listado más.

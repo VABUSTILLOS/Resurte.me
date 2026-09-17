@@ -180,59 +180,40 @@ y responde `400` con mensaje claro si no hay ninguno — así lo hace la ruta
 
 ## Invocar desde tu código (server-side)
 
-Las rutas admin exigen sesión admin (cookie). Para llamarlas desde el servidor
-de la propia app —Server Actions, Route Handlers o Server Components— usa el
-cliente `src/lib/ai/kie-ai-admin.ts`: reenvía automáticamente la cookie del
-usuario que dispara la petición, así que `requireAdmin()` valida como si fuera
-un request del navegador.
+Las rutas admin exigen sesión admin (cookie). Desde un **componente cliente**
+la llamada correcta es `fetch` a la ruta relativa: el navegador manda la cookie
+solo, y así lo hacen las dos pantallas que ya las usan
+(`admin/components/ProductFormModal.tsx` e `admin/productos/page.tsx`).
 
-> ⚠️ **Server-only.** `kie-ai-admin.ts` usa `cookies()` de `next/headers`, por
-> lo que **nunca** debe importarse desde un componente cliente. No maneja la
-> API key (esa vive en `src/lib/ai/kie-ai.ts` y se queda en el servidor);
-> solo habla con las rutas admin propias del sitio.
-
-Funciones exportadas (tipos compatibles con `src/lib/ai/kie-ai.ts`):
-
-- `kieChat(messages, model?)` → `{ content, raw }` (chat síncrono).
-- `kieImage(prompt, size = "1:1")` → `{ taskId }`.
-- `kieVideo(prompt, model = "veo3_fast", aspectRatio = "16:9")` → `{ taskId }`
-  (el campo wire es `aspect_ratio`).
-- `kieMusic(prompt, { model?, callBackUrl?, customMode?, instrumental?, style?, title? })`
-  → `{ taskId }`. `callBackUrl` sigue siendo obligatorio: envíalo en las
-  opciones o define `KIEAI_CALLBACK_URL` en el entorno.
-- `kieStatus(taskId)` → `{ record }` (estado actual de la tarea).
-- `kieWaitForTask(taskId, timeoutMs = 120_000)` → consulta cada 2 s hasta un
-  estado terminal (`success`/`fail`/`failed`/`error`, case-insensitive) o lanza
-  un `Error` en español al agotar el timeout.
-
-`BASE_URL` se resuelve con `process.env.NEXT_PUBLIC_APP_URL` (fallback
-`http://localhost:3000`). Si la ruta admin responde con error, el helper lanza
-un `Error` cuyo mensaje es el campo `error` en español de la respuesta.
-
-Ejemplo de **Server Action** (chat síncrono + generación de imagen con espera
-de resultado):
+Desde el **servidor** (Server Action, Route Handler o Server Component) el
+patrón es reenviar la cookie del request en curso:
 
 ```ts
 "use server"
 
-import { kieChat, kieImage, kieWaitForTask } from "@/lib/ai/kie-ai-admin"
+import { cookies } from "next/headers"
 
 export async function generarImagenConKie(prompt: string) {
-  // 1) Chat de apoyo (síncrono) — opcional.
-  const { content } = await kieChat([
-    { role: "user", content: `Mejora este prompt: ${prompt}` },
-  ])
-
-  // 2) Inicia la generación de imagen y espera el resultado (máx 120 s).
-  const { taskId } = await kieImage(content, "1:1")
-  const record = await kieWaitForTask(taskId)
-  return { taskId, record }
+  const cookie = (await cookies()).toString()
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+  const res = await fetch(`${base}/api/admin/kie-ai/image`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ prompt, size: "1:1" }),
+  })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null
+    throw new Error(body?.error ?? "No se pudo generar la imagen")
+  }
+  return (await res.json()) as { taskId: string }
 }
 ```
 
-> Si el usuario no está autenticado o no es admin, las rutas responden
-> `401`/`403` y el helper lanza un `Error` con el mensaje en español. Maneja
-> ese caso en la Server Action (try/catch) para devolver un mensaje claro.
+> **No existe un cliente `kie-ai-admin.ts`.** Existió: envolvía las cinco rutas
+> con `cookies()` para llamarlas desde el servidor, pero **ninguna parte de la
+> app lo importaba** — sólo lo mencionaba este documento, con un ejemplo
+> hipotético. Se eliminó en vez de mantener una capa con cero consumidores;
+> el bloque de arriba cubre el mismo caso sin código muerto.
 
 ### Script de pruebas manuales
 

@@ -15,7 +15,7 @@ vi.mock("@/lib/supabase/public", () => ({
   createPublicClient: vi.fn(() => fakeSupabase),
 }))
 
-import { getProducts, getProductsByCollection } from "@/lib/data"
+import { getProductReviewFeed, getProducts, getProductsByCollection } from "@/lib/data"
 
 const PRODUCTS = [
   {
@@ -249,5 +249,56 @@ describe("ventana de oferta (00107) en las consultas de catálogo", () => {
       ["vigente", 15],
       ["programada", null],
     ])
+  })
+})
+
+describe("getProductReviewFeed (00158)", () => {
+  it("normaliza las filas del RPC y descarta las corruptas", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: [
+        {
+          product_id: 10,
+          review_count: 2,
+          average_rating: 4.5,
+          rating: 5,
+          comment: "Llegó completo",
+          reviewed_at: "2026-03-12T18:00:00.000Z",
+        },
+        // Fila corrupta: rating fuera de rango. No debe llegar a la vista.
+        {
+          product_id: 10,
+          review_count: 2,
+          average_rating: 4.5,
+          rating: 99,
+          comment: null,
+          reviewed_at: "2026-03-11T18:00:00.000Z",
+        },
+      ],
+      error: null,
+    })
+
+    const rows = await getProductReviewFeed()
+
+    expect(rpcMock).toHaveBeenCalledWith("product_review_feed", {
+      p_limit_per_product: 5,
+    })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.comment).toBe("Llegó completo")
+  })
+
+  it("devuelve [] cuando el RPC falla: el catálogo se muestra sin reseñas", async () => {
+    // Un RPC ausente (migración sin aplicar, caché de esquema de PostgREST
+    // desactualizada) no puede tumbar una ficha de producto.
+    rpcMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'function public.product_review_feed does not exist' },
+    })
+
+    await expect(getProductReviewFeed()).resolves.toEqual([])
+  })
+
+  it("devuelve [] cuando el RPC responde sin filas", async () => {
+    rpcMock.mockResolvedValueOnce({ data: [], error: null })
+    await expect(getProductReviewFeed()).resolves.toEqual([])
   })
 })

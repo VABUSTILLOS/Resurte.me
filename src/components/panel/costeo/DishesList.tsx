@@ -1,6 +1,7 @@
 import { Plus, Edit3, Trash2, TrendingDown, AlertCircle } from "lucide-react"
 import { DISH_CATEGORIES, type Dish } from "./costeo-shared"
 import { t } from "@/lib/i18n/es"
+import { EXAMPLE_BADGE_HELP, EXAMPLE_BADGE_LABEL } from "@/lib/example-data"
 
 export default function DishesList({
   dishes,
@@ -24,6 +25,7 @@ export default function DishesList({
         const totalCost = dish.ingredients.reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0)
         const margin = dish.sellingPrice - totalCost
         const actualFoodCost = dish.sellingPrice > 0 ? (totalCost / dish.sellingPrice) * 100 : 0
+        const usesExamplePrices = dish.ingredients.some((i) => i.example)
         const isGood = actualFoodCost <= 32
         const isOk = actualFoodCost <= 38
 
@@ -38,6 +40,14 @@ export default function DishesList({
                   className="w-4 h-4 rounded accent-[#0E7A0E] cursor-pointer shrink-0"
                 />
                 <h4 className="font-bold text-gray-900 truncate">{dish.name}</h4>
+                {usesExamplePrices && (
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 bg-amber-100 text-amber-700 border border-amber-200"
+                    title={EXAMPLE_BADGE_HELP}
+                  >
+                    {EXAMPLE_BADGE_LABEL}
+                  </span>
+                )}
                 {(() => {
                   const cat = DISH_CATEGORIES.find((c) => c.key === dish.category)
                   return cat && cat.key !== "todas" ? (
@@ -61,9 +71,19 @@ export default function DishesList({
             </div>
             <div className="space-y-1.5 mb-3">
               {dish.ingredients.map((ing, i) => (
-                <div key={i} className="flex justify-between text-sm text-gray-500">
-                  <span>{ing.ingredientName} ({ing.quantity} {ing.unit})</span>
-                  <span className="font-mono">${(ing.quantity * ing.unitPrice).toFixed(2)}</span>
+                <div key={i} className="flex justify-between text-sm text-gray-500 gap-2">
+                  <span className="min-w-0 truncate">
+                    {ing.ingredientName} ({ing.quantity} {ing.unit})
+                    {ing.example && (
+                      <span
+                        className="ml-1.5 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium"
+                        title={EXAMPLE_BADGE_HELP}
+                      >
+                        {EXAMPLE_BADGE_LABEL}
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-mono shrink-0">${(ing.quantity * ing.unitPrice).toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -99,8 +119,10 @@ export default function DishesList({
               isGood ? "bg-green-50 text-green-700" : isOk ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"
             }`}>
               {isGood ? <TrendingDown className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-              Food cost real: {actualFoodCost.toFixed(1)}%
-              {isGood ? " — ¡Excelente!" : isOk ? " — Aceptable" : " — ¡Revisa tus precios!"}
+              Food cost {usesExamplePrices ? "estimado (precios de ejemplo)" : "real"}: {actualFoodCost.toFixed(1)}%
+              {usesExamplePrices
+                ? " — sustituye los precios de ejemplo para que sea tuyo"
+                : isGood ? " — ¡Excelente!" : isOk ? " — Aceptable" : " — ¡Revisa tus precios!"}
             </div>
             {dish.modificadores && dish.modificadores.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">

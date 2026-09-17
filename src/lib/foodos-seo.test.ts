@@ -8,14 +8,18 @@ import {
   buildRestaurantSchema,
   DEFAULT_SEO_ORIGIN,
   DEFAULT_SEO_THEME_COLOR,
+  DEFAULT_MANIFEST_BACKGROUND_COLOR,
   fallbackAbout,
   fallbackFaq,
   googleBusinessChecklist,
   googleBusinessProgress,
   GOOGLE_BUSINESS_CREATE_URL,
   imageMimeType,
+  MANIFEST_SHORT_NAME_MAX,
+  manifestBackgroundColor,
   manifestIcons,
   manifestPath,
+  manifestShortName,
   menuPath,
   openingHoursSpecification,
   parseFaq,
@@ -235,6 +239,65 @@ describe("buildRestaurantManifest", () => {
   it("sanea un tema inválido en vez de romper el manifest", () => {
     const manifest = buildRestaurantManifest({ ...profile, theme_color: "azul" })
     expect(manifest.theme_color).toBe(DEFAULT_SEO_THEME_COLOR)
+  })
+
+  it("sin valor propio conserva el comportamiento anterior a 00159", () => {
+    // NULL significa "derívalo": ningún restaurante cambia de manifest solo por
+    // la migración, y el recorte sigue siendo el de siempre.
+    const manifest = buildRestaurantManifest(profile)
+    expect(manifest.short_name).toBe("Tacos Don Be")
+    expect(manifest.background_color).toBe("#F7F5F0")
+  })
+
+  it("el nombre corto propio gana sobre el derivado", () => {
+    const manifest = buildRestaurantManifest({ ...profile, app_short_name: "Don Beto" })
+    expect(manifest.short_name).toBe("Don Beto")
+    expect(manifest.name).toBe("Tacos Don Beto")
+  })
+
+  it("el fondo propio gana sobre el beige por defecto", () => {
+    const manifest = buildRestaurantManifest({ ...profile, app_background_color: "#1a2b3c" })
+    expect(manifest.background_color).toBe("#1a2b3c")
+  })
+
+  it("un nombre corto propio en blanco cae al derivado, no a la cadena vacía", () => {
+    const manifest = buildRestaurantManifest({ ...profile, app_short_name: "   " })
+    expect(manifest.short_name).toBe("Tacos Don Be")
+  })
+})
+
+describe("manifestShortName", () => {
+  it("recorta a 12 sin dejar el espacio colgando", () => {
+    expect(manifestShortName({ ...profile, name: "Restaurante La Parrilla" })).toBe("Restaurante")
+  })
+
+  it("no toca un nombre que ya cabe", () => {
+    expect(manifestShortName({ ...profile, name: "Birria" })).toBe("Birria")
+  })
+
+  it("un nombre propio demasiado largo se recorta, no se publica entero", () => {
+    // El servidor ya lo rechaza; esto cubre una fila escrita por fuera.
+    expect(
+      manifestShortName({ ...profile, app_short_name: "Un nombre larguísimo" })
+    ).toHaveLength(MANIFEST_SHORT_NAME_MAX)
+  })
+
+  it("sin nombre no inventa uno", () => {
+    expect(manifestShortName({ ...profile, name: "" })).toBe("")
+  })
+})
+
+describe("manifestBackgroundColor", () => {
+  it("cae al fondo por defecto con un valor inválido", () => {
+    for (const bad of ["rojo", "#12345", "", null, undefined]) {
+      expect(manifestBackgroundColor({ ...profile, app_background_color: bad })).toBe(
+        DEFAULT_MANIFEST_BACKGROUND_COLOR
+      )
+    }
+  })
+
+  it("acepta la forma larga en cualquier caja", () => {
+    expect(manifestBackgroundColor({ ...profile, app_background_color: "#ABC123" })).toBe("#ABC123")
   })
 })
 
