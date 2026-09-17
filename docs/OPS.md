@@ -463,6 +463,54 @@ Arreglado en dos capas: se quitaron los 8 `updated_at` de los updates a
 update.** Hay una guardia de regresión en `stripe-webhook-handlers.test.ts`
 (`"ningún handler escribe updated_at en foodos_orders"`).
 
+**Producción deshabilitada por fair use de Vercel (17-sep-2026).** El sitio
+dejó de servir: `resurte.me`, `www`, `resurte-me.vercel.app` y los previews
+respondían **402 `DEPLOYMENT_DISABLED`** ("Payment required"), y los push a
+`main` dejaron de crear deployments (el último build fue `848fbac`, 16-sep
+16:37). `vercel redeploy` lo confirma con el mensaje exacto:
+
+```bash
+vercel redeploy https://resurte-<hash>-victor-bustillos-projects.vercel.app
+# Error: Your Team exceeded our fair use limits and has been blocked. (402)
+```
+
+La causa no es el código: la API del equipo reporta el bloqueo del plan
+**Hobby** por el recurso **Active CPU** (4 h/mes incluidas en Hobby):
+
+```bash
+TOK=$(python3 -c "import json;print(json.load(open('$HOME/Library/Application Support/com.vercel.cli/auth.json'))['token'])")
+curl -s -H "Authorization: Bearer $TOK" \
+  "https://api.vercel.com/v2/teams/team_WmuhafAcqVEvEcjvVssC4Kc8" \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('softBlock'))"
+# {'blockedAt': 1789603990031, 'reason': 'FAIR_USE_LIMITS_EXCEEDED', 'blockedDueToOverageType': 'fluidCpuDuration'}
+```
+
+`blockedAt` = **17-sep-2026 00:13 UTC** (16-sep 18:13 CDMX); el ciclo de
+facturación termina el **18-sep-2026 07:00 UTC** (17-sep 01:00 CDMX).
+
+Remedios, en orden de rapidez:
+
+1. **Subir el equipo a Vercel Pro** — levanta el bloqueo de inmediato y da
+   Active CPU por uso. Es además lo que exigen las Fair Use Guidelines: Hobby
+   es solo para uso personal no comercial, y esta app cobra con Stripe.
+2. **Esperar el reinicio del ciclo** (18-sep 07:00 UTC) — el bloqueo se levanta
+   solo, pero son ~30 h de sitio caído.
+3. **Bajar el consumo de Active CPU** antes de que el ciclo vuelva a empezar:
+   el costo lo dominan las regeneraciones ISR. Las páginas de catálogo
+   (`/[slug]`, `/[slug]/categoria/[categorySlug]`,
+   `/[slug]/producto/[productSlug]`) declaran `revalidate = 300`: el build
+   prerenderiza 538 páginas (el resto del catálogo se genera bajo demanda,
+   `dynamicParams=true`) y el sitemap mantiene calientes ~500 URLs de
+   ciudad/categoría/colección, así que cada una vuelve a renderizar en función
+   cada 5 minutos como máximo. Subir ese `revalidate` (a 1 h o 1 día) es la
+   palanca más directa; recortar `generateStaticParams` y las URLs del sitemap
+   es la segunda. El cron ya está consolidado en uno diario y `src/proxy.ts` ya
+   excluye assets del matcher. El desglose por ruta requiere Observability Plus
+   (Pro): `vercel metrics vercel.function_invocation.function_cpu_time_ms --group-by route`.
+
+No hay endpoint público para levantar el bloqueo: solo cambiar de plan o
+esperar. Vercel manda un correo al `vabustillos@gmail.com` con el detalle.
+
 ### Migraciones pendientes de aplicar a mano
 
 En el SQL Editor de Supabase, en este orden:
