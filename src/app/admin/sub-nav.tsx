@@ -11,8 +11,21 @@ import { AdminNotificationCenter } from "./components/AdminNotificationCenter"
  * sueltas en una sola fila sin jerarquía, incluyendo entradas duplicadas
  * (visibilidad / por ciudad) y bitácoras dispersas. Ahora cada sección vive en
  * el grupo del dominio al que pertenece.
+ *
+ * El orden de los grupos ES el orden visible de las pestañas: Productos y
+ * WhatsApp abren la fila (son las dos superficies de uso diario), seguidas de
+ * Operación y el resto. Los `label` se usan como key de React, así que deben
+ * ser únicos aunque el grupo tenga una sola pestaña.
  */
 const ADMIN_NAV_GROUPS = [
+  {
+    label: "Productos",
+    items: [{ href: "/admin/productos", label: "Productos", exact: false }],
+  },
+  {
+    label: "WhatsApp",
+    items: [{ href: "/admin/whatsapp", label: "WhatsApp", exact: true }],
+  },
   {
     label: "Operación",
     items: [
@@ -23,18 +36,14 @@ const ADMIN_NAV_GROUPS = [
     ],
   },
   {
-    label: "Catálogo",
-    items: [
-      { href: "/admin/productos", label: "Productos", exact: false },
-      { href: "/admin/proveedores", label: "Proveedores", exact: false },
-    ],
+    label: "Proveedores",
+    items: [{ href: "/admin/proveedores", label: "Proveedores", exact: false }],
   },
   {
     label: "Crecimiento",
     items: [
       { href: "/admin/marketing", label: "Marketing", exact: false },
       { href: "/admin/leads", label: "Leads", exact: false },
-      { href: "/admin/whatsapp", label: "WhatsApp", exact: true },
       { href: "/admin/whatsapp/automations", label: "Automatizaciones", exact: false },
       { href: "/admin/seo-ia", label: "SEO IA", exact: false },
     ],

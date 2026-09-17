@@ -7,6 +7,7 @@ import {
   MAX_BUMPS_REQUEST_LIMIT,
   MIN_ITEM_QUANTITY,
   countBumpUnits,
+  countOrderUnits,
   validDeliveryFee,
   calcCouponDiscount,
   freeShippingProgress,
@@ -42,6 +43,22 @@ describe("checkout-config", () => {
 
     it("sin bumps devuelve 0", () => {
       expect(countBumpUnits([])).toBe(0)
+    })
+  })
+
+  describe("countOrderUnits", () => {
+    it("suma los productos del carrito y las unidades de bump", () => {
+      // Caso del reporte: 2 productos + 3 bumps = 5 artículos en el checkout.
+      expect(countOrderUnits(2, [{ quantity: 1 }, { quantity: 2 }])).toBe(5)
+    })
+
+    it("sin bumps devuelve el conteo del carrito", () => {
+      expect(countOrderUnits(4, [])).toBe(4)
+      expect(countOrderUnits(0, [])).toBe(0)
+    })
+
+    it("un bump en 0 no suma artículos", () => {
+      expect(countOrderUnits(2, [{ quantity: 0 }, { quantity: 1 }])).toBe(3)
     })
   })
 

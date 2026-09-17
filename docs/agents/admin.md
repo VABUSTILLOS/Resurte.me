@@ -14,8 +14,11 @@
 - Las gráficas (recharts) llevan `role="img"` + resumen textual de la serie
   (`describeSeries`) — el SVG solo no es accesible.
 - La subnav es scroll horizontal en móvil y está agrupada por dominio
-  (`ADMIN_NAV_GROUPS` en `sub-nav.tsx`: Operación, Catálogo, Crecimiento,
-  Clientes, Sistema). No agregar píldoras sueltas fuera de un grupo.
+  (`ADMIN_NAV_GROUPS` en `sub-nav.tsx`: Productos, WhatsApp, Operación,
+  Proveedores, Crecimiento, Clientes, Sistema). El orden de los grupos es el
+  orden visible: Productos y WhatsApp van primero, cada uno en su propio grupo;
+  los `label` son keys de React y deben ser únicos. No agregar píldoras sueltas
+  fuera de un grupo.
 - Superficies consolidadas: visibilidad y disponibilidad por ciudad viven solo
   en `/admin/productos`; auditoría/errores/emails en `/admin/bitacoras?tab=…`;
   facturas en `/admin/recompensas?tab=facturas`; el disparo manual de workflows

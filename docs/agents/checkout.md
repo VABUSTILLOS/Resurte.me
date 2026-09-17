@@ -14,6 +14,19 @@
   sobre bumps) se hace en ambos lados el mismo día. El `bumpCount` que recibe es
   **unidades**, no líneas: se calcula con `countBumpUnits(selectedBumps)` para
   que un bump con cantidad 3 cuente como 3 artículos.
+- **El conteo que se muestra es catálogo + bumps**: todas las superficies usan
+  `countOrderUnits(itemCount, selectedBumps)` (= `itemCount + countBumpUnits`)
+  para el número de productos que ven el header (insignia y `aria-label`),
+  `MobileCartBar`, la cabecera del drawer "Mi Carrito", `/cart` y
+  `/{ciudad}/carrito`; 2 productos + 3 bumps se leen como **5**. El `itemCount`
+  del carrito (`cart-context`) **no cambia de semántica**: sigue siendo solo
+  catálogo y sigue gobernando el vacío, `cart-bar-active` y el `itemCount` de
+  `calcCheckoutTotals`. En `/cart` y `/{ciudad}/carrito` el resumen muestra un
+  **único** "Subtotal (N productos)" con el monto ya sumado
+  (`totals.effectiveSubtotal`): no se reañade la fila "Artículos especiales".
+  Los guardas de render siguen siendo `itemCount > 0` (no puede haber bumps sin
+  catálogo) y las filas "Artículos especiales" del `CheckoutDrawer` se conservan
+  porque los e2e las verifican.
 - **Bumps encadenados sin tope**: el checkout **omite `limit`** al pedir las
   ofertas, y `resolveBumps` sin `limit` devuelve **todas** las reglas activas que
   apliquen al carrito — el tamaño del pool lo determina `bump_rules`, no una

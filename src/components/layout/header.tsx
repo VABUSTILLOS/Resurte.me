@@ -12,12 +12,18 @@ import { MobileSearchOverlay, MOBILE_SEARCH_EVENT } from "@/components/search/mo
 import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useScrollDirection } from "@/hooks/use-scroll-direction"
+import { useSelectedBumps } from "@/hooks/use-selected-bumps"
+import { countOrderUnits } from "@/lib/checkout-config"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import type { User as SupabaseUser, SupabaseClient } from "@supabase/supabase-js"
 
 export function Header() {
   const { city } = useCity()
   const { itemCount } = useCart()
+  const { selectedBumps } = useSelectedBumps()
+  // Artículos que el cliente percibe: catálogo + bumps. El badge y el
+  // aria-label deben coincidir con lo que el checkout cobra.
+  const productCount = countOrderUnits(itemCount, selectedBumps)
   const router = useRouter()
   const pathname = usePathname()
   // Lazy browser-only client: created via dynamic import after mount so
@@ -245,26 +251,26 @@ export function Header() {
             <button
               type="button"
               onClick={() => window.dispatchEvent(new Event(CART_DRAWER_EVENT))}
-              aria-label={`Abrir carrito de compras${itemCount > 0 ? `, ${itemCount} artículos` : ""}`}
+              aria-label={`Abrir carrito de compras${itemCount > 0 ? `, ${productCount} artículos` : ""}`}
               className="sm:hidden relative p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
             >
               <ShoppingCart className="w-5 h-5 text-[#343538]" aria-hidden="true" />
               {itemCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#0E7A0E] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5" role="status">
-                  {itemCount > 99 ? "99+" : itemCount}
+                  {productCount > 99 ? "99+" : productCount}
                 </span>
               )}
             </button>
 
             <Link
               href="/cart"
-              aria-label={`Carrito de compras${itemCount > 0 ? `, ${itemCount} artículos` : ""}`}
+              aria-label={`Carrito de compras${itemCount > 0 ? `, ${productCount} artículos` : ""}`}
               className="hidden sm:flex relative p-2 rounded-[10px] hover:bg-[#F7F5F0] transition-colors touch-target"
             >
               <ShoppingCart className="w-5 h-5 text-[#343538]" aria-hidden="true" />
               {itemCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#0E7A0E] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5" role="status">
-                  {itemCount > 99 ? "99+" : itemCount}
+                  {productCount > 99 ? "99+" : productCount}
                 </span>
               )}
             </Link>

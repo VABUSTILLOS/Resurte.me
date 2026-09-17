@@ -9,7 +9,7 @@ import Link from "next/link"
 import { useState, useEffect } from "react"
 import { CouponInput } from "@/components/cart/coupon-input"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
-import { calcCheckoutTotals, FREE_SHIPPING_THRESHOLD, DELIVERY_FEE_FLAT, countBumpUnits } from "@/lib/checkout-config"
+import { calcCheckoutTotals, FREE_SHIPPING_THRESHOLD, DELIVERY_FEE_FLAT, countBumpUnits, countOrderUnits } from "@/lib/checkout-config"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 
@@ -34,6 +34,9 @@ export default function CartPage() {
   )
   const deliveryFee = totals.deliveryFee
   const bumpsTotal = totals.total
+  // Artículos que el cliente percibe: catálogo + bumps (2 productos + 3 bumps
+  // se leen como 5 en el carrito y en el checkout).
+  const productCount = countOrderUnits(itemCount, selectedBumps)
 
   // Restaura el carrito desde el enlace "restore=<order_id>" del email de
   // carrito abandonado. Solo funciona si el usuario tiene sesión (RLS exige
@@ -227,7 +230,7 @@ export default function CartPage() {
             Seguir comprando
           </Link>
           <h1 className="text-2xl font-bold text-[#242529]">Tu carrito</h1>
-          <p className="text-sm text-[var(--text-secondary)]">{itemCount} {itemCount === 1 ? "producto" : "productos"}</p>
+          <p className="text-sm text-[var(--text-secondary)]">{productCount} {productCount === 1 ? "producto" : "productos"}</p>
         </div>
         <button
           onClick={handleClear}
@@ -376,15 +379,9 @@ export default function CartPage() {
 
         <div className="space-y-2 text-sm mb-4">
           <div className="flex justify-between text-[var(--text-secondary)]">
-            <span>Subtotal ({itemCount} productos)</span>
-            <span className="tabular-nums">${subtotal.toFixed(2)}</span>
+            <span>Subtotal ({productCount} {productCount === 1 ? "producto" : "productos"})</span>
+            <span className="tabular-nums">${totals.effectiveSubtotal.toFixed(2)}</span>
           </div>
-          {bumpsSubtotal > 0 && (
-            <div className="flex justify-between text-[var(--text-secondary)]">
-              <span>Artículos especiales</span>
-              <span className="tabular-nums">${bumpsSubtotal.toFixed(2)}</span>
-            </div>
-          )}
           {totals.discountAmount > 0 && (
             <div className="flex justify-between text-[#0E7A0E]">
               <span>Descuento {coupon ? `(${coupon.code})` : ""}</span>

@@ -18,7 +18,7 @@ import Link from "next/link"
 import { CouponInput } from "@/components/cart/coupon-input"
 import { ShoppingLists } from "@/components/cart/shopping-lists"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
-import { calcCheckoutTotals, DELIVERY_FEE_FLAT, countBumpUnits } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT, countBumpUnits, countOrderUnits } from "@/lib/checkout-config"
 import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 
@@ -44,6 +44,9 @@ export default function CartPage() {
   )
   const { deliveryFee } = totals
   const bumpsTotal = totals.total
+  // Artículos que el cliente percibe: catálogo + bumps (2 productos + 3 bumps
+  // se leen como 5 en el carrito y en el checkout).
+  const productCount = countOrderUnits(itemCount, selectedBumps)
 
   if (!city) {
     return (
@@ -117,7 +120,7 @@ export default function CartPage() {
 
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Tu Carrito</h1>
       <p className="text-gray-500 text-sm mb-6">
-        {itemCount} {itemCount === 1 ? "producto" : "productos"}
+        {productCount} {productCount === 1 ? "producto" : "productos"}
       </p>
 
       {/* Barra de progreso hacia envío gratis (mecánica ThriveCart).
@@ -232,16 +235,9 @@ export default function CartPage() {
               <h2 className="font-bold text-gray-900 text-lg">Resumen</h2>
 
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Subtotal ({itemCount})</span>
-                <span className="font-semibold text-gray-900">${subtotal.toFixed(2)}</span>
+                <span className="text-gray-500">Subtotal ({productCount} {productCount === 1 ? "producto" : "productos"})</span>
+                <span className="font-semibold text-gray-900">${totals.effectiveSubtotal.toFixed(2)}</span>
               </div>
-
-              {bumpsSubtotal > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Artículos especiales</span>
-                  <span className="font-semibold text-gray-900">${bumpsSubtotal.toFixed(2)}</span>
-                </div>
-              )}
 
               {totals.discountAmount > 0 && (
                 <div className="flex justify-between text-sm">

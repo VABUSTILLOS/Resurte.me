@@ -76,6 +76,22 @@ export function countBumpUnits(bumps: readonly { quantity: number }[]): number {
 }
 
 /**
+ * Cuenta los artículos que el cliente percibe en su pedido: los del catálogo
+ * más las unidades de bumps seleccionados.
+ *
+ * Es el número que publican las superficies de carrito (badge del header,
+ * barra móvil, "Mi Carrito", `/cart` y `/{ciudad}/carrito`) para que 2
+ * productos + 3 bumps se lean como 5 productos, igual que ya lo hace el
+ * checkout (`allItemsCount`).
+ */
+export function countOrderUnits(
+  itemCount: number,
+  bumps: readonly { quantity: number }[]
+): number {
+  return itemCount + countBumpUnits(bumps)
+}
+
+/**
  * Calcula el envío válido para un pedido con `itemCount` artículos.
  *
  * - Sin artículos → 0.

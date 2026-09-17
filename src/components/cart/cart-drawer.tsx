@@ -22,7 +22,7 @@ import { BumpCards } from "@/components/checkout/BumpCards"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import { FreeShippingProgress } from "@/components/cart/FreeShippingProgress"
-import { calcCheckoutTotals, DELIVERY_FEE_FLAT, freeShippingProgress, countBumpUnits } from "@/lib/checkout-config"
+import { calcCheckoutTotals, DELIVERY_FEE_FLAT, freeShippingProgress, countBumpUnits, countOrderUnits } from "@/lib/checkout-config"
 
 // Global event bus to control drawer from header
 export const CART_DRAWER_EVENT = "resurte:toggle-cart-drawer"
@@ -77,6 +77,8 @@ export function CartDrawer() {
   )
   const { deliveryFee, payableSubtotal } = totals
   const drawerTotal = totals.total
+  // Conteo visible: catálogo + bumps (mismo número que cobra el checkout).
+  const productCount = countOrderUnits(itemCount, selectedBumps)
 
   // Listen for toggle events from header
   useEffect(() => {
@@ -160,7 +162,7 @@ export function CartDrawer() {
               </h2>
               {itemCount > 0 && (
                 <span className="text-sm text-[var(--text-secondary)]">
-                  ({itemCount} {itemCount === 1 ? "producto" : "productos"})
+                  ({productCount} {productCount === 1 ? "producto" : "productos"})
                 </span>
               )}
             </div>
@@ -468,6 +470,8 @@ export function MobileCartBar() {
   const barTotal = totals.total
   const fsBar = freeShippingProgress(totals.payableSubtotal)
   const isMobile = useMediaQuery("(max-width: 640px)", true)
+  // Badge de la barra: artículos del carrito + bumps seleccionados.
+  const productCount = countOrderUnits(itemCount, selectedBumps)
 
   if (!mounted || itemCount === 0) return null
 
@@ -522,7 +526,7 @@ export function MobileCartBar() {
             className="flex items-center gap-2 min-w-0 flex-1 justify-start touch-target"
           >
             <span className="bg-[#0E7A0E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
-              {itemCount}
+              {productCount}
             </span>
             <span className="font-semibold text-sm text-[#242529] truncate">
               Ver carrito · ${barTotal.toFixed(2)}
@@ -546,7 +550,7 @@ export function MobileCartBar() {
             className="flex items-center gap-2.5 min-w-0"
           >
             <span className="bg-[#0E7A0E] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shrink-0">
-              {itemCount}
+              {productCount}
             </span>
             <span className="text-sm text-[var(--text-secondary)] truncate hidden md:inline">
               Ver carrito · ${barTotal.toFixed(2)}
