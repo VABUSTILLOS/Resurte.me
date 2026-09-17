@@ -188,4 +188,59 @@ test.describe("modal de producto — comportamiento", { tag: "@ci" }, () => {
     await nav.getByRole("button", { name: "Identidad" }).click()
     await expect(current).toContainText("Identidad")
   })
+
+  test("el margen se recalcula en vivo mientras se escribe el costo", async ({ page }) => {
+    const dialog = await openNewProductModal(page)
+    test.skip(dialog === null, "requiere sesión admin")
+    if (!dialog) return
+
+    const margin = dialog.locator("#pf-margin")
+
+    // Sin precio no hay margen: se muestra el guion, no un 0% engañoso.
+    await expect(margin).toContainText("—")
+
+    await dialog.locator("#pf-price").fill("100")
+    await dialog.locator("#pf-cost").fill("50")
+    await expect(margin).toContainText("50%")
+
+    // Costo por encima del precio: el aviso aparece y dice que se puede guardar.
+    await dialog.locator("#pf-cost").fill("120")
+    await expect(dialog.locator("#pf-warn-below-cost")).toBeVisible()
+    await expect(dialog.locator("#pf-warn-below-cost")).toContainText("Puedes guardar así")
+
+    // El aviso viaja en el resumen del encabezado y lleva a Precios.
+    await expect(dialog.getByRole("button", { name: /aviso de precio/ })).toBeVisible()
+
+    // Y al corregir el costo desaparece solo, sin recargar nada.
+    await dialog.locator("#pf-cost").fill("50")
+    await expect(dialog.locator("#pf-warn-below-cost")).toHaveCount(0)
+  })
+
+  test("el estado de stock muestra el valor que se guardará y se bloquea con unidades", async ({
+    page,
+  }) => {
+    const dialog = await openNewProductModal(page)
+    test.skip(dialog === null, "requiere sesión admin")
+    if (!dialog) return
+
+    const stock = dialog.locator("#pf-stock")
+
+    // Sin unidades manda la selección manual: el select está operativo.
+    await expect(stock).toBeEnabled()
+    await stock.selectOption("low_stock")
+
+    // Con 0 unidades el estado se deriva a agotado y el select deja de mentir.
+    await dialog.locator("#pf-qty").fill("0")
+    await expect(stock).toBeDisabled()
+    await expect(stock).toHaveValue("out_of_stock")
+
+    // Con pocas unidades (≤ umbral) pasa a bajo.
+    await dialog.locator("#pf-qty").fill("2")
+    await expect(stock).toHaveValue("low_stock")
+
+    // Y vaciar las unidades devuelve el control a la selección manual previa.
+    await dialog.locator("#pf-qty").fill("")
+    await expect(stock).toBeEnabled()
+    await expect(stock).toHaveValue("low_stock")
+  })
 })

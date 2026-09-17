@@ -1,17 +1,19 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { ImagePlus, Loader2, Plus, Search, Sparkles, Star, X } from "lucide-react"
+import { AlertTriangle, ImagePlus, Loader2, Plus, Search, Sparkles, Star, X } from "lucide-react"
 import { cropImageToSquare } from "@/lib/crop-image"
+import { formatMoney } from "@/lib/money"
 import {
   PRODUCT_FIELD_INPUT_IDS,
   formKeyForServerField,
   validateProductForm,
 } from "@/lib/product-form"
+import { analyzePricing, marginBand, type MarginBand } from "@/lib/product-pricing"
 import {
   DEFAULT_LOW_STOCK_THRESHOLD,
-  deriveStockStatus,
   resolveLowStockThreshold,
+  resolveSubmittedStockStatus,
 } from "@/lib/stock"
 
 interface Category {
@@ -84,6 +86,13 @@ const STOCK_OPTIONS = [
   { value: "low_stock", label: "Stock bajo" },
   { value: "out_of_stock", label: "Agotado" },
 ] as const
+
+/** Color del margen: los mismos cortes que la columna "Margen" del catálogo. */
+const MARGIN_TONE_CLS: Record<MarginBand, string> = {
+  good: "text-green-700",
+  warn: "text-amber-700",
+  bad: "text-red-700",
+}
 
 interface RelatedOption {
   id: number
@@ -666,6 +675,25 @@ export function ProductFormModal({
   if (baselineRef.current === null) baselineRef.current = snapshotKey(snapshot)
   const dirty = baselineRef.current !== snapshotKey(snapshot)
 
+  // Vista previa en vivo (ronda 11). Las reglas viven en `src/lib/`
+  // (`product-pricing.ts` y `stock.ts`) y se prueban sin React; aquí solo se
+  // pintan. Los avisos de precio son NO bloqueantes: el admin puede guardar.
+  const fieldNumber = (raw: string): number | null => (raw.trim() === "" ? null : Number(raw))
+  const pricing = analyzePricing({
+    price: fieldNumber(price),
+    salePrice: fieldNumber(salePrice),
+    cost: fieldNumber(cost),
+    saleStartsAt,
+    saleEndsAt,
+  })
+  const submittedStock = resolveSubmittedStockStatus(
+    fieldNumber(stockQuantity),
+    fieldNumber(lowStockThreshold),
+    stockStatus
+  )
+  const marginTone = marginBand(pricing.marginPct)
+  const saleOffWindow = pricing.saleState === "scheduled" || pricing.saleState === "expired"
+
   // Al abrir: foco en el diálogo (no en un input, para no desplegar el teclado
   // en móvil) y bloqueo del scroll del listado que queda detrás.
   useEffect(() => {
@@ -777,10 +805,13 @@ export function ProductFormModal({
     const parsedQty = check.stockQuantity
     const parsedThreshold = check.lowStockThreshold
 
-    // Espeja la regla del servidor: con unidades capturadas el estado se
-    // deriva del umbral; sin unidades manda la selección manual.
-    const derivedStockStatus =
-      parsedQty === null ? stockStatus : deriveStockStatus(parsedQty, parsedThreshold)
+    // Misma regla que la vista previa del select: con unidades capturadas el
+    // estado se deriva del umbral; sin unidades manda la selección manual.
+    const derivedStockStatus = resolveSubmittedStockStatus(
+      parsedQty,
+      parsedThreshold,
+      stockStatus
+    ).status
 
     setSaving(true)
     setError(null)
@@ -872,11 +903,18 @@ export function ProductFormModal({
   const fieldCls = (key: string, extra = "") =>
     `${inputCls}${extra}${fieldErrors[key] ? " border-red-300 bg-red-50/40" : ""}`
 
-  /** Anuncia el error del campo a lectores de pantalla. */
-  const fieldA11y = (key: string) =>
-    fieldErrors[key]
-      ? { "aria-invalid": true as const, "aria-describedby": `pf-err-${key}` }
-      : {}
+  /**
+   * Props de accesibilidad de un campo. `hints` son ids de pistas estáticas
+   * (margen, derivación de stock…); se concatenan con el id del error para que
+   * ninguno tape al otro.
+   */
+  const fieldA11y = (key: string, ...hints: string[]) => {
+    const ids = [...(fieldErrors[key] ? [`pf-err-${key}`] : []), ...hints]
+    return {
+      ...(fieldErrors[key] ? { "aria-invalid": true as const } : {}),
+      ...(ids.length > 0 ? { "aria-describedby": ids.join(" ") } : {}),
+    }
+  }
 
   /** Al editar un campo se retira su marca de error y, si no queda ninguna, el aviso. */
   function clearFieldError(key: string) {
@@ -916,6 +954,22 @@ export function ProductFormModal({
                 <span className="ml-2 font-semibold text-amber-600">Cambios sin guardar</span>
               )}
             </p>
+            {/* Resumen de avisos: se ven desde cualquier sección del formulario,
+                porque el detalle vive en Precios. No es una región viva: los
+                avisos cambian con cada tecla y anunciarlos sería ruido. */}
+            {pricing.warnings.length > 0 && (
+              <button
+                type="button"
+                onClick={() => goToSection("pf-sec-precios")}
+                className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100"
+              >
+                <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                {pricing.warnings.length === 1
+                  ? "1 aviso de precio"
+                  : `${pricing.warnings.length} avisos de precio`}
+                <span className="font-normal underline">Ver precios</span>
+              </button>
+            )}
           </div>
           <button
             type="button"
@@ -1457,7 +1511,11 @@ export function ProductFormModal({
                     clearFieldError("price")
                   }}
                   className={fieldCls("price")}
-                  {...fieldA11y("price")}
+                  {...fieldA11y(
+                    "price",
+                    "pf-margin",
+                    ...pricing.warnings.map((w) => `pf-warn-${w.key}`)
+                  )}
                 />
                 <FieldError id="pf-err-price" message={fieldErrors.price} />
               </div>
@@ -1476,7 +1534,10 @@ export function ProductFormModal({
                     clearFieldError("salePrice")
                   }}
                   className={fieldCls("salePrice")}
-                  {...fieldA11y("salePrice")}
+                  {...fieldA11y(
+                    "salePrice",
+                    ...pricing.warnings.map((w) => `pf-warn-${w.key}`)
+                  )}
                 />
                 <FieldError id="pf-err-salePrice" message={fieldErrors.salePrice} />
               </div>
@@ -1500,6 +1561,65 @@ export function ProductFormModal({
                 <FieldError id="pf-err-cost" message={fieldErrors.cost} />
               </div>
             </div>
+
+            {/* Margen en vivo: mismos cortes que la columna "Margen" del catálogo.
+                Es informativo; no bloquea guardar. */}
+            <div
+              id="pf-margin"
+              className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-gray-50 px-3 py-2 text-xs"
+            >
+              <span className="font-semibold text-gray-600">
+                Margen:{" "}
+                <span
+                  className={marginTone ? `font-bold ${MARGIN_TONE_CLS[marginTone]}` : "text-gray-400"}
+                >
+                  {pricing.marginPct === null ? "—" : `${pricing.marginPct}%`}
+                </span>
+              </span>
+              <span className="text-gray-500">
+                Markup:{" "}
+                <span className="font-semibold text-gray-700">
+                  {pricing.markupPct === null ? "—" : `${pricing.markupPct}%`}
+                </span>{" "}
+                sobre el costo
+              </span>
+              <span className="text-gray-500">
+                Precio efectivo:{" "}
+                <span className="font-semibold text-gray-700">
+                  {pricing.effectivePrice === null
+                    ? "—"
+                    : formatMoney(pricing.effectivePrice)}
+                </span>
+                {pricing.saleState === "active" && (
+                  <span className="ml-1 text-green-700">(oferta activa)</span>
+                )}
+                {saleOffWindow && (
+                  <span className="ml-1 text-gray-400">
+                    ({pricing.saleState === "scheduled" ? "oferta programada" : "oferta vencida"})
+                  </span>
+                )}
+              </span>
+            </div>
+
+            {/* Avisos no bloqueantes. Van aquí, junto a los campos que los
+                causan, y se referencian desde `pf-price`/`pf-sale`. */}
+            {pricing.warnings.length > 0 && (
+              <ul className="space-y-1">
+                {pricing.warnings.map((warning) => (
+                  <li
+                    key={warning.key}
+                    id={`pf-warn-${warning.key}`}
+                    className="flex items-start gap-1.5 text-[11px] text-amber-700"
+                  >
+                    <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
+                    <span>
+                      {warning.message}{" "}
+                      <span className="text-amber-600/80">Puedes guardar así.</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -1572,21 +1692,28 @@ export function ProductFormModal({
                   }}
                   placeholder="—"
                   className={fieldCls("stockQuantity")}
-                  {...fieldA11y("stockQuantity")}
+                  {...fieldA11y("stockQuantity", "pf-qty-hint")}
                 />
                 <FieldError id="pf-err-stockQuantity" message={fieldErrors.stockQuantity} />
+                <p id="pf-qty-hint" className="mt-1 text-[10px] text-gray-400">
+                  Con unidades capturadas el estado se calcula solo.
+                </p>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-stock">
                   Estado de stock
                 </label>
+                {/* El select dice la verdad: muestra el estado que se guardará
+                    (derivado o manual) y se bloquea cuando hay unidades. */}
                 <select
                   id="pf-stock"
-                  value={stockStatus}
+                  value={submittedStock.status}
+                  disabled={submittedStock.derived}
                   onChange={(e) =>
                     setStockStatus(e.target.value as ProductFormProduct["stock_status"])
                   }
-                  className={`${inputCls} bg-white`}
+                  className={`${inputCls} bg-white disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500`}
+                  {...fieldA11y("stockStatus", "pf-stock-hint")}
                 >
                   {STOCK_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -1594,10 +1721,15 @@ export function ProductFormModal({
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-[10px] text-gray-400">
-                  {`Si capturas unidades, el estado se deriva (0 → agotado, ≤${resolveLowStockThreshold(
-                    lowStockThreshold.trim() === "" ? null : Number(lowStockThreshold)
-                  )} → bajo).`}
+                <FieldError id="pf-err-stockStatus" message={fieldErrors.stockStatus} />
+                <p id="pf-stock-hint" className="mt-1 text-[10px] text-gray-400">
+                  {submittedStock.derived
+                    ? `Calculado con las unidades capturadas (0 → agotado, ≤${resolveLowStockThreshold(
+                        fieldNumber(lowStockThreshold)
+                      )} → bajo). Deja las unidades vacías para elegirlo a mano.`
+                    : `Sin unidades capturadas manda tu selección. Captura unidades para derivarlo (0 → agotado, ≤${resolveLowStockThreshold(
+                        fieldNumber(lowStockThreshold)
+                      )} → bajo).`}
                 </p>
               </div>
               <div>
@@ -1619,10 +1751,10 @@ export function ProductFormModal({
                   }}
                   placeholder={String(DEFAULT_LOW_STOCK_THRESHOLD)}
                   className={fieldCls("lowStockThreshold")}
-                  {...fieldA11y("lowStockThreshold")}
+                  {...fieldA11y("lowStockThreshold", "pf-threshold-hint")}
                 />
                 <FieldError id="pf-err-lowStockThreshold" message={fieldErrors.lowStockThreshold} />
-                <p className="mt-1 text-[10px] text-gray-400">
+                <p id="pf-threshold-hint" className="mt-1 text-[10px] text-gray-400">
                   Vacío = predeterminado ({DEFAULT_LOW_STOCK_THRESHOLD}).
                 </p>
               </div>

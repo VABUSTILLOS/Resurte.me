@@ -16,9 +16,13 @@ function asAdmin() {
   vi.mocked(requireAdmin).mockResolvedValue({ user: { id: "admin-1" }, response: null } as never)
 }
 
+type UploadOptions = { contentType: string; cacheControl: string }
+
 /** Cliente falso: `storage.from` devuelve un bucket nuevo en cada llamada. */
 function storageWith(uploadResult: { error: unknown } = { error: null }) {
-  const upload = vi.fn().mockResolvedValue(uploadResult)
+  const upload = vi
+    .fn<(path: string, file: File, options: UploadOptions) => Promise<{ error: unknown }>>()
+    .mockResolvedValue(uploadResult)
   const getPublicUrl = vi.fn((path: string) => ({
     data: { publicUrl: `https://cdn.test/productos/${path}` },
   }))
@@ -111,10 +115,17 @@ describe("/api/admin/products/upload-image", () => {
     // jpeg se normaliza a jpg para que la extensión sea la del archivo servido
     expect(json.path).toMatch(/^\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\.jpg$/)
     expect(upload).toHaveBeenCalledTimes(1)
-    expect(upload).toHaveBeenCalledWith(json.path, file, {
+    expect(upload).toHaveBeenCalledWith(json.path, expect.any(File), {
       contentType: "image/jpeg",
       cacheControl: "31536000",
     })
+    // `request.formData()` reconstruye el File y le sella su propio
+    // `lastModified`, así que comparar el objeto entero es flaky: se comprueba
+    // por partes lo que importa (que los bytes y el tipo lleguen a Storage).
+    const uploaded = upload.mock.calls[0]?.[1]
+    expect(uploaded?.name).toBe("foto.jpeg")
+    expect(uploaded?.type).toBe("image/jpeg")
+    expect(uploaded?.size).toBe(file.size)
     expect(getPublicUrl).toHaveBeenCalledWith(json.path)
     // una llamada para subir y otra para resolver la URL pública
     expect(storageFrom).toHaveBeenNthCalledWith(1, "productos")

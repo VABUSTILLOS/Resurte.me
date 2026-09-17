@@ -41,3 +41,25 @@ export function deriveStockStatus(
   if (quantity <= 0) return "out_of_stock"
   return quantity <= resolveLowStockThreshold(threshold) ? "low_stock" : "in_stock"
 }
+
+/**
+ * Estado que se guardará y si lo impuso la derivación (ronda 11).
+ *
+ * Con unidades capturadas el estado se deriva del umbral y la selección manual
+ * no aplica; sin unidades manda la selección. Antes esta regla vivía solo en el
+ * `submitForm` del formulario, así que el select seguía habilitado y el admin
+ * podía elegir "Agotado" con 50 unidades: se guardaba "En stock" sin avisar. El
+ * formulario usa `derived` para bloquear el select y mostrar el valor real.
+ */
+export function resolveSubmittedStockStatus(
+  quantity: number | null,
+  threshold: number | null,
+  manual: StockStatus
+): { status: StockStatus; derived: boolean } {
+  // Unidades inválidas (texto a medio escribir, decimales, negativos) no
+  // cuentan como control de inventario: el formulario ya las marca en rojo.
+  if (quantity === null || !Number.isInteger(quantity) || quantity < 0) {
+    return { status: manual, derived: false }
+  }
+  return { status: deriveStockStatus(quantity, threshold), derived: true }
+}
