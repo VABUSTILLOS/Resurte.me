@@ -3,10 +3,12 @@ import { NextRequest } from "next/server"
 
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }))
 vi.mock("@/lib/admin-auth", () => ({ requireAdmin: vi.fn() }))
+vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
 import { GET } from "./route"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logger } from "@/lib/logger"
 
 interface FakeResult {
   data?: unknown
@@ -79,7 +81,7 @@ describe("/api/admin/products/audit", () => {
     const json = await response.json()
 
     expect(response.status).toBe(200)
-    expect(json).toEqual({ entries: ENTRIES })
+    expect(json).toEqual({ entries: ENTRIES, degraded: false })
     expect(supabase.selects).toEqual([
       { table: "admin_audit_log", columns: "action,actor_email,created_at,detail" },
     ])
@@ -101,7 +103,7 @@ describe("/api/admin/products/audit", () => {
     const json = await response.json()
 
     expect(response.status).toBe(200)
-    expect(json).toEqual({ entries: ENTRIES })
+    expect(json).toEqual({ entries: ENTRIES, degraded: false })
     expect(supabase.selects).toEqual([
       { table: "admin_audit_log", columns: "action,actor_email,created_at,detail,entity_id" },
     ])
@@ -120,24 +122,25 @@ describe("/api/admin/products/audit", () => {
     const json = await response.json()
 
     expect(response.status).toBe(200)
-    expect(json).toEqual({ entries: [] })
+    expect(json).toEqual({ entries: [], degraded: false })
   })
 
-  it("devuelve 500 con el mensaje de PostgREST cuando la consulta falla", async () => {
+  it("degrada a 200 con degraded:true cuando la consulta falla (B31)", async () => {
     asAdmin()
     serviceWith({ data: null, error: { message: "permission denied for table admin_audit_log" } })
 
     const response = await GET(auditRequest("?productId=1"))
     const json = await response.json()
 
-    expect(response.status).toBe(500)
-    expect(json.error).toBe("permission denied for table admin_audit_log")
+    expect(response.status).toBe(200)
+    expect(json).toEqual({ entries: [], degraded: true })
+    expect(logger.warn).toHaveBeenCalledWith(
+      "products.audit.degraded",
+      expect.objectContaining({ scope: "history", productId: 1 })
+    )
   })
 
-  // Bug documentado: el route NO usa isMissingRelationError, así que si la
-  // tabla aún no existe (PGRST205/42P01) responde 500 en lugar de degradar a
-  // una lista vacía. No se corrige aquí: solo se fija el comportamiento actual.
-  it("devuelve 500 cuando la tabla admin_audit_log no existe (sin degradación)", async () => {
+  it("degrada a 200 con degraded:true cuando la tabla admin_audit_log no existe (B31)", async () => {
     asAdmin()
     serviceWith({
       data: null,
@@ -148,7 +151,35 @@ describe("/api/admin/products/audit", () => {
     })
 
     const response = await GET(auditRequest("?productId=1"))
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toEqual({ entries: [], degraded: true })
+  })
+
+  it("degrada también el listado general (actividad reciente) sin productId (B31)", async () => {
+    asAdmin()
+    serviceWith({ data: null, error: { message: "connection terminated" } })
+
+    const response = await GET(auditRequest())
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toEqual({ entries: [], degraded: true })
+    expect(logger.warn).toHaveBeenCalledWith(
+      "products.audit.degraded",
+      expect.objectContaining({ scope: "activity" })
+    )
+  })
+
+  it("sigue siendo 500 si el cliente de Supabase no se puede crear", async () => {
+    asAdmin()
+    vi.mocked(createServiceClient).mockRejectedValue(new Error("Supabase no está configurado"))
+
+    const response = await GET(auditRequest("?productId=1"))
+    const json = await response.json()
 
     expect(response.status).toBe(500)
+    expect(json.error).toBe("Supabase no está configurado")
   })
 })

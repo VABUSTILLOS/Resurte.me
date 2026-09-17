@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logger } from "@/lib/logger"
 import { NextResponse, type NextRequest } from "next/server"
 
 const MAX_ROWS = 50
@@ -9,6 +10,13 @@ const MAX_ROWS = 50
  * Últimas N acciones de la bitácora sobre un producto (timeline del modal
  * de historial en /admin/productos). Sin productId devuelve las últimas 30
  * acciones de products en general (drawer de actividad reciente).
+ *
+ * B31 — el timeline es una lectura **decorativa**: si `admin_audit_log` no
+ * existe todavía (PGRST205/42P01, p.ej. migración pendiente) o PostgREST
+ * rechaza la consulta, se degrada a lista vacía con `degraded: true` en vez de
+ * tumbar la vista con un 500. El panel distingue "sin historial" de "historial
+ * no disponible". El 500 queda reservado a fallos reales del servidor (el
+ * cliente de Supabase no se pudo crear).
  */
 export async function GET(request: NextRequest) {
   const { response: adminDenied } = await requireAdmin()
@@ -26,9 +34,10 @@ export async function GET(request: NextRequest) {
         .order("created_at", { ascending: false })
         .limit(30)
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        logger.warn("products.audit.degraded", { scope: "activity", error: error.message })
+        return NextResponse.json({ entries: [], degraded: true })
       }
-      return NextResponse.json({ entries: data ?? [] })
+      return NextResponse.json({ entries: data ?? [], degraded: false })
     }
 
     const { data, error } = await supabase
@@ -40,10 +49,15 @@ export async function GET(request: NextRequest) {
       .limit(MAX_ROWS)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      logger.warn("products.audit.degraded", {
+        scope: "history",
+        productId,
+        error: error.message,
+      })
+      return NextResponse.json({ entries: [], degraded: true })
     }
 
-    return NextResponse.json({ entries: data ?? [] })
+    return NextResponse.json({ entries: data ?? [], degraded: false })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error interno del servidor"
     return NextResponse.json({ error: message }, { status: 500 })

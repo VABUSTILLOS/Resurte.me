@@ -1792,6 +1792,10 @@ function AdminProductsContent() {
     { action: string; actor_email: string | null; created_at: string; detail: Record<string, unknown> }[]
   >([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  // B31: `admin_audit_log` es una lectura decorativa; si el route degrada
+  // (tabla ausente, PostgREST rechaza), distinguimos "sin cambios" de
+  // "historial no disponible" en vez de mentir con una lista vacía.
+  const [historyDegraded, setHistoryDegraded] = useState(false)
   // Drawer de actividad reciente (audit log de products, todos los productos).
   const [activityOpen, setActivityOpen] = useState(false)
   const [activityEntries, setActivityEntries] = useState<
@@ -1804,15 +1808,22 @@ function AdminProductsContent() {
     }[]
   >([])
   const [activityLoading, setActivityLoading] = useState(false)
+  const [activityDegraded, setActivityDegraded] = useState(false)
 
   async function openActivity() {
     setActivityOpen(true)
     setActivityEntries([])
     setActivityLoading(true)
+    setActivityDegraded(false)
     try {
       const res = await fetch("/api/admin/products/audit")
       const data = await res.json().catch(() => ({}))
-      if (res.ok) setActivityEntries(data.entries ?? [])
+      if (res.ok) {
+        setActivityEntries(data.entries ?? [])
+        setActivityDegraded(data.degraded === true)
+      } else {
+        setActivityDegraded(true)
+      }
     } finally {
       setActivityLoading(false)
     }
@@ -1822,10 +1833,16 @@ function AdminProductsContent() {
     setHistoryFor(p)
     setHistoryEntries([])
     setHistoryLoading(true)
+    setHistoryDegraded(false)
     try {
       const res = await fetch(`/api/admin/products/audit?productId=${p.id}`)
       const data = await res.json().catch(() => ({}))
-      if (res.ok) setHistoryEntries(data.entries ?? [])
+      if (res.ok) {
+        setHistoryEntries(data.entries ?? [])
+        setHistoryDegraded(data.degraded === true)
+      } else {
+        setHistoryDegraded(true)
+      }
     } finally {
       setHistoryLoading(false)
     }
@@ -5756,6 +5773,10 @@ function AdminProductsContent() {
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   Cargando…
                 </div>
+              ) : activityDegraded ? (
+                <p className="py-8 text-center text-sm text-amber-600">
+                  Historial no disponible en este momento.
+                </p>
               ) : activityEntries.length === 0 ? (
                 <p className="py-8 text-center text-sm text-gray-400">Sin actividad registrada.</p>
               ) : (
@@ -6344,6 +6365,10 @@ function AdminProductsContent() {
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   Cargando…
                 </div>
+              ) : historyDegraded ? (
+                <p className="py-8 text-center text-sm text-amber-600">
+                  Historial no disponible en este momento.
+                </p>
               ) : historyEntries.length === 0 ? (
                 <p className="py-8 text-center text-sm text-gray-400">
                   Sin cambios registrados.
