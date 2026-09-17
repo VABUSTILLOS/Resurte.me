@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { Mail, RefreshCcw, CheckCircle2, XCircle } from "lucide-react"
 
 interface EmailLog {
@@ -25,6 +26,10 @@ const TYPE_LABEL: Record<string, string> = {
   reactivation_90: "Reactivación 90d",
 }
 
+const ERROR_LABEL: Record<string, string> = {
+  email_not_configured: "Sin credenciales del proveedor de correo",
+}
+
 /**
  * Bitácora de correos enviados (transaccionales y campañas), con filtro por
  * tipo y estado.
@@ -34,6 +39,8 @@ export function EmailsTab() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState("all")
+  // Optimista: solo se pinta la alerta cuando el servidor confirma el hueco.
+  const [configured, setConfigured] = useState(true)
 
   const load = useCallback(async () => {
     try {
@@ -41,6 +48,7 @@ export function EmailsTab() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Error al cargar")
       setLogs(data.logs ?? [])
+      setConfigured(data.configured !== false)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar")
     } finally {
@@ -72,6 +80,18 @@ export function EmailsTab() {
 
   return (
     <div>
+      {!configured && (
+        <div className="mb-5 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+          <strong className="font-semibold">El correo no está configurado.</strong> Ningún
+          email de pedidos, campañas ni recordatorios puede salir, y todos quedan
+          registrados como fallidos abajo.{" "}
+          <Link href="/admin/sistema" className="font-semibold underline">
+            Ver qué falta
+          </Link>
+          .
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <p className="text-sm text-gray-500">
           Bitácora de emails transaccionales y campañas (email_logs).
@@ -162,7 +182,11 @@ export function EmailsTab() {
                       ) : (
                         <span
                           className="inline-flex items-center gap-1 text-red-600"
-                          title={log.error ?? undefined}
+                          title={
+                            log.error
+                              ? (ERROR_LABEL[log.error] ?? log.error)
+                              : undefined
+                          }
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           Falló

@@ -39,7 +39,7 @@ export const ZONES: Zone[] = [
     label: "Paseo Central / Plaza del Sol",
     weekday: 3, // miércoles
     visitGoal: 8,
-    pitch: "Precios de central de abastos con entrega en menos de 24 horas y factura automática.",
+    pitch: "Precios de central de abastos con entrega en menos de 24 horas y factura a solicitud.",
     keyProducts: ["Pollo", "Carne molida", "Tortillas", "Aceite", "Papa", "Cebolla"],
   },
   {
@@ -102,6 +102,6 @@ export const VALUE_PROPS = [
   "Precios de central de abastos",
   "Crédito a 7/15/30 días sin aval, según historial",
   "Programa de Recompensas: del 5% (Verde) al 20% (Diamante) en cada compra, canjeables por marketing digital, fotografía y web — los únicos proveedores que te regresan crecimiento por surtirte. Resurte.me y crece",
-  "Facturación CFDI 4.0 automática",
+  "Facturación CFDI 4.0 a solicitud",
   `Pedido mínimo de ${formatMxn(MIN_ORDER_MXN)} y envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}`,
 ]

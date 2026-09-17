@@ -22,6 +22,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
+import { mapCrmProspect } from "@/lib/crm-core"
 import { createServiceClient } from "@/lib/supabase/service"
 import { sendTemplate, sendTextMessage } from "@/lib/whatsapp"
 import { isMissingRelationError } from "@/lib/sale-window"
@@ -31,14 +32,11 @@ import {
   quickReplyValuesFor,
   renderQuickReply,
   sequenceDedupeKey,
-  isSequenceStepDue,
   indexMessagesByPhone,
   phoneLookupVariants,
   type ConversationProspect,
   type InboxMessage,
 } from "@/lib/crm-inbox"
-
-export { isSequenceStepDue }
 
 /** Tope de envíos por corrida. El resto queda para el día siguiente. */
 export const MAX_SEQUENCE_SENDS_PER_RUN = 50
@@ -531,21 +529,11 @@ async function markEnrollment(
   }
 }
 
+/**
+ * El motor solo conoce un puñado de campos, pero la bandeja exige el contrato
+ * completo. `mapCrmProspect` rellena lo ausente con los mismos valores por
+ * defecto que usa cualquier otra lectura, en vez de repetirlos aquí.
+ */
 function toConversationProspect(prospect: SequenceProspect): ConversationProspect {
-  return {
-    id: prospect.id,
-    seller_id: null,
-    lead_id: null,
-    name: prospect.name,
-    restaurant_name: prospect.restaurant_name,
-    phone: prospect.phone,
-    whatsapp: prospect.whatsapp,
-    email: null,
-    status: "nuevo",
-    notes: null,
-    next_follow_up_at: null,
-    last_contact_at: null,
-    created_at: new Date(0).toISOString(),
-    tags: [],
-  }
+  return mapCrmProspect({ ...prospect, created_at: new Date(0).toISOString() })
 }

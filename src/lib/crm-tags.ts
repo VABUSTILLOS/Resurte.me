@@ -7,7 +7,14 @@
  * depende de cómo la escribió cada vendedor.
  */
 
-import { normalizeForSearch } from "./crm-pipeline"
+import { normalizeForSearch } from "./crm-core"
+
+/**
+ * Ronda 7: `readTags` se movió a `crm-core.ts` (lo necesita el mapeo de filas, y
+ * `crm-core` no puede importar de aquí sin crear un ciclo). Se reexporta para no
+ * romper a sus consumidores.
+ */
+export { readTags } from "./crm-core"
 
 /** Longitud máxima de una etiqueta, ya normalizada. */
 export const MAX_TAG_LENGTH = 24
@@ -81,21 +88,4 @@ export function tagMatches(tag: string, query: string | null | undefined): boole
 export function tagLabel(tag: string): string {
   if (!tag) return ""
   return tag.charAt(0).toUpperCase() + tag.slice(1)
-}
-
-/**
- * Lee `crm_prospects.tags` tal como llega de PostgREST.
- *
- * No normaliza ni aplica el tope: lo que ya está guardado se muestra tal cual.
- * Solo descarta lo que no sea texto y las repeticiones exactas.
- */
-export function readTags(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  const out: string[] = []
-  for (const item of value) {
-    if (typeof item !== "string") continue
-    const trimmed = item.trim()
-    if (trimmed && !out.includes(trimmed)) out.push(trimmed)
-  }
-  return out
 }

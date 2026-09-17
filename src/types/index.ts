@@ -174,8 +174,8 @@ export type PaymentMethod =
 
 export const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string; description: string }[] = [
   { value: 'card', label: 'Tarjeta (Stripe)', icon: '💳', description: 'Crédito o débito. Procesado por Stripe.' },
-  { value: 'spei', label: 'SPEI', icon: '🏦', description: 'Transferencia bancaria. Recibirás CLABE al confirmar.' },
-  { value: 'oxxo', label: 'OXXO Pay', icon: '🏪', description: 'Paga en efectivo en cualquier OXXO con referencia.' },
+  { value: 'spei', label: 'SPEI', icon: '🏦', description: 'Transferencia bancaria desde tu banca en línea.' },
+  { value: 'oxxo', label: 'OXXO Pay', icon: '🏪', description: 'Pago en efectivo en tienda OXXO.' },
   { value: 'mercado_pago', label: 'Mercado Pago', icon: '📱', description: 'Link de pago de Mercado Pago.' },
   { value: 'cash_on_delivery', label: 'Efectivo', icon: '💵', description: 'Paga al recibir tu pedido.' },
   { value: 'codi', label: 'CoDi', icon: '📲', description: 'Pago con QR del Banco de México.' },

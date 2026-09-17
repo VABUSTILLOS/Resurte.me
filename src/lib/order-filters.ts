@@ -52,6 +52,8 @@ export interface SavedOrderFilter {
   search: string
   from: string
   to: string
+  /** Estado de pago. Ausente en presets guardados antes de esta ronda. */
+  paymentStatus?: string
 }
 
 const MAX_SAVED_FILTERS = 10
@@ -74,7 +76,9 @@ export function parseSavedFilters(json: string | null): SavedOrderFilter[] {
           typeof (f as SavedOrderFilter).status === "string" &&
           typeof (f as SavedOrderFilter).search === "string" &&
           typeof (f as SavedOrderFilter).from === "string" &&
-          typeof (f as SavedOrderFilter).to === "string"
+          typeof (f as SavedOrderFilter).to === "string" &&
+          ((f as SavedOrderFilter).paymentStatus === undefined ||
+            typeof (f as SavedOrderFilter).paymentStatus === "string")
       )
       .slice(0, MAX_SAVED_FILTERS)
   } catch {
@@ -117,9 +121,44 @@ export const ORDER_STATUS_VALUES: readonly OrderStatus[] = [
   "cancelled",
 ]
 
+/**
+ * Estado de pago con el que se puede filtrar la lista de pedidos.
+ *
+ * Son los ocho valores del enum `payment_status` de Postgres: el panel debe
+ * poder aislar cualquier desenlace real, incluidos los que nadie mira
+ * (`failed`, `refunded`, `disputed`), que es justo el punto del desglose del
+ * embudo de conversión. No se restringe a los cuatro que resume el embudo.
+ */
+export type OrderPaymentStatusFilter =
+  | "pending"
+  | "processing"
+  | "paid"
+  | "failed"
+  | "expired"
+  | "refunded"
+  | "disputed"
+  | "amount_mismatch"
+  | "all"
+
+/**
+ * Allowlist runtime de estados de pago aceptados por el filtro. Un test la
+ * compara con `PAYMENT_STATUS_LABEL` para que no se desincronice del enum real.
+ */
+export const ORDER_PAYMENT_STATUS_VALUES: readonly OrderPaymentStatusFilter[] = [
+  "pending",
+  "processing",
+  "paid",
+  "failed",
+  "expired",
+  "refunded",
+  "disputed",
+  "amount_mismatch",
+]
+
 /** Subconjunto de la página que viaja en la URL. */
 export interface OrderFilterState {
   status: OrderStatusFilter
+  paymentStatus: OrderPaymentStatusFilter
   search: string
   from: string
   to: string
@@ -128,6 +167,7 @@ export interface OrderFilterState {
 /** Estado inicial de la página, también usado como forma del preset guardado. */
 export const EMPTY_ORDER_FILTER: OrderFilterState = {
   status: "all",
+  paymentStatus: "all",
   search: "",
   from: "",
   to: "",
@@ -137,21 +177,28 @@ function isOrderStatus(value: string): value is OrderStatus {
   return (ORDER_STATUS_VALUES as readonly string[]).includes(value)
 }
 
+function isOrderPaymentStatus(value: string): value is OrderPaymentStatusFilter {
+  return (ORDER_PAYMENT_STATUS_VALUES as readonly string[]).includes(value)
+}
+
 /**
  * Lee los filtros de la query string. Cada valor se valida antes de usarse como
  * estado: un `status` fuera de la allowlist o una fecha mal formada se
  * descartan en lugar de propagarse (la URL la puede escribir cualquiera).
  *
- * Las claves (`status`, `q`, `from`, `to`) son las mismas que serializa
+ * Las claves (`status`, `payment_status`, `q`, `from`, `to`) son las mismas que
+ * serializa
  * `orderFilterQuery`, de modo que un enlace profundo y un filtro guardado
  * describen lo mismo y no compiten entre sí.
  */
 export function parseOrderFilterParams(params: URLSearchParams): OrderFilterState {
   const rawStatus = params.get("status")?.trim() ?? ""
+  const rawPaymentStatus = params.get("payment_status")?.trim() ?? ""
   const rawFrom = params.get("from")?.trim() ?? ""
   const rawTo = params.get("to")?.trim() ?? ""
   return {
     status: isOrderStatus(rawStatus) ? rawStatus : "all",
+    paymentStatus: isOrderPaymentStatus(rawPaymentStatus) ? rawPaymentStatus : "all",
     search: params.get("q")?.trim() ?? "",
     from: isValidIsoDate(rawFrom) ? rawFrom : "",
     to: isValidIsoDate(rawTo) ? rawTo : "",
@@ -165,6 +212,7 @@ export function parseOrderFilterParams(params: URLSearchParams): OrderFilterStat
 export function orderFilterQuery(current: OrderFilterState): string {
   const sp = new URLSearchParams()
   if (current.status !== "all") sp.set("status", current.status)
+  if (current.paymentStatus !== "all") sp.set("payment_status", current.paymentStatus)
   const search = current.search.trim()
   if (search) sp.set("q", search)
   if (isValidIsoDate(current.from.trim())) sp.set("from", current.from.trim())

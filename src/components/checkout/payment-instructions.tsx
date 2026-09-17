@@ -1,6 +1,6 @@
 "use client"
 
-import { Building2, Store, Copy, Check } from "lucide-react"
+import { Building2, Store, Copy, Check, MessageCircle } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/components/toast"
 
@@ -15,7 +15,14 @@ import { useToast } from "@/components/toast"
  * Los datos bancarios/referencia se configuran por env (no hay credenciales de
  * cobro, solo la información para que el cliente transfiera):
  *   NEXT_PUBLIC_SPEI_CLABE, NEXT_PUBLIC_SPEI_BENEFICIARIO, NEXT_PUBLIC_OXXO_REFERENCIA
- * Si no están configuradas, se muestra un mensaje genérico de contacto.
+ *
+ * Si un dato no está configurado NO se promete que llegará después (no hay
+ * canal de envío automático: ni correo ni WhatsApp Business están configurados).
+ * En su lugar se ofrece el enlace público de WhatsApp, que sí funciona sin
+ * credenciales, para que el cliente pida los datos al momento.
+ *
+ * Nota: la `referencia OXXO` solo se muestra si viene configurada. El folio del
+ * pedido NO sirve para pagar en tienda, por eso no se usa como referencia.
  */
 
 interface PaymentInstructionsProps {
@@ -24,6 +31,22 @@ interface PaymentInstructionsProps {
   amount?: number | null
   /** Referencia del pedido (p.ej. #1234) para incluir en el concepto. */
   orderRef?: string | null
+}
+
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5216145337486"
+
+function WhatsAppHelpLink({ message, label }: { message: string; label: string }) {
+  return (
+    <a
+      href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+    >
+      <MessageCircle className="h-3.5 w-3.5" />
+      {label}
+    </a>
+  )
 }
 
 function CopyRow({ label, value }: { label: string; value: string }) {
@@ -65,6 +88,7 @@ export function PaymentInstructions({ method, amount, orderRef }: PaymentInstruc
   const isSpei = method === "spei"
   const Icon = isSpei ? Building2 : Store
   const title = isSpei ? "Paga por transferencia (SPEI)" : "Paga en efectivo (OXXO)"
+  const orderConcept = orderRef ? ` del pedido ${orderRef}` : ""
 
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-left">
@@ -82,32 +106,45 @@ export function PaymentInstructions({ method, amount, orderRef }: PaymentInstruc
             {clabe ? (
               <CopyRow label="CLABE" value={clabe} />
             ) : (
-              <p className="text-xs text-amber-700 bg-white border border-amber-200 rounded-lg px-3 py-2">
-                Te enviaremos la CLABE por WhatsApp al confirmar tu pedido.
-              </p>
+              <div className="rounded-lg bg-white border border-amber-200 px-3 py-2">
+                <p className="text-xs text-amber-700">
+                  Todavía no publicamos una CLABE fija. Pídenos los datos de
+                  transferencia y te los compartimos al momento.
+                </p>
+                <WhatsAppHelpLink
+                  message={`Hola, necesito la CLABE para transferir el pago${orderConcept}.`}
+                  label="Pedir la CLABE por WhatsApp"
+                />
+              </div>
             )}
             <CopyRow label="Beneficiario" value={beneficiario} />
             {orderRef && <CopyRow label="Concepto / referencia" value={orderRef} />}
           </>
+        ) : oxxoRef ? (
+          <CopyRow label="Referencia OXXO" value={oxxoRef} />
         ) : (
-          <>
-            {oxxoRef ? (
-              <CopyRow label="Referencia OXXO" value={oxxoRef} />
-            ) : orderRef ? (
-              <CopyRow label="Referencia" value={orderRef} />
-            ) : (
-              <p className="text-xs text-amber-700 bg-white border border-amber-200 rounded-lg px-3 py-2">
-                Te enviaremos la referencia por WhatsApp al confirmar tu pedido.
-              </p>
-            )}
-          </>
+          <div className="rounded-lg bg-white border border-amber-200 px-3 py-2">
+            <p className="text-xs text-amber-700">
+              El pago en OXXO todavía no está habilitado, así que no podemos
+              generar una referencia. Escríbenos y te damos una alternativa para
+              completar tu pedido.
+            </p>
+            <WhatsAppHelpLink
+              message={`Hola, elegí pagar en OXXO${orderConcept} y necesito una alternativa para completar el pago.`}
+              label="Ver alternativas por WhatsApp"
+            />
+          </div>
         )}
       </div>
 
       <p className="text-[11px] text-amber-700 mt-3">
         {isSpei
-          ? "Tu pedido se confirma y se surte en cuanto recibimos tu transferencia. Envíanos el comprobante por WhatsApp para agilizar."
-          : "Presenta la referencia en cualquier OXXO y paga en caja. Tu pedido se surte al confirmar el pago."}
+          ? clabe
+            ? "Tu pedido se confirma y se surte en cuanto recibimos tu transferencia. Envíanos el comprobante por WhatsApp para agilizar."
+            : "En cuanto nos confirmes la transferencia, tu pedido se surte."
+          : oxxoRef
+            ? "Presenta la referencia en cualquier OXXO y paga en caja. Tu pedido se surte al confirmar el pago."
+            : "Tu pedido queda registrado. Te contactamos para acordar cómo completar el pago."}
       </p>
     </div>
   )

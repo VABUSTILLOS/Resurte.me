@@ -92,7 +92,7 @@
 | U1-U7 | Fechas relativas, aria-labels, form accesible, badge predeterminada, scroll al editar | ✅ |
 | U8-U12 | Mostrar/ocultar contraseña, Bloq Mayús, autocomplete, hints, roles | ✅ |
 | U13 | **Passkeys / WebAuthn**: entrar sin contraseña con huella, rostro, PIN o llave física. `src/lib/supabase/client.ts` enciende el flag que auth-js exige para la API experimental (`auth: { experimental: { passkey: true } }`); sin él `signInWithPasskey`/`auth.passkey.*` lanzan **al llamarse**, no al construirse. `AuthForm` (modo login) añade "Entrar con llave de acceso" (`signInWithPasskey()`, sin correo: la credencial es descubrible), oculto si `isPasskeySupported()` es falso y detectado con `useSyncExternalStore` para que el servidor pinte `false` sin desajuste de hidratación (y sin el render extra de un `setState` en efecto). En `/recompensas?tab=profile` la `PasskeyCard` lista, crea (`registerPasskey()`), renombra (`passkey.update`) y borra (`passkey.delete`, con confirmación: es irreversible y puede dejar al usuario sin su única entrada). `src/lib/passkeys.ts` (reglas puras, 31 tests) concentra lo que no debe reimplementarse en la UI: la fecha en la zona canónica del proyecto, la etiqueta (nombre del usuario → fecha → "Llave de acceso"; **nunca un índice**, que se recorre al agregar otra), la validación del nombre (recorta antes de medir, tope 120) y el mapeo de errores a español. Dos decisiones de correctitud: (a) `ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY` se resuelve por el **nombre de la causa**, no como cancelación — auth-js lo usa tanto para `NotAllowedError` como para el caso desconocido, y tratarlo en bloque silenciaría fallos reales; (b) `NotAllowedError` **no** se suprime: el navegador no distingue "cerré la ventana" de "este dispositivo no tiene ninguna llave" (privacidad), así que `passkeyErrorMessage(err, flow)` da copy distinto al entrar (con salida por correo) y al crear. `isPasskeyCancelled` se reserva para el aborto explícito. La tarjeta se oculta entera —sin dejar hueco— si WebAuthn no existe o si el proyecto no tiene las passkeys habilitadas (`list()` falla) | ✅ |
-| U14 | **La recuperación de contraseña ya tiene entrada** (hallazgo de la ronda 4, **cerrado en la ronda 9**). La **mitad receptora** ya funcionaba: `/auth/reset` cambia la contraseña con `supabase.auth.updateUser({ password })` y `/auth/callback` intercambia el código por la sesión temporal. La **mitad iniciadora** que faltaba ahora existe: `AuthForm` (modo login) tiene el disparador **"¿Olvidaste tu contraseña?"** (`type="button"`, `disabled` mientras carga), que con el correo vacío avisa **sin viajar a la red** («Escribe tu correo y te enviamos el enlace.») y con correo llama a `resetPasswordForEmail`. El mensaje de éxito es **neutral a propósito** («Si {correo} tiene una cuenta, te enviamos un enlace…»): no revela si la cuenta existe. **Decisión que evita una rotura silenciosa en producción**: el destino viaja en la **cookie** `resurte_auth_next` (`rememberNextPath("/auth/reset")`), **no** como `?next=` en la `redirectTo`. Supabase valida la URL de redirección completa contra la allow-list de *Redirect URLs*, así que una entrada exacta de `/auth/callback` no coincide con `/auth/callback?next=/auth/reset`: el proveedor cae al **Site URL** y el enlace habría llevado a `/` en vez de a `/auth/reset`, **sin error visible**. Es exactamente la razón por la que `src/lib/auth-next.ts` existe (lo dice su comentario) y por la que el `redirectTo` se queda limpio. Cubierto por `e2e/auth.spec.ts` (disparador presente en login, ausente en registro, y aviso de correo vacío — lo único determinista sin backend de correo). El enlace mágico (`signInWithOtp`) **sigue sin existir en `src/`** | ✅ |
+| U14 | **La recuperación de contraseña ya tiene entrada** (hallazgo de la ronda 4, **cerrado** — esta fila es su acta). La **mitad receptora** ya funcionaba: `/auth/reset` cambia la contraseña con `supabase.auth.updateUser({ password })` y `/auth/callback` intercambia el código por la sesión temporal. La **mitad iniciadora** que faltaba ahora existe: `AuthForm` (modo login) tiene el disparador **"¿Olvidaste tu contraseña?"** (`type="button"`, `disabled` mientras carga), que con el correo vacío avisa **sin viajar a la red** («Escribe tu correo y te enviamos el enlace.») y con correo llama a `resetPasswordForEmail`. El mensaje de éxito es **neutral a propósito** («Si {correo} tiene una cuenta, te enviamos un enlace…»): no revela si la cuenta existe. **Decisión que evita una rotura silenciosa en producción**: el destino viaja en la **cookie** `resurte_auth_next` (`rememberNextPath("/auth/reset")`), **no** como `?next=` en la `redirectTo`. Supabase valida la URL de redirección completa contra la allow-list de *Redirect URLs*, así que una entrada exacta de `/auth/callback` no coincide con `/auth/callback?next=/auth/reset`: el proveedor cae al **Site URL** y el enlace habría llevado a `/` en vez de a `/auth/reset`, **sin error visible**. Es exactamente la razón por la que `src/lib/auth-next.ts` existe (lo dice su comentario) y por la que el `redirectTo` se queda limpio. Cubierto por `e2e/auth.spec.ts` (disparador presente en login, ausente en registro, y aviso de correo vacío — lo único determinista sin backend de correo). El enlace mágico (`signInWithOtp`) **sigue sin existir en `src/`** | ✅ |
 
 ## 7. Panel del restaurante
 
@@ -347,7 +347,7 @@ matchean. Verificado verde en ambos projects contra el repo CI-equivalente.
    5 s el test medía el arranque en frío. Arreglado con **`timeout: 15000`** en
    los 4 tests del 404 — **sin tocar una sola aserción**, porque las aserciones
    eran correctas.
-   **La ronda 9 volvió a medir esto y el `timeout: 15000` resultó insuficiente**:
+   **Se volvió a medir esto y el `timeout: 15000` resultó insuficiente**:
    el `h1 "404"` tarda **~2.1 s en caliente pero >30 s con 5 workers en
    paralelo** — y ahí no se arregla subiéndole el número, porque un aserto de
    visibilidad mide la **hidratación del servidor de desarrollo**, que no tiene
@@ -366,7 +366,7 @@ matchean. Verificado verde en ambos projects contra el repo CI-equivalente.
 **Dos hallazgos de producto, declarados aquí y hoy resueltos:**
 
 1. **La recuperación de contraseña no tenía entrada** (rastreada como **U14**,
-   **cerrada en la ronda 9** — ver esa fila). La **mitad receptora funcionaba**
+   **cerrada** — ver la fila U14). La **mitad receptora funcionaba**
    (`/auth/reset` cambia la contraseña con `updateUser`, y `/auth/callback`
    intercambia el código por la sesión temporal); faltaba la **mitad
    iniciadora**: `resetPasswordForEmail` aparecía **únicamente en un comentario**
@@ -462,6 +462,7 @@ trabajaba el prospecto.
 | C9 | **Asistente de respuesta** (`src/lib/crm-ai.ts`): arma el contexto del hilo redactando PII (`maskPhone`, `maskEmail`, `redactFreeText`) y **propone** un borrador; `suggestLeadReply` cae a `buildFallbackReply` (plantilla) cuando el proveedor no responde. **Nunca auto-envía** y nunca pone un teléfono o correo completo en el prompt. 29 pruebas | ✅ |
 | C10 | **Contratos y e2e**: `src/lib/crm-inbox.contract.test.ts` (43 pruebas) ata `00140`/`00097` al motor puro — columna generada equivalente a `phoneKey()`, `is_active` en `false`, `CHECK` de `status` ↔ `SequenceAdvance`, RLS sin políticas, y la **ausencia** de columnas desnormalizadas de último mensaje; cinco bloques `@ci` nuevos en `e2e/admin-leads.spec.ts` (guard de la pestaña, allowlist de `?view=`, `?tag=`, combinación completa de filtros y "las secuencias no se activan por URL") | ✅ |
 | C11 | **Documentación**: invariantes de la ronda en `docs/agents/admin.md` y esta sección | ✅ |
+| C12 | **Backlog declarado, no código muerto** 🔜: cinco server actions de escritura existen y están cubiertas por pruebas, pero **ninguna tiene consumidor en la UI** — `saveQuickReply` y `deleteQuickReply` (su lectura, `getAdminQuickReplies`, sí está cableada en `LeadConversations.tsx`), `distributeCrmProspects` y `getAdminSellerLoads` (el reparto se hace hoy prospecto a prospecto desde `LeadDetailDrawer.tsx`, con `assignCrmProspect`) y `cancelSequenceEnrollment` (`LeadSequences.tsx` importa `enrollProspectsInSequence` pero **no** permite cancelar una inscripción). Se declaran aquí en vez de borrarlas porque la mitad del ciclo está construida y en uso. Viven en la allowlist de `knip` con este motivo escrito (ronda 7, K5) | 🔜 |
 
 **Verificación de la ronda**: `npx tsc --noEmit` → 0 · `npm run lint` → 0 ·
 `npm test` → 4506 passed / 0 failed (271 archivos) · `npm run build` → 0.
@@ -473,6 +474,79 @@ migración no está aplicada — en particular la bandeja empareja por
 `from_number` y **no** por la columna generada, así que funciona con 00140 sin
 aplicar.
 
+### Ronda 7 — El quinto gate de CI: `knip`
+
+`.github/workflows/ci.yml` declara **cinco** verificaciones y la quinta nunca se
+había medido. `npx knip --production` llevaba rojo permanente con **479
+hallazgos**: no era un gate, era un paso que se había aprendido a ignorar. La
+causa raíz no estaba en el código sino en **la configuración**. `--production`
+oculta todo lo que solo consumen los tests; `ignoreExportsUsedInFile` no estaba
+activado, y sin él knip reporta cada símbolo usado únicamente dentro de su
+propio módulo y cada colisión de nombre entre módulos; y `package.json`
+arrastraba un `knip.ignoreIssues` de **65 entradas** que enumeraban justo ese
+ruido. Medido con y sin ellas, el recuento no se movía: **la lista era inerte**,
+nadie la había comprobado nunca.
+
+La ronda pone el gate en verde arreglando **primero la medición y después el
+código**, y cierra las dos formas de volver a apagarlo: un contrato que ata la
+configuración —y su justificación— y otro que ata los punteros de este propio
+documento.
+
+| # | Fase | Estado |
+|---|---|---|
+| K1 | **La medición se arregla antes que el código**: script `"knip": "knip"` sin flags —para que CI y local midan lo mismo—, `ignoreExportsUsedInFile: true` y las **65 entradas inertes** de `ignoreIssues` borradas (212 líneas). `knip` pasa de **479 → 62**. Se midió que `--config` **reemplaza** la clave `ignoreIssues` en vez de fusionarla, así que un config parcial mide otra cosa: la medición se hace sobre `package.json` | ✅ |
+| K2 | **El barrel de impresión deja de ofrecer lo que no tiene** (`src/lib/foodos-printing/index.ts`): de 26 re-exports a los **5** que producción importa. El resto era el catálogo ESC/POS declarado "para que la UI pueda mostrarlo como próximamente" — una capacidad que no existe, exportada como si existiera. El docstring prohíbe reexportar "por comodidad" → **40** | ✅ |
+| K3 | **Cinco recortes de re-export** sin consumidor: `crm-pipeline` (11 símbolos y el `export type` reducido a `{ CrmStatus, ProspectFilters }`; su docstring decía "se reexporta para no romper a los consumidores" y la migración a `crm-core` ya había terminado), `crm-sequences-engine` (`isSequenceStepDue`), `foodos-reportes` (`channelLabel`), `storage/index` (`StorageSchema`) y `checkout-shared` (`DeliveryDay`) → **24** | ✅ |
+| K4 | **`courierLink` se cablea en vez de duplicarse**: `panel/foodos/actions.ts` armaba el enlace del repartidor **inline** teniendo el helper al lado. Ahora lo llama. La duplicación era la razón de que knip lo viera muerto, y el arreglo no era borrarlo sino usarlo → **21** | ✅ |
+| K5 | **Triaje símbolo por símbolo, verificando antes de borrar**: `ScoredCustomer` (`foodos-rfm.ts`) no tenía una sola referencia —ni dentro de su módulo— y se borró. El resto va a **allowlist con motivo escrito**, no a borrado: los cinco server actions de escritura del CRM (K9), `pollTaskUntilComplete` (API de piloto declarada en su propio docstring), `readCartSyncEntry` e `INBOX_VIEW_LABEL` (fuentes únicas escritas y no adoptadas), `integration-status.ts` (archivo sin trackear de otra sesión) y los 8 interfaces de `types/foodos.ts`/`types/index.ts`, que **espejan tablas que sí existen** en migraciones. Más `sharp`, `supabase` y `vercel` como `ignoreDependencies`: los dos últimos son los **CLI de los runbooks** de `docs/OPS.md` (12 invocaciones de `npx supabase` y las de `vercel`), y `sharp` lo importan scripts que knip no analiza porque `scripts/**` está en `ignore`. De 21 quedaba **1**: un archivo sin trackear de otra sesión | ✅ |
+| K6 | **El gate entra en CI y se ata**: `ci.yml` pasa de `npx knip --production` a **`npm run knip`** —medir con un flag que nadie usa es medir otra cosa—, y `src/lib/knip-config.contract.test.ts` (8 pruebas) hace de **ratchet**: fija la allowlist y sus motivos por igualdad exacta, exige que cada entrada tenga justificación escrita, que no queden justificaciones huérfanas, que solo se supriman `exports`/`types` (nunca `files`, que escondería un archivo entero) y que CI no vuelva al flag. Probado por mutación: añadir una entrada sin motivo hace fallar tres pruebas | ✅ |
+| K7 | **Los punteros de este plan dejan de mentir** (`src/lib/docs-pointers.contract.test.ts`): había tres referencias a una **ronda 9** que **nunca se escribió** —las actas se interrumpen después de la ronda 6— y dos punteros vagos del tipo *ver esa sección* sin destino. Los punteros se sanean (el contenido de esa ronda vive en la fila **U14** y en § Verificación, y ahora ahí apuntan) y el contrato falla ante un puntero a una sección o a una fila inexistente, ante un puntero vago y ante dos actas con el mismo número. Incluye el discriminador que hacía falta: en este documento **"Productos ronda N"** (filas A18–A37 y B1–B32) es el nombre de una tanda del panel de productos, **no** un acta. Nota para quien escriba aquí: las frases exactas que el contrato prohíbe no se pueden citar literalmente ni para explicarlas —el contrato no distingue prosa de puntero—, así que van en cursiva o con el número en negrita | ✅ |
+| K8 | **Invariante 11** en `docs/agents/README.md`: *todo gate de CI está verificado y verde, o no está en CI*. Un paso en rojo permanente no protege: entrena a ignorar el resultado | ✅ |
+| K9 | **Los cinco server actions de la ronda 6 se investigan, no se borran**: `saveQuickReply`, `deleteQuickReply`, `distributeCrmProspects`, `getAdminSellerLoads` y `cancelSequenceEnrollment` no tienen consumidor, pero la mitad **lectora** sí está cableada (`LeadConversations.tsx` llama `getAdminQuickReplies`; `LeadSequences.tsx` muestra `activeEnrollments`). No es código abandonado: es una función a medio construir, y queda declarada como backlog en la fila **C12** | ✅ |
+
+**Lección — `knip` mide el working tree, no `HEAD`.** Su código de salida no es
+estable en un checkout compartido: un archivo nuevo sin trackear de otra sesión
+aparece como *unused file* y devuelve el gate a rojo sin que nada de esta ronda
+haya cambiado. El contrato de K6 fija **la configuración**, que es lo único que
+esta ronda puede controlar; el recuento depende del estado del árbol en el
+instante de medirlo. Corolario: antes de atribuirse un hallazgo, comprobar la
+propiedad del archivo (`git status --porcelain <archivo>` +
+`git cat-file -e HEAD:<archivo>`).
+
+### Ronda 8 — Conversión: el embudo deja de mentir
+
+El panel de conversiones abría con **"Error al cargar el funnel"**. La causa no
+estaba en la UI: `/api/admin/funnel` filtraba `email_logs` por `created_at`, una
+columna que esa tabla **nunca tuvo** (solo tiene `sent_at`). Postgres devolvía
+`42703`, la ruta un 500, y el cliente pintaba un mensaje genérico que no
+distinguía "la consulta está mal escrita" de "no hay datos". Un embudo que se
+cae entero porque una de sus cinco consultas nombra mal una columna.
+
+Arreglar eso dejó a la vista lo de fondo: la superficie **no se podía
+cuestionar**. No decía contra qué se comparaba el periodo, no decía cuándo un
+número estaba recortado, y no decía qué parte del embudo se medía y qué parte
+solo se contaba. La ronda arregla el error y después hace que el panel sea
+honesto sobre lo que mide.
+
+| # | Fase | Estado |
+|---|---|---|
+| CV1 | **La columna que no existía**: `email_logs` se filtra por `sent_at` en `/api/admin/funnel` y en `reorder-reminders.ts` (mismo error, misma tabla). El `42703` tenía una segunda causa latente: la ruta pedía `utm_source` en la lectura de detalle y reintentaba sin él si la columna no estaba — el reintento ahora está probado, igual que la regresión de `sent_at` | ✅ |
+| CV2 | **Contra qué se compara**: `buildFunnelComparison` / `buildMethodComparison` / `buildUtmComparison` en `@/lib/conversion-funnel` comparan contra la **ventana anterior de la misma duración** (`periodBounds`), no contra el día previo, y las tarjetas muestran el delta con su dirección. La regla que no se rompe: `compareMetric` devuelve `deltaPct: null` cuando la base es **0** — nunca `100` ni `-100`, porque un "▲ 100%" sobre cero es un dato inventado — y la UI lo pinta como *no medido* | ✅ |
+| CV3 | **Un recorte se declara**: las tres lecturas tienen tope (`DETAIL_LIMIT` 2000, `RECOVERY_LOG_LIMIT` 2000, `TAKE_RATE_ID_LIMIT` 1000) y la respuesta ahora lo dice (`detailTruncated`, `recoveryTruncated`, `takeRateTruncated`) y nombra en `degraded[]` qué quedó a medias; el encabezado muestra un aviso en vez de presentar cifras parciales como completas. En la misma ronda, la recuperación se atribuye **con desenlace** (`recoveredOrders` / `recoveredRevenue`, no solo el envío) y la tasa por origen UTM gana su denominador | ✅ |
+| CV4 | **Las dos implementaciones se atan** (`src/lib/conversion-funnel.contract.test.ts`): la regla vive **dos veces** —la RPC `admin_conversion_funnel_window` (migración `00141`) agrega en Postgres sin tope de filas, y `classifyOrder`/`buildFunnel` es la referencia a la que la ruta degrada— y nada garantizaba que dijeran lo mismo. El contrato lee la migración como **texto** y exige que coincidan el orden de los `WHEN`, la tabla `VALUES` de orden, los centinelas, el tope de UTM, el índice y los permisos; y además evalúa el `CASE` del SQL contra `classifyOrder` sobre las **60** combinaciones de estado, pago y método. Probado por mutación en tres rondas, con el SQL restaurado byte a byte | ✅ |
+| CV5 | **La tendencia diaria, sin una segunda verdad**: la serie se calcula en JS con el detalle que la ruta **ya** leyó (coste cero) y **se apaga** cuando esa lectura se recortó o falló (`trendUnavailable` → `trend: null`), porque un corte sobre una lectura ordenada por fecha descendente deja completos los días recientes y vacíos los primeros: dibujarla publicaría un crecimiento que no ocurrió. Se descartó una RPC de tendencia: duplicaría la regla que CV4 existe para atar, y un `RETURNS TABLE` con tope de filas reintroduciría el fallo silencioso que `00141` vino a cerrar. El contrato encontró un **bug real** al escribirla: agrupar por día local sin cortar por instante colaba el pedido que cae justo en `until`, que el SQL excluye. La ventana es semiabierta `[since, until)`, el día es local (`DEFAULT_TIMEZONE`), y como 30 días son 30×24 h la serie toca **31** días locales: los del borde se marcan `partial` y la gráfica lo advierte, porque un día a medias se lee igual que una caída | ✅ |
+| CV6 | **La gráfica no es la única salida**: `role="img"` con el resumen textual de la serie (`describeTrend`) y, plegada bajo *Ver los datos por día*, la misma serie como tabla. El SVG solo no es accesible; la tabla deja el dato a quien no ve la curva. La superficie queda documentada como invariantes en `docs/agents/admin.md` | ✅ |
+| CV7 | **La paridad se probó contra datos reales, no solo contra fixtures**: se capturó la respuesta de `admin_conversion_funnel_window` sobre las 23 órdenes de la base viva y se pasaron las **mismas filas** por el motor JS; las dos salidas son iguales campo por campo. Es la única prueba que no puede pasar por construcción, porque no comparte el fixture con ninguna de las dos implementaciones | ✅ |
+
+**Lección — un `CASE` en SQL y un `if` en TypeScript son la misma regla escrita
+dos veces, y la segunda copia no avisa cuando la primera cambia.** El embudo
+tenía un camino rápido (agregar en Postgres) y un camino de respaldo (degradar a
+JS), y los dos tenían que decir lo mismo. Ninguna prueba lo comprobaba porque
+ninguna prueba puede llamar a Postgres: el contrato lee la migración como
+**texto** y compara el orden de los `WHEN` contra la función pura. La lección
+general es la de K6 y K7 en otro sitio: **lo que no se mide se desvía**, y en
+código duplicado se desvía en silencio.
+
 ## 9. Blog
 
 | # | Fase | Estado |
@@ -480,6 +554,8 @@ aplicar.
 | BL1-BL10 | Escape, scroll al paginar, aria-live, `<time>`, RSS, limpiar filtros | ✅ |
 | BL11 | **Barra de progreso de lectura** en artículos (`reading-progress.tsx`, `role="progressbar"` con `aria-valuenow` actualizado por rAF) | ✅ |
 | BL12 | **Índice del artículo con scroll-spy**: `article-toc.tsx` reutiliza `extractHeadings` (los ids ya coinciden con los anclajes de `rehypeHeadingAnchors`), se muestra a partir de 3 H2 y marca la sección activa con `aria-current="location"`; la barra de progreso respeta `prefers-reduced-motion`. Automatizado en `e2e/smoke.spec.ts` (verifica que cada enlace apunte a un encabezado real y que el activo siga al scroll) | ✅ |
+
+| BL13 | 🔜 **El timeout del test de paridad de anclas está al límite**: `src/lib/heading-slug.test.ts:114` recorre los 226 posts con el pipeline de remark y se le dio `timeout: 30_000` (commit `4af28723`) pensando en "~1.3 s en local". Medido en la ronda 7: **25 s aislado** y **>30 s dentro de `npm test`** — falla por timeout en la suite completa (dos corridas: 3 rojos y 1 rojo, siempre este). Aislado pasa 11/11. No es una regresión de código: es un timeout calibrado sobre una medición vieja | 🔜 |
 
 ## 10. Navegación global
 
@@ -492,11 +568,21 @@ aplicar.
 
 ## Verificación
 
-El pipeline `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run build`
-corre en CI (`.github/workflows/ci.yml`) y en el build de Vercel al hacer
-merge. Revisión estática completa del diff sin errores evidentes (los puntos
-de riesgo — imports, tipos estrictos, componentes nuevos — fueron verificados
-uno a uno).
+El pipeline `npx tsc --noEmit`, `npm run lint`, `npm test`, `npm run knip` y
+`npm run build` corre en CI (`.github/workflows/ci.yml`) y en el build de Vercel
+al hacer merge. Revisión estática completa del diff sin errores evidentes (los
+puntos de riesgo — imports, tipos estrictos, componentes nuevos — fueron
+verificados uno a uno).
+
+**Sobre el quinto gate:** hasta la **ronda 7** `knip` no se había medido nunca y
+llevaba rojo permanente (479 hallazgos), así que en la práctica eran cuatro
+gates y un paso decorativo. Se arregló la configuración, se recortó el código
+muerto que la configuración tapaba y el paso de CI ahora corre `npm run knip`
+(sin `--production`, que era el origen de la mayoría del ruido). Ojo con la
+expectativa: `knip` analiza el **working tree**, no `HEAD`, así que su resultado
+depende de lo que haya sin commitear — un archivo nuevo de otra sesión lo
+devuelve a rojo. Lo que fija `src/lib/knip-config.contract.test.ts` es la
+configuración, que es la parte controlable.
 
 **Estado de `test:e2e`:** `e2e/a11y.spec.ts` está **20/20 verde** en
 `chromium` y `mobile-chromium`. Ojo con leer eso como "no hay deuda de
@@ -508,10 +594,10 @@ fijaron con `src/lib/admin-productos-contrast.contract.test.ts` (filas
 **B36**/**B37** en § 8) — mientras no haya credenciales de admin en CI, ese
 contrato es el único gate posible para esa superficie.
 Queda un rojo **intermitente** que pasa aislado bajo carga paralela
-(`e2e/compartir.spec.ts`) — **cerrado en la ronda 9** (ver esa sección). El otro,
+(`e2e/compartir.spec.ts`) — **cerrado**. El otro,
 `e2e/mobile-chrome.spec.ts:28`, resultó ser
 un fallo **real de producto** —no un flake— y quedó arreglado en la **ronda 4**
-(ver esa sección): el pill de la guía del panel
+(ver la sección de la ronda 4): el pill de la guía del panel
 (`src/components/panel/guide/guide-toggle-button.tsx`, commit `61decf1`,
 `fixed` + `z-[85]`) **interceptaba el tap del banner de cookies**, así que el
 usuario móvil del panel no podía pulsar "Aceptar todas". También en la ronda 4
@@ -522,10 +608,9 @@ hidratar el payload de flight —tras hidratar, el título **sí** es el del
 segmento, el de `generateMetadata` de `src/app/[slug]/page.tsx`—, así que con el
 timeout por defecto de 5 s el test no alcanzaba a verlo en frío. Arreglado con
 `timeout: 15000` en los 4, **sin tocar ninguna aserción**: las aserciones eran
-correctas. **La ronda 9 midió que `15000` tampoco alcanza** (el `h1` tarda >30 s
+correctas. **Se midió que `15000` tampoco alcanza** (el `h1` tarda >30 s
 con 5 workers) y resolvió el caso del micrositio afirmando el **cuerpo de la
-respuesta** en vez de la hidratación — ver la lección 2 de la ronda 4 y la
-sección de la ronda 9.
+respuesta** en vez de la hidratación — ver la lección 2 de la ronda 4.
 `npx tsc --noEmit`, `npm test` y `npm run build` están en verde para el código
 de las rondas 1–4. **Al cerrar la ronda 4 los tres gates quedaron en rojo por
 trabajo en vuelo de otra sesión** (la ronda 5, Leads CRM: `src/app/admin/leads/page.tsx`,

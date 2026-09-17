@@ -19,6 +19,7 @@ import { AchievementsSection } from "./AchievementsSection";
 import { ReferralDashboard } from "@/components/referral-dashboard";
 import { useOnboardingCompleted } from "@/components/onboarding-wizard";
 import { createClient } from "@/lib/supabase/client";
+import { serviceAffordability } from "@/lib/store-affordability";
 import {
   getWalletBalance,
   getWalletHistory,
@@ -33,6 +34,9 @@ import type { ServiceItem } from "./types";
 import type { WalletTransaction } from "@/types";
 import type { WalletSummary } from "@/lib/wallet-summary";
 import type { WalletExpirySummary } from "@/lib/wallet-expiry";
+
+/** Servicio del catálogo usado como ancla del "siguiente desbloqueo" del dashboard. */
+const NEXT_UNLOCK_SERVICE_ID = "meta-ads";
 
 interface DashboardScreenProps {
   onOpenCalculator: (service?: ServiceItem) => void;
@@ -82,6 +86,19 @@ export function DashboardScreen({
     return [...featured, ...rest];
   })();
 
+  // Servicio ancla del "siguiente desbloqueo" del dashboard. Se resuelve
+  // contra el catálogo real para no mostrar un costo inventado si el catálogo
+  // cambia; el costo y el avance salen siempre de datos reales.
+  const nextUnlockService = SERVICES.find((s) => s.id === NEXT_UNLOCK_SERVICE_ID) ?? SERVICES[0];
+  if (!nextUnlockService) throw new Error("SERVICES no puede estar vacío");
+  const nextUnlockAffordability = serviceAffordability(nextUnlockService.cost, balance);
+  const nextUnlock = {
+    name: nextUnlockService.name,
+    cost: nextUnlockService.cost,
+    progressPercent: nextUnlockAffordability.percent,
+    missing: nextUnlockAffordability.missing,
+  };
+
   return (
     <div className="pt-1 pb-4 md:max-w-none">
       {/* Top Header with Notifications */}
@@ -122,9 +139,9 @@ export function DashboardScreen({
               <GrowthWalletBanner
                 balance={balance}
                 nextUnlock={{
-                  name: "Campaña Meta Ads — Nivel Plata",
-                  cost: 16000,
-                  progressPercent: Math.min(Math.round((balance / 16000) * 100), 100),
+                  name: nextUnlock.name,
+                  cost: nextUnlock.cost,
+                  progressPercent: nextUnlock.progressPercent,
                 }}
               />
               <p className="mx-4 text-[10px] italic leading-relaxed text-[#6e737b] md:mx-0">
@@ -204,7 +221,9 @@ export function DashboardScreen({
             </div>
             <div className="flex-1">
               <p className="text-warm-700 text-[13px] font-semibold">
-                Con tu consumo actual, en 3 meses desbloqueas tu Campaña Meta Ads
+                {nextUnlock.missing === 0
+                  ? `Ya te alcanza para ${nextUnlock.name}`
+                  : `Te faltan ${formatNumber(Math.round(nextUnlock.missing))} Créditos para ${nextUnlock.name}`}
               </p>
               <button
                 onClick={() => onOpenCalculator()}

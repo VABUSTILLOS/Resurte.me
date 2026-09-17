@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation"
 import { getProspectDetail, getProspectClientOrders } from "@/lib/comercializacion/actions"
 import { getCities } from "@/lib/data"
-import { ProspectoDetail } from "@/components/comercializacion/prospecto-detail"
+import { requireSellerOrAdmin } from "@/lib/roles"
+import { scopeForRole } from "@/lib/crm-core"
+import { SellerProspectDetail } from "@/components/comercializacion/seller-prospect-detail"
 
 export default async function ProspectoDetailPage({
   params,
@@ -11,6 +13,8 @@ export default async function ProspectoDetailPage({
   const { id } = await params
   const prospectId = Number(id)
   if (!Number.isInteger(prospectId) || prospectId <= 0) notFound()
+
+  const { userId, role } = await requireSellerOrAdmin()
 
   let detail
   try {
@@ -25,10 +29,11 @@ export default async function ProspectoDetailPage({
   const cities = await getCities()
 
   return (
-    <ProspectoDetail
+    <SellerProspectDetail
       detail={detail}
       clientOrders={clientOrders}
       cities={(cities ?? []).map((c) => ({ id: c.id, name: c.name, state: c.state }))}
+      scope={scopeForRole(role, userId)}
     />
   )
 }

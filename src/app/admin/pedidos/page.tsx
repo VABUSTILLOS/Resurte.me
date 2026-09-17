@@ -21,8 +21,10 @@ import { useOrderAutoRefresh } from "@/hooks/use-order-auto-refresh"
 import { formatRelativeTime } from "@/lib/relative-time"
 import {
   normalizeDateRange,
+  ORDER_PAYMENT_STATUS_VALUES,
   orderFilterQuery,
   parseOrderFilterParams,
+  type OrderPaymentStatusFilter,
   parseSavedFilters,
   serializeSavedFilters,
   makeSavedFilter,
@@ -108,6 +110,10 @@ function AdminOrdersContent() {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">(
     initialFilters.status
   )
+  // Filtro por estado de pago: llega por URL desde el desglose del embudo de
+  // conversión, que enlaza cada desenlace a los pedidos que lo componen.
+  const [paymentStatusFilter, setPaymentStatusFilter] =
+    useState<OrderPaymentStatusFilter>(initialFilters.paymentStatus)
   const [search, setSearch] = useState(initialFilters.search)
   const [debouncedSearch, setDebouncedSearch] = useState(initialFilters.search)
   // Fase 9 — rango de fechas (YYYY-MM-DD) y presets guardados en localStorage.
@@ -150,12 +156,13 @@ function AdminOrdersContent() {
   useEffect(() => {
     const qs = orderFilterQuery({
       status: statusFilter,
+      paymentStatus: paymentStatusFilter,
       search: debouncedSearch,
       from: fromDate,
       to: toDate,
     })
     router.replace(qs ? `?${qs}` : pathname, { scroll: false })
-  }, [debouncedSearch, statusFilter, fromDate, toDate, router, pathname])
+  }, [debouncedSearch, statusFilter, paymentStatusFilter, fromDate, toDate, router, pathname])
 
   // Repartidores para asignación (migración 00076). Se conservan también los
   // inactivos para poder etiquetar pedidos ya cerrados; el selector solo
@@ -214,6 +221,7 @@ function AdminOrdersContent() {
         const { fromIso, toExclusiveIso } = normalizeDateRange({ from: fromDate, to: toDate })
         const { orders: data, hasMore: more } = await getAdminOrders(100, undefined, {
           status: statusFilter,
+          paymentStatus: paymentStatusFilter,
           search: debouncedSearch,
           from: fromIso,
           toExclusive: toExclusiveIso,
@@ -237,7 +245,7 @@ function AdminOrdersContent() {
     return () => {
       cancelled = true
     }
-  }, [refreshKey, statusFilter, debouncedSearch, fromDate, toDate])
+  }, [refreshKey, statusFilter, paymentStatusFilter, debouncedSearch, fromDate, toDate])
 
   // Fase 3 — auto-refresh silencioso cada 30 s (pausado en segundo plano).
   // Mantiene los filtros activos y avisa si entra un pedido nuevo.
@@ -246,6 +254,7 @@ function AdminOrdersContent() {
       const { fromIso, toExclusiveIso } = normalizeDateRange({ from: fromDate, to: toDate })
       const { orders: data, hasMore: more } = await getAdminOrders(100, undefined, {
         status: statusFilter,
+        paymentStatus: paymentStatusFilter,
         search: debouncedSearch,
         from: fromIso,
         toExclusive: toExclusiveIso,
@@ -264,7 +273,7 @@ function AdminOrdersContent() {
     } catch {
       // Silencioso: el siguiente ciclo de 30 s lo reintenta
     }
-  }, [statusFilter, debouncedSearch, fromDate, toDate, toast])
+  }, [statusFilter, paymentStatusFilter, debouncedSearch, fromDate, toDate, toast])
 
   useOrderAutoRefresh(silentRefresh, 30_000)
 
@@ -277,6 +286,7 @@ function AdminOrdersContent() {
       const { fromIso, toExclusiveIso } = normalizeDateRange({ from: fromDate, to: toDate })
       const { orders: older, hasMore: more } = await getAdminOrders(100, cursor, {
         status: statusFilter,
+        paymentStatus: paymentStatusFilter,
         search: debouncedSearch,
         from: fromIso,
         toExclusive: toExclusiveIso,
@@ -342,6 +352,7 @@ function AdminOrdersContent() {
       search,
       from: fromDate,
       to: toDate,
+      paymentStatus: paymentStatusFilter,
     })
     if (!preset) return
     persistSavedFilters([...savedFilters.filter((f) => f.name !== preset.name), preset])
@@ -350,6 +361,13 @@ function AdminOrdersContent() {
 
   function applySavedFilter(f: SavedOrderFilter) {
     setStatusFilter(f.status as OrderStatus | "all")
+    // Presets guardados antes de esta ronda no traen estado de pago: "all".
+    setPaymentStatusFilter(
+      f.paymentStatus &&
+        (ORDER_PAYMENT_STATUS_VALUES as readonly string[]).includes(f.paymentStatus)
+        ? (f.paymentStatus as OrderPaymentStatusFilter)
+        : "all"
+    )
     setSearch(f.search)
     setFromDate(f.from)
     setToDate(f.to)
@@ -601,6 +619,35 @@ function AdminOrdersContent() {
             <button
               type="button"
               onClick={() => { setFromDate(""); setToDate("") }}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500" htmlFor="filter-payment-status">
+            Pago
+          </label>
+          <select
+            id="filter-payment-status"
+            value={paymentStatusFilter}
+            onChange={(e) =>
+              setPaymentStatusFilter(e.target.value as OrderPaymentStatusFilter)
+            }
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-600 focus:outline-none focus:border-brand-500"
+          >
+            <option value="all">Cualquiera</option>
+            {ORDER_PAYMENT_STATUS_VALUES.map((value) => (
+              <option key={value} value={value}>
+                {PAYMENT_STATUS_LABEL[value] ?? value}
+              </option>
+            ))}
+          </select>
+          {paymentStatusFilter !== "all" && (
+            <button
+              type="button"
+              onClick={() => setPaymentStatusFilter("all")}
               className="text-xs text-gray-400 hover:text-gray-600"
             >
               Limpiar

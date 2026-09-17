@@ -52,7 +52,7 @@ const VICTOR_BUSTILLOS: AuthorProfile = {
   jobTitle: "Fundador de Resurte.me",
   tagline: "Fundador de Resurte.me · Proveeduría y operación de restaurantes",
   bio: [
-    "Victor Bustillos es fundador de Resurte.me, la central de abastos digital que conecta a restaurantes, fondas, cafeterías y hoteles de México con proveedores de mayoreo. Escribe sobre costeo de menú, control de mermas, compra de insumos y operación de cocina a partir del trabajo diario con miles de negocios de comida en el país.",
+    "Victor Bustillos es fundador de Resurte.me, la central de abastos digital que conecta a restaurantes, fondas, cafeterías y hoteles de México con proveedores de mayoreo. Escribe sobre costeo de menú, control de mermas, compra de insumos y operación de cocina a partir del trabajo diario con negocios de comida en el país.",
     "Su enfoque es práctico: cada guía sale de datos reales de compra —precios por ciudad, mermas medidas en cocina y márgenes de menús que están operando hoy— y no de teoría de manual. Por eso el blog de Resurte.me publica tablas de costos, comparativas de formas de surtir y el índice de precios de insumos por ciudad.",
   ],
   credentials: [

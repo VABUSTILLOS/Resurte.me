@@ -24,6 +24,7 @@ import {
 } from "@/lib/foodos-rfm"
 import { pickVariant } from "@/lib/messaging/channel"
 import { loadMessagingCapabilities, sendMarketingMessage } from "@/lib/messaging/send"
+import { isIntegrationConfigured } from "@/lib/integration-status"
 import {
   alreadySentByPlatform,
   platformTypeForRestaurantType,
@@ -393,6 +394,26 @@ export async function runFoodosCampaign(
   // Capacidades resueltas una vez por corrida: descifrar el token por
   // cliente sería un desperdicio y un riesgo de rate limit.
   const caps = await loadMessagingCapabilities(supabase, campaign.restaurant_id)
+
+  // Sin NINGÚN canal posible no se recorre la lista de destinatarios: antes
+  // cada uno se contaba como "omitido" y la campaña sólo terminaba con un
+  // "Sin canal disponible" genérico, sin decir qué faltaba conectar. Es un
+  // problema de configuración, no un fallo por destinatario, y así se reporta.
+  if (!caps.whatsapp && !caps.sms) {
+    const error = caps.waConfig === null && !isIntegrationConfigured("whatsapp")
+      ? "WhatsApp no está conectado. Conéctalo en FoodOS → WhatsApp para que tus automatizaciones puedan enviarse."
+      : "No hay ningún canal de envío disponible (WhatsApp ni SMS)."
+    await supabase
+      .from("foodos_campaigns")
+      .update({ status: "failed", error })
+      .eq("id", campaignId)
+    logger.warn("foodos-campaigns.no-channel", {
+      campaignId,
+      restaurantId: campaign.restaurant_id,
+      preferred: auto.channel ?? "whatsapp",
+    })
+    return { campaignId, sent: 0, failed: 0, skipped: 1, skippedByPlatform: 0 }
+  }
 
   // Guardia entre motores (Fase 9): los envíos que la plataforma ya hizo hoy de
   // esta misma intención. Se lee una vez, no por cliente.

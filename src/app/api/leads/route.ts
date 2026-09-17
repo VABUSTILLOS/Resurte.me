@@ -11,6 +11,8 @@ const SOURCES = new Set([
   "exit_intent",
   // Landing B2B /restaurantes: alta directa desde el calificador de leads.
   "restaurantes_landing",
+  // Suscripción del blog: la lista de correos que antes se descartaba.
+  "blog_newsletter",
 ])
 
 /**
@@ -23,6 +25,7 @@ const SOURCES = new Set([
  *     abandono.
  *   · source 'restaurantes_landing' → restaurantero que se autocalificó en
  *     /restaurantes y dejó sus datos.
+ *   · source 'blog_newsletter'  → suscriptor del formulario del blog.
  * Body: { email, phone?, source?, coupon_code?, restaurant_name?, answers? }
  *
  * Fail-open: si la BD falla se responde 200 de todas formas — la captura de

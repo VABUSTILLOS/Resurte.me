@@ -54,10 +54,11 @@ export interface InboxMessage {
   from_number: string | null
 }
 
-/** Prospecto más lo que la bandeja necesita de él (etiquetas de 00140). */
-export interface ConversationProspect extends CrmProspect {
-  tags: string[]
-}
+/**
+ * Prospecto dentro de la bandeja. Ronda 7: `tags` ya forma parte del contrato
+ * compartido, así que la bandeja consume `CrmProspect` sin añadir nada.
+ */
+export type ConversationProspect = CrmProspect
 
 /**
  * Coacciona la dirección al enum. La columna es `message_direction`, así que un

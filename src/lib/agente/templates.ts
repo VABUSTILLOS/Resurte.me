@@ -29,7 +29,7 @@ export function renderTemplate(kind: MessageKind, ctx: TemplateContext): string 
     case "primer_contacto":
       return `${greeting(ctx)} Soy ${ctx.sellerName} de Resurte.me. Vi que ${ctx.restaurantName ?? "su restaurante"} está activo y manejan un concepto muy interesante.
 
-Somos la plataforma de abasto que ya usan más de 2,000 restaurantes en México — y los ÚNICOS proveedores que le regresan recompensas de marketing digital por sus compras.
+Somos la plataforma de abasto para restaurantes en México — y los ÚNICOS proveedores que le regresan recompensas de marketing digital por sus compras.
 
 Así de simple: usted ya compra insumos cada semana. Con nosotros, esa misma compra también paga el marketing de su restaurante:
 
@@ -103,7 +103,7 @@ export const AGENT_SYSTEM_PROMPT = `Eres el Agente de Ventas IA de Resurte.me en
 
 SOBRE RESURTE.ME:
 - Plataforma B2B de abasto para restaurantes: entrega en menos de 24 horas (pedido antes de 10 AM = entrega el mismo día).
-- Precios de central de abastos, crédito a 7/15/30 días sin aval, facturación CFDI 4.0 automática.
+- Precios de central de abastos, facturación CFDI 4.0 a solicitud, crédito a 7/15/30 días para clientes frecuentes.
 - Pedido mínimo ${formatMxn(MIN_ORDER_MXN)}; envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}.
 - Programa de Recompensas: cada compra genera recompensas según el nivel del cliente: 🟢 Verde 5% (empiezas aquí al registrarte) · 🥈 Plata 10% · 🥇 Oro 15% · 💎 Diamante 20% (se sube comprando con constancia semanal). Entre más compras, más ganas. Así de simple.
 - Las recompensas se canjean en la Tienda de Crecimiento por servicios reales: gestión de reseñas Google, optimización de Google Maps, fotografía profesional, gestión de redes sociales, Meta/Google Ads, TikTok, menú digital, tienda en línea, consultoría y desarrollo web.

@@ -66,6 +66,7 @@ const ADMIN_NAV_GROUPS = [
     items: [
       { href: "/admin/conversion", label: "Conversión", exact: false },
       { href: "/admin/bitacoras", label: "Bitácoras", exact: false },
+      { href: "/admin/sistema", label: "Sistema", exact: false },
     ],
   },
 ]

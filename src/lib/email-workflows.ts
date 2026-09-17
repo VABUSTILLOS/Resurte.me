@@ -16,6 +16,7 @@ import { logger } from "@/lib/logger"
 import { createServiceClient } from "@/lib/supabase/service"
 import { sendEmail, abandonedCartEmailHtml, reactivationEmailHtml } from "@/lib/email"
 import { getActivePersonalCoupon, issuePersonalCoupon } from "@/lib/repurchase-coupon"
+import { applyAbandonedCartFilter } from "@/lib/abandoned-cart"
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -125,12 +126,12 @@ export async function checkAbandonedCarts(): Promise<CronResult> {
   // restore_token permite restaurar el carrito a invitados (capability URL).
   // Si la migración 00063 aún no se aplicó (columna inexistente), se reintenta
   // sin ella y el enlace queda solo para usuarios con sesión (comportamiento previo).
+  //
+  // La elegibilidad (pending + sin pagar + método abandonable) viene de
+  // `applyAbandonedCartFilter`: es la MISMA que usa el panel de conversión, así
+  // que el embudo no puede decir "0 abandonados" mientras aquí se manda correo.
   const baseQuery = (columns: string) =>
-    supabase
-      .from("orders")
-      .select(columns)
-      .eq("status", "pending")
-      .eq("payment_status", "pending")
+    applyAbandonedCartFilter(supabase.from("orders").select(columns))
 
   type AbandonedOrder = {
     id: number
@@ -143,17 +144,12 @@ export async function checkAbandonedCarts(): Promise<CronResult> {
   let orders: AbandonedOrder[] | null = null
 
   const withToken = await baseQuery("id, user_id, customer_email, total, created_at, restore_token")
-    // Los pedidos en efectivo (cash_on_delivery) quedan "pending" hasta que la
-    // tienda los confirma, pero NO son carritos abandonados: ya son pedidos
-    // reales en espera. Solo los métodos con pago anticipado pueden abandonarse.
-    .not("payment_method", "eq", "cash_on_delivery")
     .gte("created_at", oldestWindowStart)
     .lte("created_at", newestWindowEnd)
     .order("created_at", { ascending: false })
 
   if (withToken.error && withToken.error.code === "42703") {
     const withoutToken = await baseQuery("id, user_id, customer_email, total, created_at")
-      .not("payment_method", "eq", "cash_on_delivery")
       .gte("created_at", oldestWindowStart)
       .lte("created_at", newestWindowEnd)
       .order("created_at", { ascending: false })

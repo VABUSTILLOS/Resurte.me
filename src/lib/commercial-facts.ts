@@ -31,7 +31,10 @@ export const CREDIT_DAYS_PROSE = `${CREDIT_DAYS.slice(0, -1).join(", ")} o ${CRE
 /** No hay cuota de membresía ni suscripción. */
 export const MEMBERSHIP_FEE_MXN = 0
 
-/** Comprobante fiscal que se emite automáticamente por cada pedido. */
+/**
+ * Formato del comprobante fiscal que se emite a solicitud del cliente.
+ * No hay timbrado automático: se factura cuando el cliente lo pide.
+ */
 export const INVOICING = "CFDI 4.0"
 
 /** Ciudades con entrega a domicilio del mismo catálogo. */
@@ -89,8 +92,8 @@ export function getCommercialFacts(): CommercialFact[] {
     },
     {
       label: "Facturación",
-      value: `${INVOICING} automática`,
-      detail: "Cada pedido genera su factura sin trámite adicional",
+      value: `${INVOICING} disponible`,
+      detail: "Solicítala y te la emitimos, sin costo extra",
     },
     {
       label: "Crédito",
@@ -110,7 +113,7 @@ export function getCommercialFactsSummary(): string {
     `envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}`,
     `entrega en ${DELIVERY_CITIES} ciudades de México`,
     MEMBERSHIP_FEE_MXN === 0 ? "sin membresía" : null,
-    `facturación ${INVOICING} automática`,
+    `facturación ${INVOICING} a solicitud`,
     `crédito a ${CREDIT_DAYS.join(", ")} días`,
   ]
     .filter((part): part is string => part !== null)

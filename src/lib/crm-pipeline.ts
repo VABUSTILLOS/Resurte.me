@@ -11,27 +11,36 @@
  * Módulo puro: sin Supabase, sin React. Lo consumen las server actions del panel
  * y los componentes cliente, así que cualquier cambio aquí se prueba en
  * `crm-pipeline.test.ts`.
+ *
+ * Ronda 7: lo que comparten el panel de vendedores y el de admin (vocabulario de
+ * estado, contrato de fila, mapeo, columnas, alcance, búsqueda y filtros) se
+ * movió a `crm-core.ts`, que es la única autoridad. Aquí solo queda la capa de
+ * **tablero** del admin (columnas, urgencia, embudo) y la **bandeja de leads**
+ * web.
+ *
+ * Ronda 5: los reexports de compatibilidad de esa migración ya no los importaba
+ * nadie —los consumidores migraron a `crm-core.ts`— así que se retiraron. Si
+ * necesitas vocabulario de estado, contrato de fila, alcance o búsqueda,
+ * impórtalo de `crm-core.ts`; no lo reexportes desde aquí.
  */
 
-export const CRM_STATUSES = [
-  "nuevo",
-  "contactado",
-  "en_seguimiento",
-  "cliente_activo",
-  "inactivo",
-  "perdido",
-] as const
+import { isFollowUpDue, normalizeForSearch, phoneKey } from "./crm-core"
+import type { CrmProspectRow, CrmStatus } from "./crm-core"
 
-export type CrmStatus = (typeof CRM_STATUSES)[number]
+export {
+  CRM_STATUSES,
+  CRM_STATUS_LABEL,
+  isCrmStatus,
+  isFollowUpDue,
+  normalizeForSearch,
+  digitsOf,
+  phoneKey,
+  matchesSearch,
+  matchesProspectFilters,
+  filterProspects,
+} from "./crm-core"
 
-export const CRM_STATUS_LABEL: Record<CrmStatus, string> = {
-  nuevo: "Nuevo",
-  contactado: "Contactado",
-  en_seguimiento: "En seguimiento",
-  cliente_activo: "Cliente activo",
-  inactivo: "Inactivo",
-  perdido: "Perdido",
-}
+export type { CrmStatus, ProspectFilters } from "./crm-core"
 
 /** Columnas visibles del tablero (inactivo/perdido se agrupan en "Cerrados"). */
 export const CRM_BOARD_COLUMNS: { key: string; label: string; statuses: CrmStatus[] }[] = [
@@ -42,10 +51,6 @@ export const CRM_BOARD_COLUMNS: { key: string; label: string; statuses: CrmStatu
   { key: "cerrados", label: "Cerrados", statuses: ["inactivo", "perdido"] },
 ]
 
-export function isCrmStatus(value: string): value is CrmStatus {
-  return (CRM_STATUSES as readonly string[]).includes(value)
-}
-
 /** Siguiente paso "feliz" del embudo; null si ya es cliente o está cerrado. */
 export function nextCrmStatus(status: CrmStatus): CrmStatus | null {
   const flow: CrmStatus[] = ["nuevo", "contactado", "en_seguimiento", "cliente_activo"]
@@ -54,28 +59,15 @@ export function nextCrmStatus(status: CrmStatus): CrmStatus | null {
   return next ?? null
 }
 
-export interface CrmProspect {
-  id: number
-  /** `null` = sin asignar (p.ej. un lead web convertido que nadie repartió). */
-  seller_id: string | null
-  /** Lead web de origen; `null` si el prospecto se capturó a mano. */
-  lead_id: number | null
-  name: string
-  restaurant_name: string | null
-  phone: string | null
-  whatsapp: string | null
-  email: string | null
-  status: string
-  notes: string | null
-  next_follow_up_at: string | null
-  last_contact_at: string | null
-  created_at: string
-  /**
-   * Etiquetas del prospecto (00140). Opcional porque las filas cargadas sin la
-   * migración aplicada no traen la columna y el pipeline debe seguir pintando.
-   */
-  tags?: string[]
-}
+/**
+ * Fila de `crm_prospects` del tablero admin.
+ *
+ * Ronda 7: es un alias del contrato compartido `CrmProspectRow`. El tipo pasó de
+ * `status: string` a `CrmStatus` y de `tags?: string[]` a `tags: string[]`
+ * obligatorio (el mapeador siempre produce arreglo), lo que elimina los casts en
+ * `groupIntoBoard` y los `tags?.` defensivos.
+ */
+export type CrmProspect = CrmProspectRow
 
 export interface CrmBoard {
   [columnKey: string]: CrmProspect[]
@@ -85,7 +77,7 @@ export interface CrmBoard {
 export function groupIntoBoard(prospects: CrmProspect[]): CrmBoard {
   const board: CrmBoard = Object.fromEntries(CRM_BOARD_COLUMNS.map((c) => [c.key, []]))
   for (const p of prospects) {
-    const col = CRM_BOARD_COLUMNS.find((c) => c.statuses.includes(p.status as CrmStatus))
+    const col = CRM_BOARD_COLUMNS.find((c) => c.statuses.includes(p.status))
     const column = col ? board[col.key] : undefined
     if (column) column.push(p)
   }
@@ -123,10 +115,7 @@ export function compareByUrgency(a: CrmProspect, b: CrmProspect, now: Date = new
 }
 
 /** Un seguimiento está vencido si tiene fecha y ya pasó. */
-export function isFollowUpDue(nextFollowUpAt: string | null, now: Date = new Date()): boolean {
-  if (!nextFollowUpAt) return false
-  return new Date(nextFollowUpAt) <= now
-}
+// `isFollowUpDue` se reexporta desde `./crm-core` (arriba).
 
 // ─────────────────────────────────────────────────────────────
 // Bandeja de leads web (leads.status)
@@ -255,96 +244,12 @@ export function leadToProspectDraft(lead: ConvertibleLead): ProspectDraft {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Búsqueda, duplicados y filtros
+// Duplicados
 // ─────────────────────────────────────────────────────────────
 
-/** Normaliza para comparar: minúsculas y sin acentos. */
-export function normalizeForSearch(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-}
-
-/** Sólo dígitos; `null` si no queda ninguno. Sirve para comparar teléfonos. */
-export function digitsOf(value: string | null | undefined): string | null {
-  if (!value) return null
-  const digits = value.replace(/\D/g, "")
-  return digits.length > 0 ? digits : null
-}
-
-/**
- * Clave de comparación de teléfonos. En México el número nacional son 10 dígitos
- * (LADA + número), y el mismo celular aparece como `+52 614…`, `52 1 614…` o
- * `614…` según quién lo capturó. Comparar los últimos 10 dígitos evita duplicar
- * la ficha por la pura lada del país. Números más cortos se comparan completos.
- */
-export function phoneKey(value: string | null | undefined): string | null {
-  const digits = digitsOf(value)
-  if (!digits) return null
-  return digits.length > 10 ? digits.slice(-10) : digits
-}
-
-export interface ProspectFilters {
-  /** Texto libre sobre nombre, restaurante, correo y teléfono. */
-  q?: string
-  status?: CrmStatus | "todos"
-  /** Sólo los que tienen seguimiento vencido. */
-  due?: boolean
-  /** Sólo los que no tienen vendedor asignado. */
-  unassigned?: boolean
-}
-
-/**
- * ¿Alguno de los campos coincide con la búsqueda?
- *
- * Además del texto normalizado, se comparan los dígitos: quien busca un teléfono
- * suele pegarlo tal cual lo tiene en el celular (`+52 614 123 4567`) o pegado
- * sin espacios, y `normalizeForSearch` no borra signos, así que sin esta segunda
- * pasada la búsqueda por teléfono fallaría según cómo se escribió.
- */
-export function matchesSearch(
-  q: string,
-  fields: Array<string | null | undefined>,
-  digitsFields: Array<string | null | undefined> = [],
-): boolean {
-  const needle = normalizeForSearch(q)
-  if (!needle) return true
-  const haystack = normalizeForSearch(fields.filter(Boolean).join(" "))
-  if (haystack.includes(needle)) return true
-
-  const needleDigits = digitsOf(q)
-  if (!needleDigits) return false
-  return digitsFields.some((value) => digitsOf(value)?.includes(needleDigits) ?? false)
-}
-
-export function matchesProspectFilters(
-  p: CrmProspect,
-  filters: ProspectFilters,
-  now: Date = new Date(),
-): boolean {
-  if (filters.status && filters.status !== "todos" && p.status !== filters.status) return false
-  if (filters.due && !isFollowUpDue(p.next_follow_up_at, now)) return false
-  if (filters.unassigned && p.seller_id !== null) return false
-
-  if (filters.q) {
-    return matchesSearch(
-      filters.q,
-      [p.name, p.restaurant_name, p.email, p.phone, p.whatsapp],
-      [p.phone, p.whatsapp],
-    )
-  }
-  return true
-}
-
-export function filterProspects(
-  prospects: CrmProspect[],
-  filters: ProspectFilters,
-  now: Date = new Date(),
-): CrmProspect[] {
-  return prospects.filter((p) => matchesProspectFilters(p, filters, now))
-}
+// `normalizeForSearch`, `digitsOf`, `phoneKey`, `ProspectFilters`, `matchesSearch`,
+// `matchesProspectFilters` y `filterProspects` viven en `./crm-core` y se
+// reexportan arriba (Ronda 7). `phoneKey` y `normalizeForSearch` se usan aquí.
 
 /**
  * Busca un prospecto existente que corresponda al lead, para no duplicar la
@@ -355,10 +260,26 @@ export function filterProspects(
  * que el correo porque dos personas comparten correo de restaurante con más
  * frecuencia de lo que comparten celular.
  */
+/**
+ * Mínimo que `findMatchingProspect` necesita para decidir si ya existe la ficha.
+ *
+ * Es un `Pick` y no `CrmProspect` completo a propósito: la conversión de un lead
+ * solo selecciona estas columnas (y `name`, para el aviso de duplicado), así que
+ * exigir el contrato entero obligaría a rellenar campos que nadie va a leer.
+ */
+export type ProspectMatchCandidate = Pick<
+  CrmProspect,
+  "id" | "name" | "lead_id" | "phone" | "whatsapp" | "email"
+>
+
+/**
+ * Busca un prospecto que ya represente al mismo negocio, en este orden:
+ * `lead_id` → teléfono (contra `phone` y `whatsapp`) → correo.
+ */
 export function findMatchingProspect(
   draft: ProspectDraft,
-  existing: CrmProspect[],
-): CrmProspect | null {
+  existing: readonly ProspectMatchCandidate[],
+): ProspectMatchCandidate | null {
   const byLead = existing.find((p) => p.lead_id === draft.lead_id)
   if (byLead) return byLead
 

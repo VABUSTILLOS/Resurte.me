@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, Sparkles, TrendingUp, Users, X } from "lucide-react";
+import { CheckCircle, Sparkles, TrendingUp, X } from "lucide-react";
 import type { ServiceItem, Tier } from "./types";
 import { useLoyaltyTier } from "./LoyaltyTierCard";
 import { useEscapeKey } from "@/hooks/use-escape-key";
@@ -264,18 +264,6 @@ function ServiceCard({
   onCalculator: () => void;
 }) {
   const { missing: remaining, percent } = serviceAffordability(service.cost, balance);
-  // Simulated social proof counters
-  const socialProofCounts: Record<string, string> = {
-    "google-maps": "247 restaurantes",
-    "foto-profesional": "189 restaurantes",
-    "redes-sociales": "312 restaurantes",
-    "meta-ads": "156 restaurantes",
-    "google-ads": "134 restaurantes",
-    "tiktok": "98 restaurantes",
-    "menu-digital": "73 restaurantes",
-    "ecommerce": "41 restaurantes",
-    "web-completa": "28 restaurantes",
-  };
 
   return (
     <div
@@ -349,14 +337,6 @@ function ServiceCard({
           <p className="text-brand-500 text-[10px] font-medium leading-tight">
             {service.estimatedImpact}
           </p>
-        </div>
-
-        {/* Social Proof */}
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <Users className="h-3 w-3 text-[#6e737b]" />
-          <span className="text-[#6e737b] text-[10px]">
-            {socialProofCounts[service.id] || "0 restaurantes"} ya lo canjearon
-          </span>
         </div>
 
         {/* Avance hacia el canje */}

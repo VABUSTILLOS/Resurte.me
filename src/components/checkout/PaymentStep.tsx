@@ -137,7 +137,7 @@ export function PaymentStep({
             </div>
             <div className="flex items-center gap-2 text-xs text-[#6b6b6b]">
               <CheckCircle2 className="w-4 h-4 text-[#0E7A0E]" />
-              <span>Factura electrónica (CFDI 4.0) incluida</span>
+              <span>Factura electrónica (CFDI 4.0) disponible</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-[#6b6b6b]">
               <CheckCircle2 className="w-4 h-4 text-[#0E7A0E]" />
@@ -191,7 +191,8 @@ export function PaymentStep({
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm">
               <p className="text-blue-800 font-semibold mb-1">Pago vía SPEI</p>
               <p className="text-blue-600 text-xs">
-                Al confirmar tu pedido recibirás la CLABE interbancaria para realizar la transferencia. Tu pedido se procesará cuando el pago sea confirmado (típicamente 5–30 minutos).
+                Te damos los datos de transferencia al confirmar tu pedido. Tu
+                pedido se surte cuando confirmamos el pago.
               </p>
             </div>
           )}
@@ -200,7 +201,8 @@ export function PaymentStep({
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 text-sm">
               <p className="text-orange-800 font-semibold mb-1">Pago en OXXO</p>
               <p className="text-orange-600 text-xs">
-                Recibirás un código de barras para pagar en cualquier tienda OXXO. Tienes 24 horas para realizar el pago. Tu pedido se prepara al confirmar el pago.
+                Al confirmar te decimos cómo completar el pago en efectivo. Tu
+                pedido se prepara al confirmar el pago.
               </p>
             </div>
           )}

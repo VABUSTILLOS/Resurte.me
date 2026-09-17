@@ -31,6 +31,7 @@ import {
   type ConversationProspect,
   type InboxMessage,
 } from "./crm-inbox"
+import { crmProspect } from "./crm-fixtures"
 
 const NOW = new Date("2026-03-10T18:00:00.000Z")
 
@@ -48,23 +49,15 @@ function msg(
 }
 
 function prospect(overrides: Partial<ConversationProspect> = {}): ConversationProspect {
-  return {
+  return crmProspect({
     id: 7,
-    seller_id: null,
-    lead_id: null,
     name: "Ana",
     restaurant_name: "Taquería Ana",
     phone: "6141234567",
     whatsapp: "+52 614 123 4567",
-    email: null,
-    status: "nuevo",
-    notes: null,
-    next_follow_up_at: null,
-    last_contact_at: null,
     created_at: "2026-03-01T00:00:00.000Z",
-    tags: [],
     ...overrides,
-  }
+  })
 }
 
 describe("normalizeDirection", () => {

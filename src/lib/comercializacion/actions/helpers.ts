@@ -1,4 +1,10 @@
-import type { Prospect, ProspectStatus } from "../types"
+import { mapCrmProspect } from "@/lib/crm-core"
+
+/**
+ * Ronda 7: el mapeo de fila → prospecto vive en `crm-core.ts` y es el mismo que
+ * usa el panel admin. Se reexporta para no tocar a sus consumidores.
+ */
+export { mapCrmProspect as mapProspect }
 
 /**
  * Escapa caracteres especiales para interpolar texto de usuario en
@@ -54,31 +60,5 @@ export function validateProspectContact(input: {
         throw new Error(`El ${label} debe tener entre 8 y 15 dígitos`)
       }
     }
-  }
-}
-
-export function mapProspect(row: Record<string, unknown>): Prospect {
-  return {
-    id: Number(row.id),
-    // Un prospecto sin vendedor llega como NULL; `String(null)` daría "null".
-    seller_id: row.seller_id != null ? String(row.seller_id) : null,
-    name: String(row.name),
-    restaurant_name: (row.restaurant_name as string | null) ?? null,
-    phone: (row.phone as string | null) ?? null,
-    whatsapp: (row.whatsapp as string | null) ?? null,
-    email: (row.email as string | null) ?? null,
-    city_id: row.city_id != null ? Number(row.city_id) : null,
-    city_name: (row.city_name as string | null) ?? null,
-    tier: row.tier != null ? Number(row.tier) : null,
-    zone: (row.zone as string | null) ?? null,
-    status: row.status as ProspectStatus,
-    user_id: (row.user_id as string | null) ?? null,
-    referral_code: (row.referral_code as string | null) ?? null,
-    last_contact_at: (row.last_contact_at as string | null) ?? null,
-    next_follow_up_at: (row.next_follow_up_at as string | null) ?? null,
-    notes: (row.notes as string | null) ?? null,
-    source: (row.source as string) ?? "manual",
-    created_at: String(row.created_at),
-    updated_at: String(row.updated_at),
   }
 }

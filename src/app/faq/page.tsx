@@ -33,11 +33,11 @@ const FAQS = [
   },
   {
     q: "¿Me pueden dar crédito?",
-    a: `Claro. Si surtes con frecuencia, te abrimos línea de crédito a ${CREDIT_DAYS_PROSE} días. Sin aval, sin garantías rebuscadas. Evaluamos tu historial en la plataforma y en 24 horas tienes respuesta.`,
+    a: `Claro. Si surtes con frecuencia, te abrimos línea de crédito a ${CREDIT_DAYS_PROSE} días. Sin aval, sin garantías rebuscadas. Evaluamos tu historial en la plataforma y te decimos si aplica.`,
   },
   {
     q: "¿Facturan mis compras?",
-    a: `Todas. Cada pedido genera automáticamente tu ${INVOICING}. Solo registras tu RFC y uso de CFDI una vez, y de ahí en adelante nos encargamos de todo. Tus facturas listas para deducir, sin mover un dedo.`,
+    a: `Sí. Todas las compras se pueden facturar: solicítala y te emitimos tu ${INVOICING} sin costo extra. Necesitamos RFC, razón social, régimen fiscal, uso de CFDI y código postal fiscal.`,
   },
   {
     q: "¿Cómo registro mi negocio?",

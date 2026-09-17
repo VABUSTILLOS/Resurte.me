@@ -15,6 +15,7 @@ import {
   type SellerRef,
 } from "./crm-assignment"
 import { buildThreads, type ConversationProspect, type InboxMessage } from "./crm-inbox"
+import { crmProspect } from "./crm-fixtures"
 
 const NOW = new Date("2026-03-10T18:00:00.000Z")
 
@@ -23,22 +24,13 @@ function seller(id: string, overrides: Partial<SellerRef> = {}): SellerRef {
 }
 
 function prospect(overrides: Partial<AssignableProspect> = {}): AssignableProspect {
-  return {
-    id: 1,
-    seller_id: null,
-    lead_id: null,
+  return crmProspect({
     name: "Ana",
     restaurant_name: "Taquería Ana",
     phone: "6141234567",
-    whatsapp: null,
-    email: null,
-    status: "nuevo",
-    notes: null,
-    next_follow_up_at: null,
-    last_contact_at: null,
     created_at: "2026-03-01T00:00:00.000Z",
     ...overrides,
-  }
+  })
 }
 
 type MsgSpec = { direction: "inbound" | "outbound"; at: string; id?: number }
@@ -53,7 +45,11 @@ function threadsFor(
 
   entries.forEach((entry, i) => {
     const phone = `61400000${i}`
-    prospects.push({ ...prospect({ id: i + 1, phone, whatsapp: phone }), tags: [], ...entry.overrides })
+    // `crmProspect()` (y no `prospect()`) porque aquí se necesita el contrato
+    // completo: `AssignableProspect` deja `city_id` opcional para el tablero.
+    prospects.push(
+      Object.assign(crmProspect({ id: i + 1, phone, whatsapp: phone }), entry.overrides),
+    )
     entry.messages.forEach((m, j) => {
       messages.push({
         id: (i + 1) * 100 + j,

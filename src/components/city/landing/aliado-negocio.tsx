@@ -12,7 +12,7 @@ export function AliadoNegocio() {
               Tu negocio no puede parar. Nosotros tampoco.
             </h2>
             <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-3 max-w-xl mx-auto leading-relaxed">
-              Calidad consistente, precios que no brincan, facturación automática y un ejecutivo que te contesta en minutos. Así de simple.
+              Calidad consistente, precios que no brincan, facturación a solicitud y un ejecutivo que te contesta en minutos. Así de simple.
             </p>
           </div>
           <div className="flex flex-col md:flex-row items-center gap-10">
@@ -45,7 +45,7 @@ export function AliadoNegocio() {
                   },
                   {
                     title: "Facturación fiscal",
-                    desc: "Todos los pedidos incluyen CFDI. Deduce tus compras sin complicaciones.",
+                    desc: "Solicita tu CFDI en cada pedido. Deduce tus compras sin complicaciones.",
                   },
                   {
                     title: "Pedidos recurrentes",

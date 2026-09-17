@@ -1,10 +1,16 @@
-export type ProspectStatus =
-  | "nuevo"
-  | "contactado"
-  | "en_seguimiento"
-  | "cliente_activo"
-  | "inactivo"
-  | "perdido"
+import {
+  CRM_STATUSES,
+  CRM_STATUS_LABEL,
+  type CrmProspectRow,
+  type CrmStatus,
+} from "@/lib/crm-core"
+
+/**
+ * Ronda 7: el estado del prospecto es **el mismo** vocabulario que el del panel
+ * admin. No hay dos listas que sincronizar: `crm_prospects.status` tiene un solo
+ * `CHECK` (00052) y `crm-core.ts` es la única autoridad en TypeScript.
+ */
+export type ProspectStatus = CrmStatus
 
 export type ActivityType =
   | "llamada"
@@ -16,23 +22,13 @@ export type ActivityType =
 
 export type ActivityDirection = "saliente" | "entrante"
 
-export const PROSPECT_STATUSES: ProspectStatus[] = [
-  "nuevo",
-  "contactado",
-  "en_seguimiento",
-  "cliente_activo",
-  "inactivo",
-  "perdido",
-]
+/**
+ * Se conserva como arreglo mutable (`ProspectStatus[]`) porque hay consumidores
+ * que lo recorren y otros que validan con `.includes()`; la fuente es `CRM_STATUSES`.
+ */
+export const PROSPECT_STATUSES: ProspectStatus[] = [...CRM_STATUSES]
 
-export const PROSPECT_STATUS_LABEL: Record<ProspectStatus, string> = {
-  nuevo: "Nuevo",
-  contactado: "Contactado",
-  en_seguimiento: "En seguimiento",
-  cliente_activo: "Cliente activo",
-  inactivo: "Inactivo",
-  perdido: "Perdido",
-}
+export const PROSPECT_STATUS_LABEL: Record<ProspectStatus, string> = CRM_STATUS_LABEL
 
 export const ACTIVITY_TYPES: ActivityType[] = [
   "llamada",
@@ -74,29 +70,14 @@ export const ACTIVITY_OUTCOME_LABEL: Record<string, string> = {
   pedido_confirmado: "Pedido confirmado",
 }
 
-export interface Prospect {
-  id: number
-  /** `null` = sin asignar (lead web convertido que aún no tiene vendedor). */
-  seller_id: string | null
-  name: string
-  restaurant_name: string | null
-  phone: string | null
-  whatsapp: string | null
-  email: string | null
-  city_id: number | null
-  city_name: string | null
-  tier: number | null
-  zone: string | null
-  status: ProspectStatus
-  user_id: string | null
-  referral_code: string | null
-  last_contact_at: string | null
-  next_follow_up_at: string | null
-  notes: string | null
-  source: string
-  created_at: string
-  updated_at: string
-}
+/**
+ * Prospecto tal como lo ve el vendedor.
+ *
+ * Ronda 7: es un alias del contrato compartido `CrmProspectRow` (el mismo que usa
+ * el panel admin), así que además de los campos de la ficha trae `lead_id` y
+ * `tags`. Ya no hay dos formas de la misma fila.
+ */
+export type Prospect = CrmProspectRow
 
 export interface Activity {
   id: number

@@ -8,8 +8,9 @@ import {
   orderFilterQuery,
   EMPTY_ORDER_FILTER,
   ORDER_STATUS_VALUES,
+  ORDER_PAYMENT_STATUS_VALUES,
 } from "./order-filters"
-import { STATUS_LABEL } from "./order-labels"
+import { PAYMENT_STATUS_LABEL, STATUS_LABEL } from "./order-labels"
 
 describe("normalizeDateRange", () => {
   it("devuelve vacío cuando no hay fechas", () => {
@@ -80,7 +81,13 @@ describe("parseOrderFilterParams", () => {
   const parse = (qs: string) => parseOrderFilterParams(new URLSearchParams(qs))
 
   it("devuelve el estado por defecto sin parámetros", () => {
-    expect(parse("")).toEqual({ status: "all", search: "", from: "", to: "" })
+    expect(parse("")).toEqual({
+      status: "all",
+      paymentStatus: "all",
+      search: "",
+      from: "",
+      to: "",
+    })
   })
 
   it("lee el estado que envía el deep-link de pedidos atorados", () => {
@@ -96,6 +103,7 @@ describe("parseOrderFilterParams", () => {
   it("lee búsqueda y fechas válidas", () => {
     expect(parse("q=juan&from=2026-09-01&to=2026-09-12")).toEqual({
       status: "all",
+      paymentStatus: "all",
       search: "juan",
       from: "2026-09-01",
       to: "2026-09-12",
@@ -106,6 +114,7 @@ describe("parseOrderFilterParams", () => {
     expect(parse("q=%20juan%20").search).toBe("juan")
     expect(parse("from=10/09/2026&to=2026-13-40")).toEqual({
       status: "all",
+      paymentStatus: "all",
       search: "",
       from: "",
       to: "",
@@ -119,27 +128,81 @@ describe("orderFilterQuery", () => {
   })
 
   it("serializa solo los filtros activos", () => {
-    expect(orderFilterQuery({ status: "pending", search: "", from: "", to: "" })).toBe(
-      "status=pending"
-    )
+    expect(
+      orderFilterQuery({
+        status: "pending",
+        paymentStatus: "all",
+        search: "",
+        from: "",
+        to: "",
+      })
+    ).toBe("status=pending")
   })
 
   it("escapa la búsqueda", () => {
-    const qs = orderFilterQuery({ status: "all", search: "juan pérez", from: "", to: "" })
+    const qs = orderFilterQuery({
+      status: "all",
+      paymentStatus: "all",
+      search: "juan pérez",
+      from: "",
+      to: "",
+    })
     expect(new URLSearchParams(qs).get("q")).toBe("juan pérez")
   })
 
   it("ignora fechas inválidas", () => {
-    expect(orderFilterQuery({ status: "all", search: "", from: "ayer", to: "" })).toBe("")
+    expect(
+      orderFilterQuery({
+        status: "all",
+        paymentStatus: "all",
+        search: "",
+        from: "ayer",
+        to: "",
+      })
+    ).toBe("")
   })
 
   it("roundtrip: parse(query(state)) === state", () => {
-    const state = { status: "out_for_delivery" as const, search: "ana", from: "2026-09-01", to: "2026-09-12" }
+    const state = {
+      status: "out_for_delivery" as const,
+      paymentStatus: "failed" as const,
+      search: "ana",
+      from: "2026-09-01",
+      to: "2026-09-12",
+    }
     expect(parseOrderFilterParams(new URLSearchParams(orderFilterQuery(state)))).toEqual(state)
   })
 
   it("roundtrip con el deep-link del dashboard", () => {
     const state = parseOrderFilterParams(new URLSearchParams("status=pending"))
     expect(orderFilterQuery(state)).toBe("status=pending")
+  })
+
+  it("serializa y reparsea el estado de pago del embudo", () => {
+    // Deep-link real: el desglose de conversión enlaza "pago fallido" aquí.
+    const state = parseOrderFilterParams(new URLSearchParams("payment_status=failed"))
+    expect(state.paymentStatus).toBe("failed")
+    expect(orderFilterQuery(state)).toBe("payment_status=failed")
+  })
+
+  it("descarta un estado de pago fuera del enum", () => {
+    // La URL la escribe cualquiera: un valor inventado no debe llegar a SQL.
+    expect(
+      parseOrderFilterParams(new URLSearchParams("payment_status=inventado")).paymentStatus
+    ).toBe("all")
+  })
+})
+
+describe("ORDER_PAYMENT_STATUS_VALUES", () => {
+  it("cubre exactamente las etiquetas del catálogo real", () => {
+    // Guardia de deriva contra el enum `payment_status` de Postgres: si la
+    // migración añade un valor y aquí no, el filtro no podría aislarlo.
+    expect([...ORDER_PAYMENT_STATUS_VALUES].sort()).toEqual(
+      Object.keys(PAYMENT_STATUS_LABEL).sort()
+    )
+  })
+
+  it("no ofrece 'cancelled': la cancelación vive en orders.status", () => {
+    expect(ORDER_PAYMENT_STATUS_VALUES as readonly string[]).not.toContain("cancelled")
   })
 })

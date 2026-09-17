@@ -302,7 +302,7 @@ export function ProductDetailClient({ product, category, relatedProducts, presen
             <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-[#e8f5e9] rounded-xl border border-[#c8e6c8]">
               <Check className="w-4 h-4 text-[#0E7A0E] shrink-0" />
               <p className="text-xs font-medium text-[#1E6E1E]">
-                Calidad garantizada o te devolvemos tu dinero · Factura (CFDI) incluida
+                Calidad garantizada o te devolvemos tu dinero · Factura (CFDI) disponible
               </p>
             </div>
 

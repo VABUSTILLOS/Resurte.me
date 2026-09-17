@@ -10,6 +10,14 @@
  */
 
 import { LEAD_STATUSES, matchesSearch, type LeadStatus } from "@/lib/crm-pipeline"
+import { formatRate, rate } from "@/lib/funnel-metrics"
+
+/**
+ * Se reexportan para no romper a los consumidores que ya las importaban de aquí.
+ * La definición vive en `funnel-metrics.ts` para que el embudo de pedidos la
+ * comparta sin arrastrar toda la cadena del CRM de leads.
+ */
+export { formatRate, rate }
 
 /** Lo mínimo que necesita el embudo de cada lead. */
 export interface FunnelLead {
@@ -106,17 +114,6 @@ export function buildLeadFunnel(leads: FunnelLead[]): FunnelStep[] {
       rateFromPrevious: rate(converted, total),
     },
   ]
-}
-
-/** Tasa en porcentaje entero, o `null` si el denominador es cero. */
-export function rate(part: number, total: number): number | null {
-  if (total <= 0) return null
-  return Math.round((part / total) * 100)
-}
-
-/** Formatea una tasa para la UI sin inventar un cero cuando no se midió. */
-export function formatRate(value: number | null): string {
-  return value === null ? "No medido" : `${value}%`
 }
 
 export interface FunnelBySourceRow {

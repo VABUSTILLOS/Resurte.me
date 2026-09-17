@@ -51,10 +51,13 @@ export interface SellerRef {
 }
 
 /**
- * Prospecto a repartir. `city_id` es opcional porque la columna existe en la
- * tabla pero no todo consumidor la selecciona (el tablero no la necesita).
+ * Prospecto a repartir.
+ *
+ * `city_id` sigue siendo opcional: la columna existe en la tabla, pero no todo
+ * consumidor la selecciona (el tablero no la necesita). Es la única diferencia
+ * con el contrato compartido `CrmProspect`.
  */
-export interface AssignableProspect extends CrmProspect {
+export type AssignableProspect = Omit<CrmProspect, "city_id"> & {
   city_id?: number | null
 }
 
@@ -67,7 +70,7 @@ const CLOSED_STATUSES: readonly string[] = ["inactivo", "perdido"]
  * Un estado desconocido se trata como abierto: es preferible repartirlo de más a
  * dejar una ficha huérfana por un valor que no está en el CHECK.
  */
-export function isOpenProspect(prospect: Pick<CrmProspect, "status">): boolean {
+export function isOpenProspect(prospect: { status: string }): boolean {
   return !CLOSED_STATUSES.includes(prospect.status)
 }
 

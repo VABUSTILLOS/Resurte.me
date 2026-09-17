@@ -79,6 +79,21 @@ requieren revisar todos los playbooks que dependen de esa superficie.
    banner se renderiza al final de `layout.tsx` y gana el empate por orden de
    DOM). `src/lib/floats.contract.test.ts` **falla** si aparece un flotante sin
    decidir o si una clase declarada como oculta no está en el CSS.
+11. **Todo gate de CI está verificado y verde, o no está en CI**: un paso que
+   lleva rojo permanente no protege de nada — entrena a ignorar el resultado, y
+   su rojo deja de distinguirse del rojo ajeno. `knip` estuvo así desde que se
+   añadió al pipeline: **479 hallazgos** y nadie mirándolo, porque la causa
+   estaba en la **configuración** (`--production` oculta todo lo que solo
+   consumen los tests; sin `ignoreExportsUsedInFile`, cada símbolo usado dentro
+   de su propio módulo y cada colisión de nombre entre módulos cuentan como
+   hallazgo) y no en el código. Corolario: **medir con un flag que el
+   desarrollador no usa es medir otra cosa** — CI y local invocan el mismo
+   script. `src/lib/knip-config.contract.test.ts` **falla** si la allowlist crece
+   sin justificación escrita, si una justificación queda huérfana, si se suprime
+   un archivo entero en vez de un export, o si el paso de CI vuelve al flag.
+   Matiz que conviene recordar antes de atribuirse un rojo: `knip` analiza el
+   **working tree**, no `HEAD`, así que su recuento depende de lo que haya sin
+   commitear; lo que el contrato fija es la configuración.
 
 ## Sin agente asignado: cuenta y autenticación
 

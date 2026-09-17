@@ -239,7 +239,7 @@ export default function OrderConfirmedPage() {
         {/* WhatsApp share button — viral referral */}
         <a
           href={`https://wa.me/?text=${encodeURIComponent(
-            `¡Acabo de pedir mis insumos para restaurante en Resurte.me! 🥑\n\n✅ Precios de mayoreo\n✅ Entrega el mismo día\n✅ Facturación CFDI\n\nPruébalo: https://resurte.me`
+            `¡Acabo de pedir mis insumos para restaurante en Resurte.me! 🥑\n\n✅ Precios de mayoreo\n✅ Entrega el mismo día\n✅ Facturación CFDI disponible\n\nPruébalo: https://resurte.me`
           )}`}
           target="_blank"
           rel="noopener noreferrer"

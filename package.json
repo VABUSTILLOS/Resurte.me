@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "test": "vitest run",
+    "knip": "knip",
     "test:e2e": "playwright test --grep @ci",
     "test:e2e:all": "playwright test",
     "admin": "node scripts/admin-credentials.mjs"
@@ -66,215 +67,32 @@
       "src/lib/ai/kie-ai-admin.ts",
       "public/sw.js"
     ],
+    "ignoreExportsUsedInFile": true,
+    "ignoreDependencies": [
+      "sharp",
+      "supabase",
+      "vercel"
+    ],
     "ignoreIssues": {
-      "src/lib/panel-utils.ts": [
-        "exports"
-      ],
-      "src/lib/payment-validation.ts": [
-        "exports"
-      ],
-      "src/lib/geo-queries.ts": [
-        "exports"
-      ],
-      "src/lib/foodos-campaigns.ts": [
-        "exports"
-      ],
-      "src/lib/storage/index.ts": [
-        "exports",
-        "types"
-      ],
-      "src/lib/storage/storage-schemas.ts": [
-        "exports"
-      ],
-      "src/lib/geo-assets.ts": [
-        "exports"
-      ],
-      "src/lib/exit-intent.ts": [
-        "exports"
-      ],
-      "src/lib/foodos-whatsapp.ts": [
-        "exports"
-      ],
-      "src/lib/whatsapp-catalogs.ts": [
-        "exports",
-        "types"
-      ],
-      "src/lib/whatsapp-automations-engine.ts": [
-        "exports",
-        "types"
-      ],
-      "src/lib/whatsapp-batch-status.ts": [
-        "exports"
-      ],
-      "src/lib/whatsapp-share.ts": [
-        "exports"
-      ],
-      "src/lib/whatsapp.ts": [
-        "exports",
-        "types"
-      ],
-      "src/lib/auth-next.ts": [
-        "exports"
-      ],
-      "src/lib/order-bumps.ts": [
-        "exports",
-        "types"
-      ],
-      "src/lib/orders-address.ts": [
-        "exports"
-      ],
-      "src/lib/order-emails.ts": [
-        "exports"
-      ],
-      "src/lib/admin-cohorts.ts": [
-        "exports"
-      ],
-      "src/lib/ai-referrers.ts": [
-        "exports"
-      ],
-      "src/lib/audit.ts": [
-        "exports",
-        "types"
-      ],
-      "src/lib/comercializacion/actions/commissions-admin.ts": [
-        "types"
-      ],
-      "src/lib/foodos.ts": [
-        "exports",
-        "types"
-      ],
-      "src/app/panel/foodos/payment-proofs.ts": [
-        "exports"
-      ],
-      "src/lib/foodos-payment-reminders.ts": [
-        "exports"
-      ],
-      "src/lib/foodos-webhooks.ts": [
-        "exports"
-      ],
-      "src/lib/stripe-connect.ts": [
-        "exports"
-      ],
-      "src/lib/admin-errors.ts": [
-        "types"
-      ],
-      "src/lib/preguntas.ts": [
-        "exports"
-      ],
-      "src/lib/payment-next-action.ts": [
-        "exports"
-      ],
-      "src/lib/shopping-lists.ts": [
-        "exports",
-        "types"
-      ],
-      "src/lib/foodos-notifications.ts": [
-        "types"
-      ],
-      "src/hooks/use-ventas-page.ts": [
-        "exports"
-      ],
-      "src/lib/admin-marketing-validation.ts": [
+      "src/app/admin/actions.ts": [
         "exports"
       ],
       "src/lib/ai/kie-ai.ts": [
-        "exports",
+        "exports"
+      ],
+      "src/lib/cart-sync-queue.ts": [
+        "exports"
+      ],
+      "src/lib/crm-filters.ts": [
+        "exports"
+      ],
+      "src/lib/integration-status.ts": [
+        "exports"
+      ],
+      "src/types/foodos.ts": [
         "types"
-      ],
-      "src/lib/commercial-facts.ts": [
-        "exports"
-      ],
-      "src/lib/catalog-cache.ts": [
-        "exports"
-      ],
-      "src/lib/comercializacion/whatsapp.ts": [
-        "exports"
-      ],
-      "src/lib/email-workflows.ts": [
-        "exports",
-        "types"
-      ],
-      "src/lib/i18n/en.ts": [
-        "exports"
-      ],
-      "src/lib/i18n/es.ts": [
-        "exports"
-      ],
-      "src/lib/price-index-refresh.ts": [
-        "exports"
-      ],
-      "src/lib/panel-roles.ts": [
-        "exports"
-      ],
-      "src/lib/panel-sync.ts": [
-        "exports"
-      ],
-      "src/lib/utm.ts": [
-        "exports"
       ],
       "src/types/index.ts": [
-        "types"
-      ],
-      "src/lib/panel/foodos-sync.ts": [
-        "exports"
-      ],
-      "src/lib/quick-answer.ts": [
-        "exports"
-      ],
-      "src/lib/search-terms.ts": [
-        "exports"
-      ],
-      "src/lib/product-import.ts": [
-        "exports"
-      ],
-      "src/lib/restock.ts": [
-        "exports"
-      ],
-      "src/lib/sale-window.ts": [
-        "exports",
-        "types"
-      ],
-      "src/lib/sku.ts": [
-        "exports"
-      ],
-      "src/lib/trash.ts": [
-        "exports"
-      ],
-      "src/lib/audit-diff.ts": [
-        "exports"
-      ],
-      "src/lib/seo-batch.ts": [
-        "exports"
-      ],
-      "src/lib/related-products.ts": [
-        "exports"
-      ],
-      "src/lib/sales-report.ts": [
-        "exports",
-        "types"
-      ],
-      "src/lib/unit-price.ts": [
-        "exports",
-        "types"
-      ],
-      "src/hooks/use-selected-bumps.ts": [
-        "exports"
-      ],
-      "src/lib/ingredient-affinity.ts": [
-        "exports",
-        "types"
-      ],
-      "src/lib/order-bulk.ts": [
-        "exports"
-      ],
-      "src/lib/share-list.ts": [
-        "exports"
-      ],
-      "src/lib/admin-alerts.ts": [
-        "exports"
-      ],
-      "src/lib/order-filters.ts": [
-        "exports",
         "types"
       ]
     }

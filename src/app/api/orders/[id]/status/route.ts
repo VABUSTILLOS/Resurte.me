@@ -24,6 +24,7 @@ import { onOrderStatusChange } from "@/lib/workflows"
 import { notifyCashbackCredited } from "@/lib/notifications"
 import { logAdminAction } from "@/lib/audit-log"
 import { missingOptionalOrderColumn, type OrderQueryResult } from "@/lib/admin/order-selects"
+import { callStockRpc } from "@/lib/order-stock"
 import type { OrderStatus, PaymentStatus } from "@/types"
 
 const VALID_STATUSES: OrderStatus[] = [
@@ -235,6 +236,20 @@ export async function PATCH(
     // notifyCashbackCredited leyendo el monedero real, igual que la vía Stripe.
     if (payment_status === "paid" && oldPaymentStatus !== "paid") {
       void notifyCashbackCredited(orderId)
+    }
+
+    // Devolver el inventario que el pedido reservó al crearse (migración
+    // 00143). Va aquí, junto a la liberación del cupón, porque ambos son
+    // recursos que el pedido tomó y que una cancelación debe devolver.
+    // Es un no-op si el pedido nunca reservó (o si la RPC aún no existe).
+    if (status === "cancelled" && oldStatus !== "cancelled") {
+      const released = await callStockRpc(supabase, "release_order_stock", orderId)
+      if (released?.ok === false && released.reason !== "not_reserved") {
+        logger.warn("[API] No se pudo devolver el inventario del pedido cancelado", {
+          orderId,
+          reason: released.reason,
+        })
+      }
     }
 
     // Revertir la reserva del cupón si la orden se cancela.

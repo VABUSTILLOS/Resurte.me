@@ -26,6 +26,7 @@ import { formatMoney, slugify } from "@/lib/foodos"
 import { tallyAbTest } from "@/lib/messaging/channel"
 import type { CampaignCopyOutput, CampaignTone } from "@/lib/foodos-ai/copy"
 import { notifyFoodosCustomer } from "@/lib/foodos-notifications"
+import { courierLink } from "@/lib/foodos-flotilla"
 import {
   EMPTY_WALLET_STATS,
   ensureWalletPass,
@@ -2591,7 +2592,7 @@ export async function ensureFlotillaCourierLink(input: {
   })
   if (!result.ok) return { ok: false, error: result.error }
   revalidatePath("/panel/foodos/flotilla")
-  return { ok: true, url: `${SITE_URL}/reparto/${result.token}` }
+  return { ok: true, url: courierLink(SITE_URL, result.token) }
 }
 
 /** Rota el enlace del repartidor: el anterior deja de funcionar al instante. */

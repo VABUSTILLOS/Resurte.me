@@ -44,7 +44,19 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
   const apiKey = process.env.RESEND_API_KEY
 
   if (!apiKey) {
-    // Dev fallback: log to console
+    // Sin credencial no se puede enviar nada. En producción esto es un fallo,
+    // no un éxito: devolver ok:true aquí hacía que email_logs registrara
+    // "sent", que la bitácora admin lo mostrara como enviado y que
+    // hasAlreadySent() bloqueara el reintento para siempre.
+    if (process.env.NODE_ENV === "production") {
+      logger.error("email.not_configured", undefined, {
+        to: payload.to,
+        tag: payload.tag ?? "—",
+      })
+      return { ok: false, error: "email_not_configured" }
+    }
+    // En desarrollo sí se registra en consola: el correo no sale, pero el
+    // flujo completo se puede probar sin credenciales.
     logger.warn("email.dev_fallback", {
       to: payload.to,
       subject: payload.subject,

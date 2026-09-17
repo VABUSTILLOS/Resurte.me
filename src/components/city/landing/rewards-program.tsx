@@ -161,7 +161,7 @@ export function RewardsProgram() {
 
               {/* CTA */}
               <div className="text-center pt-6 sm:pt-8 border-t border-[#f0ede5]">
-                <p className="text-[13px] sm:text-sm text-[var(--text-secondary)] mb-4">Más de 500 restaurantes y hoteles ya surten con nosotros</p>
+                <p className="text-[13px] sm:text-sm text-[var(--text-secondary)] mb-4">Restaurantes y hoteles ya surten con nosotros</p>
                 <Link
                   href="/recompensas"
                   className="btn-pill btn-pill-primary inline-flex items-center justify-center gap-2 text-sm sm:text-base px-6 sm:px-8 py-2.5 sm:py-3 w-full sm:w-auto"

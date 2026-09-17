@@ -86,7 +86,7 @@ function buildHeader(
 
   return `# Resurte.me — Corpus completo para modelos de lenguaje
 
-> Central de abastos digital para restaurantes, fondas y negocios de comida en México. Venta por mayoreo de abarrotes, frutas, verduras, carnes, lácteos, bebidas, desechables y más, con entrega a domicilio. Sin membresía. Pedido mínimo ${formatMxn(MIN_ORDER_MXN)}. Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}. Facturación ${INVOICING} automática. Crédito a ${CREDIT_DAYS_PROSE} días para clientes frecuentes.
+> Central de abastos digital para restaurantes, fondas y negocios de comida en México. Venta por mayoreo de abarrotes, frutas, verduras, carnes, lácteos, bebidas, desechables y más, con entrega a domicilio. Sin membresía. Pedido mínimo ${formatMxn(MIN_ORDER_MXN)}. Envío gratis desde ${formatMxn(FREE_SHIPPING_MXN)}. Facturación ${INVOICING} a solicitud. Crédito a ${CREDIT_DAYS_PROSE} días para clientes frecuentes.
 
 ## Entidad y cobertura
 

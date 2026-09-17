@@ -271,7 +271,7 @@ export const PREGUNTAS: Pregunta[] = [
     slug: "que-es-el-pedido-minimo-de-resurte-me",
     question: "¿Cuál es el pedido mínimo de Resurte.me?",
     answer:
-      `El pedido mínimo es de ${formatMxn(MIN_ORDER_MXN)} y no hay costo de membresía. Si tu pedido supera los ${formatMxn(FREE_SHIPPING_MXN)}, el envío va por nuestra cuenta. Entregamos en ${DELIVERY_CITIES} ciudades de México y cada pedido genera automáticamente tu factura ${INVOICING}.`,
+      `El pedido mínimo es de ${formatMxn(MIN_ORDER_MXN)} y no hay costo de membresía. Si tu pedido supera los ${formatMxn(FREE_SHIPPING_MXN)}, el envío va por nuestra cuenta. Entregamos en ${DELIVERY_CITIES} ciudades de México y todas las compras se pueden facturar con ${INVOICING}, sin costo extra.`,
     theme: "proveeduria",
     links: [
       { label: "Preguntas frecuentes", href: "/faq" },
@@ -558,7 +558,7 @@ export const PREGUNTAS: Pregunta[] = [
     slug: "como-facturar-mis-compras-de-insumos",
     question: "¿Cómo facturo mis compras de insumos?",
     answer:
-      `Registra tu RFC y uso de CFDI una sola vez y cada pedido genera su factura automáticamente. En Resurte.me todas las compras se facturan con ${INVOICING}, así que no tienes que pedirla después ni perseguir al proveedor: la factura queda lista para deducir en cuanto cierras el pedido.`,
+      `Solicítala y te emitimos la factura con ${INVOICING}. Necesitamos tu RFC, razón social, régimen fiscal, uso de CFDI y código postal fiscal: con eso la factura queda lista para deducir. En Resurte.me no tienes que perseguir al proveedor por tu comprobante.`,
     theme: "herramientas",
     links: [
       { label: "Preguntas frecuentes", href: "/faq" },

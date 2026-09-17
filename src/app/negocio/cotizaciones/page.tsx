@@ -5,7 +5,7 @@ import { ArrowRight, Box, Calculator, MessageCircle, Clock } from "lucide-react"
 export const metadata: Metadata = {
   title: "Cotizaciones por volumen — Resurte.me",
   description:
-    "¿Compras por tonelada? Te damos precio de mayoreo real. Cotización personalizada en menos de 2 horas con ejecutivo dedicado.",
+    "¿Compras por tonelada? Te damos precio de mayoreo real. Cotización personalizada con ejecutivo dedicado, normalmente en el mismo día.",
 }
 
 export default function CotizacionesPage() {
@@ -34,8 +34,8 @@ export default function CotizacionesPage() {
             <Clock className="w-6 h-6 text-white" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-[#242529]">Cotización en menos de 2 horas, garantizado</p>
-            <p className="text-xs text-[#5C6068]">Si en 2 horas no tienes tu cotización, te mandamos un cupón de $200 para tu primer pedido. Así de seguros estamos.</p>
+            <p className="text-sm font-semibold text-[#242529]">Cotización en menos de 2 horas hábiles</p>
+            <p className="text-xs text-[#5C6068]">Es el tiempo que nos ponemos como meta para armarte el precio. Si se nos pasa, escríbenos por WhatsApp y lo resolvemos de inmediato.</p>
           </div>
         </div>
       </section>
@@ -78,8 +78,8 @@ export default function CotizacionesPage() {
             ¿Listo para pagar menos?
           </h2>
           <p className="text-[13px] sm:text-sm text-[#5C6068] mb-6 max-w-lg mx-auto">
-            Mándanos un WhatsApp con lo que necesitas y en menos de 2 horas te
-            mandamos tu cotización. Sin compromiso, sin letras chiquitas.
+            Mándanos un WhatsApp con lo que necesitas y te armamos tu
+            cotización con un ejecutivo dedicado. Sin compromiso, sin letras chiquitas.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a

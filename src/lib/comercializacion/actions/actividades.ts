@@ -10,6 +10,7 @@ import {
   type ActivityType,
   type ActivityDirection,
 } from "../types"
+import { readTags } from "@/lib/crm-core"
 import { mapProspect } from "./helpers"
 
 // ============================================================
@@ -19,6 +20,12 @@ import { mapProspect } from "./helpers"
 export async function getProspectDetail(id: number): Promise<{
   prospect: Prospect
   activities: Activity[]
+  /**
+   * Ronda 7: se expone en la raíz para cumplir el contrato de la ficha
+   * compartida (`CrmProspectDetail`). Si 00140 no está aplicada, `tags` no
+   * viene en la fila y esto queda en `[]` — la ficha se pinta sin chips.
+   */
+  tags: string[]
 }> {
   const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
@@ -45,6 +52,7 @@ export async function getProspectDetail(id: number): Promise<{
       ...prospect,
       city_name: (prospect.cities as { name?: string } | null)?.name ?? null,
     }),
+    tags: readTags((prospect as Record<string, unknown>).tags),
     activities: (activities ?? []).map((a) => ({
       id: Number(a.id),
       prospect_id: Number(a.prospect_id),

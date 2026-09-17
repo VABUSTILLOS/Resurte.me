@@ -20,8 +20,10 @@ import {
   LEAD_STATUSES,
   CRM_BOARD_COLUMNS,
   type CrmProspect,
+  type CrmStatus,
   type ConvertibleLead,
 } from "./crm-pipeline"
+import { crmProspect } from "./crm-fixtures"
 
 describe("nextCrmStatus", () => {
   it("avanza por el embudo feliz", () => {
@@ -47,14 +49,10 @@ describe("isCrmStatus", () => {
 describe("groupIntoBoard", () => {
   const p = (
     id: number,
-    status: string,
+    status: CrmStatus,
     created = "2026-09-01T00:00:00Z",
     extra: Partial<CrmProspect> = {},
-  ): CrmProspect => ({
-    id, seller_id: null, lead_id: null, name: `P${id}`, restaurant_name: null, phone: null,
-    whatsapp: null, email: null, status, notes: null, next_follow_up_at: null,
-    last_contact_at: null, created_at: created, ...extra,
-  })
+  ): CrmProspect => crmProspect({ id, status, created_at: created, name: `P${id}`, ...extra })
 
   it("agrupa por columnas y mete inactivo/perdido en cerrados", () => {
     const board = groupIntoBoard([p(1, "nuevo"), p(2, "perdido"), p(3, "inactivo")])
@@ -87,11 +85,7 @@ describe("groupIntoBoard", () => {
 
 describe("prospectUrgency", () => {
   const now = new Date("2026-09-12T12:00:00Z")
-  const base: CrmProspect = {
-    id: 1, seller_id: null, lead_id: null, name: "P", restaurant_name: null,
-    phone: null, whatsapp: null, email: null, status: "nuevo", notes: null,
-    next_follow_up_at: null, last_contact_at: null, created_at: "2026-09-01T00:00:00Z",
-  }
+  const base: CrmProspect = crmProspect({ name: "P" })
 
   it("clasifica vencido, sin agendar y agendado", () => {
     expect(prospectUrgency({ ...base, next_follow_up_at: "2026-09-11T00:00:00Z" }, now)).toBe(0)
@@ -228,12 +222,8 @@ describe("findMatchingProspect", () => {
     qualification: null,
   })
 
-  const existing = (extra: Partial<CrmProspect> = {}): CrmProspect => ({
-    id: 1, seller_id: null, lead_id: null, name: "Otro", restaurant_name: null,
-    phone: null, whatsapp: null, email: null, status: "nuevo", notes: null,
-    next_follow_up_at: null, last_contact_at: null, created_at: "2026-09-01T00:00:00Z",
-    ...extra,
-  })
+  const existing = (extra: Partial<CrmProspect> = {}): CrmProspect =>
+    crmProspect({ name: "Otro", ...extra })
 
   it("sin coincidencias devuelve null", () => {
     expect(findMatchingProspect(draft, [existing({ email: "otro@x.mx" })])).toBeNull()
@@ -257,12 +247,15 @@ describe("findMatchingProspect", () => {
 
 describe("filterProspects", () => {
   const now = new Date("2026-09-12T12:00:00Z")
-  const row = (extra: Partial<CrmProspect> = {}): CrmProspect => ({
-    id: 1, seller_id: "seller-1", lead_id: null, name: "Taquería El Sol",
-    restaurant_name: "El Sol", phone: "6141234567", whatsapp: null,
-    email: "hola@elsol.mx", status: "nuevo", notes: null, next_follow_up_at: null,
-    last_contact_at: null, created_at: "2026-09-01T00:00:00Z", ...extra,
-  })
+  const row = (extra: Partial<CrmProspect> = {}): CrmProspect =>
+    crmProspect({
+      seller_id: "seller-1",
+      name: "Taquería El Sol",
+      restaurant_name: "El Sol",
+      phone: "6141234567",
+      email: "hola@elsol.mx",
+      ...extra,
+    })
 
   it("sin filtros deja pasar todo", () => {
     expect(filterProspects([row()], {})).toHaveLength(1)

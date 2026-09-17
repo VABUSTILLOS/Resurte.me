@@ -48,7 +48,7 @@ interface TableResult {
  */
 function tableBuilder(result: TableResult = { data: null, error: null }) {
   const builder: Record<string, unknown> = {}
-  for (const method of ["select", "eq", "in", "is", "not", "update", "insert", "order", "limit", "ilike"]) {
+  for (const method of ["select", "eq", "in", "is", "not", "update", "insert", "delete", "order", "limit", "ilike"]) {
     builder[method] = vi.fn().mockReturnValue(builder)
   }
   builder.maybeSingle = vi.fn().mockResolvedValue(result)
@@ -61,9 +61,16 @@ function tableBuilder(result: TableResult = { data: null, error: null }) {
   }
 }
 
-function mockSupabase(tables: Record<string, ReturnType<typeof tableBuilder>>) {
+function mockSupabase(
+  tables: Record<string, ReturnType<typeof tableBuilder>>,
+  rpcImpl?: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>
+) {
   const from = vi.fn((table: string) => tables[table] ?? tableBuilder())
-  vi.mocked(createServiceClient).mockResolvedValue({ from } as never)
+  // RPC de inventario (migración 00143): por defecto reserva/libera con éxito.
+  const rpc = vi.fn(
+    rpcImpl ?? (async () => ({ data: { ok: true, reason: "reserved" }, error: null }))
+  )
+  vi.mocked(createServiceClient).mockResolvedValue({ from, rpc } as never)
   return from
 }
 
@@ -97,7 +104,7 @@ const validBody = {
 function mockValidOrderFlow() {
   return mockSupabase({
     products: tableBuilder({
-      data: [{ id: 1, price: 100, sale_price: null, stock_status: "in_stock" }],
+      data: [{ id: 1, price: 100, sale_price: null, stock_status: "in_stock", stock_quantity: 10 }],
       error: null,
     }),
     stores: tableBuilder({ data: { id: 1 }, error: null }),
@@ -174,10 +181,13 @@ describe("/api/orders validación zod", () => {
 })
 
 /** Flujo válido parametrizable: igual que mockValidOrderFlow pero admite overrides por tabla. */
-function mockFlow(extra: Record<string, ReturnType<typeof tableBuilder>> = {}) {
+function mockFlow(
+  extra: Record<string, ReturnType<typeof tableBuilder>> = {},
+  rpcImpl?: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>
+) {
   return mockSupabase({
     products: tableBuilder({
-      data: [{ id: 1, price: 100, sale_price: null, stock_status: "in_stock" }],
+      data: [{ id: 1, price: 100, sale_price: null, stock_status: "in_stock", stock_quantity: 10 }],
       error: null,
     }),
     stores: tableBuilder({ data: { id: 1 }, error: null }),
@@ -189,7 +199,7 @@ function mockFlow(extra: Record<string, ReturnType<typeof tableBuilder>> = {}) {
     }),
     order_items: tableBuilder({ data: null, error: null }),
     ...extra,
-  })
+  }, rpcImpl)
 }
 
 /** Simula una sesión activa para esta llamada (createClient viene del mock global con user null). */
@@ -355,5 +365,113 @@ describe("/api/orders POST sesión, cupón y fallbacks", () => {
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toContain("cupón")
+  })
+})
+
+describe("/api/orders inventario (migración 00143)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("reserva el inventario del pedido recién creado", async () => {
+    const calls: Array<{ fn: string; args: Record<string, unknown> }> = []
+    mockFlow({}, async (fn, args) => {
+      calls.push({ fn, args })
+      return { data: { ok: true, reason: "reserved" }, error: null }
+    })
+
+    const res = await POST(orderReq(validBody))
+
+    expect(res.status).toBe(200)
+    expect(calls).toEqual([{ fn: "reserve_order_stock", args: { p_order_id: 7 } }])
+  })
+
+  it("rechaza 409 y revierte el pedido cuando la RPC reporta existencia insuficiente", async () => {
+    const orders = tableBuilder({
+      data: { id: 7, cashback_credits: 5, cashback_tier: "Verde", total: 100, restore_token: "tok" },
+      error: null,
+    })
+    mockFlow({ orders }, async () => ({
+      data: {
+        ok: false,
+        reason: "insufficient_stock",
+        conflicts: [{ product_id: 1, requested: 4, available: 1 }],
+      },
+      error: null,
+    }))
+
+    const res = await POST(
+      orderReq({
+        ...validBody,
+        subtotal: 400,
+        total: 400,
+        items: [{ product_id: 1, quantity: 4, unit_price: 100, name: "Jitomate" }],
+      })
+    )
+
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.code).toBe("insufficient_stock")
+    // El mensaje usa el nombre del carrito, no el id.
+    expect(body.error).toContain("Jitomate")
+    expect(body.error).toContain("pediste 4")
+    expect(body.conflicts).toHaveLength(1)
+    // El pedido recién creado se borra (el cascade se lleva sus items).
+    expect(orders.delete).toHaveBeenCalled()
+  })
+
+  it("no tumba el checkout si la RPC de inventario no está desplegada", async () => {
+    mockFlow({}, async () => ({
+      data: null,
+      error: { message: "function public.reserve_order_stock(bigint) does not exist", code: "42883" },
+    }))
+
+    const res = await POST(orderReq(validBody))
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.orderId).toBe(7)
+    expect(logger.error).toHaveBeenCalled()
+  })
+
+  it("rechaza 409 sin crear pedido cuando el carrito pide más de lo disponible", async () => {
+    const from = mockFlow({
+      products: tableBuilder({
+        data: [{ id: 1, price: 100, sale_price: null, stock_status: "in_stock", stock_quantity: 2 }],
+        error: null,
+      }),
+    })
+
+    const res = await POST(
+      orderReq({ ...validBody, items: [{ product_id: 1, quantity: 5, unit_price: 100, name: "Jitomate" }] })
+    )
+
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.code).toBe("insufficient_stock")
+    expect(body.error).toContain("pediste 5")
+    expect(body.error).toContain("hay 2")
+    // El rechazo ocurre antes de tocar `orders`.
+    expect(from).not.toHaveBeenCalledWith("orders")
+  })
+
+  it("no bloquea productos sin control de inventario (stock_quantity null)", async () => {
+    mockFlow({
+      products: tableBuilder({
+        data: [{ id: 1, price: 100, sale_price: null, stock_status: "in_stock", stock_quantity: null }],
+        error: null,
+      }),
+    })
+
+    const res = await POST(
+      orderReq({
+        ...validBody,
+        subtotal: 9900,
+        total: 9900,
+        items: [{ product_id: 1, quantity: 99, unit_price: 100, name: "Servilletas" }],
+      })
+    )
+
+    expect(res.status).toBe(200)
   })
 })

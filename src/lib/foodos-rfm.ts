@@ -73,11 +73,6 @@ export interface RfmScore {
   audience: FoodosAudienceKey
 }
 
-export interface ScoredCustomer {
-  customer: FoodosCustomer
-  score: RfmScore
-}
-
 // ------------------------------------------------------------
 // Puntajes
 // ------------------------------------------------------------

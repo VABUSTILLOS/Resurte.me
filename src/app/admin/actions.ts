@@ -52,14 +52,21 @@ import {
 import type { RewardsOrder } from "@/lib/wallet-progress"
 import type { CashbackTier } from "@/types"
 import { filterLeads } from "@/lib/crm-funnel"
+import {
+  ADMIN_SCOPE,
+  CRM_PROSPECT_COLUMNS,
+  CRM_PROSPECT_COLUMNS_WITHOUT_TAGS,
+  mapCrmProspect,
+} from "@/lib/crm-core"
+import { readCrmProspects } from "@/lib/crm-prospects"
 import { CRM_PAGE_SIZE } from "@/lib/crm-filters"
 import {
-  filterProspects,
   findMatchingProspect,
   leadToProspectDraft,
   phoneKey,
   type CrmProspect,
   type ProspectFilters,
+  type ProspectMatchCandidate,
 } from "@/lib/crm-pipeline"
 import {
   buildThread,
@@ -164,6 +171,8 @@ export interface AdminOrder {
  */
 export interface AdminOrderFilters {
   status?: string
+  /** Estado de pago exacto (`payment_status`). Ver ORDER_PAYMENT_STATUS_VALUES. */
+  paymentStatus?: string
   search?: string
   /** ISO timestamptz inclusive (inicio del rango de fechas) */
   from?: string
@@ -242,6 +251,9 @@ export async function getAdminOrders(
     }
     if (status && status !== "all") {
       q = q.eq("status", status)
+    }
+    if (filters?.paymentStatus && filters.paymentStatus !== "all") {
+      q = q.eq("payment_status", filters.paymentStatus)
     }
     // Fase 9 — rango de fechas (día calendario; el límite superior ya viene
     // exclusivo desde normalizeDateRange).
@@ -1426,44 +1438,6 @@ async function loadLeadBoardCounts(
   return { pending, converted, discarded, total: rows.length }
 }
 
-/** Mapea una fila de `crm_prospects` al tipo del CRM. Compartido por el tablero y la bandeja. */
-/**
- * Columnas base de un prospecto, compartidas por todas las lecturas del CRM.
- * `lead_id` (00139) va aquí y se degrada aparte donde haga falta.
- */
-const CRM_PROSPECT_COLUMNS =
-  "id, seller_id, lead_id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at"
-
-function toCrmProspectRow(row: Record<string, unknown>): CrmProspect {
-  return {
-    id: Number(row.id),
-    seller_id: row.seller_id != null ? String(row.seller_id) : null,
-    lead_id: row.lead_id != null ? Number(row.lead_id) : null,
-    name: String(row.name),
-    restaurant_name: (row.restaurant_name as string | null) ?? null,
-    phone: (row.phone as string | null) ?? null,
-    whatsapp: (row.whatsapp as string | null) ?? null,
-    email: (row.email as string | null) ?? null,
-    status: String(row.status),
-    notes: (row.notes as string | null) ?? null,
-    next_follow_up_at: (row.next_follow_up_at as string | null) ?? null,
-    last_contact_at: (row.last_contact_at as string | null) ?? null,
-    created_at: String(row.created_at),
-    tags: readTags(row.tags),
-  }
-}
-
-/**
- * Columnas del pipeline, de más a menos completa. Se prueban en orden y se
- * degrada una columna a la vez: un entorno sin 00139 (sin `lead_id`) o sin
- * 00140 (sin `tags`) debe seguir pintando el tablero, no reventar.
- */
-const CRM_BOARD_COLUMNS = [
-  `${CRM_PROSPECT_COLUMNS}, tags`,
-  CRM_PROSPECT_COLUMNS,
-  "id, seller_id, name, restaurant_name, phone, whatsapp, email, status, notes, next_follow_up_at, last_contact_at, created_at",
-] as const
-
 /** Conteos de la bandeja, para las pestañas de `/admin/leads`. */
 export async function getAdminLeadBoardCounts(): Promise<AdminLeadBoardCounts> {
   const { response: adminDenied } = await requireAdmin()
@@ -1474,7 +1448,13 @@ export async function getAdminLeadBoardCounts(): Promise<AdminLeadBoardCounts> {
   return loadLeadBoardCounts(supabase)
 }
 
-/** Tablero CRM: prospectos con sus campos de seguimiento. */
+/**
+ * Tablero CRM: prospectos con sus campos de seguimiento.
+ *
+ * Envoltorio fino sobre el lector compartido. El admin ve todo, incluido el pozo
+ * sin asignar (`seller_id IS NULL`), que es justo lo que el alcance de vendedor
+ * esconde.
+ */
 export async function getAdminCrmBoard(
   filters: ProspectFilters & { limit?: number } = {},
 ): Promise<CrmProspect[]> {
@@ -1484,43 +1464,11 @@ export async function getAdminCrmBoard(
   }
 
   const supabase = await createServiceClient()
-  const limit = filters.limit ?? 500
-
-  const buildQuery = (columns: string) => {
-    let query = supabase
-      .from("crm_prospects")
-      .select(columns)
-      .order("created_at", { ascending: false })
-      .limit(limit)
-    if (filters.status && filters.status !== "todos") query = query.eq("status", filters.status)
-    if (filters.unassigned) query = query.is("seller_id", null)
-    if (filters.due) query = query.not("next_follow_up_at", "is", null).lte(
-      "next_follow_up_at",
-      new Date().toISOString(),
-    )
-    return query
-  }
-
-  let rows: Record<string, unknown>[] = []
-  for (const columns of CRM_BOARD_COLUMNS) {
-    const { data, error } = await buildQuery(columns)
-    if (!error) {
-      rows = (data ?? []) as unknown as Record<string, unknown>[]
-      break
-    }
-    // Solo se degrada ante columnas ausentes (00139/00140 sin aplicar).
-    if (!isMissingColumnError(error)) {
-      logger.error("[ADMIN-CRM] Error fetching prospects:", error)
-      throw new Error("Error al cargar el pipeline CRM")
-    }
-    logger.warn("[ADMIN-CRM] Columnas incompletas en crm_prospects; se reintenta degradado", {
-      message: error.message,
-    })
-  }
-
-  const prospects: CrmProspect[] = rows.map(toCrmProspectRow)
-  // `q` se resuelve en memoria para poder ignorar acentos, que PostgREST no hace.
-  return filters.q ? filterProspects(prospects, { q: filters.q }) : prospects
+  return readCrmProspects(supabase, {
+    scope: ADMIN_SCOPE,
+    filters,
+    limit: filters.limit ?? 500,
+  })
 }
 
 /** Vendedores activos, para el selector de asignación. */
@@ -1686,20 +1634,13 @@ export async function convertLeadToProspect(leadId: number): Promise<ConvertLead
     throw new Error("Error al buscar prospectos existentes")
   }
 
-  const existing = (existingRows ?? []).map((row) => ({
+  const existing: ProspectMatchCandidate[] = (existingRows ?? []).map((row) => ({
     id: Number(row.id),
-    seller_id: null,
     lead_id: row.lead_id != null ? Number(row.lead_id) : null,
     name: String(row.name),
-    restaurant_name: (row.restaurant_name as string | null) ?? null,
     phone: (row.phone as string | null) ?? null,
     whatsapp: (row.whatsapp as string | null) ?? null,
     email: (row.email as string | null) ?? null,
-    status: "nuevo",
-    notes: null,
-    next_follow_up_at: null,
-    last_contact_at: null,
-    created_at: "",
   }))
 
   const match = findMatchingProspect(draft, existing)
@@ -2073,7 +2014,7 @@ async function loadProspectRow(
 ): Promise<Record<string, unknown> | null> {
   const { data, error } = await supabase
     .from("crm_prospects")
-    .select(`${CRM_PROSPECT_COLUMNS}, tags`)
+    .select(CRM_PROSPECT_COLUMNS)
     .eq("id", prospectId)
     .maybeSingle()
   if (!error) return (data as Record<string, unknown> | null) ?? null
@@ -2081,7 +2022,7 @@ async function loadProspectRow(
   if (isMissingColumnError(error)) {
     const fallback = await supabase
       .from("crm_prospects")
-      .select(CRM_PROSPECT_COLUMNS)
+      .select(CRM_PROSPECT_COLUMNS_WITHOUT_TAGS)
       .eq("id", prospectId)
       .maybeSingle()
     if (!fallback.error) return (fallback.data as Record<string, unknown> | null) ?? null
@@ -2092,7 +2033,7 @@ async function loadProspectRow(
 }
 
 function toConversationProspect(row: Record<string, unknown>): ConversationProspect {
-  return { ...toCrmProspectRow(row), tags: readTags(row.tags) }
+  return mapCrmProspect(row)
 }
 
 /**
@@ -2837,26 +2778,12 @@ async function loadAssignableProspects(
   ids: readonly number[] | null,
   scope: "all" | "assigned" | "unassigned",
 ): Promise<AssignableProspect[]> {
-  let query = supabase
-    .from("crm_prospects")
-    .select(`${CRM_PROSPECT_COLUMNS}, city_id`)
-    .order("created_at", { ascending: false })
-    .limit(ASSIGN_SCAN_LIMIT)
-
-  if (scope === "assigned") query = query.not("seller_id", "is", null)
-  if (scope === "unassigned") query = query.is("seller_id", null)
-  if (ids) query = query.in("id", [...ids])
-
-  const { data, error } = await query
-  if (error) {
-    logger.error("[ADMIN-CRM] Error cargando prospectos para reparto:", error)
-    throw new Error("Error al cargar los prospectos")
-  }
-
-  return (data ?? []).map((row) => ({
-    ...toCrmProspectRow(row),
-    city_id: row.city_id != null ? Number(row.city_id) : null,
-  }))
+  return readCrmProspects(supabase, {
+    scope: ADMIN_SCOPE,
+    limit: ASSIGN_SCAN_LIMIT,
+    ids: ids ?? undefined,
+    sellerPresence: scope === "all" ? "any" : scope,
+  })
 }
 
 export interface DistributeCrmInput {
@@ -3098,11 +3025,11 @@ export async function getAdminCrmInbox(): Promise<AdminCrmInbox> {
 async function loadInboxProspects(supabase: ServiceClient): Promise<Record<string, unknown>[]> {
   const { data, error } = await supabase
     .from("crm_prospects")
-    .select(`${CRM_PROSPECT_COLUMNS}, tags`)
+    .select(CRM_PROSPECT_COLUMNS)
     .order("created_at", { ascending: false })
     .limit(INBOX_PROSPECT_LIMIT)
 
-  if (!error) return (data ?? []) as Record<string, unknown>[]
+  if (!error) return (data ?? []) as unknown as Record<string, unknown>[]
 
   if (!isMissingColumnError(error)) {
     logger.error("[ADMIN-CRM] Error cargando la bandeja:", error)
@@ -3112,14 +3039,14 @@ async function loadInboxProspects(supabase: ServiceClient): Promise<Record<strin
   logger.warn("[ADMIN-CRM] Migración 00140 no aplicada; se omite tags")
   const fallback = await supabase
     .from("crm_prospects")
-    .select(CRM_PROSPECT_COLUMNS)
+    .select(CRM_PROSPECT_COLUMNS_WITHOUT_TAGS)
     .order("created_at", { ascending: false })
     .limit(INBOX_PROSPECT_LIMIT)
   if (fallback.error) {
     logger.error("[ADMIN-CRM] Error cargando la bandeja:", fallback.error)
     throw new Error("Error al cargar la bandeja")
   }
-  return (fallback.data ?? []) as Record<string, unknown>[]
+  return (fallback.data ?? []) as unknown as Record<string, unknown>[]
 }
 
 /** Mensajes recientes de todos los números, para indexarlos en un solo paso. */

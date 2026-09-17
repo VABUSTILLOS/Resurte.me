@@ -8,7 +8,9 @@ import {
   type Prospect,
   type ProspectStatus,
 } from "../types"
-import { escapeOrTerm, digitsOf, validateProspectContact, mapProspect } from "./helpers"
+import { scopeForRole, type ProspectFilters as CoreProspectFilters } from "@/lib/crm-core"
+import { readCrmProspects } from "@/lib/crm-prospects"
+import { digitsOf, validateProspectContact, mapProspect } from "./helpers"
 
 export type DuplicateMatch = {
   /** Dígitos del teléfono buscado que coincidió. */
@@ -68,66 +70,42 @@ export async function findDuplicatesByPhone(
 // PROSPECTOS
 // ============================================================
 
-export interface ProspectFilters {
-  status?: ProspectStatus | "todos"
-  q?: string
-  onlyPending?: boolean
+/**
+ * Filtros de la cartera del vendedor: los del núcleo compartido más la forma de
+ * la página. `limit`/`offset` son forma de consulta, no criterio de selección,
+ * y por eso no viven en `crm-core`.
+ */
+export interface ProspectFilters extends CoreProspectFilters {
   /** Máximo de filas (default 200) para no traer la tabla completa. */
   limit?: number
   /** Desplazamiento para paginación ("Cargar más"). */
   offset?: number
 }
 
+/** Techo de filas por lectura cuando el llamador no pide otra cosa. */
+const DEFAULT_PROSPECT_LIMIT = 200
+
+/**
+ * Prospectos dentro del alcance del usuario.
+ *
+ * Envoltorio fino sobre el lector compartido: aquí solo quedan el gate de rol y
+ * la traducción de rol a alcance. La búsqueda, el orden, la escalera de columnas
+ * y la paginación viven en `readCrmProspects`, para que el panel de administración
+ * y la cartera del vendedor respondan exactamente lo mismo a la misma pregunta.
+ */
 export async function getProspects(
   filters: ProspectFilters = {}
 ): Promise<Prospect[]> {
   const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
 
-  const limit = filters.limit ?? 200
-  const offset = filters.offset ?? 0
-
-  let query = supabase
-    .from("crm_prospects")
-    .select("*, cities(name)")
-    .order("created_at", { ascending: false })
-    .range(offset, offset + limit - 1)
-
-  // El admin ve la cartera completa; el vendedor solo la suya
-  if (role !== "admin") query = query.eq("seller_id", userId)
-
-  if (filters.status && filters.status !== "todos") {
-    query = query.eq("status", filters.status)
-  }
-  if (filters.q) {
-    const q = escapeOrTerm(filters.q.trim())
-    // Valores entre comillas dobles (ver escapeOrTerm): el parser de
-    // PostgREST solo respeta los caracteres reservados dentro de citas.
-    query = query.or(
-      `name.ilike."%${q}%",restaurant_name.ilike."%${q}%",phone.ilike."%${q}%",email.ilike."%${q}%"`
-    )
-  }
-
-  const { data, error } = await query
-  if (error) {
-    logger.error("[CRM] getProspects error:", error)
-    throw new Error("Error al cargar los prospectos")
-  }
-
-  let prospects = (data ?? []).map((row) =>
-    mapProspect({ ...row, city_name: (row.cities as { name?: string } | null)?.name ?? null })
-  )
-
-  if (filters.onlyPending) {
-    const now = new Date().toISOString()
-    prospects = prospects.filter(
-      (p) => p.status === "nuevo" || (p.next_follow_up_at && p.next_follow_up_at <= now)
-    )
-  }
-
-  return prospects
+  return readCrmProspects(supabase, {
+    scope: scopeForRole(role, userId),
+    filters,
+    limit: filters.limit ?? DEFAULT_PROSPECT_LIMIT,
+    offset: filters.offset ?? 0,
+  })
 }
-
 
 export interface ProspectInput {
   name: string

@@ -7,7 +7,6 @@
 
 import { getStorageSchema } from "./storage-schemas"
 
-export type { StorageSchema } from "./storage-schemas"
 export { registerStorageSchema, getStorageSchema } from "./storage-schemas"
 
 export interface StorageLike {

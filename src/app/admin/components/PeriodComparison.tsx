@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Download, TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { Download } from "lucide-react"
+import { MetricWithDelta } from "./MetricDelta"
 import { getAdminPeriodComparison, type PeriodComparison } from "../actions"
 import {
   PERIOD_OPTIONS,
@@ -12,22 +13,6 @@ import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
 function money(value: number): string {
   return `$${value.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`
-}
-
-function DeltaChip({ deltaPct, direction }: { deltaPct: number | null; direction: "up" | "down" | "flat" }) {
-  if (deltaPct === null) {
-    return <span className="text-[11px] text-gray-400">sin base</span>
-  }
-  const Icon = direction === "up" ? TrendingUp : direction === "down" ? TrendingDown : Minus
-  const color =
-    direction === "up" ? "text-green-600" : direction === "down" ? "text-red-600" : "text-gray-500"
-  return (
-    <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${color}`}>
-      <Icon className="w-3 h-3" aria-hidden="true" />
-      {deltaPct > 0 ? "+" : ""}
-      {deltaPct}%
-    </span>
-  )
 }
 
 /**
@@ -122,11 +107,11 @@ export function PeriodComparisonCard() {
         <div className="h-24 animate-pulse rounded-lg bg-gray-100" />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-          <Metric label="Pedidos" current={String(data.orders.current)} previous={String(data.orders.previous)} comp={data.orders} />
-          <Metric label="Ingresos" current={money(data.revenue.current)} previous={money(data.revenue.previous)} comp={data.revenue} />
-          <Metric label="Ticket promedio" current={money(data.avgTicket.current)} previous={money(data.avgTicket.previous)} comp={data.avgTicket} />
-          <Metric label="Clientes nuevos" current={String(data.newCustomers)} previous={String(data.prevNewCustomers)} />
-          <Metric label="Recurrentes" current={String(data.recurringCustomers)} previous={String(data.prevRecurringCustomers)} />
+          <MetricWithDelta label="Pedidos" current={String(data.orders.current)} previous={String(data.orders.previous)} comp={data.orders} />
+          <MetricWithDelta label="Ingresos" current={money(data.revenue.current)} previous={money(data.revenue.previous)} comp={data.revenue} />
+          <MetricWithDelta label="Ticket promedio" current={money(data.avgTicket.current)} previous={money(data.avgTicket.previous)} comp={data.avgTicket} />
+          <MetricWithDelta label="Clientes nuevos" current={String(data.newCustomers)} previous={String(data.prevNewCustomers)} />
+          <MetricWithDelta label="Recurrentes" current={String(data.recurringCustomers)} previous={String(data.prevRecurringCustomers)} />
         </div>
       )}
       {data && (
@@ -135,27 +120,5 @@ export function PeriodComparisonCard() {
         </p>
       )}
     </section>
-  )
-}
-
-function Metric({
-  label,
-  current,
-  previous,
-  comp,
-}: {
-  label: string
-  current: string
-  previous: string
-  comp?: { deltaPct: number | null; direction: "up" | "down" | "flat" }
-}) {
-  return (
-    <div>
-      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">{label}</p>
-      <p className="mt-0.5 text-lg font-bold text-gray-900">{current}</p>
-      <p className="text-[11px] text-gray-400">
-        antes: {previous} {comp && <DeltaChip deltaPct={comp.deltaPct} direction={comp.direction} />}
-      </p>
-    </div>
   )
 }

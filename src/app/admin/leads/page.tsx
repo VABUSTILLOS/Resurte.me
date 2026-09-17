@@ -92,6 +92,7 @@ const SOURCE_LABEL: Record<string, string> = {
   checkout_drawer: "Checkout",
   exit_intent: "Exit intent",
   restaurantes_landing: "Landing /restaurantes",
+  blog_newsletter: "Suscripción del blog",
   manual: "Alta manual",
   lead_web: "Lead web",
 }

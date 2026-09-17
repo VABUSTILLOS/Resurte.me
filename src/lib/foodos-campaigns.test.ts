@@ -540,23 +540,19 @@ describe("runFoodosCampaign", () => {
     })
   })
 
-  it("marca la campaña como fallida si ningún objetivo tiene canal", async () => {
+  it("falla la campaña de inmediato, y con precisión, si no hay ningún canal configurado", async () => {
     const rec = scenario()
     vi.mocked(loadMessagingCapabilities).mockResolvedValue({ whatsapp: false, sms: false, waConfig: null })
-    vi.mocked(sendMarketingMessage).mockResolvedValue({
-      ok: false,
-      channel: null,
-      provider: null,
-      reason: "whatsapp_unavailable",
-      error: null,
-    })
 
     const result = await runFoodosCampaign("camp1")
-    expect(result).toEqual({ campaignId: "camp1", sent: 0, failed: 0, skipped: 2 , skippedByPlatform: 0 })
+    // No se recorre la lista de destinatarios: el problema es de configuración,
+    // no de cada cliente, así que se reporta una sola vez.
+    expect(result).toEqual({ campaignId: "camp1", sent: 0, failed: 0, skipped: 1, skippedByPlatform: 0 })
+    expect(sendMarketingMessage).not.toHaveBeenCalled()
     expect(rec.inserts.find((i) => i.table === "foodos_campaigns")).toBeUndefined()
     expect(rec.updates.at(-1)?.values).toMatchObject({
       status: "failed",
-      error: "Sin canal disponible para los clientes objetivo",
+      error: expect.stringContaining("WhatsApp no está conectado"),
     })
   })
 

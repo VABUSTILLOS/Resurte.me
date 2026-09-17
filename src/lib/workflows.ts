@@ -23,6 +23,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { sendOrderConfirmationEmail, sendOrderStatusEmail } from "@/lib/order-emails"
 import type { OrderStatus, PaymentStatus } from "@/types"
 import { logger } from "@/lib/logger"
+import { callStockRpc } from "@/lib/order-stock"
 import type { WorkflowType } from "@/lib/workflow-types"
 
 // ============================================================
@@ -611,6 +612,11 @@ export async function checkAndSendPaymentReminders(): Promise<{
           .from("orders")
           .update({ status: "cancelled", updated_at: now.toISOString() })
           .eq("id", order.id)
+
+        // Devolver el inventario reservado (migración 00143). Esta ruta no
+        // pasa por /api/orders/[id]/status, así que sin esta llamada el stock
+        // de un pedido abandonado quedaría descontado para siempre.
+        await callStockRpc(supabase, "release_order_stock", order.id)
 
         // Notify customer about cancellation
         await notifyCustomerStatusUpdate(order.id, "cancelled")

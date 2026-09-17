@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   Search,
   Plus,
@@ -14,6 +14,7 @@ import {
   Users,
   Upload,
   Download,
+  Tag,
 } from "lucide-react"
 import {
   Button,
@@ -34,11 +35,22 @@ import type { Prospect, ProspectStatus } from "@/lib/comercializacion/types"
 import { PROSPECT_STATUS_LABEL } from "@/lib/comercializacion/types"
 import { formatDateTime } from "@/lib/comercializacion/dates"
 import { WhatsappTemplateMenu } from "./whatsapp-templates"
-import { getProspects, deleteProspect } from "@/lib/comercializacion/actions"
+import {
+  bulkTagProspects,
+  deleteProspect,
+  getProspects,
+} from "@/lib/comercializacion/actions"
 import { toCsv, downloadCsv } from "@/lib/comercializacion/csv"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
+import { CRM_PAGE_SIZE } from "@/lib/crm-filters"
+import { parseTagInput, tagLabel, tagMatches } from "@/lib/crm-tags"
 
-export const PAGE_SIZE = 50
+/**
+ * Filas por página. Es el mismo número que usa el tablero de `/admin/leads`
+ * (`CRM_PAGE_SIZE`): la lista del vendedor y el panel del admin tienen que
+ * paginar igual para que "Cargar más" signifique lo mismo en las dos.
+ */
+export const PAGE_SIZE = CRM_PAGE_SIZE
 
 interface CityOption {
   id: number
@@ -54,6 +66,8 @@ export function ProspectosPage({
   cities: CityOption[]
 }) {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const { toast } = useToast()
 
   const [prospects, setProspects] = useState<Prospect[]>(initialProspects)
@@ -72,6 +86,13 @@ export function ProspectosPage({
   const [deleting, setDeleting] = useState<Prospect | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  // El filtro por etiqueta vive en la URL igual que en `/admin/leads`: un enlace
+  // a "mis prospectos vip" tiene que poder pegarse en un chat.
+  const [tag, setTag] = useState(() => (searchParams.get("tag") ?? "").trim())
+  const [selecting, setSelecting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [bulkTagDraft, setBulkTagDraft] = useState("")
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   // Cerrar el menú "⋯" con click fuera o Escape
   useEffect(() => {
@@ -155,6 +176,63 @@ export function ProspectosPage({
     return prospects
   }, [prospects, view])
 
+  /**
+   * El filtro por etiqueta se aplica en memoria, sobre lo ya cargado — igual que
+   * en `/admin/leads`. Filtrar en el servidor exigiría un operador de arreglo en
+   * PostgREST (`cs`) y dejaría fuera el caso de "sin etiquetas".
+   */
+  const tagged = useMemo(
+    () => (tag ? filtered.filter((p) => (p.tags ?? []).some((t) => tagMatches(t, tag))) : filtered),
+    [filtered, tag],
+  )
+
+  /** Etiquetas presentes en lo cargado, para el selector. */
+  const tagOptions = useMemo(() => {
+    const known = new Set<string>()
+    for (const p of prospects) for (const t of p.tags ?? []) known.add(t)
+    const sorted = [...known].sort((a, b) => a.localeCompare(b, "es"))
+    return tag && !known.has(tag) ? [tag, ...sorted] : sorted
+  }, [prospects, tag])
+
+  function changeTag(next: string) {
+    setTag(next)
+    const params = new URLSearchParams(searchParams.toString())
+    if (next) params.set("tag", next)
+    else params.delete("tag")
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }
+
+  function toggleSelected(id: number) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => (prev.length === tagged.length ? [] : tagged.map((p) => p.id)))
+  }
+
+  async function applyBulkTags(mode: "add" | "remove") {
+    const add = mode === "add" ? parseTagInput(bulkTagDraft) : []
+    const remove = mode === "remove" ? parseTagInput(tag) : []
+    if (add.length === 0 && remove.length === 0) return
+    setBulkBusy(true)
+    try {
+      const touched = await bulkTagProspects(selectedIds, add, remove)
+      toast(
+        mode === "add"
+          ? `${touched} prospecto(s) etiquetados`
+          : `${touched} prospecto(s) sin «${tagLabel(tag)}»`,
+      )
+      setBulkTagDraft("")
+      setSelectedIds([])
+      await reload()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error al etiquetar", "error")
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   async function handleCopyLink(prospect: Prospect) {
     const code = prospect.referral_code
     if (!code) {
@@ -188,7 +266,7 @@ export function ProspectosPage({
   }
 
   function exportCsv() {
-    const rows = filtered.map((p) => [
+    const rows = tagged.map((p) => [
       p.name,
       p.restaurant_name,
       p.phone,
@@ -207,7 +285,7 @@ export function ProspectosPage({
         rows
       )
     )
-    toast(`${filtered.length} prospecto(s) exportados`)
+    toast(`${tagged.length} prospecto(s) exportados`)
   }
 
   return (
@@ -221,7 +299,7 @@ export function ProspectosPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={exportCsv} disabled={filtered.length === 0}>
+          <Button variant="outline" onClick={exportCsv} disabled={tagged.length === 0}>
             <Download className="w-4 h-4" />
             Exportar
           </Button>
@@ -266,6 +344,21 @@ export function ProspectosPage({
             <option value="inactivo">Inactivo</option>
             <option value="perdido">Perdido</option>
           </Select>
+          {tagOptions.length > 0 || tag ? (
+            <Select
+              className="!w-auto"
+              value={tag}
+              onChange={(e) => changeTag(e.target.value)}
+              aria-label="Filtrar por etiqueta"
+            >
+              <option value="">Todas las etiquetas</option>
+              {tagOptions.map((t) => (
+                <option key={t} value={t}>
+                  🏷️ {tagLabel(t)}
+                </option>
+              ))}
+            </Select>
+          ) : null}
         </div>
 
         {/* Vistas rápidas + toggle lista/pipeline */}
@@ -306,9 +399,60 @@ export function ProspectosPage({
                 {l.label}
               </button>
             ))}
+            {layout === "lista" ? (
+              <button
+                onClick={() => {
+                  setSelecting((v) => !v)
+                  setSelectedIds([])
+                }}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  selecting
+                    ? "bg-[#0E7A0E] text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+                title="Etiquetar varios prospectos a la vez"
+              >
+                {selecting ? "Cancelar" : "Seleccionar"}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
+
+      {selecting ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-gray-600">
+            {selectedIds.length} de {tagged.length} seleccionados
+          </span>
+          <Button variant="outline" onClick={toggleSelectAll} disabled={tagged.length === 0}>
+            {selectedIds.length > 0 && selectedIds.length === tagged.length
+              ? "Quitar selección"
+              : "Seleccionar todo"}
+          </Button>
+          <Input
+            className="!w-auto flex-1 min-w-[180px]"
+            placeholder="Etiquetas separadas por coma"
+            value={bulkTagDraft}
+            onChange={(e) => setBulkTagDraft(e.target.value)}
+            aria-label="Etiquetas a añadir"
+          />
+          <Button
+            disabled={bulkBusy || selectedIds.length === 0 || !bulkTagDraft.trim()}
+            onClick={() => void applyBulkTags("add")}
+          >
+            <Tag className="w-4 h-4" />
+            Etiquetar
+          </Button>
+          <Button
+            variant="outline"
+            disabled={bulkBusy || selectedIds.length === 0 || !tag}
+            title={tag ? undefined : "Elige una etiqueta en el filtro para poder quitarla"}
+            onClick={() => void applyBulkTags("remove")}
+          >
+            {tag ? `Quitar «${tagLabel(tag)}»` : "Quitar etiqueta"}
+          </Button>
+        </div>
+      ) : null}
 
       {/* Lista o pipeline */}
       {layout === "pipeline" ? (
@@ -317,7 +461,7 @@ export function ProspectosPage({
             <Spinner />
           </div>
         ) : (
-          <PipelineView prospects={filtered} onChanged={reload} />
+          <PipelineView prospects={tagged} onChanged={reload} />
         )
       ) : (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -325,13 +469,15 @@ export function ProspectosPage({
           <div className="flex justify-center py-12">
             <Spinner />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : tagged.length === 0 ? (
           <EmptyState
-            title="No hay prospectos"
+            title={tag ? "Ningún prospecto con esa etiqueta" : "No hay prospectos"}
             subtitle={
-              view === "por_contactar"
-                ? "No tienes prospectos por contactar 🎉"
-                : "Crea tu primer prospecto para empezar a hacer seguimiento."
+              tag
+                ? `Ninguno de los prospectos cargados lleva «${tagLabel(tag)}».`
+                : view === "por_contactar"
+                  ? "No tienes prospectos por contactar 🎉"
+                  : "Crea tu primer prospecto para empezar a hacer seguimiento."
             }
             action={
               <Button
@@ -347,11 +493,20 @@ export function ProspectosPage({
           />
         ) : (
           <ul className="divide-y divide-gray-50">
-            {filtered.map((p) => {
+            {tagged.map((p) => {
               const waPhone = p.whatsapp ?? p.phone
               return (
                 <li key={p.id} className="relative">
                   <div className="px-4 py-3 flex items-center justify-between gap-3">
+                    {selecting ? (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(p.id)}
+                        onChange={() => toggleSelected(p.id)}
+                        className="w-4 h-4 shrink-0 rounded border-gray-300 accent-[#0E7A0E]"
+                        aria-label={`Seleccionar ${p.name}`}
+                      />
+                    ) : null}
                     <Link
                       href={`/comercializacion/prospectos/${p.id}`}
                       className="min-w-0 flex-1 group"
@@ -369,6 +524,27 @@ export function ProspectosPage({
                         {p.restaurant_name ? `${p.restaurant_name} · ` : ""}
                         {p.phone ?? "Sin teléfono"}
                       </p>
+                      {p.tags && p.tags.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {p.tags.map((t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                changeTag(tagMatches(t, tag) ? "" : t)
+                              }}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border transition-colors ${
+                                tagMatches(t, tag)
+                                  ? "bg-[#0E7A0E] text-white border-[#0E7A0E]"
+                                  : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                              }`}
+                            >
+                              {tagLabel(t)}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
                       {p.next_follow_up_at ? (
                         <p className="text-[11px] text-amber-600 mt-0.5">
                           Seguimiento: {formatDateTime(p.next_follow_up_at)}
@@ -458,7 +634,7 @@ export function ProspectosPage({
             })}
           </ul>
         )}
-        {!loading && filtered.length > 0 && hasMore ? (
+        {!loading && tagged.length > 0 && hasMore ? (
           <div className="border-t border-gray-100 px-4 py-3 flex justify-center">
             <Button variant="outline" onClick={loadMore} disabled={loadingMore}>
               {loadingMore ? <Spinner className="w-4 h-4" /> : null}

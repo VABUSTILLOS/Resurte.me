@@ -3,5 +3,6 @@
 export * from "./actions/prospectos"
 export * from "./actions/actividades"
 export * from "./actions/vinculos"
+export * from "./actions/etiquetas"
 export * from "./actions/dashboard"
 export * from "./actions/pedidos"

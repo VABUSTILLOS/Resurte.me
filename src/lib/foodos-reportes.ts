@@ -31,10 +31,12 @@ export const NO_BRANCH = "sin_sucursal"
 export const FOODOS_REPORT_CHANNELS: FoodosOrderChannel[] = FOODOS_ORDER_CHANNELS
 
 /**
- * Etiquetas de canal. Se reexportan desde `@/lib/foodos` para que exista una
- * sola tabla: la lista de pedidos y el tablero tienen que decir lo mismo.
+ * Etiqueta de canal. Se reexporta desde `@/lib/foodos` para que exista una sola
+ * tabla: la lista de pedidos y el tablero tienen que decir lo mismo. La tabla
+ * completa (`CHANNEL_LABELS`) no se reexporta: quien la necesite la importa de
+ * `@/lib/foodos`.
  */
-export { CHANNEL_LABELS, channelLabel } from "./foodos"
+export { channelLabel } from "./foodos"
 
 /** True si el pedido ya puso dinero. Es la única fuente de ingresos. */
 export function isPaidOrder(order: Pick<FoodosOrder, "payment_status">): boolean {

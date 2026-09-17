@@ -15,6 +15,7 @@ import { logger } from "@/lib/logger"
 
 import { NextRequest, NextResponse } from "next/server"
 import { safeSecretEqual } from "@/lib/secret-equal"
+import { logUnconfiguredIntegrations } from "@/lib/integration-status"
 import { checkAndSendPaymentReminders } from "@/lib/workflows"
 import { checkAndSendFoodosPaymentReminders } from "@/lib/foodos-payment-reminders"
 import { retryFailedOrderEmails } from "@/lib/order-emails"
@@ -32,6 +33,10 @@ export async function GET(req: NextRequest) {
   }
 
   const results: Record<string, unknown> = {}
+
+  // Los jobs de abajo fallan en silencio si falta una credencial: este log es
+  // la única señal de por qué el cron "corrió bien" sin enviar nada.
+  logUnconfiguredIntegrations("cron/daily")
 
   const jobs: Array<[string, () => Promise<unknown>]> = [
     ["payment-reminders", () => checkAndSendPaymentReminders()],

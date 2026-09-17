@@ -2,12 +2,13 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowRight, Leaf, Truck, Users, Shield, Building2, BadgeCheck } from "lucide-react"
 import { MEXICO_CITIES } from "@/lib/cities"
+import { DELIVERY_CITIES } from "@/lib/commercial-facts"
 import { PRIMARY_AUTHOR, getPersonSchema, ORGANIZATION_ID, SITE_URL, SITE_NAME } from "@/lib/author"
 
 export const metadata: Metadata = {
   title: "Sobre nosotros — Resurte.me",
   description:
-    "Somos la Central de Abastos Digital que le ahorra tiempo y dinero a miles de negocios mexicanos. Proveeduría inteligente, sin intermediarios, con entregas al siguiente día.",
+    "Somos la Central de Abastos Digital que le ahorra tiempo y dinero a los negocios mexicanos. Proveeduría inteligente, sin intermediarios, con entregas al siguiente día.",
 }
 
 const STATS = [
@@ -106,7 +107,7 @@ export default function AboutPage() {
             {
               icon: Users,
               title: "Hecho a la medida del negocio mexicano",
-              desc: "Crédito a 30 días, facturación automática, cotizaciones por volumen y un ejecutivo dedicado que te resuelve por WhatsApp. Así de simple.",
+              desc: "Crédito a 30 días, facturación a solicitud, cotizaciones por volumen y un ejecutivo dedicado que te resuelve por WhatsApp. Así de simple.",
             },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="text-center group">
@@ -164,11 +165,11 @@ export default function AboutPage() {
           Decidimos construir el puente: una plataforma que mantiene la calidad y
           el precio de la central, pero elimina el tráfico, las 4 AM y la
           incertidumbre. Mismos proveedores, mismos precios, pero desde tu celular,
-          con entrega al siguiente día y factura automática.
+          con entrega al siguiente día y factura a solicitud.
         </p>
         <p className="text-[#5C6068] leading-relaxed">
-          Hoy más de 5,000 negocios nos confían su proveeduría. Y apenas vamos
-          empezando.
+          Surtimos a restaurantes, fondas, cafeterías y hoteles en {DELIVERY_CITIES} ciudades
+          de México. Y apenas vamos empezando.
         </p>
       </section>
 

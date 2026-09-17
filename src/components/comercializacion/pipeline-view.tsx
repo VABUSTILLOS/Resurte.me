@@ -6,6 +6,7 @@ import { ChevronRight, ChevronLeft } from "lucide-react"
 import { EmptyState } from "./ui"
 import { useToast } from "@/components/toast"
 import { updateProspect } from "@/lib/comercializacion/actions"
+import { tagLabel } from "@/lib/crm-tags"
 import {
   PROSPECT_STATUS_LABEL,
   type Prospect,
@@ -139,6 +140,23 @@ export function PipelineView({
                     <p className="text-[11px] text-gray-500 truncate">
                       {p.restaurant_name ?? p.phone ?? "—"}
                     </p>
+                    {p.tags && p.tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {p.tags.slice(0, 3).map((t) => (
+                          <span
+                            key={t}
+                            className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-50 text-gray-600 border border-gray-200"
+                          >
+                            {tagLabel(t)}
+                          </span>
+                        ))}
+                        {p.tags.length > 3 ? (
+                          <span className="text-[10px] text-gray-400">
+                            +{p.tags.length - 3}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </Link>
                   <div className="flex items-center justify-between mt-1.5">
                     {prevCol ? (

@@ -149,6 +149,22 @@ describe("POST /api/leads", () => {
     expect(res.status).toBe(400)
   })
 
+  it("guarda la suscripción del blog con su source, sin diagnóstico", async () => {
+    const res = await POST(
+      post({ email: " Chef@Restaurante.com ", source: "blog_newsletter" })
+    )
+    expect(res.status).toBe(200)
+
+    const supabase = await createServiceClient()
+    const insert = supabase.from("leads").insert as ReturnType<typeof vi.fn>
+    expect(insert).toHaveBeenCalledWith({
+      email: "chef@restaurante.com",
+      source: "blog_newsletter",
+    })
+    // El diagnóstico del calificador es exclusivo de /restaurantes.
+    expect(insert.mock.calls[0]?.[0]).not.toHaveProperty("qualification")
+  })
+
   it("responde 429 cuando el rate limit está agotado", async () => {
     vi.mocked(rateLimited).mockResolvedValue({ allowed: false } as never)
     const insert = vi.fn().mockResolvedValue({ error: null })

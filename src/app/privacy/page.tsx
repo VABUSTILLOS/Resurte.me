@@ -54,8 +54,10 @@ export default function PrivacyPage() {
         <div>
           <h2 className="text-xl font-bold text-[#242529] mb-3">2. Datos que recopilamos</h2>
           <p className="text-[#5C6068] leading-relaxed">
-            Recopilamos nombre, correo electrónico, teléfono, RFC, dirección de
-            entrega e información de tu negocio. También recopilamos datos de uso
+            Recopilamos nombre, correo electrónico, teléfono, dirección de
+            entrega e información de tu negocio. Si nos pides factura, también
+            recopilamos tus datos fiscales (RFC, razón social, régimen fiscal,
+            uso de CFDI y código postal). También recopilamos datos de uso
             de la plataforma para mejorar tu experiencia.
           </p>
         </div>

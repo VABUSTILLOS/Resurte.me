@@ -11,6 +11,7 @@ import { validDeliveryFee } from "@/lib/checkout-config"
 import { resolveBumpPricing } from "@/lib/order-bumps"
 import { insertAddressResilient } from "@/lib/orders-address"
 import { missingColumnName } from "@/lib/admin/order-selects"
+import { callStockRpc, describeStockConflicts } from "@/lib/order-stock"
 
 // Esquema zod del body (espejo de CreateOrderBody/OrderItemInput). Claves
 // desconocidas se descartan; los montos siguen sin ser de confianza — se
@@ -216,7 +217,7 @@ export async function POST(request: NextRequest) {
     const productIds = items.map((i) => i.product_id)
     const { data: dbProducts, error: productsErr } = await supabase
       .from("products")
-      .select("id, price, sale_price, stock_status")
+      .select("id, price, sale_price, stock_status, stock_quantity")
       .in("id", productIds)
 
     if (productsErr) {
@@ -227,7 +228,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const priceByProduct = new Map<number, { price: number; sale_price: number | null; stock_status: string }>()
+    const priceByProduct = new Map<
+      number,
+      { price: number; sale_price: number | null; stock_status: string; stock_quantity: number | null }
+    >()
     for (const p of dbProducts ?? []) {
       priceByProduct.set(p.id, p)
     }
@@ -272,6 +276,34 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
+    }
+
+    // Existencia insuficiente — rechazo temprano, antes de crear el pedido.
+    // La verificación autoritativa es la RPC `reserve_order_stock` (atómica,
+    // con bloqueo de fila); esto solo evita crear y borrar un pedido cuando
+    // el carrito pide de más. Se agrupa por producto porque el carrito puede
+    // repetirlo (un item normal + un bump del mismo producto).
+    // `stock_quantity IS NULL` = sin control de inventario → no se bloquea.
+    const requestedByProduct = new Map<number, number>()
+    for (const item of items) {
+      requestedByProduct.set(
+        item.product_id,
+        (requestedByProduct.get(item.product_id) ?? 0) + item.quantity
+      )
+    }
+    const shortages: string[] = []
+    for (const [productId, requested] of requestedByProduct) {
+      const db = getDbProduct(productId)
+      if (db.stock_quantity !== null && db.stock_quantity < requested) {
+        const name = items.find((i) => i.product_id === productId)?.name ?? `Producto ${productId}`
+        shortages.push(`${name} (pediste ${requested}, hay ${db.stock_quantity})`)
+      }
+    }
+    if (shortages.length > 0) {
+      return NextResponse.json(
+        { error: `Sin existencia suficiente: ${shortages.join("; ")}`, code: "insufficient_stock" },
+        { status: 409 }
+      )
     }
 
     // ── Precios de order bumps (server-side, nunca del cliente) ──
@@ -705,6 +737,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Error al guardar los productos del pedido" },
         { status: 500 }
+      )
+    }
+
+    // ── Reserva de inventario (migración 00143) ──
+    // Descuenta products.stock_quantity de forma atómica, después de que los
+    // items existen (la RPC los lee) y antes de responder. Si falta existencia
+    // se revierte el pedido recién creado —el cascade borra sus items— y se
+    // libera el cupón, igual que el rollback de arriba. Un error de
+    // infraestructura (RPC no desplegada) NO rechaza la venta: se registra y
+    // el checkout sigue, que es como se comportaba antes de esta migración.
+    const stock = await callStockRpc(supabase, "reserve_order_stock", order.id)
+    if (stock && stock.ok === false && stock.reason === "insufficient_stock") {
+      const conflicts = stock.conflicts ?? []
+      const nameByProduct = new Map(items.map((i) => [i.product_id, i.name]))
+      await supabase.from("orders").delete().eq("id", order.id)
+      await releaseCoupon(coupon, couponReserved, supabase)
+      return NextResponse.json(
+        {
+          error: `Sin existencia suficiente: ${describeStockConflicts(conflicts, nameByProduct)}`,
+          code: "insufficient_stock",
+          conflicts,
+        },
+        { status: 409 }
       )
     }
 

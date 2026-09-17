@@ -814,6 +814,59 @@
     **no** se relaja ninguna política de `crm_prospects` ni de
     `whatsapp_messages`. `crm_prospects` **no** denormaliza el último mensaje:
     se deriva en lectura.
+- **Conversión (`/admin/conversion`, Ronda CV)**: el embudo tiene **una sola
+  fuente de verdad**, el motor puro `@/lib/conversion-funnel`; la página y la
+  ruta nunca recalculan una tasa por su cuenta. Invariantes que no se pueden
+  romper:
+  - **La misma regla vive en dos implementaciones, y hay que mantenerlas
+    iguales.** El camino rápido es la RPC `admin_conversion_funnel_window`
+    (migración `00141`, agrega en Postgres y no tiene tope de filas); la
+    referencia es `classifyOrder`/`buildFunnel`, a la que la ruta degrada si la
+    migración no está aplicada. Nada garantizaba que dijeran lo mismo, así que
+    `src/lib/conversion-funnel.contract.test.ts` lee la migración como texto y
+    exige que las dos copias coincidan (orden del `CASE`, tabla `VALUES` de
+    orden, centinelas, tope de UTM, índice, permisos) **y** evalúa el `CASE` del
+    SQL contra `classifyOrder` sobre las 60 combinaciones de estado, pago y
+    método. Al tocar el `CASE` del SQL o `classifyOrder`, se tocan los dos.
+  - **La prioridad del desenlace es pagado → fallido → cancelado → abandonado →
+    otros**, y no es el orden de presentación: `OUTCOMES` (paid, failed,
+    pending, cancelled, other) es el orden en que se pintan las filas y el SQL
+    lo impone con una columna `sort` explícita. Reordenar `OUTCOMES` **no**
+    cambia la clasificación; reordenar los `WHEN` del `CASE` **sí**.
+  - **`email_logs` no tiene `created_at`: se filtra por `sent_at`.** Filtrarla
+    por `created_at` producía `42703` y el 500 que la UI mostraba como "Error al
+    cargar el funnel". La regresión está clavada con una prueba propia.
+  - **`null` ≠ `0`.** `rate()` devuelve `null` sin denominador y la UI pinta
+    "No medido"; `compareMetric()` devuelve `deltaPct: null` cuando la base es
+    `0` — **nunca `100` ni `-100`**, porque un "▲ 100%" sobre cero es un dato
+    inventado. Los deltas son contra el periodo anterior de la misma duración
+    (`periodBounds`), no contra el día previo.
+  - **Un recorte se declara, no se disimula.** Las tres lecturas tienen tope
+    (`DETAIL_LIMIT`, `RECOVERY_LOG_LIMIT`, `TAKE_RATE_ID_LIMIT`) y al alcanzarlo
+    la respuesta lo dice (`detailTruncated`, `recoveryTruncated`,
+    `takeRateTruncated`) y nombra lo que quedó a medias en `degraded[]`; el
+    encabezado muestra un aviso en vez de presentar cifras parciales como
+    completas. PostgREST además corta en ~1000 filas: los topes grandes se
+    paginan, no se piden de una vez.
+  - **La tendencia diaria se calcula en JS, no en una segunda RPC.** Se arma con
+    el detalle que la ruta **ya** leyó (no cuesta una consulta extra) y por eso
+    mismo **se apaga** cuando esa lectura se recortó o falló
+    (`trendUnavailable: "truncated" | "detailError"`, y `trend: null`): un corte
+    sobre una lectura ordenada por fecha descendente deja completos los días
+    recientes y vacíos los primeros, así que dibujarla publicaría un crecimiento
+    que no ocurrió. Duplicar la regla en SQL multiplicaría la deriva que el
+    contrato existe para evitar, y un `RETURNS TABLE` con tope de filas
+    reintroduciría justo el fallo silencioso que `00141` vino a cerrar.
+  - **La ventana es semiabierta `[since, until)` y el día es local.** La serie
+    corta por **instante**, no por día (agrupar solo por día colaba el pedido
+    que cae justo en `until`, que el SQL excluye) y agrupa por el día de
+    `DEFAULT_TIMEZONE`, nunca por el día UTC. La ventana de 30 días es de
+    30×24 h, así que toca **31** días locales: los del borde se marcan
+    `partial: true` y la gráfica lo advierte, porque un día a medias se lee
+    igual que una caída.
+  - **La gráfica no es la única salida.** Lleva `role="img"` con el resumen
+    textual de la serie (`describeTrend`) y, plegada bajo "Ver los datos por
+    día", la misma serie como tabla — el SVG solo no es accesible.
 
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de

@@ -41,10 +41,10 @@ export const DELIVERY_TIMES = [
 ]
 
 // Los próximos 7 días de entrega viven en `@/lib/delivery-days`: se calculan
-// sobre el día LOCAL del restaurante, no sobre el día UTC. Se reexportan aquí
-// para no tocar a quienes ya los importaban de este módulo.
+// sobre el día LOCAL del restaurante, no sobre el día UTC. Se reexporta
+// `getNextDays` para no tocar a quienes ya lo importaban de este módulo; el tipo
+// `DeliveryDay` se importa de `@/lib/delivery-days` directamente.
 export { getNextDays } from "@/lib/delivery-days"
-export type { DeliveryDay } from "@/lib/delivery-days"
 
 export const PAYMENT_ICONS: Record<PaymentMethod, ReactNode> = {
   card: <CreditCard className="w-5 h-5" />,

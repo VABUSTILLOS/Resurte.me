@@ -50,7 +50,7 @@ export function HeroSection({
                 </button>
                 <span className="hidden sm:inline text-white/30">·</span>
                 <span className="hidden sm:inline-flex items-center gap-1">
-                  📄 Factura automática
+                  📄 Factura CFDI
                 </span>
                 <span className="hidden sm:inline text-white/30">·</span>
                 <span className="hidden sm:inline-flex items-center gap-1">
@@ -59,7 +59,7 @@ export function HeroSection({
               </div>
               {/* Mobile-only compact feature line */}
               <p className="mt-3 sm:hidden text-xs text-white/60">
-                📄 Factura automática · 🔄 Devolución sin costo · 🚚 Entrega el mismo día
+                📄 Factura CFDI · 🔄 Devolución sin costo · 🚚 Entrega el mismo día
               </p>
               <form
                 onSubmit={onSearch}

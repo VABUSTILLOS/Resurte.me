@@ -461,6 +461,6 @@ export default function CartPage() {
 const trustSignals = [
   { icon: "🔒", label: "Pago Seguro", desc: "Procesado por Stripe" },
   { icon: "🚚", label: "Envío Rápido", desc: `Tarifa fija de $${DELIVERY_FEE_FLAT.toFixed(0)}` },
-  { icon: "📄", label: "Factura (CFDI)", desc: "Para tu negocio" },
+  { icon: "📄", label: "Factura (CFDI)", desc: "A solicitud" },
   { icon: "⭐", label: "Calidad Garantizada", desc: "O te devolvemos tu dinero" },
 ]

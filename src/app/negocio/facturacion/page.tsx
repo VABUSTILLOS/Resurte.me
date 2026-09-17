@@ -5,7 +5,7 @@ import { ArrowRight, FileText, CheckCircle, Download, Shield } from "lucide-reac
 export const metadata: Metadata = {
   title: "Facturación electrónica (CFDI 4.0) — Resurte.me",
   description:
-    "Cada compra genera tu factura automáticamente. CFDI 4.0, listo para deducir. Sin costo extra, sin pasos extra.",
+    "Todas tus compras se pueden facturar. Pide tu CFDI 4.0 y te lo emitimos listo para deducir. Sin costo extra.",
 }
 
 export default function FacturacionPage() {
@@ -15,11 +15,11 @@ export default function FacturacionPage() {
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-3xl sm:text-5xl font-bold text-[#242529] mb-4">
             Facturación{" "}
-            <span className="text-[#0E7A0E]">sin mover un dedo</span>
+            <span className="text-[#0E7A0E]">sin costo extra</span>
           </h1>
           <p className="text-base sm:text-lg text-[#5C6068]">
-            Registras tu RFC una sola vez y olvídate. Cada pedido genera tu CFDI
-            4.0 automáticamente. Sin costo, sin recordatorios, sin estrés fiscal.
+            Nos mandas tus datos fiscales una sola vez y te emitimos tu CFDI 4.0
+            cuando lo pidas. Sin costo, sin recordatorios, sin estrés fiscal.
           </p>
         </div>
       </section>
@@ -31,8 +31,8 @@ export default function FacturacionPage() {
             <Shield className="w-6 h-6 text-white" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-[#242529]">CFDI 4.0 garantizado</p>
-            <p className="text-xs text-[#5C6068]">Cumplimos con todos los requisitos del SAT. Tus facturas son 100% deducibles. Si el SAT te rechaza una factura nuestra, la corregimos en menos de 4 horas.</p>
+            <p className="text-sm font-semibold text-[#242529]">CFDI 4.0 sin costo</p>
+            <p className="text-xs text-[#5C6068]">Emitimos comprobantes válidos ante el SAT, 100% deducibles. Si algo sale mal con tu factura, la corregimos y te la reemitimos.</p>
           </div>
         </div>
       </section>
@@ -47,13 +47,13 @@ export default function FacturacionPage() {
             },
             {
               icon: CheckCircle,
-              title: "Automático de verdad",
-              desc: "Registras tu RFC y uso de CFDI al crear tu cuenta. A partir de ahí, cada pedido dispara tu factura sin que tengas que pedirla. Cero clics.",
+              title: "Facturamos a tu nombre",
+              desc: "Emitimos con tus datos fiscales: RFC, razón social, régimen fiscal, uso de CFDI y código postal. Nos los mandas una vez y quedan guardados para tus siguientes compras.",
             },
             {
               icon: Download,
-              title: "Siempre disponibles",
-              desc: "Todas tus facturas viven en tu panel. Descarga PDF y XML cuando quieras. También te las mandamos por correo si lo prefieres.",
+              title: "En PDF y XML",
+              desc: "Te entregamos tu factura en PDF y XML, listos para tu contador y para deducir. Si prefieres, te la enviamos por correo.",
             },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex items-start gap-3 text-left sm:block sm:text-center">
@@ -88,6 +88,9 @@ export default function FacturacionPage() {
               </li>
             ))}
           </ul>
+          <p className="mt-4 text-[13px] sm:text-sm text-[#5C6068]">
+            Mándanoslos con el número de tu pedido y te emitimos la factura.
+          </p>
         </div>
 
         <div className="text-center">
@@ -95,7 +98,7 @@ export default function FacturacionPage() {
             href="/auth/register"
             className="inline-flex items-center gap-2 bg-[#0E7A0E] text-white font-semibold px-6 sm:px-8 py-3 rounded-[10px] hover:bg-[#0D720D] transition-colors"
           >
-            Crear cuenta y automatizar mi facturación
+            Crear cuenta y facturar mis compras
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
