@@ -70,11 +70,17 @@
      tiene items, `body.cart-bar-active` sube todos los flotantes por encima
      del MobileCartBar para evitar colisiones. */
   --floating-bottom-offset: calc(1rem + var(--inset-bottom));
+  /* Aire entre el aviso (toast) y el carril inferior. En mobile el aviso va
+     pegado al carril; en sm+ sube un escalón para librar los pills flotantes
+     de la izquierda (StickyCatalogButton/pill de cuenta: 46px de alto + 10px
+     de aire) sin tapar el CTA "Hacer Checkout". */
+  --toast-bottom-gap: 1rem;
 }
 
 @media (min-width: 640px) {
   :root {
     --floating-bottom-offset: calc(1.5rem + var(--inset-bottom));
+    --toast-bottom-gap: 3.5rem;
   }
 }
 

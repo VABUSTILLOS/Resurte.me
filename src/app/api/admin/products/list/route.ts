@@ -157,7 +157,15 @@ async function duplicateNameProductIds(
     .map((row) => row.id as number)
 }
 
-/** Aplica los filtros compartidos por la consulta de filas y los conteos. */
+/**
+ * Aplica los filtros compartidos por la consulta de filas y los conteos.
+ *
+ * Devuelve el builder dentro de un objeto y no suelto: el builder de PostgREST
+ * es "thenable", así que una función `async` que lo retornara directamente lo
+ * asimilaría y el `await` del llamador resolvería al resultado ya ejecutado
+ * (`{ data, error, count }`) en vez del builder, rompiendo el encadenado
+ * posterior (`.order(...)`, `.range(...)`).
+ */
 async function applyFilters(
   supabase: ServiceClient,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- builder de PostgREST no exporta un tipo reusable
@@ -165,7 +173,7 @@ async function applyFilters(
   p: ListParams,
   withDeletedAt: boolean
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> {
+): Promise<{ query: any }> {
   // Papelera (00099): por defecto solo productos vivos; trash=1 lista borrados.
   if (withDeletedAt) {
     query = p.trash ? query.not("deleted_at", "is", null) : query.is("deleted_at", null)
@@ -265,7 +273,7 @@ async function applyFilters(
       query = query.in("id", ids)
     }
   }
-  return query
+  return { query }
 }
 
 /**
@@ -317,7 +325,7 @@ export async function GET(request: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const alive = (q: any) => (withDeletedAt ? q.is("deleted_at", null) : q)
 
-      let query = await applyFilters(
+      let { query } = await applyFilters(
         supabase,
         supabase.from("products").select(p.idsOnly ? "id" : cols, { count: "exact" }),
         p,

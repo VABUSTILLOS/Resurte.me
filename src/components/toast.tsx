@@ -51,11 +51,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastCtx.Provider value={{ toast: addToast }}>
       {children}
       {/* Toast container — mobile: centrado arriba de las barras flotantes
-          (MobileCartBar z-50 / sticky ATC z-40). Desktop: esquina inferior.
+          (MobileCartBar z-50 / sticky ATC z-40). Desktop: esquina inferior
+          izquierda, un escalón (--toast-bottom-gap) por encima del
+          StickyCatalogButton, para no tapar el CTA "Hacer Checkout" del carril.
           aria-live anuncia las notificaciones a lectores de pantalla. */}
       <div
         aria-live="polite"
-        className="fixed z-[100] space-y-2 max-w-sm left-4 right-4 sm:left-auto sm:right-6 bottom-[calc(var(--floating-bottom-offset,0px)+1rem)] sm:bottom-6 mx-auto sm:mx-0"
+        className="fixed z-[100] space-y-2 max-w-sm left-4 right-4 sm:left-6 sm:right-auto bottom-[calc(var(--floating-bottom-offset,0px)+var(--toast-bottom-gap,1rem))] mx-auto sm:mx-0"
       >
         {toasts.map((t) => {
           const iconMap = {
