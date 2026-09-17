@@ -73,9 +73,9 @@ function fakeBuilder() {
 
   function makeChain(rows: unknown[], error: unknown = null): Record<string, unknown> {
     const chain: Record<string, unknown> = {
-      select: (cols: string) => {
-        spies.select(cols)
-        return makeChain(rowsFor(cols), error)
+      select: (...args: unknown[]) => {
+        spies.select(...args)
+        return makeChain(rowsFor(String(args[0])), error)
       },
       then: (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
         Promise.resolve(
@@ -141,6 +141,36 @@ function mockClientWithRpc(filterCountsPayload: unknown) {
 
 function listRequest(query = "page=1&pageSize=2") {
   return new NextRequest(`http://localhost/api/admin/products/list?${query}`)
+}
+
+/** ¿Alguna consulta pidió solo el conteo (`head: true`)? Es la firma de los 11
+ *  contadores de chips que la v2 elimina. */
+function headQueries(spies: ReturnType<typeof fakeBuilder>["spies"]) {
+  return spies.select.mock.calls.filter((args) => {
+    const options = args[1]
+    return !!options && typeof options === "object" && "head" in options
+  })
+}
+
+/** Payload de la v2 del RPC (00118): contadores + marcas + etiquetas. */
+const V2_PAYLOAD = {
+  catalogTotal: 120,
+  published: 90,
+  noImage: 4,
+  lowStock: 6,
+  outStock: 3,
+  noPrice: 2,
+  noCategory: 1,
+  waMismatch: 5,
+  onSale: 12,
+  staleSale: 2,
+  trash: 9,
+  noCitiesIds: [7, 9],
+  dupNameIds: [11],
+  underThresholdIds: [4, 5, 6],
+  categoryCounts: { "1": 42, "3": 7 },
+  brands: ["Zeta", " alfa ", "Alfa", ""],
+  tagCounts: { oferta: 9, nuevo: 9, liquidacion: 1 },
 }
 
 beforeEach(() => {
@@ -302,6 +332,70 @@ describe("GET /api/admin/products/list", () => {
     expect(rpc).toHaveBeenCalledWith("admin_product_filter_counts", { p_include_deleted: false })
     // Fallback: el tally sale de las filas paginadas del catálogo.
     expect(body.categoryCounts).toEqual({ "1": 2, "3": 1 })
+  })
+
+  it("resuelve chips, marcas y etiquetas con el RPC v2 (00118), sin consultas por conteo", async () => {
+    const { rpc, spies } = mockClientWithRpc(V2_PAYLOAD)
+
+    const res = await GET(listRequest())
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    // Una sola llamada agregada para todo el panel.
+    expect(rpc).toHaveBeenCalledTimes(1)
+    // Ni los 11 contadores `head: true`...
+    expect(headQueries(spies)).toEqual([])
+    // ...ni las dos descargas de 1000 filas de marcas y etiquetas.
+    expect(spies.limit).not.toHaveBeenCalled()
+
+    expect(body.counts).toEqual({
+      catalogTotal: 120,
+      published: 90,
+      unpublished: 30,
+      noImage: 4,
+      lowStock: 6,
+      outStock: 3,
+      noCities: 2,
+      noPrice: 2,
+      noCategory: 1,
+      waMismatch: 5,
+      onSale: 12,
+      staleSale: 2,
+      dupNames: 1,
+      underThreshold: 3,
+      trash: 9,
+    })
+    // Marcas deduplicadas y ordenadas en `es`; etiquetas por frecuencia.
+    expect(body.brands).toEqual(["alfa", "Alfa", "Zeta"])
+    expect(body.tags).toEqual(["nuevo", "oferta", "liquidacion"])
+    expect(body.categoryCounts).toEqual({ "1": 42, "3": 7 })
+  })
+
+  it("no consulta marcas ni etiquetas del catálogo cuando la v2 responde vacíos", async () => {
+    const { spies } = mockClientWithRpc({ ...V2_PAYLOAD, brands: [], tagCounts: {} })
+
+    const res = await GET(listRequest())
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    // El payload vacío es un dato válido (catálogo sin marcas), no una excusa
+    // para volver a paginar el catálogo.
+    expect(body.brands).toEqual([])
+    expect(body.tags).toEqual([])
+    expect(spies.limit).not.toHaveBeenCalled()
+  })
+
+  it("vuelve al camino JS si la v2 trae `brands` con un tipo inválido", async () => {
+    const { spies } = mockClientWithRpc({ ...V2_PAYLOAD, brands: "Zeta", tagCounts: null })
+
+    const res = await GET(listRequest())
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    // Payload roto: se rehace con las consultas antiguas en vez de pintar NaN.
+    expect(spies.limit).toHaveBeenCalled()
+    expect(body.brands).toEqual(["Marca"])
+    expect(body.tags).toEqual(["oferta"])
   })
 })
 
