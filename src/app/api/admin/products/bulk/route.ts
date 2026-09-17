@@ -16,6 +16,11 @@
  * añadir una etiqueta a las que ya tiene cada uno) sin volver al fan-out:
  * siguen siendo **una** petición.
  *
+ * B19 — concurrencia optimista: `expected: { "12": "<updated_at>" }` es
+ * opcional. Los ids cuya versión ya cambió **no se escriben** y vuelven en
+ * `failed` (más `stale`, para que el panel pueda explicarlo sin parsear
+ * textos); `force: true` ignora las precondiciones a conciencia.
+ *
  * No hay transacción distribuida (PostgREST no la ofrece): el contrato es
  * "mejor esfuerzo con reporte preciso", no atomicidad.
  */
@@ -34,6 +39,7 @@ import {
   type BulkFailure,
 } from "@/lib/product-bulk"
 import { validateProductPatch, type ProductPatch } from "@/lib/product-patch"
+import { parseExpectedMap, staleIds, STALE_WRITE_REASON } from "@/lib/product-conflict"
 import { deriveStockStatus } from "@/lib/stock"
 import { isMissingColumnError } from "@/lib/sale-window"
 import { NextResponse } from "next/server"

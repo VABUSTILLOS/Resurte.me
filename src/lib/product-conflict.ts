@@ -72,6 +72,9 @@ export function conflictPayload(
   }
 }
 
+/** Motivo corto por id para el resumen de fallos del lote (B19). */
+export const STALE_WRITE_REASON = "Modificado por otro usuario; recarga e inténtalo de nuevo"
+
 /** Lee la fila vigente del cuerpo del 409 (para el panel). */
 export function conflictFromResponse(
   body: unknown
