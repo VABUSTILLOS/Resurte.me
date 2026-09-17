@@ -439,7 +439,9 @@ function AdminProductsContent() {
   const initialStock = searchParams.get("stock")
   const initialSort = searchParams.get("sort")
   const [categoryFilter, setCategoryFilter] = useState<string>(
-    searchParams.get("category") ?? "all"
+    // `||` (no `??`): un `?category=` vacío se trataría como filtro y dejaría el
+    // listado en blanco, sin error, hasta que el usuario limpiara la URL.
+    searchParams.get("category") || "all"
   )
   const [stockFilter, setStockFilter] = useState<StockStatus | "all">(
     initialStock === "in_stock" || initialStock === "low_stock" || initialStock === "out_of_stock"
@@ -465,7 +467,7 @@ function AdminProductsContent() {
   const [onlyUnderThreshold, setOnlyUnderThreshold] = useState(
     searchParams.get("underThreshold") === "1"
   )
-  const [tagFilter, setTagFilter] = useState(searchParams.get("tag") ?? "all")
+  const [tagFilter, setTagFilter] = useState(searchParams.get("tag") || "all")
   const [tagList, setTagList] = useState<{ tag: string; count: number }[]>([])
   // Ronda 7 — imágenes rotas detectadas por el sondeo del servidor. El filtro
   // es local a la página cargada (el sondeo trabaja sobre filas concretas).
@@ -483,8 +485,8 @@ function AdminProductsContent() {
   const [healthOpen, setHealthOpen] = useState(false)
   const [alertsOpen, setAlertsOpen] = useState(false)
   // Filtros por ciudad y marca (server-side).
-  const [cityFilter, setCityFilter] = useState(searchParams.get("city") ?? "all")
-  const [brandFilter, setBrandFilter] = useState(searchParams.get("brand") ?? "all")
+  const [cityFilter, setCityFilter] = useState(searchParams.get("city") || "all")
+  const [brandFilter, setBrandFilter] = useState(searchParams.get("brand") || "all")
   const [brands, setBrands] = useState<string[]>([])
   // Vista tabla/grid (también viaja en la URL).
   // La vista efectiva se deriva en render: `useMediaQuery` devuelve `false` en

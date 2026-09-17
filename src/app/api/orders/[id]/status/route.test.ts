@@ -154,6 +154,42 @@ describe("PATCH /api/orders/[id]/status", () => {
     expect(onOrderStatusChange).not.toHaveBeenCalled()
   })
 
+  it("42703 de coupon_code: reintenta sin la columna en lugar de responder 404", async () => {
+    const updated = { id: 7, status: "confirmed", user_id: "u-1", cashback_credits: 0 }
+    const orders = tableBuilder()
+    orders.single
+      .mockResolvedValueOnce({
+        data: null,
+        error: { code: "42703", message: "column orders.coupon_code does not exist" },
+      })
+      .mockResolvedValueOnce({ data: { ...CURRENT_ORDER }, error: null })
+      .mockResolvedValue(updated)
+    mockSupabase({ orders })
+
+    const res = await PATCH(req({ status: "confirmed" }), { params: params7 })
+
+    expect(res.status).toBe(200)
+    // El primer fetch pide el cupón; el reintento lo omite.
+    expect(orders.select).toHaveBeenNthCalledWith(1, expect.stringContaining("coupon_code"))
+    expect(orders.select).toHaveBeenNthCalledWith(2, "status, payment_status, customer_phone")
+    expect(onOrderStatusChange).toHaveBeenCalledWith(7, "pending", "confirmed")
+  })
+
+  it("42703 de una columna NO opcional: no reintenta, responde 404", async () => {
+    const orders = tableBuilder()
+    orders.single.mockResolvedValue({
+      data: null,
+      error: { code: "42703", message: "column orders.customer_phone does not exist" },
+    })
+    mockSupabase({ orders })
+
+    const res = await PATCH(req({ status: "confirmed" }), { params: params7 })
+
+    expect(res.status).toBe(404)
+    // Solo el fetch inicial: el fallback está acotado a las columnas opcionales.
+    expect(orders.select).toHaveBeenCalledTimes(1)
+  })
+
   it("transición válida: actualiza el pedido y dispara el workflow de estado", async () => {
     const updated = { id: 7, status: "confirmed", user_id: "u-1", cashback_credits: 0 }
     const from = mockSupabase({

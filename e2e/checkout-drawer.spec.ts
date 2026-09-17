@@ -769,9 +769,12 @@ test.describe("checkout drawer (alta conversión)", { tag: "@ci" }, () => {
     expect(anchor).not.toBeNull()
     if (!anchor || !checkoutBox || !viewport) return
 
-    // 1) Nunca alcanza el CTA: su borde derecho máximo (left + max-w-sm) queda a
-    //    la izquierda del botón de checkout.
-    expect(anchor.left + anchor.maxWidth).toBeLessThanOrEqual(checkoutBox.x)
+    // 1) En sm+ el aviso se ancla a la izquierda: su borde derecho máximo
+    //    (left + max-w-sm) queda a la izquierda del botón de checkout. En mobile
+    //    el aviso es full-width por diseño y se separa del CTA en vertical.
+    if (!isMobile) {
+      expect(anchor.left + anchor.maxWidth).toBeLessThanOrEqual(checkoutBox.x)
+    }
 
     // 2) Arranca por encima de la barra de carrito (no la pisa).
     const toastBottomY = viewport.height - anchor.bottom

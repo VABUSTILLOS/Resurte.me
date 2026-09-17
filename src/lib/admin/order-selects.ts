@@ -110,17 +110,96 @@ export function buildAdminOrderPrintSelect({
 }
 
 /**
- * Nombre de la columna que falta cuando PostgREST responde `42703`.
+ * Nombre de la columna que falta en un error `42703` (undefined_column).
  * El mensaje de Postgres es `column orders.coupon_code does not exist`; se
  * acepta con o sin el prefijo de tabla para no depender del formato exacto.
- * Devuelve `null` para cualquier columna que no sea una de las opcionales.
  */
-export function missingOptionalOrderColumn(
-  error: { code?: string | null; message?: string | null } | null
-): AdminOrderOptionalColumn | null {
+export function missingColumnName(error: PostgrestErrorLike | null): string | null {
   if (!error || error.code !== "42703") return null
   const match = /column\s+(?:[\w"]+\.)?([\w"]+)\s+does not exist/i.exec(error.message ?? "")
-  const column = match?.[1]?.replace(/"/g, "")
+  return match?.[1]?.replace(/"/g, "") ?? null
+}
+
+/**
+ * Igual que `missingColumnName`, pero solo devuelve la columna cuando es una
+ * de las opcionales: así un error de esquema real (una columna obligatoria
+ * ausente) no se degrada en silencio.
+ */
+export function missingOptionalOrderColumn(
+  error: PostgrestErrorLike | null
+): AdminOrderOptionalColumn | null {
+  const column = missingColumnName(error)
   if (!column || !isAdminOrderOptionalColumn(column)) return null
   return column
+}
+
+/** Forma mínima del error de PostgREST que consumen los reintentos. */
+export interface PostgrestErrorLike {
+  code?: string | null
+  message?: string | null
+}
+
+/** Dirección embebida en un pedido (many-to-one: objeto único en runtime). */
+export interface AdminOrderAddressRow {
+  street: string
+  number: string
+  interior: string | null
+  neighborhood: string
+  city: string
+  state: string
+  zip_code: string
+  references: string | null
+}
+
+/** Fila cruda de `orders` tal como la devuelve `buildAdminOrdersSelect`. */
+export interface AdminOrderRow {
+  id: number
+  user_id: string
+  status: string
+  subtotal: number | string
+  delivery_fee: number | string
+  discount: number | string | null
+  /** Ausente cuando la columna no existe en el esquema desplegado (00114). */
+  coupon_code?: string | null
+  total: number | string
+  payment_method: string | null
+  payment_status: string
+  source: string
+  created_at: string
+  /** Ausente cuando la columna no existe en el esquema desplegado (00076). */
+  driver_id?: number | null
+  profiles: { full_name: string | null } | { full_name: string | null }[] | null
+  addresses: AdminOrderAddressRow | AdminOrderAddressRow[] | null
+}
+
+/** Fila cruda de `orders` tal como la devuelve `buildAdminOrderPrintSelect`. */
+export interface AdminOrderPrintRow {
+  id: number
+  status: string
+  subtotal: number | string
+  discount: number | string | null
+  coupon_code?: string | null
+  delivery_fee: number | string
+  total: number | string
+  payment_method: string | null
+  payment_status: string
+  created_at: string
+  scheduled_for: string | null
+  customer_phone: string | null
+  profiles: { full_name: string | null } | { full_name: string | null }[] | null
+  addresses: AdminOrderAddressRow | AdminOrderAddressRow[] | null
+  delivery_drivers: { name: string } | { name: string }[] | null
+  order_items:
+    | {
+        quantity: number
+        unit_price: number | string
+        products: { name: string } | { name: string }[] | null
+      }[]
+    | null
+}
+
+/** Respuesta de una consulta a `orders` tipada con la fila que espera quien la consume. */
+export interface OrderQueryResult<Row> {
+  data: Row | null
+  error: PostgrestErrorLike | null
 }

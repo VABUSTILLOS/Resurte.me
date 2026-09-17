@@ -28,6 +28,37 @@ cubiertos por las migraciones versionadas (detalle en
    (`npx supabase db pull`) y comparar contra `supabase/migrations/` — nunca
    `db reset --linked` ni escrituras directas.
 
+## 🟠 `orders.coupon_code` (migración 00114)
+
+Segundo drift encontrado después de 00071: **`orders.coupon_code` se usaba en
+el código pero nunca se versionó.** `00049` la añadió a `leads` y `00080` a
+`foodos_restaurants`; `orders` se quedó sin ella.
+
+Consumidores que la escriben o leen:
+
+| Superficie | Uso |
+| --- | --- |
+| `POST /api/orders` | la escribe al crear el pedido con cupón |
+| `GET /admin/pedidos` | la muestra en el panel |
+| `/admin/pedidos/[id]/print` | la imprime en el ticket |
+| `PATCH /api/orders/[id]/status` | libera la reserva al cancelar |
+| `releaseCouponForPaymentIntent` (webhook Stripe) | libera la reserva si el cobro falla |
+
+Consecuencia del drift: `42703 undefined_column`. En el panel de admin **toda
+la consulta** fallaba (de ahí "Error al cargar los pedidos"), el checkout con
+cupón devolvía 500 y `PATCH /api/orders/[id]/status` respondía 404 en *cualquier*
+actualización, porque el error de lectura se confundía con "el pedido no existe".
+
+`00114_orders_coupon_code.sql` la versiona como `TEXT` (referencia lógica a
+`coupons.code`, **sin FK**: el histórico del descuento debe sobrevivir al
+borrado del cupón). Es aditiva e idempotente, sin backfill.
+
+**Mientras la migración no esté aplicada**, el código no se cae:
+`src/lib/admin/order-selects.ts` centraliza los SELECT de `orders` y expone
+`missingOptionalOrderColumn()`, que detecta el `42703` de una columna opcional
+(`coupon_code`, `driver_id`) y reintenta la consulta sin ella. El cupón
+simplemente no aparece en el panel ni en el ticket.
+
 ## 🔴 Drift histórico (ya versionado): `products` vs `product_stores`
 
 Las migraciones originales (00001–00027) definían precio/stock **por tienda** en

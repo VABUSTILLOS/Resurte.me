@@ -23,11 +23,23 @@ import { logAdminAction as logAdminAudit } from "@/lib/audit"
 import { onOrderStatusChange } from "@/lib/workflows"
 import { notifyCashbackCredited } from "@/lib/notifications"
 import { logAdminAction } from "@/lib/audit-log"
+import { missingOptionalOrderColumn, type OrderQueryResult } from "@/lib/admin/order-selects"
 import type { OrderStatus, PaymentStatus } from "@/types"
 
 const VALID_STATUSES: OrderStatus[] = [
   "pending", "confirmed", "preparing", "out_for_delivery", "delivered", "cancelled",
 ]
+
+/**
+ * Columnas del pedido que consume esta ruta. `coupon_code` es opcional porque
+ * el reintento por 42703 la descarta cuando la migración 00114 no está aplicada.
+ */
+type CurrentOrderRow = {
+  status: string
+  payment_status: string
+  customer_phone: string | null
+  coupon_code?: string | null
+}
 
 export async function PATCH(
   req: NextRequest,
@@ -96,11 +108,26 @@ export async function PATCH(
     const supabase = await createServiceClient()
 
     // Fetch current order to get old status
-    const { data: currentOrder, error: fetchError } = await supabase
-      .from("orders")
-      .select("status, payment_status, customer_phone, coupon_code")
-      .eq("id", orderId)
-      .single()
+    const fetchCurrentOrder = async (select: string) =>
+      (await supabase
+        .from("orders")
+        .select(select)
+        .eq("id", orderId)
+        .single()) as unknown as OrderQueryResult<CurrentOrderRow>
+
+    let { data: currentOrder, error: fetchError } = await fetchCurrentOrder(
+      "status, payment_status, customer_phone, coupon_code"
+    )
+
+    // 42703 = orders.coupon_code aún no existe (migración 00114 sin aplicar).
+    // Sin este reintento TODA actualización de estado respondía 404 porque el
+    // error de lectura se confundía con "el pedido no existe".
+    if (missingOptionalOrderColumn(fetchError) === "coupon_code") {
+      logger.warn("[API] orders.coupon_code no existe; actualizando sin liberar cupón")
+      ;({ data: currentOrder, error: fetchError } = await fetchCurrentOrder(
+        "status, payment_status, customer_phone"
+      ))
+    }
 
     if (fetchError || !currentOrder) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 })
@@ -108,7 +135,6 @@ export async function PATCH(
 
     const oldStatus = currentOrder.status as OrderStatus
     const oldPaymentStatus = currentOrder.payment_status as PaymentStatus
-
     // Don't update if nothing changed
     if (
       (!status || oldStatus === status) &&

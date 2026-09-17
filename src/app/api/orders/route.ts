@@ -10,6 +10,7 @@ import { rateLimited, clientIp, rateLimitResponse } from "@/lib/rate-limit"
 import { validDeliveryFee } from "@/lib/checkout-config"
 import { resolveBumpPricing } from "@/lib/order-bumps"
 import { insertAddressResilient } from "@/lib/orders-address"
+import { missingColumnName } from "@/lib/admin/order-selects"
 
 // Esquema zod del body (espejo de CreateOrderBody/OrderItemInput). Claves
 // desconocidas se descartan; los montos siguen sin ser de confianza — se
@@ -613,25 +614,27 @@ export async function POST(request: NextRequest) {
       : []
     const withUtm = { ...insertOrder, ...Object.fromEntries(utmEntries) }
 
-    const firstTry = await supabase
-      .from("orders")
-      .insert(utmEntries.length > 0 ? withUtm : insertOrder)
-      .select("id, cashback_credits, cashback_tier, total, restore_token")
-      .single()
+    const ORDER_INSERT_RETURN = "id, cashback_credits, cashback_tier, total, restore_token"
+    const insertOrderRow = (payload: Record<string, unknown>) =>
+      supabase.from("orders").insert(payload).select(ORDER_INSERT_RETURN).single()
 
-    // 42703 = undefined_column: la migración 00061 aún no está aplicada →
-    // reintento sin atribución UTM en lugar de fallar el checkout.
-    const { data: order, error: orderError } =
-      firstTry.error && utmEntries.length > 0 && firstTry.error.code === "42703"
-        ? await (async () => {
-            logger.warn("orders.utm_* no existe; insertando sin atribución UTM")
-            return supabase
-              .from("orders")
-              .insert(insertOrder)
-              .select("id, cashback_credits, cashback_tier, total, restore_token")
-              .single()
-          })()
-        : firstTry
+    // 42703 = undefined_column: el esquema desplegado aún no tiene alguna
+    // columna opcional del pedido (utm_* → migración 00061, coupon_code →
+    // 00114). Se reintenta quitando SOLO la columna que falta en lugar de
+    // fallar el checkout completo (antes un cupón aplicado devolvía 500).
+    let orderPayload: Record<string, unknown> = utmEntries.length > 0 ? withUtm : insertOrder
+    let orderResponse = await insertOrderRow(orderPayload)
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const missing = missingColumnName(orderResponse.error)
+      if (!missing || !(missing in orderPayload)) break
+      logger.warn(`orders.${missing} no existe; insertando el pedido sin esa columna`)
+      orderPayload = { ...orderPayload }
+      delete orderPayload[missing]
+      orderResponse = await insertOrderRow(orderPayload)
+    }
+
+    const { data: order, error: orderError } = orderResponse
 
     if (orderError) {
       logger.error("Order creation error:", orderError)

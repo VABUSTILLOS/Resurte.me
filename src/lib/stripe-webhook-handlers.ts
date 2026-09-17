@@ -4,6 +4,7 @@ import { sendOrderStatusEmail } from "@/lib/order-emails"
 import { notifyCashbackCredited } from "@/lib/notifications"
 import { isAmountSufficient, toCents } from "@/lib/payment-validation"
 import { logger } from "@/lib/logger"
+import { missingOptionalOrderColumn, type OrderQueryResult } from "@/lib/admin/order-selects"
 import type { createServiceClient } from "@/lib/supabase/service"
 
 /**
@@ -460,11 +461,27 @@ async function releaseCouponForPaymentIntent(
   paymentIntentId: string
 ) {
   try {
-    const { data: order } = await supabase
-      .from("orders")
-      .select("id, coupon_code")
-      .eq("stripe_payment_intent_id", paymentIntentId)
-      .maybeSingle()
+    const fetchOrder = async (select: string) =>
+      (await supabase
+        .from("orders")
+        .select(select)
+        .eq("stripe_payment_intent_id", paymentIntentId)
+        .maybeSingle()) as unknown as OrderQueryResult<{ id: number; coupon_code?: string | null }>
+
+    let { data: order, error: orderError } = await fetchOrder("id, coupon_code")
+
+    // 42703 = orders.coupon_code aún no existe (migración 00114 sin aplicar):
+    // sin el reintento la confirmación de pago fallaba al liberar el cupón.
+    if (missingOptionalOrderColumn(orderError) === "coupon_code") {
+      logger.warn("stripe.coupon.release_skipped", {
+        reason: "orders.coupon_code no existe",
+      })
+      ;({ data: order, error: orderError } = await fetchOrder("id"))
+    }
+    if (orderError) {
+      logger.warn("stripe.coupon.release_skipped", { reason: orderError.message })
+      return
+    }
     if (!order?.coupon_code) return
 
     const { data: coupon } = await supabase

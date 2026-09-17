@@ -53,16 +53,19 @@ function parseParams(req: NextRequest): ListParams {
   const rawSort = sp.get("sort")
   return {
     q: (sp.get("q") ?? "").trim(),
-    category: sp.get("category") ?? "all",
-    stock: sp.get("stock") ?? "all",
-    status: sp.get("status") ?? "all",
+    // Un parámetro presente pero vacío (`?brand=`) NO significa "sin filtro":
+    // `eq("brand", "")` no encuentra nada y el panel queda vacío sin error. Se
+    // normaliza a "all", como ya se hacía con `tag`.
+    category: sp.get("category")?.trim() || "all",
+    stock: sp.get("stock")?.trim() || "all",
+    status: sp.get("status")?.trim() || "all",
     noImage: sp.get("noImage") === "1",
     noCities: sp.get("noCities") === "1",
     noPrice: sp.get("noPrice") === "1",
     noCategory: sp.get("noCategory") === "1",
     waMismatch: sp.get("waMismatch") === "1",
-    city: sp.get("city") ?? "all",
-    brand: sp.get("brand") ?? "all",
+    city: sp.get("city")?.trim() || "all",
+    brand: sp.get("brand")?.trim() || "all",
     onSale: sp.get("onSale") === "1",
     staleSale: sp.get("staleSale") === "1",
     underThreshold: sp.get("underThreshold") === "1",
@@ -504,6 +507,7 @@ export async function GET(request: NextRequest) {
       schemaDrift = true
     }
     if ("error" in out && out.error) {
+      console.error("[admin/products/list] consulta fallida", out.error)
       return NextResponse.json({ error: out.error.message }, { status: 500 })
     }
     if ("idsOnlyResult" in out && out.idsOnlyResult) {
@@ -512,6 +516,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ ...out, schemaDrift })
   } catch (error) {
+    // Sin este log, un 500 solo deja la línea de estado en Vercel (el cuerpo lo
+    // consume el panel): así fue como el bug de `applyFilters` pasó inadvertido.
+    console.error("[admin/products/list] error inesperado", error)
     const message = error instanceof Error ? error.message : "Error interno del servidor"
     return NextResponse.json({ error: message }, { status: 500 })
   }

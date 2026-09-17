@@ -261,7 +261,50 @@ describe("/api/orders POST sesión, cupón y fallbacks", () => {
     expect(orders.insert).toHaveBeenCalledTimes(2)
     expect(orders.insert.mock.calls[0]![0]).toMatchObject({ utm_source: "facebook" })
     expect(orders.insert.mock.calls[1]![0]).not.toHaveProperty("utm_source")
-    expect(logger.warn).toHaveBeenCalledWith("orders.utm_* no existe; insertando sin atribución UTM")
+    expect(logger.warn).toHaveBeenCalledWith(
+      "orders.utm_source no existe; insertando el pedido sin esa columna"
+    )
+  })
+
+  it("fallback 42703: el cupón se aplica aunque coupon_code falte en el esquema", async () => {
+    // Regresión: antes el insert fallaba en 500 y el cliente perdía el pedido.
+    const couponRow = {
+      id: 1,
+      code: "DIEZ",
+      discount_type: "percentage",
+      discount_value: 10,
+      min_order: 0,
+      max_uses: 0,
+      used_count: 0,
+      expires_at: null,
+      user_id: null,
+    }
+    const coupons = tableBuilder({ data: couponRow, error: null })
+    coupons.then = ((resolve: (v: unknown) => void) =>
+      resolve({ data: [{ id: 1 }], error: null })) as unknown as (typeof coupons)["then"]
+    const orders = tableBuilder()
+    orders.single
+      .mockResolvedValueOnce({
+        data: null,
+        error: { message: "column orders.coupon_code does not exist", code: "42703" },
+      })
+      .mockResolvedValueOnce({
+        data: { id: 7, cashback_credits: 5, cashback_tier: "Verde", total: 215, restore_token: "tok" },
+        error: null,
+      })
+    mockFlow({ coupons, orders })
+
+    const res = await POST(orderReq({ ...validBody, coupon_code: "DIEZ", delivery_fee: 125, total: 215 }))
+
+    expect(res.status).toBe(200)
+    expect(orders.insert).toHaveBeenCalledTimes(2)
+    expect(orders.insert.mock.calls[0]![0]).toHaveProperty("coupon_code", "DIEZ")
+    expect(orders.insert.mock.calls[1]![0]).not.toHaveProperty("coupon_code")
+    // El descuento se conserva: solo se descarta la columna ausente.
+    expect(orders.insert.mock.calls[1]![0]).toHaveProperty("discount", 10)
+    expect(logger.warn).toHaveBeenCalledWith(
+      "orders.coupon_code no existe; insertando el pedido sin esa columna"
+    )
   })
 
   it("aplica cupón porcentual y recalcula el total con descuento + envío", async () => {

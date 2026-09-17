@@ -411,4 +411,42 @@ describe("stripe-webhook-handlers", () => {
 
     expect(coupons.update).not.toHaveBeenCalled()
   })
+
+  it("42703 de coupon_code: reintenta sin la columna y no rompe el webhook", async () => {
+    // Regresión: la confirmación de pago devolvía 500 al liberar el cupón
+    // cuando orders.coupon_code no existía en el esquema desplegado.
+    const orders = tableBuilder()
+    orders.maybeSingle
+      .mockResolvedValueOnce({
+        data: null,
+        error: { code: "42703", message: "column orders.coupon_code does not exist" },
+      })
+      .mockResolvedValueOnce({ data: { id: 7 }, error: null })
+    const coupons = tableBuilder()
+    const supabase = mockSupabase({ orders, coupons })
+
+    await handlePaymentIntentFailed(supabase, { id: "pi_drift" })
+
+    expect(orders.maybeSingle).toHaveBeenCalledTimes(2)
+    expect(logger.warn).toHaveBeenCalledWith("stripe.coupon.release_skipped", {
+      reason: "orders.coupon_code no existe",
+    })
+    expect(coupons.update).not.toHaveBeenCalled()
+  })
+
+  it("error real al leer la orden: no libera el cupón y lo registra", async () => {
+    const orders = tableBuilder({
+      data: null,
+      error: { code: "57014", message: "canceling statement due to statement timeout" },
+    })
+    const coupons = tableBuilder()
+    const supabase = mockSupabase({ orders, coupons })
+
+    await handlePaymentIntentFailed(supabase, { id: "pi_timeout" })
+
+    expect(logger.warn).toHaveBeenCalledWith("stripe.coupon.release_skipped", {
+      reason: "canceling statement due to statement timeout",
+    })
+    expect(coupons.update).not.toHaveBeenCalled()
+  })
 })

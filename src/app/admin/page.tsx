@@ -35,6 +35,20 @@ import { AdminAlerts } from "./components/AdminAlerts"
 import { LeadsCrmWidget } from "./components/LeadsCrmWidget"
 import { DashboardSkeleton } from "./components/DashboardSkeleton"
 
+/**
+ * Mensaje de error del API admin: usa el `{ error }` que devuelve el servidor
+ * (p. ej. el de `getAdminOrders`) en lugar de un texto fijo, para que una
+ * futura caída sea diagnosticable desde el propio panel.
+ */
+async function apiErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: unknown }
+    return typeof body?.error === "string" && body.error ? body.error : fallback
+  } catch {
+    return fallback
+  }
+}
+
 // recharts is ~100 KB gz; load charts on demand with a skeleton.
 const MetricsCharts = dynamic(
   () => import("./components/MetricsCharts").then((m) => m.MetricsCharts),
@@ -137,8 +151,12 @@ function AdminDashboardContent() {
           getAdminInsights(),
           getAdminLeadsSummary(),
         ])
-      if (!metricsRes.ok) throw new Error("Error al cargar métricas")
-      if (!ordersRes.ok) throw new Error("Error al cargar pedidos")
+      if (!metricsRes.ok) {
+        throw new Error(await apiErrorMessage(metricsRes, "Error al cargar métricas"))
+      }
+      if (!ordersRes.ok) {
+        throw new Error(await apiErrorMessage(ordersRes, "Error al cargar pedidos"))
+      }
       const [metricsData, ordersData] = await Promise.all([
         metricsRes.json(),
         ordersRes.json(),

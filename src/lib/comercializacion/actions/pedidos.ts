@@ -15,6 +15,7 @@ import {
   type WeeklyTrendsReport,
 } from "../types"
 import { escapeIlike } from "./helpers"
+import { ORDERS_PROFILE_FK } from "@/lib/admin/order-selects"
 
 // ============================================================
 // PEDIDOS ASISTIDOS
@@ -323,7 +324,11 @@ export async function getAssistedOrders(): Promise<AssistedOrderSummary[]> {
 
   const query = supabase
     .from("orders")
-    .select("id, status, payment_status, total, created_at, profiles(full_name), order_items(id)")
+    // El hint de FK es obligatorio: `orders` tiene dos FKs a `profiles`
+    // (user_id y seller_id) y el embed sin calificar da PGRST201.
+    .select(
+      `id, status, payment_status, total, created_at, profiles!${ORDERS_PROFILE_FK}(full_name), order_items(id)`
+    )
     .order("created_at", { ascending: false })
     .limit(50)
   if (role !== "admin") query.eq("seller_id", userId)

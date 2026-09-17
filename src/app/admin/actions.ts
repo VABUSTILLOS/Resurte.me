@@ -6,6 +6,14 @@ import type * as WaCatalogs from "@/lib/whatsapp-catalogs"
 import { logger } from "@/lib/logger"
 import { requireAdmin } from "@/lib/admin-auth"
 import { isMissingColumnError } from "@/lib/sale-window"
+import {
+  ADMIN_ORDER_OPTIONAL_COLUMNS,
+  buildAdminOrdersSelect,
+  missingOptionalOrderColumn,
+  type AdminOrderOptionalColumn,
+  type OrderQueryResult,
+  type AdminOrderRow,
+} from "@/lib/admin/order-selects"
 import { deriveStockStatus } from "@/lib/stock"
 import {
   buildAlertHref,
@@ -96,38 +104,13 @@ export async function getAdminOrders(
 
   const supabase = await createServiceClient()
 
-  // Solo las columnas que el panel mapea (la tabla orders es ancha:
-  // utm, tokens, ids de Stripe, etc. no se usan aquí).
-  const SELECT_BASE =
-    "id, user_id, status, subtotal, delivery_fee, discount, coupon_code, total, payment_method, payment_status, source, created_at, profiles(full_name), addresses(street, number, interior, neighborhood, city, state, zip_code, references)"
-  const SELECT_WITH_DRIVER = `${SELECT_BASE}, driver_id`
-
-  const buildQuery = <S extends string>(select: S) =>
-    supabase.from("orders").select(select).order("created_at", { ascending: false })
-
-  let query = buildQuery(SELECT_WITH_DRIVER)
-
-  if (before) {
-    // Pedidos creados ANTES del cursor (página anterior, de más viejo a más nuevo se
-    // recorre hacia abajo: el cursor es la fila más antigua ya visible).
-    query = query.lt("created_at", before)
-  }
-
   const status = filters?.status
-  if (status && status !== "all") {
-    query = query.eq("status", status)
-  }
-
-  // Fase 9 — rango de fechas (día calendario; el límite superior ya viene
-  // exclusivo desde normalizeDateRange).
-  if (filters?.from) {
-    query = query.gte("created_at", filters.from)
-  }
-  if (filters?.toExclusive) {
-    query = query.lt("created_at", filters.toExclusive)
-  }
-
   const search = filters?.search?.trim()
+
+  // Resolver la búsqueda por nombre/teléfono UNA sola vez: el resultado se
+  // reutiliza en cada reintento por columna ausente (antes cada intento
+  // repetía la consulta a profiles).
+  let searchConditions: string[] = []
   if (search) {
     const conditions: string[] = []
     if (/^\d+$/.test(search)) {
@@ -148,32 +131,63 @@ export async function getAdminOrders(
       // Búsqueda de texto sin coincidencias de nombre ni id numérico.
       return { orders: [], hasMore: false }
     }
-    query = query.or(conditions.join(","))
+    searchConditions = conditions
   }
 
-  // Traer limit+1 para saber si hay más páginas
-  let ordersResult = await query.limit(limit + 1)
+  // Traer limit+1 para saber si hay más páginas. Los filtros se aplican en un
+  // único lugar para que los reintentos no pierdan ninguno (el fallback de
+  // driver_id los descartaba todos: before, status, fechas y búsqueda).
+  const runQuery = (select: string) => {
+    let q = supabase
+      .from("orders")
+      .select(select)
+      .order("created_at", { ascending: false })
 
-  // 42703 = orders.driver_id aún no existe (migración 00076 sin aplicar):
-  // reintenta sin la columna en lugar de romper el panel de pedidos.
-  if (ordersResult.error?.code === "42703") {
-    let fallback = buildQuery(SELECT_BASE)
-    if (before) fallback = fallback.lt("created_at", before)
-    if (status && status !== "all") fallback = fallback.eq("status", status)
-    if (search) {
-      const conditions: string[] = []
-      if (/^\d+$/.test(search)) conditions.push(`id.eq.${search}`)
-      const { data: matchedProfiles } = await supabase
-        .from("profiles")
-        .select("id")
-        .ilike("full_name", `%${search}%`)
-        .limit(50)
-      const matchedIds = (matchedProfiles ?? []).map((p) => p.id as string)
-      if (matchedIds.length > 0) conditions.push(`user_id.in.(${matchedIds.join(",")})`)
-      if (conditions.length === 0) return { orders: [], hasMore: false }
-      fallback = fallback.or(conditions.join(","))
+    if (before) {
+      // Pedidos creados ANTES del cursor (página anterior, de más viejo a más nuevo se
+      // recorre hacia abajo: el cursor es la fila más antigua ya visible).
+      q = q.lt("created_at", before)
     }
-    ordersResult = (await fallback.limit(limit + 1)) as typeof ordersResult
+    if (status && status !== "all") {
+      q = q.eq("status", status)
+    }
+    // Fase 9 — rango de fechas (día calendario; el límite superior ya viene
+    // exclusivo desde normalizeDateRange).
+    if (filters?.from) {
+      q = q.gte("created_at", filters.from)
+    }
+    if (filters?.toExclusive) {
+      q = q.lt("created_at", filters.toExclusive)
+    }
+    if (searchConditions.length > 0) {
+      q = q.or(searchConditions.join(","))
+    }
+    return q.limit(limit + 1)
+  }
+
+  const dropped = new Set<AdminOrderOptionalColumn>()
+  const selectFor = () =>
+    buildAdminOrdersSelect({
+      coupon: !dropped.has("coupon_code"),
+      driver: !dropped.has("driver_id"),
+    })
+
+  // El SELECT se arma en runtime (columnas opcionales), así que supabase-js no
+  // puede inferir la fila a partir de un literal: se tipa explícitamente.
+  const fetchPage = async (select: string) =>
+    (await runQuery(select)) as unknown as OrderQueryResult<AdminOrderRow[]>
+
+  let ordersResult = await fetchPage(selectFor())
+
+  // 42703 = una columna opcional aún no existe en el esquema desplegado
+  // (driver_id → migración 00076, coupon_code → 00114): reintenta sin ella
+  // en lugar de romper el panel de pedidos. Tope de un intento por columna.
+  for (let attempt = 0; attempt < ADMIN_ORDER_OPTIONAL_COLUMNS.length; attempt++) {
+    const column = missingOptionalOrderColumn(ordersResult.error)
+    if (!column || dropped.has(column)) break
+    logger.warn(`[ADMIN-ORDERS] orders.${column} no existe; reintentando sin la columna`)
+    dropped.add(column)
+    ordersResult = await fetchPage(selectFor())
   }
 
   const { data: orders, error } = ordersResult
@@ -224,18 +238,8 @@ export async function getAdminOrders(
       // orders→profiles/addresses es many-to-one (objeto único).
       const unwrap = <T,>(v: T | T[] | null): T | null =>
         Array.isArray(v) ? (v[0] ?? null) : v
-      const profile = unwrap(o.profiles as { full_name: string | null } | { full_name: string | null }[] | null)
-      type Address = {
-        street: string
-        number: string
-        interior: string | null
-        neighborhood: string
-        city: string
-        state: string
-        zip_code: string
-        references: string | null
-      }
-      const addr = unwrap(o.addresses as Address | Address[] | null)
+      const profile = unwrap(o.profiles)
+      const addr = unwrap(o.addresses)
       return {
         id: o.id,
         user_id: o.user_id,

@@ -1,6 +1,13 @@
 import { notFound } from "next/navigation"
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireAdmin } from "@/lib/admin-auth"
+import { logger } from "@/lib/logger"
+import {
+  buildAdminOrderPrintSelect,
+  missingOptionalOrderColumn,
+  type AdminOrderPrintRow,
+  type OrderQueryResult,
+} from "@/lib/admin/order-selects"
 import {
   STATUS_LABEL,
   PAYMENT_METHOD_LABEL,
@@ -28,29 +35,35 @@ export default async function PrintOrderPage({
   if (!Number.isInteger(orderId) || orderId <= 0) notFound()
 
   const supabase = await createServiceClient()
-  const { data: order } = await supabase
-    .from("orders")
-    .select(
-      "id, status, subtotal, discount, coupon_code, delivery_fee, total, payment_method, payment_status, created_at, scheduled_for, customer_phone, profiles(full_name), addresses(street, number, interior, neighborhood, city, state, zip_code, references), delivery_drivers(name), order_items(quantity, unit_price, products(name))"
-    )
-    .eq("id", orderId)
-    .maybeSingle()
 
+  const fetchOrder = async (select: string) =>
+    (await supabase
+      .from("orders")
+      .select(select)
+      .eq("id", orderId)
+      .maybeSingle()) as unknown as OrderQueryResult<AdminOrderPrintRow>
+
+  let { data: order, error: orderError } = await fetchOrder(buildAdminOrderPrintSelect())
+
+  // 42703 = orders.coupon_code aún no existe (migración 00114 sin aplicar):
+  // se imprime el ticket sin la línea del cupón en lugar de devolver 404.
+  if (missingOptionalOrderColumn(orderError) === "coupon_code") {
+    logger.warn("[ADMIN-ORDER-PRINT] orders.coupon_code no existe; imprimiendo sin cupón")
+    ;({ data: order, error: orderError } = await fetchOrder(
+      buildAdminOrderPrintSelect({ coupon: false })
+    ))
+  }
+
+  if (orderError) {
+    logger.error("[ADMIN-ORDER-PRINT] query error:", orderError)
+  }
   if (!order) notFound()
 
   const unwrap = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v)
-  const profile = unwrap(order.profiles as { full_name: string | null } | { full_name: string | null }[] | null)
-  type Addr = {
-    street: string; number: string; interior: string | null; neighborhood: string
-    city: string; state: string; zip_code: string; references: string | null
-  }
-  const address = unwrap(order.addresses as Addr | Addr[] | null)
-  const driver = unwrap(order.delivery_drivers as { name: string } | { name: string }[] | null)
-  const items = (order.order_items ?? []) as unknown as {
-    quantity: number
-    unit_price: number
-    products: { name: string } | { name: string }[] | null
-  }[]
+  const profile = unwrap(order.profiles)
+  const address = unwrap(order.addresses)
+  const driver = unwrap(order.delivery_drivers)
+  const items = order.order_items ?? []
 
   return (
     <div className="min-h-screen bg-gray-100 py-8 print:bg-white print:py-0">
