@@ -22,6 +22,8 @@ import { revalidatePath } from "next/cache"
 import { requireAuth } from "@/lib/auth"
 import { assertOwnRestaurant } from "@/lib/foodos-owner"
 import { createFoodosOrder } from "@/lib/foodos-order-create"
+import { isGeoPoint } from "@/lib/foodos-flotilla"
+import { quoteDelivery } from "@/lib/flotilla/deliveries"
 import { isPaymentMethod, type FoodosPaymentMethod } from "@/lib/foodos-payments"
 import { findOpenShift, isNoOpenShiftError, requireOpenShift, type ShiftRow } from "@/lib/foodos-shift"
 import { requireFoodosFeature } from "@/lib/foodos-tier"
@@ -290,4 +292,65 @@ export async function createMostradorSale(
     total: result.total,
     change: breakdown?.change ?? null,
   }
+}
+
+export interface MostradorQuote {
+  ok: boolean
+  error?: string
+  /** Tarifa de entrega cotizada por el servidor. */
+  deliveryFee?: number
+  etaMinutes?: number | null
+}
+
+/**
+ * Cotiza la entrega de una venta de mostrador **sin crearla**.
+ *
+ * Existe porque el cobro a domicilio puede rechazarse por dos motivos que el
+ * cajero tiene que ver antes de tomar el dinero: la dirección está fuera de las
+ * zonas, o el pedido no llega al mínimo de la zona. Reproduce la misma llamada
+ * que hace `createFoodosOrder`, así que la cifra que se le dice al cliente es la
+ * que se le va a cobrar.
+ */
+export async function quoteMostradorDelivery(input: {
+  restaurant_id: string
+  branch_id?: string | null
+  subtotal: number
+  delivery_lat?: number | null
+  delivery_lng?: number | null
+}): Promise<MostradorQuote> {
+  await requireFoodosFeature(MOSTRADOR_FEATURE)
+  const { supabase, user } = await requireAuth()
+  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+
+  const branchId = input.branch_id ?? null
+  if (!branchId) return { ok: false, error: "Elige una sucursal para cotizar la entrega." }
+
+  const { data: branch, error } = await supabase
+    .from("foodos_branches")
+    .select("delivery_active, delivery_fee")
+    .eq("id", branchId)
+    .maybeSingle()
+  if (error) return { ok: false, error: error.message }
+
+  const b = branch as Pick<MostradorBranch, "delivery_active"> & { delivery_fee: number | null } | null
+  if (!b?.delivery_active) return { ok: false, error: "Esta sucursal no entrega a domicilio." }
+
+  const candidate = { lat: input.delivery_lat, lng: input.delivery_lng }
+  const quote = await quoteDelivery(supabase, {
+    restaurantId: input.restaurant_id,
+    branchId,
+    branchFee: Number(b.delivery_fee) || 0,
+    subtotal: Math.max(0, Number(input.subtotal) || 0),
+    point: isGeoPoint(candidate) ? candidate : null,
+  })
+
+  if (quote.reason === "unavailable") return { ok: false, error: "No entregamos en esta dirección." }
+  if (quote.reason === "below_minimum") {
+    return {
+      ok: false,
+      error: `El pedido mínimo para entrega a esta dirección es de $${quote.minOrder}`,
+    }
+  }
+
+  return { ok: true, deliveryFee: quote.fee, etaMinutes: quote.etaMinutes }
 }
