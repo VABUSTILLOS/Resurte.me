@@ -4,20 +4,15 @@ import {
   generateProductImportTemplate,
   parseImportDate,
   parseImportTags,
+  PRODUCT_IMPORT_HEADER,
+  type ProductImportColumn,
 } from "./product-import"
-
-// Espejo del encabezado interno (no exportado): mismo orden de columnas.
-const PRODUCT_IMPORT_HEADER = [
-  "nombre", "slug", "sku", "barcode", "precio", "precio_oferta", "oferta_desde",
-  "oferta_hasta", "marca", "categoria", "etiquetas", "unidad", "stock", "cantidad",
-  "umbral_stock", "visible", "imagen",
-] as const
 
 const HEADER = PRODUCT_IMPORT_HEADER.join(";")
 
 /** Arma una línea CSV nombrando columnas (resto vacío). */
-function csvRow(fields: Partial<Record<(typeof PRODUCT_IMPORT_HEADER)[number], string>>): string {
-  return PRODUCT_IMPORT_HEADER.map((h) => fields[h] ?? "").join(";")
+function csvRow(fields: Partial<Record<ProductImportColumn, string>>): string {
+  return PRODUCT_IMPORT_HEADER.map((h) => fields[h as ProductImportColumn] ?? "").join(";")
 }
 
 describe("generateProductImportTemplate", () => {

@@ -4,28 +4,16 @@
  */
 
 import { slugify } from "./foodos"
+import { PRODUCT_CSV_EXAMPLE, PRODUCT_CSV_HEADER, type ProductCsvColumnName } from "./product-csv"
 import { validateSku, validateBarcode } from "./sku"
 import { deriveStockStatus, DEFAULT_LOW_STOCK_THRESHOLD } from "./stock"
 
-const PRODUCT_IMPORT_HEADER = [
-  "nombre",
-  "slug",
-  "sku",
-  "barcode",
-  "precio",
-  "precio_oferta",
-  "oferta_desde",
-  "oferta_hasta",
-  "marca",
-  "categoria",
-  "etiquetas",
-  "unidad",
-  "stock",
-  "cantidad",
-  "umbral_stock",
-  "visible",
-  "imagen",
-] as const
+/** Encabezados que acepta la importación. Fuente única en `product-csv.ts`
+ *  (compartida con la exportación del panel, para que sigan siendo simétricas). */
+export const PRODUCT_IMPORT_HEADER: readonly string[] = PRODUCT_CSV_HEADER
+
+/** Nombre de columna válido en el CSV de productos. */
+export type ProductImportColumn = ProductCsvColumnName
 
 export interface ProductImportRow {
   name: string
@@ -62,25 +50,7 @@ export interface ProductImportResult {
 
 /** Plantilla descargable con encabezado y una fila de ejemplo. */
 export function generateProductImportTemplate(): string {
-  const example = [
-    "Agua mineral 600ml",
-    "agua-mineral-600ml",
-    "AGUA-600",
-    "7501234567890",
-    "18.50",
-    "15.00",
-    "2026-03-01T00:00:00.000Z",
-    "2026-03-31T23:59:59.000Z",
-    "Topo Chico",
-    "bebidas",
-    "arranque|refrescos",
-    "pieza",
-    "in_stock",
-    "24",
-    "6",
-    "si",
-    "",
-  ].join(";")
+  const example = PRODUCT_CSV_EXAMPLE.join(";")
   return "﻿" + PRODUCT_IMPORT_HEADER.join(";") + "\r\n" + example + "\r\n"
 }
 

@@ -117,6 +117,8 @@ import {
   resolveProductsView,
   type ProductsView,
 } from "@/lib/admin-products-view"
+import { downloadCsv, toCsv } from "@/lib/csv"
+import { PRODUCT_CSV_HEADER, productCsvCells } from "@/lib/product-csv"
 
 interface Product {
   id: number
@@ -1154,42 +1156,14 @@ function AdminProductsContent() {
       pageIdx++
     }
     if (rows.length === 0) return
-    const esc = (v: string) => (/[",;\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
     const catSlug = (id: number | null) => categories.find((c) => c.id === id)?.slug ?? ""
-    // Mismas columnas que parseProductImportCsv (paridad export/import).
-    const header =
-      "nombre,slug,sku,barcode,precio,precio_oferta,oferta_desde,oferta_hasta,marca,categoria,etiquetas,unidad,stock,cantidad,umbral_stock,visible,imagen"
-    const lines = rows.map((p) =>
-      [
-        esc(p.name),
-        p.slug,
-        esc(p.sku ?? ""),
-        esc(p.barcode ?? ""),
-        p.price ?? "",
-        p.sale_price ?? "",
-        p.sale_starts_at ?? "",
-        p.sale_ends_at ?? "",
-        esc(p.brand ?? ""),
-        catSlug(p.category_id),
-        esc((p.tags ?? []).join("|")),
-        p.unit ?? "",
-        p.stock_status,
-        p.stock_quantity ?? "",
-        p.low_stock_threshold ?? "",
-        p.is_visible ? "si" : "no",
-        esc(p.image_url ?? ""),
-      ].join(",")
+    // Columnas y escapado compartidos con la importación (product-csv.ts), así
+    // que la exportación siempre es re-importable.
+    const exportRows = rows.map((p) => ({ ...p, category_slug: catSlug(p.category_id) }))
+    downloadCsv(
+      `productos-${new Date().toISOString().slice(0, 10)}.csv`,
+      toCsv([...PRODUCT_CSV_HEADER], productCsvCells(exportRows))
     )
-    // BOM para que Excel respete los acentos.
-    const blob = new Blob(["﻿" + [header, ...lines].join("\n")], {
-      type: "text/csv;charset=utf-8",
-    })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `productos-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   /** Alta/edición completa: creación y duplicado recargan para traer
