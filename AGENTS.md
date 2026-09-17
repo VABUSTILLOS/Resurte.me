@@ -12,8 +12,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - [`docs/PLAN-MEJORAS.md`](docs/PLAN-MEJORAS.md) — programa de mejoras por feature
   (10 fases por feature + fases 11, con estado ✅/🔜 y backlog priorizado).
-- [`docs/agents/`](docs/agents/README.md) — playbooks de los 6 agentes de dominio
-  (catálogo, checkout, recompensas, panel, admin, UX móvil). Antes de modificar una
+- [`docs/agents/`](docs/agents/README.md) — playbooks de los 7 agentes de dominio
+  (catálogo, checkout, recompensas, panel, admin, UX móvil, punto de venta y
+  comandero). Antes de modificar una
   superficie, lee el playbook correspondiente: define perímetro, invariantes
   (prerender estático, fuente única de totales, rail inferior, reduced motion) y
   comandos de verificación obligatorios.

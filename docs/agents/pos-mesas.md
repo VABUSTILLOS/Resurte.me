@@ -91,9 +91,15 @@ npx vitest run src/lib/foodos-cash.test.ts src/lib/foodos-tables.test.ts \
   src/lib/foodos-reportes.test.ts src/lib/foodos-printing \
   src/lib/panel-roles.test.ts
 E2E_PORT=3100 npx playwright test e2e/foodos-pos.spec.ts e2e/foodos.spec.ts
-npx tsx /tmp/checkkeys.ts <páginas tocadas>   # ninguna clave i18n huérfana
 npm run lint && npm run build
 ```
+
+`src/lib/i18n/locale.test.ts` exige paridad **bidireccional** es↔en y la igualdad de
+marcadores por clave, pero no sabe si una clave que la página pide existe: al
+tocar una página, compara las claves `t("…")` del archivo contra el objeto `es`
+(`src/lib/i18n/es.ts`) antes de dar por cerrada la tarea. `TranslationKey` es
+`string`, así que una clave mal escrita **no falla el build**; se pinta la clave
+cruda en la interfaz.
 
 **El e2e no autentica.** El repo no tiene seed ni credenciales de e2e
 (`e2e/global-setup.ts` solo calienta rutas), así que un flujo completo —abrir
