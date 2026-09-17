@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { ImagePlus, Loader2, Plus, Search, Sparkles, Star, X } from "lucide-react"
 import { cropImageToSquare } from "@/lib/crop-image"
-import { validateBarcode, validateSku } from "@/lib/sku"
+import { PRODUCT_FIELD_INPUT_IDS, validateProductForm } from "@/lib/product-form"
 import {
   DEFAULT_LOW_STOCK_THRESHOLD,
   deriveStockStatus,
@@ -132,20 +132,6 @@ interface FormSnapshot {
 }
 
 const snapshotKey = (s: FormSnapshot) => JSON.stringify(s)
-
-/** Campo con error → control que recibe el foco al reintentar el envío. */
-const FIELD_INPUT_IDS: Record<string, string> = {
-  name: "pf-name",
-  category: "pf-category",
-  price: "pf-price",
-  salePrice: "pf-sale",
-  cost: "pf-cost",
-  stockQuantity: "pf-qty",
-  lowStockThreshold: "pf-threshold",
-  sku: "pf-sku",
-  barcode: "pf-barcode",
-  saleWindow: "pf-sale-start",
-}
 
 /** Desplaza el cuerpo del modal hasta una sección, respetando reduced motion. */
 function goToSection(id: string) {
@@ -740,8 +726,9 @@ export function ProductFormModal({
       'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
     )
     if (!focusables || focusables.length === 0) return
-    const first = focusables[0]
-    const last = focusables[focusables.length - 1]
+    const first = focusables.item(0)
+    const last = focusables.item(focusables.length - 1)
+    if (!first || !last) return
     if (e.shiftKey && document.activeElement === first) {
       e.preventDefault()
       last.focus()
@@ -755,51 +742,34 @@ export function ProductFormModal({
     e.preventDefault()
     if (saving) return
     // Valida todo antes de enviar y marca cada campo, en vez de detenerse en el
-    // primer problema: así se ve de una vez qué falta por corregir.
-    const nextErrors: Record<string, string> = {}
-    if (!name.trim()) nextErrors.name = "El nombre es obligatorio"
-    const parsedPrice = price.trim() === "" ? null : parseFloat(price)
-    if (parsedPrice !== null && (!Number.isFinite(parsedPrice) || parsedPrice < 0)) {
-      nextErrors.price = "Precio inválido"
-    }
-    const parsedSale = salePrice.trim() === "" ? null : parseFloat(salePrice)
-    if (parsedSale !== null && (!Number.isFinite(parsedSale) || parsedSale < 0)) {
-      nextErrors.salePrice = "Precio de oferta inválido"
-    }
-    const parsedCost = cost.trim() === "" ? null : parseFloat(cost)
-    if (parsedCost !== null && (!Number.isFinite(parsedCost) || parsedCost < 0)) {
-      nextErrors.cost = "Costo inválido"
-    }
-    const parsedQty =
-      stockQuantity.trim() === "" ? null : parseInt(stockQuantity, 10)
-    if (parsedQty !== null && (!Number.isInteger(parsedQty) || parsedQty < 0)) {
-      nextErrors.stockQuantity = "Cantidad de stock inválida"
-    }
-    const parsedThreshold =
-      lowStockThreshold.trim() === "" ? null : parseInt(lowStockThreshold, 10)
-    if (
-      parsedThreshold !== null &&
-      (!Number.isInteger(parsedThreshold) || parsedThreshold < 0)
-    ) {
-      nextErrors.lowStockThreshold = "Umbral de stock bajo inválido"
-    }
-    const skuCheck = validateSku(sku)
-    if (!skuCheck.ok) nextErrors.sku = skuCheck.error
-    const barcodeCheck = validateBarcode(barcode)
-    if (!barcodeCheck.ok) nextErrors.barcode = barcodeCheck.error
-    if (saleStartsAt && saleEndsAt && new Date(saleStartsAt) > new Date(saleEndsAt)) {
-      nextErrors.saleWindow = "La oferta no puede empezar después de terminar"
-    }
-    const firstInvalid = Object.keys(nextErrors)[0]
-    if (firstInvalid) {
-      setFieldErrors(nextErrors)
+    // primer problema: así se ve de una vez qué falta por corregir. Las reglas
+    // viven en `src/lib/product-form.ts` (probadas) porque espejan las del
+    // servidor; aquí solo se pintan.
+    const check = validateProductForm({
+      name,
+      price,
+      salePrice,
+      cost,
+      stockQuantity,
+      lowStockThreshold,
+      sku,
+      barcode,
+      saleStartsAt,
+      saleEndsAt,
+    })
+    if (check.firstInvalid) {
+      setFieldErrors(check.errors)
       setError("Revisa los campos marcados en rojo")
-      const target = document.getElementById(FIELD_INPUT_IDS[firstInvalid])
+      const inputId = PRODUCT_FIELD_INPUT_IDS[check.firstInvalid]
+      const target = inputId ? document.getElementById(inputId) : null
       target?.scrollIntoView({ block: "center" })
       target?.focus()
       return
     }
     setFieldErrors({})
+    const { price: parsedPrice, salePrice: parsedSale, cost: parsedCost } = check
+    const parsedQty = check.stockQuantity
+    const parsedThreshold = check.lowStockThreshold
 
     // Espeja la regla del servidor: con unidades capturadas el estado se
     // deriva del umbral; sin unidades manda la selección manual.
@@ -869,6 +839,27 @@ export function ProductFormModal({
   const inputCls =
     "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
 
+  /** Estilo del control: marca en rojo el campo que falló la validación. */
+  const fieldCls = (key: string, extra = "") =>
+    `${inputCls}${extra}${fieldErrors[key] ? " border-red-300 bg-red-50/40" : ""}`
+
+  /** Anuncia el error del campo a lectores de pantalla. */
+  const fieldA11y = (key: string) =>
+    fieldErrors[key]
+      ? { "aria-invalid": true as const, "aria-describedby": `pf-err-${key}` }
+      : {}
+
+  /** Al editar un campo se retira su marca de error y, si no queda ninguna, el aviso. */
+  function clearFieldError(key: string) {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev
+      const next = { ...prev }
+      delete next[key]
+      if (Object.keys(next).length === 0) setError(null)
+      return next
+    })
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -915,7 +906,10 @@ export function ProductFormModal({
 
           <div
             ref={bodyRef}
-            className="min-w-0 flex-1 space-y-6 overflow-y-auto px-4 py-4 sm:px-5"
+            data-pf-scroll=""
+            tabIndex={-1}
+            aria-label="Campos del producto"
+            className="min-w-0 flex-1 space-y-6 overflow-y-auto px-4 py-4 outline-none sm:px-5"
           >
             {error && (
               <div
@@ -926,315 +920,701 @@ export function ProductFormModal({
               </div>
             )}
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-name">
-              Nombre *
-            </label>
-            <input
-              id="pf-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={inputCls}
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <fieldset id="pf-sec-identidad" className="scroll-mt-2 space-y-4 border-0 p-0">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+                Identidad
+              </legend>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-unit">
-                Unidad (kg, pieza, litro…)
+              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-name">
+                Nombre *
               </label>
               <input
-                id="pf-unit"
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                placeholder="kg"
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-brand">
-                Marca
-              </label>
-              <input
-                id="pf-brand"
-                value={brand}
-                onChange={(e) => setBrand(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-sku">
-                SKU
-              </label>
-              <input
-                id="pf-sku"
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                placeholder="AB-0001"
-                maxLength={40}
-                className={`${inputCls} font-mono`}
-              />
-            </div>
-            <div>
-              <label
-                className="block text-xs font-semibold text-gray-600 mb-1"
-                htmlFor="pf-barcode"
-              >
-                Código de barras
-              </label>
-              <input
-                id="pf-barcode"
-                value={barcode}
-                onChange={(e) => setBarcode(e.target.value)}
-                inputMode="numeric"
-                placeholder="7501234567890"
-                className={`${inputCls} font-mono`}
-              />
-            </div>
-          </div>
-          <p className="text-[10px] text-gray-400 -mt-2">
-            El SKU debe ser único en el catálogo; el código de barras acepta 8, 12, 13 o 14
-            dígitos.
-          </p>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-tag">
-              Etiquetas
-            </label>
-            <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-              {tags.length === 0 && (
-                <span className="text-[11px] text-gray-400">Sin etiquetas</span>
-              )}
-              {tags.map((t) => (
-                <span
-                  key={t}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-[11px] font-semibold"
-                >
-                  {t}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(t)}
-                    className="text-brand-500 hover:text-brand-800"
-                    aria-label={`Quitar etiqueta ${t}`}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                id="pf-tag"
-                value={tagDraft}
-                onChange={(e) => setTagDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === ",") {
-                    e.preventDefault()
-                    addTag(tagDraft)
-                  }
+                id="pf-name"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  clearFieldError("name")
                 }}
-                placeholder="arranque, limpieza…"
-                maxLength={40}
-                className={inputCls}
+                className={fieldCls("name")}
+                {...fieldA11y("name")}
+                required
               />
-              <button
-                type="button"
-                onClick={() => addTag(tagDraft)}
-                disabled={!tagDraft.trim()}
-                className="shrink-0 flex items-center gap-1 px-3 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Agregar
-              </button>
+              <FieldError id="pf-err-name" message={fieldErrors.name} />
             </div>
-            {tagSuggestionsAvailable.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {tagSuggestionsAvailable.map((t) => (
-                  <button
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-unit">
+                  Unidad (kg, pieza, litro…)
+                </label>
+                <input
+                  id="pf-unit"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  placeholder="kg"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-brand">
+                  Marca
+                </label>
+                <input
+                  id="pf-brand"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-sku">
+                  SKU
+                </label>
+                <input
+                  id="pf-sku"
+                  value={sku}
+                  onChange={(e) => {
+                    setSku(e.target.value)
+                    clearFieldError("sku")
+                  }}
+                  placeholder="AB-0001"
+                  maxLength={40}
+                  className={fieldCls("sku", " font-mono")}
+                  {...fieldA11y("sku")}
+                />
+                <FieldError id="pf-err-sku" message={fieldErrors.sku} />
+              </div>
+              <div>
+                <label
+                  className="block text-xs font-semibold text-gray-600 mb-1"
+                  htmlFor="pf-barcode"
+                >
+                  Código de barras
+                </label>
+                <input
+                  id="pf-barcode"
+                  value={barcode}
+                  onChange={(e) => {
+                    setBarcode(e.target.value)
+                    clearFieldError("barcode")
+                  }}
+                  inputMode="numeric"
+                  placeholder="7501234567890"
+                  className={fieldCls("barcode", " font-mono")}
+                  {...fieldA11y("barcode")}
+                />
+                <FieldError id="pf-err-barcode" message={fieldErrors.barcode} />
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-400 -mt-2">
+              El SKU debe ser único en el catálogo; el código de barras acepta 8, 12, 13 o 14
+              dígitos.
+            </p>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-tag">
+                Etiquetas
+              </label>
+              <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                {tags.length === 0 && (
+                  <span className="text-[11px] text-gray-400">Sin etiquetas</span>
+                )}
+                {tags.map((t) => (
+                  <span
                     key={t}
-                    type="button"
-                    onClick={() => addTag(t)}
-                    className="px-2 py-0.5 rounded-full border border-gray-200 text-[11px] text-gray-500 hover:bg-gray-50"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-[11px] font-semibold"
                   >
                     {t}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => removeTag(t)}
+                      className="text-brand-500 hover:text-brand-800"
+                      aria-label={`Quitar etiqueta ${t}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
                 ))}
               </div>
-            )}
-            <p className="mt-1 text-[10px] text-gray-400">
-              Las etiquetas alimentan las colecciones de la tienda (p. ej. arranque, limpieza).
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-related">
-              Productos relacionados
-            </label>
-            <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-              {relatedIds.length === 0 && (
-                <span className="text-[11px] text-gray-400">
-                  Sin relacionados: la tienda sugiere por categoría
-                </span>
-              )}
-              {relatedIds.map((id) => (
-                <span
-                  key={id}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 text-[11px] font-semibold"
-                >
-                  {relatedInfo[id]?.name ?? `#${id}`}
-                  <button
-                    type="button"
-                    onClick={() => setRelatedIds((prev) => prev.filter((x) => x !== id))}
-                    className="text-violet-500 hover:text-violet-800"
-                    aria-label={`Quitar relacionado ${relatedInfo[id]?.name ?? id}`}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                id="pf-related"
-                value={relatedQuery}
-                onChange={(e) => setRelatedQuery(e.target.value)}
-                placeholder="Buscar por nombre, marca o SKU…"
-                className={`${inputCls} pl-9`}
-                autoComplete="off"
-              />
-              {relatedActive && relatedSearching && (
-                <Loader2 className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 animate-spin" />
-              )}
-            </div>
-            {relatedActive && relatedResults.length > 0 && (
-              <ul className="mt-1.5 max-h-40 overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-100">
-                {relatedResults.map((r) => {
-                  const selected = relatedIds.includes(r.id)
-                  const isSelf = product?.id === r.id
-                  const full = !selected && relatedIds.length >= RELATED_MAX
-                  return (
-                    <li key={r.id}>
-                      <button
-                        type="button"
-                        onClick={() => toggleRelated(r)}
-                        disabled={isSelf || full}
-                        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-gray-50 disabled:opacity-40"
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate font-medium text-gray-800">
-                            {r.name}
-                          </span>
-                          {r.brand && (
-                            <span className="block truncate text-[10px] text-gray-400">
-                              {r.brand}
-                            </span>
-                          )}
-                        </span>
-                        <span className="shrink-0 text-[10px] font-semibold text-violet-600">
-                          {isSelf ? "Es este" : selected ? "Quitar" : full ? "Tope" : "Agregar"}
-                        </span>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-            {relatedActive &&
-              !relatedSearching &&
-              relatedResults.length === 0 && (
-                <p className="mt-1 text-[10px] text-gray-400">Sin resultados.</p>
-              )}
-            <p className="mt-1 text-[10px] text-gray-400">
-              Se muestran primero en la ficha del producto; máximo {RELATED_MAX}. Si no hay
-              ninguno, la tienda sugiere por categoría.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-category">
-                  Categoría
-                </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="pf-tag"
+                  value={tagDraft}
+                  onChange={(e) => setTagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === ",") {
+                      e.preventDefault()
+                      addTag(tagDraft)
+                    }
+                  }}
+                  placeholder="arranque, limpieza…"
+                  maxLength={40}
+                  className={inputCls}
+                />
                 <button
                   type="button"
-                  onClick={() => setNewCatOpen((v) => !v)}
-                  className="text-[11px] font-semibold text-brand-600 hover:underline"
+                  onClick={() => addTag(tagDraft)}
+                  disabled={!tagDraft.trim()}
+                  className="shrink-0 flex items-center gap-1 px-3 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                 >
-                  {newCatOpen ? "Cancelar" : "＋ Nueva"}
+                  <Plus className="w-3.5 h-3.5" />
+                  Agregar
                 </button>
               </div>
-              {newCatOpen ? (
-                <div className="flex items-center gap-2">
+              {tagSuggestionsAvailable.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {tagSuggestionsAvailable.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => addTag(t)}
+                      className="px-2 py-0.5 rounded-full border border-gray-200 text-[11px] text-gray-500 hover:bg-gray-50"
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="mt-1 text-[10px] text-gray-400">
+                Las etiquetas alimentan las colecciones de la tienda (p. ej. arranque, limpieza).
+              </p>
+            </div>
+          </fieldset>
+
+          <fieldset id="pf-sec-catalogo" className="scroll-mt-2 space-y-4 border-0 p-0">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+                Catálogo
+              </legend>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-related">
+                Productos relacionados
+              </label>
+              <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                {relatedIds.length === 0 && (
+                  <span className="text-[11px] text-gray-400">
+                    Sin relacionados: la tienda sugiere por categoría
+                  </span>
+                )}
+                {relatedIds.map((id) => (
+                  <span
+                    key={id}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 text-[11px] font-semibold"
+                  >
+                    {relatedInfo[id]?.name ?? `#${id}`}
+                    <button
+                      type="button"
+                      onClick={() => setRelatedIds((prev) => prev.filter((x) => x !== id))}
+                      className="text-violet-500 hover:text-violet-800"
+                      aria-label={`Quitar relacionado ${relatedInfo[id]?.name ?? id}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  id="pf-related"
+                  value={relatedQuery}
+                  onChange={(e) => setRelatedQuery(e.target.value)}
+                  placeholder="Buscar por nombre, marca o SKU…"
+                  className={`${inputCls} pl-9`}
+                  autoComplete="off"
+                />
+                {relatedActive && relatedSearching && (
+                  <Loader2 className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 animate-spin" />
+                )}
+              </div>
+              {relatedActive && relatedResults.length > 0 && (
+                <ul className="mt-1.5 max-h-40 overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-100">
+                  {relatedResults.map((r) => {
+                    const selected = relatedIds.includes(r.id)
+                    const isSelf = product?.id === r.id
+                    const full = !selected && relatedIds.length >= RELATED_MAX
+                    return (
+                      <li key={r.id}>
+                        <button
+                          type="button"
+                          onClick={() => toggleRelated(r)}
+                          disabled={isSelf || full}
+                          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-gray-50 disabled:opacity-40"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium text-gray-800">
+                              {r.name}
+                            </span>
+                            {r.brand && (
+                              <span className="block truncate text-[10px] text-gray-400">
+                                {r.brand}
+                              </span>
+                            )}
+                          </span>
+                          <span className="shrink-0 text-[10px] font-semibold text-violet-600">
+                            {isSelf ? "Es este" : selected ? "Quitar" : full ? "Tope" : "Agregar"}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              {relatedActive &&
+                !relatedSearching &&
+                relatedResults.length === 0 && (
+                  <p className="mt-1 text-[10px] text-gray-400">Sin resultados.</p>
+                )}
+              <p className="mt-1 text-[10px] text-gray-400">
+                Se muestran primero en la ficha del producto; máximo {RELATED_MAX}. Si no hay
+                ninguno, la tienda sugiere por categoría.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-category">
+                    Categoría
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setNewCatOpen((v) => !v)}
+                    className="text-[11px] font-semibold text-brand-600 hover:underline"
+                  >
+                    {newCatOpen ? "Cancelar" : "＋ Nueva"}
+                  </button>
+                </div>
+                {newCatOpen ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      placeholder="Nombre de la categoría"
+                      aria-label="Nombre de la nueva categoría"
+                      className={inputCls}
+                    />
+                    <button
+                      type="button"
+                      onClick={createCategory}
+                      disabled={creatingCat || !newCatName.trim()}
+                      className="shrink-0 flex items-center gap-1 px-3 py-2.5 rounded-xl bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50"
+                    >
+                      {creatingCat && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Crear
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    id="pf-category"
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    className={`${inputCls} bg-white`}
+                  >
+                    <option value="">Sin categoría</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-desc">
+                  Descripción
+                </label>
+                <div className="flex items-center gap-3">
+                  {typeof window !== "undefined" &&
+                    ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) && (
+                      <button
+                        type="button"
+                        onClick={toggleDictation}
+                        disabled={dictating}
+                        title="Dictar la descripción por voz (español)"
+                        className={`flex items-center gap-1 text-[11px] font-semibold hover:underline disabled:opacity-50 ${
+                          dictating ? "text-red-600" : "text-gray-500"
+                        }`}
+                      >
+                        <span className={dictating ? "animate-pulse" : ""}>🎤</span>
+                        {dictating ? "Escuchando… (clic para parar)" : "Dictar"}
+                      </button>
+                    )}
+                  <button
+                    type="button"
+                    onClick={generateDescription}
+                    disabled={generatingDesc}
+                    title="Genera una propuesta con IA (editable antes de guardar)"
+                    className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:underline disabled:opacity-50"
+                  >
+                    {generatingDesc ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5" />
+                    )}
+                    Generar con IA
+                  </button>
+                </div>
+              </div>
+              <textarea
+                id="pf-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className={`${inputCls} resize-y`}
+              />
+            </div>
+          </fieldset>
+
+          <fieldset id="pf-sec-imagenes" className="scroll-mt-2 space-y-4 border-0 p-0">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+                Imágenes
+              </legend>
+            {/* Galería de imágenes: la marcada con ★ es la principal (image_url) */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="block text-xs font-semibold text-gray-600">
+                  Imágenes {gallery.length > 0 && `(${gallery.length})`}
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setAiImageOpen((v) => !v)}
+                    disabled={generatingImg}
+                    title="Genera una imagen con IA"
+                    className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:underline disabled:opacity-50"
+                  >
+                    {generatingImg ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5" />
+                    )}
+                    Generar con IA
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    disabled={uploadingImg}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:underline disabled:opacity-50"
+                  >
+                    {uploadingImg ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ImagePlus className="w-3.5 h-3.5" />
+                    )}
+                    Agregar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUrlOpen((v) => !v)}
+                    title="Agregar imagen pegando una URL"
+                    className="text-[11px] font-semibold text-gray-500 hover:underline"
+                  >
+                    Por URL
+                  </button>
+                </div>
+                <input
+                  ref={galleryInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  className="hidden"
+                  onChange={(e) => void uploadGalleryImage(e.target.files?.[0])}
+                  aria-label="Agregar imagen a la galería"
+                />
+              </div>
+              {urlOpen && (
+                <div className="mb-2 flex items-center gap-2">
                   <input
-                    value={newCatName}
-                    onChange={(e) => setNewCatName(e.target.value)}
-                    placeholder="Nombre de la categoría"
-                    aria-label="Nombre de la nueva categoría"
+                    value={urlValue}
+                    onChange={(e) => setUrlValue(e.target.value)}
+                    placeholder="https://… o /ruta/local"
+                    aria-label="URL de la imagen"
                     className={inputCls}
                   />
                   <button
                     type="button"
-                    onClick={createCategory}
-                    disabled={creatingCat || !newCatName.trim()}
-                    className="shrink-0 flex items-center gap-1 px-3 py-2.5 rounded-xl bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 disabled:opacity-50"
+                    onClick={addImageByUrl}
+                    disabled={!urlValue.trim()}
+                    className="shrink-0 px-3 py-2.5 rounded-xl bg-gray-700 text-white text-xs font-semibold hover:bg-gray-800 disabled:opacity-50"
                   >
-                    {creatingCat && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    Crear
+                    Agregar
                   </button>
                 </div>
+              )}
+              {aiImageOpen && (
+                <div className="mb-2 flex items-center gap-2">
+                  <input
+                    value={aiImagePrompt}
+                    onChange={(e) => setAiImagePrompt(e.target.value)}
+                    placeholder={`Foto de producto: ${name || "…"}, fondo blanco`}
+                    aria-label="Prompt para generar imagen"
+                    className={inputCls}
+                  />
+                  <button
+                    type="button"
+                    onClick={generateImage}
+                    disabled={generatingImg}
+                    className="shrink-0 flex items-center gap-1 px-3 py-2.5 rounded-xl bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    {generatingImg && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Generar
+                  </button>
+                </div>
+              )}
+              {gallery.length === 0 ? (
+                <p className="text-[11px] text-gray-400">Sin imágenes todavía.</p>
               ) : (
+                <div className="flex flex-wrap gap-2">
+                  {gallery.map((url) => (
+                    <div
+                      key={url}
+                      className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 ${
+                        mainImage === url ? "border-brand-500" : "border-gray-200"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- thumbs admin, URLs dinámicas de Storage */}
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                      <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/40 px-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setMainImage(url)}
+                          title="Marcar como imagen principal"
+                          aria-label="Marcar como imagen principal"
+                          className={`p-0.5 ${
+                            mainImage === url ? "text-yellow-300" : "text-white/70 hover:text-white"
+                          }`}
+                        >
+                          <Star className="w-3.5 h-3.5" fill={mainImage === url ? "currentColor" : "none"} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeGalleryImage(url)}
+                          title="Quitar de la galería"
+                          aria-label="Quitar de la galería"
+                          className="p-0.5 text-white/70 hover:text-red-300"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </fieldset>
+
+          <fieldset id="pf-sec-precios" className="scroll-mt-2 space-y-4 border-0 p-0">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+                Precios
+              </legend>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-price">
+                  Precio
+                </label>
+                <input
+                  id="pf-price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={price}
+                  onChange={(e) => {
+                    setPrice(e.target.value)
+                    clearFieldError("price")
+                  }}
+                  className={fieldCls("price")}
+                  {...fieldA11y("price")}
+                />
+                <FieldError id="pf-err-price" message={fieldErrors.price} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-sale">
+                  Precio oferta
+                </label>
+                <input
+                  id="pf-sale"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={salePrice}
+                  onChange={(e) => {
+                    setSalePrice(e.target.value)
+                    clearFieldError("salePrice")
+                  }}
+                  className={fieldCls("salePrice")}
+                  {...fieldA11y("salePrice")}
+                />
+                <FieldError id="pf-err-salePrice" message={fieldErrors.salePrice} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-cost">
+                  Costo
+                </label>
+                <input
+                  id="pf-cost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={cost}
+                  onChange={(e) => {
+                    setCost(e.target.value)
+                    clearFieldError("cost")
+                  }}
+                  className={fieldCls("cost")}
+                  {...fieldA11y("cost")}
+                />
+                <FieldError id="pf-err-cost" message={fieldErrors.cost} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label
+                  className="block text-xs font-semibold text-gray-600 mb-1"
+                  htmlFor="pf-sale-start"
+                >
+                  Oferta desde
+                </label>
+                <input
+                  id="pf-sale-start"
+                  type="datetime-local"
+                  value={saleStartsAt}
+                  onChange={(e) => {
+                    setSaleStartsAt(e.target.value)
+                    clearFieldError("saleWindow")
+                  }}
+                  className={fieldCls("saleWindow")}
+                  aria-invalid={fieldErrors.saleWindow ? true : undefined}
+                  aria-describedby={fieldErrors.saleWindow ? "pf-err-saleWindow" : undefined}
+                />
+              </div>
+              <div>
+                <label
+                  className="block text-xs font-semibold text-gray-600 mb-1"
+                  htmlFor="pf-sale-end"
+                >
+                  Oferta hasta
+                </label>
+                <input
+                  id="pf-sale-end"
+                  type="datetime-local"
+                  value={saleEndsAt}
+                  onChange={(e) => {
+                    setSaleEndsAt(e.target.value)
+                    clearFieldError("saleWindow")
+                  }}
+                  className={fieldCls("saleWindow")}
+                  aria-invalid={fieldErrors.saleWindow ? true : undefined}
+                  aria-describedby={fieldErrors.saleWindow ? "pf-err-saleWindow" : undefined}
+                />
+              </div>
+            </div>
+            <FieldError id="pf-err-saleWindow" message={fieldErrors.saleWindow} />
+            <p className="text-[11px] text-gray-400 -mt-2">
+              {salePrice.trim() === ""
+                ? "Sin precio de oferta no hay ventana que aplicar."
+                : "Fuera de esta ventana la tienda cobra el precio normal; déjala vacía para que la oferta no expire."}
+            </p>
+          </fieldset>
+
+          <fieldset id="pf-sec-inventario" className="scroll-mt-2 space-y-4 border-0 p-0">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+                Inventario
+              </legend>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-qty">
+                  Unidades disponibles
+                </label>
+                <input
+                  id="pf-qty"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={stockQuantity}
+                  onChange={(e) => {
+                    setStockQuantity(e.target.value)
+                    clearFieldError("stockQuantity")
+                  }}
+                  placeholder="—"
+                  className={fieldCls("stockQuantity")}
+                  {...fieldA11y("stockQuantity")}
+                />
+                <FieldError id="pf-err-stockQuantity" message={fieldErrors.stockQuantity} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-stock">
+                  Estado de stock
+                </label>
                 <select
-                  id="pf-category"
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
+                  id="pf-stock"
+                  value={stockStatus}
+                  onChange={(e) =>
+                    setStockStatus(e.target.value as ProductFormProduct["stock_status"])
+                  }
                   className={`${inputCls} bg-white`}
                 >
-                  <option value="">Sin categoría</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={String(c.id)}>
-                      {c.name}
+                  {STOCK_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
                     </option>
                   ))}
                 </select>
-              )}
+                <p className="mt-1 text-[10px] text-gray-400">
+                  {`Si capturas unidades, el estado se deriva (0 → agotado, ≤${resolveLowStockThreshold(
+                    lowStockThreshold.trim() === "" ? null : Number(lowStockThreshold)
+                  )} → bajo).`}
+                </p>
+              </div>
+              <div>
+                <label
+                  className="block text-xs font-semibold text-gray-600 mb-1"
+                  htmlFor="pf-threshold"
+                >
+                  Umbral stock bajo
+                </label>
+                <input
+                  id="pf-threshold"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={lowStockThreshold}
+                  onChange={(e) => {
+                    setLowStockThreshold(e.target.value)
+                    clearFieldError("lowStockThreshold")
+                  }}
+                  placeholder={String(DEFAULT_LOW_STOCK_THRESHOLD)}
+                  className={fieldCls("lowStockThreshold")}
+                  {...fieldA11y("lowStockThreshold")}
+                />
+                <FieldError id="pf-err-lowStockThreshold" message={fieldErrors.lowStockThreshold} />
+                <p className="mt-1 text-[10px] text-gray-400">
+                  Vacío = predeterminado ({DEFAULT_LOW_STOCK_THRESHOLD}).
+                </p>
+              </div>
             </div>
-          </div>
+          </fieldset>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-desc">
-                Descripción
-              </label>
-              <div className="flex items-center gap-3">
-                {typeof window !== "undefined" &&
-                  ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) && (
-                    <button
-                      type="button"
-                      onClick={toggleDictation}
-                      disabled={dictating}
-                      title="Dictar la descripción por voz (español)"
-                      className={`flex items-center gap-1 text-[11px] font-semibold hover:underline disabled:opacity-50 ${
-                        dictating ? "text-red-600" : "text-gray-500"
-                      }`}
-                    >
-                      <span className={dictating ? "animate-pulse" : ""}>🎤</span>
-                      {dictating ? "Escuchando… (clic para parar)" : "Dictar"}
-                    </button>
-                  )}
+          <fieldset id="pf-sec-seo" className="scroll-mt-2 space-y-4 border-0 p-0">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+                SEO
+              </legend>
+            <div className="grid grid-cols-1 gap-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-600">SEO del producto</span>
                 <button
                   type="button"
-                  onClick={generateDescription}
-                  disabled={generatingDesc}
-                  title="Genera una propuesta con IA (editable antes de guardar)"
+                  onClick={generateSeo}
+                  disabled={generatingSeo}
+                  title="Genera título y descripción SEO con IA"
                   className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:underline disabled:opacity-50"
                 >
-                  {generatingDesc ? (
+                  {generatingSeo ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
                     <Sparkles className="w-3.5 h-3.5" />
@@ -1242,432 +1622,157 @@ export function ProductFormModal({
                   Generar con IA
                 </button>
               </div>
-            </div>
-            <textarea
-              id="pf-desc"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              className={`${inputCls} resize-y`}
-            />
-          </div>
-
-          {/* Galería de imágenes: la marcada con ★ es la principal (image_url) */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="block text-xs font-semibold text-gray-600">
-                Imágenes {gallery.length > 0 && `(${gallery.length})`}
-              </span>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setAiImageOpen((v) => !v)}
-                  disabled={generatingImg}
-                  title="Genera una imagen con IA"
-                  className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:underline disabled:opacity-50"
-                >
-                  {generatingImg ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-3.5 h-3.5" />
-                  )}
-                  Generar con IA
-                </button>
-                <button
-                  type="button"
-                  onClick={() => galleryInputRef.current?.click()}
-                  disabled={uploadingImg}
-                  className="flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:underline disabled:opacity-50"
-                >
-                  {uploadingImg ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <ImagePlus className="w-3.5 h-3.5" />
-                  )}
-                  Agregar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUrlOpen((v) => !v)}
-                  title="Agregar imagen pegando una URL"
-                  className="text-[11px] font-semibold text-gray-500 hover:underline"
-                >
-                  Por URL
-                </button>
-              </div>
-              <input
-                ref={galleryInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/avif"
-                className="hidden"
-                onChange={(e) => void uploadGalleryImage(e.target.files?.[0])}
-                aria-label="Agregar imagen a la galería"
-              />
-            </div>
-            {urlOpen && (
-              <div className="mb-2 flex items-center gap-2">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-seo-title">
+                    SEO: título
+                  </label>
+                  <span
+                    className={`text-[10px] ${seoTitle.length > 60 ? "text-amber-600" : "text-gray-400"}`}
+                  >
+                    {seoTitle.length}/60
+                  </span>
+                </div>
                 <input
-                  value={urlValue}
-                  onChange={(e) => setUrlValue(e.target.value)}
-                  placeholder="https://… o /ruta/local"
-                  aria-label="URL de la imagen"
+                  id="pf-seo-title"
+                  value={seoTitle}
+                  onChange={(e) => setSeoTitle(e.target.value)}
+                  placeholder={name || "Título para Google"}
                   className={inputCls}
                 />
-                <button
-                  type="button"
-                  onClick={addImageByUrl}
-                  disabled={!urlValue.trim()}
-                  className="shrink-0 px-3 py-2.5 rounded-xl bg-gray-700 text-white text-xs font-semibold hover:bg-gray-800 disabled:opacity-50"
-                >
-                  Agregar
-                </button>
               </div>
-            )}
-            {aiImageOpen && (
-              <div className="mb-2 flex items-center gap-2">
-                <input
-                  value={aiImagePrompt}
-                  onChange={(e) => setAiImagePrompt(e.target.value)}
-                  placeholder={`Foto de producto: ${name || "…"}, fondo blanco`}
-                  aria-label="Prompt para generar imagen"
-                  className={inputCls}
-                />
-                <button
-                  type="button"
-                  onClick={generateImage}
-                  disabled={generatingImg}
-                  className="shrink-0 flex items-center gap-1 px-3 py-2.5 rounded-xl bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 disabled:opacity-50"
-                >
-                  {generatingImg && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Generar
-                </button>
-              </div>
-            )}
-            {gallery.length === 0 ? (
-              <p className="text-[11px] text-gray-400">Sin imágenes todavía.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {gallery.map((url) => (
-                  <div
-                    key={url}
-                    className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 ${
-                      mainImage === url ? "border-brand-500" : "border-gray-200"
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-seo-desc">
+                    SEO: descripción
+                  </label>
+                  <span
+                    className={`text-[10px] ${
+                      seoDescription.length > 160 ? "text-amber-600" : "text-gray-400"
                     }`}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- thumbs admin, URLs dinámicas de Storage */}
-                    <img src={url} alt="" className="w-full h-full object-cover" />
-                    <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/40 px-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setMainImage(url)}
-                        title="Marcar como imagen principal"
-                        aria-label="Marcar como imagen principal"
-                        className={`p-0.5 ${
-                          mainImage === url ? "text-yellow-300" : "text-white/70 hover:text-white"
-                        }`}
-                      >
-                        <Star className="w-3.5 h-3.5" fill={mainImage === url ? "currentColor" : "none"} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeGalleryImage(url)}
-                        title="Quitar de la galería"
-                        aria-label="Quitar de la galería"
-                        className="p-0.5 text-white/70 hover:text-red-300"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                    {seoDescription.length}/160
+                  </span>
+                </div>
+                <textarea
+                  id="pf-seo-desc"
+                  value={seoDescription}
+                  onChange={(e) => setSeoDescription(e.target.value)}
+                  rows={2}
+                  placeholder="Descripción para resultados de búsqueda"
+                  className={`${inputCls} resize-y`}
+                />
               </div>
-            )}
-          </div>
+            </div>
+          </fieldset>
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-note">
-              Nota interna (solo visible en el panel)
-            </label>
-            <textarea
-              id="pf-note"
-              value={adminNote}
-              onChange={(e) => setAdminNote(e.target.value)}
-              rows={2}
-              placeholder="Ej. proveedor, condiciones de compra…"
-              className={`${inputCls} resize-y`}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-price">
-                Precio
-              </label>
-              <input
-                id="pf-price"
-                type="number"
-                min="0"
-                step="0.01"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-sale">
-                Precio oferta
-              </label>
-              <input
-                id="pf-sale"
-                type="number"
-                min="0"
-                step="0.01"
-                value={salePrice}
-                onChange={(e) => setSalePrice(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-cost">
-                Costo
-              </label>
-              <input
-                id="pf-cost"
-                type="number"
-                min="0"
-                step="0.01"
-                value={cost}
-                onChange={(e) => setCost(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label
-                className="block text-xs font-semibold text-gray-600 mb-1"
-                htmlFor="pf-sale-start"
-              >
-                Oferta desde
-              </label>
-              <input
-                id="pf-sale-start"
-                type="datetime-local"
-                value={saleStartsAt}
-                onChange={(e) => setSaleStartsAt(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label
-                className="block text-xs font-semibold text-gray-600 mb-1"
-                htmlFor="pf-sale-end"
-              >
-                Oferta hasta
-              </label>
-              <input
-                id="pf-sale-end"
-                type="datetime-local"
-                value={saleEndsAt}
-                onChange={(e) => setSaleEndsAt(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          </div>
-          <p className="text-[11px] text-gray-400 -mt-2">
-            {salePrice.trim() === ""
-              ? "Sin precio de oferta no hay ventana que aplicar."
-              : "Fuera de esta ventana la tienda cobra el precio normal; déjala vacía para que la oferta no expire."}
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-qty">
-                Unidades disponibles
-              </label>
-              <input
-                id="pf-qty"
-                type="number"
-                min="0"
-                step="1"
-                value={stockQuantity}
-                onChange={(e) => setStockQuantity(e.target.value)}
-                placeholder="—"
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-stock">
-                Estado de stock
-              </label>
-              <select
-                id="pf-stock"
-                value={stockStatus}
-                onChange={(e) =>
-                  setStockStatus(e.target.value as ProductFormProduct["stock_status"])
-                }
-                className={`${inputCls} bg-white`}
-              >
-                {STOCK_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-[10px] text-gray-400">
-                {`Si capturas unidades, el estado se deriva (0 → agotado, ≤${resolveLowStockThreshold(
-                  lowStockThreshold.trim() === "" ? null : Number(lowStockThreshold)
-                )} → bajo).`}
-              </p>
-            </div>
-            <div>
-              <label
-                className="block text-xs font-semibold text-gray-600 mb-1"
-                htmlFor="pf-threshold"
-              >
-                Umbral stock bajo
-              </label>
-              <input
-                id="pf-threshold"
-                type="number"
-                min="0"
-                step="1"
-                value={lowStockThreshold}
-                onChange={(e) => setLowStockThreshold(e.target.value)}
-                placeholder={String(DEFAULT_LOW_STOCK_THRESHOLD)}
-                className={inputCls}
-              />
-              <p className="mt-1 text-[10px] text-gray-400">
-                Vacío = predeterminado ({DEFAULT_LOW_STOCK_THRESHOLD}).
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-gray-600">SEO del producto</span>
-              <button
-                type="button"
-                onClick={generateSeo}
-                disabled={generatingSeo}
-                title="Genera título y descripción SEO con IA"
-                className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:underline disabled:opacity-50"
-              >
-                {generatingSeo ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5" />
-                )}
-                Generar con IA
-              </button>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-seo-title">
-                  SEO: título
-                </label>
-                <span
-                  className={`text-[10px] ${seoTitle.length > 60 ? "text-amber-600" : "text-gray-400"}`}
+          <fieldset id="pf-sec-publicacion" className="scroll-mt-2 space-y-4 border-0 p-0">
+              <legend className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+                Publicación
+              </legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label
+                  className="block text-xs font-semibold text-gray-600 mb-1"
+                  htmlFor="pf-publish-at"
                 >
-                  {seoTitle.length}/60
-                </span>
-              </div>
-              <input
-                id="pf-seo-title"
-                value={seoTitle}
-                onChange={(e) => setSeoTitle(e.target.value)}
-                placeholder={name || "Título para Google"}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-gray-600" htmlFor="pf-seo-desc">
-                  SEO: descripción
+                  Publicar automáticamente
                 </label>
-                <span
-                  className={`text-[10px] ${
-                    seoDescription.length > 160 ? "text-amber-600" : "text-gray-400"
-                  }`}
-                >
-                  {seoDescription.length}/160
-                </span>
+                <input
+                  id="pf-publish-at"
+                  type="datetime-local"
+                  value={publishAt}
+                  onChange={(e) => setPublishAt(e.target.value)}
+                  className={inputCls}
+                />
               </div>
+              <div>
+                <label
+                  className="block text-xs font-semibold text-gray-600 mb-1"
+                  htmlFor="pf-unpublish-at"
+                >
+                  Despublicar automáticamente
+                </label>
+                <input
+                  id="pf-unpublish-at"
+                  type="datetime-local"
+                  value={unpublishAt}
+                  onChange={(e) => setUnpublishAt(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-gray-400 -mt-2">
+              Se aplica en la corrida diaria del cron; publicar/despublicar a mano cancela la
+              programación.
+            </p>
+
+            <div className="flex flex-wrap gap-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isVisible}
+                  onChange={(e) => setIsVisible(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                <span className="text-sm text-gray-700">Publicado en tienda</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showInWhatsapp}
+                  onChange={(e) => setShowInWhatsapp(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                <span className="text-sm text-gray-700">Mostrar en WhatsApp</span>
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1" htmlFor="pf-note">
+                Nota interna (solo visible en el panel)
+              </label>
               <textarea
-                id="pf-seo-desc"
-                value={seoDescription}
-                onChange={(e) => setSeoDescription(e.target.value)}
+                id="pf-note"
+                value={adminNote}
+                onChange={(e) => setAdminNote(e.target.value)}
                 rows={2}
-                placeholder="Descripción para resultados de búsqueda"
+                placeholder="Ej. proveedor, condiciones de compra…"
                 className={`${inputCls} resize-y`}
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label
-                className="block text-xs font-semibold text-gray-600 mb-1"
-                htmlFor="pf-publish-at"
-              >
-                Publicar automáticamente
-              </label>
-              <input
-                id="pf-publish-at"
-                type="datetime-local"
-                value={publishAt}
-                onChange={(e) => setPublishAt(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label
-                className="block text-xs font-semibold text-gray-600 mb-1"
-                htmlFor="pf-unpublish-at"
-              >
-                Despublicar automáticamente
-              </label>
-              <input
-                id="pf-unpublish-at"
-                type="datetime-local"
-                value={unpublishAt}
-                onChange={(e) => setUnpublishAt(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          </div>
-          <p className="text-[11px] text-gray-400 -mt-2">
-            Se aplica en la corrida diaria del cron; publicar/despublicar a mano cancela la
-            programación.
-          </p>
-
-          <div className="flex flex-wrap gap-6">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isVisible}
-                onChange={(e) => setIsVisible(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-              />
-              <span className="text-sm text-gray-700">Publicado en tienda</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showInWhatsapp}
-                onChange={(e) => setShowInWhatsapp(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-              />
-              <span className="text-sm text-gray-700">Mostrar en WhatsApp</span>
-            </label>
+          </fieldset>
           </div>
         </div>
+
+        {confirmingClose && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-amber-200 bg-amber-50 px-5 py-3">
+            <p className="text-xs font-semibold text-amber-800">
+              Hay cambios sin guardar en este producto.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmingClose(false)}
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+              >
+                Seguir editando
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+              >
+                Descartar cambios
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100">
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             disabled={saving}
             className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
           >

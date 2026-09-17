@@ -114,9 +114,9 @@
 - Productos ronda 7 — historial: el PATCH guarda `detail.before/after` con
   solo los campos de `AUDIT_FIELDS`; `audit-diff.ts` es la fuente única de
   las etiquetas y del formateo (los registros viejos traen `updates` plano y
-  caen al fallback). `related_product_ids` aún no está en `AUDIT_FIELDS`, así
-  que sus cambios no generan diff (`cost` sí está, y `low_stock_threshold`
-  se omite del diff mientras 00108 falte).
+  caen al fallback). `related_product_ids` se sumó a `AUDIT_FIELDS` en la
+  ronda 8 (B2): antes sus cambios no generaban diff. `cost` está, y
+  `low_stock_threshold` se omite del diff mientras 00108 falte.
 - Productos ronda 7 — IA: `bulk-seo` SOLO devuelve propuestas (nunca
   escribe); la escritura pasa por el PATCH normal tras la vista previa
   editable. El prompt SEO vive duplicado en `seo-batch.ts` y en
@@ -154,6 +154,88 @@
   La columna "Ventas" (header) y el `<select>` de orden aplican el mismo
   criterio: `GET /api/admin/products/row-meta` excluye cancelados
   (`orders!inner(status)`) para que el número mostrado coincida con el orden.
+- Productos ronda 8 — escritura masiva (B2): `POST /api/admin/products/bulk` es
+  la ÚNICA vía de edición en lote. Ninguna acción debe volver a hacer fan-out de
+  `N × PATCH /update`. Acepta `{ids, patch}` (el mismo parche para todos)
+  **XOR** `{ids, patches: {"<id>": {...}}}` (un valor por producto; un id
+  desconocido o ausente es 400 con el error prefijado `patches[<id>]: `). Los
+  ids se deduplican y hay tope de `MAX_BULK_IDS`; las escrituras van en trozos
+  de `BULK_CHUNK` **agrupadas por `JSON.stringify(patch)`**, así que un lote de
+  500 con el mismo parche es una sola sentencia. Cada `update()` lleva
+  `.select("id")` obligatorio: sin él PostgREST responde 204 aunque el id no
+  exista y el panel reportaría como actualizados productos que nunca tocó. El
+  whitelist de campos vive en `src/lib/product-patch.ts`
+  (`validateProductPatch`, compartido con `/update`) y las reglas puras en
+  `src/lib/product-bulk.ts` — nunca en el `route.ts`, que **solo puede exportar
+  handlers HTTP** (exportar helpers ahí rompe el build de Next). El lote deja
+  **una** entrada de bitácora (`product_bulk_update`) agrupada, no N.
+  Siguen siendo por producto (no migrar a `/bulk`): borrar, duplicar, generar
+  imágenes, `applySeoBatch`, merge, purga de papelera y `bulkSaveImage`, porque
+  cada uno tiene efectos propios por fila.
+- Productos ronda 8 — conteos y disponibilidad (B1): los contadores de los
+  chips (estado, categoría, "sin ciudad", papelera…) se calculan en Postgres con
+  la RPC `admin_product_filter_counts` (00115: 5 índices + `jsonb`), una sola
+  llamada por listado; `list/route.ts` cae al `categoryTally` en JS si la RPC no
+  está (proyecto sin migrar) y **nunca** responde 5xx por eso. Al añadir un
+  filtro con contador hay que tocar la RPC **y** el fallback: son dos caminos,
+  no uno. La lista de ids de "sin ciudad" ya no se trunca.
+  La disponibilidad por ciudad se sirve **por página** con
+  `GET /api/admin/products/city-availability?ids=…` (antes el panel descargaba
+  `product_city_availability` entera): el estado es un
+  `Record<productId, number>` y el modal la pide al abrirse. `PATCH` sobre esa
+  misma ruta sí deja bitácora (`product_city_availability`) — era la única
+  mutación del panel sin auditoría.
+- Productos ronda 8 — orden, deep-links y diálogos (B3): el orden vive en
+  `src/lib/admin-product-sort.ts` (fuente única compartida por el cliente y
+  `list/route.ts`); `aria-sort` va en el `<th>`, **nunca** en el `<button>` de
+  dentro, y el contenedor de tabla/grid lleva `aria-busy` + `opacity-60`
+  mientras refetchea, más una región `role="status"` que anuncia el resultado.
+  Todo filtro viaja en la URL (`brokenImage` incluido) para que un enlace
+  pegado reproduzca la vista; `clearFilters` delega en
+  `clearedProductFilters()` para que añadir un filtro no lo deje fuera. Las
+  confirmaciones destructivas usan el diálogo accesible con foco atrapado:
+  `window.confirm`/`window.prompt` están prohibidos en esta página.
+- Productos ronda 8 — lotes largos (B4): toda acción masiva ofrece deshacer
+  (`setUndoAction`, incluidas WhatsApp, unidad, visibilidad, ofertas, etiquetas,
+  categoría, precio y disponibilidad) y los lotes muestran barra de progreso
+  (`aria-valuenow`/`aria-valuemax`) con **cancelar** y un resumen de fallos
+  parciales. `postBulk`/`bulkPatchEach` nunca lanzan: convierten el error en
+  entradas `failed` por id, para que el panel diga cuántos fallaron en vez de
+  morir a medias.
+- Productos ronda 8 — estructura y pruebas (B5): la página pasa de 6 000 líneas,
+  así que la lógica nueva NO se escribe inline. Estado y reglas puras viven
+  fuera: `src/lib/admin-product-filters.ts`, `-list.ts`, `-selection.ts` y
+  `-bulk-run.ts` (con sus `.test.ts`), más los hooks de cliente
+  `src/app/admin/productos/use-product-selection.ts` y `use-bulk-runner.ts`.
+  Regla: si una función se puede probar sin React ni Supabase, va a
+  `src/lib/`. La cobertura de `/admin/productos` es por capas — unitarias de los
+  módulos puros + `e2e/admin-productos.spec.ts` (guardas de API para anónimos y
+  robustez de deep-links, etiquetadas `@ci`). Queda pendiente (diferido a
+  propósito) extraer `useProductFilters` y separar tabla/modales en archivos
+  propios: el objeto `filters` depende de 18 átomos de estado, así que el
+  corte toca el centro de `page.tsx`; el parseo, la serialización a URL, la
+  query de la API y el conteo de filtros activos ya viven en
+  `src/lib/admin-product-filters.ts`, que es la parte con reglas.
+- Productos ronda 9 — UX del modal de producto (B6-B10): `ProductFormModal` es
+  la superficie con más campos del panel, así que sus invariantes son cuatro.
+  (1) **Índice y secciones**: `FORM_SECTIONS` es la fuente única de las 7
+  secciones y cada `<fieldset>` debe conservar su `id="pf-sec-*"`; el
+  `IntersectionObserver` observa el **cuerpo scrolleable del modal**
+  (`data-pf-scroll`), nunca la ventana, y `goToSection` es el único camino para
+  saltar (respeta `prefers-reduced-motion`). (2) **Diálogo**: `role="dialog"` +
+  `aria-modal` + foco atrapado con Tab/Shift+Tab + `Escape` + bloqueo del
+  `body.overflow` restaurado al desmontar; el foco inicial va al diálogo, no a
+  un input (en móvil desplegaría el teclado). (3) **Nunca se pierde lo
+  escrito**: `dirty` sale de `snapshotKey(FormSnapshot)` contra `baselineRef`
+  (capturado una sola vez) y decide el chip "Cambios sin guardar", el
+  `beforeunload` y la confirmación de descarte; si un campo nuevo debe contar
+  como cambio, va en `FormSnapshot`, y si no debe contar, no entra. (4)
+  **Validación completa**: `handleSubmit` acumula TODOS los errores antes de
+  enviar y enfoca el primero vía `FIELD_INPUT_IDS` (mapa campo → `id`), nunca
+  con `document.querySelector`. Las reglas del cliente deben espejar
+  `create`/`update`: al cambiar una allí, cambiar la otra. El error de campo se
+  pinta con `fieldCls`/`fieldA11y` y se retira con `clearFieldError` en el
+  `onChange` — un error que no se limpia al corregir el campo es un bug.
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
@@ -442,3 +524,22 @@ sección. Probar `GET /api/admin/city-performance?days=999` (debe responder 200
 con la ventana por defecto, nunca 5xx) y las dos rutas sin sesión (deben ser
 denegadas). A 375×812 el ranking pasa a tarjetas sin scroll horizontal y los
 controles mantienen 44px.
+
+Modal de producto (requiere sesión admin): abrir "Nuevo producto" y comprobar
+que el foco entra en el diálogo (en móvil NO se abre el teclado) y que el índice
+de secciones aparece — chips en una sola fila a 375×812, rail fijo a la izquierda
+en 1280. Bajar dentro del modal: la sección activa del índice debe cambiar sola y
+marcarse con `aria-current`; pulsar "Precios" debe llevar a esa sección respetando
+`prefers-reduced-motion` (con la preferencia activa, sin animación). Enviar el
+formulario vacío: deben salir **todos** los errores a la vez (no solo el primero),
+el resumen "Revisa los campos marcados en rojo" arriba y el foco en el campo
+nombre; corregir un campo debe quitar su error al escribir (y el resumen cuando
+no quede ninguno). Probar un precio `-1`, un costo `abc`, una cantidad `2.5` y una
+oferta que empiece después de terminar: cada uno marca su campo, y en la ventana
+de oferta los dos `datetime-local` quedan en rojo con el mismo mensaje. Escribir
+algo y pulsar Escape (o el velo, o la X): debe aparecer la confirmación de
+descarte; `Escape` otra vez la cierra sin cerrar el modal, y con la pestaña sucia
+el navegador debe pedir confirmación al recargar. Con Tab desde el último control
+el foco debe volver al primero, y el listado de atrás no debe scrollear mientras
+el modal está abierto. Repetir en "Editar" sobre un producto con SKU: guardar sin
+tocar nada no debe marcar "Cambios sin guardar".
