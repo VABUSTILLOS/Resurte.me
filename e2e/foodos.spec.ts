@@ -145,38 +145,35 @@ test.describe("micrositio /r/[slug]", { tag: "@ci" }, () => {
   // WhatsApp y un soft-404 (200 con la vista de 404) indexaba enlaces rotos
   // como páginas válidas. Por eso se verifica el status, no solo la vista.
   //
-  // Los asertos del servidor se hacen sobre el CUERPO de la respuesta, no sobre
-  // el DOM: medido, la cáscara inicial (id="__next_error__") llega con el cuerpo
-  // VACÍO —h1s=[], innerText.length=0— y todo el boundary viaja en el payload de
-  // flight, así que getByText/getByRole son post-hidratación. El copy del
-  // not-found SÍ está en la respuesta y discrimina: "El restaurante que buscas
-  // no existe" aparece 1 vez en /r/* y 0 en el boundary raíz.
+  // Los asertos se hacen sobre el CUERPO de la respuesta, no sobre el DOM.
+  // Medido: la cáscara inicial (id="__next_error__") llega con el cuerpo VACÍO
+  // —h1s=[], innerText.length=0— y el boundary viaja en el payload de flight,
+  // así que getByRole/getByText son post-hidratación. Y esa hidratación no tiene
+  // cota en dev: el h1 "404" tarda ~2.1s en caliente y >30s con 5 workers en
+  // paralelo. Un aserto de visibilidad aquí medía la hidratación del servidor de
+  // desarrollo, no el 404 — por eso ya no se hace, en vez de subirle el timeout.
+  //
+  // Lo que sí es estable y discrimina: "El restaurante que buscas no existe"
+  // aparece 1 vez en /r/** y 0 veces en el boundary raíz, así que prueba que
+  // respondió ESTE boundary y no el genérico. Eso además implica que la vista
+  // del restaurante no se renderizó: son ramas mutuamente excluyentes.
   test("un slug inexistente responde 404 y no renderiza un restaurante", async ({ page }) => {
     const response = await page.goto("/r/no-existe-este-restaurante", { waitUntil: "domcontentloaded" })
 
     expect(response?.status()).toBe(404)
     const body = (await response?.text()) ?? ""
-    // Boundary del micrositio, no el raíz.
     expect(body).toContain("El restaurante que buscas no existe")
-
-    // Único aserto post-hidratación, y por eso el único con presupuesto: el h1
-    // "404" aparece a ~2.1s en caliente y a 24.4s bajo carga paralela, así que
-    // el default de 5s medía la hidratación y no el 404. Una vez hidratado, el
-    // resto resuelve al instante y no necesita margen propio.
-    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible({ timeout: 30000 })
-    await expect(page.getByText("Página no encontrada")).toBeVisible()
-    await expect(page.getByRole("link", { name: /Agregar/i })).toHaveCount(0)
+    expect(body).toContain("Página no encontrada")
   })
 
   test("la carta de un slug inexistente responde 404", async ({ page }) => {
-    const response = await page.goto("/r/no-existe-este-restaurante/carta", { waitUntil: "domcontentloaded" })
+    const response = await page.goto("/r/no-existe-este-restaurante/carta", {
+      waitUntil: "domcontentloaded",
+    })
 
     expect(response?.status()).toBe(404)
     const body = (await response?.text()) ?? ""
     expect(body).toContain("El restaurante que buscas no existe")
-
-    // Mismo margen que el test anterior: el boundary se hidrata, no viene en la cáscara.
-    await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible({ timeout: 30000 })
-    await expect(page.getByText("Página no encontrada")).toBeVisible()
+    expect(body).toContain("Página no encontrada")
   })
 })

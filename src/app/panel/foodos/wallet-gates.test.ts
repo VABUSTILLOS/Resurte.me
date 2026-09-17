@@ -6,10 +6,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   requireFoodosFeature: vi.fn(),
   requireAuth: vi.fn(),
+  requireFoodosAuth: vi.fn(),
+  getOperatingContext: vi.fn(),
   createServiceClient: vi.fn(),
 }))
 
 vi.mock("@/lib/auth", () => ({ requireAuth: mocks.requireAuth, getCurrentUser: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({
+  requireFoodosAuth: mocks.requireFoodosAuth,
+  getOperatingContext: mocks.getOperatingContext,
+}))
 vi.mock("@/lib/foodos-tier", () => ({
   requireFoodosFeature: mocks.requireFoodosFeature,
 }))
@@ -35,6 +41,24 @@ const RESTAURANT_ID = "rest-1"
 const CUSTOMER_ID = "cust-1"
 const PASS_ID = "pass-1"
 const USER = { id: "user-1", email: "dueno@example.com" }
+
+/**
+ * Respuesta del seam de operación para el caso normal (sin impersonación):
+ * `supabase` es el cliente de sesión que cada test fabrica, así que el
+ * camino que ejecuta la acción es exactamente el de siempre.
+ */
+function operating(supabase: unknown) {
+  const ctx = {
+    restaurantId: RESTAURANT_ID,
+    ownerUserId: USER.id,
+    client: supabase,
+    impersonating: false,
+    actorUserId: USER.id,
+    actorEmail: USER.email ?? null,
+  }
+  mocks.getOperatingContext.mockResolvedValue(ctx as never)
+  return { supabase, user: USER, ownerUserId: USER.id, ctx } as never
+}
 
 /**
  * Fila que satisface a la vez `loadRestaurant`, `assertOwnRestaurant` y
@@ -92,7 +116,7 @@ function client(ownRestaurant = true) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requireAuth.mockResolvedValue({ supabase: client(), user: USER })
+  mocks.requireFoodosAuth.mockResolvedValue(operating(client()))
   mocks.createServiceClient.mockResolvedValue(client())
 })
 
@@ -125,7 +149,7 @@ describe("wallet: bloqueada sin nivel Diamante", () => {
     ).rejects.toThrow()
 
     // Ni siquiera se resuelve la sesión: el gate corre primero.
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
     expect(mocks.requireFoodosFeature).toHaveBeenCalledWith("wallet_passes")
   })
 
@@ -139,7 +163,7 @@ describe("wallet: bloqueada sin nivel Diamante", () => {
       valueOutstanding: 0,
     })
     await expect(getWalletSettings(RESTAURANT_ID)).resolves.toBeNull()
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
   })
 })
 
@@ -155,7 +179,7 @@ describe("wallet: con nivel suficiente", () => {
       wallet_enabled: true,
     })
     expect(mocks.requireFoodosFeature).toHaveBeenCalledWith("wallet_passes")
-    expect(mocks.requireAuth).toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).toHaveBeenCalled()
   })
 
   it("las escrituras proceden", async () => {
@@ -190,7 +214,7 @@ describe("wallet: con nivel suficiente", () => {
   })
 
   it("rechaza escribir en un restaurante ajeno", async () => {
-    mocks.requireAuth.mockResolvedValue({ supabase: client(false), user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(client(false)))
     await expect(
       upsertWalletSettings({ restaurant_id: RESTAURANT_ID, wallet_enabled: true })
     ).rejects.toThrow("Restaurante no encontrado")

@@ -12,9 +12,9 @@
 //      ventas del turno y sus movimientos. El cajero solo declara lo que contó.
 // ============================================================
 
-import { requireAuth } from "@/lib/auth"
 import { requireFoodosFeature } from "@/lib/foodos-tier"
 import { assertOwnRestaurant } from "@/lib/foodos-owner"
+import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { logger } from "@/lib/logger"
 import {
   cashSalesFromOrders,
@@ -78,7 +78,7 @@ function emptySales(): CajaSales {
 
 /** Nombres del personal para el historial. RLS de `profiles` es dueño-only. */
 async function resolveStaffNames(
-  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  supabase: Awaited<ReturnType<typeof requireFoodosAuth>>["supabase"],
   ids: (string | null)[]
 ): Promise<Map<string, string>> {
   const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))]
@@ -111,7 +111,7 @@ function withNames(shift: ShiftRow, names: Map<string, string>): CajaShift {
 }
 
 async function loadSales(
-  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  supabase: Awaited<ReturnType<typeof requireFoodosAuth>>["supabase"],
   shiftId: string
 ): Promise<CajaSales> {
   const { data, error } = await supabase
@@ -135,7 +135,7 @@ async function loadSales(
 }
 
 async function loadMovements(
-  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  supabase: Awaited<ReturnType<typeof requireFoodosAuth>>["supabase"],
   shiftId: string
 ): Promise<CajaMovement[]> {
   const { data, error } = await supabase
@@ -172,7 +172,7 @@ export async function getCajaData(
   branchId?: string | null
 ): Promise<CajaData | null> {
   if (!(await canUseCaja())) return null
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
 
   const shift = await findOpenShift(supabase, restaurantId, branchId)
 
@@ -236,8 +236,8 @@ export async function openShiftAction(input: {
   opening_float: number
 }): Promise<ShiftActionResult> {
   await requireFoodosFeature(CAJA_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, user, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const openingFloat = Number(input.opening_float)
   if (!Number.isFinite(openingFloat) || openingFloat < 0) {
@@ -278,7 +278,7 @@ export async function addShiftMovementAction(input: {
   reason?: string
 }): Promise<ShiftActionResult> {
   await requireFoodosFeature(CAJA_FEATURE)
-  const { supabase, user } = await requireAuth()
+  const { supabase, user, ownerUserId } = await requireFoodosAuth()
 
   const { data: shift, error: shiftError } = await supabase
     .from("foodos_pos_shifts")
@@ -291,7 +291,7 @@ export async function addShiftMovementAction(input: {
   if (!row) return { ok: false, error: "Turno no encontrado." }
   if (row.status !== "open") return { ok: false, error: "El turno ya está cerrado." }
 
-  await assertOwnRestaurant(supabase, user.id, row.restaurant_id)
+  await assertOwnRestaurant(supabase, ownerUserId, row.restaurant_id)
 
   const amount = Number(input.amount)
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -306,6 +306,8 @@ export async function addShiftMovementAction(input: {
     type: input.type,
     amount: Math.round(amount * 100) / 100,
     reason: input.reason?.trim() || null,
+    // Atribución de quién movió el cajón, no propiedad: el RLS de esta tabla
+    // va por `shift_id` → `foodos_restaurants.user_id`. Ver foodos-operating.
     user_id: user.id,
   })
 
@@ -329,7 +331,7 @@ export async function closeShiftAction(input: {
   notes?: string
 }): Promise<ShiftActionResult & { difference?: number }> {
   await requireFoodosFeature(CAJA_FEATURE)
-  const { supabase, user } = await requireAuth()
+  const { supabase, user, ownerUserId } = await requireFoodosAuth()
 
   const { data: shift, error: shiftError } = await supabase
     .from("foodos_pos_shifts")
@@ -342,7 +344,7 @@ export async function closeShiftAction(input: {
   if (!row) return { ok: false, error: "Turno no encontrado." }
   if (row.status !== "open") return { ok: false, error: "El turno ya está cerrado." }
 
-  await assertOwnRestaurant(supabase, user.id, row.restaurant_id)
+  await assertOwnRestaurant(supabase, ownerUserId, row.restaurant_id)
 
   const [movements, sales] = await Promise.all([
     loadMovements(supabase, row.id),

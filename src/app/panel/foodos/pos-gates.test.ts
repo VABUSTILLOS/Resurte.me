@@ -11,11 +11,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   requireFoodosFeature: vi.fn(),
   requireAuth: vi.fn(),
+  requireFoodosAuth: vi.fn(),
+  getOperatingContext: vi.fn(),
   revalidatePath: vi.fn(),
   revalidateTag: vi.fn(),
 }))
 
 vi.mock("@/lib/auth", () => ({ requireAuth: mocks.requireAuth, getCurrentUser: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({
+  requireFoodosAuth: mocks.requireFoodosAuth,
+  getOperatingContext: mocks.getOperatingContext,
+}))
 vi.mock("@/lib/foodos-tier", () => ({ requireFoodosFeature: mocks.requireFoodosFeature }))
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
@@ -38,6 +44,24 @@ import {
 
 const RESTAURANT_ID = "rest-1"
 const USER = { id: "user-1", email: "dueno@example.com" }
+
+/**
+ * Respuesta del seam de operación para el caso normal (sin impersonación):
+ * `supabase` es el cliente de sesión que cada test fabrica, así que el
+ * camino que ejecuta la acción es exactamente el de siempre.
+ */
+function operating(supabase: unknown) {
+  const ctx = {
+    restaurantId: RESTAURANT_ID,
+    ownerUserId: USER.id,
+    client: supabase,
+    impersonating: false,
+    actorUserId: USER.id,
+    actorEmail: USER.email ?? null,
+  }
+  mocks.getOperatingContext.mockResolvedValue(ctx as never)
+  return { supabase, user: USER, ownerUserId: USER.id, ctx } as never
+}
 
 const RESTAURANT_ROW = {
   id: RESTAURANT_ID,
@@ -116,7 +140,7 @@ function writes(calls: Call[], table: string, method: string): unknown[] {
 beforeEach(() => {
   vi.clearAllMocks()
   const { supabase } = defaultClient()
-  mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+  mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 })
 
 describe("punto de venta: bloqueado sin nivel Diamante", () => {
@@ -146,7 +170,7 @@ describe("punto de venta: bloqueado sin nivel Diamante", () => {
     ).rejects.toThrow()
 
     // Ni siquiera se resuelve la sesión: el gate corre primero.
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
     expect(mocks.requireFoodosFeature).toHaveBeenCalledWith("pos_integraciones")
     expect(mocks.revalidatePath).not.toHaveBeenCalled()
   })
@@ -213,7 +237,7 @@ describe("punto de venta: desbloqueado", () => {
 
   it("una conexión incompleta nunca queda 'connected'", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await savePosConnectionAction({
       restaurant_id: RESTAURANT_ID,
@@ -233,7 +257,7 @@ describe("punto de venta: desbloqueado", () => {
 
   it("con todas las credenciales guarda la conexión y revalida el panel", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       savePosConnectionAction({
@@ -270,7 +294,7 @@ describe("punto de venta: desbloqueado", () => {
       },
       foodos_pos_sync_log: { rows: [] },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await testPosConnectionAction({
       restaurant_id: RESTAURANT_ID,
@@ -302,7 +326,7 @@ describe("punto de venta: desbloqueado", () => {
 
   it("sincronizar el menú no finge: reporta lo que falta y no toca los platillos", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await runPosMenuSyncAction({
       restaurant_id: RESTAURANT_ID,
@@ -327,7 +351,7 @@ describe("punto de venta: desbloqueado", () => {
 
   it("rota el secreto del webhook solo en proveedores que lo emiten", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const rotated = await rotatePosWebhookSecretAction({
       restaurant_id: RESTAURANT_ID,
@@ -348,7 +372,7 @@ describe("punto de venta: desbloqueado", () => {
 
   it("desconectar conserva la fila y revalida", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       disconnectPosConnectionAction({ restaurant_id: RESTAURANT_ID, provider: "toast" })
@@ -365,7 +389,7 @@ describe("punto de venta: desbloqueado", () => {
     const { supabase } = fakeClient({
       foodos_restaurants: { maybeSingle: { data: null, error: null } },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       savePosConnectionAction({

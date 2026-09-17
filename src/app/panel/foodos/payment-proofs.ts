@@ -8,12 +8,17 @@
 // trabajo distinta (conciliación de pagos) y así el archivo
 // principal no crece más.
 //
-// Todas usan requireAuth() y operan con el cliente de sesión, de
-// modo que RLS es la última línea de defensa: sólo el dueño del
-// restaurante puede leer y decidir sobre sus comprobantes.
+// Todas resuelven la sesión con requireFoodosAuth() y operan con el
+// cliente que ese seam devuelve: el de sesión normalmente (RLS como
+// última línea de defensa) y el de service role mientras un admin opera
+// como el restaurante. En ese segundo caso RLS ya no filtra nada, así que
+// las acciones que reciben un id suelto acotan además por el restaurante
+// operado. El acotado es sólo para ese modo: sin impersonación RLS sigue
+// siendo la barrera y acotar por el primer restaurante del dueño
+// rompería a quien tiene más de uno.
 // ============================================================
 
-import { requireAuth } from "@/lib/auth"
+import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { createServiceClient } from "@/lib/supabase/service"
 import { notifyFoodosCustomer } from "@/lib/foodos-notifications"
 import { revalidatePath } from "next/cache"
@@ -41,9 +46,9 @@ export interface PaymentProofWithOrder extends FoodosOrderPayment {
 export async function listPendingPaymentProofs(
   restaurantId: string
 ): Promise<PaymentProofWithOrder[]> {
-  const { supabase } = await requireAuth()
+  const { ctx } = await requireFoodosAuth()
 
-  const { data: proofs, error } = await supabase
+  const { data: proofs, error } = await ctx.client
     .from("foodos_order_payments")
     .select("*")
     .eq("restaurant_id", restaurantId)
@@ -59,7 +64,7 @@ export async function listPendingPaymentProofs(
   // embed: así el tipo es explícito y no depende de la forma que
   // PostgREST devuelva para la relación.
   const orderIds = [...new Set(rows.map((p) => p.order_id))]
-  const { data: orders, error: ordersError } = await supabase
+  const { data: orders, error: ordersError } = await ctx.client
     .from("foodos_orders")
     .select("id, customer_name, customer_phone, total, payment_status, created_at")
     .in("id", orderIds)
@@ -85,8 +90,8 @@ export async function listPendingPaymentProofs(
 
 /** Cuántos comprobantes esperan revisión (badge del panel). */
 export async function countPendingPaymentProofs(restaurantId: string): Promise<number> {
-  const { supabase } = await requireAuth()
-  const { count, error } = await supabase
+  const { ctx } = await requireFoodosAuth()
+  const { count, error } = await ctx.client
     .from("foodos_order_payments")
     .select("id", { count: "exact", head: true })
     .eq("restaurant_id", restaurantId)
@@ -98,17 +103,18 @@ export async function countPendingPaymentProofs(restaurantId: string): Promise<n
 /**
  * URL firmada (1 h) para ver el comprobante. El bucket es privado y no
  * tiene políticas de lectura, así que la firma se genera con la
- * service key — pero sólo después de que el cliente de sesión haya
- * podido leer la fila, lo que prueba que el solicitante es el dueño.
+ * service key — pero sólo después de que el seam haya autorizado la
+ * operación y la lectura se haya acotado al restaurante operado.
  */
 export async function getPaymentProofUrl(proofId: number): Promise<string | null> {
-  const { supabase } = await requireAuth()
+  const { ctx } = await requireFoodosAuth()
+  const scope = ctx.impersonating ? ctx.restaurantId : null
 
-  const { data: proof, error } = await supabase
+  const base = ctx.client
     .from("foodos_order_payments")
     .select("proof_path")
     .eq("id", proofId)
-    .maybeSingle()
+  const { data: proof, error } = await (scope ? base.eq("restaurant_id", scope) : base).maybeSingle()
 
   if (error) throw new Error(error.message)
   if (!proof?.proof_path) return null
@@ -131,19 +137,23 @@ export async function getPaymentProofUrl(proofId: number): Promise<string | null
  * ningún paso extra.
  */
 export async function approvePaymentProof(proofId: number): Promise<void> {
-  const { supabase, user } = await requireAuth()
+  const { user, ctx } = await requireFoodosAuth()
+  const scope = ctx.impersonating ? ctx.restaurantId : null
 
-  const { data: proof, error: readError } = await supabase
+  const base = ctx.client
     .from("foodos_order_payments")
     .select("id, order_id, status")
     .eq("id", proofId)
-    .maybeSingle()
+  const { data: proof, error: readError } = await (scope
+    ? base.eq("restaurant_id", scope)
+    : base
+  ).maybeSingle()
 
   if (readError) throw new Error(readError.message)
   if (!proof) throw new Error("Comprobante no encontrado")
   if (proof.status !== "pending") throw new Error("Este comprobante ya fue revisado")
 
-  const { error } = await supabase
+  const { error } = await ctx.client
     .from("foodos_order_payments")
     .update({
       status: "approved",
@@ -154,7 +164,7 @@ export async function approvePaymentProof(proofId: number): Promise<void> {
 
   if (error) throw new Error(error.message)
 
-  const { error: orderError } = await supabase
+  const { error: orderError } = await ctx.client
     .from("foodos_orders")
     .update({ payment_status: "paid" })
     .eq("id", proof.order_id)
@@ -175,13 +185,17 @@ export async function approvePaymentProof(proofId: number): Promise<void> {
  * sólo bloquea mientras haya uno pendiente).
  */
 export async function rejectPaymentProof(proofId: number, notes: string): Promise<void> {
-  const { supabase, user } = await requireAuth()
+  const { user, ctx } = await requireFoodosAuth()
+  const scope = ctx.impersonating ? ctx.restaurantId : null
 
-  const { data: proof, error: readError } = await supabase
+  const base = ctx.client
     .from("foodos_order_payments")
     .select("id, status, order_id")
     .eq("id", proofId)
-    .maybeSingle()
+  const { data: proof, error: readError } = await (scope
+    ? base.eq("restaurant_id", scope)
+    : base
+  ).maybeSingle()
 
   if (readError) throw new Error(readError.message)
   if (!proof) throw new Error("Comprobante no encontrado")
@@ -189,7 +203,7 @@ export async function rejectPaymentProof(proofId: number, notes: string): Promis
 
   const reason = notes.trim().slice(0, 500)
 
-  const { error } = await supabase
+  const { error } = await ctx.client
     .from("foodos_order_payments")
     .update({
       status: "rejected",

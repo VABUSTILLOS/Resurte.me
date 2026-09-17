@@ -12,11 +12,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   requireFoodosFeature: vi.fn(),
   requireAuth: vi.fn(),
+  requireFoodosAuth: vi.fn(),
+  getOperatingContext: vi.fn(),
   revalidatePath: vi.fn(),
   revalidateTag: vi.fn(),
 }))
 
 vi.mock("@/lib/auth", () => ({ requireAuth: mocks.requireAuth, getCurrentUser: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({
+  requireFoodosAuth: mocks.requireFoodosAuth,
+  getOperatingContext: mocks.getOperatingContext,
+}))
 vi.mock("@/lib/foodos-tier", () => ({ requireFoodosFeature: mocks.requireFoodosFeature }))
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
@@ -40,6 +46,24 @@ const RESTAURANT_ID = "rest-1"
 const PACKAGE_ID = "pkg-1"
 const REQUEST_ID = "req-1"
 const USER = { id: "user-1", email: "dueno@example.com" }
+
+/**
+ * Respuesta del seam de operación para el caso normal (sin impersonación):
+ * `supabase` es el cliente de sesión que cada test fabrica, así que el
+ * camino que ejecuta la acción es exactamente el de siempre.
+ */
+function operating(supabase: unknown) {
+  const ctx = {
+    restaurantId: RESTAURANT_ID,
+    ownerUserId: USER.id,
+    client: supabase,
+    impersonating: false,
+    actorUserId: USER.id,
+    actorEmail: USER.email ?? null,
+  }
+  mocks.getOperatingContext.mockResolvedValue(ctx as never)
+  return { supabase, user: USER, ownerUserId: USER.id, ctx } as never
+}
 
 const RESTAURANT_ROW = {
   id: RESTAURANT_ID,
@@ -146,7 +170,7 @@ function writes(calls: Call[], table: string, method: string): unknown[] {
 beforeEach(() => {
   vi.clearAllMocks()
   const { supabase } = defaultClient()
-  mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+  mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 })
 
 describe("catering: bloqueado sin nivel Diamante", () => {
@@ -182,7 +206,7 @@ describe("catering: bloqueado sin nivel Diamante", () => {
     ).rejects.toThrow()
 
     // Ni siquiera se resuelve la sesión: el gate corre primero.
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
     expect(mocks.requireFoodosFeature).toHaveBeenCalledWith("catering")
     expect(mocks.revalidatePath).not.toHaveBeenCalled()
   })
@@ -235,7 +259,7 @@ describe("catering: desbloqueado", () => {
 
   it("crear un paquete revalida el panel y la página pública", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await saveCateringPackageAction({
       restaurant_id: RESTAURANT_ID,
@@ -260,7 +284,7 @@ describe("catering: desbloqueado", () => {
 
   it("editar un paquete actualiza en vez de crear", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await saveCateringPackageAction({
       restaurant_id: RESTAURANT_ID,
@@ -288,7 +312,7 @@ describe("catering: desbloqueado", () => {
 
   it("confirmar una solicitud cotizada la mueve de estado", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       setCateringRequestStatusAction({
@@ -318,7 +342,7 @@ describe("catering: desbloqueado", () => {
       foodos_restaurants: { maybeSingle: { data: RESTAURANT_ROW, error: null } },
       foodos_catering_requests: { maybeSingle: { data: null, error: null } },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
     await expect(
       setCateringRequestStatusAction({
         restaurant_id: RESTAURANT_ID,
@@ -335,7 +359,7 @@ describe("catering: desbloqueado", () => {
         maybeSingle: { data: { ...REQUEST_ROW, status: "confirmed" }, error: null },
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const declined = await setCateringRequestStatusAction({
       restaurant_id: RESTAURANT_ID,
@@ -367,7 +391,7 @@ describe("catering: desbloqueado", () => {
 
   it("el ajuste manual redondea a centavos y revalida", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       overrideCateringTotalAction({
@@ -386,7 +410,7 @@ describe("catering: desbloqueado", () => {
 
   it("una solicitud de catering nunca escribe un pedido", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await setCateringRequestStatusAction({
       restaurant_id: RESTAURANT_ID,
@@ -407,7 +431,7 @@ describe("catering: desbloqueado", () => {
     const { supabase } = fakeClient({
       foodos_restaurants: { maybeSingle: { data: null, error: null } },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       saveCateringPackageAction({

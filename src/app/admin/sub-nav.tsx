@@ -55,6 +55,10 @@ const ADMIN_NAV_GROUPS = [
       { href: "/admin/usuarios", label: "Usuarios", exact: false },
       { href: "/admin/recompensas", label: "Recompensas", exact: false },
       { href: "/admin/restaurantes", label: "Restaurantes", exact: false },
+      // P14: puerta de entrada a la sesión de soporte. Va junto a Restaurantes
+      // porque es la misma audiencia, pero es una acción sobre el restaurante,
+      // no un listado más.
+      { href: "/admin/operar", label: "Operar como", exact: true },
     ],
   },
   {

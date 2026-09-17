@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/auth", () => ({ requireAuth: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({ requireFoodosAuth: vi.fn() }))
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
@@ -18,16 +19,17 @@ import {
   listPendingPaymentProofs,
   rejectPaymentProof,
 } from "./payment-proofs"
-import { requireAuth } from "@/lib/auth"
+import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { createServiceClient } from "@/lib/supabase/service"
 import { notifyFoodosCustomer } from "@/lib/foodos-notifications"
 import { revalidatePath } from "next/cache"
 
 const USER = { id: "user-1" }
+const RESTAURANT_ID = "rest-1"
 const PROOF = {
   id: 9,
   order_id: "ord-1",
-  restaurant_id: "rest-1",
+  restaurant_id: RESTAURANT_ID,
   method: "transfer",
   amount: "250.00",
   proof_path: "rest-1/ord-1/comprobante.png",
@@ -87,7 +89,19 @@ function setup(config: { tables: Record<string, Result>; signError?: unknown } =
     .mockResolvedValue({ data: { signedUrl: "https://signed/x" }, error: config.signError ?? null })
   const storage = { from: vi.fn(() => ({ createSignedUrl })) }
   const session = { from, storage }
-  vi.mocked(requireAuth).mockResolvedValue({ supabase: session, user: USER } as never)
+  vi.mocked(requireFoodosAuth).mockResolvedValue({
+    supabase: session,
+    user: USER,
+    ownerUserId: USER.id,
+    ctx: {
+      restaurantId: RESTAURANT_ID,
+      ownerUserId: USER.id,
+      client: session,
+      impersonating: false,
+      actorUserId: USER.id,
+      actorEmail: null,
+    },
+  } as never)
   vi.mocked(createServiceClient).mockResolvedValue({ storage } as never)
   return { builders, createSignedUrl, storage }
 }

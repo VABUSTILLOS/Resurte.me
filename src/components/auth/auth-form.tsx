@@ -160,8 +160,14 @@ export function AuthForm({ mode }: AuthFormProps) {
     setLoading(true)
 
     try {
+      // El destino viaja en cookie, no en la query: Supabase valida `redirectTo`
+      // contra la allow-list de "Redirect URLs" y una entrada exacta
+      // (`/auth/callback`) no coincide con `/auth/callback?next=…`, así que el
+      // proveedor caería al Site URL y el enlace llevaría a `/` en vez de a
+      // `/auth/reset` — la recuperación se rompería en producción sin avisar.
+      rememberNextPath("/auth/reset")
       const { error } = await supabase.auth.resetPasswordForEmail(target, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       })
       if (error) throw error
       setSuccessMessage(

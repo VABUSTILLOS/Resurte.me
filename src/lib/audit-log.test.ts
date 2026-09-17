@@ -22,6 +22,16 @@ describe("isAuditAction", () => {
       expect(AUDIT_ACTION_LABEL[a]).toBeTruthy()
     }
   })
+
+  it("incluye las acciones de la sesión de soporte (P14)", () => {
+    for (const a of [
+      "foodos_operating_start",
+      "foodos_operating_stop",
+      "foodos_operating_action",
+    ]) {
+      expect(AUDIT_ACTIONS).toContain(a)
+    }
+  })
 })
 
 describe("normalizeAuditFilters", () => {

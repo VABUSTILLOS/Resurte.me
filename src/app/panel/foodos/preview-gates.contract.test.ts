@@ -114,6 +114,18 @@ describe("contrato de vista previa de herramientas premium", () => {
     expect(tier).toContain("isCurrentUserAdmin")
     const gate = tier.slice(tier.indexOf("export async function requireFoodosFeature"))
     expect(gate).toMatch(/isCurrentUserAdmin\(\)/)
+    // P14: la exención no aplica mientras un admin impersona un restaurante.
+    // Ahí el nivel que decide es el real del restaurante visitado, para que el
+    // modo soporte muestre exactamente lo que ve el dueño.
+    expect(gate).toMatch(/!impersonating && \(await isCurrentUserAdmin\(\)\)/)
+  })
+
+  it("el nivel del panel sale del restaurante operado, no de una lectura propia", () => {
+    const tier = readFileSync(join(REPO, "src", "lib", "foodos-tier.ts"), "utf8")
+    // El restaurante lo resuelve el seam de P14: mientras un admin impersona,
+    // `getMyEntitlements` tiene que reportar el nivel del restaurante visitado.
+    expect(tier).toContain("getOperatingContext")
+    expect(tier).toMatch(/getRestaurantEntitlements\(ctx\.restaurantId\)/)
   })
 
   it("el admin también queda exento en el cliente", () => {

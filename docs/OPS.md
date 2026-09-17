@@ -293,22 +293,32 @@ El servicio de correo por defecto de Supabase Auth es **solo para desarrollo** (
 4. En **Authentication → URL Configuration**, asegurar que **Redirect URLs** incluya:
    - `https://<dominio-prod>/auth/callback`
    - `http://localhost:3000/auth/callback` (desarrollo)
+
+   **No agregues `?next=…` a estas entradas ni al `redirectTo` del código.**
+   Supabase valida la URL de redirección **completa** contra la allow-list
+   (los comodines `*`/`**` existen, pero el matching es sobre la cadena
+   entera), así que una entrada exacta de `/auth/callback` **no** coincide con
+   `/auth/callback?next=/auth/reset`: el proveedor cae al **Site URL** y el
+   enlace lleva al usuario a `/` en vez de a su destino, sin ningún error
+   visible. Por eso el destino viaja en la cookie `resurte_auth_next`
+   (`src/lib/auth-next.ts`, `rememberNextPath` / `readNextPath`) y el
+   `redirectTo` se queda limpio. Corolario: revisa también el **Site URL**
+   (paso 1 de esta lista es el SMTP, pero el Site URL vive en la misma página),
+   porque es el destino al que se cae cuando la allow-list no coincide.
 5. Probar: registrar un usuario de prueba en `/auth/register` y confirmar que llega el correo.
 
-Flujos que dependen de este SMTP: **solo la confirmación de registro** está
-implementada hoy. Los otros dos están **diseñados pero no construidos**:
+Flujos que dependen de este SMTP: **la confirmación de registro y la
+recuperación de contraseña** están implementadas y consumen el SMTP:
 
-- **Recuperación de contraseña**: la mitad receptora existe y funciona
-  (`/auth/reset` cambia la contraseña con `updateUser`, y `/auth/callback`
-  intercambia el código por la sesión temporal), pero **no tiene entrada** —
-  `resetPasswordForEmail` aparece **únicamente en un comentario**
-  (`src/app/auth/reset/page.tsx:14`) y **ningún control de la UI enlaza a esa
-  ruta**.
-- **Enlace mágico**: `signInWithOtp` **no existe en `src/`**.
+- **Confirmación de registro**: `/auth/register` → correo → `/auth/callback`.
+- **Recuperación de contraseña**: el disparador "¿Olvidaste tu contraseña?" en
+  `/auth/login` llama a `resetPasswordForEmail`; el enlace vuelve por
+  `/auth/callback` (que lee la cookie de destino) y termina en `/auth/reset`,
+  donde `updateUser({ password })` fija la contraseña nueva.
 
-No configures el SMTP esperando que estos flujos funcionen: hoy el único
-consumidor es la confirmación de registro. Detalle, consecuencias y boceto de
-implementación: `docs/PLAN-MEJORAS.md` § 6 (U14).
+El **enlace mágico** (`signInWithOtp`) **no existe en `src/`**: sigue sin
+construir, así que no lo configures esperando que funcione. Detalle de los dos
+flujos vivos: `docs/PLAN-MEJORAS.md` § 6 (U14).
 
 ### 8.2 Roles del sitio y master admin
 

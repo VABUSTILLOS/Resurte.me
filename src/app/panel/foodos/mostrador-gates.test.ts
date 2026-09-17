@@ -17,6 +17,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   requireFoodosFeature: vi.fn(),
   requireAuth: vi.fn(),
+  requireFoodosAuth: vi.fn(),
+  getOperatingContext: vi.fn(),
   assertOwnRestaurant: vi.fn(),
   createFoodosOrder: vi.fn(),
   quoteDelivery: vi.fn(),
@@ -26,6 +28,10 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/auth", () => ({ requireAuth: mocks.requireAuth, getCurrentUser: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({
+  requireFoodosAuth: mocks.requireFoodosAuth,
+  getOperatingContext: mocks.getOperatingContext,
+}))
 vi.mock("@/lib/foodos-tier", () => ({ requireFoodosFeature: mocks.requireFoodosFeature }))
 vi.mock("@/lib/foodos-owner", () => ({ assertOwnRestaurant: mocks.assertOwnRestaurant }))
 vi.mock("@/lib/foodos-order-create", () => ({ createFoodosOrder: mocks.createFoodosOrder }))
@@ -51,6 +57,24 @@ const RESTAURANT_ID = "rest-1"
 const BRANCH_ID = "branch-1"
 const SHIFT_ID = "shift-1"
 const USER = { id: "user-1", email: "cajero@example.com" }
+
+/**
+ * Respuesta del seam de operación para el caso normal (sin impersonación):
+ * `supabase` es el cliente de sesión que cada test fabrica, así que el
+ * camino que ejecuta la acción es exactamente el de siempre.
+ */
+function operating(supabase: unknown) {
+  const ctx = {
+    restaurantId: RESTAURANT_ID,
+    ownerUserId: USER.id,
+    client: supabase,
+    impersonating: false,
+    actorUserId: USER.id,
+    actorEmail: USER.email ?? null,
+  }
+  mocks.getOperatingContext.mockResolvedValue(ctx as never)
+  return { supabase, user: USER, ownerUserId: USER.id, ctx } as never
+}
 const RESTAURANT_ROW = {
   id: RESTAURANT_ID,
   name: "Taquería Centro",
@@ -130,7 +154,7 @@ function folioCalls(calls: Call[]): Call[] {
 beforeEach(() => {
   vi.clearAllMocks()
   const { supabase } = defaultClient()
-  mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+  mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
   mocks.assertOwnRestaurant.mockResolvedValue(undefined)
   mocks.requireOpenShift.mockResolvedValue(OPEN_SHIFT)
   mocks.createFoodosOrder.mockResolvedValue({ ok: true, orderId: "order-1", total: 101, slug: "taqueria-centro" })
@@ -150,7 +174,7 @@ describe("mostrador: bloqueado sin nivel Diamante", () => {
     ).rejects.toThrow()
 
     // Ni siquiera se resuelve la sesión ni se reserva un folio: el gate corre primero.
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
     expect(mocks.requireOpenShift).not.toHaveBeenCalled()
     expect(mocks.rpc).not.toHaveBeenCalled()
     expect(mocks.createFoodosOrder).not.toHaveBeenCalled()
@@ -193,7 +217,7 @@ describe("mostrador: caja cerrada", () => {
 
   it("no quema un folio cuando la venta se cae por falta de turno", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
     mocks.requireOpenShift.mockRejectedValue(new NoOpenShiftError())
 
     await createMostradorSale({
@@ -282,7 +306,7 @@ describe("mostrador: validaciones antes del folio", () => {
   it("un folio que la base no puede reservar no se inventa en el cliente", async () => {
     const { supabase } = defaultClient()
     supabase.rpc = (() => Promise.resolve({ data: null, error: { message: "boom" } })) as never
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await createMostradorSale({
       restaurant_id: RESTAURANT_ID,
@@ -464,7 +488,7 @@ describe("mostrador: cotización de entrega", () => {
         maybeSingle: { data: { delivery_active: false, delivery_fee: 45 }, error: null },
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await quoteMostradorDelivery({
       restaurant_id: RESTAURANT_ID,
@@ -483,7 +507,7 @@ describe("mostrador: cotización de entrega", () => {
         maybeSingle: { data: { delivery_active: true, delivery_fee: 45 }, error: null },
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
     mocks.quoteDelivery.mockResolvedValue({ fee: 45, reason: "ok", etaMinutes: 35 })
 
     const result = await quoteMostradorDelivery({
@@ -507,7 +531,7 @@ describe("mostrador: cotización de entrega", () => {
         maybeSingle: { data: { delivery_active: true, delivery_fee: 45 }, error: null },
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
     mocks.quoteDelivery.mockResolvedValue({ fee: 0, reason: "unavailable" })
 
     const result = await quoteMostradorDelivery({
@@ -528,7 +552,7 @@ describe("mostrador: cotización de entrega", () => {
         maybeSingle: { data: { delivery_active: true, delivery_fee: 45 }, error: null },
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
     mocks.quoteDelivery.mockResolvedValue({ fee: 45, reason: "below_minimum", minOrder: 150 })
 
     const result = await quoteMostradorDelivery({

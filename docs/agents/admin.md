@@ -766,6 +766,54 @@
     primero, no por `id` ni por `created_at` a secas.
   - **El "día" es local.** Nunca `toISOString()` para claves de día; usar
     `dayKeyOf(DEFAULT_TIMEZONE, …)` de `@/lib/local-date` (regla común 8).
+- **Leads CRM (`/admin/leads`, Ronda 6 — bandeja, reparto y nutrición)**: la
+  cuarta pestaña *Bandeja* lee `whatsapp_messages`, que **ya se escribía desde
+  antes** (el webhook persiste los entrantes) pero **nadie leía**. La ronda no
+  crea un segundo almacén de conversaciones: proyecta el existente. Invariantes
+  que no se pueden romper:
+  - **`from_number` es *la otra parte* de la conversación, en ambas
+    direcciones.** Es el teléfono del cliente tanto en `direction='inbound'`
+    como en `'outbound'`. No interpretarlo como "el número del negocio" ni
+    filtrar por `direction` para deducir el interlocutor. Los envíos con
+    `from_number` no telefónico (`"system"`, `"N/A"`) no tienen dígitos, así que
+    `phoneKey()` devuelve `null` y quedan fuera del emparejamiento **solos**.
+  - **La ventana de 24 h es una compuerta del servidor, no una preferencia de
+    UI.** `sendLeadMessage` la revalida; el compositor solo la refleja. Sin
+    entrante no hay ventana (`{open:false}`, no "abierta con 0 h"). Fuera de
+    ventana solo se puede enviar **plantilla aprobada**.
+  - **Consentimiento antes que volumen.** Sin `user_id` que enlace con
+    `profiles` no hay consentimiento: solo plantilla. Un envío que no cumple se
+    registra como **`skipped` con motivo** en
+    `whatsapp_automation_sends.detail`, nunca se descarta en silencio.
+  - **Las secuencias solo encolan.** `crm_sequences.is_active` nace en
+    **`false`**: activar es un acto explícito del admin y **no** hay forma de
+    activarla por URL. El motor corre en el cron diario con tope por pasada
+    (`MAX_SEQUENCE_SENDS_PER_RUN`), dedupe por `dedupe_key` (el `23505` cuenta
+    como `skipped`, no como error) y jamás dispara en masa.
+  - **El asistente de IA nunca auto-envía y nunca mete PII completa en el
+    prompt.** `suggestLeadReply` devuelve un borrador; el envío sigue siendo
+    humano. Teléfonos y correos se enmascaran (`maskPhone`/`maskEmail`) y el
+    texto libre se redacta (`redactFreeText`) antes de salir a un proveedor.
+  - **Nunca se registran cuerpos de mensaje en `admin_audit_log`.** El `detail`
+    de un envío guarda `{ template, characters }` y nada más.
+  - **`null` ≠ `0` en todos los indicadores.** Una tasa sin denominador, un
+    tiempo de primera respuesta sin entrante y un vendedor sin conversaciones
+    se pintan como *no medido* (`formatMinutes` → `"—"`), no como cero.
+  - **Las etiquetas se normalizan antes de tocar la base**
+    (`@/lib/crm-tags`: `MAX_TAG_LENGTH` 24, `MAX_TAGS_PER_PROSPECT` 12). El
+    `crm_prospects.tags TEXT[]` es `NOT NULL DEFAULT '{}'` con índice GIN, y la
+    lectura tolera que la columna no exista todavía (00140 sin aplicar).
+  - **Emparejar por teléfono puede dar falsos positivos entre leads.** Se
+    reutiliza `phoneKey()` (Ronda 5) y la UI muestra los eventos **sin afirmar**
+    que el número pertenece al lead. `phoneLookupVariants()` prueba las
+    variantes con lada (`52`/`521`) porque el mismo cliente se guarda con y sin
+    prefijo.
+  - **La migración `00140` es aditiva y su RLS es de solo servicio.** Las cuatro
+    tablas nuevas (`crm_quick_replies`, `crm_sequences`, `crm_sequence_steps`,
+    `crm_sequence_enrollments`) llevan RLS **habilitada con cero políticas**, y
+    **no** se relaja ninguna política de `crm_prospects` ni de
+    `whatsapp_messages`. `crm_prospects` **no** denormaliza el último mensaje:
+    se deriva en lectura.
 
 ## Verificación
 `npm test` + entrar a /admin con cuenta admin: métricas por período, cambio de
@@ -1060,3 +1108,77 @@ La migración **00139 no se puede aplicar en local** (no hay Docker ni `psql` en
 este entorno): queda escrita y lista para `supabase db push`. Sin ella, las
 acciones degradan avisando (`logger.warn`) en vez de romper, y la bandeja sigue
 funcionando en modo lectura.
+
+Leads CRM (Ronda 6, requiere **00140** aplicada): en `/admin/leads` abrir la
+pestaña *Bandeja* y comprobar que los hilos se ordenan por urgencia
+(`sin_responder` → `ventana_cerrada` → `esperando` → sin conversación) y que un
+prospecto **sin** mensajes no se cuenta como "esperando 0 minutos". Enviar
+dentro de la ventana de 24 h y comprobar que la acción **vuelve a validar la
+ventana en el servidor**; forzar el envío fuera de ventana debe rechazarse
+aunque la UI esté desactualizada. El detalle en `admin_audit_log` guarda
+`{ template, characters }` — **nunca el cuerpo del mensaje**.
+
+Las secuencias **no se activan por URL**: `?sequence=` no existe en la allowlist
+de filtros y `toggleCrmSequence` es la única vía. Tras activar una, el cron
+diario (`/api/cron/daily`, job `crm-sequences`) debe encolar y no disparar en
+masa; un envío duplicado se cuenta como `skipped` (`23505` sobre `dedupe_key`),
+no como error.
+
+El contrato del esquema está fijado en
+`npx vitest run src/lib/crm-inbox.contract.test.ts` (43 pruebas): lee `00140` y
+`00097` y exige que la columna generada `from_digits` use
+`NULLIF(right(regexp_replace(from_number,'\D','','g'),10),'')` (equivalente
+exacto de `phoneKey()`), que `crm_sequences.is_active` **nazca en `false`**, que
+el `CHECK` de `status` de las inscripciones coincida con `SequenceAdvance`, que
+`MAX_SEQUENCE_DELAY_HOURS` no llegue a un año, que las cuatro tablas nuevas
+tengan RLS habilitada **sin** políticas y que **no** se añadan columnas
+desnormalizadas de último mensaje en `crm_prospects`. También ata
+`WHATSAPP_WINDOW_HOURS === 24`, el vocabulario de `INBOX_BUCKETS` y las 9
+acciones de auditoría nuevas.
+
+La migración **00140 tampoco se puede aplicar en local** (misma razón): queda
+escrita y lista para `supabase db push`. `fetchConversationMessages` empareja
+por `.in("from_number", phoneLookupVariants(...))` y **no** por la columna
+generada, así que la bandeja funciona incluso con 00140 sin aplicar.
+
+
+## Operar como restaurante (P14, Ronda 9)
+
+`/admin/operar` es la puerta de entrada a la sesión de soporte: el admin elige
+un restaurante y el **panel** (`/panel/foodos/*`) pasa a leer y escribir con sus
+datos. La franja "Operando como X — Salir" aparece en el panel, no aquí: la
+superficie impersonada es la que tiene que anunciarse.
+
+Tres reglas que no se pueden relajar:
+
+- **La cookie no es una credencial.** `resurte_foodos_operating` solo *pide* un
+  restaurante; `src/lib/foodos-operating.ts` revalida `isCurrentUserAdmin()` en
+  **cada** llamada. Caducidad 4 h.
+- **Al impersonar se usa service role, y por eso el seam es la única barrera.**
+  Todas las políticas de `foodos_*` son `auth.uid() = user_id`, así que con el
+  cliente de cookies el restaurante impersonado devolvería **0 filas**. La
+  contrapartida obligatoria: toda consulta de **visibilidad o propiedad** se
+  acota con `ownerUserId`. Las columnas de **atribución** (`foodos_pos_shifts.
+  opened_by`/`closed_by`, `foodos_pos_shift_movements.user_id`, `foodos_orders.
+  cashier_user_id`, `foodos_order_payments.reviewed_by`) se quedan en el
+  `user.id` de la sesión: registran quién lo hizo, no de quién es.
+- **El nivel que se ve es el REAL del restaurante.** La exención de admin está
+  apagada mientras se impersona, en las dos capas: `requireFoodosFeature`
+  (`!impersonating && …`) y el contexto del panel
+  (`role === "admin" && !impersonating`). Encenderla haría que la UI ofreciera
+  una herramienta que el servidor rechaza.
+
+Rastro de auditoría: `requireFoodosAuth()` escribe `foodos_operating_action` en
+`admin_audit_log` **en cada llamada** mientras se impersona — también en las
+lecturas. `getOperatingContext()` **no** audita a propósito: corre en cada
+render del layout y registraría visitas de página en vez de acciones. Entrar y
+salir se registran aparte (`foodos_operating_start` / `foodos_operating_stop`)
+desde `src/app/panel/foodos/operating-actions.ts`; `stopOperatingAs` cierra la
+sesión **aunque el rol se haya revocado**, para que nadie quede atrapado dentro.
+
+Comprobación: `npx vitest run src/lib/foodos-operating.test.ts
+src/app/admin/operar/operating-picker.contract.test.ts
+src/app/panel/foodos/operating-actions.test.ts` y, con sesión de admin real,
+abrir `/admin/operar`, pulsar "Operar aquí" en un restaurante ajeno y verificar
+que el panel muestra la franja, que el nivel mostrado es el del restaurante (no
+Diamante por ser admin) y que la acción queda en `/admin/bitacoras`.

@@ -23,6 +23,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   requireFoodosFeature: vi.fn(),
   requireAuth: vi.fn(),
+  requireFoodosAuth: vi.fn(),
+  getOperatingContext: vi.fn(),
   assertOwnRestaurant: vi.fn(),
   createFoodosOrder: vi.fn(),
   requireOpenShift: vi.fn(),
@@ -32,6 +34,10 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/auth", () => ({ requireAuth: mocks.requireAuth, getCurrentUser: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({
+  requireFoodosAuth: mocks.requireFoodosAuth,
+  getOperatingContext: mocks.getOperatingContext,
+}))
 vi.mock("@/lib/foodos-tier", () => ({ requireFoodosFeature: mocks.requireFoodosFeature }))
 vi.mock("@/lib/foodos-owner", () => ({ assertOwnRestaurant: mocks.assertOwnRestaurant }))
 vi.mock("@/lib/foodos-order-create", () => ({ createFoodosOrder: mocks.createFoodosOrder }))
@@ -75,6 +81,24 @@ const SHIFT_ID = "shift-1"
 const TICKET_ID = "ticket-1"
 const TABLE_ID = "table-1"
 const USER = { id: "user-1", email: "mesero@example.com" }
+
+/**
+ * Respuesta del seam de operación para el caso normal (sin impersonación):
+ * `supabase` es el cliente de sesión que cada test fabrica, así que el
+ * camino que ejecuta la acción es exactamente el de siempre.
+ */
+function operating(supabase: unknown) {
+  const ctx = {
+    restaurantId: RESTAURANT_ID,
+    ownerUserId: USER.id,
+    client: supabase,
+    impersonating: false,
+    actorUserId: USER.id,
+    actorEmail: USER.email ?? null,
+  }
+  mocks.getOperatingContext.mockResolvedValue(ctx as never)
+  return { supabase, user: USER, ownerUserId: USER.id, ctx } as never
+}
 
 const RESTAURANT_ROW = {
   id: RESTAURANT_ID,
@@ -245,7 +269,7 @@ function orderOptions() {
 beforeEach(() => {
   vi.clearAllMocks()
   const { supabase } = defaultClient()
-  mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+  mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
   mocks.assertOwnRestaurant.mockResolvedValue(undefined)
   mocks.requireOpenShift.mockResolvedValue(OPEN_SHIFT)
   mocks.findOpenShift.mockResolvedValue(OPEN_SHIFT)
@@ -283,7 +307,7 @@ describe("mesas: bloqueado sin nivel Diamante", () => {
     ).rejects.toThrow()
 
     // Ni siquiera se resuelve la sesión ni se reserva un folio: el gate corre primero.
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
     expect(mocks.requireOpenShift).not.toHaveBeenCalled()
     expect(mocks.rpc).not.toHaveBeenCalled()
     expect(mocks.createFoodosOrder).not.toHaveBeenCalled()
@@ -293,7 +317,7 @@ describe("mesas: bloqueado sin nivel Diamante", () => {
 
   it("la lectura degrada en vez de romper el mapa de mesas", async () => {
     await expect(getMesasData(RESTAURANT_ID)).resolves.toBeNull()
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
   })
 })
 
@@ -311,7 +335,7 @@ describe("mesas: carga del salón", () => {
       foodos_table_tickets: { rows: { data: [OPEN_TICKET] }, maybeSingle: { data: OPEN_TICKET } },
       foodos_menu_items: { rows: { data: [{ id: "item-1", name: "Taco al pastor" }] } },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const data = await getMesasData(RESTAURANT_ID)
 
@@ -342,7 +366,7 @@ describe("mesas: abrir una cuenta", () => {
     const { supabase, calls } = defaultClient({
       foodos_table_tickets: { single: { data: { id: TICKET_ID } } },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await openTable({ restaurant_id: RESTAURANT_ID, table_id: TABLE_ID, guests: 4 })
 
@@ -357,7 +381,7 @@ describe("mesas: abrir una cuenta", () => {
     const { supabase } = defaultClient({
       foodos_table_tickets: { single: { error: { code: "23505", message: "dup" } } },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await openTable({ restaurant_id: RESTAURANT_ID, table_id: TABLE_ID, guests: 2 })
 
@@ -371,7 +395,7 @@ describe("mesas: abrir una cuenta", () => {
     const { supabase } = defaultClient({
       foodos_tables: { maybeSingle: { data: { ...TABLE_ROW, is_active: false } } },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await openTable({ restaurant_id: RESTAURANT_ID, table_id: TABLE_ID, guests: 2 })
 
@@ -381,7 +405,7 @@ describe("mesas: abrir una cuenta", () => {
 
   it("acota los comensales al tope del salón", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await setGuests({ restaurant_id: RESTAURANT_ID, ticket_id: TICKET_ID, guests: 999 })
 
@@ -390,7 +414,7 @@ describe("mesas: abrir una cuenta", () => {
 
   it("la señal de la cuenta viaja a la base para que el cajero la vea", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await requestBill({ restaurant_id: RESTAURANT_ID, ticket_id: TICKET_ID, requested: true })
 
@@ -435,7 +459,7 @@ describe("mesas: enviar una ronda a cocina", () => {
 
   it("no quema un folio por mandar platillos a cocina", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await sendToKitchen({ restaurant_id: RESTAURANT_ID, ticket_id: TICKET_ID, items: ITEMS })
 
@@ -473,7 +497,7 @@ describe("mesas: enviar una ronda a cocina", () => {
     const { supabase } = defaultClient({
       foodos_table_tickets: { maybeSingle: { data: { ...OPEN_TICKET, status: "closed" } } },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await sendToKitchen({
       restaurant_id: RESTAURANT_ID,
@@ -527,7 +551,7 @@ describe("mesas: cobrar la cuenta", () => {
 
   it("no quema un folio cuando la mesa se cae por falta de turno", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
     mocks.requireOpenShift.mockRejectedValue(new NoOpenShiftError())
 
     await closeTable({
@@ -595,7 +619,7 @@ describe("mesas: cobrar la cuenta", () => {
       },
       { data: null, error: { message: "boom" } }
     )
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await closeTable({
       restaurant_id: RESTAURANT_ID,
@@ -646,7 +670,7 @@ describe("mesas: cobrar la cuenta", () => {
 
   it("divide la cuenta con un solo cobro de varias formas de pago", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await closeTable({
       restaurant_id: RESTAURANT_ID,
@@ -671,7 +695,7 @@ describe("mesas: cobrar la cuenta", () => {
 
   it("cierra la cuenta apuntando a la venta que la saldó", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await closeTable({
       restaurant_id: RESTAURANT_ID,
@@ -694,7 +718,7 @@ describe("mesas: cobrar la cuenta", () => {
         rows: { data: null, error: { message: "boom" } },
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await closeTable({
       restaurant_id: RESTAURANT_ID,
@@ -757,7 +781,7 @@ describe("mesas: transferir y unir", () => {
         maybeSingle: [{ data: OPEN_TICKET }, { data: null }],
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await transferTable({
       restaurant_id: RESTAURANT_ID,
@@ -783,7 +807,7 @@ describe("mesas: transferir y unir", () => {
         maybeSingle: [{ data: OPEN_TICKET }, { data: { ...OPEN_TICKET, id: "ticket-2" } }],
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await transferTable({
       restaurant_id: RESTAURANT_ID,
@@ -816,7 +840,7 @@ describe("mesas: transferir y unir", () => {
         ],
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await mergeTables({
       restaurant_id: RESTAURANT_ID,
@@ -848,7 +872,7 @@ describe("mesas: cancelar una cuenta", () => {
 
   it("marca las comandas canceladas en vez de borrarlas", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await cancelTicket({ restaurant_id: RESTAURANT_ID, ticket_id: TICKET_ID })
 
@@ -869,7 +893,7 @@ describe("mesas: acomodo del salón", () => {
       foodos_table_zones: { maybeSingle: { data: { width: 1000, height: 700 } } },
       foodos_tables: { maybeSingle: { data: { zone_id: "zone-1" } } },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await moveTable({ restaurant_id: RESTAURANT_ID, id: TABLE_ID, pos_x: -500, pos_y: 99999 })
 
@@ -882,7 +906,7 @@ describe("mesas: acomodo del salón", () => {
 
   it("no borra una zona que todavía tiene mesas", async () => {
     const { supabase } = defaultClient({ foodos_tables: { rows: { count: 3 } } })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await deleteZone({ restaurant_id: RESTAURANT_ID, id: "zone-1" })
 
@@ -892,7 +916,7 @@ describe("mesas: acomodo del salón", () => {
 
   it("no borra una mesa con cuenta abierta", async () => {
     const { supabase } = defaultClient({ foodos_table_tickets: { rows: { count: 1 } } })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await deleteTable({ restaurant_id: RESTAURANT_ID, id: TABLE_ID })
 

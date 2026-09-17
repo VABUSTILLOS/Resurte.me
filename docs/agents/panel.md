@@ -93,3 +93,33 @@ y **cero** `<NivelGate`; `src/lib/foodos-entitlements.test.ts` fija
 `src/lib/foodos-tier.test.ts` fija el bypass en `requireFoodosFeature` y que el
 camino normal nunca consulta el rol. Al añadir o renombrar una herramienta
 premium, actualiza esas tres listas.
+
+## Franja de la sesión de soporte (P14, Ronda 9)
+
+Cuando un admin abre una sesión desde `/admin/operar`, el panel muestra una
+franja ámbar `role="status"` —"Operando como X"— con un botón **Salir** que llama
+a `stopOperatingAs()`. Tres decisiones que se ven raras hasta que se explica el
+porqué:
+
+- **No se puede cerrar.** No tiene aspa: el admin tiene que poder ver en todo
+  momento que está dentro de otro restaurante. Cerrarla con un clic lo dejaría
+  escribiendo sobre datos ajenos creyendo que opera los suyos.
+- **Se pinta fuera del control de acceso** (`panel-layout-client.tsx`, antes del
+  ternario de `denied`). Si viviera dentro, un admin en una página que su rol no
+  alcanza no tendría cómo salir y quedaría atrapado.
+- **`print:hidden`.** Los tickets son documentos del restaurante, no de la sesión
+  de soporte: no deben salir con la franja impresa.
+
+La exención de admin del contexto se apaga durante la sesión
+(`isAdmin = role === "admin" && !impersonating` en `src/app/panel/layout.tsx`).
+Es deliberado: el admin entra a ver el **nivel real** del restaurante, y si la
+exención siguiera encendida vería todas las herramientas abiertas — justo lo que
+vino a diagnosticar — y además la UI le ofrecería un botón que el servidor
+rechaza. El nivel se resuelve con `getPanelOperatingState()`, que lee contexto y
+nombre en **una** pasada.
+
+Verificación: `npx vitest run src/app/admin/operar/operating-picker.contract.test.ts`
+fija el cableado (franja fuera del `denied`, `isAdmin` con `!impersonating`,
+`print:hidden`). El comportamiento en pantalla no tiene e2e a propósito:
+`/panel` responde 200 sin sesión (su layout no llama a `requireAuth`) y CI no
+fabrica cuentas de admin.

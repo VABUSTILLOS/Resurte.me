@@ -14,6 +14,7 @@ import { usePanelRole } from "@/hooks/use-panel-role"
 import { useEscapeKey } from "@/hooks/use-escape-key"
 import { canAccessPanelHref, toolKeyForPath } from "@/lib/panel-roles"
 import { FoodosEntitlementsProvider } from "@/components/panel/foodos/entitlements-context"
+import { OperatingBanner } from "@/components/panel/foodos/operating-banner"
 import type { FoodosEntitlementState } from "@/lib/foodos-entitlements"
 import { PanelMobileNav } from "./_components/PanelMobileNav"
 import { PanelFab } from "./_components/PanelFab"
@@ -45,7 +46,14 @@ const COLLECTION_ICONS: Record<string, string> = {
     "bebidas-bares-botanas": "🍺",
 }
 
-function PanelContent({ children }: { children: React.ReactNode }) {
+function PanelContent({
+  children,
+  operatingRestaurantName,
+}: {
+  children: React.ReactNode
+  /** Nombre del restaurante visitado por un admin en sesión de soporte (P14). */
+  operatingRestaurantName?: string | null
+}) {
   const router = useRouter()
   // Lazy browser-only client: creating it during SSR would throw when
   // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
@@ -236,6 +244,9 @@ function PanelContent({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-20 lg:pb-6">
+        {/* Fuera del condicional de acceso: un admin en sesión de soporte tiene
+            que poder salir incluso desde una página que su rol no alcanza. */}
+        {operatingRestaurantName && <OperatingBanner name={operatingRestaurantName} />}
         {denied ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center max-w-md mx-auto mt-8">
             <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
@@ -273,17 +284,27 @@ function PanelContent({ children }: { children: React.ReactNode }) {
 export function PanelLayoutClient({
   entitlements,
   isAdmin = false,
+  operatingRestaurantName = null,
   children,
 }: {
   entitlements: FoodosEntitlementState
-  /** Vista de administrador de plataforma: todo desbloqueado. */
+  /**
+   * Vista de administrador de plataforma: todo desbloqueado.
+   *
+   * El layout lo apaga mientras la sesión es de soporte (P14), para que el
+   * desbloqueo del cliente y el gate del servidor cuenten lo mismo.
+   */
   isAdmin?: boolean
+  /** Nombre del restaurante visitado en sesión de soporte, o `null`. */
+  operatingRestaurantName?: string | null
   children: React.ReactNode
 }) {
   return (
     <FoodosEntitlementsProvider value={entitlements} isAdmin={isAdmin}>
       <RestaurantProvider>
-        <PanelContent>{children}</PanelContent>
+        <PanelContent operatingRestaurantName={operatingRestaurantName}>
+          {children}
+        </PanelContent>
       </RestaurantProvider>
     </FoodosEntitlementsProvider>
   )

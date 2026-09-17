@@ -6,9 +6,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   requireFoodosFeature: vi.fn(),
   requireAuth: vi.fn(),
+  requireFoodosAuth: vi.fn(),
+  getOperatingContext: vi.fn(),
 }))
 
 vi.mock("@/lib/auth", () => ({ requireAuth: mocks.requireAuth, getCurrentUser: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({
+  requireFoodosAuth: mocks.requireFoodosAuth,
+  getOperatingContext: mocks.getOperatingContext,
+}))
 vi.mock("@/lib/foodos-tier", () => ({
   requireFoodosFeature: mocks.requireFoodosFeature,
 }))
@@ -40,6 +46,24 @@ const DELIVERY_ID = "del-1"
 const COURIER_ID = "cour-1"
 const ZONE_ID = "zone-1"
 const USER = { id: "user-1", email: "dueno@example.com" }
+
+/**
+ * Respuesta del seam de operación para el caso normal (sin impersonación):
+ * `supabase` es el cliente de sesión que cada test fabrica, así que el
+ * camino que ejecuta la acción es exactamente el de siempre.
+ */
+function operating(supabase: unknown) {
+  const ctx = {
+    restaurantId: RESTAURANT_ID,
+    ownerUserId: USER.id,
+    client: supabase,
+    impersonating: false,
+    actorUserId: USER.id,
+    actorEmail: USER.email ?? null,
+  }
+  mocks.getOperatingContext.mockResolvedValue(ctx as never)
+  return { supabase, user: USER, ownerUserId: USER.id, ctx } as never
+}
 
 const COURIER_INPUT = {
   restaurant_id: RESTAURANT_ID,
@@ -99,7 +123,7 @@ beforeEach(() => {
   delete process.env.UBER_DIRECT_CLIENT_ID
   delete process.env.UBER_DIRECT_CLIENT_SECRET
   delete process.env.UBER_DIRECT_CUSTOMER_ID
-  mocks.requireAuth.mockResolvedValue({ supabase: client(), user: USER })
+  mocks.requireFoodosAuth.mockResolvedValue(operating(client()))
 })
 
 describe("flotilla: bloqueada sin nivel Oro", () => {
@@ -141,7 +165,7 @@ describe("flotilla: bloqueada sin nivel Oro", () => {
     ).rejects.toThrow()
 
     // Ni siquiera se resuelve la sesión: el gate corre primero.
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
     expect(mocks.requireFoodosFeature).toHaveBeenCalledWith("flotilla")
   })
 
@@ -154,7 +178,7 @@ describe("flotilla: bloqueada sin nivel Oro", () => {
       couriers: 0,
       zones: 0,
     })
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
   })
 })
 
@@ -169,7 +193,7 @@ describe("flotilla: con nivel suficiente", () => {
     await expect(listFlotillaDeliveries(RESTAURANT_ID)).resolves.toEqual([])
     await expect(getFlotillaStats(RESTAURANT_ID)).resolves.toMatchObject({ active: 0 })
     expect(mocks.requireFoodosFeature).toHaveBeenCalledWith("flotilla")
-    expect(mocks.requireAuth).toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).toHaveBeenCalled()
   })
 
   it("las mutaciones proceden", async () => {
@@ -209,7 +233,7 @@ describe("flotilla: con nivel suficiente", () => {
   })
 
   it("rechaza escribir en un restaurante ajeno", async () => {
-    mocks.requireAuth.mockResolvedValue({ supabase: client(false), user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(client(false)))
     await expect(upsertFlotillaCourier(COURIER_INPUT)).rejects.toThrow("Restaurante no encontrado")
     await expect(upsertFlotillaZone(ZONE_INPUT)).rejects.toThrow("Restaurante no encontrado")
   })

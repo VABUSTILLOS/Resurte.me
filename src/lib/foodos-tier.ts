@@ -15,7 +15,8 @@ import { cache } from "react"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { isSupabaseConfigured } from "@/lib/supabase/env"
-import { getUserRole } from "@/lib/roles"
+import { isCurrentUserAdmin } from "@/lib/foodos-admin"
+import { getOperatingContext, loadOperatingRestaurantName } from "@/lib/foodos-operating"
 import { logger } from "@/lib/logger"
 import {
   effectiveTier,
@@ -123,29 +124,73 @@ export async function getRestaurantEntitlements(
 
 /**
  * Entitlements del usuario autenticado, para las superficies del panel.
+ *
+ * El restaurante lo resuelve el seam de operación (`getOperatingContext`), no
+ * una lectura directa por `user_id`: en el camino normal eso es exactamente el
+ * restaurante propio, y mientras un admin impersona (P14) es el restaurante
+ * visitado, con **su nivel real** — nunca el del admin ni un bypass.
+ *
  * La sesión sale del client con cookies; el nivel se lee con service role.
- * `cache()` deduplica ambas lecturas dentro de la misma request.
+ * `cache()` deduplica las lecturas dentro de la misma request.
  */
-export const getMyEntitlements = cache(async (): Promise<FoodosEntitlementState> => {
-  // Sin Supabase configurado (dev local / preview sin secrets) no puede haber
-  // sesión: degradamos a Verde en lugar de lanzar, igual que `getUserRole`.
-  if (!isSupabaseConfigured()) return EMPTY_STATE
+const resolveEntitlements = cache(
+  async (): Promise<{
+    entitlements: FoodosEntitlementState
+    impersonating: boolean
+    operatingRestaurantName: string | null
+  }> => {
+    // Sin Supabase configurado (dev local / preview sin secrets) no puede haber
+    // sesión: degradamos a Verde en lugar de lanzar, igual que `getUserRole`.
+    if (!isSupabaseConfigured())
+      return { entitlements: EMPTY_STATE, impersonating: false, operatingRestaurantName: null }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return EMPTY_STATE
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user)
+      return { entitlements: EMPTY_STATE, impersonating: false, operatingRestaurantName: null }
 
-  const { data: restaurant } = await supabase
-    .from("foodos_restaurants")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle()
+    const ctx = await getOperatingContext(supabase, user)
+    if (!ctx.restaurantId) {
+      return {
+        entitlements: EMPTY_STATE,
+        impersonating: ctx.impersonating,
+        operatingRestaurantName: null,
+      }
+    }
 
-  if (!restaurant?.id) return EMPTY_STATE
-  return getRestaurantEntitlements(restaurant.id)
-})
+    const [entitlements, operatingRestaurantName] = await Promise.all([
+      getRestaurantEntitlements(ctx.restaurantId),
+      // Devuelve `null` sin consultar nada si no hay impersonación, así que el
+      // camino normal no paga una lectura extra.
+      loadOperatingRestaurantName(ctx),
+    ])
+    return { entitlements, impersonating: ctx.impersonating, operatingRestaurantName }
+  }
+)
+
+/**
+ * Lo que necesita la cabecera del panel: el nivel del restaurante operado, si
+ * la sesión es de soporte y, en ese caso, el nombre del restaurante visitado
+ * (para el banner "Operando como X").
+ *
+ * Existe para resolver las tres cosas con **una sola** lectura de contexto: el
+ * layout necesita el nivel y el nombre a la vez, y pedirlos por separado
+ * duplicaría el sondeo del restaurante en cada render.
+ */
+export async function getPanelOperatingState(): Promise<{
+  entitlements: FoodosEntitlementState
+  impersonating: boolean
+  operatingRestaurantName: string | null
+}> {
+  return resolveEntitlements()
+}
+
+/** Nivel del restaurante operado. Atajo de `getPanelOperatingState()`. */
+export async function getMyEntitlements(): Promise<FoodosEntitlementState> {
+  return (await resolveEntitlements()).entitlements
+}
 
 // ------------------------------------------------------------
 // Gate de servidor
@@ -174,17 +219,10 @@ export class FoodosFeatureLockedError extends Error {
  *
  * El admin no tiene restaurante propio, así que su nivel real siempre es
  * Verde: sin este bypass no podría probar ni dar soporte a las herramientas
- * premium. Delega en `getUserRole()` (ADMIN_EMAILS / profiles.role /
- * admin_users) y `cache()` deduplica la verificación dentro de la request.
+ * premium. La implementación vive en `foodos-admin.ts` porque el seam de
+ * impersonación también la necesita y no puede depender de este módulo.
  */
-export const isCurrentUserAdmin = cache(async (): Promise<boolean> => {
-  try {
-    return (await getUserRole()) === "admin"
-  } catch (err) {
-    logger.warn("foodos.entitlements.adminCheck", { error: String(err) })
-    return false
-  }
-})
+export { isCurrentUserAdmin } from "@/lib/foodos-admin"
 
 /**
  * Puerta de entrada de las server actions premium: devuelve los entitlements
@@ -197,11 +235,15 @@ export const isCurrentUserAdmin = cache(async (): Promise<boolean> => {
 export async function requireFoodosFeature(
   feature: FoodosFeature
 ): Promise<FoodosEntitlementState> {
-  const entitlements = await getMyEntitlements()
+  const { entitlements, impersonating } = await resolveEntitlements()
   if (!hasFeature(entitlements.tier, feature)) {
     // El bypass del admin se consulta solo cuando el nivel no alcanza, para
     // no pagar la verificación extra en el camino normal de un restaurantero.
-    if (await isCurrentUserAdmin()) return entitlements
+    //
+    // Al impersonar NO aplica nunca: el punto de P14 es ver exactamente lo que
+    // ve el dueño, así que el nivel que decide es el real del restaurante
+    // visitado (ya resuelto por `resolveEntitlements`), sin privilegio extra.
+    if (!impersonating && (await isCurrentUserAdmin())) return entitlements
     throw new FoodosFeatureLockedError(
       feature,
       FEATURE_MIN_TIER[feature],

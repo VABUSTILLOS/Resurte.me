@@ -12,11 +12,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   requireFoodosFeature: vi.fn(),
   requireAuth: vi.fn(),
+  requireFoodosAuth: vi.fn(),
+  getOperatingContext: vi.fn(),
   revalidatePath: vi.fn(),
   revalidateTag: vi.fn(),
 }))
 
 vi.mock("@/lib/auth", () => ({ requireAuth: mocks.requireAuth, getCurrentUser: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({
+  requireFoodosAuth: mocks.requireFoodosAuth,
+  getOperatingContext: mocks.getOperatingContext,
+}))
 vi.mock("@/lib/foodos-tier", () => ({ requireFoodosFeature: mocks.requireFoodosFeature }))
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
@@ -39,6 +45,24 @@ import {
 const RESTAURANT_ID = "rest-1"
 const SHIFT_ID = "shift-1"
 const USER = { id: "user-1", email: "cajero@example.com" }
+
+/**
+ * Respuesta del seam de operación para el caso normal (sin impersonación):
+ * `supabase` es el cliente de sesión que cada test fabrica, así que el
+ * camino que ejecuta la acción es exactamente el de siempre.
+ */
+function operating(supabase: unknown) {
+  const ctx = {
+    restaurantId: RESTAURANT_ID,
+    ownerUserId: USER.id,
+    client: supabase,
+    impersonating: false,
+    actorUserId: USER.id,
+    actorEmail: USER.email ?? null,
+  }
+  mocks.getOperatingContext.mockResolvedValue(ctx as never)
+  return { supabase, user: USER, ownerUserId: USER.id, ctx } as never
+}
 
 const RESTAURANT_ROW = { id: RESTAURANT_ID, user_id: USER.id }
 
@@ -129,7 +153,7 @@ function selects(calls: Call[], table: string): unknown[] {
 beforeEach(() => {
   vi.clearAllMocks()
   const { supabase } = defaultClient()
-  mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+  mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 })
 
 describe("caja: bloqueada sin nivel Diamante", () => {
@@ -149,7 +173,7 @@ describe("caja: bloqueada sin nivel Diamante", () => {
     ).rejects.toThrow()
 
     // Ni siquiera se resuelve la sesión: el gate corre primero.
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
     expect(mocks.requireFoodosFeature).toHaveBeenCalledWith("pos_mostrador")
     expect(mocks.revalidatePath).not.toHaveBeenCalled()
   })
@@ -193,7 +217,7 @@ describe("caja: desbloqueada", () => {
       },
       profiles: { rows: [{ id: USER.id, full_name: "Ana Cajera" }] },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const data = await getCajaData(RESTAURANT_ID)
 
@@ -236,7 +260,7 @@ describe("caja: desbloqueada", () => {
       },
       profiles: { rows: [] },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const data = await getCajaData(RESTAURANT_ID)
 
@@ -246,7 +270,7 @@ describe("caja: desbloqueada", () => {
 
   it("no abre un turno con fondo negativo", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       openShiftAction({ restaurant_id: RESTAURANT_ID, opening_float: -1 })
@@ -259,7 +283,7 @@ describe("caja: desbloqueada", () => {
       foodos_restaurants: { maybeSingle: { data: RESTAURANT_ROW, error: null } },
       foodos_pos_shifts: { maybeSingle: { data: OPEN_SHIFT, error: null }, rows: [] },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       openShiftAction({ restaurant_id: RESTAURANT_ID, opening_float: 500 })
@@ -277,7 +301,7 @@ describe("caja: desbloqueada", () => {
         error: { code: "23505", message: "duplicate key value violates unique constraint" },
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       openShiftAction({ restaurant_id: RESTAURANT_ID, opening_float: 500 })
@@ -286,7 +310,7 @@ describe("caja: desbloqueada", () => {
 
   it("abre el turno a nombre del usuario y revalida la caja", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       openShiftAction({ restaurant_id: RESTAURANT_ID, opening_float: 500.5 })
@@ -309,7 +333,7 @@ describe("caja: desbloqueada", () => {
         rows: [],
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       addShiftMovementAction({ shift_id: SHIFT_ID, type: "out", amount: 100 })
@@ -322,7 +346,7 @@ describe("caja: desbloqueada", () => {
       foodos_restaurants: { maybeSingle: { data: RESTAURANT_ROW, error: null } },
       foodos_pos_shifts: { maybeSingle: { data: OPEN_SHIFT, error: null }, rows: [] },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       addShiftMovementAction({ shift_id: SHIFT_ID, type: "out", amount: 0 })
@@ -346,7 +370,7 @@ describe("caja: desbloqueada", () => {
       foodos_restaurants: { maybeSingle: { data: RESTAURANT_ROW, error: null } },
       foodos_pos_shifts: { maybeSingle: { data: OPEN_SHIFT, error: null }, rows: [] },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       addShiftMovementAction({
@@ -384,7 +408,7 @@ describe("caja: desbloqueada", () => {
       },
       profiles: { rows: [] },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     // Esperado real: 500 + 1000 − 100 = 1400. El conteo declara 1350.
     const result = await closeShiftAction({
@@ -414,7 +438,7 @@ describe("caja: desbloqueada", () => {
       foodos_orders: { rows: [] },
       profiles: { rows: [] },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     // Fondo 500, sin ventas: un billete de 1000 declarado deja 500 de sobrante.
     const result = await closeShiftAction({ shift_id: SHIFT_ID, counts: { "1000": 1 } })
@@ -436,7 +460,7 @@ describe("caja: desbloqueada", () => {
         rows: [],
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       closeShiftAction({ shift_id: SHIFT_ID, counts: { "500": 1 } })
@@ -449,7 +473,7 @@ describe("caja: desbloqueada", () => {
       foodos_restaurants: { maybeSingle: { data: null, error: null } },
       foodos_pos_shifts: { maybeSingle: { data: null, error: null }, rows: [] },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       openShiftAction({ restaurant_id: RESTAURANT_ID, opening_float: 500 })
@@ -481,7 +505,7 @@ describe("caja: desbloqueada", () => {
         ],
       },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const history = await getShiftHistory(RESTAURANT_ID)
 
@@ -507,7 +531,7 @@ describe("caja: desbloqueada", () => {
       foodos_orders: { rows: [] },
       profiles: { rows: [{ id: USER.id, full_name: "Ana Cajera" }] },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await getCajaData(RESTAURANT_ID)
 
@@ -526,7 +550,7 @@ describe("caja: desbloqueada", () => {
       foodos_orders: { rows: [] },
       profiles: { error: { message: "permission denied for table profiles" } },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const data = await getCajaData(RESTAURANT_ID)
 

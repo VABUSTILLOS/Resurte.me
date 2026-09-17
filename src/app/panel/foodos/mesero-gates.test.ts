@@ -6,9 +6,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   requireFoodosFeature: vi.fn(),
   requireAuth: vi.fn(),
+  requireFoodosAuth: vi.fn(),
+  getOperatingContext: vi.fn(),
 }))
 
 vi.mock("@/lib/auth", () => ({ requireAuth: mocks.requireAuth, getCurrentUser: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({
+  requireFoodosAuth: mocks.requireFoodosAuth,
+  getOperatingContext: mocks.getOperatingContext,
+}))
 vi.mock("@/lib/foodos-tier", () => ({
   requireFoodosFeature: mocks.requireFoodosFeature,
 }))
@@ -30,6 +36,24 @@ import {
 const RESTAURANT_ID = "rest-1"
 const SESSION_ID = "sess-1"
 const USER = { id: "user-1", email: "dueno@example.com" }
+
+/**
+ * Respuesta del seam de operación para el caso normal (sin impersonación):
+ * `supabase` es el cliente de sesión que cada test fabrica, así que el
+ * camino que ejecuta la acción es exactamente el de siempre.
+ */
+function operating(supabase: unknown) {
+  const ctx = {
+    restaurantId: RESTAURANT_ID,
+    ownerUserId: USER.id,
+    client: supabase,
+    impersonating: false,
+    actorUserId: USER.id,
+    actorEmail: USER.email ?? null,
+  }
+  mocks.getOperatingContext.mockResolvedValue(ctx as never)
+  return { supabase, user: USER, ownerUserId: USER.id, ctx } as never
+}
 
 const EMPTY_STATS = {
   conversations: 0,
@@ -67,10 +91,9 @@ function tableBuilder(rows: unknown = []) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requireAuth.mockResolvedValue({
-    supabase: { from: () => tableBuilder() },
-    user: USER,
-  })
+  mocks.requireFoodosAuth.mockResolvedValue(
+    operating({ from: () => tableBuilder() }),
+  )
 })
 
 describe("mesero_ia: bloqueado sin nivel Diamante", () => {
@@ -84,7 +107,7 @@ describe("mesero_ia: bloqueado sin nivel Diamante", () => {
     await expect(resumeMeseroSession(SESSION_ID)).rejects.toThrow()
 
     // La sesión ni se resuelve: el gate es lo primero que corre.
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
     expect(mocks.requireFoodosFeature).toHaveBeenCalledWith("mesero_ia")
   })
 
@@ -93,7 +116,7 @@ describe("mesero_ia: bloqueado sin nivel Diamante", () => {
     await expect(listMeseroSessions(RESTAURANT_ID)).resolves.toEqual([])
     await expect(listMeseroMessages(SESSION_ID)).resolves.toEqual([])
     await expect(getMeseroStats(RESTAURANT_ID)).resolves.toEqual(EMPTY_STATS)
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
   })
 })
 
@@ -107,13 +130,13 @@ describe("mesero_ia: con nivel suficiente", () => {
     await expect(listMeseroMessages(SESSION_ID)).resolves.toEqual([])
     await expect(getMeseroSettings(RESTAURANT_ID)).resolves.toBeNull()
     expect(mocks.requireFoodosFeature).toHaveBeenCalledWith("mesero_ia")
-    expect(mocks.requireAuth).toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).toHaveBeenCalled()
   })
 
   it("las mutaciones proceden", async () => {
     await expect(upsertMeseroSettings(SETTINGS_INPUT)).resolves.toBeUndefined()
     await expect(takeOverMeseroSession(SESSION_ID)).resolves.toBeUndefined()
     await expect(resumeMeseroSession(SESSION_ID)).resolves.toBeUndefined()
-    expect(mocks.requireAuth).toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).toHaveBeenCalled()
   })
 })

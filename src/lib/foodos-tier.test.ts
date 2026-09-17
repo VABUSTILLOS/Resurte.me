@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   getSessionUser: vi.fn(),
   isSupabaseConfigured: vi.fn(),
   getUserRole: vi.fn(),
+  getOperatingContext: vi.fn(),
+  loadOperatingRestaurantName: vi.fn(),
 }))
 
 vi.mock("@/lib/supabase/service", () => ({
@@ -29,10 +31,17 @@ vi.mock("@/lib/logger", () => ({
 vi.mock("@/lib/roles", () => ({
   getUserRole: mocks.getUserRole,
 }))
+// El restaurante que se opera lo decide el seam de P14; aquí se controla para
+// poder ejercer el camino normal y el de impersonación por separado.
+vi.mock("@/lib/foodos-operating", () => ({
+  getOperatingContext: mocks.getOperatingContext,
+  loadOperatingRestaurantName: mocks.loadOperatingRestaurantName,
+}))
 
 import {
   FoodosFeatureLockedError,
   getMyEntitlements,
+  getPanelOperatingState,
   getRestaurantEntitlements,
   isCurrentUserAdmin,
   requireFoodosFeature,
@@ -90,17 +99,37 @@ function qualifyingOrders(weeks: number, perWeek = 3000) {
   }))
 }
 
+/**
+ * Contexto de operación falso. Por defecto el restaurante propio del usuario y
+ * sin impersonación, que es el camino normal; cada test lo ajusta si necesita
+ * el camino de P14.
+ */
+function operating(overrides: Record<string, unknown> = {}) {
+  return {
+    restaurantId: "rest-1",
+    ownerUserId: "user-1",
+    client: null,
+    impersonating: false,
+    actorUserId: "user-1",
+    actorEmail: null,
+    ...overrides,
+  }
+}
+
 beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(NOW)
   vi.clearAllMocks()
   mocks.isSupabaseConfigured.mockReturnValue(true)
-  // El client con cookies resuelve la sesión y, cuando hay usuario, la fila del
-  // restaurante (`getMyEntitlements` la busca por `user_id`).
+  // El client con cookies solo resuelve la sesión: el restaurante lo entrega el
+  // seam, no una lectura directa por `user_id`.
   mocks.getServerClient.mockImplementation(async () => ({
     auth: { getUser: mocks.getSessionUser },
     from: () => query({ data: { id: "rest-1" }, error: null }),
   }))
+  mocks.getOperatingContext.mockResolvedValue(operating())
+  // Por defecto no hay sesión de soporte: el banner no se pinta.
+  mocks.loadOperatingRestaurantName.mockResolvedValue(null)
   // Por defecto nadie es admin: el camino del restaurantero es el normal.
   mocks.getUserRole.mockResolvedValue(null)
 })
@@ -224,6 +253,74 @@ describe("getMyEntitlements", () => {
     expect(state.tier).toBe("Verde")
     expect(mocks.getServiceClient).not.toHaveBeenCalled()
   })
+
+  it("mientras un admin impersona resuelve el nivel del restaurante visitado", async () => {
+    mocks.getSessionUser.mockResolvedValue({ data: { user: { id: "user-admin" } } })
+    mocks.getOperatingContext.mockResolvedValue(
+      operating({
+        restaurantId: "rest-ajeno",
+        ownerUserId: "dueno-2",
+        impersonating: true,
+      })
+    )
+    mocks.getServiceClient.mockResolvedValue(
+      serviceClient({
+        restaurant: { data: { user_id: "dueno-2" } },
+        orders: { data: qualifyingOrders(4) },
+      })
+    )
+
+    const state = await getMyEntitlements()
+
+    // El nivel sale del restaurante visitado, no del admin (que no tiene
+    // restaurante propio y por tanto siempre sería Verde).
+    expect(state.tier).toBe("Diamante")
+    expect(mocks.getServiceClient).toHaveBeenCalled()
+  })
+})
+
+describe("getPanelOperatingState", () => {
+  // El layout del panel necesita el nivel Y el nombre del restaurante visitado
+  // en la misma pasada: pedirlos por separado duplicaría el sondeo.
+  it("en el camino normal no hay impersonación ni nombre que anunciar", async () => {
+    mocks.getSessionUser.mockResolvedValue({ data: { user: { id: "user-1" } } })
+
+    const state = await getPanelOperatingState()
+
+    expect(state.impersonating).toBe(false)
+    expect(state.operatingRestaurantName).toBeNull()
+  })
+
+  it("mientras un admin impersona reporta la sesión y el nombre del restaurante", async () => {
+    mocks.getSessionUser.mockResolvedValue({ data: { user: { id: "user-admin" } } })
+    mocks.getOperatingContext.mockResolvedValue(
+      operating({ restaurantId: "rest-ajeno", ownerUserId: "dueno-2", impersonating: true })
+    )
+    mocks.getServiceClient.mockResolvedValue(
+      serviceClient({
+        restaurant: { data: { user_id: "dueno-2" } },
+        orders: { data: qualifyingOrders(4) },
+      })
+    )
+    mocks.loadOperatingRestaurantName.mockResolvedValue("Taquería Ajena")
+
+    const state = await getPanelOperatingState()
+
+    expect(state.impersonating).toBe(true)
+    expect(state.operatingRestaurantName).toBe("Taquería Ajena")
+    expect(state.entitlements.tier).toBe("Diamante")
+  })
+
+  it("sin Supabase configurado degrada sin abrir el cliente", async () => {
+    mocks.isSupabaseConfigured.mockReturnValue(false)
+
+    const state = await getPanelOperatingState()
+
+    expect(state.entitlements.tier).toBe("Verde")
+    expect(state.impersonating).toBe(false)
+    expect(state.operatingRestaurantName).toBeNull()
+    expect(mocks.getServerClient).not.toHaveBeenCalled()
+  })
 })
 
 describe("requireFoodosFeature", () => {
@@ -318,5 +415,72 @@ describe("bypass del administrador de plataforma", () => {
     await requireFoodosFeature("comandero")
 
     expect(mocks.getUserRole).not.toHaveBeenCalled()
+  })
+})
+
+describe("impersonación (P14): manda el nivel real del restaurante", () => {
+  // P14 sirve para ver exactamente lo que ve el dueño. Si el admin conservara
+  // su bypass mientras impersona, el modo soporte mentiría: reportaría una
+  // herramienta como disponible donde el dueño la tiene bloqueada.
+  it("un admin impersonando un restaurante en Verde NO recibe el bypass", async () => {
+    mocks.getUserRole.mockResolvedValue("admin")
+    mocks.getSessionUser.mockResolvedValue({ data: { user: { id: "user-admin" } } })
+    mocks.getOperatingContext.mockResolvedValue(
+      operating({
+        restaurantId: "rest-ajeno",
+        ownerUserId: "dueno-2",
+        impersonating: true,
+      })
+    )
+    mocks.getServiceClient.mockResolvedValue(
+      serviceClient({
+        restaurant: { data: { user_id: "dueno-2" } },
+        orders: { data: [] },
+      })
+    )
+
+    await expect(requireFoodosFeature("comandero")).rejects.toBeInstanceOf(
+      FoodosFeatureLockedError
+    )
+    // Ni se consulta el rol: al impersonar no hay privilegio que aplicar.
+    expect(mocks.getUserRole).not.toHaveBeenCalled()
+  })
+
+  it("un admin impersonando un restaurante Diamante ve la capacidad habilitada", async () => {
+    mocks.getUserRole.mockResolvedValue("admin")
+    mocks.getSessionUser.mockResolvedValue({ data: { user: { id: "user-admin" } } })
+    mocks.getOperatingContext.mockResolvedValue(
+      operating({
+        restaurantId: "rest-ajeno",
+        ownerUserId: "dueno-2",
+        impersonating: true,
+      })
+    )
+    mocks.getServiceClient.mockResolvedValue(
+      serviceClient({
+        restaurant: { data: { user_id: "dueno-2" } },
+        orders: { data: qualifyingOrders(4) },
+      })
+    )
+
+    await expect(requireFoodosFeature("comandero")).resolves.toMatchObject({
+      tier: "Diamante",
+    })
+  })
+
+  it("al terminar la impersonación el admin recupera su bypass", async () => {
+    mocks.getUserRole.mockResolvedValue("admin")
+    mocks.getSessionUser.mockResolvedValue({ data: { user: { id: "user-admin" } } })
+    mocks.getServiceClient.mockResolvedValue(
+      serviceClient({
+        restaurant: { data: { user_id: "user-admin" } },
+        orders: { data: [] },
+      })
+    )
+
+    // `beforeEach` deja el seam sin impersonar: el mismo admin en Verde pasa.
+    await expect(requireFoodosFeature("comandero")).resolves.toMatchObject({
+      tier: "Verde",
+    })
   })
 })

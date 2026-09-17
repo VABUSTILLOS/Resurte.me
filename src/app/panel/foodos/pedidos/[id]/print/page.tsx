@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { requireAuth } from "@/lib/auth"
+import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { buildTicket, type TicketKind, type TicketPayment } from "@/lib/foodos-printing"
 import type { FoodosBranch, FoodosOrder, FoodosRestaurant } from "@/types/foodos"
 import { TicketView } from "./ticket-view"
@@ -18,8 +18,9 @@ function resolveKind(raw: string | string[] | undefined): TicketKind {
  * `?kind=kitchen` imprime la comanda de cocina (sin precios); por defecto el
  * ticket del cliente. `?auto=1` abre el diálogo de impresión al cargar.
  *
- * Lee con la sesión del dueño (RLS), no con service role, y no recalcula
- * totales: `buildTicket` sólo presenta lo que ya calculó `createFoodosOrder`.
+ * Lee con el seam de operación (cliente de sesión normalmente, service role
+ * mientras un admin opera como el restaurante) y no recalcula totales:
+ * `buildTicket` sólo presenta lo que ya calculó `createFoodosOrder`.
  */
 export default async function FoodosPrintOrderPage({
   params,
@@ -28,29 +29,33 @@ export default async function FoodosPrintOrderPage({
   params: Promise<{ id: string }>
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const { supabase } = await requireAuth()
+  const { ctx } = await requireFoodosAuth()
   const { id } = await params
   const query = await searchParams
 
   const kind = resolveKind(query.kind)
   const auto = query.auto === "1"
 
-  const { data: order } = await supabase
-    .from("foodos_orders")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle()
+  // Mientras un admin opera como el restaurante el cliente es service role y
+  // RLS no filtra: se acota el pedido al restaurante operado para que un id
+  // ajeno no sea imprimible. Sin impersonación RLS sigue siendo la barrera.
+  const db = ctx.client
+  const base = db.from("foodos_orders").select("*").eq("id", id)
+  const { data: order } = await (ctx.impersonating && ctx.restaurantId
+    ? base.eq("restaurant_id", ctx.restaurantId)
+    : base
+  ).maybeSingle()
   if (!order) notFound()
 
   const o = order as FoodosOrder
 
   const [restaurantRes, branchRes, cashierRes] = await Promise.all([
-    supabase.from("foodos_restaurants").select("name, slug").eq("id", o.restaurant_id).maybeSingle(),
+    db.from("foodos_restaurants").select("name, slug").eq("id", o.restaurant_id).maybeSingle(),
     o.branch_id
-      ? supabase.from("foodos_branches").select("name").eq("id", o.branch_id).maybeSingle()
+      ? db.from("foodos_branches").select("name").eq("id", o.branch_id).maybeSingle()
       : Promise.resolve({ data: null }),
     o.cashier_user_id
-      ? supabase.from("profiles").select("full_name").eq("id", o.cashier_user_id).maybeSingle()
+      ? db.from("profiles").select("full_name").eq("id", o.cashier_user_id).maybeSingle()
       : Promise.resolve({ data: null }),
   ])
 

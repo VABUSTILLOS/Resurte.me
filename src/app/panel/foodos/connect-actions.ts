@@ -10,8 +10,10 @@
 //
 // Dos capas de defensa, y son distintas a propósito:
 //
-//  · **Lectura** con el cliente de sesión → RLS garantiza que sólo
-//    el dueño ve su restaurante.
+//  · **Lectura** con el cliente de `requireFoodosAuth()` → en el camino normal
+//    es el de sesión y RLS garantiza que sólo el dueño ve su restaurante; al
+//    impersonar es el de service role (P14), y entonces la garantía la da la
+//    comprobación explícita de `loadOwnedRestaurant`.
 //  · **Escritura** de las columnas `stripe_*` con el service client
 //    → 00085 las revoca a `authenticated`, porque la política RLS
 //    de restaurantes es a nivel de fila y permitiría al dueño
@@ -19,10 +21,10 @@
 //    desviar los pagos de sus propios comensales.
 //
 // Por eso toda escritura de Connect pasa por aquí y valida antes
-// que el restaurante sea del usuario autenticado.
+// que el restaurante sea del dueño efectivo.
 // ============================================================
 
-import { requireAuth } from "@/lib/auth"
+import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
 import { revalidatePath } from "next/cache"
@@ -55,13 +57,13 @@ const CONNECT_COLUMNS =
 /**
  * Estado de Connect de un restaurante del usuario.
  *
- * Devuelve `null` si el restaurante no existe o no es suyo: la consulta
- * usa el cliente de sesión, así que RLS responde por nosotros.
+ * Devuelve `null` si el restaurante no existe o no es el que se está operando.
  */
 export async function getConnectStatus(
   restaurantId: string
 ): Promise<ConnectStatus | null> {
-  const { supabase } = await requireAuth()
+  const { supabase, ctx } = await requireFoodosAuth()
+  if (!ctx.ownerUserId || restaurantId !== ctx.restaurantId) return null
   const { data, error } = await supabase
     .from("foodos_restaurants")
     .select(CONNECT_COLUMNS)
@@ -75,20 +77,61 @@ export async function getConnectStatus(
 
 /**
  * Verifica propiedad del restaurante y devuelve la fila con sus datos de
- * Connect. Usa el cliente de sesión (RLS) y falla cerrado.
+ * Connect. Falla cerrado.
+ *
+ * La comprobación es explícita y no delegada a RLS porque al impersonar el
+ * cliente es de service role y RLS no aplica: sin ella, un admin operando como
+ * el restaurante A podría leer el B con sólo cambiar el argumento.
  */
 async function loadOwnedRestaurant(restaurantId: string) {
-  const { supabase, user } = await requireAuth()
+  const { supabase, user, ctx } = await requireFoodosAuth()
+  if (!ctx.ownerUserId || restaurantId !== ctx.restaurantId) {
+    throw new Error("Restaurante no encontrado")
+  }
+  const ownerUserId = ctx.ownerUserId
   const { data, error } = await supabase
     .from("foodos_restaurants")
     .select(`id, name, user_id, ${CONNECT_COLUMNS}`)
     .eq("id", restaurantId)
     .maybeSingle()
   if (error) throw new Error(error.message)
-  if (!data) throw new Error("Restaurante no encontrado")
+  if (!data || data.user_id !== ownerUserId) {
+    throw new Error("Restaurante no encontrado")
+  }
   const row = data as Pick<FoodosRestaurant, "id" | "name" | "user_id"> &
     Parameters<typeof connectStatusFromRestaurant>[0]
-  return { supabase, user, row, status: connectStatusFromRestaurant(row) }
+  return {
+    supabase,
+    user,
+    row,
+    status: connectStatusFromRestaurant(row),
+    ownerUserId,
+    impersonating: ctx.impersonating,
+  }
+}
+
+/**
+ * Correo con el que se crea la cuenta Express del restaurante.
+ *
+ * Al impersonar, `user` es el admin: usar su correo dejaría los cobros del
+ * dueño bajo la identidad de otra persona. El correo del dueño vive en
+ * `auth.users`, que sólo el service client puede leer; si no se puede leer se
+ * omite, porque Stripe lo vuelve a pedir durante el onboarding.
+ */
+async function expressAccountEmail(params: {
+  impersonating: boolean
+  ownerUserId: string
+  actorEmail: string | null
+}): Promise<string | null> {
+  if (!params.impersonating) return params.actorEmail
+  try {
+    const service = await createServiceClient()
+    const { data } = await service.auth.admin.getUserById(params.ownerUserId)
+    return data.user?.email ?? null
+  } catch (err) {
+    logger.warn("foodos.connect.owner_email", { error: String(err) })
+    return null
+  }
 }
 
 /**
@@ -102,14 +145,19 @@ async function loadOwnedRestaurant(restaurantId: string) {
 export async function startConnectOnboarding(
   restaurantId: string
 ): Promise<{ url: string }> {
-  const { user, row, status } = await loadOwnedRestaurant(restaurantId)
+  const { user, row, status, ownerUserId, impersonating } =
+    await loadOwnedRestaurant(restaurantId)
 
   let accountId = status.accountId
   if (!accountId) {
     accountId = await createExpressAccountForRestaurant({
       restaurantId: row.id,
       restaurantName: row.name,
-      email: user.email ?? null,
+      email: await expressAccountEmail({
+        impersonating,
+        ownerUserId,
+        actorEmail: user.email ?? null,
+      }),
     })
     // Escritura sensible → service client (00085 revoca la columna a
     // `authenticated`). El `eq` por user_id reafirma la propiedad.
@@ -118,7 +166,7 @@ export async function startConnectOnboarding(
       .from("foodos_restaurants")
       .update({ stripe_account_id: accountId })
       .eq("id", row.id)
-      .eq("user_id", user.id)
+      .eq("user_id", ownerUserId)
     if (error) {
       logger.error("foodos.connect.persist_account_failed", {
         restaurant: row.id,

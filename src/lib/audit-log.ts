@@ -37,6 +37,9 @@ export const AUDIT_ACTIONS = [
   "crm_sequence_save",
   "crm_sequence_toggle",
   "crm_sequence_cancel",
+  "foodos_operating_start",
+  "foodos_operating_stop",
+  "foodos_operating_action",
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -75,6 +78,9 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   crm_sequence_save: "Secuencia de goteo guardada",
   crm_sequence_toggle: "Secuencia de goteo activada o pausada",
   crm_sequence_cancel: "Inscripción en secuencia cancelada",
+  foodos_operating_start: "Sesión de soporte iniciada",
+  foodos_operating_stop: "Sesión de soporte terminada",
+  foodos_operating_action: "Acción de soporte en restaurante",
 }
 
 function isAuditAction(value: string): value is AuditAction {

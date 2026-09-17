@@ -10,8 +10,11 @@ import { test, expect } from "@playwright/test"
  *
  * ⚠️ Hueco cerrado (antes backlog P0): la recuperación de contraseña YA es
  * alcanzable desde el login. El disparador "¿Olvidaste tu contraseña?" llama a
- * `resetPasswordForEmail` y el enlace vuelve por /auth/callback con
- * `next=/auth/reset`, donde el usuario elige la contraseña nueva.
+ * `resetPasswordForEmail`; el destino (`/auth/reset`) viaja en la cookie
+ * `resurte_auth_next` y no como `?next=` en la `redirectTo`, porque la
+ * allow-list de "Redirect URLs" de Supabase valida la URL completa y una
+ * entrada exacta de `/auth/callback` no coincide con `/auth/callback?next=…`.
+ * El enlace vuelve por /auth/callback, que lee la cookie y manda a /auth/reset.
  *
  * El envío real no se prueba aquí (necesitaría backend de correo): lo que se
  * prueba es el disparador y el aviso de correo vacío, que es determinista y no

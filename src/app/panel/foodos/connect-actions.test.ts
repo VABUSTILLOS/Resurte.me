@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/auth", () => ({ requireAuth: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({ requireFoodosAuth: vi.fn() }))
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 vi.mock("@/lib/logger", () => ({
@@ -30,7 +31,7 @@ import {
   refreshConnectStatus,
   startConnectOnboarding,
 } from "./connect-actions"
-import { requireAuth } from "@/lib/auth"
+import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { createServiceClient } from "@/lib/supabase/service"
 import { logger } from "@/lib/logger"
 
@@ -68,9 +69,19 @@ function tableBuilder(row: unknown) {
 
 function setupSession(row: unknown) {
   const session = tableBuilder(row)
-  vi.mocked(requireAuth).mockResolvedValue({
-    supabase: { from: vi.fn(() => session.builder) },
+  const supabase = { from: vi.fn(() => session.builder) }
+  vi.mocked(requireFoodosAuth).mockResolvedValue({
+    supabase,
     user: USER,
+    ownerUserId: USER.id,
+    ctx: {
+      restaurantId: RESTAURANT.id,
+      ownerUserId: USER.id,
+      client: supabase,
+      impersonating: false,
+      actorUserId: USER.id,
+      actorEmail: USER.email,
+    },
   } as never)
   return session
 }

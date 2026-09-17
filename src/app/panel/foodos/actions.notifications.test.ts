@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/auth", () => ({ requireAuth: vi.fn(), getCurrentUser: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({ requireFoodosAuth: vi.fn() }))
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }))
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }))
 vi.mock("@/lib/foodos-notifications", () => ({ notifyFoodosCustomer: vi.fn() }))
@@ -11,7 +12,7 @@ vi.mock("next/server", async (importOriginal) => ({
 }))
 
 import { markOrderPaid, updateOrderStatus } from "./actions"
-import { requireAuth } from "@/lib/auth"
+import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { notifyFoodosCustomer } from "@/lib/foodos-notifications"
 import { revalidatePath } from "next/cache"
 
@@ -36,7 +37,7 @@ function setup(results: { read?: Result; write?: Result } = {}) {
     onFulfilled({ data: null, error: results.write?.error ?? null })
 
   const from = vi.fn(() => builder)
-  vi.mocked(requireAuth).mockResolvedValue({ supabase: { from } } as never)
+  vi.mocked(requireFoodosAuth).mockResolvedValue({ supabase: { from } } as never)
   return { builder, update, from }
 }
 

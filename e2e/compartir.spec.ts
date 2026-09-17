@@ -4,21 +4,26 @@ import { test, expect } from "@playwright/test"
  * E2E del share target PWA (W8) y de la lista compartida.
  *
  * `/compartir` resuelve cada renglón contra el catálogo con `searchProducts`.
- * Sin env de Supabase ese server action devuelve `[]`, así que el camino
- * verificable aquí es "sin coincidencia" — que además es el que no depende de
- * datos. El camino con productos (agregar al carrito) requiere catálogo real.
+ * Ese resultado depende del entorno (con Supabase configurado devuelve
+ * productos reales; sin él, `[]`), así que el camino verificable aquí es "sin
+ * coincidencia" con renglones que no existen en ningún catálogo: es el único
+ * que se comporta igual con y sin datos. El camino con productos reales
+ * ("agregar al carrito") depende del catálogo y no es determinista.
  */
 
 test.describe("lista compartida — share target PWA", { tag: "@ci" }, () => {
   /**
    * `/compartir` es un `<Suspense>` sobre un componente CLIENTE y la página no
-   * declara `force-dynamic`, así que NADA de su contenido viaja en la cáscara
-   * del servidor: todo aserto de esta suite es post-hidratación. El default de
-   * 5s medía la hidratación y no la página — de ahí los rojos intermitentes.
-   * El presupuesto va solo en el primer aserto de cada test: una vez hidratado,
-   * el resto resuelve al instante y no necesita margen propio.
+   * declara `force-dynamic`, así que la cáscara del servidor sólo trae
+   * "Cargando…": todo el contenido aparece al hidratar. Medido en caliente y sin
+   * carga, el contenido visible llega a ~2.2s; con 5 workers en paralelo supera
+   * el default de 5s, que medía la hidratación y no la página.
+   *
+   * El presupuesto va SÓLO en el primer aserto que exige contenido VISIBLE, y
+   * por eso `toHaveValue` no lo lleva: un textarea oculto ya tiene su valor, así
+   * que ese aserto pasa antes de que el componente se pinte y no espera nada.
    */
-  const HIDRATACION = { timeout: 20_000 }
+  const HIDRATACION = { timeout: 30_000 }
 
   test("sin lista muestra el estado vacío y no ofrece agregar nada", async ({ page }) => {
     const response = await page.goto("/compartir", { waitUntil: "domcontentloaded" })
@@ -41,18 +46,24 @@ test.describe("lista compartida — share target PWA", { tag: "@ci" }, () => {
       waitUntil: "domcontentloaded",
     })
 
-    await expect(page.getByLabel("Tu lista")).toHaveValue(lista, HIDRATACION)
-    // 3 renglones, 2+1+3 piezas.
-    await expect(page.getByText("3 productos · 6 piezas")).toBeVisible()
+    // 3 renglones, 2+1+3 piezas. Este resumen sale de `parseShareText`, así que
+    // no depende del catálogo; pero sí depende de que el cliente haya hidratado.
+    await expect(page.getByText("3 productos · 6 piezas")).toBeVisible(HIDRATACION)
+    await expect(page.getByLabel("Tu lista")).toHaveValue(lista)
   })
 
   test("los renglones sin coincidencia enlazan al buscador y bloquean el CTA", async ({ page }) => {
-    const lista = "2 kg de tomate\n1 lechuga"
+    // Palabras que no existen en ningún catálogo, para forzar el camino "sin
+    // coincidencia" de forma determinista. Antes este test usaba "tomate" y
+    // "lechuga", que SÍ están en el catálogo real: con Supabase configurado la
+    // página muestra "Encontrados (2)" y el aserto no podía pasar nunca, con
+    // cualquier timeout. El camino sin coincidencia es el único que se comporta
+    // igual con y sin catálogo, y por eso es el verificable aquí.
+    const lista = "2 kg de plonkxyz\n1 zzzqqq"
     await page.goto(`/compartir?texto=${encodeURIComponent(lista)}`, {
       waitUntil: "domcontentloaded",
     })
 
-    // Sin Supabase `searchProducts` devuelve []: todo cae en "sin coincidencia".
     // La resolución corre en el cliente contra un server action, así que el
     // primer aserto espera con holgura (el resto ya es inmediato).
     const sinCoincidencia = page.getByRole("heading", { name: /Sin coincidencia \(2\)/ })
@@ -65,8 +76,8 @@ test.describe("lista compartida — share target PWA", { tag: "@ci" }, () => {
     await expect(enlaces.first()).toHaveAttribute("href", /\/buscar\?q=/)
     // El deep link busca el sustantivo del renglón (sin cantidad ni unidad) y
     // conserva el orden de la lista, no el de otro renglón.
-    await expect(enlaces.first()).toHaveAttribute("href", /q=tomate$/)
-    await expect(enlaces.nth(1)).toHaveAttribute("href", /q=lechuga$/)
+    await expect(enlaces.first()).toHaveAttribute("href", /q=plonkxyz$/)
+    await expect(enlaces.nth(1)).toHaveAttribute("href", /q=zzzqqq$/)
 
     // Nada que agregar: el CTA queda deshabilitado y lo dice.
     await expect(
@@ -78,7 +89,8 @@ test.describe("lista compartida — share target PWA", { tag: "@ci" }, () => {
     await page.goto(`/compartir?titulo=${encodeURIComponent("2 kg de tomate")}`, {
       waitUntil: "domcontentloaded",
     })
-    await expect(page.getByLabel("Tu lista")).toHaveValue("2 kg de tomate", HIDRATACION)
+    await expect(page.getByLabel("Tu lista")).toBeVisible(HIDRATACION)
+    await expect(page.getByLabel("Tu lista")).toHaveValue("2 kg de tomate")
   })
 
   test("el manifest declara el share target GET hacia /compartir", async ({ request }) => {

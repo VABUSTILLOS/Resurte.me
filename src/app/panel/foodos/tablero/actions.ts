@@ -8,7 +8,7 @@
 // silencio y el reporte mentía a la baja. Aquí la ventana se filtra en SQL.
 // ============================================================
 
-import { requireAuth } from "@/lib/auth"
+import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { listRestaurantShifts, type ShiftRow } from "@/lib/foodos-shift"
 import type { FoodosOrder } from "@/types/foodos"
 
@@ -37,17 +37,10 @@ export async function getFoodosReportData(input: {
   branchId?: string | null
   now?: number
 }): Promise<FoodosReportData> {
-  const { supabase, user } = await requireAuth()
-
-  const { data: restaurant, error } = await supabase
-    .from("foodos_restaurants")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-
-  const restaurantId = (restaurant as { id: string } | null)?.id
+  const { ctx } = await requireFoodosAuth()
+  const restaurantId = ctx.restaurantId
   if (!restaurantId) return { orders: [], shifts: [], truncated: false }
+  const db = ctx.client
 
   const days = Math.min(Math.max(Math.trunc(input.days) || 1, 1), 365)
   const stamp =
@@ -55,7 +48,7 @@ export async function getFoodosReportData(input: {
   const cutoff = new Date(stamp - (days + 1) * DAY_MS).toISOString()
   const branchId = input.branchId ?? null
 
-  const base = supabase
+  const base = db
     .from("foodos_orders")
     .select("*")
     .eq("restaurant_id", restaurantId)
@@ -65,7 +58,7 @@ export async function getFoodosReportData(input: {
     (branchId ? base.eq("branch_id", branchId) : base)
       .order("created_at", { ascending: false })
       .limit(MAX_REPORT_ORDERS),
-    listRestaurantShifts(supabase, restaurantId),
+    listRestaurantShifts(db, restaurantId),
   ])
 
   if (ordersRes.error) throw new Error(ordersRes.error.message)

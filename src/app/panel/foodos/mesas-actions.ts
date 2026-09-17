@@ -23,8 +23,8 @@
 import { revalidatePath } from "next/cache"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { requireAuth } from "@/lib/auth"
 import { assertOwnRestaurant } from "@/lib/foodos-owner"
+import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { createFoodosOrder } from "@/lib/foodos-order-create"
 import { isPaymentMethod } from "@/lib/foodos-payments"
 import { findOpenShift, isNoOpenShiftError, requireOpenShift } from "@/lib/foodos-shift"
@@ -159,8 +159,8 @@ export async function getMesasData(
   branchId?: string | null
 ): Promise<MesasData | null> {
   if (!(await canUseMesas())) return null
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, restaurantId)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, restaurantId)
 
   const scope = branchId ?? null
 
@@ -319,8 +319,8 @@ export interface SaveZoneInput {
 
 export async function saveZone(input: SaveZoneInput): Promise<MesasResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const name = input.name?.trim()
   if (!name) return fail("Ponle nombre a la zona.")
@@ -364,8 +364,8 @@ export async function deleteZone(input: {
   id: string
 }): Promise<MesasResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   // `foodos_tables.zone_id` es ON DELETE SET NULL, así que borrar la zona no
   // borraría las mesas: las dejaría sin acomodo. Se avisa en vez de sorprender.
@@ -427,8 +427,8 @@ async function clampToZone(
 
 export async function saveTable(input: SaveTableInput): Promise<MesasResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const label = input.label?.trim()
   if (!label) return fail("Ponle nombre a la mesa.")
@@ -491,8 +491,8 @@ export async function moveTable(input: {
   pos_y: number
 }): Promise<MesasResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const { data: current } = await supabase
     .from("foodos_tables")
@@ -527,8 +527,8 @@ export async function deleteTable(input: {
   id: string
 }): Promise<MesasResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   // `foodos_table_tickets.table_id` es ON DELETE CASCADE: borrar una mesa con
   // cuenta abierta se llevaría por delante el rastro de una venta.
@@ -565,8 +565,8 @@ export async function openTable(input: {
   note?: string | null
 }): Promise<MesasResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, user, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const table = await loadTable(supabase, input.restaurant_id, input.table_id)
   if (!table) return fail("Mesa no encontrada.")
@@ -616,8 +616,8 @@ export interface SendToKitchenInput {
  */
 export async function sendToKitchen(input: SendToKitchenInput): Promise<MesasResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, user, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   if (!input.items?.length) return fail("No hay platillos que mandar a cocina.")
 
@@ -675,8 +675,8 @@ export async function requestBill(input: {
   requested: boolean
 }): Promise<MesasResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const ticket = await loadOpenTicket(supabase, input.restaurant_id, input.ticket_id)
   if (!ticket) return fail("Esta cuenta ya no está abierta.")
@@ -701,8 +701,8 @@ export async function setGuests(input: {
   guests: number
 }): Promise<MesasResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const ticket = await loadOpenTicket(supabase, input.restaurant_id, input.ticket_id)
   if (!ticket) return fail("Esta cuenta ya no está abierta.")
@@ -753,8 +753,8 @@ export async function transferTable(input: {
   table_id: string
 }): Promise<MesasResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const ticket = await loadOpenTicket(supabase, input.restaurant_id, input.ticket_id)
   if (!ticket) return fail("Esta cuenta ya no está abierta.")
@@ -802,8 +802,8 @@ export async function mergeTables(input: {
   target_ticket_id: string
 }): Promise<MesasResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, user, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   if (input.source_ticket_id === input.target_ticket_id) {
     return fail("Elige dos cuentas distintas.")
@@ -885,8 +885,8 @@ export interface CloseTableResult extends MesasResult {
  */
 export async function closeTable(input: CloseTableInput): Promise<CloseTableResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, user, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   if (!input.items?.length) return fail("La cuenta está vacía.")
 
@@ -994,8 +994,8 @@ export async function cancelTicket(input: {
   ticket_id: string
 }): Promise<MesasResult> {
   await requireFoodosFeature(MESAS_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, user, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const ticket = await loadOpenTicket(supabase, input.restaurant_id, input.ticket_id)
   if (!ticket) return fail("Esta cuenta ya no está abierta.")

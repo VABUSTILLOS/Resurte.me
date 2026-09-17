@@ -7,6 +7,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   requireFoodosFeature: vi.fn(),
   requireAuth: vi.fn(),
+  requireFoodosAuth: vi.fn(),
+  getOperatingContext: vi.fn(),
   createServiceClient: vi.fn(),
   revalidatePath: vi.fn(),
   revalidateTag: vi.fn(),
@@ -16,6 +18,10 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/auth", () => ({ requireAuth: mocks.requireAuth, getCurrentUser: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({
+  requireFoodosAuth: mocks.requireFoodosAuth,
+  getOperatingContext: mocks.getOperatingContext,
+}))
 vi.mock("@/lib/foodos-tier", () => ({ requireFoodosFeature: mocks.requireFoodosFeature }))
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: mocks.createServiceClient }))
 vi.mock("next/cache", () => ({
@@ -47,6 +53,24 @@ const RESTAURANT_ID = "rest-1"
 const PAGE_ID = "page-1"
 const DISH_ID = "dish-1"
 const USER = { id: "user-1", email: "dueno@example.com" }
+
+/**
+ * Respuesta del seam de operación para el caso normal (sin impersonación):
+ * `supabase` es el cliente de sesión que cada test fabrica, así que el
+ * camino que ejecuta la acción es exactamente el de siempre.
+ */
+function operating(supabase: unknown) {
+  const ctx = {
+    restaurantId: RESTAURANT_ID,
+    ownerUserId: USER.id,
+    client: supabase,
+    impersonating: false,
+    actorUserId: USER.id,
+    actorEmail: USER.email ?? null,
+  }
+  mocks.getOperatingContext.mockResolvedValue(ctx as never)
+  return { supabase, user: USER, ownerUserId: USER.id, ctx } as never
+}
 
 const RESTAURANT_ROW = {
   id: RESTAURANT_ID,
@@ -163,7 +187,7 @@ function upsertPayload(calls: Call[]): Record<string, unknown> {
 beforeEach(() => {
   vi.clearAllMocks()
   const { supabase } = defaultClient()
-  mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+  mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
   mocks.createServiceClient.mockResolvedValue(supabase)
   mocks.generateAboutText.mockResolvedValue({
     text: "En Taquería Centro atendemos con la receta de la familia desde el primer día.",
@@ -204,7 +228,7 @@ describe("sitio IA: bloqueado sin nivel Diamante", () => {
     ).rejects.toThrow()
 
     // Ni siquiera se resuelve la sesión: el gate corre primero.
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
     expect(mocks.requireFoodosFeature).toHaveBeenCalledWith("sitio_ia")
     // Y nada se genera ni se revalida.
     expect(mocks.generateAboutText).not.toHaveBeenCalled()
@@ -252,7 +276,7 @@ describe("sitio IA: desbloqueado", () => {
 
   it("la página generada nace en borrador y sin aprobar", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await generateSeoPage({ restaurant_id: RESTAURANT_ID, kind: "about" })
     expect(result.ok).toBe(true)
@@ -267,7 +291,7 @@ describe("sitio IA: desbloqueado", () => {
 
   it("la FAQ se arma sin modelo y se guarda como borrador", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await generateSeoPage({ restaurant_id: RESTAURANT_ID, kind: "faq" })
     expect(result.ok).toBe(true)
@@ -281,7 +305,7 @@ describe("sitio IA: desbloqueado", () => {
 
   it("la página del platillo añade el precio real que el modelo no puede escribir", async () => {
     const { supabase, calls } = defaultClient()
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     const result = await generateSeoPage({
       restaurant_id: RESTAURANT_ID,
@@ -309,7 +333,7 @@ describe("sitio IA: desbloqueado", () => {
       foodos_restaurants: { maybeSingle: { data: RESTAURANT_ROW, error: null } },
       foodos_menu_items: { maybeSingle: { data: null, error: null } },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
     await expect(
       generateSeoPage({ restaurant_id: RESTAURANT_ID, kind: "dish", menu_item_id: "otro" })
     ).resolves.toEqual({ ok: false, error: "Ese platillo ya no está en el menú" })
@@ -365,7 +389,7 @@ describe("sitio IA: desbloqueado", () => {
     const { supabase } = fakeClient({
       foodos_restaurants: { maybeSingle: { data: null, error: null } },
     })
-    mocks.requireAuth.mockResolvedValue({ supabase, user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(supabase))
 
     await expect(
       saveSeoProfileAction({ restaurant_id: RESTAURANT_ID, tagline: "Hola" })

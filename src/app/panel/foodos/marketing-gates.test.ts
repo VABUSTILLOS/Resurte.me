@@ -6,9 +6,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   requireFoodosFeature: vi.fn(),
   requireAuth: vi.fn(),
+  requireFoodosAuth: vi.fn(),
+  getOperatingContext: vi.fn(),
 }))
 
 vi.mock("@/lib/auth", () => ({ requireAuth: mocks.requireAuth, getCurrentUser: vi.fn() }))
+vi.mock("@/lib/foodos-operating", () => ({
+  requireFoodosAuth: mocks.requireFoodosAuth,
+  getOperatingContext: mocks.getOperatingContext,
+}))
 vi.mock("@/lib/foodos-tier", () => ({
   requireFoodosFeature: mocks.requireFoodosFeature,
 }))
@@ -32,6 +38,24 @@ import {
 
 const RESTAURANT_ID = "rest-1"
 const USER = { id: "user-1", email: "dueno@example.com" }
+
+/**
+ * Respuesta del seam de operación para el caso normal (sin impersonación):
+ * `supabase` es el cliente de sesión que cada test fabrica, así que el
+ * camino que ejecuta la acción es exactamente el de siempre.
+ */
+function operating(supabase: unknown) {
+  const ctx = {
+    restaurantId: RESTAURANT_ID,
+    ownerUserId: USER.id,
+    client: supabase,
+    impersonating: false,
+    actorUserId: USER.id,
+    actorEmail: USER.email ?? null,
+  }
+  mocks.getOperatingContext.mockResolvedValue(ctx as never)
+  return { supabase, user: USER, ownerUserId: USER.id, ctx } as never
+}
 
 /** Builder encadenable y "awaitable", como el de supabase-js. */
 function tableBuilder(rows: unknown = [], writes: unknown[] = []) {
@@ -79,10 +103,9 @@ function fakeClientMissing() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.requireAuth.mockResolvedValue({
-    supabase: fakeClient(),
-    user: USER,
-  })
+  mocks.requireFoodosAuth.mockResolvedValue(
+    operating(fakeClient()),
+  )
 })
 
 describe("marketing_ia: escrituras bloqueadas sin nivel", () => {
@@ -106,7 +129,7 @@ describe("marketing_ia: escrituras bloqueadas sin nivel", () => {
     ).rejects.toThrow()
 
     // La sesión ni se resuelve: el gate es lo primero que corre.
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
     expect(mocks.requireFoodosFeature).toHaveBeenCalledWith("marketing_ia")
   })
 
@@ -114,7 +137,7 @@ describe("marketing_ia: escrituras bloqueadas sin nivel", () => {
     await expect(listAutomations(RESTAURANT_ID)).resolves.toEqual([])
     await expect(listCampaigns(RESTAURANT_ID)).resolves.toEqual([])
     await expect(getCampaignAbStats(RESTAURANT_ID)).resolves.toEqual([])
-    expect(mocks.requireAuth).not.toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).not.toHaveBeenCalled()
   })
 })
 
@@ -127,12 +150,12 @@ describe("marketing_ia: con nivel suficiente", () => {
     await expect(listAutomations(RESTAURANT_ID)).resolves.toEqual([])
     await expect(listCampaigns(RESTAURANT_ID)).resolves.toEqual([])
     expect(mocks.requireFoodosFeature).toHaveBeenCalledWith("marketing_ia")
-    expect(mocks.requireAuth).toHaveBeenCalled()
+    expect(mocks.requireFoodosAuth).toHaveBeenCalled()
   })
 
   it("normaliza el experimento A/B: sin segundo mensaje no hay prueba", async () => {
     const writes: unknown[] = []
-    mocks.requireAuth.mockResolvedValue({ supabase: fakeClient({}, writes), user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(fakeClient({}, writes)))
 
     await upsertAutomation({
       restaurant_id: RESTAURANT_ID,
@@ -164,8 +187,8 @@ describe("marketing_ia: con nivel suficiente", () => {
   })
 
   it("el A/B se resume por variante sobre el reparto real", async () => {
-    mocks.requireAuth.mockResolvedValue({
-      supabase: fakeClient({
+    mocks.requireFoodosAuth.mockResolvedValue(
+    operating(fakeClient({
         foodos_campaigns: [
           { variant: "a", status: "sent" },
           { variant: "a", status: "sent" },
@@ -174,9 +197,8 @@ describe("marketing_ia: con nivel suficiente", () => {
           { variant: "b", status: "scheduled" },
           { variant: null, status: "sent" },
         ],
-      }),
-      user: USER,
-    })
+      })),
+  )
 
     await expect(getCampaignAbStats(RESTAURANT_ID)).resolves.toEqual([
       { variant: "a", sent: 2, failed: 1, total: 3 },
@@ -186,7 +208,7 @@ describe("marketing_ia: con nivel suficiente", () => {
 
   it("no deja escribir el CRM ni gastar IA sobre un restaurante ajeno", async () => {
     // `maybeSingle()` devuelve null: la fila existe pero no es suya.
-    mocks.requireAuth.mockResolvedValue({ supabase: fakeClientMissing(), user: USER })
+    mocks.requireFoodosAuth.mockResolvedValue(operating(fakeClientMissing()))
     await expect(
       updateCustomerProfile({ id: "cust-1", sms_opt_in: true })
     ).rejects.toThrow("Cliente no encontrado")
@@ -196,10 +218,9 @@ describe("marketing_ia: con nivel suficiente", () => {
   })
 
   it("valida la fecha de cumpleaños antes de escribir", async () => {
-    mocks.requireAuth.mockResolvedValue({
-      supabase: fakeClient({ foodos_customers: { id: "cust-1" } }),
-      user: USER,
-    })
+    mocks.requireFoodosAuth.mockResolvedValue(
+    operating(fakeClient({ foodos_customers: { id: "cust-1" } })),
+  )
     await expect(
       updateCustomerProfile({ id: "cust-1", birthday: "04/05/1990" })
     ).rejects.toThrow("Fecha de cumpleaños inválida")

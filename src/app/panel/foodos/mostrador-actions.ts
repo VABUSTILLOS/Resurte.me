@@ -19,8 +19,8 @@
 
 import { revalidatePath } from "next/cache"
 
-import { requireAuth } from "@/lib/auth"
 import { assertOwnRestaurant } from "@/lib/foodos-owner"
+import { requireFoodosAuth } from "@/lib/foodos-operating"
 import { createFoodosOrder } from "@/lib/foodos-order-create"
 import { isGeoPoint } from "@/lib/foodos-flotilla"
 import { quoteDelivery } from "@/lib/flotilla/deliveries"
@@ -103,8 +103,8 @@ export async function getMostradorData(
   branchId?: string | null
 ): Promise<MostradorData | null> {
   if (!(await canUseMostrador())) return null
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, restaurantId)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, restaurantId)
 
   const scope = branchId ?? null
 
@@ -203,8 +203,8 @@ export async function createMostradorSale(
   input: MostradorSaleInput
 ): Promise<MostradorSaleResult> {
   await requireFoodosFeature(MOSTRADOR_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, user, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const fulfillment = SERVICE_FULFILLMENT[input.service]
   if (!fulfillment) return fail("Tipo de servicio no reconocido.")
@@ -319,8 +319,8 @@ export async function quoteMostradorDelivery(input: {
   delivery_lng?: number | null
 }): Promise<MostradorQuote> {
   await requireFoodosFeature(MOSTRADOR_FEATURE)
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const branchId = input.branch_id ?? null
   if (!branchId) return { ok: false, error: "Elige una sucursal para cotizar la entrega." }

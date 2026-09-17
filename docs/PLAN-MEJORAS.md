@@ -92,7 +92,7 @@
 | U1-U7 | Fechas relativas, aria-labels, form accesible, badge predeterminada, scroll al editar | ✅ |
 | U8-U12 | Mostrar/ocultar contraseña, Bloq Mayús, autocomplete, hints, roles | ✅ |
 | U13 | **Passkeys / WebAuthn**: entrar sin contraseña con huella, rostro, PIN o llave física. `src/lib/supabase/client.ts` enciende el flag que auth-js exige para la API experimental (`auth: { experimental: { passkey: true } }`); sin él `signInWithPasskey`/`auth.passkey.*` lanzan **al llamarse**, no al construirse. `AuthForm` (modo login) añade "Entrar con llave de acceso" (`signInWithPasskey()`, sin correo: la credencial es descubrible), oculto si `isPasskeySupported()` es falso y detectado con `useSyncExternalStore` para que el servidor pinte `false` sin desajuste de hidratación (y sin el render extra de un `setState` en efecto). En `/recompensas?tab=profile` la `PasskeyCard` lista, crea (`registerPasskey()`), renombra (`passkey.update`) y borra (`passkey.delete`, con confirmación: es irreversible y puede dejar al usuario sin su única entrada). `src/lib/passkeys.ts` (reglas puras, 31 tests) concentra lo que no debe reimplementarse en la UI: la fecha en la zona canónica del proyecto, la etiqueta (nombre del usuario → fecha → "Llave de acceso"; **nunca un índice**, que se recorre al agregar otra), la validación del nombre (recorta antes de medir, tope 120) y el mapeo de errores a español. Dos decisiones de correctitud: (a) `ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY` se resuelve por el **nombre de la causa**, no como cancelación — auth-js lo usa tanto para `NotAllowedError` como para el caso desconocido, y tratarlo en bloque silenciaría fallos reales; (b) `NotAllowedError` **no** se suprime: el navegador no distingue "cerré la ventana" de "este dispositivo no tiene ninguna llave" (privacidad), así que `passkeyErrorMessage(err, flow)` da copy distinto al entrar (con salida por correo) y al crear. `isPasskeyCancelled` se reserva para el aborto explícito. La tarjeta se oculta entera —sin dejar hueco— si WebAuthn no existe o si el proyecto no tiene las passkeys habilitadas (`list()` falla) | ✅ |
-| U14 | **🔜 La recuperación de contraseña no tiene entrada** (hallazgo de la ronda 4, declarado). La **mitad receptora está construida y funciona**: `/auth/reset` cambia la contraseña con `supabase.auth.updateUser({ password })` (`src/app/auth/reset/page.tsx:57`) y `/auth/callback` intercambia el código por la sesión temporal. Falta la **mitad iniciadora**: `resetPasswordForEmail` aparece **solo en un comentario** (`src/app/auth/reset/page.tsx:14`) y **ningún control de la UI enlaza a esa ruta**. Consecuencia real, medida: quien olvida su contraseña **no tiene forma de entrar**; peor, el aviso de enlace caducado de la propia página (`:99`, copy **visible**) le dice que lo solicite «desde iniciar sesión con ¿Olvidaste tu contraseña?» — **un control que no existe**, así que el callejón es doble. `signInWithOtp` (enlace mágico) tampoco existe, aunque `docs/OPS.md` § 8.1 lo daba por implementado junto con la recuperación (**corregido ahí** en la ronda 4). **Por qué no se arregla aquí**: es una **decisión de producto** (¿recuperación por correo o enlace mágico? ¿dónde vive el control y con qué copy?) y **no es verificable de extremo a extremo** sin recibir el correo real, así que enviarlo sin poder probarlo violaría el invariante 5. **Boceto, una vez decidido**: en `AuthForm` (modo login) un control que pida el correo y llame a `supabase.auth.resetPasswordForEmail(email, { redirectTo: \`${SITE_URL}/auth/callback?next=/auth/reset\` })`, con guard de `isSupabaseConfigured()`, `rateLimited()` contra abuso, claves nuevas en **ambos** archivos de i18n (`es.ts` y `en.ts`, por el test de paridad) y, como **prerrequisito de dashboard**, la Redirect URL en la allow-list de Supabase (`docs/OPS.md` § 8.1 paso 4). Un test e2e puede verificar que el control existe y que la llamada se hace — **no la entrega** | 🔜 |
+| U14 | **La recuperación de contraseña ya tiene entrada** (hallazgo de la ronda 4, **cerrado en la ronda 9**). La **mitad receptora** ya funcionaba: `/auth/reset` cambia la contraseña con `supabase.auth.updateUser({ password })` y `/auth/callback` intercambia el código por la sesión temporal. La **mitad iniciadora** que faltaba ahora existe: `AuthForm` (modo login) tiene el disparador **"¿Olvidaste tu contraseña?"** (`type="button"`, `disabled` mientras carga), que con el correo vacío avisa **sin viajar a la red** («Escribe tu correo y te enviamos el enlace.») y con correo llama a `resetPasswordForEmail`. El mensaje de éxito es **neutral a propósito** («Si {correo} tiene una cuenta, te enviamos un enlace…»): no revela si la cuenta existe. **Decisión que evita una rotura silenciosa en producción**: el destino viaja en la **cookie** `resurte_auth_next` (`rememberNextPath("/auth/reset")`), **no** como `?next=` en la `redirectTo`. Supabase valida la URL de redirección completa contra la allow-list de *Redirect URLs*, así que una entrada exacta de `/auth/callback` no coincide con `/auth/callback?next=/auth/reset`: el proveedor cae al **Site URL** y el enlace habría llevado a `/` en vez de a `/auth/reset`, **sin error visible**. Es exactamente la razón por la que `src/lib/auth-next.ts` existe (lo dice su comentario) y por la que el `redirectTo` se queda limpio. Cubierto por `e2e/auth.spec.ts` (disparador presente en login, ausente en registro, y aviso de correo vacío — lo único determinista sin backend de correo). El enlace mágico (`signInWithOtp`) **sigue sin existir en `src/`** | ✅ |
 
 ## 7. Panel del restaurante
 
@@ -103,7 +103,7 @@
 | P11 | **Atajos 1-9 para abrir herramientas** | ✅ |
 | P12 | **Pedidos de la tienda en el hub**: el hub muestra el resumen del mostrador del día (`AppOrdersCard`) tras el resumen de ventas, con gate `canAccessTool(role, "foodos")` **además** del gate por nivel. `entryTotal` (`src/components/panel/ventas/ventas-shared.ts`) pasa a ser la **fuente única** de los totales del mostrador — recorta el descuento porcentual en 0 para que ningún total salga negativo — y `hubEntryTotal` (`hub-data.ts`) **delega** en él; antes era una copia que divergía y el hub podía mostrar un total negativo. `counterSummary(entries, day)` centraliza el filtro + suma del día. **Bug de zona horaria corregido**: las entradas se escriben con `todayStr()` (local) pero el hub comparaba con `new Date().toISOString().slice(0, 10)` (UTC), así que después de las ~18:00 de CDMX el hub mostraba $0 y perdía el resumen del día; los 5 sitios pasan a `todayStr()`. El copy de la tarjeta, incluido el plural, pasa por `t()` con un helper `plural()` porque i18n no tiene ICU | ✅ |
 | P13 | **"Ver" separado de "usar"**: el nivel de lealtad ya **no oculta los campos**. Las 10 herramientas premium (más `inbox`) se renderizan completas en cualquier nivel —campos visibles y recorribles, lecturas reales o vacías— y el nivel solo se pide al **usar**: guardar, cobrar, ejecutar. Se eliminó el muro `<NivelGate>` a pantalla completa (la página entera quedaba tapada); `nivel-gate.tsx` conserva solo `featureLabel`, `featureDescription` y `NivelProgress`. Predicado único `canUseFeature(tier, feature, { isAdmin })` / `lockedTierFor(...)` (`foodos-entitlements.ts`), consumido por el contexto y por `useTierGuard(feature)` (`src/hooks/use-tier-guard.tsx`), que envuelve cada escritura (~56 sitios) y ante falta de nivel devuelve `{ ran: false }` **sin viajar al servidor** abriendo `TierUpsellDialog`. `<ToolPreviewNotice>` avisa de la vista previa y ofrece **"Ver demo"** (el overlay de `ToolGuideHost` con 9 datasets nuevos en `TOOL_DEMOS`). **El administrador de plataforma queda exento en las dos capas** —`isCurrentUserAdmin()` en `requireFoodosFeature()` (solo en la ruta de fallo, así el camino normal no paga una lectura de rol extra) y `isAdmin` propagado desde `panel/layout.tsx`— porque su nivel real es Verde y sin la exención no podría probar ni dar soporte | ✅ |
-| P14 🔜 | **"Operar como restaurante" (fase 2)**: el admin ve la UI completa y ejecuta acciones, pero solo sobre el restaurante que ya posee. Falta un selector/impersonación para abrir la herramienta con los datos de **cualquier** restaurante (soporte real), con rastro de auditoría. Hasta entonces, un admin sin restaurante propio solo ve el estado de configuración | 🔜 |
+| P14 | **"Operar como restaurante" (fase 2)**: el admin ya puede abrir la herramienta con los datos de **cualquier** restaurante. Seam único `src/lib/foodos-operating.ts`: la cookie `resurte_foodos_operating` **solo pide** el restaurante y `isCurrentUserAdmin()` se revalida en cada llamada (caducidad 4 h, fail closed). Como todas las políticas de `foodos_*` son `auth.uid() = user_id`, al impersonar se lee y se escribe con **service role** —el seam pasa a ser la única barrera—, así que `requireFoodosAuth()` (149 llamadas en el panel) acota toda consulta de **visibilidad/propiedad** con `ownerUserId` y deja las columnas de **atribución** (`opened_by`, `cashier_user_id`, `reviewed_by`) en el usuario de la sesión. El nivel mostrado es el **real** del restaurante: la exención de admin se apaga mientras se impersona en las dos capas (`requireFoodosFeature` y el contexto del panel). Selector en `/admin/operar` (listado reutilizado de `/admin/restaurantes`, con nivel efectivo por restaurante, buscador y distintivos "Tu restaurante"/"Operando aquí"); franja ámbar no cerrable "Operando como X — Salir" en el panel, **fuera** del control de acceso para que el admin nunca quede atrapado, con `print:hidden` porque los tickets son del restaurante y no de la sesión. Auditoría en `admin_audit_log`: `foodos_operating_start`/`_stop` desde `operating-actions.ts` y `foodos_operating_action` en **cada** llamada mientras se impersona, lecturas incluidas (`getOperatingContext` no audita a propósito: corre en cada render del layout y registraría visitas, no acciones). `stopOperatingAs` sale **aunque el rol se haya revocado**. | ✅ |
 
 ## 8. Administración
 
@@ -347,29 +347,38 @@ matchean. Verificado verde en ambos projects contra el repo CI-equivalente.
    5 s el test medía el arranque en frío. Arreglado con **`timeout: 15000`** en
    los 4 tests del 404 — **sin tocar una sola aserción**, porque las aserciones
    eran correctas.
+   **La ronda 9 volvió a medir esto y el `timeout: 15000` resultó insuficiente**:
+   el `h1 "404"` tarda **~2.1 s en caliente pero >30 s con 5 workers en
+   paralelo** — y ahí no se arregla subiéndole el número, porque un aserto de
+   visibilidad mide la **hidratación del servidor de desarrollo**, que no tiene
+   cota, no una propiedad del producto. En `e2e/foodos.spec.ts` los dos tests del
+   micrositio pasan a afirmar **el cuerpo de la respuesta** (`status()` 404 +
+   `"El restaurante que buscas no existe"`), que llega en la cáscara y es estable
+   en milisegundos. Detalle de por qué ese copy discrimina: aparece **1 vez** en
+   `/r/**` y **0 veces** en el boundary raíz, así que prueba que respondió **este**
+   boundary y no el genérico — y, al ser ramas mutuamente excluyentes, implica
+   que la vista del restaurante no se renderizó.
 3. **El CI no sirvió como línea base.** Llevaba **6 corridas consecutivas en
    rojo en `main`** por estados intermedios rotos de otras sesiones (un `TS2300`
    por identificador duplicado, Knip), así que la comparación válida es
    **local y con `--retries=2`**.
 
-**Dos hallazgos de producto, declarados y no arreglados aquí:**
+**Dos hallazgos de producto, declarados aquí y hoy resueltos:**
 
-1. **La recuperación de contraseña no tiene entrada** (rastreada como **U14 🔜**
-   en § 6). La **mitad receptora funciona** (`/auth/reset` cambia la contraseña
-   con `updateUser`, y `/auth/callback` intercambia el código por la sesión
-   temporal); falta la **mitad iniciadora**: `resetPasswordForEmail` aparece
-   **únicamente en un comentario** y **nada enlaza a esa ruta**. Dos agravantes
-   que encontré al comprobar la propiedad del hallazgo: (a) el aviso de enlace
-   caducado de la propia página es **copy visible** y le dice al usuario que lo
-   solicite «desde iniciar sesión con ¿Olvidaste tu contraseña?» — **un control
-   que no existe**, así que el callejón sin salida es doble; (b) `docs/OPS.md`
-   § 8.1 **daba por implementados** este flujo y el enlace mágico
-   (`signInWithOtp`, que **no existe en `src/`**) y avisaba de que ambos consumen
-   el SMTP. **Corregido ahí**: hoy el único consumidor del SMTP es la
-   confirmación de registro. Sigue siendo una **decisión de producto** (¿correo o
-   enlace mágico? ¿copy?), y **no es verificable de extremo a extremo** sin
-   recibir el correo real — por eso se declara con el boceto exacto en vez de
-   enviarse sin poder probarlo.
+1. **La recuperación de contraseña no tenía entrada** (rastreada como **U14**,
+   **cerrada en la ronda 9** — ver esa fila). La **mitad receptora funcionaba**
+   (`/auth/reset` cambia la contraseña con `updateUser`, y `/auth/callback`
+   intercambia el código por la sesión temporal); faltaba la **mitad
+   iniciadora**: `resetPasswordForEmail` aparecía **únicamente en un comentario**
+   y **nada enlazaba a esa ruta**. Dos agravantes que encontré al comprobar la
+   propiedad del hallazgo: (a) el aviso de enlace caducado de la propia página es
+   **copy visible** y le dice al usuario que lo solicite «desde iniciar sesión con
+   ¿Olvidaste tu contraseña?» — **un control que no existía**, así que el callejón
+   sin salida era doble; (b) `docs/OPS.md` § 8.1 **daba por implementados** este
+   flujo y el enlace mágico (`signInWithOtp`, que **no existe en `src/`**) y
+   avisaba de que ambos consumen el SMTP. **Corregido ahí** en la ronda 4: hoy
+   `docs/OPS.md` § 8.1 vuelve a listar la recuperación como flujo vivo y deja el
+   enlace mágico como no construido.
 2. **El pill de la guía tapaba "Aceptar todas"** (bug #2, ya arreglado arriba en
    M6).
 
@@ -424,6 +433,46 @@ vendedores** sin tocar ninguna política, y el admin la reparte desde el panel.
 para degradar avisando (`logger.warn`) en vez de romper cuando la migración no
 está aplicada, así que el orden de despliegue no es un riesgo de caída.
 
+### Ronda 6 — Leads CRM: bandeja, reparto y nutrición
+
+El CRM de leads sabía **captar y repartir**, pero no **conversar**. El webhook de
+WhatsApp ya persistía cada mensaje entrante en `whatsapp_messages` y **nadie los
+leía**: no existía ninguna vista de conversación en todo el panel. Tampoco había
+forma de responder desde el CRM, ni de saber a quién le tocaba, ni de nutrir un
+lead frío sin escribirle uno por uno.
+
+La ronda toma los cuatro pilares que le faltaban al panel respecto a una
+herramienta de chat empresarial —**bandeja de conversaciones, reparto con SLA,
+etiquetas y nutrición por secuencias, y asistente de respuesta**— y los
+implementa **proyectando lo que ya existe** en vez de crear un segundo almacén
+de conversaciones. La bandeja es una **cuarta pestaña** de `/admin/leads`, y la
+conversación del lead vive dentro de su drawer: el mismo lugar donde ya se
+trabajaba el prospecto.
+
+| # | Fase | Estado |
+|---|---|---|
+| C1 | **Migración `00140`**: `crm_prospects.tags TEXT[] NOT NULL DEFAULT '{}'` + índice GIN; columna generada `whatsapp_messages.from_digits` (`NULLIF(right(regexp_replace(from_number,'\D','','g'),10),'')`) + índice `(from_digits, created_at DESC)` — el primer índice que hace consultable el teléfono sin depender de formato; `crm_quick_replies` (título único + índice parcial de activas); `crm_sequences` / `crm_sequence_steps` / `crm_sequence_enrollments` con `CHECK` de payload, `UNIQUE(sequence_id, step_order)` y `UNIQUE(sequence_id, prospect_id)`. RLS **habilitada con cero políticas** en las cuatro tablas nuevas; **ninguna** política existente relajada | ✅ |
+| C2 | **Motor puro de bandeja** (`src/lib/crm-inbox.ts`): ventana de 24 h (`whatsappWindowState`, `canSendFreeForm`, `requiresTemplate`), hilos (`mergeTimeline`, `buildThread`), buckets (`INBOX_BUCKETS`), tiempo de primera respuesta, plantillas de respuesta rápida (`renderQuickReply` deja **literal** la variable desconocida) y programación de pasos (`nextSequenceRun`). Corrección clave de supuesto: `from_number` es **el cliente** en ambas direcciones. 64 pruebas | ✅ |
+| C3 | **Reparto y SLA** (`src/lib/crm-assignment.ts`): `buildSellerLoad`, `distributeProspects` con desempate por `sellerId` ascendente (reparto **determinista**, no aleatorio), `buildSlaBoard`, `firstResponseStats` + `percentile`. `formatMinutes` devuelve `"—"` para `null`/`undefined`/`NaN`, porque un tiempo de respuesta no medido **no es cero**. 48 pruebas | ✅ |
+| C4 | **Server actions** (`src/app/admin/actions.ts`): `getAdminLeadConversation`, `sendLeadMessage` (**revalida la ventana de 24 h en el servidor**), `saveQuickReply`, `setCrmProspectTags`, `bulkTagProspects`, `phoneLookupVariants` para tolerar la lada (`52`/`521`). Nueve acciones de auditoría; el `detail` de un envío guarda `{template, characters}` y **nunca el cuerpo** | ✅ |
+| C5 | **Pestaña *Bandeja*** (`LeadConversations.tsx`): lista de hilos ordenada por urgencia, contadores por bucket, y panel de conversación reutilizable **dentro del drawer del lead**. El compositor se bloquea fuera de ventana y ofrece plantilla | ✅ |
+| C6 | **SLA en el embudo**: sección nueva con tablero por bucket, tiempos de primera respuesta (mediana/p90) y carga por vendedor. Todo indicador sin datos se declara *no medido* | ✅ |
+| C7 | **Etiquetas** (`src/lib/crm-tags.ts`): normalización (`MAX_TAG_LENGTH` 24, `MAX_TAGS_PER_PROSPECT` 12), `parseTagInput` que parte por coma, punto y coma y salto de línea, y filtro `?tag=` integrado en la allowlist de la URL. Columna nueva en el CSV. 30 pruebas | ✅ |
+| C8 | **Secuencias de nutrición** (`src/lib/crm-sequences-engine.ts`): motor que corre en el cron diario como job `crm-sequences`, con tope por pasada (`MAX_SEQUENCE_SENDS_PER_RUN` 50), dedupe por `dedupe_key` (el `23505` cuenta como `skipped`), y **`is_active` por defecto `false`** — activar es un acto explícito del admin y no hay forma de hacerlo por URL. 25 pruebas | ✅ |
+| C9 | **Asistente de respuesta** (`src/lib/crm-ai.ts`): arma el contexto del hilo redactando PII (`maskPhone`, `maskEmail`, `redactFreeText`) y **propone** un borrador; `suggestLeadReply` cae a `buildFallbackReply` (plantilla) cuando el proveedor no responde. **Nunca auto-envía** y nunca pone un teléfono o correo completo en el prompt. 29 pruebas | ✅ |
+| C10 | **Contratos y e2e**: `src/lib/crm-inbox.contract.test.ts` (43 pruebas) ata `00140`/`00097` al motor puro — columna generada equivalente a `phoneKey()`, `is_active` en `false`, `CHECK` de `status` ↔ `SequenceAdvance`, RLS sin políticas, y la **ausencia** de columnas desnormalizadas de último mensaje; cinco bloques `@ci` nuevos en `e2e/admin-leads.spec.ts` (guard de la pestaña, allowlist de `?view=`, `?tag=`, combinación completa de filtros y "las secuencias no se activan por URL") | ✅ |
+| C11 | **Documentación**: invariantes de la ronda en `docs/agents/admin.md` y esta sección | ✅ |
+
+**Verificación de la ronda**: `npx tsc --noEmit` → 0 · `npm run lint` → 0 ·
+`npm test` → 4506 passed / 0 failed (271 archivos) · `npm run build` → 0.
+
+**Ni `00139` ni `00140` se pudieron aplicar en este entorno** (no hay Docker ni
+`psql`): ambas quedan escritas y listas para `supabase db push`. El código está
+escrito para degradar avisando (`logger.warn`) en vez de romper cuando la
+migración no está aplicada — en particular la bandeja empareja por
+`from_number` y **no** por la columna generada, así que funciona con 00140 sin
+aplicar.
+
 ## 9. Blog
 
 | # | Fase | Estado |
@@ -459,7 +508,8 @@ fijaron con `src/lib/admin-productos-contrast.contract.test.ts` (filas
 **B36**/**B37** en § 8) — mientras no haya credenciales de admin en CI, ese
 contrato es el único gate posible para esa superficie.
 Queda un rojo **intermitente** que pasa aislado bajo carga paralela
-(`e2e/compartir.spec.ts`). El otro, `e2e/mobile-chrome.spec.ts:28`, resultó ser
+(`e2e/compartir.spec.ts`) — **cerrado en la ronda 9** (ver esa sección). El otro,
+`e2e/mobile-chrome.spec.ts:28`, resultó ser
 un fallo **real de producto** —no un flake— y quedó arreglado en la **ronda 4**
 (ver esa sección): el pill de la guía del panel
 (`src/components/panel/guide/guide-toggle-button.tsx`, commit `61decf1`,
@@ -472,7 +522,10 @@ hidratar el payload de flight —tras hidratar, el título **sí** es el del
 segmento, el de `generateMetadata` de `src/app/[slug]/page.tsx`—, así que con el
 timeout por defecto de 5 s el test no alcanzaba a verlo en frío. Arreglado con
 `timeout: 15000` en los 4, **sin tocar ninguna aserción**: las aserciones eran
-correctas.
+correctas. **La ronda 9 midió que `15000` tampoco alcanza** (el `h1` tarda >30 s
+con 5 workers) y resolvió el caso del micrositio afirmando el **cuerpo de la
+respuesta** en vez de la hidratación — ver la lección 2 de la ronda 4 y la
+sección de la ronda 9.
 `npx tsc --noEmit`, `npm test` y `npm run build` están en verde para el código
 de las rondas 1–4. **Al cerrar la ronda 4 los tres gates quedaron en rojo por
 trabajo en vuelo de otra sesión** (la ronda 5, Leads CRM: `src/app/admin/leads/page.tsx`,

@@ -843,6 +843,15 @@ const en: Dictionary = {
         "Bulk menus, an event quoter and a dedicated page to receive catering requests.",
     },
 
+    // "Operate as restaurant" (P14): the admin's support session.
+    operating: {
+      banner: "Operating as {name}",
+      bannerHint: "Any change you make is saved to their restaurant.",
+      bannerExit: "Exit",
+      bannerExiting: "Exiting…",
+      bannerExitError: "We could not close the support session. Please try again.",
+    },
+
     // AI waiter: WhatsApp ordering agent (Diamond tier).
     mesero: {
       title: "AI waiter",

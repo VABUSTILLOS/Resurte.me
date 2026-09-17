@@ -3,12 +3,18 @@
 // ============================================================
 // Server Actions de FoodOS: CRUD de restaurante, menú, combos,
 // reglas, clientes, automatizaciones y pedidos.
-// Todas usan requireAuth() y respetan RLS (owner-only).
+// Todas usan requireFoodosAuth() y respetan RLS (owner-only).
+//
+// Ese helper devuelve el cliente que corresponde al restaurante operado: el de
+// cookies en el camino normal y el de service role cuando un admin opera como
+// otro restaurante (P14). Por eso lo que se compara contra `user_id` **nunca**
+// es `user.id` sino `ownerUserId`, el dueño efectivo.
 // ============================================================
 
-import { requireAuth, getCurrentUser } from "@/lib/auth"
+import { getCurrentUser } from "@/lib/auth"
 import { requireFoodosFeature } from "@/lib/foodos-tier"
 import { assertOwnRestaurant } from "@/lib/foodos-owner"
+import { getOperatingContext, requireFoodosAuth } from "@/lib/foodos-operating"
 import { reportServerError } from "@/lib/error-log"
 import { dailyTokenCap } from "@/lib/ai/budget"
 import { loadAiUsage, type AiUsageSnapshot } from "@/lib/ai/usage"
@@ -101,47 +107,54 @@ import type {
  * `getMyRestaurant()` y luego disparar N server actions más por página.
  *
  * Cada página del panel consume solo las listas que necesita.
+ *
+ * El restaurante sale del seam de operación (`getOperatingContext`): un admin
+ * con impersonación activa carga el restaurante ajeno, y en ese caso las
+ * lecturas van con service role porque RLS las devolvería vacías.
  */
 export async function getFoodosPanelData() {
-  const { supabase, user } = await requireAuth()
-  const { data: restaurant, error: rErr } = await supabase
+  const { supabase, user } = await requireFoodosAuth()
+  const ctx = await getOperatingContext(supabase, user)
+  const empty = {
+    restaurant: null,
+    branches: [],
+    orders: [],
+    customers: [],
+    categories: [],
+    items: [],
+    combos: [],
+    rules: [],
+    automations: [],
+    campaigns: [],
+    optionGroups: [],
+    optionValues: [],
+  }
+  if (!ctx.restaurantId) return empty
+
+  const db = ctx.client
+  const { data: restaurant, error: rErr } = await db
     .from("foodos_restaurants")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("id", ctx.restaurantId)
     .maybeSingle()
   if (rErr) throw new Error(rErr.message)
 
   const r = restaurant as FoodosRestaurant | null
-  if (!r) {
-    return {
-      restaurant: null,
-      branches: [],
-      orders: [],
-      customers: [],
-      categories: [],
-      items: [],
-      combos: [],
-      rules: [],
-      automations: [],
-      campaigns: [],
-      optionGroups: [],
-      optionValues: [],
-    }
-  }
+  if (!r) return empty
 
   const [branches, orders, customers, categories, items, combos, rules, automations, campaigns, optionGroups, optionValues] =
     await Promise.all([
-      supabase.from("foodos_branches").select("*").eq("restaurant_id", r.id).order("name"),
-      supabase.from("foodos_orders").select("*").eq("restaurant_id", r.id).order("created_at", { ascending: false }).limit(200),
-      supabase.from("foodos_customers").select("*").eq("restaurant_id", r.id).order("total_spend", { ascending: false }).limit(500),
-      supabase.from("foodos_menu_categories").select("*").eq("restaurant_id", r.id).order("sort_order"),
-      supabase.from("foodos_menu_items").select("*").eq("restaurant_id", r.id).order("sort_order"),
-      supabase.from("foodos_combos").select("*").eq("restaurant_id", r.id).order("created_at"),
-      supabase.from("foodos_upsell_rules").select("*").eq("restaurant_id", r.id).order("created_at"),
-      supabase.from("foodos_automations").select("*").eq("restaurant_id", r.id).order("created_at"),
-      supabase.from("foodos_campaigns").select("*").eq("restaurant_id", r.id).order("created_at", { ascending: false }).limit(200),
-      supabase.from("foodos_item_option_groups").select("*").eq("restaurant_id", r.id).order("sort_order"),
-      supabase.from("foodos_item_option_values").select("*").eq("restaurant_id", r.id).order("sort_order"),
+      db.from("foodos_branches").select("*").eq("restaurant_id", r.id).order("name"),
+      db.from("foodos_orders").select("*").eq("restaurant_id", r.id).order("created_at", { ascending: false }).limit(200),
+      db.from("foodos_customers").select("*").eq("restaurant_id", r.id).order("total_spend", { ascending: false }).limit(500),
+      db.from("foodos_menu_categories").select("*").eq("restaurant_id", r.id).order("sort_order"),
+      db.from("foodos_menu_items").select("*").eq("restaurant_id", r.id).order("sort_order"),
+      db.from("foodos_combos").select("*").eq("restaurant_id", r.id).order("created_at"),
+      db.from("foodos_upsell_rules").select("*").eq("restaurant_id", r.id).order("created_at"),
+      db.from("foodos_automations").select("*").eq("restaurant_id", r.id).order("created_at"),
+      db.from("foodos_campaigns").select("*").eq("restaurant_id", r.id).order("created_at", { ascending: false }).limit(200),
+      db.from("foodos_item_option_groups").select("*").eq("restaurant_id", r.id).order("sort_order"),
+      db.from("foodos_item_option_values").select("*").eq("restaurant_id", r.id).order("sort_order"),
     ])
 
   for (const q of [branches, orders, customers, categories, items, combos, rules, automations, campaigns, optionGroups, optionValues]) {
@@ -180,7 +193,7 @@ export async function upsertRestaurant(input: {
   transfer_bank?: string | null
   transfer_beneficiary?: string | null
 }): Promise<FoodosRestaurant> {
-  const { supabase, user } = await requireAuth()
+  const { supabase, user, ownerUserId } = await requireFoodosAuth()
 
   const slug = slugify(input.slug || input.name)
   if (!slug) throw new Error("Escribe un nombre o slug válido")
@@ -219,7 +232,7 @@ export async function upsertRestaurant(input: {
       .from("foodos_restaurants")
       .update(payload)
       .eq("id", input.id)
-      .eq("user_id", user.id)
+      .eq("user_id", ownerUserId)
       .select("*")
       .single()
   } else {
@@ -240,12 +253,12 @@ export async function setRestaurantStatus(
   id: string,
   status: FoodosRestaurantStatus
 ): Promise<void> {
-  const { supabase, user } = await requireAuth()
+  const { supabase, ownerUserId } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_restaurants")
     .update({ status })
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", ownerUserId)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/restaurante")
   revalidatePath("/panel/foodos/tablero")
@@ -258,7 +271,7 @@ export async function setRestaurantStatus(
 export async function listBranches(
   restaurantId: string
 ): Promise<FoodosBranch[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_branches")
     .select("*")
@@ -283,14 +296,14 @@ export async function upsertBranch(input: {
   delivery_fee: number
   min_order: number
 }): Promise<void> {
-  const { supabase, user } = await requireAuth()
+  const { supabase, ownerUserId } = await requireFoodosAuth()
 
   // Verificar que el restaurante es del usuario
   const { data: owned } = await supabase
     .from("foodos_restaurants")
     .select("id")
     .eq("id", input.restaurant_id)
-    .eq("user_id", user.id)
+    .eq("user_id", ownerUserId)
     .maybeSingle()
   if (!owned) throw new Error("Restaurante no encontrado")
 
@@ -317,7 +330,7 @@ export async function upsertBranch(input: {
 }
 
 export async function deleteBranch(id: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase.from("foodos_branches").delete().eq("id", id)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/restaurante")
@@ -330,7 +343,7 @@ export async function deleteBranch(id: string): Promise<void> {
 export async function listBranchHours(
   branchId: string
 ): Promise<FoodosBranchHours[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_branch_hours")
     .select("*")
@@ -350,7 +363,7 @@ export async function upsertBranchHours(
     is_closed: boolean
   }>
 ): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const rows = days
     .filter((d) => d.day_of_week >= 0 && d.day_of_week <= 6)
     .map((d) => ({
@@ -374,7 +387,7 @@ export async function upsertBranchHours(
 export async function listCategories(
   restaurantId: string
 ): Promise<FoodosMenuCategory[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_menu_categories")
     .select("*")
@@ -387,7 +400,7 @@ export async function listCategories(
 export async function listMenuItems(
   restaurantId: string
 ): Promise<FoodosMenuItem[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_menu_items")
     .select("*")
@@ -403,7 +416,7 @@ export async function upsertCategory(input: {
   name: string
   sort_order: number
 }): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = input.id
     ? await supabase
         .from("foodos_menu_categories")
@@ -422,7 +435,7 @@ export async function upsertCategory(input: {
 }
 
 export async function deleteCategory(id: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_menu_categories")
     .delete()
@@ -445,7 +458,7 @@ export async function upsertMenuItem(input: {
   tags?: string[]
   sort_order?: number
 }): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const payload = {
     restaurant_id: input.restaurant_id,
     category_id: input.category_id ?? null,
@@ -468,7 +481,7 @@ export async function upsertMenuItem(input: {
 }
 
 export async function deleteMenuItem(id: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_menu_items")
     .delete()
@@ -488,7 +501,7 @@ export async function bulkUpsertMenuItems(
     tags?: string[]
   }>
 ): Promise<{ added: number }> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const rows = items.map((i) => ({
     restaurant_id: restaurantId,
     category_id: i.category_id ?? null,
@@ -512,7 +525,7 @@ export async function bulkUpsertMenuItems(
 export async function listOptionGroups(
   restaurantId: string
 ): Promise<FoodosItemOptionGroup[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_item_option_groups")
     .select("*")
@@ -525,7 +538,7 @@ export async function listOptionGroups(
 export async function listOptionValues(
   restaurantId: string
 ): Promise<FoodosItemOptionValue[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_item_option_values")
     .select("*")
@@ -545,7 +558,7 @@ export async function upsertOptionGroup(input: {
   max_select?: number
   sort_order?: number
 }): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const payload = {
     restaurant_id: input.restaurant_id,
     item_id: input.item_id,
@@ -566,7 +579,7 @@ export async function upsertOptionGroup(input: {
 }
 
 export async function deleteOptionGroup(id: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_item_option_groups")
     .delete()
@@ -584,7 +597,7 @@ export async function upsertOptionValue(input: {
   is_available?: boolean
   sort_order?: number
 }): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const payload = {
     group_id: input.group_id,
     restaurant_id: input.restaurant_id,
@@ -604,7 +617,7 @@ export async function upsertOptionValue(input: {
 }
 
 export async function deleteOptionValue(id: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_item_option_values")
     .delete()
@@ -618,7 +631,7 @@ export async function deleteOptionValue(id: string): Promise<void> {
 // ------------------------------------------------------------
 
 export async function listCombos(restaurantId: string): Promise<FoodosCombo[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_combos")
     .select("*")
@@ -638,7 +651,7 @@ export async function upsertCombo(input: {
   is_active?: boolean
   highlight?: boolean
 }): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const payload = {
     restaurant_id: input.restaurant_id,
     name: input.name,
@@ -656,7 +669,7 @@ export async function upsertCombo(input: {
 }
 
 export async function deleteCombo(id: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase.from("foodos_combos").delete().eq("id", id)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/combos")
@@ -665,7 +678,7 @@ export async function deleteCombo(id: string): Promise<void> {
 export async function listUpsellRules(
   restaurantId: string
 ): Promise<FoodosUpsellRule[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_upsell_rules")
     .select("*")
@@ -686,7 +699,7 @@ export async function upsertUpsellRule(input: {
   boost_amount?: number
   is_active?: boolean
 }): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const payload = {
     restaurant_id: input.restaurant_id,
     name: input.name,
@@ -705,7 +718,7 @@ export async function upsertUpsellRule(input: {
 }
 
 export async function deleteUpsellRule(id: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_upsell_rules")
     .delete()
@@ -733,21 +746,17 @@ export async function getOrdersSummary(): Promise<{
   const user = await getCurrentUser()
   if (!user) return null
   const supabase = await createClient()
-  const { data: restaurant } = await supabase
-    .from("foodos_restaurants")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle()
-  if (!restaurant) return null
+  const ctx = await getOperatingContext(supabase, user)
+  if (!ctx.restaurantId) return null
 
   const now = new Date()
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
   const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  const { data: orders, error } = await supabase
+  const { data: orders, error } = await ctx.client
     .from("foodos_orders")
     .select("total, status, created_at")
-    .eq("restaurant_id", restaurant.id)
+    .eq("restaurant_id", ctx.restaurantId)
     .gte("created_at", startOfWeek)
   if (error) throw new Error(error.message)
 
@@ -778,15 +787,11 @@ export async function getAiUsage(): Promise<AiUsageSnapshot | null> {
     const user = await getCurrentUser()
     if (!user) return null
     const supabase = await createClient()
-    const { data: restaurant } = await supabase
-      .from("foodos_restaurants")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-    if (!restaurant) return null
+    const ctx = await getOperatingContext(supabase, user)
+    if (!ctx.restaurantId) return null
     // El tope es el mismo que aplica `reserveAiBudget`; si divergieran, el
     // aviso al 80 % mentiría.
-    return await loadAiUsage(supabase, restaurant.id, { cap: dailyTokenCap() })
+    return await loadAiUsage(ctx.client, ctx.restaurantId, { cap: dailyTokenCap() })
   } catch (error) {
     logger.warn("foodos.ai-usage.action", {
       message: error instanceof Error ? error.message : String(error),
@@ -796,7 +801,7 @@ export async function getAiUsage(): Promise<AiUsageSnapshot | null> {
 }
 
 export async function listOrders(restaurantId: string) {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_orders")
     .select("*")
@@ -818,17 +823,13 @@ export async function listOrdersForSync(): Promise<FoodosOrder[]> {
   const user = await getCurrentUser()
   if (!user) return []
   const supabase = await createClient()
-  const { data: restaurant } = await supabase
-    .from("foodos_restaurants")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle()
-  if (!restaurant) return []
+  const ctx = await getOperatingContext(supabase, user)
+  if (!ctx.restaurantId) return []
 
-  const { data, error } = await supabase
+  const { data, error } = await ctx.client
     .from("foodos_orders")
     .select("id, items, total, discount, subtotal, delivery_fee, channel, fulfillment, status, payment_status, payment_method, customer_name, created_at")
-    .eq("restaurant_id", restaurant.id)
+    .eq("restaurant_id", ctx.restaurantId)
     .eq("payment_status", "paid")
     .neq("status", "cancelled")
     .order("created_at", { ascending: false })
@@ -841,7 +842,7 @@ export async function updateOrderStatus(
   orderId: string,
   status: FoodosOrderStatus
 ): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
 
   const { data: current, error: readError } = await supabase
     .from("foodos_orders")
@@ -896,7 +897,7 @@ export async function listAutomations(
   restaurantId: string
 ): Promise<FoodosAutomation[]> {
   if (!(await canUseMarketingIa())) return []
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_automations")
     .select("*")
@@ -923,7 +924,7 @@ export async function upsertAutomation(input: {
   is_active?: boolean
 }): Promise<void> {
   await requireFoodosFeature("marketing_ia")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const messageB = input.message_b?.trim() || null
   const payload = {
     restaurant_id: input.restaurant_id,
@@ -951,7 +952,7 @@ export async function toggleAutomation(
   isActive: boolean
 ): Promise<void> {
   await requireFoodosFeature("marketing_ia")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_automations")
     .update({ is_active: isActive })
@@ -971,14 +972,14 @@ export async function updateCustomerProfile(input: {
   sms_opt_in?: boolean
 }): Promise<void> {
   await requireFoodosFeature("marketing_ia")
-  const { supabase, user } = await requireAuth()
+  const { supabase, ownerUserId } = await requireFoodosAuth()
   // Defensa en profundidad: el RLS ya protege, pero verificamos la
   // propiedad del restaurante antes de escribir.
   const { data: owned } = await supabase
     .from("foodos_customers")
     .select("id, foodos_restaurants!inner(user_id)")
     .eq("id", input.id)
-    .eq("foodos_restaurants.user_id", user.id)
+    .eq("foodos_restaurants.user_id", ownerUserId)
     .maybeSingle()
   if (!owned) throw new Error("Cliente no encontrado")
 
@@ -1003,7 +1004,7 @@ export async function updateCustomerProfile(input: {
 
 export async function listCampaigns(restaurantId: string) {
   if (!(await canUseMarketingIa())) return []
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_campaigns")
     .select("*")
@@ -1023,14 +1024,14 @@ export async function insertCampaign(input: {
   channel?: string
 }): Promise<{ data: FoodosCampaign }> {
   await requireFoodosFeature("marketing_ia")
-  const { supabase, user } = await requireAuth()
+  const { supabase, ownerUserId } = await requireFoodosAuth()
   // Defensa en profundidad: el RLS ya protege, pero verificamos la
   // propiedad del restaurante explícitamente antes de insertar.
   const { data: owned } = await supabase
     .from("foodos_restaurants")
     .select("id")
     .eq("id", input.restaurant_id)
-    .eq("user_id", user.id)
+    .eq("user_id", ownerUserId)
     .maybeSingle()
   if (!owned) throw new Error("Restaurante no encontrado")
 
@@ -1056,12 +1057,12 @@ export async function runCampaignNow(
 ): Promise<{ sent: number; failed: number; skipped: number }> {
   await requireFoodosFeature("marketing_ia")
   // Verifica sesión y propiedad antes de delegar al motor (service client)
-  const { supabase, user } = await requireAuth()
+  const { supabase, ownerUserId } = await requireFoodosAuth()
   const { data: campaign } = await supabase
     .from("foodos_campaigns")
     .select("id, foodos_restaurants!inner(user_id)")
     .eq("id", campaignId)
-    .eq("foodos_restaurants.user_id", user.id)
+    .eq("foodos_restaurants.user_id", ownerUserId)
     .maybeSingle()
   if (!campaign) throw new Error("Campaña no encontrada")
 
@@ -1087,14 +1088,14 @@ export async function runCampaignNow(
 
 export async function deleteCampaign(id: string): Promise<void> {
   await requireFoodosFeature("marketing_ia")
-  const { supabase, user } = await requireAuth()
+  const { supabase, ownerUserId } = await requireFoodosAuth()
   // Defensa en profundidad: el RLS ya protege, pero verificamos la
   // propiedad antes de borrar (mismo patrón que runCampaignNow).
   const { data: owned } = await supabase
     .from("foodos_campaigns")
     .select("id, foodos_restaurants!inner(user_id)")
     .eq("id", id)
-    .eq("foodos_restaurants.user_id", user.id)
+    .eq("foodos_restaurants.user_id", ownerUserId)
     .maybeSingle()
   if (!owned) throw new Error("Campaña no encontrada")
 
@@ -1122,7 +1123,7 @@ export async function getCampaignAbStats(
   days = 30
 ): Promise<CampaignAbStats[]> {
   if (!(await canUseMarketingIa())) return []
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const window = Math.min(Math.max(Math.trunc(days) || 30, 1), 365)
   const since = new Date(Date.now() - window * 86_400_000).toISOString()
 
@@ -1159,12 +1160,12 @@ export async function generateCampaignCopy(input: {
   tone?: CampaignTone
 }): Promise<CampaignCopyOutput> {
   await requireFoodosFeature("marketing_ia")
-  const { supabase, user } = await requireAuth()
+  const { supabase, ownerUserId } = await requireFoodosAuth()
   const { data: owned } = await supabase
     .from("foodos_restaurants")
     .select("id, name")
     .eq("id", input.restaurant_id)
-    .eq("user_id", user.id)
+    .eq("user_id", ownerUserId)
     .maybeSingle()
   if (!owned) throw new Error("Restaurante no encontrado")
 
@@ -1187,7 +1188,7 @@ export async function generateCampaignCopy(input: {
 // ------------------------------------------------------------
 
 export async function listCoupons(restaurantId: string): Promise<FoodosCoupon[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_coupons")
     .select("*")
@@ -1208,7 +1209,7 @@ export async function upsertCoupon(input: {
   is_active?: boolean
   expires_at?: string | null
 }): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const payload = {
     restaurant_id: input.restaurant_id,
     code: input.code.trim().toUpperCase(),
@@ -1227,7 +1228,7 @@ export async function upsertCoupon(input: {
 }
 
 export async function deleteCoupon(id: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase.from("foodos_coupons").delete().eq("id", id)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/cupones")
@@ -1240,7 +1241,7 @@ export async function deleteCoupon(id: string): Promise<void> {
 export async function listBranchMenuOverrides(
   branchId: string
 ): Promise<FoodosBranchMenuOverride[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_branch_menu_overrides")
     .select("*")
@@ -1256,7 +1257,7 @@ export async function upsertBranchMenuOverride(input: {
   price?: number | null
   is_available?: boolean | null
 }): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const price = input.price ?? null
   const isAvailable = input.is_available ?? null
   if (price === null && isAvailable === null) {
@@ -1283,7 +1284,7 @@ export async function upsertBranchMenuOverride(input: {
 // ------------------------------------------------------------
 
 export async function markOrderPaid(orderId: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_orders")
     .update({ payment_status: "paid" })
@@ -1303,7 +1304,7 @@ export async function markOrderPaid(orderId: string): Promise<void> {
 export async function getLoyaltyProgram(
   restaurantId: string
 ): Promise<FoodosLoyaltyProgram | null> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_loyalty_programs")
     .select("*")
@@ -1319,7 +1320,7 @@ export async function upsertLoyaltyProgram(input: {
   point_value: number
   is_active: boolean
 }): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_loyalty_programs")
     .upsert(
@@ -1340,7 +1341,7 @@ export async function adjustCustomerCredit(
   customerId: string,
   amount: number
 ): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data: customer, error: readErr } = await supabase
     .from("foodos_customers")
     .select("store_credit")
@@ -1361,7 +1362,7 @@ export async function adjustCustomerCredit(
 // ------------------------------------------------------------
 
 export async function listReviews(restaurantId: string): Promise<FoodosReview[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_reviews")
     .select("*")
@@ -1373,7 +1374,7 @@ export async function listReviews(restaurantId: string): Promise<FoodosReview[]>
 }
 
 export async function setReviewVisibility(id: string, isVisible: boolean): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_reviews")
     .update({ is_visible: isVisible })
@@ -1401,7 +1402,7 @@ export async function importMenuCsv(
     tags?: string[]
   }>
 ): Promise<{ added: number; categories: number }> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
 
   // Categorías existentes por nombre (lowercase)
   const { data: cats, error: catErr } = await supabase
@@ -1450,7 +1451,7 @@ export async function importMenuCsv(
 // ------------------------------------------------------------
 
 export async function listWebhooks(restaurantId: string): Promise<FoodosWebhook[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_webhooks")
     .select("*")
@@ -1461,7 +1462,7 @@ export async function listWebhooks(restaurantId: string): Promise<FoodosWebhook[
 }
 
 export async function addWebhook(restaurantId: string, url: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const parsed = new URL(url) // lanza si no es URL válida
   if (parsed.protocol !== "https:") throw new Error("La URL del webhook debe ser HTTPS")
   const { error } = await supabase
@@ -1472,7 +1473,7 @@ export async function addWebhook(restaurantId: string, url: string): Promise<voi
 }
 
 export async function toggleWebhook(id: string, isActive: boolean): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_webhooks")
     .update({ is_active: isActive })
@@ -1482,14 +1483,14 @@ export async function toggleWebhook(id: string, isActive: boolean): Promise<void
 }
 
 export async function deleteWebhook(id: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase.from("foodos_webhooks").delete().eq("id", id)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/restaurante")
 }
 
 export async function listWebhookDeliveries(restaurantId: string): Promise<FoodosWebhookDelivery[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data: hooks, error: hErr } = await supabase
     .from("foodos_webhooks")
     .select("id")
@@ -1515,7 +1516,7 @@ export async function listWebhookDeliveries(restaurantId: string): Promise<Foodo
 export async function getWhatsAppConnection(
   restaurantId: string
 ): Promise<FoodosWhatsAppConnection | null> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_whatsapp_connections")
     .select("id, restaurant_id, phone_number_id, waba_id, display_phone, status, status_detail, verified_at, created_at")
@@ -1532,7 +1533,7 @@ export async function saveWhatsAppConnection(input: {
   waba_id: string
   access_token: string
 }): Promise<{ status: FoodosWhatsAppStatus; detail: string | null }> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { encryptToken, verifyWhatsAppConnection } = await import("@/lib/foodos-whatsapp")
 
   const config = {
@@ -1563,7 +1564,7 @@ export async function saveWhatsAppConnection(input: {
 }
 
 export async function deleteWhatsAppConnection(restaurantId: string): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_whatsapp_connections")
     .delete()
@@ -1578,7 +1579,7 @@ export async function setItemWhatsAppVisible(
   visible: boolean,
   position?: number | null
 ): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_menu_items")
     .update({ whatsapp_visible: visible, whatsapp_position: position ?? null })
@@ -1592,7 +1593,7 @@ export async function reorderWhatsAppCatalog(
   restaurantId: string,
   orderedItemIds: string[]
 ): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   for (let i = 0; i < orderedItemIds.length; i++) {
     const { error } = await supabase
       .from("foodos_menu_items")
@@ -1613,7 +1614,7 @@ export async function reorderWhatsAppCatalog(
 export async function syncWhatsAppCatalog(
   restaurantId: string
 ): Promise<{ added: number; removed: number }> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
 
   // Verificar propiedad y conexión
   const { data: conn } = await supabase
@@ -1651,7 +1652,7 @@ export async function sendCatalogToCustomer(
   restaurantId: string,
   toPhone: string
 ): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data: conn } = await supabase
     .from("foodos_whatsapp_connections")
     .select("status")
@@ -1702,7 +1703,7 @@ export async function setAutoReplyCatalog(
   enabled: boolean,
   text?: string | null
 ): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_whatsapp_connections")
     .update({ auto_reply_catalog: enabled, auto_reply_text: text ?? null })
@@ -1721,7 +1722,7 @@ export async function broadcastWhatsAppSegment(input: {
   template_name: string
   language_code?: string
 }): Promise<{ sent: number; failed: number }> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data: conn } = await supabase
     .from("foodos_whatsapp_connections")
     .select("status")
@@ -1776,7 +1777,7 @@ export async function listWaMessages(
   restaurantId: string,
   limit = 500
 ): Promise<FoodosWhatsAppMessage[]> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_whatsapp_messages")
     .select("*")
@@ -1791,7 +1792,7 @@ export async function markWaConversationRead(
   restaurantId: string,
   customerPhone: string
 ): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_whatsapp_messages")
     .update({ read_at: new Date().toISOString() })
@@ -1808,7 +1809,7 @@ export async function sendWaReply(
   customerPhone: string,
   text: string
 ): Promise<void> {
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const trimmed = text.trim()
   if (!trimmed) return
 
@@ -1895,7 +1896,7 @@ export async function getMeseroSettings(
   restaurantId: string
 ): Promise<MeseroSettings | null> {
   if (!(await canUseMeseroIa())) return null
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data } = await supabase
     .from("foodos_ai_settings")
     .select("*")
@@ -1915,7 +1916,7 @@ export async function upsertMeseroSettings(input: {
   business_hours_only: boolean
 }): Promise<void> {
   await requireFoodosFeature("mesero_ia")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
 
   const maxItems = Math.min(Math.max(Math.round(Number(input.max_items) || 20), 1), 50)
   const dailyCap = Math.min(Math.max(Math.round(Number(input.daily_reply_cap) || 0), 0), 2000)
@@ -1943,7 +1944,7 @@ export async function listMeseroSessions(
   limit = 50
 ): Promise<MeseroSessionRow[]> {
   if (!(await canUseMeseroIa())) return []
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data } = await supabase
     .from("foodos_ai_sessions")
     .select(
@@ -1960,7 +1961,7 @@ export async function listMeseroMessages(
   limit = 100
 ): Promise<MeseroMessageRow[]> {
   if (!(await canUseMeseroIa())) return []
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data } = await supabase
     .from("foodos_ai_messages")
     .select("id, session_id, direction, content, source, created_at")
@@ -1973,7 +1974,7 @@ export async function listMeseroMessages(
 /** El humano toma la conversación: la IA deja de responder. */
 export async function takeOverMeseroSession(sessionId: string): Promise<void> {
   await requireFoodosFeature("mesero_ia")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_ai_sessions")
     .update({ handoff_at: new Date().toISOString(), state: "handoff", pending_question: null })
@@ -1985,7 +1986,7 @@ export async function takeOverMeseroSession(sessionId: string): Promise<void> {
 /** La IA retoma la conversación desde cero (borrador limpio). */
 export async function resumeMeseroSession(sessionId: string): Promise<void> {
   await requireFoodosFeature("mesero_ia")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_ai_sessions")
     .update({
@@ -2012,7 +2013,7 @@ export async function getMeseroStats(
     avgTicket: 0,
   }
   if (!(await canUseMeseroIa())) return empty
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
 
   const since = new Date(Date.now() - Math.min(Math.max(days, 1), 365) * 86_400_000).toISOString()
   const { data: sessions } = await supabase
@@ -2151,7 +2152,7 @@ export async function listFlotillaCouriers(
   restaurantId: string
 ): Promise<FlotillaCourierRow[]> {
   if (!(await canUseFlotilla())) return []
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { listCouriersWithLoad } = await import("@/lib/flotilla/deliveries")
   return listCouriersWithLoad(supabase, restaurantId)
 }
@@ -2160,7 +2161,7 @@ export async function listFlotillaZones(
   restaurantId: string
 ): Promise<FlotillaZoneRow[]> {
   if (!(await canUseFlotilla())) return []
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data } = await supabase
     .from("foodos_delivery_zones")
     .select(
@@ -2176,7 +2177,7 @@ export async function listFlotillaDeliveries(
   limit = 50
 ): Promise<FlotillaDeliveryRow[]> {
   if (!(await canUseFlotilla())) return []
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { listActiveDeliveries } = await import("@/lib/flotilla/deliveries")
   const rows = await listActiveDeliveries(supabase, restaurantId, limit)
   if (!rows.length) return []
@@ -2236,7 +2237,7 @@ export async function listFlotillaDeliveries(
 
 export async function getFlotillaStats(restaurantId: string): Promise<FlotillaStats> {
   if (!(await canUseFlotilla())) return EMPTY_FLOTILLA_STATS
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
 
   const [{ getFlotillaSummary }, { count: couriers }, { count: zones }, restaurantRes] =
     await Promise.all([
@@ -2283,8 +2284,8 @@ export async function upsertFlotillaCourier(input: {
   notes?: string | null
 }): Promise<void> {
   await requireFoodosFeature("flotilla")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const name = input.name?.trim()
   if (!name) throw new Error("El repartidor necesita un nombre")
@@ -2310,7 +2311,7 @@ export async function upsertFlotillaCourier(input: {
 
 export async function toggleFlotillaCourier(id: string, isActive: boolean): Promise<void> {
   await requireFoodosFeature("flotilla")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase
     .from("foodos_couriers")
     .update({ is_active: isActive })
@@ -2321,7 +2322,7 @@ export async function toggleFlotillaCourier(id: string, isActive: boolean): Prom
 
 export async function deleteFlotillaCourier(id: string): Promise<void> {
   await requireFoodosFeature("flotilla")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   // Las entregas históricas conservan `courier_id` a NULL (FK ON DELETE SET NULL):
   // borrar a un repartidor no debe borrar su historial.
   const { error } = await supabase.from("foodos_couriers").delete().eq("id", id)
@@ -2347,8 +2348,8 @@ export async function upsertFlotillaZone(input: {
   is_active?: boolean
 }): Promise<void> {
   await requireFoodosFeature("flotilla")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const name = input.name?.trim()
   if (!name) throw new Error("La zona necesita un nombre")
@@ -2389,7 +2390,7 @@ export async function upsertFlotillaZone(input: {
 
 export async function deleteFlotillaZone(id: string): Promise<void> {
   await requireFoodosFeature("flotilla")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { error } = await supabase.from("foodos_delivery_zones").delete().eq("id", id)
   if (error) throw new Error(error.message)
   revalidatePath("/panel/foodos/flotilla")
@@ -2401,7 +2402,7 @@ export async function assignFlotillaCourier(input: {
   courier_id: string
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("flotilla")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { assignCourier } = await import("@/lib/flotilla/deliveries")
   const result = await assignCourier(supabase, {
     deliveryId: input.delivery_id,
@@ -2419,7 +2420,7 @@ export async function advanceFlotillaDelivery(input: {
   note?: string | null
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("flotilla")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { advanceDelivery } = await import("@/lib/flotilla/deliveries")
   const result = await advanceDelivery(supabase, {
     deliveryId: input.delivery_id,
@@ -2443,7 +2444,7 @@ export async function dispatchFlotillaToProvider(input: {
   delivery_id: string
 }): Promise<{ ok: boolean; error?: string; trackingUrl?: string | null }> {
   await requireFoodosFeature("flotilla")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
 
   const { resolveDeliveryProvider } = await import("@/lib/flotilla/provider")
   const provider = resolveDeliveryProvider()
@@ -2559,7 +2560,7 @@ export async function autoAssignFlotillaDelivery(input: {
   delivery_id: string
 }): Promise<{ ok: boolean; courierName?: string | null; error?: string }> {
   await requireFoodosFeature("flotilla")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { autoAssignDelivery } = await import("@/lib/flotilla/deliveries")
   const result = await autoAssignDelivery(supabase, {
     deliveryId: input.delivery_id,
@@ -2582,7 +2583,7 @@ export async function ensureFlotillaCourierLink(input: {
   courier_id: string
 }): Promise<{ ok: boolean; url?: string; error?: string }> {
   await requireFoodosFeature("flotilla")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { ensureCourierToken } = await import("@/lib/flotilla/deliveries")
   const result = await ensureCourierToken(supabase, {
     courierId: input.courier_id,
@@ -2599,7 +2600,7 @@ export async function revokeFlotillaCourierLink(input: {
   courier_id: string
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("flotilla")
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { revokeCourierToken } = await import("@/lib/flotilla/deliveries")
   const result = await revokeCourierToken(supabase, {
     courierId: input.courier_id,
@@ -2648,7 +2649,7 @@ export async function getWalletSettings(
   restaurantId: string
 ): Promise<WalletSettings | null> {
   if (!(await canUseWallet())) return null
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { data, error } = await supabase
     .from("foodos_loyalty_programs")
     .select(
@@ -2664,13 +2665,13 @@ export async function listWalletPassRows(
   restaurantId: string
 ): Promise<WalletPassRow[]> {
   if (!(await canUseWallet())) return []
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   return listWalletPasses(supabase, restaurantId)
 }
 
 export async function getWalletKpis(restaurantId: string): Promise<WalletStats> {
   if (!(await canUseWallet())) return { ...EMPTY_WALLET_STATS }
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   return getWalletStats(supabase, restaurantId)
 }
 
@@ -2689,8 +2690,8 @@ export async function upsertWalletSettings(input: {
   reward_label?: string | null
 }): Promise<void> {
   await requireFoodosFeature("wallet_passes")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const raw = input.reward_points
   const threshold =
@@ -2727,8 +2728,8 @@ export async function issueWalletPass(input: {
   customer_id: string
 }): Promise<{ ok: boolean; token?: string; error?: string }> {
   await requireFoodosFeature("wallet_passes")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   let service: Awaited<ReturnType<typeof createServiceClient>>
   try {
@@ -2754,8 +2755,8 @@ export async function refreshWalletPassRow(input: {
   pass_id: string
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("wallet_passes")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
   const updated = await refreshWalletPass(supabase, input.restaurant_id, input.pass_id)
   if (!updated) return { ok: false, error: "No se pudo actualizar la tarjeta" }
   revalidatePath("/panel/foodos/wallet")
@@ -2772,8 +2773,8 @@ export async function setWalletPassEnabled(input: {
   is_active: boolean
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("wallet_passes")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
   const ok = await setWalletPassActive(
     supabase,
     input.restaurant_id,
@@ -2858,7 +2859,7 @@ function asStringArray(value: unknown): string[] {
 
 export async function getSitioData(restaurantId: string): Promise<SeoSiteData | null> {
   if (!(await canUseSitioIa())) return null
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
 
   const context = await loadSeoProfile(supabase, restaurantId)
   if (!context) return null
@@ -2930,7 +2931,7 @@ export async function getSeoKpis(restaurantId: string): Promise<SeoKpis> {
     pendingSteps: 0,
   }
   if (!(await canUseSitioIa())) return empty
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
 
   const [pages, context] = await Promise.all([
     listSeoPages(supabase, restaurantId),
@@ -2967,8 +2968,8 @@ export async function saveSeoProfileAction(input: {
   google_business_url?: string | null
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("sitio_ia")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const result = await saveSeoProfile(supabase, {
     restaurantId: input.restaurant_id,
@@ -2999,8 +3000,8 @@ export async function generateSeoPage(input: {
   menu_item_id?: string | null
 }): Promise<{ ok: boolean; error?: string; page?: SeoPageRow; source?: "llm" | "template" }> {
   await requireFoodosFeature("sitio_ia")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const context = await loadSeoProfile(supabase, input.restaurant_id)
   if (!context) return { ok: false, error: "Restaurante no encontrado" }
@@ -3108,8 +3109,8 @@ export async function publishSeoPage(input: {
   page_id: string
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("sitio_ia")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const ok = await setSeoPageStatus(supabase, input.restaurant_id, input.page_id, "published")
   if (!ok) return { ok: false, error: "No se pudo publicar la página" }
@@ -3128,8 +3129,8 @@ export async function unpublishSeoPage(input: {
   page_id: string
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("sitio_ia")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const ok = await setSeoPageStatus(supabase, input.restaurant_id, input.page_id, "draft")
   if (!ok) return { ok: false, error: "No se pudo ocultar la página" }
@@ -3146,8 +3147,8 @@ export async function deleteSeoPageRow(input: {
   page_id: string
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("sitio_ia")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const ok = await deleteSeoPage(supabase, input.restaurant_id, input.page_id)
   if (!ok) return { ok: false, error: "No se pudo borrar la página" }
@@ -3205,7 +3206,7 @@ async function canUsePos(): Promise<boolean> {
 
 export async function getPosData(restaurantId: string): Promise<PosData | null> {
   if (!(await canUsePos())) return null
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { loadPosContext } = await import("@/lib/pos/connections")
   const context = await loadPosContext(supabase, restaurantId, {
     origin: SITE_URL,
@@ -3220,8 +3221,8 @@ export async function savePosConnectionAction(input: {
   credentials: Record<string, string>
 }): Promise<{ ok: boolean; error?: string; missing?: string[] }> {
   await requireFoodosFeature("pos_integraciones")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const { isPosProvider } = await import("@/lib/pos/registry")
   if (!isPosProvider(input.provider)) return { ok: false, error: "Proveedor no reconocido" }
@@ -3244,8 +3245,8 @@ export async function testPosConnectionAction(input: {
   provider: string
 }): Promise<{ ok: boolean; status: string; message: string }> {
   await requireFoodosFeature("pos_integraciones")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const { checkPosCredentials, isPosProvider } = await import("@/lib/pos/registry")
   if (!isPosProvider(input.provider)) {
@@ -3285,8 +3286,8 @@ export async function runPosMenuSyncAction(input: {
   provider: string
 }): Promise<PosSyncSummary> {
   await requireFoodosFeature("pos_integraciones")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const empty: PosSyncSummary = {
     ok: false,
@@ -3438,8 +3439,8 @@ export async function disconnectPosConnectionAction(input: {
   provider: string
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("pos_integraciones")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const { isPosProvider } = await import("@/lib/pos/registry")
   if (!isPosProvider(input.provider)) return { ok: false, error: "Proveedor no reconocido" }
@@ -3457,8 +3458,8 @@ export async function rotatePosWebhookSecretAction(input: {
   provider: string
 }): Promise<{ ok: boolean; error?: string; secret?: string }> {
   await requireFoodosFeature("pos_integraciones")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const { isPosProvider } = await import("@/lib/pos/registry")
   if (!isPosProvider(input.provider)) return { ok: false, error: "Proveedor no reconocido" }
@@ -3501,7 +3502,7 @@ async function canUseCatering(): Promise<boolean> {
 
 export async function getCateringData(restaurantId: string): Promise<CateringData | null> {
   if (!(await canUseCatering())) return null
-  const { supabase } = await requireAuth()
+  const { supabase } = await requireFoodosAuth()
   const { loadCateringContext } = await import("@/lib/foodos-catering-data")
   const context = await loadCateringContext(supabase, restaurantId)
   return { packages: context.packages, requests: context.requests, kpis: context.kpis }
@@ -3521,8 +3522,8 @@ export async function saveCateringPackageAction(input: {
   sort_order?: number | null
 }): Promise<{ ok: boolean; error?: string; id?: string }> {
   await requireFoodosFeature("catering")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const { saveCateringPackage } = await import("@/lib/foodos-catering-data")
   const result = await saveCateringPackage(
@@ -3553,8 +3554,8 @@ export async function deleteCateringPackageAction(input: {
   package_id: string
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("catering")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const { deleteCateringPackage } = await import("@/lib/foodos-catering-data")
   const result = await deleteCateringPackage(supabase, input.restaurant_id, input.package_id)
@@ -3571,8 +3572,8 @@ export async function setCateringRequestStatusAction(input: {
   status: string
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("catering")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const { setCateringRequestStatus } = await import("@/lib/foodos-catering-data")
   const result = await setCateringRequestStatus(
@@ -3594,8 +3595,8 @@ export async function overrideCateringTotalAction(input: {
   deposit?: number | null
 }): Promise<{ ok: boolean; error?: string }> {
   await requireFoodosFeature("catering")
-  const { supabase, user } = await requireAuth()
-  await assertOwnRestaurant(supabase, user.id, input.restaurant_id)
+  const { supabase, ownerUserId } = await requireFoodosAuth()
+  await assertOwnRestaurant(supabase, ownerUserId, input.restaurant_id)
 
   const { overrideCateringTotal } = await import("@/lib/foodos-catering-data")
   const result = await overrideCateringTotal(

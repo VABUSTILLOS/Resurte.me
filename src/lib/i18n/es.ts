@@ -848,6 +848,18 @@ export const es = {
         "Menús por volumen, cotizador para eventos y una página propia para recibir solicitudes de catering.",
     },
 
+    // "Operar como restaurante" (P14): sesión de soporte del admin.
+    // El selector de restaurante vive en /admin/operar, y todo el texto de
+    // admin va hardcodeado en español: aquí solo está el banner que el panel
+    // del restaurante pinta mientras dura la sesión de soporte.
+    operating: {
+      banner: "Operando como {name}",
+      bannerHint: "Los cambios que hagas se guardan en su restaurante.",
+      bannerExit: "Salir",
+      bannerExiting: "Saliendo…",
+      bannerExitError: "No pudimos cerrar la sesión de soporte. Intenta de nuevo.",
+    },
+
     // Mesero IA: agente que toma pedidos por WhatsApp (nivel Diamante).
     mesero: {
       title: "Mesero IA",
