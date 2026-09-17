@@ -73,4 +73,22 @@ describe("POST /api/recompensas/facturas", () => {
     const body = await res.json()
     expect(body.submission).toMatchObject({ id: 7, status: "pending" })
   })
+
+  it("409 cuando el índice único detecta el mismo archivo ya enviado", async () => {
+    setup({
+      data: null,
+      error: { code: "23505", message: "duplicate key value violates unique constraint" },
+    })
+    const res = await POST(req({ image_path: "u-1/123-fac.jpg", total_amount: 5000 }))
+    expect(res.status).toBe(409)
+    await expect(res.json()).resolves.toMatchObject({
+      error: "Ese ticket ya está en revisión o ya fue acreditado",
+    })
+  })
+
+  it("500 ante un error inesperado de base de datos", async () => {
+    setup({ data: null, error: { code: "08006", message: "connection failure" } })
+    const res = await POST(req({ image_path: "u-1/123-fac.jpg", total_amount: 5000 }))
+    expect(res.status).toBe(500)
+  })
 })

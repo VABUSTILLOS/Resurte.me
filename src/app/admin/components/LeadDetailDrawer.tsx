@@ -15,7 +15,8 @@ import {
   updateCrmProspectNotes,
   updateCrmProspectStatus,
 } from "../actions"
-import { LeadConversationPanel } from "./LeadConversations"
+import { LeadConversationPanel } from "@/components/crm/ConversationPanel"
+import { ADMIN_CONVERSATION_ACTIONS } from "./admin-conversation-actions"
 
 /**
  * Adaptador del panel para la ficha compartida.
@@ -64,6 +65,7 @@ export function LeadDetailDrawer({
           key={id}
           prospectId={id}
           onSent={onSent}
+          actions={ADMIN_CONVERSATION_ACTIONS}
           className="h-[420px]"
         />
       )}

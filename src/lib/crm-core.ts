@@ -97,6 +97,13 @@ export interface CrmProspectRow {
   tags: string[]
   created_at: string
   updated_at: string
+  /**
+   * Columnas fuera del contrato, presentes solo si el llamador pidió
+   * `extraColumns` a `readCrmProspects`. Es la vía del módulo `agente`, que
+   * necesita `employees`, `instagram` y el volumen semanal — campos que el CRM
+   * no muestra y que por eso no se ensanchan aquí.
+   */
+  extra?: Record<string, unknown>
 }
 
 function asStringOrNull(value: unknown): string | null {
@@ -297,17 +304,22 @@ export function crmScopeFilter(scope: CrmScope): { column: "seller_id"; value: s
 /**
  * Aplica el alcance a una consulta de PostgREST.
  *
- * `T` es el builder encadenable: `.eq()` devuelve el mismo tipo, así que el
- * resultado conserva la interfaz para seguir con `.select()`, `.order()`, etc.
- * Para el admin no se añade ningún filtro — y en particular **no** se añade
- * `seller_id IS NULL` ni se excluyen los `NULL`.
+ * Devuelve el mismo builder que recibe, así que el resultado sigue encadenando
+ * `.order()`, `.range()`, etc. Para el admin no se añade ningún filtro — y en
+ * particular **no** se añade `seller_id IS NULL` ni se excluyen los `NULL`.
+ *
+ * La firma es deliberadamente laxa. La variante estricta
+ * (`T extends { eq(column, value): T }`) hace que TypeScript intente unificar el
+ * builder real de PostgREST —que es genérico sobre la forma filtrada— consigo
+ * mismo, y el compilador aborta con *"Type instantiation is excessively deep and
+ * possibly infinite"*. El único punto donde eso importa es esta llamada, así que
+ * el casteo vive aquí y no en cada consumidor.
  */
-export function applyCrmScope<T extends { eq(column: string, value: string): T }>(
-  query: T,
-  scope: CrmScope,
-): T {
+export function applyCrmScope<T>(query: T, scope: CrmScope): T {
   const filter = crmScopeFilter(scope)
-  return filter ? query.eq(filter.column, filter.value) : query
+  if (!filter) return query
+  const builder = query as { eq(column: string, value: string): unknown }
+  return builder.eq(filter.column, filter.value) as T
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -356,6 +368,11 @@ export interface ProspectFilters {
   /** Texto libre sobre nombre, restaurante, correo y teléfono. */
   q?: string
   status?: CrmStatus | "todos"
+  /**
+   * Varios estados a la vez. La cola del agente pide cuatro activos más
+   * `inactivo` de una sola pasada; `status` sólo admite uno.
+   */
+  statuses?: readonly CrmStatus[]
   /** Sólo los que tienen seguimiento vencido. */
   due?: boolean
   /** Sólo los que no tienen vendedor asignado. */
@@ -393,6 +410,7 @@ export function matchesProspectFilters(
   now: Date = new Date(),
 ): boolean {
   if (filters.status && filters.status !== "todos" && p.status !== filters.status) return false
+  if (filters.statuses?.length && !filters.statuses.includes(p.status)) return false
   if (filters.due && !isFollowUpDue(p.next_follow_up_at, now)) return false
   if (filters.unassigned && p.seller_id !== null) return false
   if (filters.onlyPending && p.status !== "nuevo" && !isFollowUpDue(p.next_follow_up_at, now)) {

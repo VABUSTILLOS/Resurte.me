@@ -25,13 +25,14 @@ interface InvoiceScannerScreenProps {
   onClose: () => void;
 }
 
-/** Envío registrado en invoice_submissions (migración 00074). */
+/** Envío registrado en invoice_submissions (migraciones 00074 / 00144). */
 interface InvoiceSubmission {
   id: number;
   total_amount: number | null;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "revoked";
   credits_granted: number | null;
   created_at: string;
+  revoke_reason?: string | null;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -524,6 +525,7 @@ function IdleState({
                     })}
                     {item.status === "pending" && " · En revisión"}
                     {item.status === "rejected" && " · Rechazada"}
+                    {item.status === "revoked" && " · Créditos revertidos"}
                   </p>
                 </div>
                 {item.status === "approved" && item.credits_granted != null ? (
@@ -533,6 +535,13 @@ function IdleState({
                 ) : item.status === "pending" ? (
                   <span className="text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 text-[10px] font-semibold">
                     En revisión
+                  </span>
+                ) : item.status === "revoked" ? (
+                  <span
+                    className="text-warm-700 bg-cream-200 border border-cream-300 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                    title={item.revoke_reason ?? undefined}
+                  >
+                    Revertida
                   </span>
                 ) : (
                   <span className="text-red-700 bg-red-50 border border-red-200 rounded-full px-2 py-0.5 text-[10px] font-semibold">

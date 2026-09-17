@@ -19,11 +19,16 @@ import {
   addActivity,
   deleteActivity,
   getProspectDetail,
+  getSellerLeadConversation,
   linkProspectAccount,
   searchUsersForLinking,
   setProspectTags,
   updateProspect,
 } from "@/lib/comercializacion/actions"
+import {
+  LeadConversationPanel,
+  type ConversationPanelActions,
+} from "@/components/crm/ConversationPanel"
 import type { CrmScope } from "@/lib/crm-core"
 import type { Activity, Prospect } from "@/lib/comercializacion/types"
 
@@ -80,6 +85,24 @@ const ACTIONS: ProspectDetailActions = {
   setTags: async (prospectId, tags) => {
     await setProspectTags(prospectId, tags)
   },
+}
+
+/**
+ * Bandeja del vendedor: **solo lectura**.
+ *
+ * Se inyecta únicamente `load`, que en el servidor acota por `seller_id` —el
+ * cliente de servicio ignora RLS, así que ese filtro es la única barrera—. Sin
+ * `send` ni `suggest`, el pie del panel no pinta compositor ni botón de IA: no
+ * es una interfaz deshabilitada, es una interfaz que no ofrece lo que el
+ * vendedor no puede hacer. Para escribir sigue teniendo los botones de WhatsApp
+ * de la ficha, que abren `wa.me` con el mensaje ya redactado.
+ *
+ * El envío desde el panel para el vendedor queda como trabajo aparte: exige
+ * extraer el camino de envío del admin (ventana de 24 h, plantilla aprobada) a
+ * un módulo compartido y acotarlo por cartera.
+ */
+const CONVERSATION_ACTIONS: ConversationPanelActions = {
+  load: getSellerLeadConversation,
 }
 
 function LinkAccountPanel({
@@ -307,6 +330,15 @@ export function SellerProspectDetail({
         onClose={() => router.push("/comercializacion/prospectos")}
         onChanged={softRefresh}
         actions={ACTIONS}
+        renderConversation={(id, onSent) => (
+          <LeadConversationPanel
+            key={id}
+            prospectId={id}
+            onSent={onSent}
+            actions={CONVERSATION_ACTIONS}
+            className="h-[420px]"
+          />
+        )}
         activityActions={{
           onEdit: (a) => setEditingActivity(a),
           onDelete: (a) => setDeletingActivity(a),

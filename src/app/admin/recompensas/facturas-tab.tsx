@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { FileText, Check, X, ExternalLink, RefreshCcw, Download } from "lucide-react"
+import { FileText, Check, X, ExternalLink, RefreshCcw, Download, Undo2 } from "lucide-react"
 import { toCsv, downloadCsv } from "@/lib/csv"
 import { DEFAULT_TIMEZONE, dayKeyOf } from "@/lib/local-date"
 
@@ -13,15 +13,27 @@ interface Submission {
   signed_url: string | null
   total_amount: number | null
   notes: string | null
-  status: "pending" | "approved" | "rejected"
+  status: "pending" | "approved" | "rejected" | "revoked"
   credits_granted: number | null
   created_at: string
+  revoked_at: string | null
+  revoked_credits: number | null
+  revoke_reason: string | null
+}
+
+const STATUS_LABELS: Record<Submission["status"], string> = {
+  pending: "Pendiente",
+  approved: "Aprobada",
+  rejected: "Rechazada",
+  revoked: "Revocada",
 }
 
 /**
- * Cola de revisión de facturas subidas desde /recompensas. Aprobar abona
- * créditos reales (grant_wallet_credit) y notifica al usuario; rechazar también
- * notifica.
+ * Cola de revisión de facturas subidas desde /recompensas.
+ *
+ * Aprobar abona créditos reales y rechazar/revocar notifican al usuario.
+ * Aprobar y revocar pasan por las RPC atómicas de 00144: aprobar dos veces
+ * no duplica el abono y revocar devuelve los créditos al monedero.
  */
 export function FacturasTab() {
   const [submissions, setSubmissions] = useState<Submission[]>([])
@@ -58,11 +70,6 @@ export function FacturasTab() {
 
   // Exporta la cola de facturas cargada a CSV (C6).
   function exportCsv() {
-    const STATUS_LABELS: Record<Submission["status"], string> = {
-      pending: "Pendiente",
-      approved: "Aprobada",
-      rejected: "Rechazada",
-    }
     const csv = toCsv(
       ["ID", "Email del cliente", "Total factura", "Créditos otorgados", "Estatus", "Notas", "Fecha"],
       submissions.map((s) => [
@@ -79,7 +86,11 @@ export function FacturasTab() {
     downloadCsv(`facturas-${stamp}.csv`, csv)
   }
 
-  const review = async (id: number, action: "approve" | "reject") => {
+  const review = async (
+    id: number,
+    action: "approve" | "reject" | "revoke",
+    reason?: string
+  ) => {
     setBusyId(id)
     try {
       const credits = Number(creditsInput[id]?.replace(/[^0-9.]/g, ""))
@@ -92,16 +103,39 @@ export function FacturasTab() {
           ...(action === "approve" && Number.isFinite(credits) && credits > 0
             ? { credits }
             : {}),
+          ...(action === "revoke" && reason ? { reason } : {}),
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Error al revisar")
       await reload()
+      if (action === "revoke" && Number(data.shortfall) > 0) {
+        alert(
+          `Se recuperaron $${Number(data.credits_reversed).toLocaleString("es-MX")} créditos. ` +
+            `Faltante de $${Number(data.shortfall).toLocaleString("es-MX")}: el cliente ya los había gastado.`
+        )
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Error al revisar")
     } finally {
       setBusyId(null)
     }
+  }
+
+  /** Revocar una aprobación: única vía para recuperar créditos mal otorgados. */
+  const revoke = (id: number) => {
+    const reason = window.prompt(
+      "Motivo de la revocación (queda registrado):",
+      "Ticket duplicado o no válido"
+    )
+    if (reason === null) return
+    if (
+      !window.confirm(
+        `¿Revocar la aprobación del envío #${id}? Se debitarán del monedero del cliente los créditos otorgados.`
+      )
+    )
+      return
+    void review(id, "revoke", reason.trim())
   }
 
   const pending = submissions.filter((s) => s.status === "pending")
@@ -112,7 +146,8 @@ export function FacturasTab() {
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <p className="text-sm text-gray-500">
           Revisa los tickets/facturas subidos desde Recompensas. Aprobar abona
-          créditos (5% del total por defecto).
+          créditos (5% del total por defecto); revocar una aprobación los
+          devuelve al monedero del cliente.
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -239,11 +274,32 @@ export function FacturasTab() {
                     <span className="font-semibold text-gray-700">#{s.id}</span>
                     <span className="flex-1 truncate">{s.user_email ?? s.user_id.slice(0, 8)}</span>
                     <span>{new Date(s.created_at).toLocaleDateString("es-MX")}</span>
-                    {s.status === "approved" ? (
-                      <span className="text-brand-700 bg-brand-50 border border-brand-200 rounded-full px-2 py-0.5 font-semibold">
-                        +${Number(s.credits_granted ?? 0).toLocaleString("es-MX")}
+                    {s.status === "approved" && (
+                      <>
+                        <span className="text-brand-700 bg-brand-50 border border-brand-200 rounded-full px-2 py-0.5 font-semibold">
+                          +${Number(s.credits_granted ?? 0).toLocaleString("es-MX")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => revoke(s.id)}
+                          disabled={busyId === s.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                          title="Devuelve al monedero los créditos otorgados por este envío"
+                        >
+                          <Undo2 className="w-3.5 h-3.5" />
+                          Revocar
+                        </button>
+                      </>
+                    )}
+                    {s.status === "revoked" && (
+                      <span
+                        className="text-gray-700 bg-gray-100 border border-gray-300 rounded-full px-2 py-0.5 font-semibold"
+                        title={s.revoke_reason ?? undefined}
+                      >
+                        Revocada · −${Number(s.revoked_credits ?? 0).toLocaleString("es-MX")}
                       </span>
-                    ) : (
+                    )}
+                    {s.status === "rejected" && (
                       <span className="text-red-700 bg-red-50 border border-red-200 rounded-full px-2 py-0.5 font-semibold">
                         Rechazada
                       </span>

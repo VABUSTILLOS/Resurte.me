@@ -103,8 +103,29 @@ export async function readCrmProspects(
   // son los dos que no se pueden delegar a PostgREST.
   // `mapRow` primero (rescata `city_name` del join) y `mapCrmProspect` después,
   // que es quien aplica los valores por omisión del contrato.
-  const matched = filterProspects(rows.map(mapRow).map(mapCrmProspect), filters)
+  const mapped = rows.map((row) =>
+    withExtras(mapCrmProspect(mapRow(row)), row, extraColumns),
+  )
+  const matched = filterProspects(mapped, filters)
   return search ? matched.slice(offset, offset + limit) : matched
+}
+
+/**
+ * Cuelga las columnas fuera del contrato en `extra`.
+ *
+ * `mapCrmProspect` no las conoce —no son parte del contrato compartido—, así
+ * que se adjuntan después de mapear. Sin `extraColumns` la fila sale intacta:
+ * las superficies del CRM no cargan un objeto vacío por cada prospecto.
+ */
+function withExtras(
+  prospect: CrmProspectRow,
+  raw: Record<string, unknown>,
+  extraColumns: readonly string[],
+): CrmProspectRow {
+  if (extraColumns.length === 0) return prospect
+  const extra: Record<string, unknown> = {}
+  for (const column of extraColumns) extra[column] = raw[column] ?? null
+  return { ...prospect, extra }
 }
 
 interface RawQuery {
@@ -138,6 +159,7 @@ function buildQuery(
   )
 
   if (filters.status && filters.status !== "todos") q = q.eq("status", filters.status)
+  if (filters.statuses?.length) q = q.in("status", [...filters.statuses])
   if (filters.due) {
     q = q.not("next_follow_up_at", "is", null).lte("next_follow_up_at", new Date().toISOString())
   }

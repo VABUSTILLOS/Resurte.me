@@ -11,11 +11,40 @@ export const runtime = "nodejs"
  *
  * GET  → lista de envíos (más recientes primero) con URL firmada (1h) de la
  *        imagen del bucket privado `facturas`.
- * POST → { id, action: "approve" | "reject", credits? }
- *        approve: abona créditos vía grant_wallet_credit (default: 5% del
- *        total capturado), marca aprobada y notifica al usuario.
+ * POST → { id, action: "approve" | "reject" | "revoke", credits?, reason? }
+ *        approve: abona créditos y marca aprobada en UNA transacción
+ *        (approve_invoice_submission, migración 00144), con default del 5%
+ *        del total capturado. Idempotente: reintentar no vuelve a abonar.
  *        reject: marca rechazada y notifica.
+ *        revoke: deshace una aprobación y debita los créditos abonados
+ *        (revoke_invoice_submission). Antes un envío aprobado por error o
+ *        fraude quedaba atrapado en 409 y los créditos eran irrecuperables.
  */
+
+/** Rechazos de las RPC de 00144 traducidos a HTTP. */
+const REVIEW_ERRORS: Record<string, { status: number; error: string }> = {
+  not_found: { status: 404, error: "Envío no encontrado" },
+  invalid_credits: { status: 400, error: "Indica los créditos a otorgar" },
+  already_reviewed: { status: 409, error: "Este envío ya fue revisado" },
+  already_revoked: { status: 409, error: "Esta aprobación ya fue revocada" },
+  not_approved: { status: 409, error: "Solo se puede revocar un envío aprobado" },
+}
+
+type RpcOutcome = {
+  ok?: boolean
+  reason?: string
+  credits?: number
+  reversed?: number
+  shortfall?: number
+}
+
+function rpcFailure(outcome: RpcOutcome) {
+  const mapped = REVIEW_ERRORS[outcome.reason ?? ""] ?? {
+    status: 500,
+    error: "No se pudo revisar el envío",
+  }
+  return NextResponse.json({ error: mapped.error, reason: outcome.reason }, { status: mapped.status })
+}
 
 export async function GET() {
   try {
@@ -25,7 +54,9 @@ export async function GET() {
     const supabase = await createServiceClient()
     const { data, error } = await supabase
       .from("invoice_submissions")
-      .select("id, user_id, image_path, total_amount, notes, status, credits_granted, created_at, reviewed_at")
+      .select(
+        "id, user_id, image_path, total_amount, notes, status, credits_granted, created_at, reviewed_at, revoked_at, revoked_credits, revoke_reason"
+      )
       .order("created_at", { ascending: false })
       .limit(100)
 
@@ -71,7 +102,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null)
     const id = Number(body?.id)
     const action = body?.action
-    if (!Number.isInteger(id) || (action !== "approve" && action !== "reject")) {
+    if (
+      !Number.isInteger(id) ||
+      (action !== "approve" && action !== "reject" && action !== "revoke")
+    ) {
       return NextResponse.json({ error: "Parámetros inválidos" }, { status: 400 })
     }
 
@@ -85,6 +119,41 @@ export async function POST(request: NextRequest) {
     if (fetchErr || !submission) {
       return NextResponse.json({ error: "Envío no encontrado" }, { status: 404 })
     }
+
+    // ── Revocar una aprobación: única vía para recuperar créditos ──
+    if (action === "revoke") {
+      const reason = typeof body?.reason === "string" ? body.reason.trim().slice(0, 300) : null
+      const { data: outcome, error: rpcErr } = await supabase.rpc("revoke_invoice_submission", {
+        p_id: id,
+        p_admin: adminUser?.id ?? null,
+        p_reason: reason,
+      })
+      if (rpcErr) {
+        logger.error("[ADMIN FACTURAS] revoke error:", rpcErr)
+        return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+      }
+      const result = (outcome ?? {}) as RpcOutcome
+      if (!result.ok) return rpcFailure(result)
+
+      const reversed = Number(result.reversed ?? 0)
+      void notifyUser({
+        userId: submission.user_id,
+        type: "invoice_revoked",
+        title: "Se revocó una factura aprobada",
+        body:
+          reversed > 0
+            ? `Se retiraron $${reversed.toLocaleString("es-MX")} créditos de tu cartera.`
+            : "Tu aprobación fue revocada.",
+        actionUrl: "/recompensas",
+      })
+      return NextResponse.json({
+        ok: true,
+        status: "revoked",
+        credits_reversed: reversed,
+        shortfall: Number(result.shortfall ?? 0),
+      })
+    }
+
     if (submission.status !== "pending") {
       return NextResponse.json({ error: "Este envío ya fue revisado" }, { status: 409 })
     }
@@ -125,40 +194,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { error: rpcErr } = await supabase.rpc("grant_wallet_credit", {
-      p_user_id: submission.user_id,
-      p_amount: credits,
-      p_concept: `Factura aprobada #${id}`,
+    // Abono + marcado en una sola transacción: si algo falla, no queda el
+    // monedero abonado con el envío aún pendiente (doble abono al reintentar).
+    const { data: outcome, error: rpcErr } = await supabase.rpc("approve_invoice_submission", {
+      p_id: id,
+      p_credits: credits,
+      p_admin: adminUser?.id ?? null,
     })
     if (rpcErr) {
-      logger.error("[ADMIN FACTURAS] grant error:", rpcErr)
+      logger.error("[ADMIN FACTURAS] approve error:", rpcErr)
       return NextResponse.json({ error: rpcErr.message }, { status: 500 })
     }
+    const result = (outcome ?? {}) as RpcOutcome
+    if (!result.ok) return rpcFailure(result)
 
-    const { error } = await supabase
-      .from("invoice_submissions")
-      .update({
-        status: "approved",
-        credits_granted: credits,
-        reviewed_by: adminUser?.id ?? null,
-        reviewed_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .eq("status", "pending")
-    if (error) {
-      logger.error("[ADMIN FACTURAS] approve-update error:", error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
+    const granted = Number(result.credits ?? credits)
     void notifyUser({
       userId: submission.user_id,
       type: "invoice_approved",
-      title: `Factura aprobada: +$${credits.toLocaleString("es-MX")} créditos`,
+      title: `Factura aprobada: +$${granted.toLocaleString("es-MX")} créditos`,
       body: "Ya están en tu Cartera de Crecimiento.",
       actionUrl: "/recompensas",
     })
 
-    return NextResponse.json({ ok: true, status: "approved", credits_granted: credits })
+    return NextResponse.json({ ok: true, status: "approved", credits_granted: granted })
   } catch (err) {
     logger.error("[ADMIN FACTURAS] POST unexpected:", err)
     return NextResponse.json({ error: "Error interno" }, { status: 500 })

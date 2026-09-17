@@ -56,12 +56,10 @@ import {
   ADMIN_SCOPE,
   CRM_PROSPECT_COLUMNS,
   CRM_PROSPECT_COLUMNS_WITHOUT_TAGS,
-  mapCrmProspect,
 } from "@/lib/crm-core"
 import { readCrmProspects } from "@/lib/crm-prospects"
 import { CRM_PAGE_SIZE } from "@/lib/crm-filters"
 import {
-  fetchAutomationSends,
   fetchConversationMessages,
   fetchProfileName,
   fetchProspectActivities,

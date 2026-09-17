@@ -2,6 +2,8 @@
 
 import { createServiceClient } from "@/lib/supabase/service"
 import { requireSellerOrAdminAction } from "@/lib/roles"
+import { applyCrmScope, scopeForRole, type CrmStatus } from "@/lib/crm-core"
+import { readCrmProspects } from "@/lib/crm-prospects"
 import { logger } from "@/lib/logger"
 import { getWeekBounds, getMonthBounds, getTodayBounds } from "../comercializacion/dates"
 import {
@@ -29,25 +31,30 @@ import type {
 // Helpers internos
 // ============================================================
 
-interface ProspectRow {
-  id: number
-  name: string
-  restaurant_name: string | null
-  whatsapp: string | null
-  phone: string | null
-  status: string
-  tier: number | null
-  zone: string | null
-  user_id: string | null
-  last_contact_at: string | null
-  next_follow_up_at: string | null
-  created_at: string
-}
+/**
+ * Estados que la cola del día considera vivos. El agente ya no declara su
+ * propio tipo de fila ni su propia lista de columnas: lee por `readCrmProspects`
+ * y consume el contrato `CrmProspectRow`.
+ */
+const ACTIVE_STATUSES: readonly CrmStatus[] = [
+  "nuevo",
+  "contactado",
+  "en_seguimiento",
+  "cliente_activo",
+]
 
-const PROSPECT_COLS =
-  "id, name, restaurant_name, whatsapp, phone, status, tier, zone, user_id, last_contact_at, next_follow_up_at, created_at"
-
-const ACTIVE_STATUSES = ["nuevo", "contactado", "en_seguimiento", "cliente_activo"]
+/**
+ * Columnas fuera del contrato compartido que sí necesita la generación de
+ * mensajes: cuántos empleados tiene el restaurante, su Instagram y su volumen
+ * de compra semanal alimentan el prompt. No se ensancha el CRM por tres campos
+ * que solo lee el agente.
+ */
+const EXTRA_PROSPECT_COLUMNS = [
+  "employees",
+  "instagram",
+  "weekly_volume_min",
+  "weekly_volume_max",
+] as const
 
 async function getSellerName(supabase: Awaited<ReturnType<typeof createServiceClient>>, userId: string): Promise<string> {
   const { data } = await supabase
@@ -56,6 +63,11 @@ async function getSellerName(supabase: Awaited<ReturnType<typeof createServiceCl
     .eq("id", userId)
     .maybeSingle()
   return (data?.full_name as string | null) || "tu asesor de Resurte.me"
+}
+
+/** `null` ≠ `0`: solo se convierte lo que de verdad llegó como número. */
+function numberOrNull(value: unknown): number | null {
+  return value != null && value !== "" ? Number(value) : null
 }
 
 function suggestedKindFor(status: string, touches: number): MessageKind {
@@ -83,31 +95,22 @@ export async function getDailyQueue(): Promise<AgentQueueItem[]> {
   const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
 
-  const prospectsQuery = supabase
-    .from("crm_prospects")
-    .select(PROSPECT_COLS)
-    .in("status", [...ACTIVE_STATUSES, "inactivo"])
-    .order("created_at", { ascending: false })
-    .limit(300)
-  const activitiesQuery = supabase
-    .from("crm_activities")
-    .select("prospect_id")
-    .eq("direction", "saliente")
-  // El admin ve la operación completa; el vendedor solo lo suyo
-  if (role !== "admin") {
-    prospectsQuery.eq("seller_id", userId)
-    activitiesQuery.eq("seller_id", userId)
-  }
+  // El admin ve la operación completa; el vendedor solo lo suyo. El alcance es
+  // un filtro de código porque el cliente de servicio salta RLS.
+  const scope = scopeForRole(role, userId)
+  const activitiesQuery = applyCrmScope(
+    supabase.from("crm_activities").select("prospect_id").eq("direction", "saliente"),
+    scope,
+  )
 
-  const [{ data: prospects, error }, { data: activities }] = await Promise.all([
-    prospectsQuery,
+  const [prospects, { data: activities }] = await Promise.all([
+    readCrmProspects(supabase, {
+      scope,
+      filters: { statuses: [...ACTIVE_STATUSES, "inactivo"] },
+      limit: 300,
+    }),
     activitiesQuery,
   ])
-
-  if (error) {
-    logger.error("[AgenteIA] getDailyQueue error:", error)
-    throw new Error("Error al cargar la cola del día")
-  }
 
   const touchesByProspect = new Map<number, number>()
   for (const a of activities ?? []) {
@@ -118,11 +121,10 @@ export async function getDailyQueue(): Promise<AgentQueueItem[]> {
   const todayZone = zoneOfDay()
   const now = new Date().toISOString()
 
-  const items: AgentQueueItem[] = (prospects ?? []).map((p) => {
-    const row = p as unknown as ProspectRow
-    const touches = touchesByProspect.get(Number(row.id)) ?? 0
+  const items: AgentQueueItem[] = prospects.map((row) => {
+    const touches = touchesByProspect.get(row.id) ?? 0
     return {
-      prospectId: Number(row.id),
+      prospectId: row.id,
       name: row.name,
       restaurantName: row.restaurant_name,
       whatsapp: row.whatsapp,
@@ -194,21 +196,19 @@ export async function generateAgentMessage(
   if (!MESSAGE_KINDS.includes(kind)) throw new Error("Tipo de mensaje inválido")
 
   const supabase = await createServiceClient()
-  const prospectQuery = supabase
-    .from("crm_prospects")
-    .select(PROSPECT_COLS + ", notes, employees, instagram, weekly_volume_min, weekly_volume_max")
-    .eq("id", prospectId)
-  if (role !== "admin") prospectQuery.eq("seller_id", userId)
-  const { data: prospect, error } = await prospectQuery.single()
+  // Un prospecto ajeno al vendedor no se distingue de uno inexistente: el
+  // alcance filtra la fila en la consulta y aquí solo queda el arreglo vacío.
+  const [p] = await readCrmProspects(supabase, {
+    scope: scopeForRole(role, userId),
+    ids: [prospectId],
+    limit: 1,
+    extraColumns: EXTRA_PROSPECT_COLUMNS,
+  })
+  if (!p) throw new Error("Prospecto no encontrado")
 
-  if (error || !prospect) throw new Error("Prospecto no encontrado")
-  const p = prospect as unknown as ProspectRow & {
-    notes: string | null
-    employees: number | null
-    instagram: string | null
-    weekly_volume_min: number | null
-    weekly_volume_max: number | null
-  }
+  const employees = numberOrNull(p.extra?.employees)
+  const volumeMin = numberOrNull(p.extra?.weekly_volume_min)
+  const volumeMax = numberOrNull(p.extra?.weekly_volume_max)
 
   const sellerName = await getSellerName(supabase, userId)
   const zone = p.zone ? ZONES.find((z) => z.id === p.zone) : null
@@ -221,9 +221,9 @@ export async function generateAgentMessage(
     p.restaurant_name ? `- Restaurante: ${p.restaurant_name}` : null,
     p.tier ? `- Segmento: ${TIER_LABEL[p.tier] ?? `Tier ${p.tier}`}` : null,
     zone ? `- Zona: ${zone.label}. Pitch de la zona: "${zone.pitch}". Productos clave: ${zone.keyProducts.join(", ")}.` : null,
-    p.employees ? `- Empleados: ${p.employees}` : null,
-    p.weekly_volume_min
-      ? `- Volumen estimado de compra: $${Number(p.weekly_volume_min).toLocaleString("es-MX")}–$${Number(p.weekly_volume_max ?? p.weekly_volume_min).toLocaleString("es-MX")} MXN/semana`
+    employees ? `- Empleados: ${employees}` : null,
+    volumeMin
+      ? `- Volumen estimado de compra: $${volumeMin.toLocaleString("es-MX")}–$${(volumeMax ?? volumeMin).toLocaleString("es-MX")} MXN/semana`
       : null,
     p.notes ? `- Notas del vendedor: ${p.notes}` : null,
     "",
@@ -424,12 +424,10 @@ export async function registerAgentTouch(
   const { userId, role } = await requireSellerOrAdminAction()
   const supabase = await createServiceClient()
 
-  const prospectQuery = supabase
-    .from("crm_prospects")
-    .select("id, status")
-    .eq("id", prospectId)
-  if (role !== "admin") prospectQuery.eq("seller_id", userId)
-  const { data: prospect, error } = await prospectQuery.single()
+  const { data: prospect, error } = await applyCrmScope(
+    supabase.from("crm_prospects").select("id, status").eq("id", prospectId),
+    scopeForRole(role, userId),
+  ).single()
   if (error || !prospect) throw new Error("Prospecto no encontrado")
 
   const { error: actErr } = await supabase.from("crm_activities").insert({
@@ -494,21 +492,24 @@ export async function getAgentKpis(): Promise<AgentKpis> {
   const today = getTodayBounds()
   const goals = await getAgentGoals()
 
-  const prospectsQuery = supabase
-    .from("crm_prospects")
-    .select("id, status, tier, zone, user_id, created_at")
-  const activitiesQuery = supabase
-    .from("crm_activities")
-    .select("type, occurred_at")
-    .gte("occurred_at", week.startISO)
-  const messagesQuery = supabase
-    .from("crm_agent_messages")
-    .select("status, sent_at")
-  if (role !== "admin") {
-    prospectsQuery.eq("seller_id", userId)
-    activitiesQuery.eq("seller_id", userId)
-    messagesQuery.eq("seller_id", userId)
-  }
+  // Los KPIs agregan la cartera completa: no pasan por `readCrmProspects`, que
+  // pagina. Sí comparten el alcance, que es lo que no puede divergir.
+  const scope = scopeForRole(role, userId)
+  const prospectsQuery = applyCrmScope(
+    supabase.from("crm_prospects").select("id, status, tier, zone, user_id, created_at"),
+    scope,
+  )
+  const activitiesQuery = applyCrmScope(
+    supabase
+      .from("crm_activities")
+      .select("type, occurred_at")
+      .gte("occurred_at", week.startISO),
+    scope,
+  )
+  const messagesQuery = applyCrmScope(
+    supabase.from("crm_agent_messages").select("status, sent_at"),
+    scope,
+  )
 
   const [prospectsRes, activitiesRes, messagesRes] = await Promise.all([
     prospectsQuery,
@@ -694,25 +695,24 @@ export async function getDailyBriefing(): Promise<DailyBriefing> {
   const supabase = await createServiceClient()
   const today = getTodayBounds()
 
-  const activitiesQuery = supabase
-    .from("crm_activities")
-    .select("type")
-    .gte("occurred_at", today.startISO)
-  const overdueQuery = supabase
-    .from("crm_prospects")
-    .select("id", { count: "exact", head: true })
-    .not("next_follow_up_at", "is", null)
-    .lt("next_follow_up_at", today.startISO)
-    .neq("status", "perdido")
-  const draftsQuery = supabase
-    .from("crm_agent_messages")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "borrador")
-  if (role !== "admin") {
-    activitiesQuery.eq("seller_id", userId)
-    overdueQuery.eq("seller_id", userId)
-    draftsQuery.eq("seller_id", userId)
-  }
+  const scope = scopeForRole(role, userId)
+  const activitiesQuery = applyCrmScope(
+    supabase.from("crm_activities").select("type").gte("occurred_at", today.startISO),
+    scope,
+  )
+  const overdueQuery = applyCrmScope(
+    supabase
+      .from("crm_prospects")
+      .select("id", { count: "exact", head: true })
+      .not("next_follow_up_at", "is", null)
+      .lt("next_follow_up_at", today.startISO)
+      .neq("status", "perdido"),
+    scope,
+  )
+  const draftsQuery = applyCrmScope(
+    supabase.from("crm_agent_messages").select("id", { count: "exact", head: true }).eq("status", "borrador"),
+    scope,
+  )
 
   const [activitiesRes, overdueRes, draftsRes] = await Promise.all([
     activitiesQuery,

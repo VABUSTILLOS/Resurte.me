@@ -59,6 +59,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
+      // Índice único parcial `uniq_invoice_submissions_live_image` (00144):
+      // el mismo archivo no puede estar pendiente/aprobado dos veces.
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: "Ese ticket ya está en revisión o ya fue acreditado" },
+          { status: 409 }
+        )
+      }
       logger.error("[FACTURAS] insert error:", error)
       return NextResponse.json({ error: "No se pudo registrar la factura" }, { status: 500 })
     }
@@ -82,7 +90,7 @@ export async function GET() {
 
     const { data, error } = await supabase
       .from("invoice_submissions")
-      .select("id, image_path, total_amount, notes, status, credits_granted, created_at, reviewed_at")
+      .select("id, image_path, total_amount, notes, status, credits_granted, created_at, reviewed_at, revoked_at, revoked_credits, revoke_reason")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20)
