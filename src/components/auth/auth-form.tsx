@@ -1,14 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useSyncExternalStore } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Fingerprint } from "lucide-react"
 import { AnalyticsEvents } from "@/lib/analytics"
 import { claimGuestAddresses } from "@/lib/guest-address"
 import { safeNextPath } from "@/lib/safe-next"
 import { rememberNextPath } from "@/lib/auth-next"
+import { isPasskeyCancelled, isPasskeySupported, passkeyErrorMessage } from "@/lib/passkeys"
 
 interface AuthFormProps {
   mode: "login" | "register"
@@ -16,6 +17,11 @@ interface AuthFormProps {
 
 const INPUT_CLASS =
   "mt-1 block w-full rounded-lg border border-gray-300 px-3 py-3 sm:py-2 text-gray-900 placeholder:text-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+
+/** La capacidad del navegador no cambia en caliente: no hay nada que observar. */
+function subscribeToNothing() {
+  return () => {}
+}
 
 export function AuthForm({ mode }: AuthFormProps) {
   const [email, setEmail] = useState("")
@@ -35,6 +41,15 @@ export function AuthForm({ mode }: AuthFormProps) {
   // Lazy browser-only client: creating it during SSR would throw when
   // NEXT_PUBLIC_SUPABASE_URL is a placeholder/unset.
   const [supabase] = useState(() => (typeof window === "undefined" ? null : createClient()))
+  // WebAuthn no existe en SSR: el servidor debe pintar `false` y el cliente
+  // corregir sin desajuste de hidratación. `useSyncExternalStore` es la forma
+  // canónica de leer una capacidad del navegador sin `setState` en un efecto
+  // (y sin el render extra que eso provoca).
+  const passkeyReady = useSyncExternalStore(
+    subscribeToNothing,
+    isPasskeySupported,
+    () => false
+  )
 
   const isLogin = mode === "login"
 
@@ -117,6 +132,32 @@ export function AuthForm({ mode }: AuthFormProps) {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error de autenticación")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /**
+   * Entrar con llave de acceso. No pide correo: la llave es "descubrible", el
+   * navegador ofrece las que este dispositivo tenga para el dominio.
+   */
+  async function handlePasskeySignIn() {
+    if (!supabase) return
+    setLoading(true)
+    setError(null)
+    setSuccessMessage(null)
+
+    try {
+      const { error } = await supabase.auth.signInWithPasskey()
+      if (error) throw error
+      await claimGuestAddresses()
+      router.refresh()
+      router.push(nextPath)
+    } catch (err) {
+      // Cerrar la ventana del sistema no es un error que haya que reportar.
+      if (!isPasskeyCancelled(err)) {
+        setError(passkeyErrorMessage(err, "signin"))
+      }
     } finally {
       setLoading(false)
     }
@@ -291,6 +332,18 @@ export function AuthForm({ mode }: AuthFormProps) {
         </svg>
         Continuar con Google
       </button>
+
+      {isLogin && passkeyReady && (
+        <button
+          type="button"
+          onClick={handlePasskeySignIn}
+          disabled={loading}
+          className="mt-3 flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 sm:py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+        >
+          <Fingerprint className="h-5 w-5 text-emerald-600" aria-hidden="true" />
+          Entrar con llave de acceso
+        </button>
+      )}
 
       <p className="mt-6 text-center text-sm text-gray-500">
         {isLogin ? (

@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, TrendingUp, Star, CheckCircle, Lock, HelpCircle } from "lucide-react";
+import { ArrowRight, TrendingUp, Star, CheckCircle, Lock, HelpCircle, Clock } from "lucide-react";
 import { GrowthWalletBanner } from "./GrowthWalletBanner";
 import { QuickActions } from "./QuickActions";
 import { ActivityFeed } from "./ActivityFeed";
 import { NotificationBell } from "./NotificationBell";
+import { PushOptInCard } from "./PushOptInCard";
+import { PasskeyCard } from "./PasskeyCard";
 import { ImpactStories } from "./ImpactStories";
 import { SERVICES } from "./StoreScreen";
 import { TIER_CONFIGS } from "./types";
@@ -21,6 +23,7 @@ import {
   getWalletBalance,
   getWalletHistory,
   getWalletSummary,
+  getWalletExpiry,
   getTotalRewards,
 } from "@/lib/wallet-actions";
 import { localMonthYear } from "@/lib/utils";
@@ -29,6 +32,7 @@ import type { Tier } from "./types";
 import type { ServiceItem } from "./types";
 import type { WalletTransaction } from "@/types";
 import type { WalletSummary } from "@/lib/wallet-summary";
+import type { WalletExpirySummary } from "@/lib/wallet-expiry";
 
 interface DashboardScreenProps {
   onOpenCalculator: (service?: ServiceItem) => void;
@@ -102,6 +106,9 @@ export function DashboardScreen({
           </div>
         </div>
       )}
+
+      {/* Avisos push de pedido (W9) — se oculta solo si el navegador no puede */}
+      <PushOptInCard />
 
       {/* Main Dashboard Grid — 12 col en lg: 8 principal + 4 lateral.
           En móvil el orden lo marcan las clases order-*:
@@ -253,6 +260,84 @@ function BusinessName() {
   );
 }
 
+/**
+ * Caducidad de los créditos (R17). Es informativa: el saldo lo mueve el SQL
+ * (`expire_wallet_credits`), aquí solo se reparte FIFO para explicarle al
+ * usuario qué parte de su saldo está por vencer.
+ */
+function CreditExpiryCard({ expiry }: { expiry: WalletExpirySummary }) {
+  const formatDay = (iso: string) =>
+    new Date(iso).toLocaleDateString("es-MX", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+
+  const lastExpired = expiry.lots.filter((lot) => lot.expired && lot.remaining > 0).pop();
+  const hasAlert = expiry.expiringSoon > 0 || expiry.expired > 0;
+
+  if (!hasAlert && expiry.active <= 0) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`rounded-2xl border p-4 mb-4 ${
+        expiry.expiringSoon > 0
+          ? "bg-amber-50 border-amber-200"
+          : "bg-white border-cream-300"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/70 border border-cream-300 flex-shrink-0">
+          <Clock className="h-4 w-4 text-amber-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          {expiry.expiringSoon > 0 && expiry.nextExpiryAt && (
+            <>
+              <p className="text-warm-700 text-sm font-semibold">
+                Te caducan ${formatNumber(expiry.nextExpiryAmount)} créditos el{" "}
+                {formatDay(expiry.nextExpiryAt)}
+              </p>
+              <p className="text-[#5c6069] text-xs mt-1">
+                {expiry.nextExpiryDays === 0
+                  ? "Vencen hoy. Úsalos en tu siguiente pedido."
+                  : `Te quedan ${expiry.nextExpiryDays} ${
+                      expiry.nextExpiryDays === 1 ? "día" : "días"
+                    } para usarlos.`}
+                {expiry.expiringSoon > expiry.nextExpiryAmount &&
+                  ` En total vencen $${formatNumber(expiry.expiringSoon)} créditos en los próximos 30 días.`}
+              </p>
+            </>
+          )}
+
+          {expiry.expired > 0 && (
+            <p className={`text-warm-700 text-sm ${expiry.expiringSoon > 0 ? "mt-2" : ""}`}>
+              <span className="font-semibold">
+                Vencieron ${formatNumber(expiry.expired)} créditos
+              </span>
+              {lastExpired && ` el ${formatDay(lastExpired.expiresAt)}`}. Se descuentan de tu saldo
+              en el próximo cierre.
+            </p>
+          )}
+
+          {!hasAlert && (
+            <>
+              <p className="text-warm-700 text-sm font-semibold">
+                Tienes ${formatNumber(expiry.active)} créditos vigentes
+              </p>
+              <p className="text-[#5c6069] text-xs mt-1">
+                Los créditos caducan 12 meses después de ganarlos. Se consumen primero los más
+                antiguos, así que nunca pierdes créditos mientras sigas comprando.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function WalletView() {
   const { tier, monthlyCashback } = useLoyaltyTier()
   const currentTierConfig = TIER_CONFIGS[tier]
@@ -260,6 +345,7 @@ function WalletView() {
   const [balance, setBalance] = useState(0)
   const [transactions, setTransactions] = useState<WalletTransaction[]>([])
   const [summary, setSummary] = useState<WalletSummary | null>(null)
+  const [expiry, setExpiry] = useState<WalletExpirySummary | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -270,13 +356,15 @@ function WalletView() {
         if (cancelled) return
         if (wallet) {
           setBalance(Number(wallet.balance_credits))
-          const [{ transactions }, walletSummary] = await Promise.all([
+          const [{ transactions }, walletSummary, walletExpiry] = await Promise.all([
             getWalletHistory(0, 8),
             getWalletSummary(),
+            getWalletExpiry(),
           ])
           if (!cancelled) {
             setTransactions(transactions)
             setSummary(walletSummary)
+            setExpiry(walletExpiry)
           }
         }
       } catch {
@@ -359,6 +447,9 @@ function WalletView() {
           </div>
         )}
       </div>
+
+      {/* Credit expiry (R17) */}
+      {expiry && <CreditExpiryCard expiry={expiry} />}
 
       {/* Recent Transactions */}
       <div className="mb-4">
@@ -621,6 +712,9 @@ function ProfileView({ onShowOnboarding }: { onShowOnboarding?: () => void }) {
           Compartir invitación
         </button>
       </div>
+
+      {/* Llaves de acceso (U13) — se oculta sola si el navegador o el proyecto no pueden */}
+      <PasskeyCard />
     </div>
   );
 }

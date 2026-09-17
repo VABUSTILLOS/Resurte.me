@@ -78,12 +78,50 @@ export const SALE_CHANNELS = [
 
 export type SaleChannel = (typeof SALE_CHANNELS)[number]["key"]
 
-export function entryTotal(e: SaleEntry): number {
+/**
+ * Campos mínimos para totalizar una venta. `SaleEntry` y el `HubVenta` del hub
+ * encajan aquí, así que ambos comparten un único cálculo en vez de mantener dos
+ * copias que se desincronizan.
+ */
+export interface TotalsEntry {
+  date: string
+  quantity: number
+  unitPrice: number
+  discount?: { type: "monto" | "porcentaje"; value: number }
+}
+
+/** Total de una venta de mostrador, nunca negativo. Fuente única. */
+export function entryTotal(e: TotalsEntry): number {
   let total = e.quantity * e.unitPrice
   if (e.discount) {
     total -= e.discount.type === "porcentaje" ? (total * e.discount.value) / 100 : e.discount.value
   }
   return Math.max(0, total)
+}
+
+export interface CounterSummary {
+  count: number
+  revenue: number
+}
+
+/**
+ * Ventas de mostrador de un día (`YYYY-MM-DD`). Fuente única del "mostrador de
+ * hoy" que comparten /panel/ventas y el hub: antes cada superficie filtraba y
+ * sumaba por su cuenta.
+ */
+export function counterSummary(
+  entries: readonly TotalsEntry[],
+  day: string
+): CounterSummary {
+  if (!day) return { count: 0, revenue: 0 }
+  let count = 0
+  let revenue = 0
+  for (const e of entries) {
+    if (!e.date.startsWith(day)) continue
+    count += 1
+    revenue += entryTotal(e)
+  }
+  return { count, revenue }
 }
 
 // ── Derived stat shapes (memoized values passed as props) ──

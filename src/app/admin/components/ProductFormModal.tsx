@@ -20,6 +20,13 @@ import {
   resolveLowStockThreshold,
   resolveSubmittedStockStatus,
 } from "@/lib/stock"
+import { conflictFromResponse } from "@/lib/product-conflict"
+import {
+  adoptTheirs,
+  describeWriteConflict,
+  summarizeWriteConflict,
+  type WriteConflictField,
+} from "@/lib/product-write-diff"
 
 interface Category {
   id: number
@@ -59,6 +66,8 @@ export interface ProductFormProduct {
   seo_title: string | null
   seo_description: string | null
   created_at: string | null
+  /** Versión leída de la fila: precondición de la escritura (B25). */
+  updated_at?: string | null
 }
 
 interface ProductFormModalProps {
@@ -648,6 +657,26 @@ export function ProductFormModal({
   const [confirmingClose, setConfirmingClose] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
+  // --- Concurrencia optimista (ronda 12, B25-B26) --------------------------
+  // `expectedUpdatedAt` es la versión sobre la que se apoya el formulario. El
+  // servidor rechaza el guardado si la fila cambió desde entonces (409
+  // `stale_write`) en vez de pisar el cambio ajeno en silencio. Sin él, el
+  // endpoint mantiene el comportamiento de siempre.
+  const [expectedUpdatedAt, setExpectedUpdatedAt] = useState<string | null>(
+    product?.updated_at ?? null
+  )
+  // Fila del 409 mientras el admin decide; el diff se recalcula en cada render
+  // contra el cuerpo vivo, así que editar un campo actualiza el panel.
+  const [staleWrite, setStaleWrite] = useState<{
+    current: Record<string, unknown> | null
+    currentUpdatedAt: string | null
+  } | null>(null)
+  // Fila con la que se armó el formulario: la referencia del diff de tres vías.
+  const loadedRowRef = useRef<Record<string, unknown> | null>(null)
+  if (isEdit && loadedRowRef.current === null) {
+    loadedRowRef.current = product as unknown as Record<string, unknown>
+  }
+
   const snapshot: FormSnapshot = {
     name,
     brand,
@@ -698,6 +727,80 @@ export function ProductFormModal({
   )
   const marginTone = marginBand(pricing.marginPct)
   const saleOffWindow = pricing.saleState === "scheduled" || pricing.saleState === "expired"
+
+  /**
+   * Cuerpo que se enviaría con el estado actual del formulario. Se usa dos
+   * veces: para enviar y para calcular el diff del conflicto en vivo (si el
+   * admin edita un campo, el panel de conflicto se actualiza solo).
+   */
+  function buildPayload() {
+    const check = validateProductForm({
+      name,
+      price,
+      salePrice,
+      cost,
+      stockQuantity,
+      lowStockThreshold,
+      sku,
+      barcode,
+      saleStartsAt,
+      saleEndsAt,
+    })
+    const payload = {
+      name: name.trim(),
+      brand: brand.trim() || null,
+      category_id: categoryId === "" ? null : Number(categoryId),
+      description: description.trim() || null,
+      unit: unit.trim() || null,
+      price: check.price,
+      sale_price: check.salePrice,
+      sale_starts_at: saleStartsAt ? new Date(saleStartsAt).toISOString() : null,
+      sale_ends_at: saleEndsAt ? new Date(saleEndsAt).toISOString() : null,
+      cost: check.cost,
+      stock_quantity: check.stockQuantity,
+      low_stock_threshold: check.lowStockThreshold,
+      // Misma regla que la vista previa del select: con unidades capturadas el
+      // estado se deriva del umbral; sin unidades manda la selección manual.
+      stock_status: resolveSubmittedStockStatus(
+        check.stockQuantity,
+        check.lowStockThreshold,
+        stockStatus
+      ).status,
+      sku: sku.trim() || null,
+      barcode: barcode.trim() || null,
+      tags,
+      related_product_ids: relatedIds,
+      seo_title: seoTitle.trim() || null,
+      seo_description: seoDescription.trim() || null,
+      is_visible: isVisible,
+      show_in_whatsapp: showInWhatsapp,
+      publish_at: publishAt ? new Date(publishAt).toISOString() : null,
+      unpublish_at: unpublishAt ? new Date(unpublishAt).toISOString() : null,
+      admin_note: adminNote.trim() || null,
+      image_url: mainImage,
+      images: gallery,
+      // created_at no forma parte del form: el servidor la asigna; en
+      // edición el padre conserva el valor existente.
+      created_at: null,
+    }
+    return { payload, check }
+  }
+
+  // B26 — diff de tres vías del 409: qué chocó de verdad y qué solo hay que
+  // conservar. Las reglas viven en `src/lib/product-write-diff.ts` (probadas);
+  // aquí solo se pintan. Se recalcula en cada render contra el cuerpo vivo, así
+  // que editar un campo actualiza el panel sin volver a chocar.
+  const conflictSummary = staleWrite
+    ? summarizeWriteConflict({
+        loaded: loadedRowRef.current,
+        payload: buildPayload().payload,
+        current: staleWrite.current,
+      })
+    : null
+  const conflictNotice =
+    staleWrite && conflictSummary
+      ? describeWriteConflict(conflictSummary, staleWrite.currentUpdatedAt)
+      : null
 
   // Al abrir: foco en el diálogo (no en un input, para no desplegar el teclado
   // en móvil) y bloqueo del scroll del listado que queda detrás.
@@ -777,28 +880,36 @@ export function ProductFormModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await submitForm()
+    requestSave()
+  }
+
+  /**
+   * Punto único de entrada del guardado. Con un conflicto abierto no se
+   * reenvía nada: el guardado pasa por el panel ("Guardar lo mío"), que es
+   * quien lleva la precondición actualizada.
+   */
+  function requestSave() {
+    if (saving) return
+    if (staleWrite) {
+      setConfirmingClose(false)
+      return
+    }
+    void submitForm()
   }
 
   /** Guarda el producto. También se llama sin evento desde "Guardar y cerrar". */
-  async function submitForm() {
+  async function submitForm(options?: {
+    /** Valores que ganan sobre el estado del formulario (los usa "Guardar lo mío"). */
+    overrides?: Record<string, unknown>
+    /** Precondición explícita, para no depender de un `setState` aún sin aplicar. */
+    expectedAt?: string | null
+  }) {
     if (saving) return
     // Valida todo antes de enviar y marca cada campo, en vez de detenerse en el
     // primer problema: así se ve de una vez qué falta por corregir. Las reglas
     // viven en `src/lib/product-form.ts` (probadas) porque espejan las del
     // servidor; aquí solo se pintan.
-    const check = validateProductForm({
-      name,
-      price,
-      salePrice,
-      cost,
-      stockQuantity,
-      lowStockThreshold,
-      sku,
-      barcode,
-      saleStartsAt,
-      saleEndsAt,
-    })
+    const { payload: built, check } = buildPayload()
     if (check.firstInvalid) {
       setFieldErrors(check.errors)
       setError("Revisa los campos marcados en rojo")
@@ -806,57 +917,24 @@ export function ProductFormModal({
       return
     }
     setFieldErrors({})
-    const { price: parsedPrice, salePrice: parsedSale, cost: parsedCost } = check
-    const parsedQty = check.stockQuantity
-    const parsedThreshold = check.lowStockThreshold
-
-    // Misma regla que la vista previa del select: con unidades capturadas el
-    // estado se deriva del umbral; sin unidades manda la selección manual.
-    const derivedStockStatus = resolveSubmittedStockStatus(
-      parsedQty,
-      parsedThreshold,
-      stockStatus
-    ).status
+    const payload = options?.overrides ? { ...built, ...options.overrides } : built
+    const expected = options?.expectedAt !== undefined ? options.expectedAt : expectedUpdatedAt
 
     setSaving(true)
     setError(null)
     try {
-      const payload = {
-        name: name.trim(),
-        brand: brand.trim() || null,
-        category_id: categoryId === "" ? null : Number(categoryId),
-        description: description.trim() || null,
-        unit: unit.trim() || null,
-        price: parsedPrice,
-        sale_price: parsedSale,
-        sale_starts_at: saleStartsAt ? new Date(saleStartsAt).toISOString() : null,
-        sale_ends_at: saleEndsAt ? new Date(saleEndsAt).toISOString() : null,
-        cost: parsedCost,
-        stock_quantity: parsedQty,
-        low_stock_threshold: parsedThreshold,
-        stock_status: derivedStockStatus,
-        sku: sku.trim() || null,
-        barcode: barcode.trim() || null,
-        tags,
-        related_product_ids: relatedIds,
-        seo_title: seoTitle.trim() || null,
-        seo_description: seoDescription.trim() || null,
-        is_visible: isVisible,
-        show_in_whatsapp: showInWhatsapp,
-        publish_at: publishAt ? new Date(publishAt).toISOString() : null,
-        unpublish_at: unpublishAt ? new Date(unpublishAt).toISOString() : null,
-        admin_note: adminNote.trim() || null,
-        image_url: mainImage,
-        images: gallery,
-        // created_at no forma parte del form: el servidor la asigna; en
-        // edición el padre conserva el valor existente.
-        created_at: null,
-      }
       const res = isEdit
         ? await fetch("/api/admin/products/update", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId: product.id, ...payload }),
+            body: JSON.stringify({
+              productId: product.id,
+              // Precondición optimista: si otro usuario guardó este producto
+              // después de que lo cargamos, el servidor responde 409 con su
+              // versión en vez de perder nuestro cambio en silencio.
+              expectedUpdatedAt: expected,
+              ...payload,
+            }),
           })
         : await fetch("/api/admin/products/create", {
             method: "POST",
@@ -865,6 +943,14 @@ export function ProductFormModal({
           })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
+        // Un 409 de edición concurrente no es un error de campo: no se marca
+        // ningún control ni se pinta el banner rojo, porque el aviso real es el
+        // panel de conflicto (con qué cambió cada quien y qué se conserva).
+        const stale = isEdit && res.status === 409 ? conflictFromResponse(data) : null
+        if (stale) {
+          setStaleWrite({ current: stale.current, currentUpdatedAt: stale.currentUpdatedAt })
+          return
+        }
         const message = data.error ?? "Error al guardar el producto"
         // Un 400/409 de campo (SKU duplicado, precio inválido…) marca su
         // control; el aviso general se pinta igual como resumen.
@@ -873,15 +959,74 @@ export function ProductFormModal({
       }
 
       if (isEdit) {
-        onSaved({ ...product, ...payload, created_at: product.created_at ?? null }, false)
+        const nextUpdatedAt =
+          typeof data.updated_at === "string" ? data.updated_at : expectedUpdatedAt
+        setExpectedUpdatedAt(nextUpdatedAt)
+        setStaleWrite(null)
+        // El formulario ya no se apoya en la fila original: la referencia del
+        // diff pasa a ser lo que acaba de quedar guardado, si no el siguiente
+        // 409 reportaría como choque los campos que este mismo admin guardó.
+        rememberBaseline(payload, nextUpdatedAt)
+        onSaved(
+          {
+            ...product,
+            ...payload,
+            created_at: product.created_at ?? null,
+            updated_at: nextUpdatedAt,
+          },
+          false
+        )
       } else {
         onSaved(data.product as ProductFormProduct, true)
       }
     } catch (err) {
+      // Si el reintento del conflicto falla por otra razón (SKU duplicado,
+      // validación del servidor…), el panel de conflicto ya no aplica: queda el
+      // aviso rojo como única instrucción.
+      if (options?.expectedAt !== undefined) setStaleWrite(null)
       setError(err instanceof Error ? err.message : "Error al guardar el producto")
     } finally {
       setSaving(false)
     }
+  }
+
+  /**
+   * Fija la fila de referencia del diff de tres vías: lo último que sabemos que
+   * está en la base. Se llama tras cada guardado con éxito.
+   */
+  function rememberBaseline(row: Record<string, unknown>, updatedAt: string | null) {
+    loadedRowRef.current = { ...(loadedRowRef.current ?? {}), ...row, updated_at: updatedAt }
+  }
+
+  /**
+   * "Guardar lo mío": reintenta el guardado conservando lo que edité y
+   * adoptando del servidor los campos que este formulario no tocó (para no
+   * pisar el trabajo del otro usuario). La precondición pasa a ser la versión
+   * que el servidor acaba de reportar, así que el reintento no vuelve a chocar
+   * salvo que alguien guarde otra vez en el intermedio.
+   */
+  async function saveMine() {
+    if (!staleWrite || !conflictSummary) return
+    const adopted = adoptTheirs({
+      loaded: loadedRowRef.current,
+      payload: buildPayload().payload,
+      current: staleWrite.current,
+    })
+    const expectedAt = staleWrite.currentUpdatedAt
+    // El panel se queda a la vista durante el reintento (el botón muestra su
+    // spinner): si vuelve a chocar, se repinta con la versión más reciente.
+    await submitForm({ overrides: adopted, expectedAt })
+  }
+
+  /**
+   * "Recargar": trae la versión del servidor y descarta lo local. Se recarga la
+   * página entera a propósito: el guardia de cambios sin guardar ya protege el
+   * caso de escritura a medias, y evita reconstruir el formulario a mano.
+   */
+  function reloadStale() {
+    if (saving) return
+    setStaleWrite(null)
+    window.location.reload()
   }
 
   /** Lleva el foco al control del campo, centrado, para que se vea el error. */
@@ -999,6 +1144,76 @@ export function ProductFormModal({
             aria-label="Campos del producto"
             className="min-w-0 flex-1 space-y-6 overflow-y-auto px-4 py-4 outline-none sm:px-5"
           >
+            {staleWrite && conflictSummary && conflictNotice && (
+              <section
+                aria-labelledby="pf-conflict-title"
+                aria-describedby="pf-conflict-detail"
+                className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-xs text-amber-900"
+              >
+                {/* Región viva con texto fijo a propósito: el panel aparece una
+                    sola vez por conflicto y su detalle cambia con cada tecla,
+                    así que anunciar el contenido completo en cada pulsación
+                    sería ruido. El texto visible queda fuera del `alert`. */}
+                <p role="alert" className="sr-only">
+                  No se guardó: otro usuario modificó este producto mientras lo editabas.
+                </p>
+                <p id="pf-conflict-title" className="flex items-center gap-1.5 text-sm font-bold">
+                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {conflictNotice.title}
+                </p>
+                <p id="pf-conflict-detail" className="mt-1 text-amber-800">
+                  {conflictNotice.detail}
+                </p>
+
+                {conflictSummary.changes.length > 0 && (
+                  <ul className="mt-2.5 space-y-1.5">
+                    {conflictSummary.changes.map((row: WriteConflictField) => (
+                      <li
+                        key={row.field}
+                        className="rounded-lg border border-amber-200 bg-white/60 px-2 py-1.5"
+                      >
+                        <span className="font-semibold">{row.label}</span>
+                        <span className="ml-1.5 text-amber-700">
+                          tú: <span className="font-semibold">{row.mine}</span>
+                        </span>
+                        <span className="ml-1.5 text-amber-700">
+                          en la base: <span className="font-semibold">{row.theirs}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {conflictSummary.untouched.length > 0 && (
+                  <p className="mt-2 text-[11px] text-amber-800">
+                    <span className="font-semibold">Se conservará</span> lo que cambió el otro
+                    usuario y tú no tocaste:{" "}
+                    {conflictSummary.untouched.map((row) => row.label).join(", ")}.
+                  </p>
+                )}
+
+                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={saveMine}
+                    disabled={saving}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    {saving && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
+                    Guardar lo mío
+                  </button>
+                  <button
+                    type="button"
+                    onClick={reloadStale}
+                    disabled={saving}
+                    className="rounded-lg border border-amber-300 px-3 py-1.5 text-[11px] font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    Recargar y descartar lo mío
+                  </button>
+                </div>
+              </section>
+            )}
+
             {error && (
               <div
                 role="alert"
@@ -1939,7 +2154,7 @@ export function ProductFormModal({
                   // Cerrar el aviso primero: si la validación falla, el usuario
                   // ve los errores de campo en vez de la barra de descarte.
                   setConfirmingClose(false)
-                  void submitForm()
+                  requestSave()
                 }}
                 disabled={saving}
                 className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
@@ -1962,7 +2177,10 @@ export function ProductFormModal({
           </button>
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || staleWrite !== null}
+            title={
+              staleWrite ? "Resuelve primero el conflicto de edición que aparece arriba" : undefined
+            }
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}

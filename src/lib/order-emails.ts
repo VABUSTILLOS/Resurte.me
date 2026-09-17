@@ -14,6 +14,7 @@ import { createServiceClient } from "@/lib/supabase/service"
 import { sendEmail, orderConfirmationEmailHtml, orderStatusEmailHtml, escapeHtml } from "@/lib/email"
 import { PAYMENT_METHOD_LABEL } from "@/lib/order-labels"
 import { notifyUser } from "@/lib/notifications"
+import { sendOrderStatusPush } from "@/lib/push-server"
 import { logger } from "@/lib/logger"
 import type { OrderStatus } from "@/types"
 
@@ -230,19 +231,31 @@ export async function sendOrderStatusEmail(orderId: number, status: OrderStatus)
     if (await alreadySent(supabase, orderId, emailType)) return
 
     // Notificación persistente (independiente del email: llega aunque el
-    // usuario no haya dejado correo).
+    // usuario no haya dejado correo) + push (W9). Comparten copia y enlace a
+    // propósito: campana y aviso no pueden decir cosas distintas.
     const slug = citySlugOf(order)
     if (order.user_id) {
+      const title = `Pedido #${orderId}: ${content.label}`
+      const body = content.headline
+      const trackingPath =
+        slug && order.restore_token
+          ? buildTrackingUrl(slug, orderId, order.restore_token).replace(/^https?:\/\/[^/]+/, "")
+          : undefined
       void notifyUser({
         userId: order.user_id,
         type: emailType,
-        title: `Pedido #${orderId}: ${content.label}`,
-        body: content.headline,
-        actionUrl:
-          slug && order.restore_token
-            ? buildTrackingUrl(slug, orderId, order.restore_token).replace(/^https?:\/\/[^/]+/, "")
-            : undefined,
+        title,
+        body,
+        actionUrl: trackingPath,
         orderId,
+      })
+      void sendOrderStatusPush({
+        userId: order.user_id,
+        orderId,
+        status,
+        title,
+        body,
+        url: trackingPath,
       })
     }
 

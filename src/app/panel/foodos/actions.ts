@@ -9,8 +9,12 @@
 import { requireAuth, getCurrentUser } from "@/lib/auth"
 import { requireFoodosFeature } from "@/lib/foodos-tier"
 import { reportServerError } from "@/lib/error-log"
+import { dailyTokenCap } from "@/lib/ai/budget"
+import { loadAiUsage, type AiUsageSnapshot } from "@/lib/ai/usage"
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/service"
+import { isSupabaseConfigured } from "@/lib/supabase/env"
+import { logger } from "@/lib/logger"
 import { formatMoney, slugify } from "@/lib/foodos"
 import { tallyAbTest } from "@/lib/messaging/channel"
 import type { CampaignCopyOutput, CampaignTone } from "@/lib/foodos-ai/copy"
@@ -755,6 +759,38 @@ export async function getOrdersSummary(): Promise<{
     weekCount: valid.length,
     weekRevenue: valid.reduce((s, o) => s + o.total, 0),
     pendingCount: (orders ?? []).filter((o) => o.status === "pending").length,
+  }
+}
+
+/**
+ * Consumo de IA del día para el tablero FoodTech.
+ *
+ * El asistente se apaga al agotar el tope diario y hasta ahora el dueño no
+ * tenía forma de verlo: `foodos_ai_usage` no tenía lectores en TypeScript.
+ * Devuelve `null` cuando no hay Supabase, no hay sesión o el usuario no tiene
+ * restaurante FoodOS, para que la tarjeta simplemente no se pinte (invariante
+ * 18: una lectura en ruta de render degrada, no lanza).
+ */
+export async function getAiUsage(): Promise<AiUsageSnapshot | null> {
+  if (!isSupabaseConfigured()) return null
+  try {
+    const user = await getCurrentUser()
+    if (!user) return null
+    const supabase = await createClient()
+    const { data: restaurant } = await supabase
+      .from("foodos_restaurants")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle()
+    if (!restaurant) return null
+    // El tope es el mismo que aplica `reserveAiBudget`; si divergieran, el
+    // aviso al 80 % mentiría.
+    return await loadAiUsage(supabase, restaurant.id, { cap: dailyTokenCap() })
+  } catch (error) {
+    logger.warn("foodos.ai-usage.action", {
+      message: error instanceof Error ? error.message : String(error),
+    })
+    return null
   }
 }
 

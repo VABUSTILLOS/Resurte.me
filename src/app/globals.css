@@ -550,7 +550,8 @@ input.marquee-input:placeholder-shown:not(:focus) + .marquee-placeholder {
   .product-card-img-swap .product-card-img-primary,
   .product-card-img-swap .product-card-img-secondary,
   .marquee-placeholder,
-  .reading-progress-fill {
+  .reading-progress-fill,
+  .animate-spin {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

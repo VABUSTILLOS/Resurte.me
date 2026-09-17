@@ -30,3 +30,25 @@ requieren revisar todos los playbooks que dependen de esa superficie.
    `npm test` y `npm run build`.
 6. **Accesibilidad**: diálogos con foco inicial + Escape + `aria-modal`; cambios de
    estado anunciados con `aria-live`; iconos decorativos con `aria-hidden`.
+
+## Sin agente asignado: cuenta y autenticación
+
+`src/app/auth/**`, `src/components/auth/**`, `src/lib/supabase/**` y
+`src/lib/passkeys.ts` (fase U del plan) no pertenecen a ninguno de los seis
+perímetros. **Todos** los agentes dependen de ellos, porque todos asumen una
+sesión: `createClient()` devuelve `null` sin configuración y los consumidores
+hacen `if (!supabase) return`. Antes de tocarlos, revisar los seis playbooks.
+Reglas propias de esta superficie:
+
+1. `src/lib/supabase/client.ts` enciende `auth: { experimental: { passkey: true } }`.
+   Quitarlo no rompe el build: rompe **al llamar** a `signInWithPasskey` /
+   `auth.passkey.*`. Lo cubre un test de contrato en `src/lib/passkeys.test.ts`.
+2. La detección de capacidades del navegador (WebAuthn, push) se hace con
+   `useSyncExternalStore`, no con `useState` + `useEffect`: el servidor debe
+   pintar `false` sin desajuste de hidratación, y la regla
+   `react-hooks/set-state-in-effect` lo prohíbe.
+3. Las reglas puras de passkeys (etiqueta, fecha, validación, mapeo de errores a
+   español) viven en `src/lib/passkeys.ts`. La UI no las reimplementa.
+4. Ningún error de WebAuthn se suprime salvo el aborto explícito: `NotAllowedError`
+   cubre tanto "cerré la ventana" como "este dispositivo no tiene ninguna llave" y
+   merece copy según el flujo (`passkeyErrorMessage(err, flow)`).

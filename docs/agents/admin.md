@@ -275,6 +275,22 @@
   además `idx_admin_audit_log_entity` para el historial por producto. Sigue
   valiendo la regla de la ronda 8: al añadir un filtro con contador se tocan la
   RPC **y** el fallback en JS.
+- **Versiones de migración únicas** (incidente 00118/`42P01`): el CLI de
+  Supabase identifica cada migración por su versión, así que **dos archivos con
+  el mismo prefijo `NNNNN` solo aplican uno** y el otro se queda sin registrar
+  (sin error, sin aviso). Pasó con `00078` (`00078_admin_audit_log.sql` vs.
+  `00078_foodos_modifiers_dinein.sql`): la bitácora `admin_audit_log` nunca
+  existió, `logAdminAudit()` fallaba en silencio (es best-effort), el historial
+  de un producto daba 500 y `00118` abortaba en su `CREATE INDEX` con `42P01`.
+  Por eso: (1) `00078_admin_audit_log.sql` → **`00072_admin_audit_log.sql`** y
+  `00065_refund_dispute_cashback_reversal.sql` → **`00135_…`** (se renumeró el
+  archivo que el CLI NO tenía registrado; renumerar el registrado lo reejecuta y
+  falla por objeto duplicado); (2) toda migración que crea o referencia
+  `admin_audit_log` es idempotente (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX
+  IF NOT EXISTS`, `DROP POLICY IF EXISTS` antes de la política) y `00118` crea su
+  índice dentro de un `DO $$ … to_regclass … $$` para que una sola sentencia de
+  índice no pueda tumbar la RPC de conteos; (3) `src/lib/migrations.test.ts`
+  falla si vuelve a haber dos archivos con la misma versión.
 - Productos ronda 10 — CSV con una sola cabecera (B17): `src/lib/product-csv.ts`
   es la fuente única de la cabecera y las celdas del CSV de productos, y el
   import valida contra ella (`PRODUCT_IMPORT_HEADER`, `validateImportColumns`,
@@ -296,10 +312,8 @@
   (compatibilidad con cualquier cliente viejo). El panel adopta la versión que
   devuelve el servidor y, ante un 409, muestra un banner ámbar con "Recargar" en
   vez de perder el trabajo.
-  **Traspaso pendiente**: enviar `expectedUpdatedAt` desde `ProductFormModal`
-  (ronda 9, otra sesión). Al tocarlo: mandar la versión de la fila cargada como
-  `expectedUpdatedAt` y pintar el 409 con el `conflict.current` que ya resuelve
-  `conflictFromResponse`.
+  Traspaso **cerrado en la ronda 12**: `ProductFormModal` ya manda la versión
+  con la que abrió y pinta el 409 con `conflictFromResponse`.
 - Productos ronda 10 — vistas guardadas (B20): una vista es la **query canónica
   del listado** (filtros + orden + tabla/tarjetas + tamaño de página), no un
   formato paralelo. `src/lib/product-filter-presets.ts` la normaliza (sin `page`,
@@ -351,10 +365,58 @@
   sin marcar el select. Ahora está mapeado **y** con `id` en
   `PRODUCT_FIELD_INPUT_IDS`, y hay una prueba que exige que toda columna
   traducida tenga control: si añades una al mapa, añádela también al de ids.
-  **Traspaso pendiente (no hecho aquí)**: mandar `expectedUpdatedAt` en el
-  PATCH desde `ProductFormModal`. Requiere `updated_at` en `ProductFormProduct`
-  y en la fila que le pasa `page.tsx` (archivo de otra sesión), así que se dejó
-  fuera de esta ronda a propósito para no pisar ese trabajo.
+  Traspaso **cerrado en la ronda 12** (abajo).
+- Productos ronda 12 — guardar el formulario completo ya no pisa cambios ajenos
+  (B25-B26). La ronda 10 dejó la escritura optimista para imagen, SEO y guardado
+  rápido, pero el modal —el único que escribe **todas** las columnas— seguía
+  mandando su `PATCH` sin versión previa: el último en guardar ganaba en
+  silencio y el admin leía "Guardado" sobre datos que ya no eran suyos. Reglas
+  de esta ronda:
+  - El modal manda `expectedUpdatedAt` con la versión de la fila **cargada**
+    (`product.updated_at`), no con la del último guardado propio. `page.tsx` no
+    hubo que tocarlo: el `COLS` del listado ya incluye `updated_at` y
+    `handleFormSaved` mezcla el `updated_at` que devuelve `onSaved`, así que la
+    versión vuelve sola al estado del catálogo.
+  - Un **409 `stale_write`** es un **panel**, no un error de campo. Se distingue
+    con `conflictFromResponse`, no con `res.status === 409`: el servidor también
+    responde 409 por SKU duplicado y ese sí debe marcar su campo con
+    `markServerField`. Confundirlos hacía que un SKU repetido pintara un panel de
+    conflicto y que un conflicto real marcara un campo inexistente.
+  - Con el panel abierto **no se puede guardar** y el trabajo no se pierde:
+    `requestSave()` corta cualquier envío mientras `staleWrite` siga vivo (el
+    botón de envío queda `disabled` con un `title` que lo explica) y las dos
+    salidas son explícitas —"Recargar y descartar lo mío" o "Guardar lo mío"—
+    en vez de una redirección silenciosa.
+  - El diff es a **tres bandas**: `summarizeWriteConflict({ loaded, payload,
+    current })` compara lo cargado, lo que este formulario va a enviar y la fila
+    actual, y separa `changes` (ambos lo tocaron: choque real) de `untouched`
+    (solo lo tocó el otro: se conserva sin preguntar). `adoptTheirs` recompone el
+    payload para que los campos que este formulario **no** editó tomen el valor
+    del otro — eso es literalmente "Guardar lo mío": no hay que reescribir la
+    fila, solo dejar de pisar lo que no era nuestro. Se recalcula en cada render,
+    así que el panel se actualiza mientras el admin sigue escribiendo.
+  - La comparación es **tolerante** a propósito (`100` = `"100"`, `null` =
+    `undefined`, `*_at` por fecha parseada, listas por contenido): avisar de un
+    conflicto que no existe es peor que no avisar, porque entrena al admin a
+    ignorar el panel. Y los campos que el servidor **no** devuelve en
+    `conflict.current` (`description`, `unit`, `publish_at`, `unpublish_at`,
+    `images`, `admin_note` — están en `PRODUCT_UPDATE_FIELDS` pero no en
+    `PRODUCT_AUDIT_FIELDS`) se **omiten** en vez de reportarse como choque: el
+    panel solo puede hablar de campos auditables, y eso es una limitación del
+    servidor, no del modal.
+  - El dinero del diff usa `formatMoney` (**es-MX**, el del catálogo), **no**
+    `formatAuditValue` (es-CO: `$90,00`). Reusar el formateador de la auditoría
+    aquí haría que el mismo precio se leyera distinto en dos pantallas
+    contiguas.
+  - El `role="alert"` lleva **texto fijo** ("No se guardó: otro usuario modificó
+    este producto mientras lo editabas") y el detalle variable va fuera: el
+    detalle cambia con cada tecla y anunciarlo en cada pulsación es ruido puro.
+  - Sin animaciones en el panel (reduced motion) y con `aria-labelledby` /
+    `aria-describedby` al título y al detalle, siguiendo las reglas del diálogo.
+  - `rememberBaseline(payload, updatedAt)` actualiza la base tras cada guardado
+    bueno: un **segundo** choque se compara contra lo que de verdad se guardó y
+    no contra la fila original, que si no reportaría como choque lo que el propio
+    admin acaba de escribir.
 - Sync de catálogo WhatsApp (WA1-WA7): la DB es fuente única; el sync NUNCA
   borra en Meta sin confirmación explícita (`deleteUnknown`); los cambios de
   producto se propagan por la cola `whatsapp_sync_queue` (cron diario) y todo
@@ -619,6 +681,16 @@ hueco).
 
 Ronda 10 de `/admin/productos` (requiere 00118 y 00119 aplicadas; conviene
 repetir con ellas ausentes para comprobar la degradación):
+- Base de datos al día: `admin_audit_log` existe (la crea `00072`, renumerada
+  desde `00078`), con `idx_admin_audit_log_entity`; `admin_product_filter_counts`
+  devuelve las 17 claves (con `brands` y `tagCounts`, no las 4 de la v1); y
+  `push_subscriptions` (00134) existe. Comprobación rápida:
+  `select jsonb_object_keys(admin_product_filter_counts(false));` — si solo
+  aparecen `categoryCounts`/`dupNameIds`/`noCitiesIds`/`underThresholdIds`, la
+  RPC sigue en la versión de la ronda 8 y el panel está usando el cálculo en JS.
+  Un `42P01` en una migración casi siempre significa que un archivo se quedó sin
+  aplicar por versión duplicada: comparar `supabase/migrations/` con
+  `supabase-list_migrations` antes de tocar nada.
 - Contadores: con la RPC v2 aplicada, los chips (estado, categoría, sin ciudad,
   papelera, marcas, etiquetas) cuadran con lo que devuelve cada filtro y el
   listado hace **una** llamada; sin 00118 (o con la 00115 sola) siguen
@@ -655,7 +727,36 @@ Ronda 11 del modal de producto (B22-B24; requiere sesión admin):
   aviso, `#pf-stock` derivado), el `aria-describedby` del control debe listar el
   `pf-err-*` **y** el `pf-*-hint`; ninguno debe tapar al otro.
 Automatizado: `npx playwright test e2e/admin-productos-modal.spec.ts --grep @ci`
-(los dos casos nuevos se saltan solos sin `E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD`).
+(los casos nuevos se saltan solos sin `E2E_ADMIN_EMAIL`/`E2E_ADMIN_PASSWORD`).
+
+Ronda 12 del modal de producto (B25-B26; requiere sesión admin y una segunda
+pestaña/API para mover la fila por detrás):
+- Conflicto en el formulario completo: abrir la edición de un producto, cambiar
+  el **precio** y, sin guardar, mover la fila por detrás (`PATCH` a
+  `/api/admin/products/update` sin `expectedUpdatedAt`, o edición rápida en el
+  catálogo). Al guardar debe aparecer el **panel ámbar**, no el aviso rojo, y el
+  campo del precio **no** debe quedar marcado con error de campo.
+- No se puede esquivar: con el panel abierto, el botón de envío está
+  deshabilitado y su `title` lo explica; reintentar el envío no manda nada.
+- "Guardar lo mío" conserva lo ajeno: el otro cambia **nombre** y este admin
+  cambia **precio** → tras "Guardar lo mío" el precio guardado es el de este
+  admin y el nombre es el del otro (no se pisa lo que no se editó). El panel debe
+  decir "1 campo en conflicto" y listar el precio con "tú:" y "en la base:".
+- El panel se recalcula: con el conflicto abierto, seguir escribiendo el precio
+  debe actualizar la línea del diff sin recargar la página.
+- SKU duplicado sigue siendo un error de campo: dos productos con el mismo SKU →
+  el segundo guardado marca `#pf-err-sku` en rojo y **no** abre el panel ámbar.
+- Dinero en es-MX: el diff debe mostrar `$90`, nunca `$90,00`.
+- "Recargar y descartar lo mío" recarga la página y el valor mostrado es el de la
+  base.
+- Reduced motion: con `prefers-reduced-motion: reduce` el panel no anima.
+Automatizado: `npx playwright test e2e/admin-productos-modal.spec.ts --grep @ci`
+(el caso de conflicto se salta solo sin credenciales de admin). Ese caso cambia
+**umbral de stock bajo** desde el modal y, por detrás, **título SEO** desde la
+API —campos ambos de la auditoría, así que el diff los ve—; comprueba el panel,
+que el envío queda bloqueado, que "Guardar lo mío" guarda su umbral y **conserva**
+el título del otro, y restaura los dos valores en el `finally`. El módulo puro se
+cubre aparte con `npx vitest run src/lib/product-write-diff.test.ts`.
 
 Acciones masivas de pedidos (requiere sesión admin + datos): en `/admin/pedidos`
 marcar un subconjunto y comprobar que el checkbox del encabezado queda

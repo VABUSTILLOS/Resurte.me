@@ -7,5 +7,10 @@ export function createClient() {
   const url = supabaseUrl()
   const anonKey = supabaseAnonKey()
   if (!isSupabaseConfigured() || !url || !anonKey) return null
-  return createBrowserClient(url, anonKey)
+  // Las passkeys (U13) están detrás de un flag experimental en auth-js: sin él
+  // `auth.signInWithPasskey` y `auth.passkey.*` lanzan al llamarse. Encenderlo
+  // no cambia nada mientras la UI no invoque esos métodos.
+  return createBrowserClient(url, anonKey, {
+    auth: { experimental: { passkey: true } },
+  })
 }

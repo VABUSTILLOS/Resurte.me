@@ -72,6 +72,62 @@
 - Nada se agrega al carrito sin confirmación explícita del usuario: un solo
   `addOrderItems`, un toast y un `AnalyticsEvents.addToCart` por ítem.
 
+### Ronda W10 — background sync del carrito
+
+- El push del carrito a `user_carts` sigue siendo **debounced y best-effort**
+  (`src/contexts/cart-context.tsx`); el background sync **no** lo reemplaza.
+  localStorage continúa siendo la fuente visible offline.
+- Solo se encola cuando el fallo es reintentable: `fetch` lanzó (sin red) o el
+  servidor respondió **5xx**. Un 4xx (sesión expirada, payload inválido) **no**
+  se encola: reintentarlo daría el mismo resultado para siempre
+  (`shouldQueueCartSync`).
+- Un snapshot encolado **caduca a las 24 h** y **nunca se sube vacío**
+  (`CART_SYNC_MAX_AGE_MS`): resucitar un carrito viejo o borrar el del servidor
+  es una decisión del usuario, no un efecto de la reconexión.
+- `public/sw.js` **duplica** el tag, el nombre de la base, el store, la clave, la
+  URL y el tope de edad porque un SW servido como archivo estático no puede
+  importar módulos del bundle. La prueba de contrato
+  `src/lib/cart-background-sync.test.ts` lee `public/sw.js` y falla si alguno se
+  desincroniza — es lo que impide el fallo silencioso "el flush nunca corre".
+- El handler `sync` **solo reintenta el PUT**; no agrega rutas al caché. El
+  invariante de `NEVER_CACHE_PREFIXES` (`/api/`, `/auth/`, `/admin/`, `/panel/`)
+  sigue vigente y también está cubierto por la prueba de contrato.
+- Safari/iOS no implementa Background Sync: ahí el respaldo es el listener
+  `online` del provider, que reintenta el snapshot actual y limpia el pendiente.
+  `registerCartBackgroundSync()` acota `serviceWorker.ready` con timeout (3 s)
+  para no dejar promesas colgadas en dev/preview, donde no hay SW.
+- Todo el acceso a IndexedDB es tolerante a fallos (modo privado, cuota): si
+  falla, el carrito sigue funcionando solo con localStorage.
+
+### Ronda W9 — push de estado de pedido
+
+- El push es un **canal adicional**, no un reemplazo: la campana
+  (`notifyUser`) y el correo siguen siendo la fuente. Los tres salen del mismo
+  sitio (`sendOrderStatusEmail` en `src/lib/order-emails.ts`) y comparten los
+  locales `title`/`body`/`trackingPath`; por eso no pueden divergir. No agregar
+  un `sendPush` suelto en la ruta de estado.
+- Solo los hitos empujan: `PUSHABLE_ORDER_STATUSES`
+  (`confirmed`, `out_for_delivery`, `delivered`) debe seguir siendo **idéntico**
+  a `EMAILED_STATUSES`; hay una prueba que compara ambos arreglos.
+- `public/sw.js` **duplica** el `tag`, el icono y la URL por defecto, y el
+  `push`/`notificationclick` viven ahí. `notificationclick` enfoca una pestaña
+  ya abierta del pedido antes de abrir una nueva, y **solo** abre URLs del mismo
+  origen.
+- El SW **no** gana rutas al caché con esto: `NEVER_CACHE_PREFIXES` sigue
+  vigente (y cubierto por la prueba de contrato de `src/lib/push.test.ts`).
+- `urlBase64ToUint8Array("")` devuelve `null`, no un `Uint8Array` de 0 bytes: una
+  clave vacía hace que `subscribe` lance un `InvalidAccessError` opaco.
+- El opt-in se oculta —en vez de fallar— cuando no hay clave VAPID pública, el
+  navegador no soporta push o el service worker no está registrado
+  (`RegisterSW` solo registra en producción). En dev, por tanto, la tarjeta no
+  aparece: es esperado, no un bug.
+- `disable()` hace primero el `DELETE` y después `unsubscribe()` local. Al revés,
+  el servidor seguiría mandando push a un endpoint que ya no existe.
+- Las escrituras a `push_subscriptions` son solo de `service_role`: la tabla
+  tiene RLS con políticas **SELECT** y **DELETE** propias, y **ninguna** de
+  `INSERT`/`UPDATE`. En un equipo compartido, una clave anónima no debe poder
+  reclamar el endpoint de otra persona.
+
 ## Verificación
 Recorrido a 320px/375px/768px: header, drawer de carrito, WhatsApp FAB, cookie
 banner, BackToTop, InstallPrompt, BottomTabBar de recompensas y PanelQuickNav sin
@@ -81,3 +137,29 @@ Share target: `npx playwright test e2e/compartir.spec.ts --grep "share target"`
 (ambos proyectos: `chromium` y `mobile-chromium`). Cubre estado vacío, precarga
 desde `?texto=`/`?titulo=`, resumen de la lista, deep links de "sin coincidencia"
 y que el manifest siga declarando el `share_target` GET.
+
+Background sync del carrito (W10): `npx vitest run src/lib/cart-background-sync.test.ts`
+— 21 pruebas. Cubre la decisión de encolar (red vs. 5xx vs. 4xx), la caducidad a
+24 h, el rechazo de carrito vacío y de registros corruptos de IndexedDB, el
+round-trip de serialización y el **contrato con `public/sw.js`** (constantes,
+listener `sync`, `PUT` + limpieza, y que `NEVER_CACHE_PREFIXES` siga intacto).
+La parte con efectos (IndexedDB real, `sync.register`, reintento del SW) no tiene
+prueba automatizada: no hay SW en dev/CI y Playwright no dispara `sync`.
+Verificación manual: DevTools → Network → Offline, agregar al carrito con sesión
+iniciada, volver a Online y comprobar en Application → IndexedDB →
+`resurte-offline`/`cart-sync` que el registro `pending` desaparece tras el PUT.
+
+Push de estado de pedido (W9): `npx vitest run src/lib/push.test.ts` — 30 pruebas
+(reglas puras, `urlBase64ToUint8Array`, validación del alta, contrato con
+`public/sw.js` y contrato con la migración `00134_push_subscriptions.sql`), más
+`npx vitest run src/lib/order-emails.test.ts` — 16 pruebas, tres de ellas
+comprobando que el push sale con **la misma copia y el mismo enlace** que la
+campana. La parte con efectos (permiso, `pushManager.subscribe`, `web-push`
+contra un endpoint real) no tiene prueba automatizada.
+Verificación manual: con `NEXT_PUBLIC_VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`
+definidas y la migración `00134` aplicada, en un build de producción
+(`npm run build && npm start`) abrir `/recompensas`, activar el interruptor,
+aceptar el permiso y confirmar que aparece la fila en `push_subscriptions`;
+luego avanzar un pedido propio a `out_for_delivery` y comprobar la notificación
+del sistema, que al pulsarla abre `/cdmx/pedido/<id>?t=<token>` enfocando la
+pestaña ya abierta. Desactivar y comprobar que la fila desaparece.

@@ -337,8 +337,8 @@ async function seedCart(page: Page): Promise<boolean> {
   return tapQuickAdd(page, quickAdd)
 }
 
-// Los previews fríos re-renderizan durante la hidratación (el main pasa por un
-// estado "Cargando productos..." que quita temporalmente los nodos). boundingBox
+// Los previews fríos re-renderizan durante la hidratación (el main puede pasar
+// por un estado intermedio en el que los nodos se reemplazan). boundingBox
 // puede volver null justo en esa ventana: reintenta hasta ~3s antes de fallar.
 async function boundingBoxSettled(locator: Locator): Promise<{ x: number; y: number; width: number; height: number } | null> {
   for (let attempt = 0; attempt < 6; attempt++) {

@@ -10,7 +10,7 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react"
 import { normalizeName } from "@/lib/normalize"
 import { foodCostStatus, usePanelConfig } from "@/lib/panel-config"
 import { convertQty } from "@/lib/panel-units"
-import { isCurrentMonth, isLowStock, isOutOfStock } from "@/lib/panel-utils"
+import { isCurrentMonth, isLowStock, isOutOfStock, todayStr } from "@/lib/panel-utils"
 import { Search } from "lucide-react"
 import { GlobalSearch } from "@/components/global-search"
 import {
@@ -21,6 +21,8 @@ import type { WasteEntry } from "@/components/panel/mermas/mermas-shared"
 import type { ShoppingItem } from "@/components/panel/temporada/temporada-shared"
 import type { InventoryItem } from "@/components/panel/inventario/inventario-shared"
 import type { Cliente } from "@/components/panel/ventas/ventas-shared"
+import { counterSummary } from "@/components/panel/ventas/ventas-shared"
+import AppOrdersCard from "@/components/panel/ventas/app-orders-card"
 import { useHubAlerts } from "@/components/panel/hub/use-hub-alerts"
 import { useAlertHistory } from "@/components/panel/hub/use-alert-history"
 import { usePanelRole } from "@/hooks/use-panel-role"
@@ -115,10 +117,16 @@ export default function PanelPage() {
     return { totalCosteo, totalMerma, green, red, dishesCount: sharedDishes.length, mermaCount: mermaEntries.length, aperturaCount: aperturaChecked.length, avgFoodCost, avgMargin, monthLoss, mermaVsGoal, seasonalSavings, totalPrice, monthlyGoal }
   }, [sharedDishes, mermaEntries, aperturaChecked, selectedCollection, monthlyGoal, shoppingList, panelCfg])
 
+  // Mostrador de hoy: mismo cálculo y mismo "hoy" (local) que /panel/ventas.
+  const counterToday = useMemo(
+    () => counterSummary(ventasEntries, todayStr()),
+    [ventasEntries]
+  )
+
   // Sales widget: today revenue, COGS, margin, ticket count, payment methods, merma
   const todaySales = useMemo(() => {
     if (!selectedCollection) return null
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayStr()
     const todayEntries = ventasEntries.filter((e) => e.date === today)
     const revenue = todayEntries.reduce((s, e) => s + hubEntryTotal(e), 0)
     const cost = todayEntries.reduce((s, e) => s + e.quantity * e.unitCost, 0)
@@ -154,7 +162,7 @@ export default function PanelPage() {
   // Loyalty points awarded today (sales linked to a client)
   const puntosHoy = useMemo(() => {
     if (!selectedCollection) return 0
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayStr()
     const tasa = puntosTasa > 0 ? puntosTasa : 100
     return ventasEntries
       .filter((e) => e.date === today && e.clienteId)
@@ -172,7 +180,7 @@ export default function PanelPage() {
   // Active kitchen orders: today's sales still pendiente or en-cocina
   const activeComandas = useMemo(() => {
     if (!selectedCollection) return { active: 0, pendiente: 0, enCocina: 0, readyToday: 0 }
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayStr()
     const todayIds = new Set(ventasEntries.filter((e) => e.date === today).map((e) => e.id))
     let active = 0
     let pendiente = 0
@@ -190,7 +198,7 @@ export default function PanelPage() {
   // Mesas: occupied today + those occupied longer than 3h
   const mesasInfo = useMemo(() => {
     if (!selectedCollection) return { occupied: 0, total: mesas.length, longCount: 0, longNames: [] as string[] }
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayStr()
     const firstTs = new Map<string, number>()
     ventasEntries.forEach((e) => {
       if (e.date !== today || !e.mesaId) return
@@ -480,6 +488,15 @@ export default function PanelPage() {
           puntosHoy={puntosHoy}
           goalProgress={goalProgress}
           onCopy={copyDaySummary}
+        />
+      )}
+
+      {/* Mostrador vs. app: solo para roles con acceso a FoodOS y con
+          restaurante dado de alta (getOrdersSummary degrada a null si no). */}
+      {selectedCollection && canAccessTool(role, "foodos") && (
+        <AppOrdersCard
+          counterCount={counterToday.count}
+          counterRevenue={counterToday.revenue}
         />
       )}
 

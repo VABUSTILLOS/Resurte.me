@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useVentasPage } from "@/hooks/use-ventas-page"
 import { t } from "@/lib/i18n/es"
-import { entryTotal } from "@/components/panel/ventas/ventas-shared"
+import { entryTotal, counterSummary } from "@/components/panel/ventas/ventas-shared"
 import { todayStr, dateLabel, toNonNegativeNumber } from "@/lib/panel-utils"
 import Link from "next/link"
 import { ArrowLeft, Copy, Flame, AlertCircle, Receipt } from "lucide-react"
@@ -113,6 +113,9 @@ export default function VentasPage() {
   // cierran el loop app → comanda/analítica/reportes (dedupe idempotente).
   useFoodosVentasSync(slug)
 
+  // Mostrador de hoy: mismo cálculo que el hub (fuente única en ventas-shared).
+  const counterToday = useMemo(() => counterSummary(entries, todayStr()), [entries])
+
   const exportVentasCsv = () => {
     if (reportEntries.length === 0) return
     const header = "Fecha,Platillo,Cantidad,Precio unitario,Costo unitario,Total,Método de pago,Canal,Descuento"
@@ -204,8 +207,8 @@ export default function VentasPage() {
 
       {/* Mostrador vs. pedidos reales de la app (solo si hay restaurante FoodOS) */}
       <AppOrdersCard
-        counterCount={entries.filter((e) => e.date.startsWith(todayStr())).length}
-        counterRevenue={entries.filter((e) => e.date.startsWith(todayStr())).reduce((s, e) => s + entryTotal(e), 0)}
+        counterCount={counterToday.count}
+        counterRevenue={counterToday.revenue}
       />
 
       {/* ── Tabs: Hoy / Análisis / Extras ────────────────── */}

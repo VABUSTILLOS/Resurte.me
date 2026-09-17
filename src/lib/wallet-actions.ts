@@ -7,6 +7,10 @@ import { computeRunningOutProducts } from "@/lib/reorder-heuristics"
 import { isoWeek, QUALIFYING_WEEK_MIN } from "@/lib/utils"
 import { computeWeekProgress, type WeekProgress } from "@/lib/wallet-progress"
 import { summarizeWallet, type WalletSummary } from "@/lib/wallet-summary"
+import {
+  summarizeWalletExpiry,
+  type WalletExpirySummary,
+} from "@/lib/wallet-expiry"
 import type {
   OrderWithCashback,
   OrderItem,
@@ -241,6 +245,56 @@ export async function getWalletSummary(): Promise<WalletSummary | null> {
   return summarizeWallet(movements ?? [], {
     balance: Number(wallet.balance_credits ?? 0),
   })
+}
+
+// ============================================================
+// CADUCIDAD DE LOS CRÉDITOS (R17)
+// ============================================================
+
+/**
+ * Cuánto del saldo está vigente, por vencer o ya vencido, repartiendo los
+ * canjes entre los abonos que los financiaron (FIFO).
+ *
+ * Solo calcula para mostrar: quien mueve dinero es `expire_wallet_credits`
+ * (migración 00133). Devuelve `null` si no hay sesión o no hay monedero.
+ *
+ * `expires_at` no existe hasta que 00132 esté aplicada (42703), así que se
+ * reintenta sin la columna: `summarizeWalletExpiry` deriva entonces la fecha
+ * con la misma regla que el backfill, en vez de dejar la tarjeta en blanco.
+ */
+export async function getWalletExpiry(): Promise<WalletExpirySummary | null> {
+  const supabase = await createClient()
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return null
+
+  const { data: wallet } = await supabase
+    .from("wallets")
+    .select("id")
+    .eq("user_id", user.id)
+    .single()
+
+  if (!wallet) return null
+
+  const withExpiry = await supabase
+    .from("wallet_transactions")
+    .select("id, amount, created_at, expires_at")
+    .eq("wallet_id", wallet.id)
+    .order("created_at", { ascending: true })
+
+  // 42703 = wallet_transactions.expires_at aún no existe (00132 sin aplicar).
+  const movements =
+    withExpiry.error?.code === "42703"
+      ? (
+          await supabase
+            .from("wallet_transactions")
+            .select("id, amount, created_at")
+            .eq("wallet_id", wallet.id)
+            .order("created_at", { ascending: true })
+        ).data
+      : withExpiry.data
+
+  return summarizeWalletExpiry(movements ?? [])
 }
 
 // ============================================================

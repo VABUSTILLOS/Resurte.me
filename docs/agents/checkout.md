@@ -131,8 +131,22 @@
   checkout; todas las listas filtran `deleted_at IS NULL`.
 - Stripe: el `clientSecret` se obtiene de `/api/payments/stripe/create-intent`;
   `/api/orders` solo registra. Webhooks verifican firma.
+- **El paso del checkout full-page se reanuda**: `src/lib/checkout-resume.ts`
+  guarda el paso en `sessionStorage` (`resurte:checkout-step`) y `/[slug]/checkout`
+  lo rehidrata con un inicializador perezoso de `useState` (nunca en el render
+  inicial del servidor: es `sessionStorage`, no `localStorage`). `payment`
+  **jamás** se reanuda —el `PaymentIntent` vive en memoria y reanudarlo dejaría el
+  botón de pagar sin `clientSecret`— así que `resumeCheckoutStep` lo retrocede a
+  `review`; el paso se limpia como primera línea de `onPaid`. El `CheckoutDrawer`
+  no participa: su paso es estado local de una sola sesión de montaje. Los datos
+  personales siguen sin persistirse: solo el nombre del paso.
 
 ## Verificación
 `npm test` (payments, checkout-config, order-bumps, ingredient-affinity,
 checkout-bdd-regression) + `npx playwright test e2e/checkout-drawer.spec.ts` y un
 checkout de prueba E2E en móvil con cupón y bumps.
+
+Para la reanudación del paso: `npx vitest run src/lib/checkout-resume.test.ts`
+(cubre `payment` → `review`, pasos corruptos y un `sessionStorage` hostil) y, a
+mano, recargar en `payment` para comprobar que vuelve a `review` con los datos
+intactos.

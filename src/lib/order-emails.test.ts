@@ -8,6 +8,10 @@ vi.mock("@/lib/email", () => ({
   escapeHtml: (s: string) => s,
 }))
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }))
+// W9: el push se mockea para poder afirmar que comparte copia con la campana.
+vi.mock("@/lib/push-server", () => ({
+  sendOrderStatusPush: vi.fn().mockResolvedValue(undefined),
+}))
 
 import {
   sendOrderConfirmationEmail,
@@ -18,6 +22,7 @@ import {
 } from "./order-emails"
 import { createServiceClient } from "@/lib/supabase/service"
 import { sendEmail } from "@/lib/email"
+import { sendOrderStatusPush } from "@/lib/push-server"
 
 const ORDER = {
   id: 42,
@@ -143,6 +148,31 @@ describe("sendOrderStatusEmail", () => {
     serviceWith({ dedupeRows: [{ id: 9 }] })
     await sendOrderStatusEmail(42, "delivered")
     expect(sendEmail).not.toHaveBeenCalled()
+  })
+
+  it("manda push con la MISMA copia y enlace que la campana", async () => {
+    serviceWith({})
+    await sendOrderStatusEmail(42, "out_for_delivery")
+    expect(vi.mocked(sendOrderStatusPush)).toHaveBeenCalledWith({
+      userId: "u1",
+      orderId: 42,
+      status: "out_for_delivery",
+      title: "Pedido #42: En camino",
+      body: "¡Tu pedido va en camino! Ten a la mano tu método de pago si elegiste pagar al recibir.",
+      url: "/cdmx/pedido/42?t=tok-1",
+    })
+  })
+
+  it("no manda push de un estado que no es hito", async () => {
+    serviceWith({})
+    await sendOrderStatusEmail(42, "preparing")
+    expect(vi.mocked(sendOrderStatusPush)).not.toHaveBeenCalled()
+  })
+
+  it("sin usuario no hay push (el pedido de invitado no tiene a quién avisar)", async () => {
+    serviceWith({ orderRow: { ...ORDER, user_id: null } })
+    await sendOrderStatusEmail(42, "delivered")
+    expect(vi.mocked(sendOrderStatusPush)).not.toHaveBeenCalled()
   })
 })
 

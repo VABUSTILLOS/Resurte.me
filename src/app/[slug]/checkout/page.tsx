@@ -33,6 +33,12 @@ import { useOrderLines } from "@/components/checkout/use-order-lines"
 import { useSelectedBumps } from "@/hooks/use-selected-bumps"
 import { calcCheckoutTotals, DELIVERY_FEE_FLAT, MIN_ITEM_QUANTITY, countBumpUnits } from "@/lib/checkout-config"
 import {
+  FIRST_STEP,
+  clearCheckoutStep,
+  readCheckoutStep,
+  saveCheckoutStep,
+} from "@/lib/checkout-resume"
+import {
   useCheckoutOrder,
   type CheckoutPaidInfo,
 } from "@/components/checkout/use-checkout-order"
@@ -46,7 +52,12 @@ export default function CheckoutPage() {
   const { city } = useCity()
   const router = useRouter()
 
-  const [step, setStep] = useState<Step>("address")
+  // K13: reanuda el paso donde quedó el cliente (refresco, caída de red o la
+  // vuelta de la redirección a Stripe). El paso vive en sessionStorage, así que
+  // el carrito y la compra en curso sobreviven, pero una visita de días después
+  // empieza limpia. `readCheckoutStep()` devuelve null sin almacenamiento (SSR)
+  // o con un valor inservible, y entonces se arranca en `FIRST_STEP`.
+  const [step, setStep] = useState<Step>(() => readCheckoutStep() ?? FIRST_STEP)
   const [address, setAddress] = useState<AddressForm>(DEFAULT_ADDRESS_FORM)
   const [schedule, setSchedule] = useState<ScheduleForm>({
     date: getNextDays()[0]?.value ?? "",
@@ -87,6 +98,13 @@ export default function CheckoutPage() {
       }))
     )
   }, [isLoaded, itemCount, subtotal, cart.items])
+
+  // Persiste el paso para poder reanudarlo tras una interrupción. Se guarda en
+  // cada cambio (no en `pagehide`) para que también sobreviva a un cierre
+  // abrupto de la pestaña; el valor se limpia al pagar.
+  useEffect(() => {
+    saveCheckoutStep(step)
+  }, [step])
 
   // ── Totales en tiempo real (subtotal pagable + bumps seleccionados) ──
   // El descuento de cupón se calcula sobre el subtotal CON bumps incluidos,
@@ -213,6 +231,8 @@ export default function CheckoutPage() {
     // navega a la confirmación. `city` es City | null en el closure (el hook se
     // declara antes del early return), por eso se usa `city?.slug ?? DEFAULT_CITY_SLUG`.
     onPaid: (info: CheckoutPaidInfo) => {
+      // El pedido ya está pagado: el paso guardado no tiene nada que reanudar.
+      clearCheckoutStep()
       saveLastOrder(info.orderId ?? undefined, info.cashback?.credits, info.cashback?.tier, info.repurchaseCoupon, info.trackingToken)
       clearCart()
       router.push(`/${city?.slug ?? DEFAULT_CITY_SLUG}/pedido-confirmado`)

@@ -9,6 +9,7 @@
 // ============================================================
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { logger } from "@/lib/logger"
 import { getRestaurantWhatsAppConfig } from "@/lib/foodos-whatsapp"
 import { normalizePhone } from "@/lib/foodos"
 import { sendTextMessage, type WhatsAppConfig } from "@/lib/whatsapp"
@@ -46,7 +47,13 @@ export async function loadMessagingCapabilities(
   let waConfig: WhatsAppConfig | null = null
   try {
     waConfig = await getRestaurantWhatsAppConfig(supabase, restaurantId)
-  } catch {
+  } catch (err) {
+    // Sin este aviso, un fallo de la conexión del restaurante cae en silencio
+    // al WhatsApp global de la plataforma: justo el bug que este módulo evita.
+    logger.warn("messaging.wa-config", {
+      restaurantId,
+      error: err instanceof Error ? err.message : String(err),
+    })
     waConfig = null
   }
   return {
@@ -85,10 +92,20 @@ async function attemptWhatsApp(
 async function attemptSms(to: string, text: string): Promise<AttemptResult> {
   const adapter = resolveSmsAdapter()
   if (!adapter) return { ok: false, provider: null, error: "SMS no configurado" }
-  const result = await adapter.send({ to, text })
-  return result.ok
-    ? { ok: true, provider: result.provider, error: null }
-    : { ok: false, provider: result.provider, error: result.error }
+  // Mismo blindaje que attemptWhatsApp: el contrato de sendMarketingMessage es
+  // "nunca lanza". Un adaptador que lance no puede tumbar la corrida de campañas.
+  try {
+    const result = await adapter.send({ to, text })
+    return result.ok
+      ? { ok: true, provider: result.provider, error: null }
+      : { ok: false, provider: result.provider, error: result.error }
+  } catch (err) {
+    return {
+      ok: false,
+      provider: "sms",
+      error: err instanceof Error ? err.message : "Error de SMS",
+    }
+  }
 }
 
 async function attempt(

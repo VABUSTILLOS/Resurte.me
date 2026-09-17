@@ -158,6 +158,39 @@ la metadata estimada (`week_of_month`, `month_year`, `cashback_credits`,
 - **Reversión:** al cancelar o fallar el pago, `trg_reverse_cashback` revierte
   los créditos (solo si el cashback fue realmente abonado).
 
+### Caducidad de los créditos (migraciones `00132` y `00133`)
+
+Un crédito abonado caduca **12 meses** después de ganarse. El consumo es
+**FIFO**: un canje agota primero el lote que antes vence, así que un usuario que
+sigue comprando no pierde nada.
+
+`wallets.balance_credits` es un saldo **agregado** — no hay saldo por lote — así
+que el reparto se reconstruye desde `wallet_transactions`.
+
+| Objeto | Migración | Para qué |
+| --- | --- | --- |
+| `wallet_transactions.expires_at` | `00132` | Fecha de caducidad del abono. La fija el trigger `trg_wallet_credit_expiry` (`BEFORE INSERT`, solo si `amount > 0` y no viene explícita). Un `DEFAULT` de columna **no** sirve: también fecharía los débitos. |
+| `wallet_transactions.expiry_settled_at` | `00132` | Marca del lote ya liquidado. Da **idempotencia**: un lote vencido sin restante no genera movimiento pero tampoco se revisa cada día. |
+| `idx_wallet_tx_expiry_pending` | `00132` | Índice parcial de los lotes por vencer (`amount > 0 AND expires_at IS NOT NULL AND expiry_settled_at IS NULL`). |
+| `notifications.dedupe_key` + `idx_notifications_dedupe` | `00132` | Índice único parcial `(user_id, type, dedupe_key) WHERE dedupe_key IS NOT NULL`. Los avisos que no cuelgan de un pedido no pueden usar `idx_notifications_order_type`. |
+| `wallet_credit_lots(p_wallet_id)` | `00133` | Lotes con su restante tras repartir los débitos en FIFO. `p_wallet_id NULL` = todos los monederos. `SECURITY INVOKER`. |
+| `expire_wallet_credits(p_now)` | `00133` | Avisa a 30 días y da de baja lo vencido. `SECURITY DEFINER`, `search_path = ''`, `EXECUTE` revocado a `PUBLIC`/`anon`/`authenticated` y concedido solo a `service_role`. Rejugar un corte con `p_now` es idempotente. |
+| job `expire-wallet-credits` | `00133` | `pg_cron` diario a las `37 5 * * *` UTC (23:37 CDMX). |
+
+Dos detalles que no son obvios:
+
+- **El backfill no confisca.** A los lotes anteriores al despliegue se les da
+  `GREATEST(created_at + 12 months, now() + 12 months)`: la ventana completa
+  empieza a contar desde el despliegue, no hacia atrás.
+- **La baja toma `FOR UPDATE` sobre `wallets`**, el mismo punto de serialización
+  que `credit_cashback_on_payment()` (`00036`) y `redeem_service` (`00035`). Se
+  acota con `LEAST(restante_vencido, balance)` porque `balance_credits` tiene
+  `CHECK (>= 0)`, y se registra **un solo** débito por monedero con
+  `concept = 'Caducidad de créditos'` (no uno por lote).
+
+La aritmética vive en el SQL. `src/lib/wallet-expiry.ts` la replica **solo para
+mostrarla** en `/recompensas`; si divergen, manda el SQL.
+
 ## Panel admin y control de acceso
 
 ### Cómo se valida al admin (código)
@@ -192,7 +225,7 @@ funcional, invariantes y decisiones en `docs/foodos-paridad-fluxsales.md`.
 | Tabla | Migración | Para qué |
 | --- | --- | --- |
 | `foodos_entitlement_overrides` | `00120` | Override manual del nivel (Plata/Oro/Diamante) por restaurante. El nivel normal se **computa en vivo**, no se persiste. |
-| `foodos_ai_usage` | `00121` | Contador diario de tokens por restaurante/capacidad. Lo escribe la capa de IA; el tope se aplica en `src/lib/ai/budget.ts`. |
+| `foodos_ai_usage` | `00121` | Contador diario de tokens por restaurante/capacidad. Lo escribe la capa de IA; el tope se aplica en `src/lib/ai/budget.ts` y el dueño lo ve con `src/lib/ai/usage.ts` (tarjeta del tablero). |
 | `foodos_ai_sessions` | `00122` | Sesiones del Mesero IA (una conversación de WhatsApp por cliente). |
 | `foodos_deliveries` / `foodos_delivery_events` | `00124` | Flotilla: entregas, asignación a repartidor y bitácora de estados. `provider_delivery_id` enlaza con el reparto externo. |
 | `foodos_wallet_passes` | `00126` | Tarjeta de lealtad (Apple/Google Wallet) por cliente. |

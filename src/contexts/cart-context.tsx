@@ -15,6 +15,7 @@ import type { Cart, CartItem, AppliedCoupon } from "@/types"
 import { calcCouponDiscount } from "@/lib/checkout-config"
 import { createClient } from "@/lib/supabase/client"
 import { mergeCarts, type ServerCartSnapshot } from "@/lib/cart-sync"
+import { clearCartSyncEntry, handleCartPushFailure } from "@/lib/cart-sync-queue"
 
 // ============================================================
 // Types
@@ -205,8 +206,11 @@ async function pushCartToServer(
   coupon: AppliedCoupon | null,
   opts?: { keepalive?: boolean }
 ): Promise<void> {
+  // W10: si no hay red, el snapshot queda encolado en IndexedDB y el service
+  // worker lo reintenta al recuperar conexión (ver cart-background-sync.ts).
+  let res: Response | undefined
   try {
-    await fetch("/api/cart", {
+    res = await fetch("/api/cart", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ items, coupon }),
@@ -215,7 +219,14 @@ async function pushCartToServer(
     })
   } catch {
     // Offline: el carrito local (localStorage) sigue siendo la fuente visible.
+    await handleCartPushFailure(items, coupon, { threw: true })
+    return
   }
+  if (res.ok) {
+    await clearCartSyncEntry()
+    return
+  }
+  await handleCartPushFailure(items, coupon, { status: res.status })
 }
 
 /** Serialización estable para detectar si el carrito ya fue subido. */
@@ -338,6 +349,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
       void pushCartToServer(state.cart.items, state.coupon)
     }, 1500)
     return () => clearTimeout(timer)
+  }, [userId, state.cart, state.coupon, state.isLoaded, serverSynced])
+
+  // Respaldo del background sync para navegadores sin Background Sync API
+  // (Safari/iOS): al recuperar conexión se reintenta el push del estado actual,
+  // que además limpia el snapshot encolado si el PUT llega bien.
+  useEffect(() => {
+    if (!userId || !state.isLoaded || !serverSynced) return
+    const onOnline = () => {
+      const snapshot = serializeCart(state.cart.items, state.coupon)
+      if (snapshot === lastPushedRef.current) return
+      lastPushedRef.current = snapshot
+      void pushCartToServer(state.cart.items, state.coupon)
+    }
+    window.addEventListener("online", onOnline)
+    return () => window.removeEventListener("online", onOnline)
   }, [userId, state.cart, state.coupon, state.isLoaded, serverSynced])
 
   // Flush al desmontar/cerrar: el debounce se cancela en cleanup, así que sin

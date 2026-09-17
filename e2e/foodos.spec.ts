@@ -129,20 +129,24 @@ test.describe("guards de las capacidades premium", { tag: "@ci" }, () => {
 })
 
 test.describe("micrositio /r/[slug]", { tag: "@ci" }, () => {
-  // Next sirve el armazón del not-found en streaming, así que en dev la
-  // respuesta puede llegar con 200 aunque la vista sea la 404. Lo que importa
-  // —y lo que se verifica— es que el comensal nunca vea un restaurante.
-  test("un slug inexistente no renderiza un restaurante", async ({ page }) => {
-    await page.goto("/r/no-existe-este-restaurante", { waitUntil: "domcontentloaded" })
+  // El slug inexistente debe dar 404 real: el micrositio se comparte por
+  // WhatsApp y un soft-404 (200 con la vista de 404) indexaba enlaces rotos
+  // como páginas válidas. Por eso se verifica el status, no solo la vista.
+  test("un slug inexistente responde 404 y no renderiza un restaurante", async ({ page }) => {
+    const response = await page.goto("/r/no-existe-este-restaurante", { waitUntil: "domcontentloaded" })
 
+    expect(response?.status()).toBe(404)
     await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible()
     await expect(page.getByText("Página no encontrada")).toBeVisible()
+    // Copy del not-found del micrositio: confirma que no cae al boundary raíz.
+    await expect(page.getByText("El restaurante que buscas no existe", { exact: false })).toBeVisible()
     await expect(page.getByRole("link", { name: /Agregar/i })).toHaveCount(0)
   })
 
-  test("la carta de un slug inexistente tampoco se renderiza", async ({ page }) => {
-    await page.goto("/r/no-existe-este-restaurante/carta", { waitUntil: "domcontentloaded" })
+  test("la carta de un slug inexistente responde 404", async ({ page }) => {
+    const response = await page.goto("/r/no-existe-este-restaurante/carta", { waitUntil: "domcontentloaded" })
 
+    expect(response?.status()).toBe(404)
     await expect(page.getByRole("heading", { name: "404", exact: true })).toBeVisible()
     await expect(page.getByText("Página no encontrada")).toBeVisible()
   })

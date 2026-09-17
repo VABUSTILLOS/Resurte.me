@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
+  getAiUsage,
   getFoodosPanelData,
 } from "../actions"
 import { formatMoney } from "@/lib/foodos"
@@ -17,6 +18,7 @@ import type {
   FoodosOrder,
   FoodosCustomer,
 } from "@/types/foodos"
+import type { AiUsageSnapshot } from "@/lib/ai/usage"
 import {
   Loader2,
   TrendingUp,
@@ -26,6 +28,7 @@ import {
   Percent,
   Sparkles,
   Download,
+  TriangleAlert,
 } from "lucide-react"
 import ToolGuideHost from "@/components/panel/guide/tool-guide-host"
 import { t } from "@/lib/i18n/es"
@@ -38,6 +41,7 @@ export default function TableroPage() {
   const [orders, setOrders] = useState<FoodosOrder[]>([])
   const [branches, setBranches] = useState<FoodosBranch[]>([])
   const [customers, setCustomers] = useState<FoodosCustomer[]>([])
+  const [aiUsage, setAiUsage] = useState<AiUsageSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState(30)
@@ -45,11 +49,13 @@ export default function TableroPage() {
 
   const load = useCallback(async () => {
     try {
-      const { restaurant: r, orders: os, branches: bs, customers: cs } = await getFoodosPanelData()
+      const [{ restaurant: r, orders: os, branches: bs, customers: cs }, usage] =
+        await Promise.all([getFoodosPanelData(), getAiUsage()])
       setRestaurant(r)
       setOrders(os)
       setBranches(bs)
       setCustomers(cs)
+      setAiUsage(usage)
     } catch (e) {
       setError(e instanceof Error ? e.message : t("foodos.tablero.loadError"))
     } finally {
@@ -251,6 +257,8 @@ export default function TableroPage() {
         <Kpi icon={<Repeat className="w-5 h-5" />} label={t("foodos.tablero.kpiRepeat")} value={`${metrics.repeatRate.toFixed(0)}%`} accent="bg-amber-100 text-amber-600" />
       </div>
 
+      {aiUsage && <AiUsageCard usage={aiUsage} />}
+
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Pedidos por día */}
         <Card title={t("foodos.tablero.byDay")}>
@@ -440,6 +448,62 @@ function Kpi({
       <p className="text-xl font-black text-stone-900 truncate">{value}</p>
       <p className="text-xs text-stone-500">{label}</p>
     </div>
+  )
+}
+
+function AiUsageCard({ usage }: { usage: AiUsageSnapshot }) {
+  const pct = Math.min(100, Math.round(usage.ratio * 100))
+  return (
+    <Card title={t("foodos.tablero.aiUsageCard")} className="mb-6">
+      <div className="flex items-baseline justify-between gap-3 mb-2">
+        <p className="text-sm font-semibold text-stone-900">
+          {usage.calls === 0
+            ? t("foodos.tablero.aiUsageEmpty")
+            : t("foodos.tablero.aiUsageToday", {
+                tokens: usage.tokensUsed.toLocaleString("es-MX"),
+                cap: usage.cap.toLocaleString("es-MX"),
+              })}
+        </p>
+        {usage.calls > 0 && (
+          <p className="text-xs text-stone-500 shrink-0">
+            {t("foodos.tablero.aiUsageCalls", { count: usage.calls })}
+            {usage.fallbacks > 0
+              ? ` · ${t("foodos.tablero.aiUsageFallbacks", { count: usage.fallbacks })}`
+              : ""}
+          </p>
+        )}
+      </div>
+      <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-[width] ${usage.nearCap ? "bg-amber-500" : "bg-emerald-500"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {usage.nearCap && (
+        <p className="mt-3 flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+          {t("foodos.tablero.aiUsageNearCap")}
+        </p>
+      )}
+      {usage.history.length > 1 && (
+        <div className="mt-4 pt-3 border-t border-stone-100">
+          <p className="text-xs font-bold text-stone-500 uppercase tracking-wide mb-2">
+            {t("foodos.tablero.aiUsageHistory")}
+          </p>
+          <div className="space-y-1">
+            {usage.history.map((d) => (
+              <div key={d.day} className="flex items-center justify-between text-sm">
+                <span className="text-stone-600">{d.day}</span>
+                <span className="font-semibold text-stone-900">
+                  {d.tokensUsed.toLocaleString("es-MX")}
+                  <span className="text-stone-500 font-normal"> · {d.calls}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
   )
 }
 

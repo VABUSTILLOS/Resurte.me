@@ -17,11 +17,14 @@ import { test, expect, type Page } from "@playwright/test"
  *    cierra el modal); descartar sí lo cierra.
  * 4. «Guardar y cerrar» no puede dejar la barra de descarte tapando los errores.
  * 5. El índice de secciones marca la que se está viendo al bajar.
+ * 6. Un guardado rechazado por versión (409) abre el panel de conflicto en vez
+ *    de un error de campo, y «Guardar lo mío» conserva lo que editó el otro.
  *
  * Las reglas de validación se cubren sin navegador en
  * `src/lib/product-form.test.ts`; aquí se prueba lo que solo se ve en pantalla.
- * Ningún caso guarda: el formulario se deja inválido a propósito para no crear
- * productos reales en el entorno donde corra el spec.
+ * Los casos de alta dejan el formulario inválido a propósito para no crear
+ * productos reales. El de conflicto (ronda 12) sí escribe, pero solo sobre un
+ * producto existente y **restaura** sus dos campos en el `finally`.
  */
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL
@@ -53,6 +56,48 @@ async function openNewProductModal(page: Page) {
   expect(response?.status() ?? 0).toBeLessThan(500)
   const trigger = page.getByRole("button", { name: "Nuevo producto" }).first()
   if ((await trigger.count()) === 0) return null
+  await trigger.click()
+  const dialog = page.getByRole("dialog")
+  if ((await dialog.count()) === 0) return null
+  return dialog
+}
+
+/** Fila del catálogo con lo justo para provocar —y deshacer— un conflicto. */
+interface ConflictRow {
+  id: number
+  name: string
+  low_stock_threshold?: number | null
+  seo_title?: string | null
+}
+
+/**
+ * Primer producto del catálogo, leído por API: el spec necesita su `id` para
+ * mover la fila por detrás y la tabla del DOM no lo expone.
+ *
+ * `low_stock_threshold` y `seo_title` se exigen presentes: si la base degradó a
+ * `COLS_LEGACY` faltarían, y entonces ni el diff ni la restauración final
+ * tendrían de dónde leer el valor original (el spec escribe sobre datos reales).
+ */
+async function fetchFirstProduct(page: Page): Promise<ConflictRow | null> {
+  const res = await page.request.get("/api/admin/products/list?pageSize=1")
+  if (!res.ok()) return null
+  const body = (await res.json()) as { rows?: ConflictRow[] }
+  const row = body.rows?.[0]
+  if (!row) return null
+  if (!("low_stock_threshold" in row) || !("seo_title" in row)) return null
+  return row
+}
+
+/** Abre la edición del producto por su nombre (la tabla no lleva ids). */
+async function openEditProductModal(page: Page, name: string) {
+  const trigger = page.getByRole("button", { name: `Editar ${name}`, exact: true }).first()
+  // `count()` no espera: tras un `reload()` la tabla puede no haber pintado aún,
+  // y un falso "no está" haría saltar el test sin motivo.
+  try {
+    await trigger.waitFor({ state: "visible", timeout: 15_000 })
+  } catch {
+    return null
+  }
   await trigger.click()
   const dialog = page.getByRole("dialog")
   if ((await dialog.count()) === 0) return null
@@ -242,5 +287,67 @@ test.describe("modal de producto — comportamiento", { tag: "@ci" }, () => {
     await dialog.locator("#pf-qty").fill("")
     await expect(stock).toBeEnabled()
     await expect(stock).toHaveValue("low_stock")
+  })
+
+  test("un guardado en conflicto abre el panel y «Guardar lo mío» conserva lo ajeno", async ({
+    page,
+  }) => {
+    const row = await fetchFirstProduct(page)
+    test.skip(row === null, "no se pudo leer el catálogo")
+    if (!row) return
+
+    // Dos campos distintos para las dos mitades del diff: el umbral lo edita
+    // este admin (choque real) y el título SEO lo mueve el otro usuario (no hay
+    // choque, solo hay que conservarlo). `mine` y `theirs` nunca coinciden con
+    // lo cargado, así que el panel siempre tiene algo que contar.
+    const base = row.low_stock_threshold ?? 0
+    const theirs = base + 1
+    const mine = base + 2
+    const marker = `conflicto-e2e-${Date.now()}`
+    const patch = (data: Record<string, unknown>) =>
+      page.request.patch("/api/admin/products/update", { data: { productId: row.id, ...data } })
+
+    try {
+      await page.goto("/admin/productos")
+      const dialog = await openEditProductModal(page, row.name)
+      test.skip(dialog === null, "el producto no está en la tabla")
+      if (!dialog) return
+
+      await dialog.locator("#pf-threshold").fill(String(mine))
+
+      // El otro usuario guarda por detrás, sin versión previa: gana él y la fila
+      // avanza. Es exactamente el escenario que antes se perdía en silencio.
+      const other = await patch({ low_stock_threshold: theirs, seo_title: marker })
+      expect(other.status()).toBe(200)
+
+      await dialog.getByRole("button", { name: "Guardar cambios" }).click()
+
+      // El 409 pinta un panel, no un error de campo: marcar el umbral en rojo
+      // mandaría al admin a "corregir" un valor que no tiene nada de malo.
+      const panel = dialog.locator('[aria-describedby="pf-conflict-detail"]')
+      await expect(panel).toBeVisible()
+      await expect(panel).toContainText("1 campo en conflicto")
+      await expect(panel).toContainText("en la base")
+      await expect(dialog.locator("#pf-err-lowStockThreshold")).toHaveCount(0)
+
+      // Con el conflicto abierto no se puede esquivar: el envío queda bloqueado.
+      await expect(dialog.getByRole("button", { name: "Guardar cambios" })).toBeDisabled()
+
+      // «Guardar lo mío»: gana mi umbral y sobrevive el título del otro usuario.
+      await panel.getByRole("button", { name: "Guardar lo mío" }).click()
+      await expect(page.getByRole("dialog")).toHaveCount(0)
+
+      // Se relee del servidor (no del estado local) para comprobar que ambos
+      // valores llegaron a la base.
+      await page.reload()
+      const reopened = await openEditProductModal(page, row.name)
+      test.skip(reopened === null, "el producto desapareció del listado")
+      if (!reopened) return
+      await expect(reopened.locator("#pf-threshold")).toHaveValue(String(mine))
+      await expect(reopened.locator("#pf-seo-title")).toHaveValue(marker)
+    } finally {
+      // El spec escribe en un producto real: se deja como estaba pase lo que pase.
+      await patch({ low_stock_threshold: row.low_stock_threshold, seo_title: row.seo_title })
+    }
   })
 })

@@ -31,7 +31,7 @@ Jobs dentro de `/api/cron/daily`, en orden de ejecución:
 
 > Los schedules están en **UTC**. Las horas MX mostradas asumen CST (UTC−6); ajustar en verano (CDT, UTC−5) según la zona del negocio.
 
-> ⚠️ **Además** hay 2 jobs de mantenimiento en **pg_cron (Supabase)**, no en Vercel: `cleanup-guest-addresses` (domingos 04:00 UTC, retención 30 días — ver §2) y `purge-rate-limits` (diario 04:17 UTC, retención 24h — ver §4). La tabla anterior solo lista los crons de Vercel.
+> ⚠️ **Además** hay 3 jobs de mantenimiento en **pg_cron (Supabase)**, no en Vercel: `cleanup-guest-addresses` (domingos 04:00 UTC, retención 30 días — ver §2), `purge-rate-limits` (diario 04:17 UTC, retención 24h — ver §4) y `expire-wallet-credits` (diario 05:37 UTC: avisa 30 días antes de la caducidad de Créditos Resurte y da de baja lo vencido — migración `00133`). La tabla anterior solo lista los crons de Vercel.
 
 ### Implementación (referencia)
 - `src/app/api/cron/daily/route.ts` — GET, lista secuencial de jobs; fail-closed sin `CRON_SECRET`
@@ -107,6 +107,10 @@ Si el proyecto Vercel está en plan **Hobby**, el límite es **2 crons** — añ
 | `STRIPE_CONNECT_ENABLED` | No | Enruta los cargos de tarjeta de FoodOS a la cuenta Connect del restaurante | `true` / `1`. **Por defecto apagado.** Requiere activar Connect antes en el Dashboard de Stripe (ver §11). |
 | `STRIPE_CONNECT_COUNTRY` | No | País de las cuentas Express | ISO-2, por defecto `MX`. |
 | `ADMIN_API_SECRET` | Sí | Endpoints admin (`x-admin-secret` header) | Sin fallback hardcodeado desde Fase 1. |
+| `VAPID_PUBLIC_KEY` | No | Firma de los push de estado de pedido (W9) | Par VAPID (`npx web-push generate-vapid-keys`). Sin ella el push queda **desactivado** y `/recompensas` no muestra el interruptor; campana y correo siguen igual. |
+| `VAPID_PRIVATE_KEY` | No | Firma de los push (servidor) | **Nunca** exponer al browser. Debe ir en par con la pública: si falta o no es una clave válida, `ensureVapid()` falla y el push se omite en silencio (se loguea `push.vapid.invalid`). |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | No | Clave pública que el navegador usa en `pushManager.subscribe` | Es la **misma** que `VAPID_PUBLIC_KEY`; se duplica porque el navegador necesita el prefijo `NEXT_PUBLIC_`. Si no coinciden, el push se firma con una clave distinta a la suscrita y el navegador lo descarta. |
+| `VAPID_SUBJECT` | No | Contacto del emisor VAPID | Por defecto `mailto:hola@resurte.me`. Debe ser un `mailto:` o una URL `https:`. |
 
 ### Rotación de `CRON_SECRET`
 1. Vercel → Project → Settings → Environment Variables → editar `CRON_SECRET` → **nuevo valor largo y aleatorio** (p.ej. `openssl rand -hex 32`).
@@ -252,6 +256,29 @@ El cliente recibe correo al crear el pedido y en los hitos **confirmado / en cam
 Dedupe: cada envío se registra en `email_logs` (`order_id` + `email_type`); reintentos no reenvían. Los envíos se pueden auditar en la tabla `email_logs`.
 
 Carrito persistente: la migración `00068_user_carts.sql` habilita el carrito cross-device para usuarios con sesión (merge last-write-wins con localStorage vía `/api/cart`).
+
+### 8.0.1 Push de estado de pedido (W9)
+
+Los mismos hitos que disparan el correo disparan una notificación del sistema, desde **el mismo punto** (`sendOrderStatusEmail`), reutilizando su copia y su enlace de rastreo. Es un canal adicional: si el push falla o no está configurado, la campana y el correo no cambian. Requisitos para activarlo:
+
+1. Par de claves VAPID: `npx web-push generate-vapid-keys` → poner la privada en `VAPID_PRIVATE_KEY` y la pública en **las dos** variables (`VAPID_PUBLIC_KEY` y `NEXT_PUBLIC_VAPID_PUBLIC_KEY`). Opcional: `VAPID_SUBJECT` con un `mailto:` de contacto.
+2. Migración `00134_push_subscriptions.sql` aplicada (`supabase db push`).
+3. Re-deployar: `NEXT_PUBLIC_*` se hornea en el bundle, así que sin un build nuevo el navegador no ve la clave.
+
+Sin los pasos 1–3 nada se rompe: `isPushConfigured()` devuelve `false`, el interruptor no se pinta en `/recompensas`, `sendPushToUser` sale temprano y el `INSERT`/`DELETE` de `/api/push/subscribe` responde 503 si la tabla no existe. Las suscripciones muertas (HTTP 404/410 del servicio de push) se borran solas en el primer intento; el resto de fallos incrementan `failure_count` para poder auditarlas.
+
+### 8.0.2 Llaves de acceso / passkeys (U13)
+
+Entrar sin contraseña con huella, rostro, PIN o llave física. Es **opcional y aditivo**: si no se habilita, el botón "Entrar con llave de acceso" no aparece en `/auth/login`, la tarjeta de `/recompensas?tab=profile` no se pinta y correo/Google/contraseña siguen igual. Requisitos:
+
+1. **Dashboard de Supabase → Authentication → Passkeys** (o *Sign In / Providers → Passkeys* según la versión): **activar** el proveedor. Sin esto, `auth.passkey.list()` falla y la UI se oculta sola — el código ya está desplegado y no hay que tocarlo después.
+2. **`Site URL` y `Redirect URLs`** correctas en *Authentication → URL Configuration*: la credencial queda atada al **RP ID** (el dominio registrable), así que `localhost` y `resurte.me` son llaves distintas y una llave creada en el dominio de preview no sirve en producción. Al cambiar de dominio hay que volver a crear las llaves.
+3. HTTPS (o `localhost`): WebAuthn no existe en contexto inseguro. `isPasskeySupported()` devuelve `false` y la UI no aparece.
+4. Nada que desplegar aparte: no hay migración ni variable de entorno. El flag `auth: { experimental: { passkey: true } }` que exige `@supabase/auth-js` ya va en `src/lib/supabase/client.ts`.
+
+Sin el paso 1 no se rompe nada, pero conviene saber distinguirlo: la UI se oculta **en silencio** a propósito (mismo criterio que el push de W9), así que si alguien reporta "no veo las llaves de acceso", la causa más probable es que el proveedor sigue apagado en el dashboard.
+
+Nota de alcance: las llaves son por usuario y se gestionan solas. Un usuario puede quedarse sin ninguna forma de entrar solo si borra su última llave **y** no tiene contraseña utilizable; por eso el borrado pide confirmación explícita. No hay recuperación por llave (no existe "olvidé mi llave"), y ese es el comportamiento correcto.
 
 ### 8.1 SMTP propio en Supabase (requerido para registro por email)
 

@@ -5,7 +5,7 @@ import {
   AlertTriangle, AlertCircle, TrendingUp, Calendar, ClipboardCheck, Zap, Flame, Gift, UtensilsCrossed,
 } from "lucide-react"
 import { foodCostStatus, type PanelConfig } from "@/lib/panel-config"
-import { isCurrentMonth, isLowStock, isOutOfStock } from "@/lib/panel-utils"
+import { isCurrentMonth, isLowStock, isOutOfStock, todayStr } from "@/lib/panel-utils"
 import { normalizeName } from "@/lib/normalize"
 import { hubEntryTotal, type HubAlert, type HubCollection, type HubComandas, type HubMesasInfo, type HubTodaySales, type HubVenta } from "./hub-data"
 import type { SharedDish } from "@/hooks/use-local-storage"
@@ -184,7 +184,7 @@ export function useHubAlerts({
 
     // 8. Irregular sales (antifraud heuristics on today's entries)
     if (todaySales && todaySales.count > 0) {
-      const today = new Date().toISOString().slice(0, 10)
+      const today = todayStr()
       const todayEntries = ventasEntries.filter((e) => e.date === today)
       const irregular = todayEntries.filter((e) => {
         const total = hubEntryTotal(e)

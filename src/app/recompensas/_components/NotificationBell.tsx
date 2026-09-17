@@ -26,6 +26,8 @@ interface ServerNotification {
 function serverTypeToVisual(type: string): Notification["type"] {
   if (type === "cashback_credited") return "cashback_earned";
   if (type === "redemption") return "service_ready";
+  // Aviso de caducidad (job `expire-wallet-credits`): urgente, en ámbar.
+  if (type === "wallet_expiry") return "milestone";
   if (type.startsWith("order_")) return "service_update";
   return "service_update";
 }

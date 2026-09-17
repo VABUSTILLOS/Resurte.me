@@ -709,7 +709,7 @@ del camino: la ingesta de cliente (`POST /api/log-error` +
 | Cliente del endpoint | `src/lib/report-client-error.ts` | preexistente |
 | Lectura admin | `src/lib/admin-errors.ts` → `errores-tab.tsx` | preexistente |
 | **Ingesta de servidor** | **`src/lib/error-log.ts`** | **nuevo** |
-| Trazas de IA (tokens) | `foodos_ai_usage` (`00121`) | tabla viva, **sin lectores en TypeScript** |
+| Trazas de IA (tokens) | `foodos_ai_usage` (`00121`) | `src/lib/ai/usage.ts` → tarjeta en el tablero |
 
 `reportServerError()` inserta con `source: "server"`, trunca el mensaje a 5 000
 y el stack a 10 000, y **nunca lanza**: sin Supabase configurado descarta el
@@ -737,6 +737,20 @@ debe envolver la llamada en su propio `try/catch`. El test lo destapó: un
 `reportServerError` que rechazaba rompía esa promesa. De ahí la invariante de
 abajo: quien invoca la observabilidad la blinda.
 
+**El pendiente que quedaba: nadie leía `foodos_ai_usage`.** La tabla acumulaba
+tokens desde `00121` y el dueño no tenía forma de verlos — el tope diario
+(`AI_DAILY_TOKEN_CAP`) existía como freno, no como información. La ronda de
+mejoras lo cierra con `src/lib/ai/usage.ts`:
+
+- `summarizeAiUsage(rows, { cap, today, days })` es puro: suma el día en curso,
+  los 7 días previos y la media, y marca `nearCap` al 80 % (`NEAR_CAP_RATIO`).
+- `loadAiUsage(supabase, restaurantId)` lee la tabla **directamente** —RLS ya deja
+  al dueño, y `foodos_ai_reserve`/`foodos_ai_settle` están revocadas para
+  `authenticated`— y **degrada a `null`**, nunca lanza: sin eso la tarjeta
+  tumbaría el tablero (invariante 18).
+- La tarjeta solo avisa; **no corta nada**. El corte lo sigue decidiendo
+  `reserveAiBudget`, que es la fuente única del tope.
+
 **Archivos de la fase**
 
 - `src/lib/error-log.ts` (+ `error-log.test.ts`, 11 tests)
@@ -753,6 +767,8 @@ abajo: quien invoca la observabilidad la blinda.
 - `src/app/admin/restaurantes/page.tsx` — `AdoptionPanel`
 - `src/app/admin/restaurantes.test.ts` — 23 tests
 - `src/lib/foodos-tier.ts` — guard `isSupabaseConfigured()` + test de regresión
+- `src/lib/ai/usage.ts` (+ `usage.test.ts`, 14 tests) — lector de `foodos_ai_usage`
+- `src/app/panel/foodos/tablero/page.tsx` — tarjeta `AiUsageCard`
 - `e2e/foodos.spec.ts`
 
 ## Paridad completa
@@ -800,8 +816,11 @@ npx tsc --noEmit && npm run lint && npm test && npm run build
 
 Además, `npm run test:e2e` (Playwright) cubre el smoke de las superficies
 públicas y los guards. Los specs corren contra un dev server real: en frío, la
-primera compilación de una ruta puede superar el timeout de 30 s por test, así
-que conviene calentarlas antes de juzgar un fallo.
+primera compilación de una ruta puede superar el timeout de 30 s por test. Eso
+ya **no** depende de que alguien recuerde calentar a mano: `e2e/global-setup.ts`
+(17 rutas, 3 reintentos, 60 s, `AbortController`) las calienta antes de la suite
+y nunca lanza — un calentamiento fallido solo deja un `console.warn`. Medido:
+`212 passed / 1 failed` en frío contra `213 / 0` con las rutas calientes.
 
 Dos notas para leer un fallo de e2e sin perder tiempo:
 
@@ -812,4 +831,7 @@ Dos notas para leer un fallo de e2e sin perder tiempo:
   servicio responden `500` sin llegar a validar, así que los guards aceptan 500.
 
 Las 12 migraciones del programa (`00120`–`00131`) están documentadas en
-`supabase/ESQUEMA.md`.
+`supabase/ESQUEMA.md`. La ronda de mejoras posterior añadió `00132` y `00133`
+para la caducidad de los créditos, que no son de FoodOS sino del dominio de
+recompensas: están documentadas en la sección *Caducidad de los créditos* del
+mismo archivo.

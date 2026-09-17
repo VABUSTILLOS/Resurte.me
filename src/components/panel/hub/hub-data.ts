@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react"
 import type { RestaurantCollection } from "@/types"
 import type { FoodosFeature } from "@/lib/foodos-entitlements"
+import { entryTotal } from "@/components/panel/ventas/ventas-shared"
 import {
   Calculator, ShoppingCart, Trash2, TrendingUp, Calendar, ClipboardCheck,
   Package, Receipt, Flame, QrCode, UtensilsCrossed, Gift, Megaphone,
@@ -99,12 +100,14 @@ export type HubMesa = {
   zona?: string
 }
 
+/**
+ * Total de una venta del hub. Delega en `entryTotal` (ventas-shared) para que
+ * el hub y /panel/ventas no puedan dar cifras distintas del mismo día: el
+ * cálculo estaba duplicado y divergía en el descuento porcentual (el del hub no
+ * recortaba en 0, así que un descuento > 100 % daba un total negativo).
+ */
 export function hubEntryTotal(e: HubVenta): number {
-  const gross = e.quantity * e.unitPrice
-  if (!e.discount) return gross
-  return e.discount.type === "porcentaje"
-    ? gross * (1 - e.discount.value / 100)
-    : Math.max(gross - e.discount.value, 0)
+  return entryTotal(e)
 }
 
 export const COLLECTION_ICONS: Record<string, string> = {

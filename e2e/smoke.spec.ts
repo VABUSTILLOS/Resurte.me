@@ -84,8 +84,10 @@ test.describe("smoke: páginas públicas", { tag: "@ci" }, () => {
 
   test("404 para rutas inexistentes", async ({ page }) => {
     const response = await page.goto("/ruta-que-no-existe-xyz", { waitUntil: "domcontentloaded" })
-    // En dev, App Router sirve un soft-404; lo que importa es el contenido.
-    expect([200, 404]).toContain(response?.status())
+    // 404 real (antes el streaming del shell devolvía 200 y el enlace roto se
+    // indexaba como página válida). El título lo aporta el generateMetadata
+    // del segmento, que sigue resolviéndose aunque la página llame a notFound.
+    expect(response?.status()).toBe(404)
     await expect(page).toHaveTitle(/Ciudad no encontrada/i)
   })
 })

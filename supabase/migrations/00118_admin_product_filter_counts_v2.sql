@@ -23,12 +23,25 @@
 -- Bitácora de auditoría: índice por entidad
 -- ------------------------------------------------------------
 
--- `00078` indexó `created_at`, `(action, created_at)` y `(actor_id, created_at)`,
+-- `00072` indexó `created_at`, `(action, created_at)` y `(actor_id, created_at)`,
 -- pero el timeline de un producto (`/api/admin/products/audit` con
 -- `entity='products'` + `entity_id`) y el drawer de actividad reciente filtran
 -- por entidad, y hasta ahora escaneaban la tabla completa ordenando por fecha.
-CREATE INDEX IF NOT EXISTS idx_admin_audit_log_entity
-  ON admin_audit_log(entity, entity_id, created_at DESC);
+--
+-- El índice va guardado: `admin_audit_log` la crea `00072_admin_audit_log.sql`
+-- y en bases donde esa migración aún no se haya aplicado (o se haya saltado
+-- por la colisión de versiones que obligó a renumerarla) este archivo debe
+-- seguir siendo aplicable — la función de conteos que viene debajo no depende
+-- de la bitácora y abortaba con `42P01` por una sola sentencia de índice.
+DO $$
+BEGIN
+  IF to_regclass('public.admin_audit_log') IS NULL THEN
+    RAISE NOTICE 'admin_audit_log no existe: se omite idx_admin_audit_log_entity. Aplica 00072_admin_audit_log.sql y reejecuta este archivo.';
+  ELSE
+    CREATE INDEX IF NOT EXISTS idx_admin_audit_log_entity
+      ON admin_audit_log(entity, entity_id, created_at DESC);
+  END IF;
+END $$;
 
 -- ------------------------------------------------------------
 -- Conteos agregados (v2)
