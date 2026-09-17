@@ -43,7 +43,7 @@ function fakeBuilder() {
 function mockClient() {
   const { builder, order, range } = fakeBuilder()
   vi.mocked(createServiceClient).mockResolvedValue({ from: vi.fn(() => builder) } as never)
-  return { order, range }
+  return { builder, order, range }
 }
 
 function listRequest(query = "page=1&pageSize=2") {
@@ -89,5 +89,31 @@ describe("GET /api/admin/products/list", () => {
     expect(res.status).toBe(200)
     expect(body.ids).toEqual([1, 2])
     expect(body.total).toBe(2)
+  })
+
+  it("trata un filtro presente pero vacío como 'sin filtro', no como filtro imposible", async () => {
+    const { builder } = mockClient()
+
+    // `?brand=` no debe convertirse en `eq("brand", "")` (0 filas, panel vacío
+    // y sin error): el listado tiene que salir completo.
+    const res = await GET(listRequest("category=&stock=&status=&city=&brand=&tag=&page=1&pageSize=2"))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.rows).toHaveLength(2)
+    expect(builder.eq).not.toHaveBeenCalledWith("brand", "")
+    expect(builder.eq).not.toHaveBeenCalledWith("stock_status", "")
+    expect(builder.eq).not.toHaveBeenCalledWith("category_id", expect.anything())
+    expect(builder.contains).not.toHaveBeenCalled()
+  })
+
+  it("sí aplica el filtro cuando el parámetro trae valor", async () => {
+    const { builder } = mockClient()
+
+    const res = await GET(listRequest("brand=Marca&tag=oferta&page=1&pageSize=2"))
+
+    expect(res.status).toBe(200)
+    expect(builder.eq).toHaveBeenCalledWith("brand", "Marca")
+    expect(builder.contains).toHaveBeenCalledWith("tags", JSON.stringify(["oferta"]))
   })
 })
