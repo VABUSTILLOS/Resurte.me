@@ -61,6 +61,10 @@ export const AUDIT_ACTIONS = [
   "supplier_product_link",
   "supplier_product_update",
   "supplier_product_unlink",
+  "commission_accrue",
+  "commission_pay",
+  "commission_cancel",
+  "commission_adjust",
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
@@ -123,6 +127,10 @@ export const AUDIT_ACTION_LABEL: Record<AuditAction, string> = {
   supplier_product_link: "Producto vinculado a proveedor",
   supplier_product_update: "Vínculo de proveedor editado",
   supplier_product_unlink: "Producto desvinculado de proveedor",
+  commission_accrue: "Periodo de comisión devengado",
+  commission_pay: "Comisión pagada al vendedor",
+  commission_cancel: "Periodo de comisión cancelado",
+  commission_adjust: "Ajuste a comisión",
 }
 
 function isAuditAction(value: string): value is AuditAction {

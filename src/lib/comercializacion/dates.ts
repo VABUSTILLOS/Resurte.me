@@ -56,6 +56,36 @@ export function getMonthBounds(now = new Date()): {
   }
 }
 
+/**
+ * Límites de un mes concreto (clave `AAAA-MM`) en CDMX, como ISO (UTC).
+ *
+ * Mismo corte que `getMonthBounds`, pero para un mes elegido a mano. Solo se
+ * usa para *estimar* en pantalla cuánto se va a devengar: el monto que se
+ * paga lo calcula la base al devengar (`accrue_commission_period`), que corta
+ * el mes con `AT TIME ZONE 'America/Mexico_City'`. Si estas dos cuentas
+ * difieren, manda la de la base.
+ *
+ * Devuelve `null` si la clave no es un mes válido.
+ */
+export function getMonthBoundsFor(monthKey: string): {
+  startISO: string
+  endISO: string
+} | null {
+  const match = /^(\d{4})-(\d{2})$/.exec(monthKey.trim())
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (month < 1 || month > 12) return null
+
+  // CDMX = UTC-6 (sin horario de verano desde 2022)
+  const startUTC = Date.UTC(year, month - 1, 1, 6, 0, 0)
+  const nextMonthUTC = Date.UTC(year, month, 1, 6, 0, 0) - 1
+  return {
+    startISO: new Date(startUTC).toISOString(),
+    endISO: new Date(nextMonthUTC).toISOString(),
+  }
+}
+
 /** Límites de hoy en CDMX, como ISO (UTC). */
 export function getTodayBounds(now = new Date()): {
   startISO: string
