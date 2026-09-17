@@ -200,11 +200,11 @@ export function BumpCards({
     // obsoleto: en el primer mount vale `[]` (la hidratación del store es
     // diferida), y una poda sobre ese `[]` pisaría la selección persistida con
     // un vacío. Es un riesgo latente (verificado en producción: no llega a
-    // manifestarse en el flujo natural porque el efecto vuelve a correr cuando
-    // `cartKey` pasa de vacío a la clave real del carrito, ya con `selected`
-    // hidratado), pero el shape es frágil y depende de ese re-render. La poda
-    // vive en el efecto de arriba, que sí depende de `selected` y sale temprano
-    // si está vacío.
+    // manifestarse porque el efecto sale temprano mientras el carrito no está
+    // cargado, así que la única corrida que llega a `apply()` ya tiene
+    // `selected` hidratado), pero el shape es frágil y depende de ese
+    // early-return. La poda vive en el efecto de arriba, que sí depende de
+    // `selected` y sale temprano si está vacío.
     const apply = (data: OrderBump[]) => {
       if (cancelled) return
       setBumps(data)

@@ -113,6 +113,27 @@ Si el proyecto Vercel está en plan **Hobby**, el límite es **2 crons** — añ
 2. Re-deployar (los cambios de env aplican al siguiente deploy).
 3. Verificar un cron manualmente (sección 5).
 
+### ⚠️ Contraseña de Postgres: rotación pendiente (incidente 17-sep-2026)
+
+`supabase/.temp/pooler-url` —estado local que genera el CLI de Supabase— contiene la
+cadena de conexión del rol **`postgres` (superusuario) con contraseña en claro**, y
+estuvo **versionado en un repositorio público** (`VABUSTILLOS/Resurte.me`, 6 commits
+desde `2bee041`, un único blob ⇒ la contraseña nunca se rotó). Da acceso total a la
+base de producción: pedidos, direcciones y datos de clientes.
+
+Ya está destrackeado y en `.gitignore`, pero **eso no revoca nada**: el historial ya
+está indexado y el secreto debe considerarse comprometido.
+
+1. **Rotar ya**: Dashboard de Supabase → *Project Settings → Database → Reset database
+   password*. Es la única mitigación real; el historial es público e irreversible
+   sin reescritura forzada.
+2. Actualizar el secreto donde se use (`POSTGRES_PASSWORD` / `POSTGRES_URL*` en Vercel).
+3. Si además se quiere limpiar el historial: `git filter-repo --path supabase/.temp/
+   --invert-paths` y force-push coordinado. Hazlo **después** de rotar, no en lugar
+   de rotar.
+4. Regla permanente: nada de `supabase/.temp/` ni de `.env*` en git. El CLI regenera
+   `supabase/.temp/` en cada `supabase link`.
+
 ---
 
 ## 4. RPCs de limpieza disponibles (Supabase)
@@ -620,6 +641,32 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
 curl -s -o /dev/null -w '%{http_code}\n' -H "apikey: $KEY" \
   "https://<ref>.supabase.co/rest/v1/user_carts?select=bumps&limit=1"   # 200 aplicada · 400 pendiente
 ```
+
+**Verificación real de que el sembrado está (17-sep-2026).** El chequeo de arriba
+solo prueba que el DDL commiteó. La forma de comprobar las filas sin credenciales
+es el endpoint público de bumps, que corre con service role:
+
+```bash
+# con un producto que sea `source_slug` de un par curado (p.ej. cebolla-blanca)
+curl -s -X POST "https://resurte.me/api/cart/bumps?debug=1" \
+  -H 'Content-Type: application/json' \
+  -d '{"items":[{"product_id":23,"quantity":1}],"limit":50}'
+```
+
+Si `bump_affinity` está sembrada, la respuesta trae como primeros bumps los
+destinos exactos de ese par, con `"description":"Ideal con Cebolla Blanca"` y
+`discount_pct: 0.1`. Si la tabla no existiera, `_debug.reason` sería
+`bump_affinity_fetch_error` y solo saldría el tier de recetario. Comprobado: 203
+pares definidos, los curados se sirven, el CHECK acepta `ingredient_affinity` y
+los 12 títulos de `recipe_collection` quedaron reescritos (0 títulos viejos).
+
+**Cuidado con el ledger.** Si la migración se aplicó pegándola en el SQL Editor,
+`supabase_migrations.schema_migrations` **no** tiene su fila (el editor no
+registra migraciones). Un `supabase db push` posterior la reintentará; es
+inofensivo porque son idempotentes, pero el ledger queda desincronizado. Solo se
+puede leer por canal privilegiado (Management API `POST /v1/projects/<ref>/database/query`
+o `psql`), no por REST: `supabase_migrations` no está expuesto por PostgREST
+(`406 PGRST106`).
 
 
 ---

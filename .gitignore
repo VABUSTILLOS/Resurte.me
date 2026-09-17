@@ -54,6 +54,11 @@ AGENTS.md
 # Verificación de entornos Vercel (secrets redactados)
 .env.*.tmp
 
+# Estado local del CLI de Supabase. `pooler-url` contiene la cadena de conexión
+# del rol `postgres` CON contraseña: nunca debe versionarse (estuvo commiteado
+# hasta 17-sep-2026, ver docs/OPS.md §9). El CLI lo regenera al hacer `supabase link`.
+supabase/.temp/
+
 # Softgen - prevent committing dependencies and build artifacts
 dist/
 .turbo/

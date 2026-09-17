@@ -37,12 +37,22 @@
 
 BEGIN;
 
+-- Blindaje operativo: `bump_rules` está viva (el motor de bumps la lee en
+-- cada render del carrito), así que un `ALTER TABLE` puede quedarse esperando
+-- el lock indefinidamente. Cuando eso pasa el SQL Editor aborta la petición en
+-- el navegador y el error que ves es "Failed to fetch (api.supabase.com)", no
+-- un error de SQL. Con `lock_timeout` la transacción falla en 5s con un error
+-- de lock legible y se puede reintentar sin dejar estado a medias.
+SET LOCAL lock_timeout = '5s';
+
 -- ============================================================
 -- 1) Ampliar los trigger types permitidos
 -- ============================================================
 ALTER TABLE public.bump_rules
   DROP CONSTRAINT IF EXISTS bump_rules_trigger_type_check;
 
+-- `NOT VALID` evita el escaneo de la tabla al añadir la restricción, así que
+-- el ACCESS EXCLUSIVE dura microsegundos en vez de lo que tarde la tabla.
 ALTER TABLE public.bump_rules
   ADD CONSTRAINT bump_rules_trigger_type_check
   CHECK (trigger_type IN (
@@ -53,7 +63,12 @@ ALTER TABLE public.bump_rules
     'drinks_sides',         -- bebidas → botana/vasos
     'recipe_collection',    -- tags del carrito ∩ tags de una colección de receta
     'ingredient_affinity'   -- afinidad por ingrediente (bump_affinity + recetario)
-  ));
+  )) NOT VALID;
+
+-- El `VALIDATE` corre con SHARE UPDATE EXCLUSIVE: no bloquea lecturas ni
+-- escrituras. El estado final es idéntico al de un `ADD CONSTRAINT` validado.
+ALTER TABLE public.bump_rules
+  VALIDATE CONSTRAINT bump_rules_trigger_type_check;
 
 -- ============================================================
 -- 2) Una sola regla de afinidad por producto
