@@ -235,22 +235,24 @@ test.describe("leads CRM — comportamiento con sesión admin (Ronda 16)", { tag
 
   test("un prospecto sin valor declarado no se pinta como $0", async ({ page }) => {
     await page.goto("/admin/leads?tab=pipeline")
-    const board = page.locator("[data-crm-board]").first()
+    const board = page.locator("#crm-panel-pipeline")
     test.skip((await board.count()) === 0, "el tablero no está disponible")
 
     // El total de una columna puede faltar; lo que no puede es mentir. `$0`
     // solo es legítimo si alguien declaró cero, y el formato de la interfaz
     // nunca produce esa cadena para un agregado vacío.
-    await expect(board).not.toContainText("Sin valor declarado: $0")
     const text = (await board.innerText()) ?? ""
     if (text.includes("Sin valor declarado")) {
       expect(text).not.toMatch(/Sin valor declarado[^A-Za-z0-9]{0,4}\$0(?![\d,])/)
     }
+    await expect(board).not.toContainText("Sin valor declarado: $0")
   })
 
   test("cerrar como perdido exige motivo: el botón no deja intentarlo", async ({ page }) => {
     await page.goto("/admin/leads?tab=pipeline")
-    const card = page.locator("[data-crm-prospect]").first()
+    const board = page.locator("#crm-panel-pipeline")
+    // Las tarjetas del tablero abren la ficha con un botón; el primero sirve.
+    const card = board.locator("ul > li button").first()
     test.skip((await card.count()) === 0, "no hay prospectos que abrir")
     await card.click()
 
