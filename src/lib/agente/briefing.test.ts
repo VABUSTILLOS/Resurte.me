@@ -97,6 +97,8 @@ function fakeClient(fixture: Fixture) {
     builder.then = (onFulfilled: (value: unknown) => unknown) =>
       Promise.resolve(resolve()).then(onFulfilled)
     builder.maybeSingle = async () => ({ data: { full_name: "Ana" }, error: null })
+    builder.single = async () => ({ data: { id: 1 }, error: null })
+    builder.insert = () => builder
     return builder
   }
 

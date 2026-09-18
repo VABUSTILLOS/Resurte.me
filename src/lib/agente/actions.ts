@@ -211,7 +211,7 @@ export async function generateAgentMessage(
     p.tier ? `- Segmento: ${TIER_LABEL[p.tier] ?? `Tier ${p.tier}`}` : null,
     zone ? `- Zona: ${zone.label}. Pitch de la zona: "${zone.pitch}". Productos clave: ${zone.keyProducts.join(", ")}.` : null,
     employees ? `- Empleados: ${employees}` : null,
-    instagram ? `- Instagram: ${instagram}` : null,
+    null,
     volumeMin
       ? `- Volumen estimado de compra: $${volumeMin.toLocaleString("es-MX")}–$${(volumeMax ?? volumeMin).toLocaleString("es-MX")} MXN/semana`
       : null,
