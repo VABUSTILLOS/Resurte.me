@@ -228,7 +228,8 @@ export function TrackingClient() {
           })}
           {order.city ? ` · Entrega en ${order.city.name}` : ""}
         </p>
-        {!isFinalOrderStatus(order.status) && (          <p className="text-xs text-brand-600 mt-1 flex items-center gap-1">
+        {!isFinalOrderStatus(order.status) && (
+          <p className="text-xs text-brand-600 mt-1 flex items-center gap-1">
             <span className="inline-block w-2 h-2 rounded-full bg-brand-500 animate-pulse" />
             Se actualiza automáticamente
           </p>

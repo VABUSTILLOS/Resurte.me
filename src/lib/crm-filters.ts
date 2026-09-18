@@ -13,7 +13,7 @@
 
 import { CRM_STATUSES, LEAD_STATUSES, type CrmStatus, type LeadStatus } from "@/lib/crm-pipeline"
 
-export const CRM_TABS = ["leads", "pipeline", "embudo", "bandeja"] as const
+export const CRM_TABS = ["leads", "pipeline", "embudo", "agenda", "bandeja"] as const
 export type CrmTab = (typeof CRM_TABS)[number]
 
 /** Bandeja de entrada de leads web. */

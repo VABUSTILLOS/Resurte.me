@@ -7,6 +7,7 @@ vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: 
 import {
   createProspect,
   bulkCreateProspects,
+  updateProspect,
   addActivity,
   createAssistedOrder,
 } from "./actions"
@@ -159,6 +160,57 @@ describe("bulkCreateProspects", () => {
       expect.objectContaining({ name: "Ana", city_id: 7, source: "import", status: "nuevo" }),
       expect.objectContaining({ name: "Luis", city_id: null, source: "import" }),
     ])
+  })
+})
+
+describe("updateProspect", () => {
+  // El gemelo del arreglo de F3 en la superficie del vendedor: cualquier ruta
+  // que escriba `status` tiene que limpiar `loss_reason` y `closed_at` en el
+  // mismo `UPDATE`, o reabrir un trato perdido choca con los `CHECK` de 00184.
+  it("reabrir limpia motivo y fecha en el mismo update", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 7, status: "en_seguimiento", cities: null }, error: null }],
+    })
+
+    await updateProspect(7, { status: "en_seguimiento" })
+
+    const update = builders.crm_prospects?.update as ReturnType<typeof vi.fn>
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "en_seguimiento", loss_reason: null, closed_at: null })
+    )
+  })
+
+  it("ganar limpia el motivo sin borrar la fecha de cierre", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 7, status: "cliente_activo", cities: null }, error: null }],
+    })
+
+    await updateProspect(7, { status: "cliente_activo" })
+
+    const patch = (builders.crm_prospects?.update as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as Record<string, unknown>
+    expect(patch.loss_reason).toBeNull()
+    expect("closed_at" in patch).toBe(false)
+  })
+
+  it("un cambio de contacto no toca los campos de cierre", async () => {
+    const builders = serviceWith({
+      crm_prospects: [{ data: { id: 7, status: "perdido", cities: null }, error: null }],
+    })
+
+    await updateProspect(7, { notes: "  Llamar el lunes  " })
+
+    const patch = (builders.crm_prospects?.update as ReturnType<typeof vi.fn>).mock
+      .calls[0]?.[0] as Record<string, unknown>
+    expect(patch).toEqual({ notes: "Llamar el lunes" })
+  })
+
+  it("rechaza un estado fuera del vocabulario", async () => {
+    serviceWith({ crm_prospects: [{ data: null, error: null }] })
+    await expect(updateProspect(7, { status: "ganado" as never })).rejects.toThrow(
+      "Estado de prospecto inválido"
+    )
   })
 })
 

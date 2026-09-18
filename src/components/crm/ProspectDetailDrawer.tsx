@@ -17,14 +17,22 @@ import {
   X,
 } from "lucide-react"
 import {
+  CRM_CLOSE_OUTCOME_LABEL,
+  CRM_LOSS_REASONS,
+  CRM_LOSS_REASON_LABEL,
   CRM_STATUSES,
   CRM_STATUS_LABEL,
+  isCrmClosed,
   isFollowUpDue,
+  type CrmCloseOutcome,
+  type CrmLossReason,
   type CrmProspectRow,
   type CrmScope,
   type CrmStatus,
 } from "@/lib/crm-core"
 import { MAX_TAGS_PER_PROSPECT, addTags, tagLabel, toggleTag } from "@/lib/crm-tags"
+import type { CrmTask, CrmTaskDraft } from "@/lib/crm-tasks"
+import { ProspectTasks } from "@/components/crm/ProspectTasks"
 import {
   ACTIVITY_OUTCOMES,
   ACTIVITY_OUTCOME_LABEL,
@@ -99,6 +107,16 @@ export interface ProspectActivityDraft {
 export interface ProspectDetailActions {
   loadDetail: (prospectId: number) => Promise<CrmProspectDetail>
   setStatus: (prospectId: number, status: CrmStatus) => Promise<void>
+  /**
+   * Cierra el trato con desenlace y, al perder, motivo. Sin este comando no se
+   * pinta el bloque de cierre: mover el desplegable de estado a `perdido` sigue
+   * siendo posible, pero no escribe la causa.
+   */
+  closeDeal?: (
+    prospectId: number,
+    outcome: CrmCloseOutcome,
+    lossReason?: CrmLossReason | null
+  ) => Promise<void>
   setNotes: (prospectId: number, notes: string | null) => Promise<void>
   setFollowUp: (prospectId: number, iso: string | null) => Promise<void>
   addActivity: (prospectId: number, draft: ProspectActivityDraft) => Promise<void>
@@ -108,6 +126,17 @@ export interface ProspectDetailActions {
   listSellers?: () => Promise<{ id: string; name: string; email: string }[]>
   /** Solo admin: asignación. Se pinta junto a `listSellers`. */
   assign?: (prospectId: number, sellerId: string | null) => Promise<void>
+  /**
+   * Tareas del prospecto (00185). Sin `listTasks` no se pinta la sección: una
+   * superficie sin comandos no debe mostrar un bloque vacío que parece "este
+   * trato no tiene tareas" cuando en realidad es "aquí no se pueden ver".
+   */
+  listTasks?: (prospectId: number) => Promise<CrmTask[]>
+  /** Sin este comando la sección es de solo lectura. */
+  addTask?: (prospectId: number, draft: CrmTaskDraft) => Promise<void>
+  completeTask?: (taskId: number) => Promise<void>
+  reopenTask?: (taskId: number) => Promise<void>
+  deleteTask?: (taskId: number) => Promise<void>
 }
 
 export interface ProspectDetailSlots {
@@ -187,6 +216,10 @@ export function ProspectDetailDrawer({
   const [activityFilter, setActivityFilter] = useState<ActivityType | "todos">("todos")
   const [tagDraft, setTagDraft] = useState("")
   const [tagBusy, setTagBusy] = useState(false)
+  // Cierre del trato: el desenlace elegido y el motivo. `null` = sin elegir,
+  // que es el estado que decide si se pintan los botones o la confirmación.
+  const [closeOutcome, setCloseOutcome] = useState<CrmCloseOutcome | null>(null)
+  const [lossReason, setLossReason] = useState<CrmLossReason | "">("")
 
   // Los comandos se leen por ref para que un `actions` creado en línea por el
   // adaptador no reinicie la carga en cada render.
@@ -318,7 +351,28 @@ export function ProspectDetailDrawer({
     activityFilter === "todos" ? activities : activities.filter((a) => a.type === activityFilter)
   const due = prospect ? isFollowUpDue(prospect.next_follow_up_at) : false
   const canAssign = Boolean(actions.listSellers && actions.assign)
+  const canClose = Boolean(actions.closeDeal)
   const isAdmin = scope.kind === "admin"
+  const closed = prospect ? isCrmClosed(prospect.status) : false
+
+  /**
+   * Cerrar es una decisión, no un cambio de estado: por eso pide confirmación y,
+   * al perder, el motivo. El desplegable de estado sigue existiendo para
+   * corregir un estado mal puesto, pero no registra causa.
+   */
+  function confirmClose() {
+    const closeDeal = actions.closeDeal
+    if (!closeDeal || !prospect || closeOutcome === null) return
+    const outcome = closeOutcome
+    void run(
+      async () => {
+        await closeDeal(prospect.id, outcome, outcome === "perdido" ? lossReason || null : null)
+        setCloseOutcome(null)
+        setLossReason("")
+      },
+      outcome === "perdido" ? "Trato cerrado como perdido" : "Trato cerrado como ganado"
+    )
+  }
 
   if (!open) return null
 
@@ -578,6 +632,101 @@ export function ProspectDetailDrawer({
               </div>
             </section>
 
+            {canClose && (
+              <section className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className={LABEL}>Cierre del trato</span>
+                  {closed && (
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-600">
+                      {CRM_CLOSE_OUTCOME_LABEL[prospect.status === "perdido" ? "perdido" : "ganado"]}
+                    </span>
+                  )}
+                </div>
+                {closed ? (
+                  <p className="text-xs text-gray-600">
+                    {prospect.status === "perdido"
+                      ? `Perdido · ${
+                          prospect.loss_reason
+                            ? CRM_LOSS_REASON_LABEL[prospect.loss_reason]
+                            : "motivo no registrado"
+                        }`
+                      : "Ganado"}
+                    {prospect.closed_at && ` · ${formatRelativeTime(prospect.closed_at)}`}
+                  </p>
+                ) : closeOutcome === null ? (
+                  <>
+                    <p className="mb-2 text-[11px] text-gray-500">
+                      Se registra la fecha del cierre y, al perder, el motivo. Reabrir se hace
+                      desde el estado.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setCloseOutcome("ganado")}
+                        className="min-h-[44px] flex-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
+                      >
+                        Ganado
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setCloseOutcome("perdido")}
+                        className="min-h-[44px] flex-1 rounded-xl border border-red-200 bg-red-50 px-3 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-40"
+                      >
+                        Perdido
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    {closeOutcome === "perdido" && (
+                      <div>
+                        <label className={LABEL} htmlFor="crm-loss-reason">
+                          Motivo de pérdida (obligatorio)
+                        </label>
+                        <select
+                          id="crm-loss-reason"
+                          value={lossReason}
+                          disabled={busy}
+                          onChange={(e) => setLossReason(e.target.value as CrmLossReason | "")}
+                          className={FIELD}
+                        >
+                          <option value="">Elige un motivo…</option>
+                          {CRM_LOSS_REASONS.map((reason) => (
+                            <option key={reason} value={reason}>
+                              {CRM_LOSS_REASON_LABEL[reason]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={busy || (closeOutcome === "perdido" && !lossReason)}
+                        onClick={confirmClose}
+                        className="min-h-[44px] flex-1 rounded-xl bg-gray-900 px-3 text-xs font-semibold text-white hover:bg-gray-800 disabled:opacity-40"
+                      >
+                        {closeOutcome === "perdido" ? "Cerrar como perdido" : "Cerrar como ganado"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setCloseOutcome(null)
+                          setLossReason("")
+                        }}
+                        className="min-h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
             <section>
               <label className={LABEL} htmlFor="crm-detail-notes">
                 Notas internas
@@ -611,6 +760,19 @@ export function ProspectDetailDrawer({
                 {notesDirty && <span className="text-[11px] text-amber-700">Sin guardar</span>}
               </div>
             </section>
+
+            {actions.listTasks && (
+              <ProspectTasks
+                prospectId={prospect.id}
+                listTasks={actions.listTasks}
+                addTask={actions.addTask}
+                completeTask={actions.completeTask}
+                reopenTask={actions.reopenTask}
+                deleteTask={actions.deleteTask}
+                reloadToken={reloadToken}
+                disabled={busy}
+              />
+            )}
 
             {slots?.extra?.(prospect)}
 

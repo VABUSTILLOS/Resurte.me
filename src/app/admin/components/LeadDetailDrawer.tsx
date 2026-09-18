@@ -8,13 +8,19 @@ import {
 import {
   addCrmActivity,
   assignCrmProspect,
+  closeCrmProspect,
+  completeCrmTask,
+  createCrmTask,
+  deleteCrmTask,
   getAdminProspectDetail,
   getAdminSellers,
+  reopenCrmTask,
   setCrmProspectFollowUp,
   setCrmProspectTags,
   updateCrmProspectNotes,
   updateCrmProspectStatus,
 } from "../actions"
+import { listProspectTasks } from "@/lib/comercializacion/actions/tareas"
 import { LeadConversationPanel } from "@/components/crm/ConversationPanel"
 import { ProspectMoneyPanel } from "./ProspectMoneyPanel"
 import { ADMIN_CONVERSATION_ACTIONS } from "./admin-conversation-actions"
@@ -35,6 +41,7 @@ import { ADMIN_CONVERSATION_ACTIONS } from "./admin-conversation-actions"
 const ACTIONS: ProspectDetailActions = {
   loadDetail: getAdminProspectDetail,
   setStatus: (prospectId, status: CrmStatus) => updateCrmProspectStatus(prospectId, status),
+  closeDeal: closeCrmProspect,
   // La acción del panel recibe `string`; el drawer usa `null` para "sin notas".
   setNotes: (prospectId, notes) => updateCrmProspectNotes(prospectId, notes ?? ""),
   setFollowUp: setCrmProspectFollowUp,
@@ -42,6 +49,13 @@ const ACTIONS: ProspectDetailActions = {
   setTags: (prospectId, tags) => setCrmProspectTags(prospectId, tags),
   listSellers: getAdminSellers,
   assign: assignCrmProspect,
+  // Las tareas leen del módulo compartido (no escriben, no hay bitácora que
+  // dejar) y escriben por los envoltorios del panel, que sí la dejan.
+  listTasks: listProspectTasks,
+  addTask: createCrmTask,
+  completeTask: completeCrmTask,
+  reopenTask: reopenCrmTask,
+  deleteTask: deleteCrmTask,
 }
 
 export function LeadDetailDrawer({

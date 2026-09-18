@@ -8,7 +8,7 @@ import {
   type Prospect,
   type ProspectStatus,
 } from "../types"
-import { scopeForRole, type ProspectFilters as CoreProspectFilters } from "@/lib/crm-core"
+import { scopeForRole, crmStatusPatch, type ProspectFilters as CoreProspectFilters } from "@/lib/crm-core"
 import { readCrmProspects } from "@/lib/crm-prospects"
 import { digitsOf, validateProspectContact, mapProspect } from "./helpers"
 
@@ -173,7 +173,14 @@ export async function updateProspect(
   if (input.city_id !== undefined) patch.city_id = input.city_id ?? null
   if (input.tier !== undefined) patch.tier = input.tier ?? null
   if (input.zone !== undefined) patch.zone = input.zone ?? null
-  if (input.status !== undefined) patch.status = input.status
+  // El parche de estado va en el MISMO `UPDATE`: los `CHECK` de coherencia de
+  // 00184 rechazan un motivo de pérdida sobre un trato abierto o un `closed_at`
+  // sobre uno no cerrado, así que reabrir un trato perdido desde este formulario
+  // fallaría con un error de constraint en la cara del vendedor.
+  if (input.status !== undefined) {
+    patch.status = input.status
+    Object.assign(patch, crmStatusPatch(input.status))
+  }
   if (input.next_follow_up_at !== undefined)
     patch.next_follow_up_at = input.next_follow_up_at || null
   if (input.notes !== undefined) patch.notes = input.notes?.trim() || null

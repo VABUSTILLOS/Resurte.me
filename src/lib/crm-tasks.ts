@@ -121,6 +121,17 @@ export function mapCrmTask(row: Record<string, unknown>): CrmTask {
 // ─────────────────────────────────────────────────────────────
 
 /**
+ * Lo que un formulario de alta envía. Los tres campos son opcionales salvo el
+ * título: una tarea sin fecha ni prioridad es legítima ("llamar cuando pueda"),
+ * y convertir eso en obligatorio llenaría la agenda de fechas inventadas.
+ */
+export interface CrmTaskDraft {
+  title: string
+  due_at?: string | null
+  priority?: string | null
+}
+
+/**
  * Normaliza el título: espacios colapsados y recorte. Devuelve `null` cuando no
  * queda nada usable, para que el llamador no tenga que distinguir `""` de `"   "`.
  *
@@ -242,19 +253,25 @@ const PRIORITY_WEIGHT: Record<CrmTaskPriority, number> = { alta: 0, media: 1, ba
  * descendente: la lista sirve para trabajar, no para archivar.
  */
 export function sortTasks(tasks: readonly CrmTask[], now: Date = new Date()): CrmTask[] {
-  return [...tasks].sort((a, b) => {
-    const openA = isTaskOpen(a)
-    const openB = isTaskOpen(b)
-    if (openA !== openB) return openA ? -1 : 1
-    if (!openA) return (b.completed_at ?? "").localeCompare(a.completed_at ?? "")
-    const ua = taskUrgency(a, now)
-    const ub = taskUrgency(b, now)
-    if (ua !== ub) return ua - ub
-    const pa = PRIORITY_WEIGHT[a.priority]
-    const pb = PRIORITY_WEIGHT[b.priority]
-    if (pa !== pb) return pa - pb
-    return a.created_at.localeCompare(b.created_at)
-  })
+  return [...tasks].sort((a, b) => compareTasks(a, b, now))
+}
+
+/**
+ * El comparador de `sortTasks`, expuesto para ordenar estructuras que envuelven
+ * una tarea (una agenda con su cliente) sin descomponerlas y recomponerlas.
+ */
+export function compareTasks(a: CrmTask, b: CrmTask, now: Date = new Date()): number {
+  const openA = isTaskOpen(a)
+  const openB = isTaskOpen(b)
+  if (openA !== openB) return openA ? -1 : 1
+  if (!openA) return (b.completed_at ?? "").localeCompare(a.completed_at ?? "")
+  const ua = taskUrgency(a, now)
+  const ub = taskUrgency(b, now)
+  if (ua !== ub) return ua - ub
+  const pa = PRIORITY_WEIGHT[a.priority]
+  const pb = PRIORITY_WEIGHT[b.priority]
+  if (pa !== pb) return pa - pb
+  return a.created_at.localeCompare(b.created_at)
 }
 
 /** Las pendientes de una lista, en orden de trabajo. */
@@ -265,6 +282,91 @@ export function openTasks(tasks: readonly CrmTask[], now: Date = new Date()): Cr
 /** Las vencidas de una lista. Un subconjunto de las abiertas, nunca al revés. */
 export function overdueTasks(tasks: readonly CrmTask[], now: Date = new Date()): CrmTask[] {
   return sortTasks(tasks, now).filter((t) => isTaskOverdue(t, now))
+}
+
+// ─────────────────────────────────────────────────────────────
+// Agenda
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Horizontes de la agenda, en el orden en que se leen.
+ *
+ * `semana` es "en los próximos 7 días, sin contar hoy": una tarea que vence hoy
+ * no debe aparecer dos veces, y la que vence en 7 días sí entra. `completadas`
+ * es un cajón de archivo, no un horizonte de trabajo — existe para que
+ * `taskBucket` sea total y ningún consumidor tenga que ramificar sobre `null`.
+ */
+export const CRM_TASK_BUCKETS = [
+  "vencidas",
+  "hoy",
+  "semana",
+  "despues",
+  "sin_fecha",
+  "completadas",
+] as const
+
+export type CrmTaskBucket = (typeof CRM_TASK_BUCKETS)[number]
+
+export const CRM_TASK_BUCKET_LABEL: Record<CrmTaskBucket, string> = {
+  vencidas: "Vencidas",
+  hoy: "Hoy",
+  semana: "Próximos 7 días",
+  despues: "Más adelante",
+  sin_fecha: "Sin fecha",
+  completadas: "Completadas",
+}
+
+/** Días que abarca el horizonte `semana`, contando desde mañana. */
+export const TASK_WEEK_DAYS = 7
+
+/**
+ * Tamaño de la ventana de la agenda.
+ *
+ * La superficie avisa cuando lo alcanza: la agenda es la lista de lo que se
+ * puede incumplir, y recortarla en silencio esconde precisamente las tareas que
+ * llevan más tiempo esperando.
+ */
+export const TASK_AGENDA_LIMIT = 500
+
+/**
+ * Horizonte de una tarea. Función total: las completadas caen en `completadas`
+ * sin mirar su fecha, porque una tarea cerrada no vence.
+ *
+ * Una tarea sin `due_at` cae en `sin_fecha` y **no** en `hoy`: la regla del
+ * módulo es que lo no medido no es cero, y "sin fecha" convertido en "vence hoy"
+ * es la versión de esta columna del mismo error.
+ */
+export function taskBucket(task: CrmTask, now: Date = new Date()): CrmTaskBucket {
+  if (!isTaskOpen(task)) return "completadas"
+  const days = daysUntilDue(task, now)
+  if (days === null) return "sin_fecha"
+  if (days < 0) return "vencidas"
+  if (days === 0) return "hoy"
+  if (days <= TASK_WEEK_DAYS) return "semana"
+  return "despues"
+}
+
+/**
+ * Reparte las tareas en los horizontes de la agenda, cada cajón ya ordenado por
+ * `sortTasks`.
+ *
+ * El orden lo decide `sortTasks` y **no** la consulta a la base: la agenda se
+ * corta por fecha en la zona del usuario, y PostgREST solo sabe de `TIMESTAMPTZ`.
+ * Ordenar en SQL daría una lista que discrepa de los cajones en cuanto un
+ * vencimiento cae cerca de la medianoche.
+ */
+export function groupTasks(
+  tasks: readonly CrmTask[],
+  now: Date = new Date(),
+): Record<CrmTaskBucket, CrmTask[]> {
+  const groups = Object.fromEntries(CRM_TASK_BUCKETS.map((b) => [b, [] as CrmTask[]])) as Record<
+    CrmTaskBucket,
+    CrmTask[]
+  >
+  for (const task of sortTasks(tasks, now)) {
+    groups[taskBucket(task, now)].push(task)
+  }
+  return groups
 }
 
 // ─────────────────────────────────────────────────────────────

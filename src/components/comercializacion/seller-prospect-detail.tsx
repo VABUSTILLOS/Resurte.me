@@ -17,10 +17,15 @@ import { formatDate } from "@/lib/comercializacion/dates"
 import { formatMoney } from "@/lib/comercializacion/commissions"
 import {
   addActivity,
+  completeCrmTask,
+  createTask,
   deleteActivity,
+  deleteCrmTask,
   getProspectDetail,
   getSellerLeadConversation,
   linkProspectAccount,
+  listProspectTasks,
+  reopenCrmTask,
   searchUsersForLinking,
   setProspectTags,
   updateProspect,
@@ -85,6 +90,13 @@ const ACTIONS: ProspectDetailActions = {
   setTags: async (prospectId, tags) => {
     await setProspectTags(prospectId, tags)
   },
+  // Tareas (F4): el vendedor ve y mueve las suyas. El alcance lo resuelve el
+  // servidor sobre el prospecto, así que aquí no hay filtro que repetir.
+  listTasks: listProspectTasks,
+  addTask: createTask,
+  completeTask: completeCrmTask,
+  reopenTask: reopenCrmTask,
+  deleteTask: deleteCrmTask,
 }
 
 /**

@@ -19,6 +19,7 @@ import {
   findMatchingProspect,
   LEAD_STATUSES,
   CRM_BOARD_COLUMNS,
+  sumEstimatedValue,
   type CrmProspect,
   type CrmStatus,
   type ConvertibleLead,
@@ -286,5 +287,60 @@ describe("filterProspects", () => {
   it("unassigned sólo deja los que no tienen vendedor", () => {
     expect(matchesProspectFilters(row(), { unassigned: true }, now)).toBe(false)
     expect(matchesProspectFilters(row({ seller_id: null }), { unassigned: true }, now)).toBe(true)
+  })
+})
+
+describe("sumEstimatedValue", () => {
+  it("sin ningún valor declarado devuelve null, no cero", () => {
+    // La invariante de la fase: un pipeline sin valorar no vale `$0`. Si esto
+    // devolviera 0, la cabecera del tablero afirmaría que no hay dinero cuando
+    // lo que pasa es que nadie ha valorado nada.
+    expect(sumEstimatedValue([])).toEqual({ total: null, declared: 0 })
+    expect(
+      sumEstimatedValue([{ estimated_value: null }, { estimated_value: null }]),
+    ).toEqual({ total: null, declared: 0 })
+  })
+
+  it("suma los valores presentes y cuenta cuántos son", () => {
+    expect(
+      sumEstimatedValue([
+        { estimated_value: 1500 },
+        { estimated_value: null },
+        { estimated_value: 250.5 },
+      ]),
+    ).toEqual({ total: 1750.5, declared: 2 })
+  })
+
+  it("redondea a dos decimales como el resto del dinero", () => {
+    expect(
+      sumEstimatedValue([{ estimated_value: 0.1 }, { estimated_value: 0.2 }]).total,
+    ).toBe(0.3)
+  })
+
+  it("un valor ilegible no es un cero: se ignora y no cuenta", () => {
+    expect(
+      sumEstimatedValue([
+        { estimated_value: "no es un número" },
+        { estimated_value: Number.NaN },
+        { estimated_value: 100 },
+      ]),
+    ).toEqual({ total: 100, declared: 1 })
+  })
+
+  it("acepta el texto numérico que devuelve PostgREST para NUMERIC", () => {
+    expect(sumEstimatedValue([{ estimated_value: "1500.50" }])).toEqual({
+      total: 1500.5,
+      declared: 1,
+    })
+  })
+
+  it("una columna ausente en la respuesta cuenta como no declarada", () => {
+    expect(sumEstimatedValue([{}, {}])).toEqual({ total: null, declared: 0 })
+  })
+
+  it("un cero declarado sí es un cero", () => {
+    // Distinto del primer caso: aquí alguien miró el prospecto y dijo «no vale
+    // nada». Es un dato, y por eso `declared` lo cuenta y `total` no es null.
+    expect(sumEstimatedValue([{ estimated_value: 0 }])).toEqual({ total: 0, declared: 1 })
   })
 })

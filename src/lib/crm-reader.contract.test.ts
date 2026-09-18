@@ -134,6 +134,12 @@ const PROSPECT_READERS_ALLOWED: { path: string; reason: string }[] = [
     path: "src/lib/comercializacion/actions/commissions-admin.ts",
     reason: "Reparto de comisiones: lee solo `seller_id` y `user_id` de los prospectos vinculados.",
   },
+  {
+    path: "src/lib/comercializacion/actions/tareas.ts",
+    reason:
+      "Tareas: resuelve el prospecto por `id` para decidir el alcance antes de tocar `crm_tasks`. " +
+      "El alcance de una tarea se decide sobre el prospecto, no sobre su `seller_id`.",
+  },
 ]
 
 /**

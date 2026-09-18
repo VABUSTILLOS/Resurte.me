@@ -48,45 +48,52 @@ const GAP_TONE_CLASS: Record<MoneyGapTone, string> = {
  */
 export function ProspectMoneyPanel({ prospect }: { prospect: CrmProspectRow }) {
   const linked = prospect.user_id !== null
-  const [orders, setOrders] = useState<ClientOrders | null>(null)
-  const [state, setState] = useState<"idle" | "loading" | "done" | "error">(
-    linked ? "loading" : "idle"
-  )
+  // `null` = todavía no hay respuesta. Un solo estado en vez de dos porque el
+  // efecto solo puede escribir dentro de la promesa: llamar a `setState` en el
+  // cuerpo del efecto provoca un render en cascada (y el lint lo rechaza).
+  const [result, setResult] = useState<{ ok: boolean; data: ClientOrders | null } | null>(null)
 
   useEffect(() => {
-    if (!linked) {
-      setOrders(null)
-      setState("idle")
-      return
-    }
+    // Sin cuenta vinculada no se llama: un `{revenue: 0}` por falta de vínculo
+    // es indistinguible de un `{revenue: 0}` por falta de pagos, y el vínculo lo
+    // sabe la fila, no la consulta.
+    if (!linked) return
     let cancelled = false
-    setState("loading")
     void getAdminProspectClientOrders(prospect.id)
       .then((data) => {
         if (cancelled) return
-        setOrders(data)
-        setState("done")
+        setResult({ ok: true, data })
       })
       .catch(() => {
         if (cancelled) return
-        setOrders(null)
-        setState("error")
+        setResult({ ok: false, data: null })
       })
     return () => {
       cancelled = true
     }
   }, [linked, prospect.id])
 
-  const measured = state === "done"
+  const state: "idle" | "loading" | "done" | "error" = !linked
+    ? "idle"
+    : result === null
+      ? "loading"
+      : result.ok
+        ? "done"
+        : "error"
+
+  // El vínculo se comprueba aquí y no solo en el efecto: si desaparece sin
+  // cambiar de prospecto, lo que sobra son las cifras ya cargadas, y basta con
+  // no darlas por medidas.
+  const measured = linked && state === "done"
+  const orders = measured ? result?.data : null
+
   const view = prospectMoneyView({
     estimatedValue: prospect.estimated_value,
-    actualRevenue: measured ? (orders?.revenue ?? null) : null,
-    actualCommission: measured ? (orders?.commission ?? null) : null,
-    paidOrders: measured
-      ? (orders?.orders ?? []).filter(
-          (o) => o.payment_status === "paid" && o.status !== "cancelled"
-        ).length
-      : 0,
+    actualRevenue: orders?.revenue ?? null,
+    actualCommission: orders?.commission ?? null,
+    paidOrders: (orders?.orders ?? []).filter(
+      (o) => o.payment_status === "paid" && o.status !== "cancelled"
+    ).length,
   })
 
   return (
@@ -130,7 +137,7 @@ export function ProspectMoneyPanel({ prospect }: { prospect: CrmProspectRow }) {
         {view.gapTone === "unknown"
           ? MONEY_GAP_LABEL.unknown
           : MONEY_GAP_LABEL[view.gapTone]}
-        {view.comparable && view.paidOrders > 0
+        {view.comparable
           ? ` · ${view.paidOrders} pedido${view.paidOrders === 1 ? "" : "s"} pagado${
               view.paidOrders === 1 ? "" : "s"
             }`

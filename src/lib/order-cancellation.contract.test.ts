@@ -82,7 +82,10 @@ const PUERTAS_DEL_MARKETPLACE = [
  */
 const PUEDEN_NOMBRAR_LA_RPC = [MODULO_DE_LA_CASCADA, "src/lib/order-stock.ts"]
 
-const SUPERFICIE_PUBLICA_DEL_CLIENTE = "src/app/[slug]/pedido/[orderId]/tracking-client.tsx"
+const SUPERFICIES_DEL_CLIENTE = [
+  "src/app/[slug]/pedido/[orderId]/tracking-client.tsx",
+  "src/app/[slug]/mis-pedidos/[orderId]/order-detail-client.tsx",
+]
 
 function leer(rel: string): string {
   return readFileSync(join(REPO, rel), "utf8")
@@ -126,7 +129,7 @@ describe("order-cancellation · una sola puerta para la cascada", () => {
     for (const puerta of PUERTAS_DEL_MARKETPLACE) {
       expect(CODIGO.get(puerta), `${puerta} no existe`).toBeDefined()
       expect(
-        CODIGO.get(puerta)!.includes("applyOrderCancellationEffects"),
+        CODIGO.get(puerta)!.includes("applyOrderCancellationEffects("),
         `${puerta} no invoca applyOrderCancellationEffects`
       ).toBe(true)
     }
@@ -168,15 +171,28 @@ describe("order-cancellation · una sola puerta para la cascada", () => {
     }
   })
 
-  it("R5 · la UI le pregunta la regla al módulo, no la copia", () => {
-    const src = CODIGO.get(SUPERFICIE_PUBLICA_DEL_CLIENTE) ?? ""
-    expect(src).not.toBe("")
-    expect(src.includes('from "@/lib/order-cancellation"')).toBe(true)
-    expect(src.includes("customerCancelRefusal")).toBe(true)
-    // La copia no se duplica: si el módulo cambia el mensaje, la UI lo cambia
-    // con él. Un literal repetido en la UI se quedaría desincronizado.
-    for (const mensaje of Object.values(CANCEL_REFUSAL_MESSAGE)) {
-      expect(src.includes(mensaje), `la UI repite el mensaje «${mensaje}»`).toBe(false)
+  it("R5 · toda superficie del cliente le pregunta la regla al módulo, no la copia", () => {
+    for (const superficie of SUPERFICIES_DEL_CLIENTE) {
+      const src = CODIGO.get(superficie) ?? ""
+      expect(src, `${superficie} no existe`).not.toBe("")
+      expect(
+        src.includes('from "@/lib/order-cancellation"'),
+        `${superficie} no importa el módulo`
+      ).toBe(true)
+      // La llamada, no solo el import: importar y no usar pasaría con el nombre
+      // suelto, que es justo el defecto que esta regla vigila.
+      expect(
+        src.includes("customerCancelRefusal("),
+        `${superficie} no consulta customerCancelRefusal`
+      ).toBe(true)
+      // La copia no se duplica: si el módulo cambia el mensaje, la UI lo cambia
+      // con él. Un literal repetido en la UI se quedaría desincronizado.
+      for (const mensaje of Object.values(CANCEL_REFUSAL_MESSAGE)) {
+        expect(
+          src.includes(mensaje),
+          `${superficie} repite el mensaje «${mensaje}»`
+        ).toBe(false)
+      }
     }
   })
 
@@ -227,13 +243,20 @@ describe("order-cancellation · la regla de producto", () => {
     }
   })
 
-  it("R10 · cada motivo de rechazo tiene un mensaje que dice qué hacer", () => {
+  it("R10 · cada motivo de rechazo tiene un mensaje completo", () => {
     const motivos = ["already_cancelled", "dispatched", "charged"] as const
     for (const motivo of motivos) {
       const mensaje = CANCEL_REFUSAL_MESSAGE[motivo]
       expect(mensaje.length, `${motivo} sin mensaje`).toBeGreaterThan(20)
-      // Un mensaje que no dice qué hacer deja al cliente en un callejón.
-      expect(/escr[íi]benos|contacta|soporte|ayuda/i.test(mensaje), `${motivo}: ${mensaje}`).toBe(true)
+    }
+    // `already_cancelled` no pide nada: el pedido ya está cancelado. Los otros
+    // dos sí dejan al cliente en un callejón si no dicen qué hacer.
+    for (const motivo of ["dispatched", "charged"] as const) {
+      const mensaje = CANCEL_REFUSAL_MESSAGE[motivo]
+      expect(
+        /escr[íi]benos|contacta|soporte|ayuda|ll[áa]manos/i.test(mensaje),
+        `${motivo}: ${mensaje}`
+      ).toBe(true)
     }
   })
 

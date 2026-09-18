@@ -105,10 +105,11 @@ const TAB_LABEL: Record<CrmTab, string> = {
   leads: "Leads",
   pipeline: "Pipeline CRM",
   embudo: "Embudo",
+  agenda: "Agenda",
   bandeja: "Bandeja",
 }
 
-const TAB_ORDER: CrmTab[] = ["leads", "pipeline", "embudo", "bandeja"]
+const TAB_ORDER: CrmTab[] = ["leads", "pipeline", "embudo", "agenda", "bandeja"]
 
 const SEGMENT_LABEL: Record<string, string> = {
   A: "A · Alto",
@@ -540,6 +541,7 @@ function AdminLeadsContent() {
     leads: null,
     pipeline: null,
     embudo: null,
+    agenda: null,
     bandeja: null,
   })
 
@@ -633,7 +635,7 @@ function AdminLeadsContent() {
         ))}
       </div>
 
-      {tab !== "embudo" && tab !== "bandeja" && (
+      {tab !== "embudo" && tab !== "bandeja" && tab !== "agenda" && (
         <div className={`${CARD} mb-4`}>
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative min-w-[200px] flex-1">

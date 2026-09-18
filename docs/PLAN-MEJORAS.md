@@ -15,7 +15,12 @@
 > lo **desmintió** (decía "42 de 61 archivos con patrones de foco" donde hay
 > 11)—, que son las otras dos fuentes legítimas de trabajo.
 >
-> Convenciones: ✅ implementada · 🔜 backlog priorizado.
+> Convenciones: ✅ implementada · 🔜 backlog priorizado. Los **IDs de fila** se
+> acotan **por sección** —el `A14` de §8 no es el `A14` de la Ronda 13, y es a
+> propósito—: un puntero desnudo («ver la fila X») solo resuelve si la fila está
+> en su propia sección o si su ID es único en todo el documento; si el ID se
+> reutiliza, se califica («de la ronda N» / «de la sección N»). El contrato
+> `docs-pointers.contract.test.ts` vigila las dos cosas.
 
 ---
 
@@ -375,7 +380,7 @@ matchean. Verificado verde en ambos projects contra el repo CI-equivalente.
 **Dos hallazgos de producto, declarados aquí y hoy resueltos:**
 
 1. **La recuperación de contraseña no tenía entrada** (rastreada como **U14**,
-   **cerrada** — ver la fila U14). La **mitad receptora funcionaba**
+   **cerrada** — ver la fila U14 de la sección 6). La **mitad receptora funcionaba**
    (`/auth/reset` cambia la contraseña con `updateUser`, y `/auth/callback`
    intercambia el código por la sesión temporal); faltaba la **mitad
    iniciadora**: `resetPasswordForEmail` aparecía **únicamente en un comentario**
@@ -511,7 +516,7 @@ documento.
 | K6 | **El gate entra en CI y se ata**: `ci.yml` pasa de `npx knip --production` a **`npm run knip`** —medir con un flag que nadie usa es medir otra cosa—, y `src/lib/knip-config.contract.test.ts` (8 pruebas) hace de **ratchet**: fija la allowlist y sus motivos por igualdad exacta, exige que cada entrada tenga justificación escrita, que no queden justificaciones huérfanas, que solo se supriman `exports`/`types` (nunca `files`, que escondería un archivo entero) y que CI no vuelva al flag. Probado por mutación: añadir una entrada sin motivo hace fallar tres pruebas | ✅ |
 | K7 | **Los punteros de este plan dejan de mentir** (`src/lib/docs-pointers.contract.test.ts`): había tres referencias a una *ronda 9* que **no existía** —las actas se interrumpían después de la ronda 6, y las de las rondas 8 y 9 llegaron más tarde— y dos punteros vagos del tipo *ver esa sección* sin destino. Los punteros se sanean (el contenido de esa ronda vive en la fila **U14** y en § Verificación, y ahora ahí apuntan) y el contrato falla ante un puntero a una sección o a una fila inexistente, ante un puntero vago y ante dos actas con el mismo número. Incluye el discriminador que hacía falta: en este documento **"Productos ronda N"** (filas A18–A37 y B1–B32) es el nombre de una tanda del panel de productos, **no** un acta. Nota para quien escriba aquí: las frases exactas que el contrato prohíbe no se pueden citar literalmente ni para explicarlas —el contrato no distingue prosa de puntero—, así que van en cursiva o con el número en negrita | ✅ |
 | K8 | **Invariante 11** en `docs/agents/README.md`: *todo gate de CI está verificado y verde, o no está en CI*. Un paso en rojo permanente no protege: entrena a ignorar el resultado | ✅ |
-| K9 | **Los cinco server actions de la ronda 6 se investigan, no se borran**: `saveQuickReply`, `deleteQuickReply`, `distributeCrmProspects`, `getAdminSellerLoads` y `cancelSequenceEnrollment` no tienen consumidor, pero la mitad **lectora** sí está cableada (`LeadConversations.tsx` llama `getAdminQuickReplies`; `LeadSequences.tsx` muestra `activeEnrollments`). No es código abandonado: es una función a medio construir, y queda declarada como backlog en la fila **C12** | ✅ |
+| K9 | **Los cinco server actions de la ronda 6 se investigan, no se borran**: `saveQuickReply`, `deleteQuickReply`, `distributeCrmProspects`, `getAdminSellerLoads` y `cancelSequenceEnrollment` no tienen consumidor, pero la mitad **lectora** sí está cableada (`LeadConversations.tsx` llama `getAdminQuickReplies`; `LeadSequences.tsx` muestra `activeEnrollments`). No es código abandonado: es una función a medio construir, y queda declarada como backlog en la fila **C12** de la ronda 6 | ✅ |
 
 **Lección — `knip` mide el working tree, no `HEAD`.** Su código de salida no es
 estable en un checkout compartido: un archivo nuevo sin trackear de otra sesión
@@ -733,7 +738,7 @@ inventario y cerrar lo que decía**.
 | `BL13` | `heading-slug.test.ts` revienta por timeout en la suite | **Falsa**: 1,33 s de archivo, 11/11 en verde, suite completa 4927/4927 |
 | `CI13` | `LeadTimelineSource` huérfano en `actions.ts:1965` | **Cierta**, pero la fila pedía recortar la entrada cuando había que retirarla entera |
 
-**Los tres defectos que la fila `C12` escondía**
+**Los tres defectos que la fila `C12` de la ronda 6 escondía**
 
 1. **`cancelSequenceEnrollment` no tenía quién le diera un id.** La acción existía
    y estaba probada, pero `listCrmSequences` solo devolvía el **conteo** de
@@ -1384,7 +1389,7 @@ texto secundario legítimo. La decisión #6 del contrato lo deja escrito.
 | CX1 | **`/panel/**` sin cobertura de contraste**: es el resto de A16. El perímetro del contrato es `/admin/**`; el panel de negocio usa la misma paleta y no tiene contrato propio | 🔜 |
 | CX2 | **A14 obsoleta**: los 28 imports / 9 `MotionConfig` que declaraba ya no coinciden con el árbol. O se remide o se retira la fila | 🔜 |
 | CX3 | **A15 sigue real y se movió**: `src/app/recompensas/_components/InvoiceScannerScreen.tsx:474`. Arreglo de una línea, archivo ajeno | 🔜 |
-| CX4 | **Integridad del propio documento**: 26 IDs de fila duplicados y 17 filas con rango que `ROW_DEF_RE` no ve, así que un puntero a ellas no resuelve. El contrato de punteros no puede vigilar lo que no ve | 🔜 |
+| CX4 | **Integridad del propio documento**: el contrato leía las filas como **una lista global** y el documento acota los IDs **por sección**. Medido en la Ronda 17: los «26 IDs duplicados» eran en realidad **46 IDs reutilizados entre secciones a propósito** con **cero colisiones dentro de una misma** —el defecto era el diagnóstico, no el documento—; lo que sí era real son las **17 filas de rango** (`A1-A8`, `BL1-BL10`…) que expanden a **82 filas** invisibles al contrato. Cerrado: el contrato expande rangos, resuelve por sección, exige calificar el ID ambiguo y vigila duplicados intra-sección y solapes rango/fila | ✅ |
 | CX5 | **R1 con un hueco**: `ring-0` y `border-transparent` no cuentan como indicador de foco para el contrato estático | 🔜 |
 | CX6 | **Fallo latente en la paleta propia**: `warm-400` (`#8F939B`) da **3.08** sobre blanco y **2.95** sobre `gray-50`; `cream-600` (`#999893`) da **2.89** y **2.77**. Ninguno se usa hoy como texto en `/admin`, así que no hay fallo vivo — pero el día que se use, falla | 🔜 |
 | CX7 | **El verde de WhatsApp**: `#25D366` da **1.98:1** con texto blanco. Es el color de marca del canal y por eso se declaró en vez de prohibirse; el barrido lo movió a `#0F7A3D` (**5.42**) donde se usa como relleno con texto | 🔜 |
@@ -1661,6 +1666,94 @@ que se corrieron en serie.
 | E9 | **Los fallos del `e2e` local son contención**, no lógica: `fullyParallel: true` contra un único dev server. Medido dos veces — **19 de 22** en la línea base y **26 de 27** en la corrida de cierre (el 27.º es el determinista ajeno `mobile-chrome.spec.ts:28`). En CI los absorbe `retries: 2`; en local **enmascaran regresiones reales** — el caso de `redeem.spec.ts` pasó desapercibido por esto. Mitigación propuesta: `workers` acotado o un dev server por proyecto | 🔜 |
 | E10 | **La incógnita del cancel sigue abierta.** *Qué* mata el paso `E2E smoke tests` no está determinado —muere a 92 s, 152 s, 144 s y 257 s en cuatro corridas, siempre con `The runner has received a shutdown signal`, sin marca de sistema y **sin corrida solapada**—; la hipótesis viva es muerte por inactividad de stdout, y la línea de progreso de E2 es la sonda que lo responderá en la próxima corrida de CI | 🔜 |
 | E11 | **Qué originó el primer rojo, si el calentamiento no cambió.** `f9d83339` trae tres archivos y `e2e/global-setup.ts` **no** es uno de ellos: quedan `e2e/redeem.spec.ts` (−102/+51) —que ya explica su propio 404— y `src/components/layout/footer.tsx` (+/−14) como candidatos del fallo que **no** es el cancel. Falta aislar `footer.tsx` contra `checkout-drawer.spec.ts:166`, el test que falló en esa corrida | 🔜 |
+
+### Ronda 17 — El modelo plano del contrato de punteros
+
+**La deuda de esta ronda no estaba en el documento: estaba en el contrato que lo
+vigila.** `src/lib/docs-pointers.contract.test.ts` —escrito en la ronda 7—
+aplanaba todas las filas del plan maestro en **una sola lista global**: un
+puntero `ver la fila X` resolvía si el ID aparecía en *cualquier* parte del
+documento. `docs/PLAN-MEJORAS.md` no funciona así: **acota los IDs por sección**,
+y la reutilización es deliberada. `A14` es una fila de producto en
+`## 8. Administración` y una fila de deuda en `### Ronda 13`; `C12` es una fila
+de catálogo en `## 3. Catálogo` y una fila de trabajo en `### Ronda 6`. Medido
+antes de tocar nada:
+
+| Medición | Valor |
+|---|---|
+| Filas sueltas que el contrato veía (`ROW_DEF_RE`) | **283** |
+| Filas de rango (`A1-A8`, `BL1-BL10`…) | **17** |
+| IDs que esos rangos aportan | **82** |
+| Universo real de IDs | **365** — el contrato era ciego a **82 (22 %)** |
+| Secciones que acotan IDs | **28** |
+| IDs reutilizados entre secciones, a propósito | **46** |
+| Colisiones **dentro** de una misma sección | **0** |
+| Solapes rango ↔ fila suelta dentro de una sección | **0** |
+
+De ese aplanamiento salían tres cegueras distintas. **(1) No veía los rangos:**
+ninguna fila cubierta por `A1-A8` existía para el contrato, así que un puntero a
+`A5` no se vigilaba —ni podía vigilarse—. **(2) Resolvía en cualquier parte:** el
+único puntero que existía entonces, `ver la fila U14`, apuntaba desde
+`### Ronda 4` a una fila de `## 6. Cuenta`, y resolvía porque `U14` es
+**globalmente único**, no porque el contrato entendiera la relación.
+**(3) Habría dado 46 falsos positivos:** cualquier guardia de duplicados escrita
+sobre el modelo plano habría denunciado como defecto las 46 reutilizaciones que
+son la convención del documento.
+
+**Lo entregado.** `src/lib/docs-pointers.contract.test.ts` reescrito —374 líneas,
+**9 pruebas**—: el modelo ahora **expande los rangos** (`RANGE_ROW_RE`),
+**asigna cada fila a su acta o a su sección numerada** y **resuelve cada puntero
+contra su propia sección**. El vocabulario de punteros pasó de una forma a tres
+—desnuda (`ver la fila U14`), con acentos graves (``fila `C14` ``) y en negrita
+(`fila **CI13**`)— más un **calificador opcional** (`de la ronda N` /
+`de la sección N`). La regla de resolución es la del documento, no la que yo
+preferiría: **un puntero sin calificador resuelve si el ID vive en su propia
+sección o si es único en todo el documento**; si el ID es ambiguo y vive fuera,
+el fallo **nombra la ambigüedad y exige el calificador**. Dos guardias nuevas
+—**ninguna sección repite el ID de una fila** y **ningún rango de filas se traga
+una fila listada aparte**— y una **prueba-canario de convención** que exige
+`≥20` IDs reutilizados, para que el día que alguien "arregle" la reutilización el
+contrato lo diga en vez de callarse.
+
+**Los dos punteros que mentían los encontró el contrato nuevo, no la lectura.**
+En la primera corrida salieron **dos violaciones vivas**, ambas citando `C12` de
+la ronda 6 sin decirlo: `L514` —una fila de tabla dentro de `### Ronda 7`— y
+`L736` (`### Ronda 11`). Mi reconocimiento había visto solo la segunda. Se
+corrigieron **cinco** sitios en el documento: los dos punteros rotos
+(`de la ronda 6`), `ver la fila U14` → `ver la fila U14 de la sección 6`
+(resolvía por suerte, no por contrato), la fila `CX4` y el bloque de convenciones
+del encabezado, que ahora **declara** que los IDs se acotan por sección.
+
+**La fila `CX4` estaba mal diagnosticada, y el propio contrato lo probó.** `CX4`
+hablaba de *"26 IDs duplicados"*. Medido: **46** IDs reutilizados entre secciones
+y **0** colisiones dentro de una misma. La reutilización **es la convención**, no
+el defecto; el defecto real eran las **17 filas de rango** que dejaban **82 IDs**
+fuera del alcance del contrato. `CX4` pasó de 🔜 a ✅ con el diagnóstico
+corregido.
+
+**Pruebas negativas.** Tres, cada una restaurada byte a byte (`md5` verificado
+idéntico después de cada una):
+
+| Prueba | Mutación | Resultado |
+|---|---|---|
+| NP1 | Se inyecta una segunda fila con el ID `A14` en `## 8. Administración` — una colisión intra-sección real | **2 fallos**: la guardia nombra `§ "8. Administración" (L122): A14 en L192, L193` |
+| NP2 | Se revierte el calificador del puntero de `L736` (`de la ronda 6` fuera) | **1 fallo**: `L741 … cita C12, que es ambiguo (vive en "3. Catálogo…" y "Ronda 6 — Leads CRM…")` |
+| NP3 | `RANGE_ROW_RE` pasa a exigir extremos de tres dígitos — **la regresión exacta al modelo plano** | **1 fallo**: `no se expandió ninguna fila de rango … el modelo volvió a ser ciego a 82 filas` |
+
+Dos defectos del propio trabajo aparecieron *durante* las pruebas negativas y se
+corrigieron: la prueba-canario duplicaba la aserción de la guardia —enrojecía por
+el motivo equivocado— y el orden de sus aserciones hacía que un fallo del parser
+se reportara como *"no se encontró ninguna fila de tabla"* teniendo 283 delante.
+La aserción específica ahora gana.
+
+**Verificación.** `npx vitest run src/lib/docs-pointers.contract.test.ts` → **9/9**;
+`tsc --noEmit` limpio; `npm run lint` 0; `npm run build` correcto; `md5` del
+documento y del contrato restaurados idénticos tras cada mutación.
+
+**Lección:** *un contrato que aplana lo que el documento acota no vigila de más:
+vigila otra cosa.*
+
+| DP1 | **La tercera forma de fila sigue sin contrato.** Medido: `### Ronda 13` numera seis filas con el ID como **prefijo** de la celda (`R1 foco`, `R2 diálogos`, `R3`…), forma que `ROW_DEF_RE` no reconoce porque exige la barra inmediatamente después de los dígitos; sus **7 citas en prosa** (`L1116`–`L1163`) son, por tanto, impoliceables. Peor: como esa declaración es invisible, el contrato cree que `R1` es único —solo lo ve en el rango `R1-R4` de `## 5. Recompensas`— cuando en realidad ya es ambiguo. Se deja sin tocar porque la sección es territorio ajeno; se declara aquí | 🔜 |
 
 ## Agentes de mantenimiento por dominio
 

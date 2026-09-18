@@ -139,6 +139,70 @@ export function crmStatusPatch(status: CrmStatus): {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Cierre del trato
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Los dos desenlaces de un trato. Se llaman "ganado"/"perdido" y no por su
+ * estado porque son **decisiones**, no posiciones en la lista: el vendedor no
+ * "mueve a cliente_activo", cierra ganando. El estado es la consecuencia.
+ */
+export type CrmCloseOutcome = "ganado" | "perdido"
+
+export const CRM_CLOSE_OUTCOME_STATUS: Record<CrmCloseOutcome, CrmStatus> = {
+  ganado: "cliente_activo",
+  perdido: "perdido",
+}
+
+export const CRM_CLOSE_OUTCOME_LABEL: Record<CrmCloseOutcome, string> = {
+  ganado: "Ganado",
+  perdido: "Perdido",
+}
+
+export function isCrmCloseOutcome(value: unknown): value is CrmCloseOutcome {
+  return value === "ganado" || value === "perdido"
+}
+
+/**
+ * El `UPDATE` completo que cierra un trato, listo para pasar a la base.
+ *
+ * Existe para que el cierre no se pueda escribir a medias. Las tres columnas
+ * que un cierre toca —`status`, `closed_at` y `loss_reason`— están sujetas a
+ * los `CHECK` de `00184`, así que escribirlas por separado en la acción deja
+ * una ventana en la que la fila miente o la base rechaza el `UPDATE`. Aquí se
+ * calculan juntas y de una sola vez.
+ *
+ * **Perder sin motivo es un error, no un cierre sin causa.** La firma obliga a
+ * pasar el motivo al perder y `isCrmLossReason` lo valida contra el vocabulario
+ * cerrado; ganar ignora el argumento y escribe `null`, para que un motivo
+ * heredado de un intento anterior no sobreviva al cambio de desenlace.
+ *
+ * `now` se inyecta solo para que las pruebas sean deterministas; en producción
+ * se usa el reloj del servidor.
+ *
+ *     crmClosePatch("ganado")            → { status: "cliente_activo", closed_at, loss_reason: null }
+ *     crmClosePatch("perdido", "precio") → { status: "perdido", closed_at, loss_reason: "precio" }
+ *     crmClosePatch("perdido")           → lanza
+ */
+export function crmClosePatch(
+  outcome: CrmCloseOutcome,
+  lossReason?: CrmLossReason | null,
+  now: string = new Date().toISOString(),
+): { status: CrmStatus; closed_at: string; loss_reason: CrmLossReason | null } {
+  if (outcome === "perdido") {
+    if (!isCrmLossReason(lossReason)) {
+      throw new Error("Un trato perdido necesita un motivo de pérdida válido")
+    }
+    return {
+      status: CRM_CLOSE_OUTCOME_STATUS[outcome],
+      closed_at: now,
+      loss_reason: lossReason,
+    }
+  }
+  return { status: CRM_CLOSE_OUTCOME_STATUS[outcome], closed_at: now, loss_reason: null }
+}
+
+// ─────────────────────────────────────────────────────────────
 // Contrato de fila
 // ─────────────────────────────────────────────────────────────
 

@@ -130,6 +130,10 @@ export function compareByUrgency(a: CrmProspect, b: CrmProspect, now: Date = new
  *
  * Un valor ilegible (`NaN`) se ignora igual que un `null`: cuenta como no
  * declarado, no como cero.
+ *
+ * La columna se acepta **opcional** a propósito: un `select("estimated_value")`
+ * de PostgREST puede devolver `{}` si la columna no existe en la respuesta, y
+ * exigirla obligaría a cada llamante a afirmar algo que no sabe.
  */
 export interface EstimatedValueSum {
   total: number | null
@@ -137,7 +141,7 @@ export interface EstimatedValueSum {
 }
 
 export function sumEstimatedValue(
-  prospects: readonly { estimated_value: unknown }[],
+  prospects: readonly { estimated_value?: unknown }[],
 ): EstimatedValueSum {
   let total = 0
   let declared = 0

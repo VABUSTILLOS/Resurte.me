@@ -54,6 +54,8 @@ import type { CashbackTier } from "@/types"
 import { filterLeads } from "@/lib/crm-funnel"
 import {
   ADMIN_SCOPE,
+  type CrmCloseOutcome,
+  type CrmLossReason,
 } from "@/lib/crm-core"
 import { readCrmProspects, readCrmPipelineValue, type PipelineValue } from "@/lib/crm-prospects"
 import { CRM_PAGE_SIZE } from "@/lib/crm-filters"
@@ -1853,11 +1855,15 @@ export async function updateCrmProspectStatus(id: number, status: string): Promi
   if (adminDenied) {
     throw new Error("Acceso restringido a administradores")
   }
-  const { isCrmStatus } = await import("@/lib/crm-pipeline")
+  const { isCrmStatus, crmStatusPatch } = await import("@/lib/crm-core")
   if (!isCrmStatus(status)) {
     throw new Error("Estado CRM inválido")
   }
-  await patchCrmProspect(id, { status }, true)
+  // El parche va en el MISMO `UPDATE` que el estado. Los `CHECK` de coherencia
+  // de 00184 rechazan un motivo de pérdida sobre un trato abierto o un
+  // `closed_at` sobre uno no cerrado, así que reabrir un trato perdido en dos
+  // escrituras no funciona: la primera ya viola el constraint.
+  await patchCrmProspect(id, { status, ...crmStatusPatch(status) }, true)
 
   const supabase = await createServiceClient()
   await logAdminAction(supabase, {
@@ -1867,6 +1873,46 @@ export async function updateCrmProspectStatus(id: number, status: string): Promi
     entity: "crm_prospects",
     entityId: id,
     detail: { status },
+  })
+  revalidatePath("/admin/leads")
+}
+
+/**
+ * Cierra el trato: ganado o perdido, con motivo obligatorio al perder.
+ *
+ * Es la única ruta que escribe `loss_reason`. Un cambio de estado suelto
+ * (`updateCrmProspectStatus`) limpia los campos de cierre que dejan de ser
+ * ciertos, pero no los escribe: "perdido" sin causa sigue siendo posible desde
+ * el desplegable, y eso es deliberado — el desplegable es un movimiento del
+ * pipeline, no una decisión de cierre, y bloquearlo obligaría al admin a
+ * inventarse un motivo para corregir un estado mal puesto.
+ */
+export async function closeCrmProspect(
+  id: number,
+  outcome: CrmCloseOutcome,
+  lossReason?: CrmLossReason | null,
+): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+  const { crmClosePatch, isCrmCloseOutcome } = await import("@/lib/crm-core")
+  if (!isCrmCloseOutcome(outcome)) {
+    throw new Error("Desenlace de cierre inválido")
+  }
+  // Lanza si el desenlace es "perdido" y falta el motivo: el `CHECK` de la base
+  // lo rechazaría igual, pero aquí el error dice qué falta.
+  const patch = crmClosePatch(outcome, lossReason)
+  await patchCrmProspect(id, patch, true)
+
+  const supabase = await createServiceClient()
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_prospect_close",
+    entity: "crm_prospects",
+    entityId: id,
+    detail: { outcome, lossReason: patch.loss_reason },
   })
   revalidatePath("/admin/leads")
 }
@@ -1930,6 +1976,23 @@ export async function assignCrmProspect(id: number, sellerId: string | null): Pr
   }
 
   await patchCrmProspect(id, { seller_id: sellerId })
+
+  // Las tareas abiertas viajan con el trato. La agenda del vendedor filtra por
+  // `crm_tasks.seller_id` —es la única columna que responde "qué me toca" en una
+  // consulta—, así que dejarlas apuntando al vendedor anterior le mostraría
+  // trabajo de un prospecto que ya no ve, y al nuevo le escondería el suyo.
+  // Las completadas no se mueven: son historial de quien las hizo.
+  const { error: taskError } = await supabase
+    .from("crm_tasks")
+    .update({ seller_id: sellerId })
+    .eq("prospect_id", id)
+    .eq("status", "pendiente")
+  if (taskError) {
+    // El trato ya se movió; fallar aquí no lo revierte, así que se registra sin
+    // lanzar. Una tarea descolgada se corrige reasignando, no repitiendo.
+    logger.error("[ADMIN-CRM] Error moviendo las tareas del prospecto:", taskError)
+  }
+
   await logAdminAction(supabase, {
     actorId: user?.id ?? null,
     actorEmail: user?.email ?? null,
@@ -2005,6 +2068,122 @@ export async function addCrmActivity(
     entity: "crm_prospects",
     entityId: prospectId,
     detail: { type: input.type, outcome: input.outcome ?? null },
+  })
+  revalidatePath("/admin/leads")
+}
+
+// ============================================================
+// RONDA 16 — TAREAS Y RECORDATORIOS (F4)
+// ============================================================
+
+/**
+ * Los comandos de tareas del panel.
+ *
+ * Todos delegan en `src/lib/comercializacion/actions/tareas.ts`, que es el
+ * módulo compartido con la ficha del vendedor: la lógica y el alcance viven una
+ * sola vez. Aquí se añade lo que solo el panel tiene — la bitácora de auditoría
+ * y el revalidado de la agenda.
+ *
+ * La lectura (`listProspectTasks`) y la agenda (`getTaskAgenda`) **no** se
+ * envuelven: no escriben nada y la bitácora registra escrituras. Envolverlas
+ * además obligaría a revalidar en cada apertura de ficha.
+ */
+
+/** Alta de una tarea sobre un prospecto. */
+export async function createCrmTask(
+  prospectId: number,
+  input: { title: string; due_at?: string | null; priority?: string | null },
+): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const { createTask } = await import("@/lib/comercializacion/actions/tareas")
+  await createTask(prospectId, input)
+
+  const supabase = await createServiceClient()
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_task_create",
+    entity: "crm_tasks",
+    entityId: prospectId,
+    detail: { title: input.title, due_at: input.due_at ?? null, priority: input.priority ?? null },
+  })
+  revalidatePath("/admin/leads")
+}
+
+/** Marca una tarea como hecha. */
+export async function completeCrmTask(id: number): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const { completeCrmTask: complete } = await import("@/lib/comercializacion/actions/tareas")
+  await complete(id)
+
+  const supabase = await createServiceClient()
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_task_complete",
+    entity: "crm_tasks",
+    entityId: id,
+    detail: {},
+  })
+  revalidatePath("/admin/leads")
+}
+
+/** Devuelve una tarea hecha al trabajo pendiente. */
+export async function reopenCrmTask(id: number): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const { reopenCrmTask: reopen } = await import("@/lib/comercializacion/actions/tareas")
+  await reopen(id)
+
+  const supabase = await createServiceClient()
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_task_reopen",
+    entity: "crm_tasks",
+    entityId: id,
+    detail: {},
+  })
+  revalidatePath("/admin/leads")
+}
+
+/** Borra una tarea. El borrado no se deshace: la bitácora guarda su título. */
+export async function deleteCrmTask(id: number): Promise<void> {
+  const { response: adminDenied, user } = await requireAdmin()
+  if (adminDenied) {
+    throw new Error("Acceso restringido a administradores")
+  }
+
+  const supabase = await createServiceClient()
+  // El título se lee antes de borrar: "Tarea eliminada" sin más no dice qué se
+  // perdió, y después ya no hay de dónde sacarlo.
+  const { data: doomed } = await supabase
+    .from("crm_tasks")
+    .select("title, prospect_id")
+    .eq("id", id)
+    .maybeSingle()
+
+  const { deleteCrmTask: remove } = await import("@/lib/comercializacion/actions/tareas")
+  await remove(id)
+
+  await logAdminAction(supabase, {
+    actorId: user?.id ?? null,
+    actorEmail: user?.email ?? null,
+    action: "crm_task_delete",
+    entity: "crm_tasks",
+    entityId: id,
+    detail: { title: doomed?.title ?? null, prospect_id: doomed?.prospect_id ?? null },
   })
   revalidatePath("/admin/leads")
 }
@@ -2709,6 +2888,17 @@ export async function distributeCrmProspects(
       throw new Error("Error al asignar los prospectos")
     }
     assigned += prospectIds.length
+
+    // Las tareas abiertas viajan con el trato, igual que en `assignCrmProspect`:
+    // la agenda del vendedor filtra por `crm_tasks.seller_id`.
+    const { error: taskError } = await supabase
+      .from("crm_tasks")
+      .update({ seller_id: sellerId })
+      .in("prospect_id", prospectIds)
+      .eq("status", "pendiente")
+    if (taskError) {
+      logger.error("[ADMIN-CRM] Error moviendo las tareas del reparto:", taskError)
+    }
   }
 
   await logAdminAction(supabase, {

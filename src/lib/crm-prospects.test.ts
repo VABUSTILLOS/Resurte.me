@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { ADMIN_SCOPE, sellerScope, CRM_PROSPECT_COLUMN_SETS, withCityJoin } from "./crm-core"
-import { CRM_SEARCH_SCAN_LIMIT, readCrmProspects } from "./crm-prospects"
+import { CRM_SEARCH_SCAN_LIMIT, readCrmPipelineValue, readCrmProspects } from "./crm-prospects"
 
 /**
  * Pruebas de comportamiento del lector único de `crm_prospects`.
@@ -329,5 +329,99 @@ describe("readCrmProspects — segmentación (contrato compartido)", () => {
     expect(prospect?.instagram).toBeNull()
     expect(prospect?.weekly_volume_min).toBeNull()
     expect(prospect?.weekly_volume_max).toBeNull()
+  })
+})
+
+describe("readCrmPipelineValue — valor previsto del alcance", () => {
+  test("suma la columna y aplica el alcance del vendedor como filtro de código", async () => {
+    const { client, calls } = stubClient(() => ({
+      data: [{ estimated_value: 1000 }, { estimated_value: "250.50" }],
+      error: null,
+    }))
+
+    const value = await readCrmPipelineValue(client, sellerScope("seller-1"))
+
+    expect(value).toEqual({ total: 1250.5, declared: 2, truncated: false })
+    // El alcance va en el `where`: las server actions usan service role, así que
+    // RLS no filtra nada por sí sola.
+    expect(last(calls, "eq")).toEqual({ op: "eq", args: ["seller_id", "seller-1"] })
+    expect(last(calls, "from")).toEqual({ op: "from", args: ["crm_prospects"] })
+    expect(last(calls, "select")).toEqual({ op: "select", args: ["estimated_value"] })
+  })
+
+  test("el admin no filtra por vendedor", async () => {
+    const { client, calls } = stubClient(() => ({ data: [{ estimated_value: 10 }], error: null }))
+
+    await readCrmPipelineValue(client, ADMIN_SCOPE)
+
+    expect(calls.some((c) => c.op === "eq")).toBe(false)
+  })
+
+  test("pide una fila de más para poder delatar el corte", async () => {
+    const { client, calls } = stubClient(() => ({ data: [], error: null }))
+
+    await readCrmPipelineValue(client, ADMIN_SCOPE, 3)
+
+    expect(last(calls, "limit")).toEqual({ op: "limit", args: [4] })
+  })
+
+  test("excluye los nulos en la consulta, no en memoria", async () => {
+    const { client, calls } = stubClient(() => ({ data: [], error: null }))
+
+    await readCrmPipelineValue(client, ADMIN_SCOPE)
+
+    expect(last(calls, "not")).toEqual({
+      op: "not",
+      args: ["estimated_value", "is", null],
+    })
+  })
+
+  test("si la ventana se queda corta, el total es un mínimo y lo dice", async () => {
+    const { client } = stubClient(() => ({
+      data: [{ estimated_value: 10 }, { estimated_value: 20 }, { estimated_value: 999 }],
+      error: null,
+    }))
+
+    // 3 filas con `limit` 2: la tercera solo existe para señalar el corte y NO
+    // debe sumarse, porque no sabemos cuántas más hay detrás.
+    expect(await readCrmPipelineValue(client, ADMIN_SCOPE, 2)).toEqual({
+      total: 30,
+      declared: 2,
+      truncated: true,
+    })
+  })
+
+  test("sin ningún valor declarado el total es null, no cero", async () => {
+    const { client } = stubClient(() => ({ data: [], error: null }))
+
+    expect(await readCrmPipelineValue(client, ADMIN_SCOPE)).toEqual({
+      total: null,
+      declared: 0,
+      truncated: false,
+    })
+  })
+
+  test("si 00184 no está aplicada degrada a «nadie ha declarado valor»", async () => {
+    const { client } = stubClient(() => ({
+      data: null,
+      error: { code: "42703", message: 'column crm_prospects.estimated_value does not exist' },
+    }))
+
+    expect(await readCrmPipelineValue(client, ADMIN_SCOPE)).toEqual({
+      total: null,
+      declared: 0,
+      truncated: false,
+    })
+  })
+
+  test("un error de otro tipo no degrada: se propaga", async () => {
+    const { client } = stubClient(() => ({
+      data: null,
+      error: { code: "08006", message: "connection failure" },
+    }))
+
+    await expect(readCrmPipelineValue(client, ADMIN_SCOPE)).rejects.toThrow(
+      "Error al calcular el valor del pipeline",
+    )
   })
 })

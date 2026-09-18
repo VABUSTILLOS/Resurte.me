@@ -69,12 +69,14 @@ export const CHARGED_PAYMENT_STATUSES: readonly PaymentStatus[] = [
 export type CustomerCancelRefusal = "already_cancelled" | "dispatched" | "charged"
 
 /**
- * Mensaje que ve el cliente. Cada motivo dice **qué pasó y qué hacer**, no un
- * código: "no se puede cancelar" a secas deja al cliente sin salida.
+ * Mensaje que ve el cliente. Cada motivo dice **qué pasó**; los que dejan al
+ * cliente con algo que hacer dicen además **qué hacer**, porque "no se puede
+ * cancelar" a secas es un callejón sin salida.
  */
 export const CANCEL_REFUSAL_MESSAGE: Record<CustomerCancelRefusal, string> = {
   already_cancelled: "Este pedido ya estaba cancelado.",
-  dispatched: "Tu pedido ya salió a reparto, así que no se puede cancelar desde aquí.",
+  dispatched:
+    "Tu pedido ya salió a reparto o ya se entregó, así que no se cancela desde aquí. Escríbenos y lo resolvemos contigo.",
   charged:
     "Este pedido ya tiene un cobro registrado. Escríbenos para cancelarlo y devolverte el dinero.",
 }

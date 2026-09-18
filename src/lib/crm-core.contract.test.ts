@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest"
 import {
   ADMIN_SCOPE,
   CRM_CLOSED_STATUSES,
+  CRM_CLOSE_OUTCOME_LABEL,
+  CRM_CLOSE_OUTCOME_STATUS,
   CRM_LOSS_REASONS,
   CRM_LOSS_REASON_LABEL,
   CRM_PROSPECT_COLUMNS,
@@ -13,8 +15,10 @@ import {
   CRM_STATUS_LABEL,
   applyCrmScope,
   assertProspectInScope,
+  crmClosePatch,
   crmStatusPatch,
   filterProspects,
+  isCrmCloseOutcome,
   isCrmClosed,
   isCrmLossReason,
   isCrmStatus,
@@ -362,6 +366,73 @@ describe("crmStatusPatch", () => {
   })
 })
 
+describe("crmClosePatch", () => {
+  const NOW = "2026-03-04T12:00:00.000Z"
+
+  // `crmStatusPatch` limpia; `crmClosePatch` escribe. Es la única ruta que pone
+  // `loss_reason`, y por eso es la única que puede fallar por falta de motivo.
+  it("ganar cierra como cliente_activo sin motivo", () => {
+    expect(crmClosePatch("ganado", null, NOW)).toEqual({
+      status: "cliente_activo",
+      closed_at: NOW,
+      loss_reason: null,
+    })
+  })
+
+  it("perder con motivo escribe las tres columnas", () => {
+    expect(crmClosePatch("perdido", "precio", NOW)).toEqual({
+      status: "perdido",
+      closed_at: NOW,
+      loss_reason: "precio",
+    })
+  })
+
+  it("perder sin motivo lanza en vez de escribir una fila incoherente", () => {
+    expect(() => crmClosePatch("perdido", null, NOW)).toThrow(/motivo de pérdida/i)
+    expect(() => crmClosePatch("perdido", undefined, NOW)).toThrow(/motivo de pérdida/i)
+    expect(() => crmClosePatch("perdido", "" as unknown as "otro", NOW)).toThrow(/motivo de pérdida/i)
+    expect(() => crmClosePatch("perdido", "porque_si" as unknown as "otro", NOW)).toThrow(
+      /motivo de pérdida/i
+    )
+  })
+
+  it("ganar ignora un motivo heredado", () => {
+    // El usuario prueba "perdido" con motivo y cambia a "ganado" antes de
+    // confirmar: el motivo no debe sobrevivir al cambio de desenlace.
+    expect(crmClosePatch("ganado", "precio", NOW).loss_reason).toBeNull()
+  })
+
+  it("el desenlace decide el estado, sin literales duplicados", () => {
+    for (const outcome of ["ganado", "perdido"] as const) {
+      expect(crmClosePatch(outcome, outcome === "perdido" ? "otro" : null, NOW).status).toBe(
+        CRM_CLOSE_OUTCOME_STATUS[outcome]
+      )
+      expect(CRM_CLOSE_OUTCOME_LABEL[outcome]).toBeTruthy()
+    }
+  })
+
+  it("el parche nunca contradice los CHECK de 00184", () => {
+    for (const outcome of ["ganado", "perdido"] as const) {
+      const patch = crmClosePatch(outcome, "competencia", NOW)
+      // `requires_closed`: un cierre siempre trae fecha y siempre está cerrado.
+      expect(patch.closed_at).not.toBeNull()
+      expect(isCrmClosed(patch.status)).toBe(true)
+      // `requires_lost`: el motivo solo existe sobre `perdido`.
+      if (patch.loss_reason !== null) {
+        expect(patch.status).toBe("perdido")
+        expect(isCrmLossReason(patch.loss_reason)).toBe(true)
+      }
+    }
+  })
+
+  it("isCrmCloseOutcome solo acepta los dos desenlaces", () => {
+    expect(isCrmCloseOutcome("ganado")).toBe(true)
+    expect(isCrmCloseOutcome("perdido")).toBe(true)
+    for (const bad of ["", "GANADO", "cliente_activo", null, undefined, 3, {}]) {
+      expect(isCrmCloseOutcome(bad)).toBe(false)
+    }
+  })
+})
 
 describe("alcance del prospecto", () => {
   it("el admin ve el pozo sin asignar (seller_id IS NULL)", () => {
